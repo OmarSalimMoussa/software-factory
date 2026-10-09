@@ -1,0 +1,32 @@
+[project]
+name = "software-factory"
+version = "0.1.0"
+description = "A frozen dev-workflow harness that runs Claude agents on one product repo"
+requires-python = ">=3.12"
+# The runtime is standard-library Python. Only checks/ uses the pinned tools below.
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.3.4",
+  "ruff==0.8.4",
+  "mypy==1.14.1",
+  "import-linter==2.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "runtime", "checks"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+packages = ["runtime", "checks"]

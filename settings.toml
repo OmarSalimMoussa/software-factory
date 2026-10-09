@@ -1,0 +1,124 @@
+# Every value the factory uses. These are the defaults; the owner overrides any of them on the
+# dashboard with the 6-digit code, which commits this file and reloads only what reads the change.
+
+[repo]                  # the one product repo the factory works on
+path = ""               # required: the factory's own checkout of the product, owned by software-agent
+default_branch = "master"
+github = ""             # required: owner/name of the product on GitHub
+staging_health = ""     # required: answers JSON naming the running commit as build_commit
+prod_health = ""        # required
+owner_login = ""        # required: the owner's GitHub login; promote.yml refuses any other actor
+
+[models]                # model and effort for every role
+allowed = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
+efforts = ["low", "medium", "high", "xhigh"]
+orchestrator = { model = "claude-opus-5-5", effort = "high" }
+designer = { model = "claude-opus-5-5", effort = "high" }
+implementer_large = { model = "claude-opus-5-5", effort = "high" }
+implementer_small = { model = "claude-sonnet-5-5", effort = "high" }
+intake = { model = "claude-sonnet-5-5", effort = "medium" }
+triage = { model = "claude-sonnet-5-5", effort = "medium" }
+critic = { model = "claude-sonnet-5-5", effort = "medium" }
+qa_backend = { model = "claude-sonnet-5-5", effort = "medium" }
+qa_security = { model = "claude-sonnet-5-5", effort = "medium" }
+qa_ux = { model = "claude-sonnet-5-5", effort = "medium" }
+qa_visual = { model = "claude-sonnet-5-5", effort = "medium" }
+qa_ui_function = { model = "claude-haiku-5-5", effort = "high" }
+qa_regression = { model = "claude-haiku-5-5", effort = "high" }
+qa_prod = { model = "claude-haiku-5-5", effort = "high" }
+
+[caps]
+implementers = 3
+designers = 2
+subagents_at_once = 4
+
+[subagents]             # which subagent kinds each role may start
+browser_personas = ["qa-ui-function", "qa-ux", "qa-visual", "qa-regression", "qa-prod"]
+orchestrator = ["intake", "triage", "qa-regression", "qa-prod", "Explore"]
+designer = ["critic-architecture", "critic-product", "critic-reliability", "critic-security", "critic-ux", "Explore"]
+implementer = ["qa-backend", "qa-security", "qa-ui-function", "qa-ux", "qa-visual", "Explore"]
+unpermitted = ["Explore"]
+
+[rounds]
+qa = 4
+critic = 4
+check_runs = 3
+extend_by = 2
+
+[qa]
+seconds_per_item = 120
+max_items = 10
+desktop_seconds = 300
+evidence_days = 14
+widths = [1440, 1024, 390]
+quiet_seconds = 120     # a tester with no result stops holding a place after this much quiet, its budget spent
+stale_seconds = 300     # or after this much quiet, whatever its budget
+screenshots_for_owner_only = ["qa-prod"]
+
+[intake]                # see the intake spec
+batch_size = 100
+batch_max_wait_hours = 6
+fast_lane_minutes = 20
+weights = { severity = 40, goal = 30, requests = 15, users = 10, age = 5 }
+minor_severity = 0.4    # a minor task's severity part; a major one counts 1
+requests_full = 20      # requests gathered at which that part reaches 1
+users_full = 10         # distinct users at which that part reaches 1
+age_full_days = 14      # age at which that part reaches 1
+
+[routing]               # see the routing spec
+small_max_slices = 1
+large_max_slices = 3
+max_proposals = 3       # open proposals on the dashboard at once
+estimate_min_runs = 5   # runs at a rung before its estimate is shown; unknown until then
+estimate_window = 20    # the estimate is the median of the last this-many runs at the rung
+
+[slots]
+count = 3
+port_base = 8100
+
+[budget]
+slice_memory_high = "11G"
+slice_memory_max = "12G"
+slice_cpu_weight = 50
+test_memory_ceiling_mib = 6656
+test_reserve_mib = 4096
+
+[vitals]
+memory_amber_gib = 8.0
+memory_red_gib = 4.0
+cpu_pressure_amber = 60.0
+battery_red = 15
+
+[watch]
+tick_seconds = 15
+probe_seconds = 60
+outage_after = 2        # failed prod probes in a row that count as an outage
+resume_tries = 2        # a crashed session is retired after this many failed resumes
+bench_grace_seconds = 60  # time a pushed-out session gets to commit before it pauses
+loop_minutes = 30
+orchestrator_silent_minutes = 40
+orchestrator_busy_silent_minutes = 120
+refusals_to_notify = 5
+
+[cost]
+daily_budget_usd = 150  # at API prices: an estimate on a subscription
+plan_stale_minutes = 45 # an older plan-limit reading shows as unknown
+plan_amber_percent = 80
+plan_red_percent = 95
+
+[prices]                # dollars per million tokens, per allowed model; a model without one costs "unknown"
+
+[sandbox]
+allowed_domains = ["pypi.org", "files.pythonhosted.org", "registry.npmjs.org"]
+
+[dashboard]
+port = 8300
+refresh_seconds = 15
+stale_seconds = 45      # data older than this is marked old
+wrong_codes_to_lock = 5
+retired_linger_minutes = 3  # a retired agent stays in the live tree this long, then moves to History
+
+[gc]                    # the nightly prune; reaping a retired session is immediate
+prune_hour = 3
+images_keep_days = 7
+docker_budget_gib = 60
