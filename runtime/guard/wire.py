@@ -1,0 +1,49 @@
+"""What the hook must know before any rule loads: how a refusal reads, which calls only read or report, and how a
+refusal reaches the warden. Stdlib only, so a broken rule module can never stop the hook from refusing."""
+
+from __future__ import annotations
+
+import errno
+import json
+import socket
+from pathlib import Path
+
+# The text before every refusal, which Claude Code hands back as the call's result: transcripts are read for it.
+REFUSED = "Refused by the factory guard"
+READ_TOOLS = frozenset({"Read", "Grep", "Glob", "LS", "ToolSearch", "TaskOutput", "TodoWrite", "SubagentHandback"})
+PARENTS = frozenset({"main", "orchestrator"})
+_SEND_TIMEOUT_S = 0.5
+
+
+def one_line(rule: str, reason: str) -> str:
+    return f"{REFUSED} ({rule}): {' '.join(reason.split())}"
+
+
+def simple_way_out(payload: dict[str, object]) -> bool:
+    """Reading and reporting, known from the input alone, so a broken rule never blocks them."""
+    tool = payload.get("tool_name")
+    raw = payload.get("tool_input")
+    to_parent = tool == "SendMessage" and isinstance(raw, dict) and raw.get("to") in PARENTS
+    return tool in READ_TOOLS or to_parent
+
+
+def send_refusal(path: Path, record: dict[str, str]) -> None:
+    """One JSON line to the warden's refusal socket, never waiting on it: the refusal stands either way, and a
+    warden that is down misses only this line of its count."""
+    line = (json.dumps(record, sort_keys=True) + "\n").encode()
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+            sock.setblocking(False)
+            sock.sendto(line, str(path))
+            return
+    except OSError as exc:
+        if exc.errno != errno.EPROTOTYPE:
+            return
+    # The warden listens on a stream socket instead.
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+            sock.settimeout(_SEND_TIMEOUT_S)
+            sock.connect(str(path))
+            sock.sendall(line)
+    except OSError:
+        return

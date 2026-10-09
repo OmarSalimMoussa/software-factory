@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# The factory's hooks for the product's checkout: core.hooksPath names this folder in the read-only install. Each
+# hook runs the installed commit check, which refuses or lets the change through; a merge into the default branch
+# lands only with a tree that passed `factory check`. pre-merge-commit and pre-push are links to this file.
+set -euo pipefail
+here="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+exec /usr/bin/python3 -I "$here/../../runtime/guard/commit_check.py" "$(basename "$0")"
