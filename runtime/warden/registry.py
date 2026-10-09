@@ -23,9 +23,10 @@ def read(places: Places) -> dict[str, Session]:
 def write(places: Places, sessions: dict[str, Session]) -> None:
     store.write_json(places.registry, {sid: models.dump(s) for sid, s in sessions.items()}, mode=0o600)
     # The guard reads only what it needs, from public/: no task text, no chat links.
+    # contract: extensions added, so the guard's round limits count what the owner or orchestrator extended.
     public = {
         sid: {k: getattr(s, k) for k in ("name", "role", "family", "task", "parent", "worktree", "slot", "state",
-                                        "agent_id", "retired")}
+                                        "agent_id", "retired", "extensions")}
         for sid, s in sessions.items()
     }  # fmt: skip
     store.write_json(places.state / "public" / "sessions.json", public)

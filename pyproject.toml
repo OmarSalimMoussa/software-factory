@@ -16,6 +16,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "runtime", "checks"]
+pythonpath = ["."]  # contract: tests import runtime and checks from the repo root
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-q"
 
