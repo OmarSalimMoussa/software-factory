@@ -30,8 +30,8 @@ from runtime.warden.context import Context, StackResult
 
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
-# A started session's registry id is PENDING + the --session-id it was started with, until the backstop sees that
-# session running and drops the prefix; the guard looks a session up under both.
+# A started session's registry id until the backstop sees it running under its name and takes the id Claude Code
+# gave it (`claude --bg` ignores --session-id). The guard finds an unbound session the same way, by name.
 PENDING = "pending-"
 REDACTED = "[redacted]"
 # What `claude --bg` prints for the session it started. A resume that prints another short id started a copy.
@@ -59,7 +59,7 @@ def _carried(launch: dict[str, Any]) -> list[str]:
 
 def session_argv(launch: dict[str, Any]) -> list[str]:
     """The `claude` command a session request names; the agent-run unit's runner executes exactly this."""
-    argv = ["claude", "--bg", "--session-id", launch["session_id"], "--name", launch["name"], *_carried(launch)]
+    argv = ["claude", "--bg", "--name", launch["name"], *_carried(launch)]
     if launch["worktree"]:
         argv += ["--worktree", launch["worktree"]]
     # Without the --, a prompt that starts with a dash would be read as a flag.
@@ -110,7 +110,8 @@ class Units:
         return self._wait(AGENT_UNIT.format(request_id), request_id)
 
     def stop_session(self, session_id: str) -> None:
-        code, output = self.agent_command(["claude", "stop", session_id], self.settings().get_str("repo.path"))
+        # `claude stop` refuses a full session id and takes its first 8 characters, the id `claude --bg` prints.
+        code, output = self.agent_command(["claude", "stop", session_id[:8]], self.settings().get_str("repo.path"))
         if code != 0:
             raise LaunchError(f"claude stop {session_id} failed: {output.strip()[-300:]}")
 
@@ -196,8 +197,7 @@ def start_session(
     if held is not None:
         worktree = Path(held["worktree"]).name
         prompt += f"\n\nYour worktree holds the last session's work on {held['branch']}: carry on from it."
-    session_id = str(uuid.uuid4())
-    request_id = f"{PENDING}{session_id}"
+    request_id = f"{PENDING}{uuid.uuid4().hex}"
     repo = Path(settings.get_str("repo.path"))
     place = session_settings.worktrees(repo) / worktree if worktree else repo
     options = _options(ctx, request_id, fields["role"], fields["model"], fields["effort"], place)
@@ -206,7 +206,7 @@ def start_session(
                 note="started", **fields)  # fmt: skip
     sessions[request_id] = s
     registry.write(ctx.places, sessions)
-    request = {"name": s.name, "session_id": session_id, "cwd": str(repo), "worktree": worktree, "prompt": prompt,
+    request = {"name": s.name, "cwd": str(repo), "worktree": worktree, "prompt": prompt,
                **options}  # fmt: skip
     try:
         ctx.launcher.start_agent(request_id, request)

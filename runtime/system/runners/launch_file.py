@@ -96,10 +96,7 @@ def _carried_ok(values: dict[str, Any], state: Path) -> None:
 
 def session_argv(raw: dict[str, Any], state: Path) -> list[str]:
     """A session's `claude --bg` command, built by the warden's own function, with the installed claude."""
-    _value(raw, "session_id")
     _value(raw, "worktree", empty=True)
-    if not _UUID.match(raw["session_id"]):
-        raise BadRequest("session_id must be a session uuid")
     if not isinstance(raw.get("prompt"), str):
         raise BadRequest("prompt must be text")
     _carried_ok(raw, state)

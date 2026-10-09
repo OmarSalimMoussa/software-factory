@@ -7,6 +7,7 @@ switches, the sessions and the ready records. A file there that cannot be read r
 from __future__ import annotations
 
 import dataclasses
+import json
 import os
 from dataclasses import dataclass
 from datetime import datetime
@@ -20,6 +21,7 @@ from runtime.shared.settings import Settings
 
 # A session's registry key until the warden's next tick sees it running; must mirror runtime.warden.launch.PENDING.
 PENDING = "pending-"
+RETIRED = "retired"  # must mirror runtime.shared.models.RETIRED
 UNPERMITTED = "unpermitted"
 OWNER = "owner"
 ORCHESTRATOR, IMPLEMENTER, DESIGNER = "orchestrator", "implementer", "designer"
@@ -112,6 +114,19 @@ def read_ready(places: Places, session_id: str) -> list[dict[str, Any]]:
     return records
 
 
+def _record_name(home: Path, sid: str) -> str:
+    """The name Claude Code's record of the running session ``sid`` holds; "" when there is none."""
+    for path in (home / ".claude" / "sessions").glob("*.json"):
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        # telemetry: expected — a record is removed or rewritten as its session ends
+        except (OSError, ValueError):
+            continue
+        if isinstance(record, dict) and record.get("sessionId") == sid:
+            return str(record.get("name") or "")
+    return ""
+
+
 @dataclass(frozen=True, slots=True)
 class Call:
     """One hook input, with the warden's published facts beside it."""
@@ -126,9 +141,20 @@ class Call:
 
     @property
     def session(self) -> SessionView | None:
-        """The session's row, under its own id or, until the warden binds it, under its pending key."""
+        """The session's row: under its own id or, until the warden binds it, the pending start of the same name.
+
+        `claude --bg` picks the session's id itself, so a start is known only by the name it was given; Claude Code's
+        record of the running session pairs that name with the id the hook sees.
+        """
         sid = str(self.payload.get("session_id", ""))
-        return self.sessions.get(sid) or self.sessions.get(PENDING + sid) if sid else None
+        if not sid:
+            return None
+        found = self.sessions.get(sid)
+        if found is not None:
+            return found
+        name = _record_name(self.home, sid)
+        return next((s for s in self.sessions.values()
+                     if name and s.id.startswith(PENDING) and s.name == name and s.state != RETIRED), None)  # fmt: skip
 
     @property
     def role(self) -> str:

@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -222,9 +223,10 @@ class Rehearsal:
         if raw["worktree"]:
             where = self.repo / ".claude" / "worktrees" / raw["worktree"]
             git(self.repo, "worktree", "add", "-q", "-b", f"worktree-{raw['worktree']}", str(where), "master")
-        self.pids[raw["session_id"]] = self.kernel.run_session(raw["session_id"], name)
+        session_id = str(uuid.uuid4())  # `claude --bg` picks the id itself
+        self.pids[session_id] = self.kernel.run_session(session_id, name)
         crashwatch.watch_sessions(self.warden())
-        return str(raw["session_id"])
+        return session_id
 
     def health(self, staging: str, prod: str) -> Any:
         def fetch(url: str, timeout: float) -> Answer:

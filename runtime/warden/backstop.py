@@ -72,16 +72,17 @@ def processes() -> dict[str, Proc]:
 
 
 def bind(sessions: dict[str, Session], procs: dict[str, Proc]) -> tuple[bool, dict[str, str]]:
-    """Give each pending start its own id once its session runs, and keep chat links current.
+    """Give each pending start the id its session got, matched by name, and keep chat links current.
 
     Whether anything changed, and each pending id bound, with the id it became.
     """
     changed, bound = False, {}
     for proc in procs.values():
         known = sessions.get(proc.session)
-        started = sessions.get(launch.PENDING + proc.session)
-        if known is None and started is not None and started.state != RETIRED:
-            known = sessions.pop(started.id)
+        pending = [s for s in sessions.values()
+                   if s.id.startswith(launch.PENDING) and s.name == proc.name and s.state != RETIRED]  # fmt: skip
+        if known is None and len(pending) == 1:
+            known = sessions.pop(pending[0].id)
             bound[known.id] = proc.session
             known.id = proc.session
             sessions[proc.session] = known

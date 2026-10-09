@@ -3,6 +3,7 @@ a stopped subagent, a session being benched; and what a session reads at start a
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -147,9 +148,13 @@ def test_the_orchestrator_cannot_go_idle_without_its_inbox_wait(
     assert (isinstance(decision, Refusal) and decision.rule == "inbox-wait") is refused
 
 
-def test_a_session_the_warden_has_not_bound_yet_is_known_by_its_pending_key(tmp_path: Path) -> None:
+def test_a_session_the_warden_has_not_bound_yet_is_known_by_the_name_it_was_started_under(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
-    kit.session("implementer", sid=launch.PENDING + SID)
+    kit.session("implementer", sid=launch.PENDING + "0f0f")
+    # Claude Code's own record of the running session pairs the id the hook sees with the name the warden gave it.
+    records = kit.home / ".claude" / "sessions"
+    records.mkdir(parents=True)
+    (records / "4242.json").write_text(json.dumps({"pid": 4242, "sessionId": SID, "name": "implementer-a"}))
     assert PENDING == launch.PENDING
     assert kit.bash("uv run pytest") is None
     assert kit.bash("claude --bg x") == "raw-starts"

@@ -43,12 +43,12 @@ def test_the_backstop_stops_only_processes_the_warden_did_not_permit(world: Worl
     assert world.launcher.stopped == (["5e550001", "9f9f9f9f"] if stopped else ["9f9f9f9f"])
 
 
-def test_a_start_is_bound_to_the_session_id_it_was_given_and_its_pending_id_still_names_it(world: World) -> None:
-    world.seat("pending-0f00ba12-real", name="impl-t-0001", task="t-0001", since=NOW)
-    world.procs["0f00ba12-real"] = Proc(pid=7, session="0f00ba12-real", name="renamed", chat_link="")
+def test_a_start_is_bound_to_its_session_by_name_and_its_pending_id_still_names_it(world: World) -> None:
+    world.seat("pending-abc", name="impl-t-0001", task="t-0001", since=NOW)
+    world.procs["0f00ba12-real"] = Proc(pid=7, session="0f00ba12-real", name="impl-t-0001", chat_link="")
     assert backstop.sweep(world.ctx(), dict(world.procs)) == []
     assert world.session("0f00ba12-real").name == "impl-t-0001"
-    assert lifecycle.find(world.ctx(), lifecycle.read(world.ctx()), "pending-0f00ba12-real").id == "0f00ba12-real"
+    assert lifecycle.find(world.ctx(), lifecycle.read(world.ctx()), "pending-abc").id == "0f00ba12-real"
 
 
 def test_a_crashed_session_is_resumed_then_retired_but_the_orchestrator_never(world: World) -> None:

@@ -14,13 +14,14 @@ STATE = Path("/var/lib/software-factory")
 HOME = Path("/home/software-agent")
 REPO = Path("/home/software-agent/shop")
 SESSION = {
-    "kind": "session", "session_id": "0b8f6a52-3c1e-4f7a-9d2b-5e6c7d8e9f01", "name": "impl-cart",
+    "kind": "session", "name": "impl-cart",
     "model": "claude-opus-5-5", "effort": "high", "agent": "implementer",
     "settings": f"{STATE}/public/session-settings/r1.json", "agents": "{}",
     "worktree": "impl-cart", "prompt": "-- build it",
 }  # fmt: skip
 RESUME = [
-    "claude", "--resume", SESSION["session_id"], "--bg", "--remote-control", "impl-cart", "--model", "claude-opus-5-5",
+    "claude", "--resume", "0b8f6a52-3c1e-4f7a-9d2b-5e6c7d8e9f01", "--bg", "--remote-control", "impl-cart",
+    "--model", "claude-opus-5-5",
     "--effort", "high", "--agent", "implementer", "--settings", f"{STATE}/public/session-settings/s1.json",
     "--agents", '{"qa-ux": {"model": "claude-sonnet-5-5"}}', "--", "-- carry on",
 ]  # fmt: skip
@@ -75,7 +76,6 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
         {**SESSION, "settings": f"{STATE}/public/session-settings/../launch/r1.json"},
         {**SESSION, "settings": "/tmp/r1.json"},
         {**SESSION, "agents": "[1, 2]"},
-        {**SESSION, "session_id": "--resume"},
         {"kind": "stack", "slot": 9, "verb": ["up"], "session": "s1"},
         {"kind": "stack", "slot": True, "verb": ["up"], "session": "s1"},
         {"kind": "stack", "slot": 1, "verb": ["rm", "-rf"], "session": "s1"},
