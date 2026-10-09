@@ -48,8 +48,8 @@ class FakeRig:
     def guard(self, tool: str, tool_input: dict[str, Any]) -> Ran:
         return self.guard_answer
 
-    def sandboxed(self, command: str, extra: dict[str, Any] | None = None) -> Ran:
-        return Ran(0, _stream(self.ran or command, "touch: cannot touch: Read-only file system"))
+    def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None) -> Ran:
+        return Ran(0, _stream(self.ran or commands[-1], "touch: cannot touch: Read-only file system"))
 
     def exists(self, path: Path) -> bool:
         return self.written

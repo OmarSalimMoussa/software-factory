@@ -1,17 +1,17 @@
 """The `factory` command: every session and the owner's own terminal ask the warden through it.
 
 It turns a command line into one request on the warden's socket and prints the answer. The warden knows who is
-asking from the calling process, never from these arguments. A file the caller names (a picture, a spec) is read
-here, as the caller, and sent as bytes; a body (a request, a task, a triage plan, a check) comes on stdin. The
-warden never opens a path a caller names. `check`, `qa-browser` and `slot-api` run here without the warden.
+asking from the calling process, never from these arguments. Every file the caller names (a picture, a spec, a
+body given with ``--body``) is read here, as the caller, and sent as bytes; the warden never opens a path a caller
+names. Nothing comes from stdin: Claude Code runs a call outside the sandbox, where the warden's socket is
+reachable, only when the call is ``factory …`` alone, with no pipe, redirect or heredoc. The guard puts
+``--agent-id <id>`` first on a subagent's call. `check`, `qa-browser` and `slot-api` run here without the warden.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
-import select
 import socket
 import sys
 from collections.abc import Callable
@@ -35,6 +35,7 @@ class Call:
     verb: str
     args: dict[str, Any]
     data: bytes | None = None
+    agent_id: str = ""
 
 
 def _words(values: list[str] | None) -> list[str]:
@@ -46,7 +47,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="factory", description="Ask the factory's warden.")
     sub = parser.add_subparsers(dest="cmd", required=True)
     start = sub.add_parser("start", help="start an implementer or designer (orchestrator), or the orchestrator")
-    start.add_argument("role", choices=["implementer", "designer", "orchestrator", "owner"])
+    start.add_argument("role", choices=["implementer", "designer", "orchestrator"])
     start.add_argument("target", nargs="?", default="")
     start.add_argument("--note", default="")
     start.add_argument("--outage", action="store_true")
@@ -73,12 +74,15 @@ def _parser() -> argparse.ArgumentParser:
     reflect.add_argument("text")
     sub.add_parser("status")
     sub.add_parser("settings").add_argument("what", choices=["show"])
-    request = sub.add_parser("request", help="request new --from … --severity … --where … (body on stdin)")
+    request = sub.add_parser("request", help="request new --from … --severity … --where … --body <file>")
     request.add_argument("what", choices=["new"])
     request.add_argument("--from", dest="sender", default="")
     request.add_argument("--severity", required=True)
     request.add_argument("--where", required=True)
-    sub.add_parser("triage", help="triage apply < plan.json").add_argument("what", choices=["apply"])
+    request.add_argument("--body", required=True)
+    triage = sub.add_parser("triage", help="triage apply --body <plan.json>")
+    triage.add_argument("what", choices=["apply"])
+    triage.add_argument("--body", required=True)
     _queue(sub)
     sub.add_parser("route").add_argument("task")
     propose = sub.add_parser("propose")
@@ -136,10 +140,12 @@ def _queue(sub: Any) -> None:
     queue = sub.add_parser("queue", help="the task priority queue")
     words = queue.add_subparsers(dest="queue_cmd", required=True)
     words.add_parser("next")
-    check = words.add_parser("check", help="queue check <merge sha> (the regression report on stdin)")
+    check = words.add_parser("check", help="queue check <merge sha> --body <report file>")
     check.add_argument("commit")
+    check.add_argument("--body", required=True)
     task = words.add_parser("task").add_subparsers(dest="task_cmd", required=True)
-    new = task.add_parser("new", help="body on stdin")
+    new = task.add_parser("new", help="the task's text in --body <file>")
+    new.add_argument("--body", required=True)
     new.add_argument("--requests", nargs="+", required=True)
     _facts(new)
     facts = task.add_parser("facts")
@@ -184,16 +190,33 @@ def _fact_args(ns: argparse.Namespace) -> dict[str, Any]:
     return found
 
 
-def build(argv: list[str], read_file: Callable[[str], bytes], read_stdin: Callable[[], bytes]) -> Call:
-    """The request a command line makes; files and stdin are read here, by the caller, and sent as bytes."""
-    ns = _parser().parse_args(argv)
+def global_options(argv: list[str]) -> tuple[str, list[str]]:
+    """The subagent id the guard put first on the command line, and the rest of the line."""
+    if argv[:1] == ["--agent-id"]:
+        if len(argv) < 2 or not argv[1] or argv[1].startswith("-"):
+            raise CliError("--agent-id names the subagent")
+        return argv[1], argv[2:]
+    if argv[:1] and argv[0].startswith("--agent-id="):
+        return argv[0].partition("=")[2], argv[1:]
+    return "", argv
+
+
+def build(argv: list[str], read_file: Callable[[str], bytes]) -> Call:
+    """The request a command line makes; every file it names is read here, by the caller, and sent as bytes."""
+    agent_id, argv = global_options(argv)
+    call = _call(_parser().parse_args(argv), read_file)
+    return Call(call.verb, call.args, call.data, agent_id)
+
+
+def _call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
     cmd = ns.cmd
     simple = {"tick": "tick", "status": "status", "qa-clean": "qa-clean", "ready-check": "ready-check"}
     if cmd in simple:
         return Call(simple[cmd], {})
     if cmd == "start":
-        key = "task" if ns.role in ("implementer", "designer") else "name"
-        return Call("start", {"role": ns.role, key: ns.target, "note": ns.note, "outage": ns.outage})
+        if ns.role == "orchestrator":
+            return Call("start", {"role": ns.role})
+        return Call("start", {"role": ns.role, "task": ns.target, "note": ns.note, "outage": ns.outage})
     if cmd in ("stop", "revive"):
         return Call(cmd, {"session": ns.session, **({"why": ns.why} if cmd == "stop" and ns.why else {})})
     if cmd == "resume":
@@ -216,11 +239,11 @@ def build(argv: list[str], read_file: Callable[[str], bytes], read_stdin: Callab
         return Call("settings.show", {})
     if cmd == "request":
         args = {"severity": ns.severity, "where": ns.where, **({"from": ns.sender} if ns.sender else {})}
-        return Call("request.new", args, read_stdin())
+        return Call("request.new", args, read_file(ns.body))
     if cmd == "triage":
-        return Call("triage.apply", {}, read_stdin())
+        return Call("triage.apply", {}, read_file(ns.body))
     if cmd == "queue":
-        return _queue_call(ns, read_stdin)
+        return _queue_call(ns, read_file)
     if cmd == "route":
         return Call("route", {"task": ns.task})
     if cmd == "propose":
@@ -243,13 +266,13 @@ def build(argv: list[str], read_file: Callable[[str], bytes], read_stdin: Callab
     raise CliError(f"factory {cmd} has no request")
 
 
-def _queue_call(ns: argparse.Namespace, read_stdin: Callable[[], bytes]) -> Call:
+def _queue_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
     if ns.queue_cmd == "next":
         return Call("queue.next", {})
     if ns.queue_cmd == "check":
-        return Call("queue.check", {"commit": ns.commit}, read_stdin())
+        return Call("queue.check", {"commit": ns.commit}, read_file(ns.body))
     if ns.task_cmd == "new":
-        return Call("task.new", {"requests": _words(ns.requests), **_fact_args(ns)}, read_stdin())
+        return Call("task.new", {"requests": _words(ns.requests), **_fact_args(ns)}, read_file(ns.body))
     if ns.task_cmd == "facts":
         return Call("task.facts", {"task": ns.task, **_fact_args(ns)})
     args = {"task": ns.task, "to": ns.to, **({"event": ns.event} if ns.event else {})}
@@ -297,22 +320,10 @@ def read_file(path: str) -> bytes:
     return Path(path).read_bytes()
 
 
-def read_stdin(stream: IO[bytes] | None = None) -> bytes:
-    """The body already given on stdin by a heredoc or a redirect; nothing is waited for."""
-    source = stream or sys.stdin.buffer
-    if source.isatty():
-        raise CliError("give the body on stdin: a heredoc (<<'EOF') or a redirect (< file)")
-    ready, _, _ = select.select([source], [], [], 0)
-    if not ready:
-        raise CliError("nothing waits on stdin: give the body with a heredoc (<<'EOF') or a redirect (< file)")
-    return source.read()
-
-
-def ask(path: Path, call: Call, agent_id: str = "") -> dict[str, Any]:
-    """``agent_id`` names the subagent the guard stamped on this command; the warden checks it against the caller."""
+def ask(path: Path, call: Call) -> dict[str, Any]:
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
         sock.connect(str(path))
-        sock.sendall(protocol.request(call.verb, call.args, call.data, agent_id=agent_id))
+        sock.sendall(protocol.request(call.verb, call.args, call.data, agent_id=call.agent_id))
         reply = b""
         while not reply.endswith(b"\n"):
             chunk = sock.recv(65536)
@@ -353,19 +364,18 @@ def _local(argv: list[str], places: Places) -> int:
 
 def main(argv: list[str], places: Places | None = None) -> int:
     places = places or Places.system()
-    if argv[:1] and argv[0] in LOCAL:
-        return _local(argv, places)
     try:
-        call = build(argv, read_file, read_stdin)
+        rest = global_options(argv)[1]
+        if rest[:1] and rest[0] in LOCAL:
+            return _local(rest, places)
+        call = build(argv, read_file)
     except (CliError, OSError) as exc:
         print(f"factory: {exc}", file=sys.stderr)
         return 2
-    # The guard prefixes a subagent's factory command with this; a session's own command has none.
-    agent_id = os.environ.get("SOFTWARE_AGENT_ID", "")
     try:
-        answer = ask(places.socket, call, agent_id)
+        answer = ask(places.socket, call)
         while call.verb == "inbox.wait" and answer.get("ok") and not answer.get("events"):
-            answer = ask(places.socket, call, agent_id)  # the warden answers after watch.inbox_wait_seconds of quiet
+            answer = ask(places.socket, call)  # the warden answers after watch.inbox_wait_seconds of quiet
     except (OSError, ValueError) as exc:
         print(f"factory: the warden cannot be reached ({type(exc).__name__}); is it running?", file=sys.stderr)
         return UNREACHABLE

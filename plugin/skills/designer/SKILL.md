@@ -11,6 +11,8 @@ how it is built. Your questions and blockers go to the orchestrator (SendMessage
 the sign-off below. The guard enforces your limits: when a call is refused, take the remedy it names.
 
 Keep one short line current with `factory doing "<what you are doing>"` whenever it changes.
+Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; write a body to a file under
+`.factory/` in your worktree first (git ignores that folder).
 
 ## 1. Understand
 

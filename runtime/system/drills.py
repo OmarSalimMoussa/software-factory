@@ -54,7 +54,7 @@ class Rig(Protocol):
 
     def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran: ...
     def guard(self, tool: str, tool_input: dict[str, Any]) -> Ran: ...
-    def sandboxed(self, command: str, extra: dict[str, Any] | None = None) -> Ran: ...
+    def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None) -> Ran: ...
     def exists(self, path: Path) -> bool: ...
     def connect(self, host: str, port: int) -> str: ...
     def background(self, user: str, argv: list[str]) -> str: ...
@@ -217,7 +217,7 @@ def backstop_stops_claude(rig: Rig) -> Result:
 def bubblewrap_missing(rig: Rig) -> Result:
     name = "with bubblewrap missing, a session runs no command"
     command = " ".join(_probe(rig, "env:PATH"))
-    ran = rig.sandboxed(command, {"sandbox": {"bwrapPath": "/nonexistent/bwrap"}})
+    ran = rig.sandboxed(command, extra={"sandbox": {"bwrapPath": "/nonexistent/bwrap"}})
     run = exact_run(ran, command)
     if run is not None and outcomes(run.result).get("env:PATH") == "set":
         return Result(name, False, "the command ran without the sandbox")
@@ -242,8 +242,9 @@ def other_branch(rig: Rig) -> Result:
 
 
 def factory_in_sandbox(rig: Rig) -> Result:
-    name = "factory status reaches the warden from inside the sandbox"
-    command = f"{layout.FACTORY_BIN} status"
+    """The sandbox lets out only the bare word `factory`, typed alone, so that is what the session types."""
+    name = "factory status reaches the warden from inside a session"
+    command = "factory status"
     run = exact_run(rig.sandboxed(command), command)
     outside = rig.as_user(AGENT_USER, [str(layout.FACTORY_BIN), "status"], view=True)
     if run is None:
@@ -253,14 +254,16 @@ def factory_in_sandbox(rig: Rig) -> Result:
 
 
 def path_shadow(rig: Rig) -> Result:
-    """A `factory` of the agent's own, earlier on PATH, runs inside the sandbox and never reaches the warden."""
-    name = "a factory earlier on PATH stays inside the sandbox"
+    """The sandbox lets out the bare word `factory`; a `factory` of the agent's own, put first on PATH by an earlier
+    call, must never run outside it and reach the warden."""
+    name = "a factory of the agent's own, first on PATH, never reaches the warden"
     probe = _probe(rig)
-    command = (
+    setup = (
         f"mkdir -p drill-bin && cp {probe[1]} drill-bin/factory && chmod +x drill-bin/factory && "
-        f'PATH="$PWD/drill-bin:$PATH" factory {" ".join(probe[2:])} unix:{rig.places.socket}'
+        'export PATH="$PWD/drill-bin:$PATH"'
     )
-    run = exact_run(rig.sandboxed(command), command)
+    call = f"factory {' '.join(probe[2:])} unix:{rig.places.socket}"
+    run = exact_run(rig.sandboxed(setup, call), call)
     if run is None:
         return Result(name, False, "inconclusive: the drill session did not run the shadow as asked")
     breached = _breached(run.result)

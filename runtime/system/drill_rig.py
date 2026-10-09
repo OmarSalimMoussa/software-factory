@@ -30,6 +30,10 @@ from runtime.system.job import Install, refuse
 from runtime.warden import registry, session_settings
 
 PROMPT = "Run this exact shell command once with the Bash tool, changing nothing in it, then reply DONE:\n{}"
+STEPS = (
+    "Run each of these exact shell commands once with the Bash tool, one call each, in order, changing nothing in "
+    "them, then reply DONE:\n{}"
+)
 _DRILL_NAME = "software-drill"
 
 
@@ -152,8 +156,10 @@ class RealRig:
         hook = [layout.PYTHON, "-I", str(self.places.install / "runtime" / "guard" / "hook.py")]
         return self._systemd_run(AGENT_USER, hook, view=True, stdin=json.dumps(event))
 
-    def sandboxed(self, command: str, extra: dict[str, Any] | None = None) -> Ran:
-        """One `claude -p` session, permitted in the drill view, asked to run exactly ``command``."""
+    def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None) -> Ran:
+        """One `claude -p` session, permitted in the drill view, asked to run exactly ``commands``, in order."""
+        listed = "\n".join(f"Command {n}: {command}" for n, command in enumerate(commands, 1))
+        prompt = PROMPT.format(commands[0]) if len(commands) == 1 else STEPS.format(listed)
         sid = str(uuid.uuid4())
         self.sessions[sid] = _session(sid, f"{_DRILL_NAME}-{sid[:8]}", self.worktree_a)
         registry.write(self.view, self.sessions)
@@ -164,7 +170,7 @@ class RealRig:
         store.write_json(layout.public(self.view.state) / name, body)
         model = self.settings["install.drill"]
         runner = self.places.install / "runtime" / "system" / "runners" / "with_token.py"
-        argv = [layout.PYTHON, "-I", str(runner), str(layout.CLAUDE_BIN), "-p", PROMPT.format(command),
+        argv = [layout.PYTHON, "-I", str(runner), str(layout.CLAUDE_BIN), "-p", prompt,
                 "--session-id", sid, "--settings", str(layout.public(self.places.state) / name),
                 "--model", model["model"], "--effort", model["effort"], "--output-format", "stream-json", "--verbose",
                 "--allowedTools", "Bash", "--permission-prompts", "none", "--no-session-persistence"]  # fmt: skip

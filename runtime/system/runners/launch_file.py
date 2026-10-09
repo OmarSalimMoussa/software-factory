@@ -1,9 +1,9 @@
 """What a template unit's runner reads: one request the warden wrote to public/launch/<id>.json, checked before
 anything runs, and the effective settings and sessions the warden published beside it.
 
-The warden is the only writer of public/, so these checks are a second wall: a request that names a program other
-than claude or git, a path outside the agent's home or the product checkout, a flag where a value belongs, or a slot
-that does not exist is refused, and the runner exits without running anything.
+The warden is the only writer of public/, so these checks are a second wall: a command of any shape but the few the
+warden runs, a path outside the agent's home or the product checkout, a flag where a value belongs, sandbox settings
+the warden did not write, or a slot that does not exist is refused, and the runner exits without running anything.
 """
 
 from __future__ import annotations
@@ -23,13 +23,18 @@ SESSION, COMMAND, STACK = "session", "command", "stack"
 REFUSED = 2
 TIMED_OUT = 124
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,96}$")
-PROGRAMS = {"claude": str(layout.CLAUDE_BIN), "git": "/usr/bin/git"}
+PROGRAMS = {"claude": str(layout.CLAUDE_BIN), "git": "/usr/bin/git", "rm": "/usr/bin/rm", "kill": "/usr/bin/kill"}
+# The one factory command the warden runs as the agent: the shape check of a repo the owner is changing to.
+REPO_SHAPE = [str(layout.FACTORY_BIN), "check", "--only", "repo-shape"]
 # The verbs of the product's scripts/dev (factory spec, "scripts/dev"; plan R24 for reports).
 DEV_VERBS = frozenset({"up", "down", "empty", "health", "sign-in", "seed", "desktop", "test", "reports", "verbs"})
 SWEEP, PRUNE, DISK = "factory-sweep-slot", "factory-prune", "factory-disk"
 OWN_VERBS = frozenset({SWEEP, PRUNE, DISK})
-_SESSION_FIELDS = ("session_id", "name", "model", "effort", "agent", "settings", "agents", "worktree")
+# What every session runs under, start or resume, as launch._carried passes it: flag, then its value.
+_CARRIED = (("--remote-control", "name"), ("--model", "model"), ("--effort", "effort"), ("--agent", "agent"),
+            ("--settings", "settings"), ("--agents", "agents"))  # fmt: skip
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+_SESSION_REF = re.compile(r"^[0-9a-f][0-9a-f-]{5,35}$")  # a short id or a uuid, as `claude stop` and `rm` take
 
 
 class BadRequest(Exception):
@@ -73,31 +78,68 @@ def _inside(path: Path, root: Path) -> bool:
     return path == root or root in path.parents
 
 
+def _carried_ok(values: dict[str, Any], state: Path) -> None:
+    """A session's options, the same for a start and a resume: plain values, the sandbox settings the warden wrote
+    for it, and agent definitions as one JSON object."""
+    for _, key in _CARRIED:
+        _value(values, key)
+    allowed = layout.public(state) / "session-settings"
+    if not _inside(Path(os.path.normpath(values["settings"])), allowed) or not values["settings"].endswith(".json"):
+        raise BadRequest(f"settings must be a file the warden wrote in {allowed}")
+    try:
+        agents = json.loads(values["agents"])
+    except ValueError as exc:
+        raise BadRequest("agents must be the agent definitions as JSON") from exc
+    if not isinstance(agents, dict):
+        raise BadRequest("agents must be one JSON object of agent definitions")
+
+
 def session_argv(raw: dict[str, Any], state: Path) -> list[str]:
     """A session's `claude --bg` command, built by the warden's own function, with the installed claude."""
-    for key in _SESSION_FIELDS:
-        _value(raw, key, empty=key == "worktree")
-    if not isinstance(raw.get("prompt"), str):
-        raise BadRequest("prompt must be text")
+    _value(raw, "session_id")
+    _value(raw, "worktree", empty=True)
     if not _UUID.match(raw["session_id"]):
         raise BadRequest("session_id must be a session uuid")
-    public = layout.public(state)
-    for key, folder in (("settings", public / "session-settings"), ("agents", public / "plugin")):
-        if not _inside(Path(os.path.normpath(raw[key])), folder) or not raw[key].endswith(".json"):
-            raise BadRequest(f"{key} must be a file the warden wrote in {folder}")
+    if not isinstance(raw.get("prompt"), str):
+        raise BadRequest("prompt must be text")
+    _carried_ok(raw, state)
     argv = launch.session_argv(raw)
     return [PROGRAMS["claude"], *argv[1:]]
 
 
-def command_argv(raw: dict[str, Any], home: Path) -> tuple[list[str], Path]:
+def _claude_ok(args: list[str], state: Path) -> None:
+    """`claude stop <id>`, `claude rm <id>`, or a resume that passes every option a start does, then its message."""
+    if len(args) == 2 and args[0] in ("stop", "rm") and _SESSION_REF.match(args[1]):
+        return
+    flags = [flag for flag, _ in _CARRIED]
+    shape = len(args) == 5 + 2 * len(flags) and args[:1] == ["--resume"] and args[2] == "--bg" and args[-2] == "--"
+    if not shape or args[3:-2:2] != flags or not _UUID.match(args[1]):
+        raise BadRequest("claude runs only as stop, rm, or a resume with the options a start passes")
+    _carried_ok({key: args[4 + 2 * n] for n, (_, key) in enumerate(_CARRIED)}, state)
+
+
+def command_argv(raw: dict[str, Any], home: Path, state: Path) -> tuple[list[str], Path]:
+    """One of the few commands the warden runs as the agent, with the installed programs."""
     argv, cwd = raw.get("argv"), raw.get("cwd")
     if not isinstance(argv, list) or not argv or not all(isinstance(a, str) and "\0" not in a for a in argv):
         raise BadRequest("argv must be a list of words")
-    if argv[0] not in PROGRAMS:
-        raise BadRequest(f"a command runs {' or '.join(PROGRAMS)}, never {argv[0]!r}")
     if not isinstance(cwd, str) or not os.path.isabs(cwd) or not _inside(Path(os.path.normpath(cwd)), home):
         raise BadRequest(f"cwd must be a folder in {home}")
-    return [PROGRAMS[argv[0]], *argv[1:]], Path(os.path.normpath(cwd))
+    if argv == REPO_SHAPE:
+        return argv, Path(os.path.normpath(cwd))
+    program, args = argv[0], argv[1:]
+    if program == "claude":
+        _claude_ok(args, state)
+    elif program == "rm":
+        target = Path(os.path.normpath(args[-1])) if len(args) == 3 and os.path.isabs(args[-1]) else None
+        if args[:2] != ["-rf", "--"] or target is None or target == home or not _inside(target, home):
+            raise BadRequest(f"rm removes only one folder below {home}")
+    elif program == "kill":
+        if len(args) != 2 or args[0] != "-TERM" or not args[1].isdigit():
+            raise BadRequest("kill only sends TERM to one process id")
+    elif program != "git":
+        raise BadRequest(f"the warden never runs {program!r} as the agent")
+    return [PROGRAMS[program], *args], Path(os.path.normpath(cwd))
 
 
 def stack_parts(raw: dict[str, Any], settings: Settings) -> tuple[int, list[str], str]:

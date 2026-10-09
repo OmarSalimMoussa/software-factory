@@ -1,11 +1,10 @@
-"""The `factory` command: it reads the caller's files itself and sends bytes, never a path, and every command line
-asks for the verb the guard reads from it."""
+"""The `factory` command: it reads the caller's files itself and sends bytes, never a path or stdin, and every
+command line asks for the verb the guard reads from it."""
 
 from __future__ import annotations
 
 import io
 import json
-import os
 
 import pytest
 
@@ -16,7 +15,6 @@ from runtime.warden.verbs import VERBS
 
 FILE = "/home/agent/wt/picture.svg"
 CONTENT = b"<svg/>"
-BODY = b"the body"
 
 
 def _build(argv: list[str]) -> Call:
@@ -24,7 +22,7 @@ def _build(argv: list[str]) -> Call:
         assert path == FILE
         return CONTENT
 
-    return build(argv, read_file, lambda: BODY)
+    return build(argv, read_file)
 
 
 @pytest.mark.parametrize(
@@ -34,12 +32,16 @@ def _build(argv: list[str]) -> Call:
         ["needs-owner", "t-0001", "--picture", FILE, "--brief", "https://claude.ai/code/artifact/x", "--ask", "Go?"],
         ["needs-owner", "t-0001", "--picture", FILE, "--question", "Keep the old link?"],
         ["spec", "save", "t-0001", FILE],
+        ["request", "new", "--severity", "normal", "--where", "the sign-in page", "--body", FILE],
+        ["triage", "apply", "--body", FILE],
+        ["queue", "check", "abc1234", "--body", FILE],
+        ["queue", "task", "new", "--requests", "r-2026-10-09-0001", "--title", "T", "--body", FILE],
     ],
 )
 def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) -> None:
     call = _build(argv)
     assert call.data == CONTENT
-    assert FILE not in json.dumps(call.args) and "picture" not in call.args
+    assert FILE not in json.dumps(call.args) and not {"picture", "body"} & set(call.args)
 
 
 @pytest.mark.parametrize(
@@ -60,11 +62,11 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["reflect", "--kind", "friction", "a rule slowed me"],
         ["status"],
         ["settings", "show"],
-        ["request", "new", "--from", "owner", "--severity", "normal", "--where", "the sign-in page"],
-        ["triage", "apply"],
+        ["request", "new", "--from", "owner", "--severity", "normal", "--where", "the sign-in page", "--body", FILE],
+        ["triage", "apply", "--body", FILE],
         ["queue", "next"],
-        ["queue", "check", "abc1234"],
-        ["queue", "task", "new", "--requests", "r-2026-10-09-0001", "--title", "T", "--goal-item", "G1",
+        ["queue", "check", "abc1234", "--body", FILE],
+        ["queue", "task", "new", "--body", FILE, "--requests", "r-2026-10-09-0001", "--title", "T", "--goal-item", "G1",
          "--severity", "major", "--surfaces", "ui,api", "--cause", "x.py:1", "--slices", "1", "--owner-class", "none"],
         ["queue", "task", "facts", "t-0001", "--surfaces", "ui", "api", "--slices", "2"],
         ["queue", "task", "status", "t-0001", "turn"],
@@ -104,15 +106,13 @@ def test_propose_none_names_no_task() -> None:
         _build(["propose", "t-0001", "--none"])
 
 
-def test_a_body_is_only_what_already_waits_on_stdin() -> None:
-    read, write = os.pipe()
-    with os.fdopen(read, "rb") as empty, os.fdopen(write, "wb"), pytest.raises(CliError, match="nothing waits"):
-        factory.read_stdin(empty)
-    read, write = os.pipe()
-    os.write(write, b"x")
-    os.close(write)
-    with os.fdopen(read, "rb") as heredoc:
-        assert factory.read_stdin(heredoc) == b"x"
+def test_the_subagent_id_the_guard_puts_first_travels_with_the_request() -> None:
+    call = _build(["--agent-id", "a1b2c3", "qa", "result", "--head", "abc1234", "--blockers", "0", "--majors", "0",
+                   "--minors", "0"])  # fmt: skip
+    assert (call.verb, call.agent_id) == ("qa.result", "a1b2c3")
+    assert _build(["qa-clean"]).agent_id == ""
+    with pytest.raises(CliError):
+        _build(["--agent-id", "--head"])
 
 
 def test_a_refusal_is_printed_with_its_rule_and_fails() -> None:

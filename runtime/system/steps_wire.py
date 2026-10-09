@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from runtime.shared.paths import AGENT_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER
+from runtime.shared.paths import AGENT_USER, MANAGED_SETTINGS, SCRATCH, SLICE, WARDEN_USER
 from runtime.system import layout, render
 from runtime.system.host import CommandError
 from runtime.system.job import Install, refuse
@@ -58,6 +58,12 @@ def git_hooks(ctx: Install) -> None:
     """The product checkout takes its hooks from the install, which no agent can write; the vitals watch this."""
     hooks = ctx.places.install / "checks" / "git-hooks"
     ctx.host.run(["git", "-C", str(ctx.checkout()), "config", "core.hooksPath", str(hooks)], user=AGENT_USER)
+    exclude = ctx.checkout() / ".git" / "info" / "exclude"
+    code, text = ctx.host.query(["cat", str(exclude)], user=AGENT_USER)
+    current = text if code == 0 else ""
+    if f"/{SCRATCH}/" not in current.splitlines():
+        ctx.host.write(exclude, current + ("" if current.endswith("\n") or not current else "\n") + f"/{SCRATCH}/\n",
+                       mode=0o644, owner=AGENT_USER)  # fmt: skip
 
 
 def tailnet(ctx: Install) -> None:

@@ -11,6 +11,8 @@ or cards the owner. When the owner opens your chat themselves, answer them there
 every limit below: when a call is refused, take the remedy it names, never a way round it.
 
 Keep one short line current with `factory doing "<what you are doing>"` whenever it changes.
+Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; write a body to a file under
+`.factory/` in your worktree first (git ignores that folder).
 
 ## 1. Set up
 
@@ -55,7 +57,7 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
    each scenario your branch adds or changes, cold); the test address each tester signs in as; and every finding
    earlier rounds raised, with what you did about it.
 5. **Findings** are claims to check (the `taking-review` skill): fix it, dispute it with evidence, or file it when it
-   is outside your task: `factory request new --from <tester> --severity normal --where "<where>"`, body on stdin.
+   is outside your task: `factory request new --from <tester> --severity normal --where "<where>" --body <file>`.
    Each bug a tester caught gets a test, or a scenario step, that would catch it again.
 6. **A round is a head.** After fixes, commit, rebuild, run `factory qa-ready` on the new head, and rerun the testers
    whose last round found something. A finished tester is never messaged again: start a new one.

@@ -23,7 +23,7 @@ AGENT_HOME = Path("/home") / AGENT_USER
 STACK_HOME = Path("/home") / STACK_USER
 
 PYTHON = "/usr/bin/python3"
-# The sandbox lets exactly this path out, so a `factory` found earlier on PATH stays inside it.
+# The factory command. Sessions type the bare word alone, which is the one text the sandbox lets out.
 FACTORY_BIN = paths.FACTORY_BIN
 # The agents' own Claude Code: root-owned, so no session can replace the program that runs its guard.
 CLAUDE_BIN = Path("/usr/local/libexec/software-factory/claude")

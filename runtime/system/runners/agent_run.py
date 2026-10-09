@@ -25,7 +25,7 @@ def main(argv: list[str]) -> int:
         if raw["kind"] == lf.SESSION:
             command, cwd = lf.session_argv(raw, state), Path(settings.get_str("repo.path"))
         else:
-            command, cwd = lf.command_argv(raw, Path.home())
+            command, cwd = lf.command_argv(raw, Path.home(), state)
         env = lf.claude_env(environ) if command[0] == lf.PROGRAMS["claude"] else environ
     except lf.BadRequest as exc:
         print(f"agent-run: refused: {exc}", flush=True)

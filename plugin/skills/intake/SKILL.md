@@ -36,9 +36,10 @@ You run beside the orchestrator in the main checkout, on the default branch. Rea
 
 ## Where it goes
 
-- **A severe request** (the fast lane): file its task at the top of the queue, linked to the request, with the body
-  on stdin (what to change, and how to know it is fixed):
-  `factory queue task new --requests <id> --title "<what is wrong, in your words>" --goal-item <G> --severity <s>
+- **A severe request** (the fast lane): file its task at the top of the queue, linked to the request. Write its text
+  (what to change, and how to know it is fixed) to a file under `.factory/` in the worktree, then, in a call of
+  its own:
+  `factory queue task new --body <file> --requests <id> --title "<what is wrong, in your words>" --goal-item <G> --severity <s>
   --surfaces <list> --cause "<file:line, what it does wrong>" --slices <n> --owner-class <class>`. Leave out
   `--cause` when it is unknown. If it was not severe after all, file it `major` or `minor`, say so in the verdict,
   and write `factory reflect --kind friction "<why it looked severe>"`.
