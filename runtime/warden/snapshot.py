@@ -55,7 +55,7 @@ class _Fold:
     """A JSON-lines log folded as it grows: each new whole line is stepped once; a replaced log starts over."""
 
     def __init__(self) -> None:
-        self.inode, self.offset = -1, 0
+        self.inode, self.offset, self.lines = -1, 0, 0
         self.reset()
 
     def reset(self) -> None:
@@ -64,6 +64,10 @@ class _Fold:
     def step(self, raw: dict[str, Any]) -> None:
         raise NotImplementedError
 
+    def unreadable(self, path: Path, exc: Exception) -> None:
+        """A line that cannot be read fails the whole fold, unless the fold draws it as a row of its own."""
+        raise store.StoreError(f"{path}: line {self.lines} cannot be read") from exc
+
     def read(self, path: Path) -> None:
         try:
             info = path.stat()
@@ -71,19 +75,43 @@ class _Fold:
         except FileNotFoundError:
             return
         if info.st_ino != self.inode or info.st_size < self.offset:
-            self.inode, self.offset = info.st_ino, 0
+            self.inode, self.offset, self.lines = info.st_ino, 0, 0
             self.reset()
         with path.open("rb") as fh:
             fh.seek(self.offset)
             data = fh.read(info.st_size - self.offset)
         whole = data[: data.rfind(b"\n") + 1]
         for line in whole.splitlines():
+            self.lines += 1
             if line.strip():
                 try:
                     self.step(json.loads(line))
-                except (ValueError, KeyError) as exc:
-                    raise store.StoreError(f"{path}: a line after byte {self.offset} cannot be read") from exc
+                except (ValueError, KeyError, TypeError) as exc:
+                    self.unreadable(path, exc)
         self.offset += len(whole)
+
+
+class _History(_Fold):
+    """Every retirement history.jsonl records, oldest first, under the session id it ended with; a line that cannot
+    be read is kept as a row that says so, so one bad line never hides the rest of History."""
+
+    def reset(self) -> None:
+        self.rows: list[dict[str, Any]] = []
+        self.bound: dict[str, str] = {}
+
+    def step(self, raw: dict[str, Any]) -> None:
+        if "was" in raw:
+            self.bound[str(raw["was"])] = str(raw["session"])
+        elif raw["state"] == RETIRED:
+            fields = ("at", "session", "name", "retired", "by", "why")
+            self.rows.append({"line": self.lines, **{k: str(raw[k]) for k in fields}})
+
+    def unreadable(self, path: Path, exc: Exception) -> None:
+        self.rows.append({"line": self.lines, "error": f"line {self.lines} of {path.name} cannot be read"})
+
+    def answer(self) -> list[dict[str, Any]]:
+        return [{**row, "session": self.bound.get(row["session"], row["session"])} if "session" in row else row
+                for row in self.rows]  # fmt: skip
 
 
 class _Cost(_Fold):
@@ -300,6 +328,12 @@ def _cost(ctx: Context, args: dict[str, Any]) -> Any:
     return copy.deepcopy(book.answer(days))
 
 
+def _history(ctx: Context, args: dict[str, Any]) -> Any:
+    book = _kept(_History, ctx.places.history)
+    book.read(ctx.places.history)
+    return book.answer()
+
+
 def _refusals(ctx: Context, args: dict[str, Any]) -> Any:
     tally = _kept(_Refusals, ctx.places.refusals)
     tally.read(ctx.places.refusals)
@@ -371,6 +405,7 @@ READERS: dict[str, Reader] = {
     "goal": _goal,
     "docker": lambda ctx, args: store.read_json_or(gc.disk_path(ctx.places), None),
     "reflections": lambda ctx, args: reflections.entries(ctx.places),
+    "history": _history,
     "cost": _cost,
 }
 

@@ -91,8 +91,8 @@ drive('work', async t => {
   await p.click('[data-out="noise"]'); await p.waitForTimeout(500);
   t.check((await texts(p, '.req-row .c-hide .chip')).every(x => x === 'noise'), 'outcome filter not applied');
   await p.click('[data-out="all"]'); await p.waitForTimeout(400);
-  await p.click('[data-boostreq="r-1042"]'); await p.waitForTimeout(500);
-  t.check(!(await p.$('[data-boostreq="r-1042"]')), 'a boosted request still offers Boost');
+  await p.click('[data-boostreq="r-2026-10-09-1042"]'); await p.waitForTimeout(500);
+  t.check(!(await p.$('[data-boostreq="r-2026-10-09-1042"]')), 'a boosted request still offers Boost');
   // Parked: Unpark asks the server and the row goes
   await p.click('[data-worktab="parked"]'); await ready(p);
   await p.click('[data-unpark="t-0011"]'); await p.waitForTimeout(500);

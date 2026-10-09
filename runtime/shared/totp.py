@@ -34,9 +34,7 @@ def valid(secret: str, code: str, now_s: float) -> bool:
     if len(code) != DIGITS or not code.isdigit():
         return False
     counter = int(now_s // STEP_S)
-    return any(
-        hmac.compare_digest(code_at(secret, counter + d), code) for d in (-1, 0, 1)
-    )
+    return any(hmac.compare_digest(code_at(secret, counter + d), code) for d in (-1, 0, 1))
 
 
 def enrolment_uri(secret: str, account: str) -> str:

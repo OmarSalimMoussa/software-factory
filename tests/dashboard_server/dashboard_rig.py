@@ -28,8 +28,8 @@ class Rig:
     def parts(self, url: str) -> dict[str, Any]:
         reply = self.get(url)
         assert reply.status == 200, reply.body
-        envelope: dict[str, Any] = json.loads(reply.body)
-        return envelope["parts"]
+        parts: dict[str, Any] = json.loads(reply.body)["parts"]
+        return parts
 
     def post(self, url: str, body: dict[str, Any], headers: dict[str, str] | None = None) -> Reply:
         sent = {**OWNER, "origin": "http://127.0.0.1:8300", "content-type": "application/json", "x-software": "1"}

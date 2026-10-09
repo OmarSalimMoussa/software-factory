@@ -58,7 +58,7 @@ def reader(snap: Snap, ref: str) -> dict[str, Any]:
     every = docs.index(snap)
     doc = next((d for d in every if d.id == ref), None)
     if doc is None:
-        raise PartError(f"There is no file {ref}; it may have been removed.")
+        raise PartError("This file is gone. It may have been removed.")
     known = {d.id for d in every}
     raw, art = doc.raw, None
     if doc.kind == "task":

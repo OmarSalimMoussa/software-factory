@@ -1,5 +1,5 @@
 'use strict';
-/* Shared by the dashboard drives: Playwright core, headless Chrome, a fresh fixture server per drive, and small checks.
+/* Shared by the dashboard drives: Playwright core, headless Chrome, a fresh live server per drive, and small checks.
    PLAYWRIGHT_CORE and CHROME override where they are found; SHOTS names a folder for screenshots. */
 const path = require('path'), fs = require('fs'), os = require('os'), {spawn} = require('child_process');
 
@@ -14,12 +14,13 @@ function playwright() {
 }
 const CHROME = process.env.CHROME || '/usr/bin/google-chrome';
 
-async function fixtureServer() {
-  const proc = spawn('python3', [path.join(__dirname, 'fixture_server.py'), '--port', '0'], {stdio: ['ignore', 'pipe', 'inherit']});
+/* The real dashboard server on a seeded real-format state, with a fake warden; see tests/dashboard_server/live_server.py. */
+async function liveServer() {
+  const proc = spawn('python3', [path.join(__dirname, '..', 'dashboard_server', 'live_server.py'), '--port', '0'], {stdio: ['ignore', 'pipe', 'inherit']});
   const url = await new Promise((resolve, reject) => {
     let buf = '';
     proc.stdout.on('data', d => { buf += d; const m = buf.match(/listening on (\S+)/); if (m) resolve(m[1]); });
-    proc.on('exit', c => reject(new Error('the fixture server exited with ' + c)));
+    proc.on('exit', c => reject(new Error('the live server exited with ' + c)));
   });
   const postJSON = (p, body) => fetch(url + p, {method: 'POST', body: JSON.stringify(body)}).then(r => r.json());
   return {url, stop: () => proc.kill(), set: body => postJSON('/__switch', body), reset: () => postJSON('/__reset', {}), calls: () => fetch(url + '/__calls').then(r => r.json())};
@@ -27,7 +28,7 @@ async function fixtureServer() {
 
 async function drive(name, fn) {
   const errors = [], shots = process.env.SHOTS;
-  const pw = playwright(), srv = await fixtureServer();
+  const pw = playwright(), srv = await liveServer();
   const browser = await pw.chromium.launch({executablePath: CHROME, args: ['--headless=new']});
   const t = {
     srv, errors,

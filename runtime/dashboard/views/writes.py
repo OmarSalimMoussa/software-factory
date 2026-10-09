@@ -107,13 +107,12 @@ def _settings_args(body: Body, ref: str, snap: Snap | None) -> dict[str, Any]:
 
 
 def _push_back_args(body: Body, ref: str, snap: Snap | None) -> dict[str, Any]:
-    """Push back names the build prod ran before; a device that sent the short sha it showed is held to it."""
+    """Push back names the build prod ran before, as the push sheet showed it (short); the warden is sent that build
+    in full, and refuses if prod's previous build has moved on since."""
     assert snap is not None
+    sent = _text(body, "expected_sha")
     previous = ((snap.get("deployments").get("prod") or {}).get("previous") or {}).get("sha")
-    if not previous:
-        raise PartError("GitHub lists no earlier prod build to go back to yet; try again in a minute.")
-    sent = body.get("expected_sha")
-    if isinstance(sent, str) and sent and not previous.startswith(sent):
+    if not previous or not previous.startswith(sent):
         raise Stale(STALE)
     return {"expected_sha": previous, "code": body.get("code")}
 

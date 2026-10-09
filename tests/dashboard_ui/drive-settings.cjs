@@ -6,14 +6,14 @@ const {drive, ready, texts} = require('./lib.cjs');
 drive('settings', async t => {
   const p = await t.open(1440, 900, 'settings');
   const bar = () => p.textContent('#savebar-n');
-  t.check(await p.$('[data-row="models.intake"] [data-ddbtn]') && await p.$('[data-row="caps.designers"] .stepper') && await p.$('[data-row="sandbox.prod_health_url"] input.txt')
-    && await p.$('[data-row="sandbox.allowed_domains"] .listed') && await p.$('[data-row="install.prices"] .ro'), 'a control kind is missing');
-  t.check(!(await p.$('[data-row="install.prices"] .reset, [data-row="install.prices"] [data-default]')), 'a read-only row can be changed');
+  t.check(await p.$('[data-row="models.intake"] [data-ddbtn]') && await p.$('[data-row="caps.designers"] .stepper') && await p.$('[data-row="budget.slice_memory_high"] input.txt')
+    && await p.$('[data-row="sandbox.allowed_domains"] .listed') && await p.$('[data-row="prices"] .ro'), 'a control kind is missing');
+  t.check(!(await p.$('[data-row="prices"] .reset, [data-row="prices"] [data-default]')), 'a read-only row can be changed');
   await p.click('[data-row="models.intake"] [data-ddbtn]'); await p.click('[data-ddopt][data-ddkind="model"][data-ddkey="models.intake"][data-v="Haiku 5.5"]');
   await p.click('[data-step="1"][data-key="caps.designers"]');
   t.check((await bar()).includes('2 changes'), 'savebar: ' + await bar());
   t.check((await p.textContent('[data-row="models.intake"] .was')).includes('was Sonnet 5.5 · medium'), 'no "was" on a changed model');
-  await p.fill('[data-row="sandbox.prod_health_url"] input', 'https://acme-app.example/ready'); await p.press('[data-row="sandbox.prod_health_url"] input', 'Tab');
+  await p.fill('[data-row="budget.slice_memory_high"] input', '10G'); await p.press('[data-row="budget.slice_memory_high"] input', 'Tab');
   await p.fill('[data-row="sandbox.allowed_domains"] [data-listadd]', 'example.org'); await p.press('[data-row="sandbox.allowed_domains"] [data-listadd]', 'Enter');
   t.check((await texts(p, '[data-row="sandbox.allowed_domains"] .listed .chip')).some(x => x.includes('example.org')), 'list item not added');
   t.check((await bar()).includes('4 changes'), 'text and list edits not counted: ' + await bar());
@@ -44,7 +44,7 @@ drive('settings', async t => {
   // Change repo sends the path; the factory refuses while it runs, and says why (it is not a wrong code)
   await p.click('[data-action="change-repo"]'); await p.waitForTimeout(400);
   await p.fill('#repo-path', '/srv/products/other-app'); await t.code(p); await p.waitForTimeout(500);
-  t.check((await p.textContent('#code-note')).includes('Stop the orchestrator first'), 'repo refusal not shown: ' + await p.textContent('#code-note'));
+  t.check((await p.textContent('#code-note')).includes('Stop the factory first'), 'repo refusal not shown: ' + await p.textContent('#code-note'));
   const repo = (await t.srv.calls()).filter(c => c.method === 'POST' && c.path === '/api/settings/repo').at(-1); t.check(repo && repo.body.path === '/srv/products/other-app', 'repo path not sent');
   await p.keyboard.press('Escape'); await p.waitForTimeout(350);
   // an edit made against a value another device then changed is dropped, and the owner is told

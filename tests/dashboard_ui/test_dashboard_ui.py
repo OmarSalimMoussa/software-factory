@@ -1,4 +1,5 @@
-"""Runs the headless dashboard drives against the fixture server; skipped where Chrome or Playwright core is missing."""
+"""Runs the headless dashboard drives against the real dashboard server on a seeded state; skipped where Chrome or
+Playwright core is missing."""
 
 from __future__ import annotations
 

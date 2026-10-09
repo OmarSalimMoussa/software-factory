@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -34,12 +35,13 @@ from runtime.dashboard.client import Warden  # noqa: E402
 from runtime.queue import formats, propose  # noqa: E402
 from runtime.shared import models, store  # noqa: E402
 from runtime.shared import settings as settings_module  # noqa: E402
-from runtime.warden import lifecycle, public, registry, settings_save  # noqa: E402
+from runtime.warden import crashwatch, public, registry, settings_save  # noqa: E402
 from runtime.warden.context import Caller, Clock  # noqa: E402
 
 CODE = "123456"
 START = 1_791_554_520.0  # 2026-10-09 14:02:00 UTC
 ORCHESTRATOR = Caller(kind="agent", session="orchestrator", role="orchestrator")
+WARDEN = Caller(kind="warden", role="warden")
 REFILL_SECONDS = 4.0  # the stand-in thinks this long, so the page shows the place choosing first
 GIT_ID = ["-c", "user.name=owner", "-c", "user.email=owner@invalid"]
 
@@ -48,10 +50,14 @@ class Running(Clock):
     """The fixtures' afternoon, moving at the speed of the wall clock."""
 
     def __init__(self) -> None:
-        self.zero = time.monotonic()
+        self.zero, self.skipped = time.monotonic(), 0.0
 
     def now(self) -> float:
-        return START + time.monotonic() - self.zero
+        return START + time.monotonic() - self.zero + self.skipped
+
+    def skip(self, seconds: float) -> None:
+        """Let time pass at once: a wait the drives cannot sit through, such as a bench's grace."""
+        self.skipped += seconds
 
 
 class Deploys(GitHub):
@@ -80,7 +86,15 @@ class Live:
         self.calls: list[dict[str, Any]] = []
         self.switches: dict[str, Any] = {}
         self.warden: FakeWarden | None = None
+        self.roots: list[Path] = []
         self.app = self.fresh()
+
+    def remove(self, *_: Any) -> None:
+        """The drive stops the server with SIGTERM: every seeded folder goes with it."""
+        self.warden = None
+        for root in self.roots:
+            shutil.rmtree(root, ignore_errors=True)
+        raise SystemExit(0)
 
     def fresh(self) -> server.App:
         """The seeded afternoon again, with the warden's own clone of the factory repo for settings saves."""
@@ -89,6 +103,7 @@ class Live:
         self.switches = {"fail_part": [], "refuse": {}}
         self.reserve = [("t-0018", "A quick win for G3, asked for twice.")]
         root = Path(tempfile.mkdtemp(prefix="dashboard-live-"))
+        self.roots.append(root)
         places = seed(root, self.clock.now())
         self.places, self.repo = places, root / "repo"
         for folder in ("plugin", "procedures", "rules"):
@@ -124,16 +139,12 @@ class Live:
             threading.Timer(0.3, self.benched, args=(self.places,)).start()
 
     def benched(self, places: Any) -> None:
-        """The crash watch's part: once a paused session's grace is over, it is deprioritized."""
+        """The crash watch's part: once the grace is over, each paused session's bench is finished."""
         if self.warden is None or places != self.places:
             return
-        ctx = self.warden.doors.context(ORCHESTRATOR)
-        with ctx.lock:
-            sessions = registry.read(places)
-            for s in sessions.values():
-                if s.state == models.BENCH_PENDING:
-                    lifecycle.move(ctx, s, models.DEPRIORITIZED, "warden", s.note)
-            registry.write(places, sessions)
+        ctx = self.warden.doors.context(WARDEN)
+        self.clock.skip(ctx.settings().get_int("watch.bench_grace_seconds"))
+        crashwatch.finish_benches(ctx, {})
 
     def refill(self, places: Any) -> None:
         if self.warden is None or places != self.places:
@@ -288,13 +299,13 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=0)
     port = parser.parse_args().port
     live = Live()
+    signal.signal(signal.SIGTERM, live.remove)
     Handler.live = live
     Handler.timeout = 10
     httpd = server._PooledServer(("127.0.0.1", port), live.app, 8)
     httpd.RequestHandlerClass = Handler
     print(f"listening on http://127.0.0.1:{httpd.server_address[1]}", flush=True)
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    threading.Event().wait()
+    httpd.serve_forever()
 
 
 if __name__ == "__main__":

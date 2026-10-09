@@ -1,5 +1,5 @@
-"""A long action's steps (a push, a settings save, a change of repo) as the warden runs them; a finished one says
-what it did and which parts of the page to reload."""
+"""A long action's steps (a push, a settings save, a change of repo, a pause) as the warden runs them; a finished one
+says what it did and which parts of the page to reload."""
 
 from __future__ import annotations
 
@@ -12,12 +12,14 @@ _TITLES = {
     "repo": "Changing the repo",
     "push": "Pushing to prod",
     "push back": "Pushing prod back",
+    "pause": "Pausing the factory",
 }
 _REFRESH = {
     "settings": ["settings", "shell"],
     "repo": ["settings", "shell"],
     "push": ["home", "shell"],
     "push back": ["home", "shell"],
+    "pause": ["agents", "home", "shell"],
 }
 
 
@@ -34,11 +36,13 @@ def operation(answer: dict[str, Any]) -> dict[str, Any]:
             "repo": "The factory works on the new repo.",
             "push": f"Prod runs {str(sha)[:7]}.",
             "push back": f"Prod runs {str(sha)[:7]} again.",
+            "pause": "Paused. Every agent is benched with its work kept.",
         }.get(op["kind"], "Done.")
     return {
         "id": op["id"],
         "title": _TITLES.get(op["kind"], "Working"),
         "state": op["state"],
-        "steps": op["steps"],
+        # The warden's details are clauses; the owner reads them as sentences.
+        "steps": [{**step, "detail": step["detail"][:1].upper() + step["detail"][1:]} for step in op["steps"]],
         "result": result,
     }

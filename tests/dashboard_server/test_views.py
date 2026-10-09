@@ -131,3 +131,10 @@ def test_a_file_that_cannot_be_read_fails_only_its_own_part(rig: Rig) -> None:
     parts = rig.parts("/api/home")
     assert not parts["needs"]["ok"] and "could not read" in parts["needs"]["error"]
     assert all(part["ok"] for name, part in parts.items() if name != "needs")
+
+
+def test_a_history_line_that_cannot_be_read_is_one_failed_row(rig: Rig) -> None:
+    rows = rig.parts("/api/agents")["history"]["data"]["rows"]
+    failed = [row for row in rows if row.get("broken")]
+    assert failed == [{"broken": True, "id": "history line 6", "error": "line 6 of history.jsonl cannot be read"}]
+    assert len(rows) == 25 and all(row.get("why") for row in rows if not row.get("broken"))

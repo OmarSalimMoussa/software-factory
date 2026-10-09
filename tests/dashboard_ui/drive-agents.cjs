@@ -55,7 +55,7 @@ drive('agents', async t => {
   await p.click('[data-agent="design-empty-states"] .nname'); await p.waitForTimeout(400);
   await p.click('#sheet-foot [data-stop="design-empty-states"]'); await p.waitForTimeout(400);
   await p.click('#sheet-foot [data-action="sheet-back"]'); await p.waitForTimeout(300);
-  t.check((await p.textContent('#sheet-title')).trim() === 'Empty states', 'Keep running did not return to the agent');
+  t.check((await p.textContent('#sheet-title')).trim() === 'Clearer empty states on Projects and Invoices', 'Keep running did not return to the agent');
   await p.keyboard.press('Escape'); await p.waitForTimeout(350);
   // Pause from the orchestrator's panel: the code, the steps, then the paused banner with Resume
   await p.click('[data-agent="orchestrator"] .nname'); await p.waitForTimeout(400);
@@ -75,7 +75,9 @@ drive('agents', async t => {
   t.check(!(await p.$('.node-card .kill')), 'agents still stoppable after stopping the factory');
   t.check(await p.$('.ro-banner [data-action="start-orch"]'), 'no stopped-factory banner');
   await p.click('[data-action="start-orch"]'); await p.waitForTimeout(600);
-  t.check((await state('orchestrator')).includes('working'), 'orchestrator did not start');
+  // a stopped orchestrator never comes back: the start is a new session at the root of the tree
+  const root = await p.$eval('.tree > .node', e => e.dataset.node);
+  t.check(root !== 'orchestrator' && (await state(root)).includes('working'), 'orchestrator did not start: ' + root);
   await p.setViewportSize({width: 1024, height: 800}); await p.waitForTimeout(200);
   const th = [...new Set(await heights(p, '.node-card'))]; t.check(th.length === 1, '1024 tree rows differ: ' + th);
   await t.wide(p, '1024 agents');

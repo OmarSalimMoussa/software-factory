@@ -97,7 +97,9 @@ class FakeWarden:
         self.server: socketserver.UnixStreamServer | None = None
         # An abstract socket: a temporary folder's path is often longer than a socket path may be.
         self.address = Path(f"\0dashboard-test-{os.getpid()}-{next(_numbers)}")
-        # No Claude session runs on a test machine, and its agent user does not exist here.
+        # No Claude session runs on a test machine, and its agent user does not exist here. stop() puts the real
+        # ones back, so a later test in the same run never inherits these.
+        self._real = (backstop.processes, launch.agent_home, codes.check_code)
         backstop.processes = dict
         launch.agent_home = lambda: places.state / "agent-home"
         if accept is not None:
@@ -132,3 +134,4 @@ class FakeWarden:
             self.server.shutdown()
             self.server.server_close()
             self.server = None
+        backstop.processes, launch.agent_home, codes.check_code = self._real

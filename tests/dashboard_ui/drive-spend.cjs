@@ -20,6 +20,8 @@ drive('spend', async t => {
   t.check((await p.textContent('.hero-num .label')) === 'Last 7 days' && (await p.$$eval(`${svg} clipPath`, els => els.length)) === 7, 'range 7 not drawn');
   await p.click('[data-range="1"]'); await p.waitForTimeout(500);
   t.check((await p.textContent('.hero-num .label')) === 'Today', 'range Today not drawn');
+  // agents that spent in the last 14 days fill more than one page
+  await p.click('[data-range="14"]'); await p.waitForTimeout(500);
   await p.click('[data-slice="agent"]'); await p.waitForTimeout(500);
   t.check((await p.$$('.bars .bar-row')).length === 25 && await p.$('[data-more="slice"]'), 'agent slice first page wrong');
   await p.click('[data-more="slice"]'); await p.waitForTimeout(500);

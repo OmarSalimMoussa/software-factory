@@ -16,14 +16,17 @@ drive('home', async t => {
   const bw = await p.$$eval('.prop-a .btn:not(.sq)', els => [...new Set(els.map(e => Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height)))]); t.check(bw.length === 1, 'Home action buttons differ: ' + bw);
   await t.shot(p, 'home-full-1440.png', {fullPage: true});
   // reorder: the server is told the order this device showed, and the card moves when it answers
+  const v24 = await p.evaluate(() => propCardOf('t-0024').version);
   await p.click('[data-prop-move="-1"][data-id="t-0024"]'); await p.waitForTimeout(600);
   t.check((await p.$eval('#props .prop .prop-t', e => e.textContent)).includes('account menu'), 'reorder failed');
   const mv = await lastCall('/api/proposals/t-0024/move');
   t.check(mv && JSON.stringify(mv.body.seen_order) === '["t-0027","t-0024","t-0025"]' && mv.body.dir === -1, 'move did not send what the device saw: ' + JSON.stringify(mv && mv.body));
-  t.check(mv && mv.headers['x-software'] === '1' && typeof mv.body.idempotency_key === 'string' && mv.body.version === 'v1', 'a write lacks its header, key or version');
+  t.check(mv && mv.headers['x-software'] === '1' && typeof mv.body.idempotency_key === 'string' && mv.body.version === v24, 'a write lacks its header, key or the version the card showed');
   // the run: changed through the dropdown, the server's new estimate drawn
+  const est0 = await p.evaluate(() => propCardOf('t-0025').estimate);
   await p.click('[data-flip="t-0025"] [data-ddbtn]'); await p.click('[data-ddopt][data-ddkind="prop-run"][data-ddkey="t-0025"][data-v="2"]'); await p.waitForTimeout(500);
-  const card = await p.textContent('[data-flip="t-0025"]'); t.check(card.includes('run changed by you') && card.includes('≈ $14'), 'run change not drawn: ' + card.slice(0, 200));
+  const card = await p.textContent('[data-flip="t-0025"]'); const est1 = await p.evaluate(() => propCardOf('t-0025').estimate);
+  t.check(card.includes('run changed by you') && /^≈ \$\d/.test(est1) && est1 !== est0 && card.includes(est1), `run change not drawn (${est0} -> ${est1}): ` + card.slice(0, 200));
   // approve: the approved state in place, then choosing, then a refill, with no height change
   const h0 = await tops(p);
   await p.click('[data-prop-act="approve"][data-id="t-0024"]'); await p.waitForTimeout(350);
@@ -50,8 +53,9 @@ drive('home', async t => {
   // a question is answered from its card; an empty answer is not sent
   await p.click('[data-need-act="answer"][data-id="n3"]'); await p.waitForTimeout(200);
   t.check(!(await lastCall('/api/needs/n3/answer')), 'an empty answer was sent');
+  const v3 = await p.evaluate(() => needOf('n3').version);
   await p.fill('input[data-answer="n3"]', 'Resume from the last full part'); await p.click('[data-need-act="answer"][data-id="n3"]'); await p.waitForTimeout(500);
-  const ans = await lastCall('/api/needs/n3/answer'); t.check(ans && ans.body.text === 'Resume from the last full part' && ans.body.version === 'v1', 'answer not sent');
+  const ans = await lastCall('/api/needs/n3/answer'); t.check(ans && ans.body.text === 'Resume from the last full part' && ans.body.version === v3, 'answer not sent');
   t.check((await p.textContent('#needs')).includes('Your answer is on its way'), 'the answered card did not say so');
   await p.click('[data-need-act="extend"][data-id="n2"]'); await p.waitForTimeout(500);
   t.check((await p.textContent('#needs')).includes('Two more rounds granted'), 'Extend not shown done');
@@ -77,7 +81,7 @@ drive('home', async t => {
   t.check(await o.$('#pill-prod .dot.bad'), 'prod pill not red');
   await t.shot(o, 'outage-1440.png');
   await o.click('.outage [data-agent="run-t-0031"]'); await o.waitForTimeout(400);
-  t.check((await o.textContent('#sheet-title')) === 'Prod outage fix', 'Watch the fix did not open the fix');
+  t.check((await o.textContent('#sheet-title')) === 'Prod answers again', 'Watch the fix did not open the fix');
   await o.keyboard.press('Escape'); await o.waitForTimeout(350);
   await o.click('[data-action="outage-stop"]'); await o.waitForTimeout(700);
   t.check((await o.$eval('#props .prop .prop-t', e => e.textContent)).includes('Prod answers again'), 'stopped fix not first');

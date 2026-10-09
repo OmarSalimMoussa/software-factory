@@ -6,8 +6,8 @@ const {drive, ready} = require('./lib.cjs');
 drive('stack', async t => {
   const p = await t.open(1440, 900, 'work');
   await p.click('[data-worktab="requests"]'); await ready(p);
-  await p.$eval('.req-row[data-open-doc="r-1024"]', e => e.click()); await p.waitForTimeout(500);
-  t.check(!(await p.$('#sheet-body [data-open-doc="r-1024"]')), 'the open request links to itself');
+  await p.$eval('.req-row[data-open-doc="r-2026-10-06-1024"]', e => e.click()); await p.waitForTimeout(500);
+  t.check(!(await p.$('#sheet-body [data-open-doc="r-2026-10-06-1024"]')), 'the open request links to itself');
   t.check(await p.$('#sheet-body [data-open-doc="t-0017"]'), 'no link to the task');
   const sheetLeft = await p.$eval('#sheet', e => e.getBoundingClientRect().left);
   await p.click('#sheet-body [data-open-doc="t-0017"]'); await p.waitForTimeout(90);
@@ -18,7 +18,7 @@ drive('stack', async t => {
   t.check(!(await p.$('#sheet-body [data-open-doc="t-0017"]')), 'the open task file links to itself');
   t.check(await p.$$eval('[id="sheet-body"]', els => els.length) === 1, 'duplicate panel ids');
   await t.shot(p, 'stack-1-1440.png');
-  const reqLink = await p.$eval('#sheet-body [data-open-doc^="r-"]:not([data-open-doc="r-1024"])', e => e.dataset.openDoc);
+  const reqLink = await p.$eval('#sheet-body [data-open-doc^="r-"]:not([data-open-doc="r-2026-10-06-1024"])', e => e.dataset.openDoc);
   await p.click(`#sheet-body [data-open-doc="${reqLink}"]`); await p.waitForTimeout(500);
   const depths = await p.$$eval('.sheet-ghost', gs => gs.map(g => g.style.getPropertyValue('--d')));
   t.check(depths.join() === '2,1', 'ghost depths: ' + depths);
@@ -30,7 +30,7 @@ drive('stack', async t => {
   await p.click('#sheet-body [data-open-doc="t-0017"]'); await p.waitForTimeout(450); await p.click('#sheet-x'); await p.waitForTimeout(450);
   t.check(!(await p.$$eval('.sheet-ghost', gs => gs.length)), 'layers left after closing');
   // an open panel refreshes on the poll, by its key
-  await p.$eval('[data-open-doc="r-1024"]', e => e.click()); await p.waitForTimeout(400);
+  await p.$eval('[data-open-doc="r-2026-10-06-1024"]', e => e.click()); await p.waitForTimeout(400);
   await p.$eval('#sheet-body [data-open-doc="t-0017"]', e => e.click()); await p.waitForTimeout(400);
   const n0 = (await t.srv.calls()).filter(c => c.path === '/api/doc/t-0017').length;
   await p.evaluate(() => poll()); await p.waitForTimeout(400);
@@ -42,7 +42,7 @@ drive('stack', async t => {
   await p.close();
   const m = await t.open(390, 844, 'work');
   await m.click('[data-worktab="requests"]'); await ready(m);
-  await m.$eval('.req-row[data-open-doc="r-1024"]', e => e.click()); await m.waitForTimeout(450);
+  await m.$eval('.req-row[data-open-doc="r-2026-10-06-1024"]', e => e.click()); await m.waitForTimeout(450);
   await m.click('#sheet-body [data-open-doc="t-0017"]'); await m.waitForTimeout(500);
   const [st, gt] = await m.evaluate(() => [document.querySelector('#sheet').getBoundingClientRect().top, document.querySelector('.sheet-ghost').getBoundingClientRect().top]);
   t.check(gt < st, 'phone: the panel underneath is not visible above');

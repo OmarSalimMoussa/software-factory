@@ -231,12 +231,12 @@ def _requests(tasks: list[Task], now: float) -> list[Request]:
         at = now - _ago(row["age"])
         day = datetime.fromtimestamp(at, UTC).strftime("%Y-%m-%d")
         real[rid] = f"r-{day}-{rid[2:]}"
-        task = owners.get(rid, "")
+        owner_task = owners.get(rid, "")
         outcome = {"waiting": "", "noise": "noise a duplicate", "parked": "parked not for this goal"}.get(
             row["outcome"], ""
         )
-        if task:
-            outcome = ("task " if owners[rid] == task else "joined ") + task
+        if owner_task:
+            outcome = "task " + owner_task
         inbox = row["inbox"]
         sender = {"users": "user-ada", "owner": "owner", "agents": "qa-visual"}[inbox]
         out.append(
@@ -255,6 +255,28 @@ def _requests(tasks: list[Task], now: float) -> list[Request]:
     for task in tasks:
         task.requests = [real[r] for r in task.requests]
     return out
+
+
+COSTS: dict[str, float] = {}  # each agent's cost as the fixtures show it, filled as the agents are written
+
+
+def _usd(text: str) -> float:
+    return float(text.lstrip("$").replace(",", ""))
+
+
+def _nodes(node: dict[str, Any]) -> list[dict[str, Any]]:
+    return [node, *(n for kid in node.get("kids", []) for n in _nodes(kid))]
+
+
+def _history_lines(sessions: list[Session]) -> str:
+    """What the lifecycle writes: a line as each agent starts and as it retires; and one line someone broke."""
+    lines = [{"at": s.started, "session": s.id, "name": s.name, "state": "working", "retired": "", "by": s.started_by,
+              "why": "started"} for s in sessions]  # fmt: skip
+    lines += [{"at": s.ended, "session": s.id, "name": s.name, "state": "retired", "retired": s.retired,
+               "by": s.retired_by or "warden", "why": f"{s.retired} by the {s.retired_by or 'warden'}"}
+              for s in sessions if s.state == "retired"]  # fmt: skip
+    text = [json.dumps(line, sort_keys=True) for line in sorted(lines, key=lambda line: line["at"])]
+    return "\n".join([*text[:5], '{"at": "2026-10-0', *text[5:]]) + "\n"
 
 
 def _sessions(now: float) -> list[Session]:
@@ -312,8 +334,10 @@ def _sessions(now: float) -> list[Session]:
             walk(kid, node["id"] if role not in ("orchestrator",) or kid["role"] in ("intake",) else "", minutes // 2)
 
     walk(tree, "", 312)
+    COSTS.update({n["id"]: _usd(n["cost"]) for n in _nodes(tree)})
     for n in range(1, 33):
         h = fixture(f"history/h{n}.json")["history"]
+        COSTS[h["id"]] = _usd(h["cost"])
         started, ended = _when(h["started"], now - 3600), _when(h["ended"], now - 1800)
         role = h["name"] if h["role"] in ("tester", "critic") else roles.get(h["role"], h["role"])
         kind = {"finished": "finished", "crashed": "crashed"}.get(h["why"]["text"], "stopped")
@@ -365,10 +389,10 @@ def _cost(sessions: list[Session], tasks: list[Task], now: float) -> list[CostRe
                 )
             )
     for s in sessions:
-        if s.state != "retired" or s.ended:
+        if s.id in COSTS:
             out.append(
                 CostRecord(
-                    at=iso(now - 120),
+                    at=s.ended or iso(now - 120),
                     session=s.parent or s.id,
                     subagent=s.agent_id,
                     role=s.role,
@@ -379,7 +403,7 @@ def _cost(sessions: list[Session], tasks: list[Task], now: float) -> list[CostRe
                     output=300,
                     cache_read=0,
                     cache_write=0,
-                    usd=1.25 + len(s.id) % 5,
+                    usd=COSTS[s.id],
                 )
             )
     out += [
@@ -427,7 +451,12 @@ def seed(root: Path, now: float = T0) -> Places:
     places.defaults.write_text(defaults_text(repo))
     places.state.mkdir(parents=True, exist_ok=True)
     places.totp_secret.write_text(totp.new_secret())
-    store.write_text(places.overrides, "[dashboard]\npage_size = 25\n")
+    # Rows per page as the UI's drives page them, the implementers' cap raised from its default, and an estimate as
+    # soon as a rung has one landed run.
+    store.write_text(
+        places.overrides,
+        "[caps]\nimplementers = 4\n\n[dashboard]\npage_size = 25\n\n[routing]\n" "estimate_min_runs = 1\n",
+    )
     settings = settings_module.load(places.defaults, places.overrides)
     public.write_settings(places, settings)
     (repo / "GOAL.md").write_text(GOAL)
@@ -461,6 +490,7 @@ def seed(root: Path, now: float = T0) -> Places:
     _write(repo / "queue" / "tasks" / "t-0026.md", "---\nid: t-0026\n---\n# A task file someone broke\n")
     _write(repo / "queue" / "requests" / "users" / "r-2026-10-07-0032.md", "not a request\n")
     sessions = _sessions(now)
+    store.write_text(places.history, _history_lines(sessions))
     store.write_json(places.registry, {s.id: models.dump(s) for s in sessions})
     store.write_json(places.state / "doing" / "impl-sign-in-loop.json", {"qa_round": 2})
     for n, holder in ((1, "impl-sign-in-loop"), (2, "impl-retry-upload"), (3, "impl-staging-down")):
@@ -470,7 +500,7 @@ def seed(root: Path, now: float = T0) -> Places:
         )
     store.write_json(places.proposals, {"open": ["t-0027", "t-0024", "t-0025"], "approved": []})
     cards = []
-    for n, (kind, task, ask) in enumerate(
+    for n, (kind, task_id, ask) in enumerate(
         (
             ("spec", "t-0023", "Sign off the partner sign-in spec"),
             ("decide", "t-0019", "Its rounds are used up at rung 3."),
@@ -488,8 +518,8 @@ def seed(root: Path, now: float = T0) -> Places:
             models.Card(
                 id=f"n{n}",
                 kind=kind,
-                task=task,
-                title=next(t.title for t in tasks if t.id == task),
+                task=task_id,
+                title=next(t.title for t in tasks if t.id == task_id),
                 ask=ask,
                 created=iso(now - 3600),
                 picture=picture,

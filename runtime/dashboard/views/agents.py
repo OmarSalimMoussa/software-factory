@@ -5,11 +5,24 @@ from __future__ import annotations
 from typing import Any
 
 from runtime.dashboard.views import agentwords as words
-from runtime.dashboard.views.kit import FAMILIES, Parts, Query, Snap, epoch, iso, money, page, plural, span, when
+from runtime.dashboard.views.kit import (
+    FAMILIES,
+    Parts,
+    Query,
+    Snap,
+    broken,
+    epoch,
+    iso,
+    money,
+    page,
+    plural,
+    span,
+    when,
+)
 from runtime.dashboard.views.shell import factory_state
 from runtime.shared.models import DEPRIORITIZED, HOLDS_SLOT, RETIRED
 
-WANTS = ("settings", "sessions", "queue", "cost", "factory", "slots")
+WANTS = ("settings", "sessions", "queue", "cost", "factory", "slots", "history")
 
 
 def _linger(snap: Snap) -> float:
@@ -69,10 +82,20 @@ def history_row(snap: Snap, row: dict[str, Any]) -> dict[str, Any]:
 
 
 def history(snap: Snap, query: Query) -> dict[str, Any]:
-    done = [r for r in snap.get("sessions").values() if r["state"] == RETIRED and not in_tree(snap, r)]
-    done.sort(key=lambda r: r["ended"], reverse=True)
-    chunk, more = page(done, query, snap.settings.get_int("dashboard.page_size"), "history_page")
-    return {"rows": [history_row(snap, r) for r in chunk], "more": more}
+    """Every retirement history.jsonl records, newest first, past the tree's linger; a line that cannot be read is
+    one failed row, first, and an agent the registry no longer holds says so in its own row."""
+    sessions = snap.get("sessions")
+    failed: list[dict[str, Any]] = []
+    done: list[dict[str, Any]] = []
+    for line in reversed(snap.get("history")):
+        if "error" in line:
+            failed.append(broken(f"history line {line['line']}", line["error"]))
+        elif line["session"] not in sessions:
+            done.append(broken(line["name"], f"{line['name']} retired, but the registry has no record of it"))
+        elif not in_tree(snap, sessions[line["session"]]):
+            done.append(sessions[line["session"]])
+    chunk, more = page([*failed, *done], query, snap.settings.get_int("dashboard.page_size"), "history_page")
+    return {"rows": [r if r.get("broken") else history_row(snap, r) for r in chunk], "more": more}
 
 
 def capacity(snap: Snap) -> list[dict[str, Any]]:

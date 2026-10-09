@@ -193,7 +193,7 @@ async function openPromote() {
   'Push to prod', (code, key) => post('/api/push', {expected_staging_sha: d.expected_staging_sha, code}, key), {opTitle: 'Pushing to prod', icon: 'rocket-launch', blocked: d.blocked});
 }
 function openPushBack(sha) {
-  codeSheet('Push prod back', `<div class="muted">Prod is redeployed at ${esc(sha)}, the commit it ran before.</div>`, 'Push back', (code, key) => post('/api/push/back', {code}, key), {opTitle: 'Pushing prod back', icon: 'arrow-path'});
+  codeSheet('Push prod back', `<div class="muted">Prod is redeployed at ${esc(sha)}, the commit it ran before.</div>`, 'Push back', (code, key) => post('/api/push/back', {expected_sha: sha, code}, key), {opTitle: 'Pushing prod back', icon: 'arrow-path'});
 }
 
 function openMore() { openSheet('More', `<div class="more-grid">${UI.pages.slice(4).map(([id, n, ic]) => `<button data-go="${id}" data-close="1">${icon(ic)}${esc(n)}</button>`).join('')}</div><div class="section"><div class="label">Theme</div><div class="seg">${['system', 'light', 'dark'].map(t => `<button data-theme-set="${t}" aria-pressed="${theme() === t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join('')}</div></div>`, '', true); }

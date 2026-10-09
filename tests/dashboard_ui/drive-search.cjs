@@ -29,7 +29,7 @@ drive('search', async t => {
   await p.click('#gq'); await p.keyboard.type('qa-visual'); await results();
   t.check((await p.textContent('#gs-pop')).toLowerCase().includes('agents'), 'agent group missing');
   await p.keyboard.press('Escape'); t.check(await p.$eval('#gs-pop', e => e.hidden), 'Escape did not close the list');
-  await p.click('#gq'); await p.keyboard.type('r-10'); await results();
+  await p.click('#gq'); await p.keyboard.type('r-2026'); await results();
   const all = await p.$('.gs-all');
   if (!all) t.errors.push('no see-all row'); else {
     const n = +(await all.textContent()).match(/\d+/)[0]; await all.click(); await ready(p); await p.waitForTimeout(300);
