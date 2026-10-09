@@ -39,6 +39,9 @@ VERBS: dict[str, Verb] = {
     "bench": _v("runtime.warden.lifecycle:bench", ORCH),
     "revive": _v("runtime.warden.lifecycle:revive", ORCH),
     "doing": _v("runtime.warden.lifecycle:set_doing", *SESSIONS),
+    # contract: added by the coordinator; the guard's SubagentStart and SubagentStop hooks report a subagent
+    "subagent.start": _v("runtime.warden.subagents:started", *SESSIONS),
+    "subagent.end": _v("runtime.warden.subagents:ended", *SESSIONS),
     # the loop, probes, outage and pushes (1B-2)
     "tick": _v("runtime.warden.loop:tick", ORCH),
     "inbox": _v("runtime.warden.inbox:read", ORCH),

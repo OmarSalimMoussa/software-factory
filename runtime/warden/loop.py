@@ -9,19 +9,24 @@ intake.batch_max_wait_hours. The orchestrator's `factory tick` acknowledges each
 
 from __future__ import annotations
 
+import copy
+import logging
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import formats
+from runtime.queue import formats, tasks
 from runtime.queue.book import Queue
 from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
-from runtime.shared.protocol import ok
-from runtime.warden import github_push, inbox, outage, probes, vitals
+from runtime.shared.protocol import Refused, ok
+from runtime.warden import github_push, inbox, outage, probes, reflections, vitals
 from runtime.warden.context import Context
 
-_FRESH: dict[str, Any] = {"probed": {}, "staging_red": False, "loop_due": None, "triage_due": None}
+log = logging.getLogger(__name__)
+
+# deployed: the build each environment last answered with, so tasks advance once per new build.
+_FRESH: dict[str, Any] = {"probed": {}, "deployed": {}, "staging_red": False, "loop_due": None, "triage_due": None}
 
 
 def _memo_path(places: Places) -> Path:
@@ -35,7 +40,7 @@ def _tick_path(places: Places) -> Path:
 def _memo(places: Places) -> dict[str, Any]:
     raw = store.read_json_or(_memo_path(places), None)
     if raw is None:
-        return {**_FRESH, "probed": {}}
+        return copy.deepcopy(_FRESH)
     if not isinstance(raw, dict) or raw.keys() != _FRESH.keys():
         raise store.StoreError(f"{_memo_path(places)}: want exactly {sorted(_FRESH)}")
     return raw
@@ -78,6 +83,7 @@ def run_tick(
                 outage.observe(ctx, probe)
             else:
                 _staging(ctx, memo, probe)
+            _deployed(ctx, memo, probe)
             store.write_json(_memo_path(ctx.places), memo)
     _loop_due(ctx, memo, now)
     _fix(ctx)
@@ -90,6 +96,7 @@ def _staging(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
         memo["staging_red"] = False
     elif probe.counts and not memo["staging_red"]:
         memo["staging_red"] = True
+        reflections.incident(ctx, f"Staging went red at {probe.at}; the orchestrator was told to revert or fix it.")
         ctx.post_event(inbox.STAGING_RED, {
             "probe": models.dump(probe),
             "request": {
@@ -100,6 +107,22 @@ def _staging(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
                         "it at once, or fix it forward.",
             },
         })  # fmt: skip
+
+
+def _deployed(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
+    """A new build on staging or prod moves the tasks it includes along: checked to on-staging to promoted."""
+    if not probe.ok or memo["deployed"].get(probe.env) == probe.commit:
+        return
+    memo["deployed"][probe.env] = probe.commit
+    try:
+        moved = tasks.advance_deployed(ctx, memo["deployed"].get(probes.STAGING), memo["deployed"].get(probes.PROD))
+    except Refused as exc:
+        # Retried on the next probe: forgetting the build makes it new again.
+        del memo["deployed"][probe.env]
+        log.warning("warden: advancing tasks to the %s build failed (%s)", probe.env, exc.rule)
+        return
+    if moved:
+        log.info("warden: tasks advanced to the %s build: %s", probe.env, ", ".join(moved))
 
 
 def _fix(ctx: Context) -> None:

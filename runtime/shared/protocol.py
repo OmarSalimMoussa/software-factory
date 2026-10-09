@@ -22,14 +22,17 @@ class Refused(Exception):
         super().__init__(f"{rule}: {reason}")
 
 
-def request(verb: str, args: dict[str, Any] | None = None, data: bytes | None = None) -> bytes:
+def request(verb: str, args: dict[str, Any] | None = None, data: bytes | None = None, agent_id: str = "") -> bytes:
+    """``agent_id``: the subagent the guard stamped on this call; the warden accepts it only from its parent."""
     body: dict[str, Any] = {"verb": verb, "args": args or {}}
+    if agent_id:
+        body["agent_id"] = agent_id
     if data is not None:
         body["bytes_b64"] = base64.b64encode(data).decode()
     return (json.dumps(body) + "\n").encode()
 
 
-def parse_request(line: bytes) -> tuple[str, dict[str, Any], bytes | None]:
+def parse_request(line: bytes) -> tuple[str, dict[str, Any], bytes | None, str]:
     if len(line) > MAX_LINE:
         raise Refused("protocol", "the request is too large")
     try:
@@ -40,7 +43,10 @@ def parse_request(line: bytes) -> tuple[str, dict[str, Any], bytes | None]:
         raise Refused("protocol", "a request needs a verb and args")
     raw = body.get("bytes_b64")
     data = base64.b64decode(raw) if isinstance(raw, str) else None
-    return body["verb"], body["args"], data
+    agent_id = body.get("agent_id", "")
+    if not isinstance(agent_id, str):
+        raise Refused("protocol", "agent_id is a string")
+    return body["verb"], body["args"], data, agent_id
 
 
 def ok(**fields: Any) -> dict[str, Any]:

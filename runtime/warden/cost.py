@@ -46,7 +46,7 @@ class Payer:
     model: str  # the model a failed call was meant for, when the transcript names none
 
 
-def _family(kind: str, parent_family: str) -> str:
+def family_of(kind: str, parent_family: str) -> str:
     return _FAMILIES.get(kind, _FAMILIES.get(kind.split("-", 1)[0], parent_family))
 
 
@@ -72,7 +72,7 @@ def _subagent_payer(parent: Session, agent_id: str, meta: Path, rows: dict[str, 
         # telemetry: expected — a subagent whose record is not written yet is charged to its parent's role
         except (OSError, ValueError):
             kind = ""
-        family, task, model = _family(kind, parent.family), parent.task, ""
+        family, task, model = family_of(kind, parent.family), parent.task, ""
         # An unregistered intake run names no request; its cost stays with the parent's own work.
     if kind == "triage":
         task = UPKEEP

@@ -19,7 +19,7 @@ from runtime.shared import protocol, store
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
-from runtime.warden import codes
+from runtime.warden import codes, subagents
 from runtime.warden.context import Caller, Clock, Context, GitHub, Launcher
 from runtime.warden.verbs import VERBS, Verb
 
@@ -117,7 +117,9 @@ class Dispatcher:
 
     def answer(self, caller: Caller, socket: str, line: bytes) -> dict[str, Any]:
         try:
-            name, args, data = protocol.parse_request(line)
+            name, args, data, agent_id = protocol.parse_request(line)
+            if agent_id:
+                caller = subagents.acting_as(self.doors.places, caller, agent_id)
             verb = self._allowed(caller, socket, name)
         except Refused as exc:
             return protocol.refused(exc.rule, exc.reason)

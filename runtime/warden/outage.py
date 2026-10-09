@@ -15,7 +15,7 @@ from runtime.shared import models, store
 from runtime.shared.models import Outage, Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import inbox, probes, registry
+from runtime.warden import inbox, probes, reflections, registry
 from runtime.warden.context import Context
 
 DOWN, FIXING, ON_STAGING, STOPPED = "down", "fixing", "on-staging", "stopped"
@@ -51,6 +51,7 @@ def observe(ctx: Context, probe: Probe) -> None:
             return
         outage = Outage(since=streak[0].at, stage=DOWN)
         _write(ctx.places, outage)
+    reflections.incident(ctx, f"Prod went down at {outage.since}: {needed} health checks in a row failed.")
     ctx.post_event(inbox.PROD_RED, {
         "since": outage.since,
         "probes": [models.dump(p) for p in streak],

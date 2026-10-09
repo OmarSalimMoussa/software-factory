@@ -30,7 +30,9 @@ from runtime.warden.context import Context, Launcher, StackResult
 
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
-PENDING = "pending-"  # a started session's registry id until the backstop binds the id Claude Code gave it
+# A started session's registry id is PENDING + the --session-id it was started with, until the backstop sees that
+# session running and drops the prefix; the guard looks a session up under both.
+PENDING = "pending-"
 REDACTED = "[redacted]"
 # What `claude --bg` prints for the session it started. A resume that prints another short id started a copy.
 _BACKGROUNDED = re.compile(r"^backgrounded · ([0-9a-f]{8})\b", re.MULTILINE)
@@ -50,7 +52,8 @@ def agent_home() -> Path:
 
 def session_argv(launch: dict[str, Any]) -> list[str]:
     """The `claude` command a session request names; the agent-run unit's runner executes exactly this."""
-    argv = ["claude", "--bg", "--name", launch["name"], "--remote-control", launch["name"]]
+    argv = ["claude", "--bg", "--session-id", launch["session_id"], "--name", launch["name"]]
+    argv += ["--remote-control", launch["name"]]
     argv += ["--model", launch["model"], "--effort", launch["effort"], "--agent", launch["agent"]]
     argv += ["--settings", launch["settings"], "--agents", launch["agents"]]
     if launch["worktree"]:
@@ -166,7 +169,7 @@ def resume(launcher: Launcher, session_id: str, message: str, cwd: str) -> None:
 def start_session(
     ctx: Context, sessions: dict[str, Session], fields: dict[str, Any], prompt: str, worktree: str
 ) -> Session:
-    """Register and start one session named by ``fields``; its id stays pending until the backstop binds it.
+    """Register and start one session named by ``fields``; its id stays pending until the backstop sees it run.
 
     It is registered before it starts, so the backstop knows the name it is about to see. A worktree the reap held for
     the task (work not yet on a merged branch) is handed to the new session.
@@ -176,7 +179,8 @@ def start_session(
     if held is not None:
         worktree = Path(held["worktree"]).name
         prompt += f"\n\nYour worktree holds the last session's work on {held['branch']}: carry on from it."
-    request_id = f"{PENDING}{uuid.uuid4().hex}"
+    session_id = str(uuid.uuid4())
+    request_id = f"{PENDING}{session_id}"
     repo = Path(settings.get_str("repo.path"))
     place = session_settings.worktrees(repo) / worktree if worktree else repo
     path = session_settings.write(settings, ctx.places, request_id, fields["role"], place, agent_home())
@@ -189,7 +193,8 @@ def start_session(
                 note="started", **fields)  # fmt: skip
     sessions[request_id] = s
     registry.write(ctx.places, sessions)
-    request = {"name": s.name, "cwd": str(repo), "worktree": worktree, "model": s.model, "effort": s.effort,
+    request = {"name": s.name, "session_id": session_id, "cwd": str(repo), "worktree": worktree, "model": s.model,
+               "effort": s.effort,
                "agent": s.role, "prompt": prompt, "settings": str(path), "agents": json.dumps(agents)}  # fmt: skip
     try:
         ctx.launcher.start_agent(request_id, request)

@@ -23,7 +23,7 @@ from runtime.shared.models import (
     Session,
 )
 from runtime.shared.protocol import Refused
-from runtime.warden import backstop, launch, lifecycle, loop, permits, registry
+from runtime.warden import backstop, launch, lifecycle, loop, permits, reflections, registry
 from runtime.warden.backstop import Proc
 from runtime.warden.context import Context
 from runtime.warden.launch import LaunchError
@@ -126,6 +126,8 @@ def watch(ctx: Context) -> None:
                     launch.resume(ctx.launcher, sid, RESTARTED, settings.get_str("repo.path"))
                 except LaunchError as exc:
                     log.warning("resume %d of crashed session %s failed (%s)", s.resume_tries, sid, type(exc).__name__)
+                if s.role == ORCH:
+                    reflections.incident(ctx, "The orchestrator's process ended; the warden resumed it.")
                 continue
             else:
                 why = f"its process ended and {tries} resumes did not keep it running"
@@ -153,6 +155,8 @@ def watch_orchestrator(ctx: Context) -> None:
             return
         try:
             lifecycle.wake(ctx, orchestrator, SILENT.format(minutes=int(silent // 60)), force=True)
+            reflections.incident(ctx, f"The orchestrator's loop was silent for {int(silent // 60)} min; the warden "
+                                      "restarted it.")  # fmt: skip
         except LaunchError as exc:
             log.warning("restart of silent orchestrator %s failed (%s)", orchestrator.id, type(exc).__name__)
             return
