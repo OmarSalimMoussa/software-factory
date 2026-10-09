@@ -145,6 +145,8 @@ working_now_max = 6
 max_threads = 16
 retired_linger_minutes = 3  # a retired agent stays in the live tree this long, then moves to History
 idempotency_hours = 24  # how long the answer to a write is kept for a retry with the same key
+warden_seconds = 8      # the longest the dashboard waits for the warden's answer; the page gives up at 10
+settled_seconds = 2     # how long a card the owner acted on says what happened before its place moves on
 
 [gc]                    # the nightly prune; reaping a retired session is immediate
 prune_hour = 3

@@ -76,6 +76,9 @@ VERBS: dict[str, Verb] = {
     "qa.result": _v("runtime.qa.verbs:qa_result", IMPL),  # contract: a tester's verdict on the head, for qa-clean
     # the owner, from the dashboard or their own terminal
     "snapshot": _o("runtime.warden.snapshot:snapshot"),
+    # contract: added by 2A. The dashboard cannot read the warden's state, so pictures and evidence come as bytes.
+    "picture": _o("runtime.warden.snapshot:picture"),
+    "evidence": _o("runtime.warden.snapshot:evidence"),
     "op.get": _o("runtime.warden.ops:get"),
     "device.admit": _o("runtime.warden.codes:admit_device", coded=True),
     "device.verify": _o("runtime.warden.codes:verify_device"),  # contract: added by 1B-3, a device token ok/expired

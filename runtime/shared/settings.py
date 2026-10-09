@@ -138,6 +138,8 @@ SCHEMA: dict[str, Spec] = {
     "dashboard.max_threads": Spec("int", 2, 64, when="Next warden start"),
     "dashboard.retired_linger_minutes": Spec("int", 1, 30),
     "dashboard.idempotency_hours": Spec("int", 1, 168),  # contract: added by 1B-3
+    "dashboard.warden_seconds": Spec("int", 1, 60),  # contract: added by 2A, its longest wait on the warden
+    "dashboard.settled_seconds": Spec("int", 1, 30),  # contract: added by 2A, an acted-on card says so this long
     "gc.prune_hour": Spec("int", 0, 23),
     "gc.images_keep_days": Spec("int", 1, 90),
     "gc.docker_budget_gib": Spec("int", 5, 2000),
