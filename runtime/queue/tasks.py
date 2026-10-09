@@ -15,9 +15,10 @@ from runtime.queue import approvals, documents, formats, goal, intake, proposals
 from runtime.queue.book import Queue, task_rel
 from runtime.queue.score import score
 from runtime.queue.statuses import OWNER, WARDEN
-from runtime.shared.models import Request, Task
+from runtime.shared.models import RETIRED, Request, Task
 from runtime.shared.order import ordered
 from runtime.shared.protocol import Refused
+from runtime.warden import registry
 from runtime.warden.context import Context
 
 SLOT_FREE = "proposal-slot-free"
@@ -45,11 +46,11 @@ def read(ctx: Context, task_id: str) -> Task:
     return Queue.of(ctx).task(task_id)
 
 
-def move(ctx: Context, task_id: str, to: str, event: str, by: str = WARDEN, text: str = "") -> Task:
-    """Move a task along the status table for ``by`` (the warden itself unless named)."""
+def move(ctx: Context, task_id: str, to: str, event: str, by: str = WARDEN, text: str = "", **fields: Any) -> Task:
+    """Move a task along the status table for ``by`` (the warden itself unless named), setting ``fields`` with it."""
     queue = Queue.of(ctx)
     with ctx.lock, queue.lock():
-        return transition(ctx, queue, queue.task(task_id), to, event, by, text or f"{event}: now {to}")
+        return transition(ctx, queue, queue.task(task_id), to, event, by, text or f"{event}: now {to}", **fields)
 
 
 def transition(
@@ -74,7 +75,10 @@ def transition(
 
 
 def follow(ctx: Context, before: Task, after: Task) -> None:
-    """Keep the proposal places, the approved order and the approval in step with a task's new status."""
+    """Keep the proposal places, the approved order, the approval and the implementer's merge turn in step with a
+    task's new status."""
+    if (before.status == "turn") != (after.status == "turn"):
+        _hold_turn(ctx, after.id, after.status == "turn")
     found = proposals.read(ctx.places)
     if after.status != "proposed" and proposals.remove(found, after.id) and before.status == "proposed":
         ctx.post_event(SLOT_FREE, {"task": after.id})
@@ -87,6 +91,17 @@ def follow(ctx: Context, before: Task, after: Task) -> None:
     if after.status in ("proposed", "queued", "parked", "closed"):
         approvals.void(ctx.places, after.id)
     proposals.write(ctx.places, found)
+
+
+def _hold_turn(ctx: Context, task_id: str, held: bool) -> None:
+    """The task's implementer holds its merge turn while the task does, so no bench pushes it out."""
+    sessions = registry.read(ctx.places)
+    mine = [s for s in sessions.values()
+            if s.task == task_id and s.role == statuses.IMPL and not s.parent and s.state != RETIRED]  # fmt: skip
+    for s in mine:
+        s.merge_turn = held
+    if mine:
+        registry.write(ctx.places, sessions)
 
 
 def set_status(ctx: Context, task_id: str, to: str, event: str, note: str) -> Task:

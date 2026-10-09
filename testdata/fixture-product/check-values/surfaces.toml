@@ -1,0 +1,3 @@
+# The path prefixes that give a change its QA surfaces. Only the owner changes this file.
+ui = ["web/"]
+api = ["app/"]

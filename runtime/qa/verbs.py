@@ -77,7 +77,8 @@ def qa_plan(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str,
 
 
 def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Every slice is built and the slot runs the head: testers may start on it."""
+    """Every slice is built and the slot runs the head: testers may start on it. The task records the worktree's
+    branch here, which is how `factory merge recorded` later finds it."""
     session = _implementer(ctx)
     asked, slices = args.get("head"), args.get("slices")
     if not isinstance(asked, str) or not SHA.match(asked) or not isinstance(slices, list) or not slices:
@@ -90,6 +91,9 @@ def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     head = _head(ctx, session)
     if not head.startswith(asked):
         raise Refused("qa-ready", f"{asked[:9]} is not your branch's head ({head[:9]}): commit, then ask again")
+    branch = _git(ctx, session.worktree, "rev-parse", "--abbrev-ref", "HEAD")
+    if branch == "HEAD":
+        raise Refused("qa-ready", "your worktree is on no branch: commit on your own branch, then ask again")
     for commit in slices:
         code, _ = ctx.launcher.agent_command(
             ["git", "-C", session.worktree, "merge-base", "--is-ancestor", commit, head], session.worktree
@@ -110,7 +114,7 @@ def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
         rounds = len({str(r["head"]) for r in [*records, record]})
         doing.record(ctx.places, session.id, slice=len(slices), slices=len(slices), qa_round=rounds)
     if task.status == "building":
-        tasks.move(ctx, task.id, "qa", "qa-ready", IMPL, f"ready for QA at {head[:9]}")
+        tasks.move(ctx, task.id, "qa", "qa-ready", IMPL, f"ready for QA at {head[:9]}", branch=branch)
     return ok(head=head, slot=lease.slot, testers=[{"tester": t, "why": why} for t, why in testers.items()])
 
 

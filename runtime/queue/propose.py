@@ -1,8 +1,9 @@
 """`factory propose`: the orchestrator puts a task on Home for the owner (routing spec, R4).
 
-At most ``routing.max_proposals`` places hold proposals. A proposal carries a picture and a one-line why; a run
-other than the one ``factory route`` names needs a reason, which goes to the task's log. A running task comes back
-one rung up the same way, with its approval gone. ``propose --none`` fills a place with "nothing else".
+At most ``routing.max_proposals`` places hold proposals. A proposal carries a picture and a one-line why; it runs at
+the rung ``factory route`` names unless it names another, which needs a reason that goes to the task's log. A
+running task comes back one rung up the same way, with its approval gone. ``propose --none`` fills a place with
+"nothing else".
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from runtime.warden.context import Context
 
 def propose(ctx: Context, task_id: str, run: object, why: str, reason: str, picture: bytes | None) -> dict[str, Any]:
     settings = ctx.settings()
-    if isinstance(run, bool) or not isinstance(run, int) or run not in range(1, 5):
+    if run is not None and (isinstance(run, bool) or not isinstance(run, int) or run not in range(1, 5)):
         raise Refused("run", "a proposal runs at rung 1 to 4; a rung-0 task closes with a reason instead")
     if not why.strip() or "\n" in why.strip():
         raise Refused("why", "a proposal says in one line why now: --why '…'")
@@ -29,6 +30,10 @@ def propose(ctx: Context, task_id: str, run: object, why: str, reason: str, pict
         if task.not_now:
             raise Refused("not-now", f"the owner said not now to {task_id}; it waits for a new request or a boost")
         planned = route.route(task, settings)
+        if run is None:
+            if planned == 0:
+                raise Refused("run", f"factory route names rung 0 for {task_id}: close it with its reason instead")
+            run = planned
         if run != planned and not reason.strip():
             raise Refused("route", f"factory route names rung {planned} for {task_id}; a run of {run} needs --reason")
         event = "propose" if task.status == "queued" else "rung-up"

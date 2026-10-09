@@ -135,7 +135,7 @@ def _deployed(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
 
 
 def _goal(ctx: Context, memo: dict[str, Any]) -> None:
-    """A change to GOAL.md scores every waiting task again."""
+    """A change to GOAL.md scores every waiting task again and tells the orchestrator; the first reading is none."""
     settings = ctx.settings()
     raw = files.read_repo_file(Path(settings.get_str("repo.path")), goal.GOAL_FILE,
                                settings.get_int("queue.max_upload_kib") * 1024)  # fmt: skip
@@ -143,8 +143,10 @@ def _goal(ctx: Context, memo: dict[str, Any]) -> None:
     if memo["goal"] == digest:
         return
     changed = tasks.rescore(ctx)
-    memo["goal"] = digest
+    first, memo["goal"] = memo["goal"] is None, digest
     store.write_json(_memo_path(ctx.places), memo)
+    if not first:
+        ctx.post_event(inbox.GOAL_CHANGED, {"rescored": changed})
     log.info("warden: GOAL.md changed; %d task scores changed", changed)
 
 

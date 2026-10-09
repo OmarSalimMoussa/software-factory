@@ -32,6 +32,7 @@ from runtime.warden import (
     public,
     reap,
     reflections,
+    registry,
     server,
     settings_save,
 )
@@ -114,6 +115,8 @@ def main() -> int:
     ops.recover(places, clock)
     public.write_settings(places, current)
     public.write_switches(places, public.read_switches(places))
+    # The unit runners refuse every request until public/sessions.json exists, the first start's git call included.
+    registry.write(places, registry.read(places))
     settings_save.render_plugin(places, current)
     peers = server.Peers(
         agent_uid=pwd.getpwnam(AGENT_USER).pw_uid,

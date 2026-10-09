@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from runtime.warden import codes, plan, registry, settings_save
+from runtime.shared import models
+from runtime.warden import codes, plan, probes, registry, settings_save
 from runtime.warden.context import Context
 
 
@@ -14,8 +15,11 @@ def status(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
     rows = [{k: getattr(s, k) for k in ("id", "name", "role", "state", "task", "doing", "slot", "model")}
             for s in sorted(sessions, key=lambda s: s.started)]  # fmt: skip
     until = codes.locked_until(ctx.places, ctx.clock.now())
+    # Each environment's last probe, None before the first: what "on staging" is checked against.
+    health = {env: next((models.dump(p) for p in probes.recent(ctx.places, env, 1)), None) for env in probes.ENVS}
     return {
         "sessions": rows,
+        **health,
         "plan": plan.reading(ctx),
         "code_locked_until": None
         if until is None

@@ -23,7 +23,7 @@ from runtime.shared.models import (
     Session,
 )
 from runtime.shared.protocol import Refused
-from runtime.warden import backstop, launch, lifecycle, loop, permits, reflections, registry
+from runtime.warden import backstop, inbox, launch, lifecycle, loop, permits, reflections, registry
 from runtime.warden.backstop import Proc
 from runtime.warden.context import Context
 from runtime.warden.launch import LaunchError
@@ -88,7 +88,7 @@ def _settle(ctx: Context, s: Session, procs: dict[str, Proc]) -> None:
         registry.write(ctx.places, sessions)
     if s.task and permits.read_task(ctx, s.task).status in ("building", "designing"):
         permits.move_task(ctx, s.task, "deprioritized", "bench")
-    ctx.post_event("benched", {"session": s.id, "name": s.name, "task": s.task})
+    ctx.post_event(inbox.BENCHED, {"session": s.id, "name": s.name, "task": s.task})
 
 
 def _finished(ctx: Context, s: Session) -> bool:
@@ -135,7 +135,7 @@ def watch(ctx: Context) -> None:
             registry.write(ctx.places, sessions)
         lifecycle.after_retire(ctx, retired)
         if retired[0].retired == CRASHED:
-            ctx.post_event("crashed", {"session": sid, "name": retired[0].name, "task": retired[0].task})
+            ctx.post_event(inbox.CRASHED, {"session": sid, "name": retired[0].name, "task": retired[0].task})
 
 
 def watch_orchestrator(ctx: Context) -> None:
