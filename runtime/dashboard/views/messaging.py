@@ -37,7 +37,8 @@ def thread(snap: Snap, row: dict[str, Any]) -> list[dict[str, Any]]:
     # telemetry: surfaced — the thread draws as one failed row; the rest of the panel still draws
     except PartError as exc:
         return [broken("thread", str(exc))]
-    name = words.name(snap, row)
+    # The panel's title already names the task; the agent speaks in its thread by its role.
+    name = str(row["role"]).capitalize()
     out: list[dict[str, Any]] = []
     for entry in entries:
         out.append({"who": "You", "at": _at(entry["at"]), "text": entry["text"]})
@@ -54,7 +55,7 @@ def box(snap: Snap, row: dict[str, Any]) -> dict[str, Any] | None:
         note = "The factory is paused: resume it, then send your message."
     else:
         note = _NOTES.get(row["state"], "It reads your message as soon as its current turn ends.")
-    name = "the orchestrator" if row["role"] == "orchestrator" else words.name(snap, row)
+    name = "the orchestrator" if row["role"] == "orchestrator" else f"this {row['role']}"
     return {
         "session": row["id"],
         "label": "Bring back with this message" if benched else "Send",

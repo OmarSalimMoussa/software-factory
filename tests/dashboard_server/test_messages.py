@@ -12,9 +12,9 @@ from runtime.warden.messages import PREFIX
 
 THREAD = [
     {"who": "You", "at": "Oct 9, 11:30", "text": "Check Safari first: most of the reports come from it."},
-    {"who": "Sign-in sends people back to the sign-in page", "at": "Oct 9, 11:30",
+    {"who": "Implementer", "at": "Oct 9, 11:30",
      "text": "Safari drops the session cookie on the redirect."},
-    {"who": "Sign-in sends people back to the sign-in page", "at": "Oct 9, 11:30", "text": "A test now covers it."},
+    {"who": "Implementer", "at": "Oct 9, 11:30", "text": "A test now covers it."},
 ]  # fmt: skip
 
 
