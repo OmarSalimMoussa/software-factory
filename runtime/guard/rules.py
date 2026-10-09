@@ -11,7 +11,7 @@ RULES: dict[str, str] = {
     "raw-starts": "running `claude`, except to list agents, read logs or print its version",
     "leave-slice": "sudo, systemd-run, at, crontab, su, systemctl --user, docker, podman, ssh, xdg-open, gio and kin",
     "factory-verbs": "a `factory` verb the role, or a subagent of it, may not use",
-    "factory-alone": "`factory` run with any other program, wrapper, redirect or variable, or naming outside files",
+    "factory-alone": "a call running `factory` that is not one plain `factory …` command, or names outside files",
     "queue-status": "a task status set by anyone but the orchestrator; any write to the queue but through `factory`",
     "subagent-kinds": "a subagent kind not on the role's list; any start from inside a subagent",
     "subagents-at-once": "more subagents than the cap; for the orchestrator, one place is kept for intake",
@@ -35,6 +35,6 @@ RULES: dict[str, str] = {
     "banned-tools": "workflows and remote triggers",
     "schedules": "any schedule kept by an agent: the warden drives the loop",
     "unreadable-command": "a command the guard cannot read, or one naming what runs through a variable, alias or pipe",
-    "agent-id": "a command naming the subagent id variable, which only the guard sets on a subagent's factory calls",
+    "agent-id": "an agent-written --agent-id: only the guard names a subagent on its factory calls",
     "inbox-wait": "the orchestrator going idle without `factory inbox --wait` in the background",
 }

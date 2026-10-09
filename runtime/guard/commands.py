@@ -65,9 +65,6 @@ def _reader(inv: shell.Invocation) -> bool:
 def check_bash(call: Call) -> Decision:
     """Every program a shell command would run, then the command as a whole."""
     command = str(call.tool_input.get("command", ""))
-    forged = factory_calls.check_forged(call, command)
-    if forged is not None:
-        return forged
     try:
         found = shell.invocations(command)
     # The refusal names the parse error to the agent.
@@ -75,6 +72,9 @@ def check_bash(call: Call) -> Decision:
         if call.off("unreadable-command"):
             return None
         return Refusal("unreadable-command", f"the guard cannot read this command ({exc}); write it plainly")
+    forged = factory_calls.check_forged(call, found)
+    if forged is not None:
+        return forged
     cwd = call.cwd
     for inv in found:
         cwd = _after_cd(call, inv, cwd)
@@ -95,7 +95,7 @@ def _whole(call: Call, command: str, found: list[shell.Invocation], cwd: Path) -
         )
     if not call.off("git-bypass") and any(map(git_rules.sets_config_from_env, found)):
         return Refusal("git-bypass", "git's configuration is the owner's, from the environment too")
-    return factory_calls.check_alone(call, found, cwd) or factory_calls.check_runs(call, found)
+    return factory_calls.check_alone(call, command, found, cwd) or factory_calls.check_runs(call, found)
 
 
 def _after_cd(call: Call, inv: shell.Invocation, cwd: Path) -> Path:

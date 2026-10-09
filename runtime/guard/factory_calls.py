@@ -2,14 +2,16 @@
 orchestrator (`queue-status`), the command alone in its line (`factory-alone`), and an implementer's check runs
 (`check-runs`).
 
-The factory command runs outside the sandbox so it can reach the warden. That exception must carry nothing else: no
-other program, wrapper, redirect or variable in the same command, and no file outside the session's worktree.
+The factory command runs outside the sandbox so it can reach the warden. Claude Code exempts a call only when its
+whole text is `factory` or `factory …`, so the guard asks for exactly that: one plain command, the bare word first,
+nothing the shell would expand or join, and no file outside the session's worktree.
 """
 
 from __future__ import annotations
 
 import os
 import re
+import shlex
 from pathlib import Path
 
 from runtime.guard import shell, transcript
@@ -18,9 +20,13 @@ from runtime.guard.wire import REFUSED
 from runtime.warden.verbs import VERBS
 
 FACTORY = "factory"
-# The variable the factory command sends as a subagent's id; only the guard sets it, on a subagent's own calls.
-AGENT_ID_VARIABLE = "SOFTWARE_AGENT_ID"
+# The flag that names a subagent to the warden; only the guard writes it, on a subagent's own calls.
+AGENT_ID_FLAG = "--agent-id"
 _SAFE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_PLAIN_START = re.compile(r"^factory(\s|$)")
+# Outside single quotes the shell expands or joins on these, so the text is no longer one plain call.
+_SHELL_SPECIAL = frozenset("$`*?[{}")
+ALONE = "run factory on its own; write a body to a file in your worktree and pass it as an argument"
 # Verbs the command answers itself, without the warden.
 LOCAL = frozenset({"check"})
 # What a subagent never asks for: what steers its session's lifecycle, the loop, the queue's order, a merge or a
@@ -37,8 +43,15 @@ _STARTS = frozenset({"implementer", "designer"})
 
 def verb_of(argv: list[str]) -> str:
     """The verb a factory command line asks for, by the warden's names; empty when it asks for nothing."""
-    words = [w for w in argv[1:] if not w.startswith("-")]
-    flags = {w.split("=", 1)[0] for w in argv[1:] if w.startswith("-")}
+    args: list[str] = []
+    rest = iter(argv[1:])
+    for word in rest:
+        if word == AGENT_ID_FLAG:
+            next(rest, None)
+        else:
+            args.append(word)
+    words = [w for w in args if not w.startswith("-")]
+    flags = {w.split("=", 1)[0] for w in args if w.startswith("-")}
     if not words:
         return ""
     for (word, flag), verb in _FLAG_VERBS.items():
@@ -78,20 +91,43 @@ def check_verb(call: Call, inv: shell.Invocation) -> Decision:
     return None
 
 
-def check_alone(call: Call, found: list[shell.Invocation], cwd: Path) -> Decision:
-    """`factory` runs outside the sandbox, so its command holds nothing else, and it reads files only from the
-    session's own worktree."""
-    runs = [inv for inv in found if inv.program == FACTORY]
-    if not runs or call.off("factory-alone"):
+def plain_words(command: str) -> list[str] | None:
+    """The words of a command that is one plain `factory` call, or None when the shell would read more into it."""
+    text = command.strip()
+    if not _PLAIN_START.match(text) or "\n" in text or "\r" in text:
         return None
-    inv = runs[0]
-    if len(found) > 1 or inv.wrappers or inv.writes or inv.assigned:
-        return Refusal(
-            "factory-alone", "run `factory` alone: no other program, wrapper, pipe, output or variable beside it"
-        )
+    quote, escaped = "", False
+    for ch in text:
+        if escaped:
+            escaped = False
+        elif quote == "'":
+            quote = "" if ch == "'" else quote
+        elif ch == "\\":
+            escaped = True
+        elif ch in _SHELL_SPECIAL and (not quote or ch in "$`"):
+            return None
+        elif ch in "'\"":
+            quote = "" if quote == ch else quote or ch
+    lexer = shlex.shlex(text, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    try:
+        words = list(lexer)
+    except ValueError:
+        return None
+    return None if any(set(w) <= set("();<>|&") for w in words) else words
+
+
+def check_alone(call: Call, command: str, found: list[shell.Invocation], cwd: Path) -> Decision:
+    """A call that runs `factory` is that one plain call, and it reads files only from the session's own worktree."""
+    if not any(inv.program == FACTORY for inv in found) or call.off("factory-alone"):
+        return None
+    words = plain_words(command)
+    if words is None:
+        return Refusal("factory-alone", ALONE)
     worktree = Path(os.path.realpath(call.worktree))
-    # Its arguments and its standard input are read outside the sandbox, so they come from the worktree.
-    for word in [*inv.argv[1:], *inv.reads]:
+    # Its arguments are read outside the sandbox, so a file it names must be the session's own.
+    for word in words[1:]:
         for candidate in [word, word.split("=", 1)[1] if "=" in word else ""]:
             if not candidate or "://" in candidate or any(c.isspace() for c in candidate):
                 continue
@@ -123,25 +159,26 @@ def check_runs(call: Call, found: list[shell.Invocation]) -> Decision:
     return None
 
 
-def check_forged(call: Call, command: str) -> Decision:
-    """No command names the subagent id variable: only the guard sets it, so the warden can trust it."""
-    if AGENT_ID_VARIABLE not in command or call.off("agent-id"):
+def check_forged(call: Call, found: list[shell.Invocation]) -> Decision:
+    """No agent writes the subagent flag: only the guard does, so the warden can trust it."""
+    if call.off("agent-id"):
         return None
-    return Refusal("agent-id", f"{AGENT_ID_VARIABLE} is set only by the guard; run your command without it")
+    for inv in found:
+        if inv.program == FACTORY and any(a == AGENT_ID_FLAG or a.startswith(AGENT_ID_FLAG + "=") for a in inv.argv):
+            return Refusal("agent-id", f"{AGENT_ID_FLAG} is set only by the guard; run factory without it")
+    return None
 
 
 def stamp(call: Call) -> Decision:
-    """A subagent's factory call carries its id, so the warden knows which subagent asks, not only its parent."""
+    """A subagent's factory call names the subagent right after the program word, so the warden knows which
+    subagent asks, not only its parent."""
     if not call.in_subagent or call.tool not in {"Bash", "Monitor"}:
         return None
     command = str(call.tool_input.get("command", ""))
-    try:
-        found = shell.invocations(command)
-    # The shell rules already refused a command the guard cannot read, or their switch is off.
-    except shell.ShellError:
-        return None
-    if not any(inv.program == FACTORY for inv in found):
+    if plain_words(command) is None:
         return None
     if not _SAFE_ID.match(call.agent_id):
         return Refusal("agent-id", "this subagent's id cannot be passed to the factory safely; report to your parent")
-    return Rewrite({**call.tool_input, "command": f"export {AGENT_ID_VARIABLE}={call.agent_id}; {command}"})
+    text = command.strip()
+    stamped = f"{FACTORY} {AGENT_ID_FLAG} {call.agent_id}{text[len(FACTORY) :]}"
+    return Rewrite({**call.tool_input, "command": stamped})

@@ -68,18 +68,10 @@ def test_the_orchestrators_worktree_is_the_main_checkout(tmp_path: Path) -> None
         ("factory snapshot", "factory-verbs"),
         ("factory push abc1234", "factory-verbs"),
         ("factory no-such-verb", "factory-verbs"),
-        ("factory status && touch x", "factory-alone"),
-        ("factory status | tail -3", "factory-alone"),
-        ("timeout 60 factory status", "factory-alone"),
-        ("factory status > {home}/.bashrc", "factory-alone"),
-        ("FACTORY_X=1 factory status", "factory-alone"),
-        ("factory request new --from implementer < {home}/.claude/.credentials.json", "factory-alone"),
         ("factory request new --from implementer --where {home}/.claude/.credentials.json", "factory-alone"),
-        ("factory request new --from implementer --severity normal --where x < {worktree}/body.md", None),
         ("factory status", None),
         ("factory qa plan", None),
         ("factory slot up web", None),
-        ("factory request new --from implementer --severity normal --where /api/users <<'EOF'\nbody\nEOF", None),
         ("factory spec save t-0001 {worktree}/spec.md", "factory-verbs"),
     ],
 )
@@ -116,20 +108,43 @@ def test_each_role_and_its_subagents_run_only_their_verbs(
     assert kit.bash(command, cwd=str(kit.repo if role == "orchestrator" else kit.worktree), **caller) == rule
 
 
-def test_a_subagents_factory_call_carries_its_id(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("command", "rule"),
+    [
+        ("factory status && touch x", "factory-alone"),
+        ("factory status; ls", "factory-alone"),
+        ("factory status || true", "factory-alone"),
+        ("factory status | tail -3", "factory-alone"),
+        ("factory status &", "factory-alone"),
+        ("(factory status)", "factory-alone"),
+        ("cd src && factory status", "factory-alone"),
+        ("timeout 60 factory status", "factory-alone"),
+        ("/usr/local/bin/factory status", "factory-alone"),
+        ("FACTORY_X=1 factory status", "factory-alone"),
+        ("bash -c 'factory status'", "factory-alone"),
+        ("factory status > out.txt", "factory-alone"),
+        ("factory request new --severity normal --where x < body.md", "factory-alone"),
+        ("factory request new --severity normal --where x <<'EOF'\nbody\nEOF", "factory-alone"),
+        ("factory status\nls", "factory-alone"),
+        ('factory reflect --kind miss "$(cat note.md)"', "factory-alone"),
+        ('factory reflect --kind miss "$HOME"', "factory-alone"),
+        ("factory reflect --kind miss notes/*", "factory-alone"),
+        ("factory status --agent-id a1234567890abc", "agent-id"),
+        ("factory --agent-id=a1234567890abc status", "agent-id"),
+        ("factory reflect --kind miss 'it costs $5, and * is fine in quotes'", None),
+        ('factory reflect --kind miss "a * b"', None),
+        ("factory qa plan", None),
+    ],
+)
+def test_a_factory_call_is_one_plain_command_and_names_no_subagent(kit: Kit, command: str, rule: str | None) -> None:
+    assert kit.bash(command) == rule
+
+
+def test_a_subagents_factory_call_names_it_right_after_the_program(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("orchestrator", worktree=kit.repo)
     intake = {"agent_id": "a1234567890abc", "agent_type": "intake", "cwd": str(kit.repo)}
     decision = kit.decide("Bash", {"command": "factory queue task new --title x"}, **intake)
     assert isinstance(decision, Rewrite)
-    stamped = "export SOFTWARE_AGENT_ID=a1234567890abc; factory queue task new --title x"
-    assert decision.updated_input["command"] == stamped
+    assert decision.updated_input["command"] == "factory --agent-id a1234567890abc queue task new --title x"
     assert kit.decide("Bash", {"command": "factory status"}, cwd=str(kit.repo)) is None
-
-
-@pytest.mark.parametrize("caller", [{}, {"agent_id": "a1234567890abc", "agent_type": "intake"}], ids=["it", "intake"])
-@pytest.mark.parametrize("command", ["SOFTWARE_AGENT_ID=a1 factory status", "echo $SOFTWARE_AGENT_ID"])
-def test_no_command_names_the_subagent_id_variable(tmp_path: Path, caller: dict[str, str], command: str) -> None:
-    kit = Kit(tmp_path)
-    kit.session("orchestrator", worktree=kit.repo)
-    assert kit.bash(command, cwd=str(kit.repo), **caller) == "agent-id"
