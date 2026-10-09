@@ -1,0 +1,21 @@
+{
+ "history": {
+  "id": "h7",
+  "family": "intake",
+  "initials": "IN",
+  "name": "Triage",
+  "role": "triage",
+  "task": null,
+  "model": "Sonnet 5.5",
+  "started": "Oct 9, 08:00",
+  "started_by": "started by Orchestrator",
+  "ended": "Oct 9, 08:22",
+  "lasted": "after 22 min",
+  "why": {
+   "text": "finished",
+   "tone": "good"
+  },
+  "cost": "$2.40",
+  "note": "100 requests triaged"
+ }
+}

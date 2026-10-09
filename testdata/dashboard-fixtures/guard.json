@@ -1,0 +1,248 @@
+{
+ "vitals": [
+  {
+   "label": "Memory free",
+   "value": "11.8 GiB",
+   "pct": 70,
+   "tone": "good"
+  },
+  {
+   "label": "CPU pressure",
+   "value": "34%",
+   "pct": 34,
+   "tone": "good"
+  },
+  {
+   "label": "Power",
+   "value": "On mains",
+   "pct": 100,
+   "tone": "good"
+  },
+  {
+   "label": "Install",
+   "value": "Matches",
+   "pct": 100,
+   "tone": "good"
+  }
+ ],
+ "slots": [
+  {
+   "n": 0,
+   "who": "Orchestrator",
+   "note": "check of the default branch",
+   "port": 8100,
+   "up": true
+  },
+  {
+   "n": 1,
+   "who": "Sign-in loop",
+   "note": "QA round 2",
+   "port": 8101,
+   "up": true
+  },
+  {
+   "n": 2,
+   "who": "Retry an upload",
+   "note": "building",
+   "port": 8102,
+   "up": true
+  },
+  {
+   "n": 3,
+   "who": "Staging is down",
+   "note": "building",
+   "port": 8103,
+   "up": true
+  }
+ ],
+ "refusals": [
+  {
+   "rule": "tester-time",
+   "count": 9
+  },
+  {
+   "rule": "subagents-at-once",
+   "count": 6
+  },
+  {
+   "rule": "unreadable-command",
+   "count": 5
+  },
+  {
+   "rule": "protected-paths",
+   "count": 4
+  },
+  {
+   "rule": "git-bypass",
+   "count": 3
+  },
+  {
+   "rule": "factory-verbs",
+   "count": 2
+  }
+ ],
+ "rules": [
+  {
+   "id": "unpermitted",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "raw-starts",
+   "on": true,
+   "today": "1 refused today",
+   "hint": null
+  },
+  {
+   "id": "leave-slice",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "factory-verbs",
+   "on": true,
+   "today": "2 refused today",
+   "hint": null
+  },
+  {
+   "id": "queue-status",
+   "on": true,
+   "today": "1 refused today",
+   "hint": null
+  },
+  {
+   "id": "subagent-kinds",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "subagents-at-once",
+   "on": true,
+   "today": "6 refused today",
+   "hint": null
+  },
+  {
+   "id": "model",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "tester-brief",
+   "on": true,
+   "today": "1 refused today",
+   "hint": null
+  },
+  {
+   "id": "tester-time",
+   "on": true,
+   "today": "9 refused today",
+   "hint": null
+  },
+  {
+   "id": "qa-ready",
+   "on": true,
+   "today": "2 refused today",
+   "hint": null
+  },
+  {
+   "id": "qa-rounds",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "critic-rounds",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "check-runs",
+   "on": true,
+   "today": "1 refused today",
+   "hint": null
+  },
+  {
+   "id": "resume-subagent",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "git-bypass",
+   "on": true,
+   "today": "3 refused today",
+   "hint": null
+  },
+  {
+   "id": "prod-frozen",
+   "on": true,
+   "today": "1 refused today",
+   "hint": null
+  },
+  {
+   "id": "protected-paths",
+   "on": true,
+   "today": "4 refused today",
+   "hint": null
+  },
+  {
+   "id": "product-drivers",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "qa-browser",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "qa-evidence",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "banned-tools",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "schedules",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "unreadable-command",
+   "on": true,
+   "today": "5 refused today",
+   "hint": null
+  },
+  {
+   "id": "inbox-wait",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  },
+  {
+   "id": "retired-session",
+   "on": true,
+   "today": "0 refused today",
+   "hint": null
+  }
+ ],
+ "docker": {
+  "used": "38 GiB",
+  "budget": "60 GiB",
+  "pct": 63,
+  "tone": "good"
+ }
+}

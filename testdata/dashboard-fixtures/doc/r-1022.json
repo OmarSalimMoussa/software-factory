@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1022",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "The approve button moves when I hover it",
+  "when": "Oct 5, 22:30 UTC · 4 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1022",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "users",
+      "tone": "pink",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "t-0013",
+      "tone": "accent",
+      "doc": "t-0013"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>The approve button moves when I hover it</h1><p>A person says: The approve button moves when I hover it.</p><p>Became part of <span class=\"doclink\" data-open-doc=\"t-0013\" tabindex=\"0\">t-0013</span>.</p>",
+  "art_url": null
+ }
+}

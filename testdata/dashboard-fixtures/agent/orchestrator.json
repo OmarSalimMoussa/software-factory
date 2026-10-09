@@ -1,0 +1,93 @@
+{
+ "agent": {
+  "name": "Orchestrator",
+  "family": "orch",
+  "initials": "OR",
+  "role": "orchestrator",
+  "doing": "Checking the merge of t-0015",
+  "life_note": null,
+  "kv": [
+   {
+    "label": "Model",
+    "value": "Opus 5.5"
+   },
+   {
+    "label": "Effort",
+    "value": "high"
+   },
+   {
+    "label": "Running",
+    "value": "312 min"
+   },
+   {
+    "label": "Cost",
+    "value": "$18.20"
+   }
+  ],
+  "task": null,
+  "kids": [
+   {
+    "id": "intake-1",
+    "family": "intake",
+    "initials": "IN",
+    "name": "Intake",
+    "doing": "Debugging t-0021",
+    "cost": "$0.84"
+   },
+   {
+    "id": "impl-staging-down",
+    "family": "impl",
+    "initials": "IM",
+    "name": "Staging is down",
+    "doing": "Building · slot 3",
+    "cost": "$2.26"
+   },
+   {
+    "id": "impl-sign-in-loop",
+    "family": "impl",
+    "initials": "IM",
+    "name": "Sign-in loop",
+    "doing": "QA round 2 of 4 · slot 1",
+    "cost": "$7.95"
+   },
+   {
+    "id": "impl-retry-upload",
+    "family": "impl",
+    "initials": "IM",
+    "name": "Retry an upload",
+    "doing": "Building slice 2 of 3 · slot 2",
+    "cost": "$6.20"
+   },
+   {
+    "id": "impl-project-names",
+    "family": "impl",
+    "initials": "IM",
+    "name": "Project names",
+    "doing": "Pushed out for “Staging is down” · comes back first",
+    "cost": "$2.10"
+   },
+   {
+    "id": "design-empty-states",
+    "family": "design",
+    "initials": "DS",
+    "name": "Empty states",
+    "doing": "Critic round 2 of 4",
+    "cost": "$6.75"
+   },
+   {
+    "id": "design-partner-sign-in",
+    "family": "design",
+    "initials": "DS",
+    "name": "Partner sign-in",
+    "doing": "Waiting for your Go",
+    "cost": "$14.30"
+   }
+  ],
+  "chat_url": "https://claude.ai/code/session_0000example",
+  "actions": [
+   "pause-factory",
+   "stop-factory"
+  ],
+  "version": "v1"
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "history": {
+  "id": "h25",
+  "family": "intake",
+  "initials": "IN",
+  "name": "Intake",
+  "role": "intake",
+  "task": "t-0016",
+  "model": "Sonnet 5.5",
+  "started": "Oct 5, 15:30",
+  "started_by": "started by Orchestrator",
+  "ended": "Oct 5, 16:04",
+  "lasted": "after 34 min",
+  "why": {
+   "text": "finished",
+   "tone": "good"
+  },
+  "cost": "$1.55",
+  "note": "Passed"
+ }
+}

@@ -1,0 +1,87 @@
+{
+ "task": {
+  "id": "t-0010",
+  "title": "Team workspaces with roles",
+  "sheet_title": "Team workspaces with roles",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "ring",
+   "word": "Parked"
+  },
+  "chips": [
+   {
+    "text": "t-0010",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "severe",
+    "tone": "bad"
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "3"
+   },
+   {
+    "label": "People",
+    "value": "3"
+   },
+   {
+    "label": "Score",
+    "value": "20"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$0.00"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 1,
+   "cause": null
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 1
+  },
+  "testers": {
+   "note": "none required",
+   "rows": [],
+   "empty": "A small backend fix runs no testers."
+  },
+  "built_from": null,
+  "requests": [],
+  "log": [
+   {
+    "at": "Oct 6, 11:00",
+    "text": "Filed by triage"
+   }
+  ],
+  "branch": null,
+  "actions": [
+   "library"
+  ]
+ }
+}

@@ -1,0 +1,157 @@
+{
+ "task": {
+  "id": "t-0017",
+  "title": "Sign-in sends people back to the sign-in page",
+  "sheet_title": "Sign-in sends people back to the sign-in page",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "accent",
+   "word": "QA, round 2 of 4"
+  },
+  "chips": [
+   {
+    "text": "t-0017",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G1",
+    "tone": "accent"
+   },
+   {
+    "text": "UI",
+    "tone": ""
+   },
+   {
+    "text": "Access",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "14"
+   },
+   {
+    "label": "People",
+    "value": "9"
+   },
+   {
+    "label": "Score",
+    "value": "92"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$12.40"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 1,
+   "cause": "auth/routes.py:41, the session cookie is dropped on redirect"
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 6
+  },
+  "testers": {
+   "note": "4 required",
+   "rows": [
+    {
+     "name": "qa-ui-function",
+     "model": "Haiku 5.5",
+     "state": "running",
+     "tone": "accent",
+     "note": null,
+     "shots": [
+      "/api/evidence/t-0017/page.svg"
+     ]
+    },
+    {
+     "name": "qa-ux",
+     "model": "Sonnet 5.5",
+     "state": "pass",
+     "tone": "good",
+     "note": null,
+     "shots": []
+    },
+    {
+     "name": "qa-visual",
+     "model": "Sonnet 5.5",
+     "state": "fail",
+     "tone": "bad",
+     "note": "Menu overflows at 390 px",
+     "shots": [
+      "/api/evidence/t-0017/phone.svg"
+     ]
+    },
+    {
+     "name": "qa-security",
+     "model": "Sonnet 5.5",
+     "state": "pass",
+     "tone": "good",
+     "note": null,
+     "shots": []
+    }
+   ],
+   "empty": "Testers start once every slice is built."
+  },
+  "built_from": null,
+  "requests": [
+   {
+    "id": "r-1024",
+    "text": "Sign in keeps looping on my phone",
+    "age": "3 days ago"
+   },
+   {
+    "id": "r-1020",
+    "text": "intake: duplicate of the sign-in loop",
+    "age": "4 days ago"
+   },
+   {
+    "id": "r-1018",
+    "text": "Signing in sends me back to the sign-in page",
+    "age": "4 days ago"
+   },
+   {
+    "id": "r-1017",
+    "text": "Login loop on Safari",
+    "age": "4 days ago"
+   }
+  ],
+  "log": [
+   {
+    "at": "Oct 8, 09:10",
+    "text": "Filed by triage"
+   },
+   {
+    "at": "Oct 9, 12:40",
+    "text": "Boosted by you"
+   }
+  ],
+  "branch": "worktree-t-0017",
+  "actions": [
+   "library"
+  ]
+ }
+}

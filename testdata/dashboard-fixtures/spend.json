@@ -1,0 +1,20 @@
+{
+ "plan": {
+  "stale": false,
+  "age": "read 3 min ago",
+  "windows": [
+   {
+    "name": "5-hour window",
+    "pct": 62,
+    "tone": "",
+    "resets": "resets in 2 h 14 min · Oct 9, 16:44 UTC"
+   },
+   {
+    "name": "This week",
+    "pct": 41,
+    "tone": "",
+    "resets": "resets in 3 d 19 h · Oct 13, 09:30 UTC"
+   }
+  ]
+ }
+}

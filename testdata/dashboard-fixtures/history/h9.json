@@ -1,0 +1,21 @@
+{
+ "history": {
+  "id": "h9",
+  "family": "qa",
+  "initials": "QA",
+  "name": "qa-ux",
+  "role": "tester",
+  "task": "t-0017",
+  "model": "Sonnet 5.5",
+  "started": "Oct 9, 13:40",
+  "started_by": "started by Sign-in loop",
+  "ended": "Oct 9, 13:49",
+  "lasted": "after 9 min",
+  "why": {
+   "text": "finished",
+   "tone": "good"
+  },
+  "cost": "$1.41",
+  "note": "Passed"
+ }
+}

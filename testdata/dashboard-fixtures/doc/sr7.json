@@ -1,0 +1,63 @@
+{
+ "doc": {
+  "id": "sr7",
+  "kind": "reflection",
+  "kind_label": "Reflection",
+  "title": "Two minutes per item is too short for a scenario that waits for a larg…",
+  "when": "Oct 7, 10:10 UTC · 2 days ago",
+  "fm": [
+   {
+    "label": "Kind",
+    "values": [
+     {
+      "text": "friction",
+      "tone": "warn",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Who",
+    "values": [
+     {
+      "text": "tester",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Where",
+    "values": [
+     {
+      "text": "qa-ui-function",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "When",
+    "values": [
+     {
+      "text": "Oct 7, 10:10 UTC",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Repeats",
+    "values": [
+     {
+      "text": "4 times",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<p>Two minutes per item is too short for a scenario that waits for a large upload.</p>",
+  "art_url": null
+ }
+}

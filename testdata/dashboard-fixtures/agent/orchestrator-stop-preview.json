@@ -1,0 +1,98 @@
+{
+ "preview": {
+  "title": "Stop the factory?",
+  "text": "Every agent stops now. Their work is kept, and each task goes back to Proposed next for you to start again.",
+  "rows": [
+   {
+    "family": "orch",
+    "initials": "OR",
+    "name": "Orchestrator",
+    "role": "orchestrator",
+    "model": "Opus 5.5",
+    "cost": "$18.20"
+   },
+   {
+    "family": "intake",
+    "initials": "IN",
+    "name": "Intake",
+    "role": "intake",
+    "model": "Sonnet 5.5",
+    "cost": "$0.84"
+   },
+   {
+    "family": "impl",
+    "initials": "IM",
+    "name": "Staging is down",
+    "role": "implementer, small",
+    "model": "Sonnet 5.5",
+    "cost": "$2.26"
+   },
+   {
+    "family": "impl",
+    "initials": "IM",
+    "name": "Sign-in loop",
+    "role": "implementer, small",
+    "model": "Sonnet 5.5",
+    "cost": "$7.95"
+   },
+   {
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-ui-function",
+    "role": "tester",
+    "model": "Haiku 5.5",
+    "cost": "$0.62"
+   },
+   {
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-visual",
+    "role": "tester",
+    "model": "Sonnet 5.5",
+    "cost": "$1.12"
+   },
+   {
+    "family": "impl",
+    "initials": "IM",
+    "name": "Retry an upload",
+    "role": "implementer, large",
+    "model": "Opus 5.5",
+    "cost": "$6.20"
+   },
+   {
+    "family": "impl",
+    "initials": "IM",
+    "name": "Project names",
+    "role": "implementer, small",
+    "model": "Sonnet 5.5",
+    "cost": "$2.10"
+   },
+   {
+    "family": "design",
+    "initials": "DS",
+    "name": "Empty states",
+    "role": "designer",
+    "model": "Opus 5.5",
+    "cost": "$6.75"
+   },
+   {
+    "family": "design",
+    "initials": "DS",
+    "name": "critic-ux",
+    "role": "critic",
+    "model": "Sonnet 5.5",
+    "cost": "$0.48"
+   },
+   {
+    "family": "design",
+    "initials": "DS",
+    "name": "Partner sign-in",
+    "role": "designer",
+    "model": "Opus 5.5",
+    "cost": "$14.30"
+   }
+  ],
+  "button": "Stop the factory",
+  "coded": true
+ }
+}

@@ -1,0 +1,111 @@
+{
+ "task": {
+  "id": "t-0024",
+  "title": "Phone width: the account menu clips",
+  "sheet_title": "The account menu fits on a phone",
+  "version": "v1",
+  "proposal": {
+   "picture": "/api/picture/task/t-0024",
+   "why": "G3 cannot finish while the phone scenarios fail on this menu."
+  },
+  "status": {
+   "tone": "warn",
+   "word": "Waiting for you"
+  },
+  "chips": [
+   {
+    "text": "Phone width: the account menu clips",
+    "tone": ""
+   },
+   {
+    "text": "t-0024",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G3",
+    "tone": "accent"
+   },
+   {
+    "text": "UI",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "3"
+   },
+   {
+    "label": "People",
+    "value": "3"
+   },
+   {
+    "label": "Score",
+    "value": "38"
+   },
+   {
+    "label": "Estimate",
+    "value": "≈ $5"
+   }
+  ],
+  "route": {
+   "label": "The run you approve",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 1,
+   "cause": null
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 2
+  },
+  "testers": {
+   "note": "3 required",
+   "rows": [],
+   "empty": "Testers start once every slice is built."
+  },
+  "built_from": null,
+  "requests": [
+   {
+    "id": "r-1016",
+    "text": "qa-visual: account menu clips at 390 px",
+    "age": "5 days ago"
+   }
+  ],
+  "log": [
+   {
+    "at": "Oct 8, 12:00",
+    "text": "Filed by triage"
+   },
+   {
+    "at": "Oct 9, 09:02",
+    "text": "Proposed by the orchestrator"
+   }
+  ],
+  "branch": null,
+  "actions": [
+   "library",
+   "drop",
+   "later",
+   "approve"
+  ]
+ }
+}

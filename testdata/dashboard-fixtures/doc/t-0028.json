@@ -1,0 +1,83 @@
+{
+ "doc": {
+  "id": "t-0028",
+  "kind": "task",
+  "kind_label": "Task",
+  "title": "Store listing screenshots",
+  "when": "Oct 9, 07:15 UTC · 7 h ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "t-0028",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "G5",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "minor",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Surfaces",
+    "values": [
+     {
+      "text": "No runtime change",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "0",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "queued",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Requests",
+    "values": [
+     {
+      "text": "r-1025",
+      "tone": null,
+      "doc": "r-1025"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Store listing screenshots</h1><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li><span class=\"doclink\" data-open-doc=\"r-1025\" tabindex=\"0\">r-1025</span></li></ul>",
+  "art_url": null
+ }
+}

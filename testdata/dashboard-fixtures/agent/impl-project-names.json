@@ -1,0 +1,38 @@
+{
+ "agent": {
+  "name": "Project names",
+  "family": "impl",
+  "initials": "IM",
+  "role": "implementer, small",
+  "doing": "Pushed out for “Staging is down” · comes back first",
+  "life_note": {
+   "kind": "depri",
+   "text": "Deprioritized. It holds no slot, keeps its full context, and comes back first when a slot frees."
+  },
+  "kv": [
+   {
+    "label": "Model",
+    "value": "Sonnet 5.5"
+   },
+   {
+    "label": "Effort",
+    "value": "medium"
+   },
+   {
+    "label": "Running",
+    "value": "41 min"
+   },
+   {
+    "label": "Cost",
+    "value": "$2.10"
+   }
+  ],
+  "task": "t-0020",
+  "kids": [],
+  "chat_url": null,
+  "actions": [
+   "stop"
+  ],
+  "version": "v1"
+ }
+}

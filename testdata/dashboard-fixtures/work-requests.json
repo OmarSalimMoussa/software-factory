@@ -1,0 +1,722 @@
+{
+ "header": {
+  "sub": "63 requests wait for triage · 4 tasks queued",
+  "triage_line": "Last triage, 2 h ago: 100 requests, 4 new tasks, 31 joined, 52 noise, 13 parked"
+ },
+ "tabs": [
+  [
+   "tasks",
+   "Tasks",
+   14
+  ],
+  [
+   "requests",
+   "Requests",
+   40
+  ],
+  [
+   "parked",
+   "Parked",
+   3
+  ],
+  [
+   "checks",
+   "Checks",
+   4
+  ]
+ ],
+ "requests": {
+  "inboxes": [
+   {
+    "key": "all",
+    "label": "All inboxes",
+    "count": 40
+   },
+   {
+    "key": "agents",
+    "label": "Agents",
+    "count": 8
+   },
+   {
+    "key": "owner",
+    "label": "You",
+    "count": 5
+   },
+   {
+    "key": "users",
+    "label": "Users",
+    "count": 27
+   }
+  ],
+  "outcomes": [
+   [
+    "all",
+    "Any outcome"
+   ],
+   [
+    "waiting",
+    "Waiting"
+   ],
+   [
+    "task",
+    "Task"
+   ],
+   [
+    "noise",
+    "Noise"
+   ],
+   [
+    "parked",
+    "Parked"
+   ]
+  ],
+  "rows": [
+   {
+    "id": "r-1042",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Signing in sends me back to the sign-in page",
+    "severe": false,
+    "age": "just now",
+    "outcome": {
+     "text": "waiting",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": true,
+    "_outcome": "waiting"
+   },
+   {
+    "id": "r-1041",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Login loop on Safari",
+    "severe": false,
+    "age": "5 h ago",
+    "outcome": {
+     "text": "waiting",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": true,
+    "_outcome": "waiting"
+   },
+   {
+    "id": "r-1040",
+    "inbox": "agents",
+    "initial": "A",
+    "family": "impl",
+    "text": "qa-visual: account menu clips at 390 px",
+    "severe": false,
+    "age": "11 h ago",
+    "outcome": {
+     "text": "waiting",
+     "tone": ""
+    },
+    "from": "from agents",
+    "can_boost": true,
+    "_outcome": "waiting"
+   },
+   {
+    "id": "r-1039",
+    "inbox": "owner",
+    "initial": "Y",
+    "family": "orch",
+    "text": "Make the billing credit line clearer",
+    "severe": false,
+    "age": "13 h ago",
+    "outcome": {
+     "text": "waiting",
+     "tone": ""
+    },
+    "from": "from you",
+    "can_boost": true,
+    "_outcome": "waiting"
+   },
+   {
+    "id": "r-1038",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "I see my credit twice on Billing",
+    "severe": false,
+    "age": "18 h ago",
+    "outcome": {
+     "text": "waiting",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": true,
+    "_outcome": "waiting"
+   },
+   {
+    "id": "r-1037",
+    "inbox": "agents",
+    "initial": "A",
+    "family": "impl",
+    "text": "New error on staging: the relay cannot reach the network",
+    "severe": true,
+    "age": "yesterday",
+    "outcome": {
+     "text": "waiting",
+     "tone": ""
+    },
+    "from": "from agents",
+    "can_boost": true,
+    "_outcome": "waiting"
+   },
+   {
+    "id": "r-1036",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Export never finishes for my year-end report",
+    "severe": false,
+    "age": "yesterday",
+    "outcome": {
+     "text": "t-0019",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1035",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "The upload stopped at 80% and did not resume",
+    "severe": false,
+    "age": "yesterday",
+    "outcome": {
+     "text": "t-0022",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1034",
+    "inbox": "owner",
+    "initial": "Y",
+    "family": "orch",
+    "text": "Empty pages feel broken; tell people what to do next",
+    "severe": false,
+    "age": "2 days ago",
+    "outcome": {
+     "text": "t-0014",
+     "tone": "accent"
+    },
+    "from": "from you",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "broken": true,
+    "id": "r-1032",
+    "error": "Its front matter could not be read."
+   },
+   {
+    "id": "r-1033",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Can I export to a spreadsheet app?",
+    "severe": false,
+    "age": "2 days ago",
+    "outcome": {
+     "text": "parked",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "parked"
+   },
+   {
+    "id": "r-1032",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "asdf test",
+    "severe": false,
+    "age": "2 days ago",
+    "outcome": {
+     "text": "noise",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "noise"
+   },
+   {
+    "id": "r-1031",
+    "inbox": "agents",
+    "initial": "A",
+    "family": "impl",
+    "text": "tracker: 3 timeouts on the export endpoint",
+    "severe": false,
+    "age": "2 days ago",
+    "outcome": {
+     "text": "t-0019",
+     "tone": "accent"
+    },
+    "from": "from agents",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1030",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Where do I see who sent this feedback?",
+    "severe": false,
+    "age": "2 days ago",
+    "outcome": {
+     "text": "t-0025",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1029",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Dark mode: the status words are hard to read",
+    "severe": false,
+    "age": "2 days ago",
+    "outcome": {
+     "text": "t-0018",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1028",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Is there a keyboard shortcut to send an invoice?",
+    "severe": false,
+    "age": "3 days ago",
+    "outcome": {
+     "text": "parked",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "parked"
+   },
+   {
+    "id": "r-1027",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "This is great!",
+    "severe": false,
+    "age": "3 days ago",
+    "outcome": {
+     "text": "noise",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "noise"
+   },
+   {
+    "id": "r-1026",
+    "inbox": "agents",
+    "initial": "A",
+    "family": "impl",
+    "text": "qa-backend: the invoice list takes 4 s with 200 items",
+    "severe": false,
+    "age": "3 days ago",
+    "outcome": {
+     "text": "t-0015",
+     "tone": "accent"
+    },
+    "from": "from agents",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1025",
+    "inbox": "owner",
+    "initial": "Y",
+    "family": "orch",
+    "text": "Prepare the store listing screenshots",
+    "severe": false,
+    "age": "3 days ago",
+    "outcome": {
+     "text": "t-0028",
+     "tone": "accent"
+    },
+    "from": "from you",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1024",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Sign in keeps looping on my phone",
+    "severe": false,
+    "age": "3 days ago",
+    "outcome": {
+     "text": "t-0017",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1023",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "I want teams with roles",
+    "severe": false,
+    "age": "3 days ago",
+    "outcome": {
+     "text": "parked",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "parked"
+   },
+   {
+    "id": "r-1022",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "The approve button moves when I hover it",
+    "severe": false,
+    "age": "4 days ago",
+    "outcome": {
+     "text": "t-0013",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1021",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "How do I cancel?",
+    "severe": false,
+    "age": "4 days ago",
+    "outcome": {
+     "text": "noise",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "noise"
+   },
+   {
+    "id": "r-1020",
+    "inbox": "agents",
+    "initial": "A",
+    "family": "impl",
+    "text": "intake: duplicate of the sign-in loop",
+    "severe": false,
+    "age": "4 days ago",
+    "outcome": {
+     "text": "t-0017",
+     "tone": "accent"
+    },
+    "from": "from agents",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1019",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Usage page should show totals per day",
+    "severe": false,
+    "age": "4 days ago",
+    "outcome": {
+     "text": "t-0012",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1018",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Signing in sends me back to the sign-in page",
+    "severe": false,
+    "age": "4 days ago",
+    "outcome": {
+     "text": "t-0017",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1017",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Login loop on Safari",
+    "severe": false,
+    "age": "4 days ago",
+    "outcome": {
+     "text": "t-0017",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1016",
+    "inbox": "agents",
+    "initial": "A",
+    "family": "impl",
+    "text": "qa-visual: account menu clips at 390 px",
+    "severe": false,
+    "age": "5 days ago",
+    "outcome": {
+     "text": "t-0024",
+     "tone": "accent"
+    },
+    "from": "from agents",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1015",
+    "inbox": "owner",
+    "initial": "Y",
+    "family": "orch",
+    "text": "Make the billing credit line clearer",
+    "severe": false,
+    "age": "5 days ago",
+    "outcome": {
+     "text": "t-0027",
+     "tone": "accent"
+    },
+    "from": "from you",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1014",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "I see my credit twice on Billing",
+    "severe": false,
+    "age": "5 days ago",
+    "outcome": {
+     "text": "t-0027",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1013",
+    "inbox": "agents",
+    "initial": "A",
+    "family": "impl",
+    "text": "New error on staging: the relay cannot reach the network",
+    "severe": false,
+    "age": "5 days ago",
+    "outcome": {
+     "text": "t-0021",
+     "tone": "accent"
+    },
+    "from": "from agents",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1012",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Export never finishes for my year-end report",
+    "severe": false,
+    "age": "5 days ago",
+    "outcome": {
+     "text": "t-0019",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1011",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "The upload stopped at 80% and did not resume",
+    "severe": false,
+    "age": "6 days ago",
+    "outcome": {
+     "text": "t-0022",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1010",
+    "inbox": "owner",
+    "initial": "Y",
+    "family": "orch",
+    "text": "Empty pages feel broken; tell people what to do next",
+    "severe": false,
+    "age": "6 days ago",
+    "outcome": {
+     "text": "t-0014",
+     "tone": "accent"
+    },
+    "from": "from you",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1009",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Can I export to a spreadsheet app?",
+    "severe": false,
+    "age": "6 days ago",
+    "outcome": {
+     "text": "parked",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "parked"
+   },
+   {
+    "id": "r-1008",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "asdf test",
+    "severe": false,
+    "age": "6 days ago",
+    "outcome": {
+     "text": "noise",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "noise"
+   },
+   {
+    "id": "r-1007",
+    "inbox": "agents",
+    "initial": "A",
+    "family": "impl",
+    "text": "tracker: 3 timeouts on the export endpoint",
+    "severe": false,
+    "age": "6 days ago",
+    "outcome": {
+     "text": "t-0019",
+     "tone": "accent"
+    },
+    "from": "from agents",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1006",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Where do I see who sent this feedback?",
+    "severe": false,
+    "age": "6 days ago",
+    "outcome": {
+     "text": "t-0025",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1005",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Dark mode: the status words are hard to read",
+    "severe": false,
+    "age": "7 days ago",
+    "outcome": {
+     "text": "t-0018",
+     "tone": "accent"
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "task"
+   },
+   {
+    "id": "r-1004",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "Is there a keyboard shortcut to send an invoice?",
+    "severe": false,
+    "age": "7 days ago",
+    "outcome": {
+     "text": "parked",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "parked"
+   },
+   {
+    "id": "r-1003",
+    "inbox": "users",
+    "initial": "U",
+    "family": "qa",
+    "text": "This is great!",
+    "severe": false,
+    "age": "7 days ago",
+    "outcome": {
+     "text": "noise",
+     "tone": ""
+    },
+    "from": "from users",
+    "can_boost": false,
+    "_outcome": "noise"
+   }
+  ],
+  "more": false
+ }
+}

@@ -1,0 +1,120 @@
+{
+ "task": {
+  "id": "t-0025",
+  "title": "Show who sent each piece of feedback",
+  "sheet_title": "Each piece of feedback shows who sent it",
+  "version": "v1",
+  "proposal": {
+   "picture": "/api/picture/task/t-0025",
+   "why": "The next step for G4: you cannot answer feedback you cannot place."
+  },
+  "status": {
+   "tone": "warn",
+   "word": "Waiting for you"
+  },
+  "chips": [
+   {
+    "text": "Show who sent each piece of feedback",
+    "tone": ""
+   },
+   {
+    "text": "t-0025",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G4",
+    "tone": "accent"
+   },
+   {
+    "text": "UI",
+    "tone": ""
+   },
+   {
+    "text": "API",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "5"
+   },
+   {
+    "label": "People",
+    "value": "4"
+   },
+   {
+    "label": "Score",
+    "value": "28"
+   },
+   {
+    "label": "Estimate",
+    "value": "≈ $28"
+   }
+  ],
+  "route": {
+   "label": "The run you approve",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 3,
+   "cause": null
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 2
+  },
+  "testers": {
+   "note": "4 required",
+   "rows": [],
+   "empty": "Testers start once every slice is built."
+  },
+  "built_from": null,
+  "requests": [
+   {
+    "id": "r-1030",
+    "text": "Where do I see who sent this feedback?",
+    "age": "2 days ago"
+   },
+   {
+    "id": "r-1006",
+    "text": "Where do I see who sent this feedback?",
+    "age": "6 days ago"
+   }
+  ],
+  "log": [
+   {
+    "at": "Oct 6, 14:00",
+    "text": "Filed by triage"
+   },
+   {
+    "at": "Oct 9, 09:02",
+    "text": "Proposed by the orchestrator"
+   }
+  ],
+  "branch": null,
+  "actions": [
+   "library",
+   "drop",
+   "later",
+   "approve"
+  ]
+ }
+}

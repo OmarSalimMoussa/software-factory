@@ -1,0 +1,83 @@
+{
+ "doc": {
+  "id": "t-0023",
+  "kind": "task",
+  "kind_label": "Task",
+  "title": "Partner sign-in from the import step",
+  "when": "Oct 7, 15:45 UTC · 2 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "t-0023",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "G2",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "major",
+      "tone": "warn",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Surfaces",
+    "values": [
+     {
+      "text": "UI, Access",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "4",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "review",
+      "tone": "warn",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Requests",
+    "values": [
+     {
+      "text": "none",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Partner sign-in from the import step</h1><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li>none yet</li></ul>",
+  "art_url": null
+ }
+}

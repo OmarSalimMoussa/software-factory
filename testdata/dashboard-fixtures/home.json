@@ -1,0 +1,393 @@
+{
+ "envs": {
+  "staging": {
+   "name": "Staging",
+   "state": "healthy",
+   "state_word": "Healthy",
+   "sha": "a1b2c3d",
+   "deployed": "Oct 9, 11:18",
+   "chips": [
+    {
+     "text": "healthy 3 h 12 min",
+     "tone": "good"
+    },
+    {
+     "text": "4 tasks ahead of prod",
+     "tone": "accent"
+    }
+   ],
+   "deployment_url": "https://github.com/acme/acme-app/actions/runs/11872341205",
+   "commit_url": "https://github.com/acme/acme-app/commit/a1b2c3d"
+  },
+  "prod": {
+   "name": "Prod",
+   "state": "healthy",
+   "state_word": "Healthy",
+   "sha": "9f8e7d1",
+   "deployed": "Oct 7, 10:05",
+   "chips": [
+    {
+     "text": "frozen",
+     "tone": "muted"
+    }
+   ],
+   "deployment_url": "https://github.com/acme/acme-app/actions/runs/11829911873",
+   "commit_url": "https://github.com/acme/acme-app/commit/9f8e7d1"
+  },
+  "to_push": 4,
+  "laptop": {
+   "state": "healthy",
+   "label": "healthy",
+   "rows": [
+    {
+     "label": "Memory",
+     "pct": 61,
+     "value": "61%"
+    },
+    {
+     "label": "CPU",
+     "pct": 34,
+     "value": "34%"
+    },
+    {
+     "label": "Power",
+     "pct": 100,
+     "value": "Mains"
+    }
+   ]
+  }
+ },
+ "outage": null,
+ "proposals": {
+  "max": 3,
+  "open": 3,
+  "approved_waiting": 0,
+  "slots": [
+   {
+    "kind": "card",
+    "task": "t-0027",
+    "number": 1,
+    "goal_item": "G1",
+    "severe": false,
+    "line": "People see their credit once on Billing, not twice",
+    "why": "4 people reported it this week, and Billing has to look right before teams pay.",
+    "picture": "/api/picture/task/t-0027",
+    "run": {
+     "value": "1",
+     "options": [
+      [
+       "1",
+       "Rung 1 · Sonnet"
+      ],
+      [
+       "2",
+       "Rung 2 · Opus"
+      ],
+      [
+       "3",
+       "Rung 3 · design, then build"
+      ],
+      [
+       "4",
+       "Rung 4 · design, your Go"
+      ]
+     ]
+    },
+    "testers": "UI testers",
+    "estimate": "≈ $6",
+    "run_changed": false,
+    "can_up": false,
+    "can_down": true,
+    "version": "v1"
+   },
+   {
+    "kind": "card",
+    "task": "t-0024",
+    "number": 2,
+    "goal_item": "G3",
+    "severe": false,
+    "line": "The account menu fits on a phone",
+    "why": "G3 cannot finish while the phone scenarios fail on this menu.",
+    "picture": "/api/picture/task/t-0024",
+    "run": {
+     "value": "1",
+     "options": [
+      [
+       "1",
+       "Rung 1 · Sonnet"
+      ],
+      [
+       "2",
+       "Rung 2 · Opus"
+      ],
+      [
+       "3",
+       "Rung 3 · design, then build"
+      ],
+      [
+       "4",
+       "Rung 4 · design, your Go"
+      ]
+     ]
+    },
+    "testers": "UI testers",
+    "estimate": "≈ $5",
+    "run_changed": false,
+    "can_up": true,
+    "can_down": true,
+    "version": "v1"
+   },
+   {
+    "kind": "card",
+    "task": "t-0025",
+    "number": 3,
+    "goal_item": "G4",
+    "severe": false,
+    "line": "Each piece of feedback shows who sent it",
+    "why": "The next step for G4: you cannot answer feedback you cannot place.",
+    "picture": "/api/picture/task/t-0025",
+    "run": {
+     "value": "3",
+     "options": [
+      [
+       "1",
+       "Rung 1 · Sonnet"
+      ],
+      [
+       "2",
+       "Rung 2 · Opus"
+      ],
+      [
+       "3",
+       "Rung 3 · design, then build"
+      ],
+      [
+       "4",
+       "Rung 4 · design, your Go"
+      ]
+     ]
+    },
+    "testers": "UI and backend testers",
+    "estimate": "≈ $28",
+    "run_changed": false,
+    "can_up": true,
+    "can_down": false,
+    "version": "v1"
+   }
+  ]
+ },
+ "needs": [
+  {
+   "id": "n1",
+   "kind": "spec",
+   "task": "t-0023",
+   "goal_item": "G2",
+   "title": "A partner sign-in during an import asks for it in place",
+   "sub": "Second sign-off",
+   "chips": [
+    {
+     "text": "Second sign-off",
+     "tone": "warn"
+    },
+    {
+     "text": "designer's mock-ups",
+     "tone": "violet"
+    }
+   ],
+   "picture": "/api/picture/card/n1",
+   "picture_label": "See the designer's mock-ups",
+   "art_url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000023",
+   "comments": "3 comments, 2 h ago",
+   "actions": [
+    "artifact",
+    "feedback",
+    "go"
+   ],
+   "done": null,
+   "version": "v1"
+  },
+  {
+   "id": "n2",
+   "kind": "decide",
+   "task": "t-0019",
+   "goal_item": "G1",
+   "title": "Slow export moved up a rung twice",
+   "sub": "Its rounds are used up at rung 3. Extend them, send it to a designer, or park it.",
+   "chips": [],
+   "picture": "/api/picture/card/n2",
+   "picture_label": "See how the task moved",
+   "art_url": null,
+   "comments": null,
+   "actions": [
+    "extend",
+    "designer",
+    "park"
+   ],
+   "done": null,
+   "version": "v1"
+  },
+  {
+   "id": "n3",
+   "kind": "question",
+   "task": "t-0022",
+   "goal_item": "G2",
+   "title": "Retry an upload asks you a question",
+   "sub": "Should a dropped upload resume from the last full part, or start again?",
+   "chips": [
+    {
+     "text": "Question",
+     "tone": "info"
+    }
+   ],
+   "picture": null,
+   "picture_label": null,
+   "art_url": null,
+   "comments": null,
+   "actions": [
+    "answer"
+   ],
+   "done": null,
+   "version": "v1"
+  }
+ ],
+ "tiles": {
+  "work": {
+   "count": 6,
+   "stages": [
+    {
+     "key": "designing",
+     "label": "designing",
+     "count": 1,
+     "color": "--f-design"
+    },
+    {
+     "key": "building",
+     "label": "building",
+     "count": 2,
+     "color": "--f-impl"
+    },
+    {
+     "key": "qa",
+     "label": "in QA",
+     "count": 1,
+     "color": "--f-qa"
+    },
+    {
+     "key": "needs",
+     "label": "need you",
+     "count": 2,
+     "color": "--warn"
+    }
+   ]
+  },
+  "staging": {
+   "count": 4,
+   "foot": "waiting to push to prod"
+  },
+  "requests": {
+   "count": 63,
+   "batch": 100,
+   "triage_at": "+118m",
+   "foot_right": "or at 100"
+  },
+  "spend": {
+   "today": 48.2,
+   "budget": 150,
+   "pct": 32,
+   "spark": [
+    65,
+    77,
+    72,
+    84,
+    62,
+    37,
+    31,
+    77,
+    90,
+    80,
+    91,
+    73,
+    107,
+    48.2
+   ],
+   "foot": "32% of the daily budget"
+  }
+ },
+ "goal": {
+  "doc": "GOAL.md",
+  "items": [
+   {
+    "id": "G1",
+    "name": "New teams sign up and send their first invoice",
+    "progress": 1.0,
+    "state": "Done"
+   },
+   {
+    "id": "G2",
+    "name": "A first import runs end to end",
+    "progress": 0.62,
+    "state": "Building"
+   },
+   {
+    "id": "G3",
+    "name": "Every screen fits a phone",
+    "progress": 0.3,
+    "state": "Building"
+   },
+   {
+    "id": "G4",
+    "name": "Feedback reaches the queue the same day",
+    "progress": 0.1,
+    "state": "Building"
+   },
+   {
+    "id": "G5",
+    "name": "Install from the app store",
+    "progress": 0.0,
+    "state": "Not started"
+   }
+  ]
+ },
+ "working": [
+  {
+   "session": "intake-1",
+   "family": "intake",
+   "initials": "IN",
+   "name": "Intake",
+   "doing": "Debugging t-0021",
+   "dot": "accent"
+  },
+  {
+   "session": "impl-staging-down",
+   "family": "impl",
+   "initials": "IM",
+   "name": "Staging is down",
+   "doing": "Building · slot 3",
+   "dot": "accent"
+  },
+  {
+   "session": "impl-sign-in-loop",
+   "family": "impl",
+   "initials": "IM",
+   "name": "Sign-in loop",
+   "doing": "QA round 2 of 4 · slot 1",
+   "dot": "accent"
+  },
+  {
+   "session": "impl-retry-upload",
+   "family": "impl",
+   "initials": "IM",
+   "name": "Retry an upload",
+   "doing": "Building slice 2 of 3 · slot 2",
+   "dot": "accent"
+  },
+  {
+   "session": "design-empty-states",
+   "family": "design",
+   "initials": "DS",
+   "name": "Empty states",
+   "doing": "Critic round 2 of 4",
+   "dot": "accent"
+  }
+ ]
+}

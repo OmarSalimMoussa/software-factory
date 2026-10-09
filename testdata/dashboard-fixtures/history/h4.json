@@ -1,0 +1,21 @@
+{
+ "history": {
+  "id": "h4",
+  "family": "qa",
+  "initials": "QA",
+  "name": "qa-backend",
+  "role": "tester",
+  "task": "t-0022",
+  "model": "Sonnet 5.5",
+  "started": "Oct 9, 12:05",
+  "started_by": "started by Retry an upload",
+  "ended": "Oct 9, 12:31",
+  "lasted": "after 26 min",
+  "why": {
+   "text": "crashed",
+   "tone": "bad"
+  },
+  "cost": "$0.66",
+  "note": "Its process died, and 2 resumes failed"
+ }
+}

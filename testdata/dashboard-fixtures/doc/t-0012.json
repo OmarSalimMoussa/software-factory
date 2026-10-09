@@ -1,0 +1,83 @@
+{
+ "doc": {
+  "id": "t-0012",
+  "kind": "task",
+  "kind_label": "Task",
+  "title": "Usage page: totals per day",
+  "when": "Oct 5, 09:00 UTC · 4 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "t-0012",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "G4",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "minor",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Surfaces",
+    "values": [
+     {
+      "text": "UI, API",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "3",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "staging",
+      "tone": "good",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Requests",
+    "values": [
+     {
+      "text": "r-1019",
+      "tone": null,
+      "doc": "r-1019"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Usage page: totals per day</h1><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li><span class=\"doclink\" data-open-doc=\"r-1019\" tabindex=\"0\">r-1019</span></li></ul>",
+  "art_url": null
+ }
+}

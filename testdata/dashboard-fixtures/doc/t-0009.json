@@ -1,0 +1,83 @@
+{
+ "doc": {
+  "id": "t-0009",
+  "kind": "task",
+  "kind_label": "Task",
+  "title": "Export to a spreadsheet app",
+  "when": "Oct 5, 10:00 UTC · 4 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "t-0009",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "severe",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "minor",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Surfaces",
+    "values": [
+     {
+      "text": "none",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "-",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "parked",
+      "tone": "muted",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Requests",
+    "values": [
+     {
+      "text": "none",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Export to a spreadsheet app</h1><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li>none yet</li></ul>",
+  "art_url": null
+ }
+}

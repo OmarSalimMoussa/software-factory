@@ -1,0 +1,63 @@
+{
+ "doc": {
+  "id": "s-0023",
+  "kind": "spec",
+  "kind_label": "Spec",
+  "title": "Partner sign-in from the import step",
+  "when": "Oct 7, 18:00 UTC · 2 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "s-0023",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Task",
+    "values": [
+     {
+      "text": "t-0023",
+      "tone": null,
+      "doc": "t-0023"
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "G2",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "4",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "review",
+      "tone": "warn",
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Partner sign-in from the import step</h1><p>When an import needs a partner sign-in, the import step asks for it in place and carries on once it is saved.</p>",
+  "art_url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000023"
+ }
+}

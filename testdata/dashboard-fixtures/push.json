@@ -1,0 +1,111 @@
+{
+ "push": {
+  "prod": {
+   "sha": "9f8e7d1",
+   "deployed": "Oct 7, 10:05 UTC",
+   "run_url": "https://github.com/acme/acme-app/actions/runs/11829911873",
+   "commit_url": "https://github.com/acme/acme-app/commit/9f8e7d1"
+  },
+  "staging": {
+   "sha": "a1b2c3d",
+   "deployed": "Oct 9, 11:18 UTC",
+   "run_url": "https://github.com/acme/acme-app/actions/runs/11872341205",
+   "commit_url": "https://github.com/acme/acme-app/commit/a1b2c3d",
+   "healthy_for": "3 h 12 min"
+  },
+  "tasks": [
+   {
+    "id": "t-0016",
+    "title": "Billing page shows credit after a refund",
+    "chip": {
+     "text": "rung 1",
+     "tone": "info"
+    },
+    "built_from": {
+     "kind": "fix",
+     "rung_label": "rung 1 · no spec",
+     "cause": "billing/credits.py: a refund never reversed its credit line",
+     "fix": "Reverse the credit line when a refund lands, with a test for each kind of refund.",
+     "qa": {
+      "kind": "none",
+      "note": "No testers: a small backend fix is covered by its own tests.",
+      "shots": []
+     }
+    }
+   },
+   {
+    "id": "t-0015",
+    "title": "Invoice list loads slowly with 200 items",
+    "chip": {
+     "text": "rung 2",
+     "tone": "info"
+    },
+    "built_from": {
+     "kind": "fix",
+     "rung_label": "rung 2 · no spec",
+     "cause": "the invoice list ran one query per item",
+     "fix": "One joined query for the whole page.",
+     "qa": {
+      "kind": "backend",
+      "note": "qa-backend timed it: 200 items in 240 ms, down from 4.1 s.",
+      "shots": []
+     }
+    }
+   },
+   {
+    "id": "t-0013",
+    "title": "Invoice page: the Approve button jumps",
+    "chip": {
+     "text": "rung 1",
+     "tone": "info"
+    },
+    "built_from": {
+     "kind": "fix",
+     "rung_label": "rung 1 · no spec",
+     "cause": "invoice page: the Approve label changed width on hover",
+     "fix": "A fixed-width label, checked at three widths.",
+     "qa": {
+      "kind": "ui",
+      "note": null,
+      "shots": [
+       {
+        "tester": "qa-ui-function",
+        "url": "/api/evidence/t-0013/page.svg",
+        "verdict": "pass"
+       },
+       {
+        "tester": "qa-visual",
+        "url": "/api/evidence/t-0013/button.svg",
+        "verdict": "pass"
+       },
+       {
+        "tester": "qa-ux",
+        "url": "/api/evidence/t-0013/phone.svg",
+        "verdict": "pass"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "id": "t-0012",
+    "title": "Usage page: totals per day",
+    "chip": {
+     "text": "spec",
+     "tone": "violet"
+    },
+    "built_from": {
+     "kind": "spec",
+     "spec": "s-0012",
+     "summary": "Usage shows each day's spend as a bar, with the month's total on top and the days listed below.",
+     "picture": "/api/picture/spec/s-0012",
+     "art_url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000012",
+     "approved_by": "the orchestrator (rung 3)"
+    }
+   }
+  ],
+  "previous_prod": "5c4d3e2",
+  "expected_staging_sha": "a1b2c3d",
+  "blocked": null
+ }
+}

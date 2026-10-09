@@ -1,0 +1,21 @@
+{
+ "history": {
+  "id": "h1",
+  "family": "impl",
+  "initials": "IM",
+  "name": "Usage page",
+  "role": "implementer, large",
+  "task": "t-0012",
+  "model": "Opus 5.5",
+  "started": "Oct 8, 11:20",
+  "started_by": "started by Orchestrator",
+  "ended": "Oct 8, 15:02",
+  "lasted": "after 3 h 42 min",
+  "why": {
+   "text": "finished",
+   "tone": "good"
+  },
+  "cost": "$18.40",
+  "note": "Merged and checked on the default branch"
+ }
+}

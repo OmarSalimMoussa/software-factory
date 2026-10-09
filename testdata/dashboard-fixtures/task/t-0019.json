@@ -1,0 +1,112 @@
+{
+ "task": {
+  "id": "t-0019",
+  "title": "Export of a long report times out",
+  "sheet_title": "Export of a long report times out",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "warn",
+   "word": "Needs your decision"
+  },
+  "chips": [
+   {
+    "text": "t-0019",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G1",
+    "tone": "accent"
+   },
+   {
+    "text": "API",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "3"
+   },
+   {
+    "label": "People",
+    "value": "3"
+   },
+   {
+    "label": "Score",
+    "value": "71"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$21.75"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 3,
+   "cause": "two services: the export job and the store copy"
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 5
+  },
+  "testers": {
+   "note": "1 required",
+   "rows": [],
+   "empty": "Testers start once every slice is built."
+  },
+  "built_from": null,
+  "requests": [
+   {
+    "id": "r-1036",
+    "text": "Export never finishes for my year-end report",
+    "age": "yesterday"
+   },
+   {
+    "id": "r-1031",
+    "text": "tracker: 3 timeouts on the export endpoint",
+    "age": "2 days ago"
+   },
+   {
+    "id": "r-1012",
+    "text": "Export never finishes for my year-end report",
+    "age": "5 days ago"
+   },
+   {
+    "id": "r-1007",
+    "text": "tracker: 3 timeouts on the export endpoint",
+    "age": "6 days ago"
+   }
+  ],
+  "log": [
+   {
+    "at": "Oct 6, 10:30",
+    "text": "Filed by triage"
+   }
+  ],
+  "branch": "worktree-t-0019",
+  "actions": [
+   "library"
+  ]
+ }
+}

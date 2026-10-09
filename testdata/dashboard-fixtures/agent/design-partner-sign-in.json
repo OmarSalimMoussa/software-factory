@@ -1,0 +1,35 @@
+{
+ "agent": {
+  "name": "Partner sign-in",
+  "family": "design",
+  "initials": "DS",
+  "role": "designer",
+  "doing": "Waiting for your Go",
+  "life_note": null,
+  "kv": [
+   {
+    "label": "Model",
+    "value": "Opus 5.5"
+   },
+   {
+    "label": "Effort",
+    "value": "medium"
+   },
+   {
+    "label": "Running",
+    "value": "0 min"
+   },
+   {
+    "label": "Cost",
+    "value": "$14.30"
+   }
+  ],
+  "task": "t-0023",
+  "kids": [],
+  "chat_url": null,
+  "actions": [
+   "stop"
+  ],
+  "version": "v1"
+ }
+}

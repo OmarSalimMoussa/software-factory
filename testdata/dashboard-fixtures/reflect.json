@@ -1,0 +1,309 @@
+{
+ "reflect": {
+  "kinds": [
+   {
+    "key": "miss",
+    "count": 6,
+    "tone": "bad"
+   },
+   {
+    "key": "owner-feedback",
+    "count": 5,
+    "tone": "accent"
+   },
+   {
+    "key": "friction",
+    "count": 6,
+    "tone": "warn"
+   },
+   {
+    "key": "discovery",
+    "count": 5,
+    "tone": "good"
+   },
+   {
+    "key": "misroute",
+    "count": 4,
+    "tone": "violet"
+   },
+   {
+    "key": "incident",
+    "count": 4,
+    "tone": "amber"
+   }
+  ],
+  "entries": [
+   {
+    "kind": "miss",
+    "tone": "bad",
+    "who": "implementer",
+    "where": "sign-in loop",
+    "when": "Oct 9, 14:02",
+    "repeats": 3,
+    "text": "A visual tester passed a menu that overflowed at 390 px: the phone-width check was not in its brief."
+   },
+   {
+    "kind": "owner-feedback",
+    "tone": "accent",
+    "who": "orchestrator",
+    "where": "from chat",
+    "when": "Oct 9, 11:40",
+    "repeats": 1,
+    "text": "“Testers should never wait on a build; give them a seed to start from instead.”"
+   },
+   {
+    "kind": "friction",
+    "tone": "warn",
+    "who": "implementer",
+    "where": "slow export",
+    "when": "Oct 8, 19:20",
+    "repeats": 1,
+    "text": "Three check runs were not enough after a rebase onto a moved migration."
+   },
+   {
+    "kind": "misroute",
+    "tone": "violet",
+    "who": "orchestrator",
+    "where": "slow export",
+    "when": "Oct 8, 16:00",
+    "repeats": 1,
+    "text": "Routed to rung 1, but the cause spanned two services; the intake verdict named only one."
+   },
+   {
+    "kind": "incident",
+    "tone": "amber",
+    "who": "warden",
+    "where": "orchestrator",
+    "when": "Oct 8, 03:12",
+    "repeats": 1,
+    "text": "Restarted the orchestrator after 41 minutes of silence while idle."
+   },
+   {
+    "kind": "discovery",
+    "tone": "good",
+    "who": "designer",
+    "where": "empty states",
+    "when": "Oct 7, 13:30",
+    "repeats": 1,
+    "text": "Critics read the whole spec each round; a changed-sections note would cut each round by half."
+   },
+   {
+    "kind": "friction",
+    "tone": "warn",
+    "who": "tester",
+    "where": "qa-ui-function",
+    "when": "Oct 7, 10:10",
+    "repeats": 4,
+    "text": "Two minutes per item is too short for a scenario that waits for a large upload."
+   },
+   {
+    "kind": "miss",
+    "tone": "bad",
+    "who": "orchestrator",
+    "where": "merge of t-0012",
+    "when": "Oct 6, 18:00",
+    "repeats": 1,
+    "text": "A regression check ran before the slot had rebuilt, and passed on the old build."
+   },
+   {
+    "kind": "miss",
+    "tone": "bad",
+    "who": "implementer",
+    "where": "invoice list",
+    "when": "Oct 6, 09:00",
+    "repeats": 1,
+    "text": "A tester brief named a page that had moved."
+   },
+   {
+    "kind": "owner-feedback",
+    "tone": "accent",
+    "who": "tester",
+    "where": "phone pages",
+    "when": "Oct 6, 02:00",
+    "repeats": 2,
+    "text": "The slot rebuilt twice for one merge."
+   },
+   {
+    "kind": "friction",
+    "tone": "warn",
+    "who": "designer",
+    "where": "import",
+    "when": "Oct 5, 19:00",
+    "repeats": 3,
+    "text": "A critic asked for a diagram the spec already had."
+   },
+   {
+    "kind": "discovery",
+    "tone": "good",
+    "who": "orchestrator",
+    "where": "billing",
+    "when": "Oct 5, 12:00",
+    "repeats": 1,
+    "text": "Triage parked a request that a goal item names."
+   },
+   {
+    "kind": "misroute",
+    "tone": "violet",
+    "who": "implementer",
+    "where": "invoice list",
+    "when": "Oct 5, 05:00",
+    "repeats": 2,
+    "text": "A tester brief named a page that had moved."
+   },
+   {
+    "kind": "incident",
+    "tone": "amber",
+    "who": "tester",
+    "where": "phone pages",
+    "when": "Oct 4, 22:00",
+    "repeats": 3,
+    "text": "The slot rebuilt twice for one merge."
+   },
+   {
+    "kind": "miss",
+    "tone": "bad",
+    "who": "designer",
+    "where": "import",
+    "when": "Oct 4, 15:00",
+    "repeats": 1,
+    "text": "A critic asked for a diagram the spec already had."
+   },
+   {
+    "kind": "owner-feedback",
+    "tone": "accent",
+    "who": "orchestrator",
+    "where": "billing",
+    "when": "Oct 4, 08:00",
+    "repeats": 2,
+    "text": "Triage parked a request that a goal item names."
+   },
+   {
+    "kind": "friction",
+    "tone": "warn",
+    "who": "implementer",
+    "where": "invoice list",
+    "when": "Oct 4, 01:00",
+    "repeats": 3,
+    "text": "A tester brief named a page that had moved."
+   },
+   {
+    "kind": "discovery",
+    "tone": "good",
+    "who": "tester",
+    "where": "phone pages",
+    "when": "Oct 3, 18:00",
+    "repeats": 1,
+    "text": "The slot rebuilt twice for one merge."
+   },
+   {
+    "kind": "misroute",
+    "tone": "violet",
+    "who": "designer",
+    "where": "import",
+    "when": "Oct 3, 11:00",
+    "repeats": 2,
+    "text": "A critic asked for a diagram the spec already had."
+   },
+   {
+    "kind": "incident",
+    "tone": "amber",
+    "who": "orchestrator",
+    "where": "billing",
+    "when": "Oct 3, 04:00",
+    "repeats": 3,
+    "text": "Triage parked a request that a goal item names."
+   },
+   {
+    "kind": "miss",
+    "tone": "bad",
+    "who": "implementer",
+    "where": "invoice list",
+    "when": "Oct 2, 21:00",
+    "repeats": 1,
+    "text": "A tester brief named a page that had moved."
+   },
+   {
+    "kind": "owner-feedback",
+    "tone": "accent",
+    "who": "tester",
+    "where": "phone pages",
+    "when": "Oct 2, 14:00",
+    "repeats": 2,
+    "text": "The slot rebuilt twice for one merge."
+   },
+   {
+    "kind": "friction",
+    "tone": "warn",
+    "who": "designer",
+    "where": "import",
+    "when": "Oct 2, 07:00",
+    "repeats": 3,
+    "text": "A critic asked for a diagram the spec already had."
+   },
+   {
+    "kind": "discovery",
+    "tone": "good",
+    "who": "orchestrator",
+    "where": "billing",
+    "when": "Oct 2, 00:00",
+    "repeats": 1,
+    "text": "Triage parked a request that a goal item names."
+   },
+   {
+    "kind": "misroute",
+    "tone": "violet",
+    "who": "implementer",
+    "where": "invoice list",
+    "when": "Oct 1, 17:00",
+    "repeats": 2,
+    "text": "A tester brief named a page that had moved."
+   },
+   {
+    "kind": "incident",
+    "tone": "amber",
+    "who": "tester",
+    "where": "phone pages",
+    "when": "Oct 1, 10:00",
+    "repeats": 3,
+    "text": "The slot rebuilt twice for one merge."
+   },
+   {
+    "kind": "miss",
+    "tone": "bad",
+    "who": "designer",
+    "where": "import",
+    "when": "Oct 1, 03:00",
+    "repeats": 1,
+    "text": "A critic asked for a diagram the spec already had."
+   },
+   {
+    "kind": "owner-feedback",
+    "tone": "accent",
+    "who": "orchestrator",
+    "where": "billing",
+    "when": "Sep 30, 20:00",
+    "repeats": 2,
+    "text": "Triage parked a request that a goal item names."
+   },
+   {
+    "kind": "friction",
+    "tone": "warn",
+    "who": "implementer",
+    "where": "invoice list",
+    "when": "Sep 30, 13:00",
+    "repeats": 3,
+    "text": "A tester brief named a page that had moved."
+   },
+   {
+    "kind": "discovery",
+    "tone": "good",
+    "who": "tester",
+    "where": "phone pages",
+    "when": "Sep 30, 06:00",
+    "repeats": 1,
+    "text": "The slot rebuilt twice for one merge."
+   }
+  ],
+  "more": false
+ }
+}

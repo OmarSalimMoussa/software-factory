@@ -1,0 +1,55 @@
+{
+ "slice": {
+  "tabs": [
+   [
+    "family",
+    "By family"
+   ],
+   [
+    "agent",
+    "By agent"
+   ],
+   [
+    "task",
+    "By task, start to merge"
+   ],
+   [
+    "model",
+    "By model"
+   ]
+  ],
+  "rows": [
+   {
+    "name": "Orchestrator",
+    "value": 143.3,
+    "color": "--f-orch",
+    "tag": null
+   },
+   {
+    "name": "Intake and triage",
+    "value": 49.1,
+    "color": "--f-intake",
+    "tag": null
+   },
+   {
+    "name": "Designers and critics",
+    "value": 152.7,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "Implementers",
+    "value": 372.6,
+    "color": "--f-impl",
+    "tag": null
+   },
+   {
+    "name": "Testers",
+    "value": 276.5,
+    "color": "--f-qa",
+    "tag": null
+   }
+  ],
+  "more": false
+ }
+}

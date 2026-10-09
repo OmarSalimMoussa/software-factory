@@ -1,0 +1,79 @@
+{
+ "shell": {
+  "repo": "acme-app",
+  "github": "https://github.com/acme/acme-app",
+  "pills": {
+   "staging": {
+    "state": "healthy",
+    "sha": "a1b2c3d"
+   },
+   "prod": {
+    "state": "down",
+    "sha": "9f8e7d1"
+   }
+  },
+  "nav": {
+   "work": 4,
+   "reflect": 8
+  },
+  "live": {
+   "refresh_seconds": 15,
+   "stale_seconds": 45
+  },
+  "factory": "running",
+  "code": {
+   "locked_until": null,
+   "lock_minutes": 60
+  },
+  "pages": [
+   [
+    "home",
+    "Home",
+    "home",
+    "h"
+   ],
+   [
+    "work",
+    "Work",
+    "queue-list",
+    "w"
+   ],
+   [
+    "agents",
+    "Agents",
+    "cpu-chip",
+    "a"
+   ],
+   [
+    "spend",
+    "Spend",
+    "currency-dollar",
+    "s"
+   ],
+   [
+    "library",
+    "Library",
+    "book-open",
+    "l"
+   ],
+   [
+    "settings",
+    "Settings",
+    "adjustments-horizontal",
+    "c"
+   ],
+   [
+    "reflect",
+    "Self-reflect",
+    "light-bulb",
+    "r"
+   ],
+   [
+    "guard",
+    "Guard",
+    "shield-check",
+    "g"
+   ]
+  ]
+ }
+}

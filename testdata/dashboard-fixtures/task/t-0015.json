@@ -1,0 +1,116 @@
+{
+ "task": {
+  "id": "t-0015",
+  "title": "Invoice list loads slowly with 200 items",
+  "sheet_title": "Invoice list loads slowly with 200 items",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "good",
+   "word": "On staging"
+  },
+  "chips": [
+   {
+    "text": "t-0015",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G2",
+    "tone": "accent"
+   },
+   {
+    "text": "API",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "3"
+   },
+   {
+    "label": "People",
+    "value": "3"
+   },
+   {
+    "label": "Score",
+    "value": "44"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$9.60"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 2,
+   "cause": "the invoice list ran one query per item"
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 9
+  },
+  "testers": {
+   "note": "1 required",
+   "rows": [
+    {
+     "name": "qa-ui-function",
+     "model": "Haiku 5.5",
+     "state": "pass",
+     "tone": "good",
+     "note": null,
+     "shots": []
+    }
+   ],
+   "empty": "Testers start once every slice is built."
+  },
+  "built_from": {
+   "kind": "fix",
+   "rung_label": "rung 2 · no spec",
+   "cause": "the invoice list ran one query per item",
+   "fix": "One joined query for the whole page.",
+   "qa": {
+    "kind": "backend",
+    "note": "qa-backend timed it: 200 items in 240 ms, down from 4.1 s.",
+    "shots": []
+   }
+  },
+  "requests": [
+   {
+    "id": "r-1026",
+    "text": "qa-backend: the invoice list takes 4 s with 200 items",
+    "age": "3 days ago"
+   }
+  ],
+  "log": [
+   {
+    "at": "Oct 7, 13:00",
+    "text": "Filed by triage"
+   }
+  ],
+  "branch": "worktree-t-0015",
+  "actions": [
+   "library"
+  ]
+ }
+}

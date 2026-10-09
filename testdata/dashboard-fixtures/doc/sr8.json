@@ -1,0 +1,63 @@
+{
+ "doc": {
+  "id": "sr8",
+  "kind": "reflection",
+  "kind_label": "Reflection",
+  "title": "A regression check ran before the slot had rebuilt, and passed on the …",
+  "when": "Oct 6, 18:00 UTC · 3 days ago",
+  "fm": [
+   {
+    "label": "Kind",
+    "values": [
+     {
+      "text": "miss",
+      "tone": "bad",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Who",
+    "values": [
+     {
+      "text": "orchestrator",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Where",
+    "values": [
+     {
+      "text": "merge of t-0012",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "When",
+    "values": [
+     {
+      "text": "Oct 6, 18:00 UTC",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Repeats",
+    "values": [
+     {
+      "text": "1 time",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<p>A regression check ran before the slot had rebuilt, and passed on the old build.</p>",
+  "art_url": null
+ }
+}

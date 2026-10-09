@@ -1,0 +1,536 @@
+{
+ "header": {
+  "sub": "63 requests wait for triage · 4 tasks queued",
+  "triage_line": "Last triage, 2 h ago: 100 requests, 4 new tasks, 31 joined, 52 noise, 13 parked"
+ },
+ "tabs": [
+  [
+   "tasks",
+   "Tasks",
+   14
+  ],
+  [
+   "requests",
+   "Requests",
+   40
+  ],
+  [
+   "parked",
+   "Parked",
+   3
+  ],
+  [
+   "checks",
+   "Checks",
+   4
+  ]
+ ],
+ "tasks": {
+  "groups": [
+   {
+    "key": "progress",
+    "title": "In progress",
+    "hint": null,
+    "empty": "Nothing is being built.",
+    "rows": [
+     {
+      "id": "t-0021",
+      "rank": null,
+      "rank_mark": "!",
+      "title": "Staging is down after the last deploy",
+      "severity": {
+       "text": "severe",
+       "tone": "bad"
+      },
+      "surfaces": [
+       "API"
+      ],
+      "requests": "1 request",
+      "goal": null,
+      "rung": 1,
+      "rung_word": "Sonnet",
+      "status": {
+       "tone": "accent",
+       "word": "Building"
+      },
+      "cost": "$3.10",
+      "action": null,
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0017",
+      "rank": null,
+      "rank_mark": "·",
+      "title": "Sign-in sends people back to the sign-in page",
+      "severity": {
+       "text": "major",
+       "tone": "warn"
+      },
+      "surfaces": [
+       "UI",
+       "Access"
+      ],
+      "requests": "14 requests",
+      "goal": "G1",
+      "rung": 1,
+      "rung_word": "Sonnet",
+      "status": {
+       "tone": "accent",
+       "word": "QA, round 2 of 4"
+      },
+      "cost": "$12.40",
+      "action": null,
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0020",
+      "rank": null,
+      "rank_mark": "·",
+      "title": "Long project names wrap badly",
+      "severity": {
+       "text": "minor",
+       "tone": ""
+      },
+      "surfaces": [
+       "UI"
+      ],
+      "requests": "2 requests",
+      "goal": "G2",
+      "rung": 1,
+      "rung_word": "Sonnet",
+      "status": {
+       "tone": "warn",
+       "word": "Deprioritized, back first"
+      },
+      "cost": "$2.10",
+      "action": null,
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0022",
+      "rank": null,
+      "rank_mark": "·",
+      "title": "Retry an upload that drops midway",
+      "severity": {
+       "text": "major",
+       "tone": "warn"
+      },
+      "surfaces": [
+       "API"
+      ],
+      "requests": "4 requests",
+      "goal": "G2",
+      "rung": 2,
+      "rung_word": "Opus",
+      "status": {
+       "tone": "accent",
+       "word": "Building"
+      },
+      "cost": "$6.20",
+      "action": null,
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0014",
+      "rank": null,
+      "rank_mark": "·",
+      "title": "Clearer empty states on Projects and Invoices",
+      "severity": {
+       "text": "minor",
+       "tone": ""
+      },
+      "surfaces": [
+       "UI"
+      ],
+      "requests": "6 requests",
+      "goal": "G2",
+      "rung": 3,
+      "rung_word": "spec",
+      "status": {
+       "tone": "accent",
+       "word": "Designing"
+      },
+      "cost": "$8.90",
+      "action": null,
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0023",
+      "rank": null,
+      "rank_mark": "·",
+      "title": "Partner sign-in from the import step",
+      "severity": {
+       "text": "major",
+       "tone": "warn"
+      },
+      "surfaces": [
+       "UI",
+       "Access"
+      ],
+      "requests": "2 requests",
+      "goal": "G2",
+      "rung": 4,
+      "rung_word": "spec",
+      "status": {
+       "tone": "warn",
+       "word": "Needs your Go"
+      },
+      "cost": "$14.30",
+      "action": null,
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0019",
+      "rank": null,
+      "rank_mark": "·",
+      "title": "Export of a long report times out",
+      "severity": {
+       "text": "major",
+       "tone": "warn"
+      },
+      "surfaces": [
+       "API"
+      ],
+      "requests": "3 requests",
+      "goal": "G1",
+      "rung": 3,
+      "rung_word": "spec",
+      "status": {
+       "tone": "warn",
+       "word": "Needs your decision"
+      },
+      "cost": "$21.75",
+      "action": null,
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     }
+    ]
+   },
+   {
+    "key": "proposed",
+    "title": "Proposed to you",
+    "hint": "Nothing starts until you approve it. The full cards, with their sketches, are on Home.",
+    "empty": "No proposals waiting.",
+    "rows": [
+     {
+      "id": "t-0027",
+      "rank": 1,
+      "rank_mark": null,
+      "title": "Billing: the credit line shows twice",
+      "severity": {
+       "text": "major",
+       "tone": "warn"
+      },
+      "surfaces": [
+       "UI"
+      ],
+      "requests": "4 requests",
+      "goal": "G1",
+      "rung": 1,
+      "rung_word": "Sonnet",
+      "status": {
+       "tone": "warn",
+       "word": "Waiting for you"
+      },
+      "cost": "$0",
+      "action": "approve",
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0024",
+      "rank": 2,
+      "rank_mark": null,
+      "title": "Phone width: the account menu clips",
+      "severity": {
+       "text": "minor",
+       "tone": ""
+      },
+      "surfaces": [
+       "UI"
+      ],
+      "requests": "3 requests",
+      "goal": "G3",
+      "rung": 1,
+      "rung_word": "Sonnet",
+      "status": {
+       "tone": "warn",
+       "word": "Waiting for you"
+      },
+      "cost": "$0",
+      "action": "approve",
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0025",
+      "rank": 3,
+      "rank_mark": null,
+      "title": "Show who sent each piece of feedback",
+      "severity": {
+       "text": "minor",
+       "tone": ""
+      },
+      "surfaces": [
+       "UI",
+       "API"
+      ],
+      "requests": "5 requests",
+      "goal": "G4",
+      "rung": 3,
+      "rung_word": "spec",
+      "status": {
+       "tone": "warn",
+       "word": "Waiting for you"
+      },
+      "cost": "$0",
+      "action": "approve",
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     }
+    ]
+   },
+   {
+    "key": "queue",
+    "title": "Queue, in computed order",
+    "hint": "The orchestrator proposes from the top of this order. Boost makes a task the next proposal, ahead of its own picks.",
+    "empty": "The queue is empty.",
+    "rows": [
+     {
+      "id": "t-0018",
+      "rank": 1,
+      "rank_mark": null,
+      "title": "Dark-mode contrast on status words",
+      "severity": {
+       "text": "minor",
+       "tone": ""
+      },
+      "surfaces": [
+       "UI"
+      ],
+      "requests": "2 requests",
+      "goal": "G3",
+      "rung": 1,
+      "rung_word": "Sonnet",
+      "status": {
+       "tone": "ring",
+       "word": "Queued"
+      },
+      "cost": "$0",
+      "action": "boost",
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0029",
+      "rank": 2,
+      "rank_mark": null,
+      "title": "Keep the last-used currency",
+      "severity": {
+       "text": "minor",
+       "tone": ""
+      },
+      "surfaces": [
+       "UI"
+      ],
+      "requests": "2 requests",
+      "goal": "G1",
+      "rung": 1,
+      "rung_word": "Sonnet",
+      "status": {
+       "tone": "ring",
+       "word": "Queued"
+      },
+      "cost": "$0",
+      "action": "boost",
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0030",
+      "rank": 3,
+      "rank_mark": null,
+      "title": "Import skips empty rows without saying so",
+      "severity": {
+       "text": "minor",
+       "tone": ""
+      },
+      "surfaces": [
+       "API"
+      ],
+      "requests": "3 requests",
+      "goal": "G2",
+      "rung": 1,
+      "rung_word": "Sonnet",
+      "status": {
+       "tone": "ring",
+       "word": "Queued"
+      },
+      "cost": "$0",
+      "action": "boost",
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0028",
+      "rank": 4,
+      "rank_mark": null,
+      "title": "Store listing screenshots",
+      "severity": {
+       "text": "minor",
+       "tone": ""
+      },
+      "surfaces": [
+       "No runtime change"
+      ],
+      "requests": "1 request",
+      "goal": "G5",
+      "rung": 0,
+      "rung_word": "no build",
+      "status": {
+       "tone": "ring",
+       "word": "Queued"
+      },
+      "cost": "$0",
+      "action": null,
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     }
+    ]
+   },
+   {
+    "key": "staging",
+    "title": "On staging, waiting to push to prod",
+    "hint": null,
+    "empty": "Staging runs what prod runs.",
+    "rows": [
+     {
+      "id": "t-0016",
+      "rank": null,
+      "rank_mark": "·",
+      "title": "Billing page shows credit after a refund",
+      "severity": {
+       "text": "major",
+       "tone": "warn"
+      },
+      "surfaces": [
+       "API"
+      ],
+      "requests": "2 requests",
+      "goal": "G1",
+      "rung": 1,
+      "rung_word": "Sonnet",
+      "status": {
+       "tone": "good",
+       "word": "On staging"
+      },
+      "cost": "$4.80",
+      "action": null,
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0015",
+      "rank": null,
+      "rank_mark": "·",
+      "title": "Invoice list loads slowly with 200 items",
+      "severity": {
+       "text": "minor",
+       "tone": ""
+      },
+      "surfaces": [
+       "API"
+      ],
+      "requests": "3 requests",
+      "goal": "G2",
+      "rung": 2,
+      "rung_word": "Opus",
+      "status": {
+       "tone": "good",
+       "word": "On staging"
+      },
+      "cost": "$9.60",
+      "action": null,
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0013",
+      "rank": null,
+      "rank_mark": "·",
+      "title": "Invoice page: the Approve button jumps",
+      "severity": {
+       "text": "minor",
+       "tone": ""
+      },
+      "surfaces": [
+       "UI"
+      ],
+      "requests": "2 requests",
+      "goal": "G2",
+      "rung": 1,
+      "rung_word": "Sonnet",
+      "status": {
+       "tone": "good",
+       "word": "On staging"
+      },
+      "cost": "$7.15",
+      "action": null,
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     },
+     {
+      "id": "t-0012",
+      "rank": null,
+      "rank_mark": "·",
+      "title": "Usage page: totals per day",
+      "severity": {
+       "text": "minor",
+       "tone": ""
+      },
+      "surfaces": [
+       "UI",
+       "API"
+      ],
+      "requests": "3 requests",
+      "goal": "G4",
+      "rung": 3,
+      "rung_word": "spec",
+      "status": {
+       "tone": "good",
+       "word": "On staging"
+      },
+      "cost": "$26.40",
+      "action": null,
+      "boosted": false,
+      "can_up": false,
+      "can_down": false
+     }
+    ]
+   }
+  ]
+ }
+}

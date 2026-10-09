@@ -1,0 +1,110 @@
+{
+ "task": {
+  "id": "t-0016",
+  "title": "Billing page shows credit after a refund",
+  "sheet_title": "Billing page shows credit after a refund",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "good",
+   "word": "On staging"
+  },
+  "chips": [
+   {
+    "text": "t-0016",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G1",
+    "tone": "accent"
+   },
+   {
+    "text": "API",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "2"
+   },
+   {
+    "label": "People",
+    "value": "2"
+   },
+   {
+    "label": "Score",
+    "value": "66"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$4.80"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 1,
+   "cause": "billing/credits.py: a refund never reversed its credit line"
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 9
+  },
+  "testers": {
+   "note": "none required",
+   "rows": [
+    {
+     "name": "qa-ui-function",
+     "model": "Haiku 5.5",
+     "state": "pass",
+     "tone": "good",
+     "note": null,
+     "shots": []
+    }
+   ],
+   "empty": "A small backend fix runs no testers."
+  },
+  "built_from": {
+   "kind": "fix",
+   "rung_label": "rung 1 · no spec",
+   "cause": "billing/credits.py: a refund never reversed its credit line",
+   "fix": "Reverse the credit line when a refund lands, with a test for each kind of refund.",
+   "qa": {
+    "kind": "none",
+    "note": "No testers: a small backend fix is covered by its own tests.",
+    "shots": []
+   }
+  },
+  "requests": [],
+  "log": [
+   {
+    "at": "Oct 8, 08:00",
+    "text": "Filed by triage"
+   }
+  ],
+  "branch": "worktree-t-0016",
+  "actions": [
+   "library"
+  ]
+ }
+}

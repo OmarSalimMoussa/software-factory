@@ -1,0 +1,21 @@
+{
+ "history": {
+  "id": "h6",
+  "family": "design",
+  "initials": "DS",
+  "name": "critic-security",
+  "role": "critic",
+  "task": "t-0009",
+  "model": "Sonnet 5.5",
+  "started": "Oct 5, 10:25",
+  "started_by": "started by Spreadsheet export",
+  "ended": "Oct 5, 10:40",
+  "lasted": "after 15 min",
+  "why": {
+   "text": "stopped with its parent",
+   "tone": "bad"
+  },
+  "cost": "$0.35",
+  "note": "Its designer was stopped"
+ }
+}

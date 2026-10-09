@@ -1,0 +1,289 @@
+{
+ "slice": {
+  "tabs": [
+   [
+    "family",
+    "By family"
+   ],
+   [
+    "agent",
+    "By agent"
+   ],
+   [
+    "task",
+    "By task, start to merge"
+   ],
+   [
+    "model",
+    "By model"
+   ]
+  ],
+  "rows": [
+   {
+    "name": "Usage page · implementer, large",
+    "value": 18.4,
+    "color": "--f-impl",
+    "tag": null
+   },
+   {
+    "name": "Orchestrator · orchestrator",
+    "value": 18.2,
+    "color": "--f-orch",
+    "tag": null
+   },
+   {
+    "name": "Partner sign-in · designer",
+    "value": 14.3,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "Usage page · designer",
+    "value": 8.0,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "Sign-in loop · implementer, small",
+    "value": 7.95,
+    "color": "--f-impl",
+    "tag": null
+   },
+   {
+    "name": "Empty states · designer",
+    "value": 6.75,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "Retry an upload · implementer, large",
+    "value": 6.2,
+    "color": "--f-impl",
+    "tag": null
+   },
+   {
+    "name": "Spreadsheet export · designer",
+    "value": 3.2,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "Triage · triage",
+    "value": 2.4,
+    "color": "--f-intake",
+    "tag": null
+   },
+   {
+    "name": "Staging is down · implementer, small",
+    "value": 2.26,
+    "color": "--f-impl",
+    "tag": null
+   },
+   {
+    "name": "Project names · implementer, small",
+    "value": 2.1,
+    "color": "--f-impl",
+    "tag": null
+   },
+   {
+    "name": "qa-ui-function · tester",
+    "value": 1.9,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "critic-ux · critic",
+    "value": 1.85,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "qa-visual · tester",
+    "value": 1.8,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "Intake · intake",
+    "value": 1.75,
+    "color": "--f-intake",
+    "tag": null
+   },
+   {
+    "name": "qa-ui-function · tester",
+    "value": 1.7,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "critic-ux · critic",
+    "value": 1.65,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "qa-visual · tester",
+    "value": 1.6,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "Intake · intake",
+    "value": 1.55,
+    "color": "--f-intake",
+    "tag": null
+   },
+   {
+    "name": "qa-ui-function · tester",
+    "value": 1.5,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "critic-ux · critic",
+    "value": 1.45,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "qa-ux · tester",
+    "value": 1.41,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "qa-visual · tester",
+    "value": 1.4,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "Intake · intake",
+    "value": 1.35,
+    "color": "--f-intake",
+    "tag": null
+   },
+   {
+    "name": "qa-security · tester",
+    "value": 1.3,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "qa-ui-function · tester",
+    "value": 1.3,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "critic-ux · critic",
+    "value": 1.25,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "qa-visual · tester",
+    "value": 1.2,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "Intake · intake",
+    "value": 1.15,
+    "color": "--f-intake",
+    "tag": null
+   },
+   {
+    "name": "qa-visual · tester",
+    "value": 1.12,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "qa-backend · tester",
+    "value": 1.12,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "qa-ui-function · tester",
+    "value": 1.1,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "critic-ux · critic",
+    "value": 1.05,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "qa-visual · tester",
+    "value": 1.0,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "Intake · intake",
+    "value": 0.95,
+    "color": "--f-intake",
+    "tag": null
+   },
+   {
+    "name": "qa-ui-function · tester",
+    "value": 0.9,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "critic-ux · critic",
+    "value": 0.85,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "Intake · intake",
+    "value": 0.84,
+    "color": "--f-intake",
+    "tag": null
+   },
+   {
+    "name": "critic-architecture · critic",
+    "value": 0.71,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "qa-backend · tester",
+    "value": 0.66,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "qa-ui-function · tester",
+    "value": 0.62,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "critic-ux · critic",
+    "value": 0.48,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "critic-security · critic",
+    "value": 0.35,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "Intake · intake",
+    "value": 0.31,
+    "color": "--f-intake",
+    "tag": null
+   }
+  ],
+  "more": false
+ }
+}

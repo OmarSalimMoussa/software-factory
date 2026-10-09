@@ -1,0 +1,18 @@
+{
+ "preview": {
+  "title": "Stop Staging is down?",
+  "text": "This agent stops now. Its task, t-0021, goes back to the top of Proposed next with its work kept.",
+  "rows": [
+   {
+    "family": "impl",
+    "initials": "IM",
+    "name": "Staging is down",
+    "role": "implementer, small",
+    "model": "Sonnet 5.5",
+    "cost": "$2.26"
+   }
+  ],
+  "button": "Stop it",
+  "coded": false
+ }
+}

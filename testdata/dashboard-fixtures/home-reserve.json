@@ -1,0 +1,78 @@
+{
+ "cards": [
+  {
+   "kind": "card",
+   "task": "t-0018",
+   "number": 3,
+   "goal_item": "G3",
+   "severe": false,
+   "line": "Status words are easy to read in dark mode",
+   "why": "A quick win for G3, asked for twice.",
+   "picture": "/api/picture/task/t-0018",
+   "run": {
+    "value": "1",
+    "options": [
+     [
+      "1",
+      "Rung 1 · Sonnet"
+     ],
+     [
+      "2",
+      "Rung 2 · Opus"
+     ],
+     [
+      "3",
+      "Rung 3 · design, then build"
+     ],
+     [
+      "4",
+      "Rung 4 · design, your Go"
+     ]
+    ]
+   },
+   "testers": "UI testers",
+   "estimate": "≈ $4",
+   "run_changed": false,
+   "can_up": true,
+   "can_down": false,
+   "version": "v1"
+  }
+ ],
+ "outage_card": {
+  "kind": "card",
+  "task": "t-0031",
+  "number": 1,
+  "goal_item": null,
+  "severe": true,
+  "line": "Prod answers again",
+  "why": "Prod is down, and you stopped the fix the factory started.",
+  "picture": "/api/picture/task/t-0031",
+  "run": {
+   "value": "1",
+   "options": [
+    [
+     "1",
+     "Rung 1 · Sonnet"
+    ],
+    [
+     "2",
+     "Rung 2 · Opus"
+    ],
+    [
+     "3",
+     "Rung 3 · design, then build"
+    ],
+    [
+     "4",
+     "Rung 4 · design, your Go"
+    ]
+   ]
+  },
+  "testers": "No testers",
+  "estimate": "≈ $3",
+  "run_changed": false,
+  "can_up": false,
+  "can_down": true,
+  "version": "v1"
+ }
+}

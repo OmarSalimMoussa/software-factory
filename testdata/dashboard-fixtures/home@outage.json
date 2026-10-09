@@ -1,0 +1,87 @@
+{
+ "outage": {
+  "since": "14:27 UTC",
+  "probes": [
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   false,
+   false
+  ],
+  "probe_note": "last 10 probes, one a minute",
+  "stage": "fixing",
+  "message": "The factory started a fix without you: <b>Prod returns 502 on every page</b> · Sonnet · rung 1. Everything else still waits for you.",
+  "session": "run-t-0031",
+  "actions": [
+   "watch",
+   "stop"
+  ]
+ },
+ "envs": {
+  "staging": {
+   "name": "Staging",
+   "state": "healthy",
+   "state_word": "Healthy",
+   "sha": "a1b2c3d",
+   "deployed": "Oct 9, 11:18",
+   "chips": [
+    {
+     "text": "healthy 3 h 12 min",
+     "tone": "good"
+    },
+    {
+     "text": "4 tasks ahead of prod",
+     "tone": "accent"
+    }
+   ],
+   "deployment_url": "https://github.com/acme/acme-app/actions/runs/11872341205",
+   "commit_url": "https://github.com/acme/acme-app/commit/a1b2c3d"
+  },
+  "prod": {
+   "name": "Prod",
+   "state": "down",
+   "state_word": "Down",
+   "sha": "9f8e7d1",
+   "deployed": "Oct 7, 10:05",
+   "chips": [
+    {
+     "text": "down 3 min",
+     "tone": "bad"
+    },
+    {
+     "text": "frozen",
+     "tone": "muted"
+    }
+   ],
+   "deployment_url": "https://github.com/acme/acme-app/actions/runs/11829911873",
+   "commit_url": "https://github.com/acme/acme-app/commit/9f8e7d1"
+  },
+  "to_push": 4,
+  "laptop": {
+   "state": "healthy",
+   "label": "healthy",
+   "rows": [
+    {
+     "label": "Memory",
+     "pct": 61,
+     "value": "61%"
+    },
+    {
+     "label": "CPU",
+     "pct": 34,
+     "value": "34%"
+    },
+    {
+     "label": "Power",
+     "pct": 100,
+     "value": "Mains"
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,34 @@
+{
+ "preview": {
+  "title": "Stop Sign-in loop?",
+  "text": "These 3 agents stop now: Sign-in loop and everything under it. Its task, t-0017, goes back to the top of Proposed next with its work kept.",
+  "rows": [
+   {
+    "family": "impl",
+    "initials": "IM",
+    "name": "Sign-in loop",
+    "role": "implementer, small",
+    "model": "Sonnet 5.5",
+    "cost": "$7.95"
+   },
+   {
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-ui-function",
+    "role": "tester",
+    "model": "Haiku 5.5",
+    "cost": "$0.62"
+   },
+   {
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-visual",
+    "role": "tester",
+    "model": "Sonnet 5.5",
+    "cost": "$1.12"
+   }
+  ],
+  "button": "Stop 3 agents",
+  "coded": false
+ }
+}

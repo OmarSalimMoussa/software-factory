@@ -1,0 +1,406 @@
+{
+ "header": {
+  "sub": "63 requests wait for triage · 4 tasks queued",
+  "triage_line": "Last triage, 2 h ago: 100 requests, 4 new tasks, 31 joined, 52 noise, 13 parked"
+ },
+ "tabs": [
+  [
+   "tasks",
+   "Tasks",
+   14
+  ],
+  [
+   "requests",
+   "Requests",
+   40
+  ],
+  [
+   "parked",
+   "Parked",
+   3
+  ],
+  [
+   "checks",
+   "Checks",
+   4
+  ]
+ ],
+ "checks": {
+  "legend": [
+   {
+    "label": "pass",
+    "tone": "good"
+   },
+   {
+    "label": "fail",
+    "tone": "bad"
+   },
+   {
+    "label": "blocked",
+    "tone": ""
+   }
+  ],
+  "rows": [
+   {
+    "id": "c-1009-1405",
+    "merge": "Merge t-0015",
+    "sha": "a1b2c3d",
+    "age": "25 min ago",
+    "results": [
+     {
+      "scenario": "auth-admission",
+      "state": "pass"
+     },
+     {
+      "scenario": "auth-remove",
+      "state": "pass"
+     },
+     {
+      "scenario": "billing-credit",
+      "state": "pass"
+     },
+     {
+      "scenario": "billing-own-key",
+      "state": "pass"
+     },
+     {
+      "scenario": "invoice-access",
+      "state": "pass"
+     },
+     {
+      "scenario": "account-menu",
+      "state": "pass"
+     },
+     {
+      "scenario": "bar-widths",
+      "state": "pass"
+     },
+     {
+      "scenario": "invoice-create",
+      "state": "pass"
+     },
+     {
+      "scenario": "home-and-lists",
+      "state": "pass"
+     },
+     {
+      "scenario": "phone-pages",
+      "state": "pass"
+     },
+     {
+      "scenario": "phone-lists",
+      "state": "fail"
+     },
+     {
+      "scenario": "shell",
+      "state": "pass"
+     },
+     {
+      "scenario": "signed-out",
+      "state": "pass"
+     },
+     {
+      "scenario": "stack",
+      "state": "pass"
+     },
+     {
+      "scenario": "trash",
+      "state": "pass"
+     },
+     {
+      "scenario": "import-run",
+      "state": "pass"
+     },
+     {
+      "scenario": "partner-connect",
+      "state": "pass"
+     },
+     {
+      "scenario": "first-invoice",
+      "state": "blocked"
+     },
+     {
+      "scenario": "api-connect",
+      "state": "pass"
+     },
+     {
+      "scenario": "sign-ins-saved",
+      "state": "pass"
+     }
+    ],
+    "summary": "18 of 20 passed",
+    "tone": "bad"
+   },
+   {
+    "id": "c-1009-1110",
+    "merge": "Merge t-0016",
+    "sha": "77ab12e",
+    "age": "3 h ago",
+    "results": [
+     {
+      "scenario": "auth-admission",
+      "state": "pass"
+     },
+     {
+      "scenario": "auth-remove",
+      "state": "pass"
+     },
+     {
+      "scenario": "billing-credit",
+      "state": "pass"
+     },
+     {
+      "scenario": "billing-own-key",
+      "state": "pass"
+     },
+     {
+      "scenario": "invoice-access",
+      "state": "pass"
+     },
+     {
+      "scenario": "account-menu",
+      "state": "pass"
+     },
+     {
+      "scenario": "bar-widths",
+      "state": "pass"
+     },
+     {
+      "scenario": "invoice-create",
+      "state": "pass"
+     },
+     {
+      "scenario": "home-and-lists",
+      "state": "pass"
+     },
+     {
+      "scenario": "phone-pages",
+      "state": "pass"
+     },
+     {
+      "scenario": "phone-lists",
+      "state": "pass"
+     },
+     {
+      "scenario": "shell",
+      "state": "pass"
+     },
+     {
+      "scenario": "signed-out",
+      "state": "pass"
+     },
+     {
+      "scenario": "stack",
+      "state": "pass"
+     },
+     {
+      "scenario": "trash",
+      "state": "pass"
+     },
+     {
+      "scenario": "import-run",
+      "state": "pass"
+     },
+     {
+      "scenario": "partner-connect",
+      "state": "pass"
+     },
+     {
+      "scenario": "first-invoice",
+      "state": "blocked"
+     },
+     {
+      "scenario": "api-connect",
+      "state": "pass"
+     },
+     {
+      "scenario": "sign-ins-saved",
+      "state": "pass"
+     }
+    ],
+    "summary": "19 of 20 passed",
+    "tone": "good"
+   },
+   {
+    "id": "c-1008-1725",
+    "merge": "Merge t-0013",
+    "sha": "3e9f0aa",
+    "age": "21 h ago",
+    "results": [
+     {
+      "scenario": "auth-admission",
+      "state": "pass"
+     },
+     {
+      "scenario": "auth-remove",
+      "state": "pass"
+     },
+     {
+      "scenario": "billing-credit",
+      "state": "pass"
+     },
+     {
+      "scenario": "billing-own-key",
+      "state": "pass"
+     },
+     {
+      "scenario": "invoice-access",
+      "state": "pass"
+     },
+     {
+      "scenario": "account-menu",
+      "state": "pass"
+     },
+     {
+      "scenario": "bar-widths",
+      "state": "pass"
+     },
+     {
+      "scenario": "invoice-create",
+      "state": "pass"
+     },
+     {
+      "scenario": "home-and-lists",
+      "state": "pass"
+     },
+     {
+      "scenario": "phone-pages",
+      "state": "pass"
+     },
+     {
+      "scenario": "phone-lists",
+      "state": "pass"
+     },
+     {
+      "scenario": "shell",
+      "state": "pass"
+     },
+     {
+      "scenario": "signed-out",
+      "state": "pass"
+     },
+     {
+      "scenario": "stack",
+      "state": "pass"
+     },
+     {
+      "scenario": "trash",
+      "state": "pass"
+     },
+     {
+      "scenario": "import-run",
+      "state": "pass"
+     },
+     {
+      "scenario": "partner-connect",
+      "state": "pass"
+     },
+     {
+      "scenario": "first-invoice",
+      "state": "pass"
+     },
+     {
+      "scenario": "api-connect",
+      "state": "pass"
+     },
+     {
+      "scenario": "sign-ins-saved",
+      "state": "pass"
+     }
+    ],
+    "summary": "20 of 20 passed",
+    "tone": "good"
+   },
+   {
+    "id": "c-1008-1505",
+    "merge": "Merge t-0012",
+    "sha": "c12d4f8",
+    "age": "23 h ago",
+    "results": [
+     {
+      "scenario": "auth-admission",
+      "state": "pass"
+     },
+     {
+      "scenario": "auth-remove",
+      "state": "pass"
+     },
+     {
+      "scenario": "billing-credit",
+      "state": "pass"
+     },
+     {
+      "scenario": "billing-own-key",
+      "state": "pass"
+     },
+     {
+      "scenario": "invoice-access",
+      "state": "pass"
+     },
+     {
+      "scenario": "account-menu",
+      "state": "pass"
+     },
+     {
+      "scenario": "bar-widths",
+      "state": "pass"
+     },
+     {
+      "scenario": "invoice-create",
+      "state": "fail"
+     },
+     {
+      "scenario": "home-and-lists",
+      "state": "pass"
+     },
+     {
+      "scenario": "phone-pages",
+      "state": "pass"
+     },
+     {
+      "scenario": "phone-lists",
+      "state": "pass"
+     },
+     {
+      "scenario": "shell",
+      "state": "pass"
+     },
+     {
+      "scenario": "signed-out",
+      "state": "pass"
+     },
+     {
+      "scenario": "stack",
+      "state": "pass"
+     },
+     {
+      "scenario": "trash",
+      "state": "pass"
+     },
+     {
+      "scenario": "import-run",
+      "state": "pass"
+     },
+     {
+      "scenario": "partner-connect",
+      "state": "pass"
+     },
+     {
+      "scenario": "first-invoice",
+      "state": "blocked"
+     },
+     {
+      "scenario": "api-connect",
+      "state": "blocked"
+     },
+     {
+      "scenario": "sign-ins-saved",
+      "state": "pass"
+     }
+    ],
+    "summary": "17 of 20 passed",
+    "tone": "bad"
+   }
+  ]
+ }
+}

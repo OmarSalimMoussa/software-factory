@@ -1,0 +1,36 @@
+{
+ "agent": {
+  "name": "qa-security",
+  "family": "qa",
+  "initials": "QA",
+  "role": "tester",
+  "doing": "Passed",
+  "life_note": {
+   "kind": "retired",
+   "text": "Retired. It can never be resumed. It moves to History in a few minutes."
+  },
+  "kv": [
+   {
+    "label": "Model",
+    "value": "Sonnet 5.5"
+   },
+   {
+    "label": "Effort",
+    "value": "medium"
+   },
+   {
+    "label": "Running",
+    "value": "11 min"
+   },
+   {
+    "label": "Cost",
+    "value": "$1.30"
+   }
+  ],
+  "task": null,
+  "kids": [],
+  "chat_url": null,
+  "actions": [],
+  "version": "v1"
+ }
+}

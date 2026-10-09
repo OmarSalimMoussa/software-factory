@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1029",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "Dark mode: the status words are hard to read",
+  "when": "Oct 7, 05:36 UTC · 2 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1029",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "users",
+      "tone": "pink",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "t-0018",
+      "tone": "accent",
+      "doc": "t-0018"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Dark mode: the status words are hard to read</h1><p>A person says: Dark mode: the status words are hard to read.</p><p>Became part of <span class=\"doclink\" data-open-doc=\"t-0018\" tabindex=\"0\">t-0018</span>.</p>",
+  "art_url": null
+ }
+}

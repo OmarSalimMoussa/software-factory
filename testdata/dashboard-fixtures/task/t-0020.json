@@ -1,0 +1,91 @@
+{
+ "task": {
+  "id": "t-0020",
+  "title": "Long project names wrap badly",
+  "sheet_title": "Long project names wrap badly",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "warn",
+   "word": "Deprioritized, back first"
+  },
+  "chips": [
+   {
+    "text": "t-0020",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G2",
+    "tone": "accent"
+   },
+   {
+    "text": "UI",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "2"
+   },
+   {
+    "label": "People",
+    "value": "2"
+   },
+   {
+    "label": "Score",
+    "value": "58"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$2.10"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 1,
+   "cause": null
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 5
+  },
+  "testers": {
+   "note": "3 required",
+   "rows": [],
+   "empty": "Testers start once every slice is built."
+  },
+  "built_from": null,
+  "requests": [],
+  "log": [
+   {
+    "at": "Oct 8, 10:00",
+    "text": "Filed by triage"
+   }
+  ],
+  "branch": "worktree-t-0020",
+  "actions": [
+   "library"
+  ]
+ }
+}

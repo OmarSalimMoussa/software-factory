@@ -1,0 +1,97 @@
+{
+ "task": {
+  "id": "t-0021",
+  "title": "Staging is down after the last deploy",
+  "sheet_title": "Staging is down after the last deploy",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "accent",
+   "word": "Building"
+  },
+  "chips": [
+   {
+    "text": "t-0021",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "severe",
+    "tone": "bad"
+   },
+   {
+    "text": "API",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "1"
+   },
+   {
+    "label": "People",
+    "value": "0"
+   },
+   {
+    "label": "Score",
+    "value": "100"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$3.10"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 1,
+   "cause": "compose file: the relay waits on a renamed network"
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 5
+  },
+  "testers": {
+   "note": "none required",
+   "rows": [],
+   "empty": "A small backend fix runs no testers."
+  },
+  "built_from": null,
+  "requests": [
+   {
+    "id": "r-1013",
+    "text": "New error on staging: the relay cannot reach the network",
+    "age": "5 days ago"
+   }
+  ],
+  "log": [
+   {
+    "at": "Oct 9, 13:55",
+    "text": "Filed by triage"
+   }
+  ],
+  "branch": "worktree-t-0021",
+  "actions": [
+   "library"
+  ]
+ }
+}

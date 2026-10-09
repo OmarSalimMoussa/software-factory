@@ -1,0 +1,23 @@
+{
+ "doc": {
+  "id": "GOAL.md",
+  "kind": "goal",
+  "kind_label": "Goal",
+  "title": "GOAL.md",
+  "when": "Oct 6, 09:00 UTC · 3 days ago",
+  "fm": [
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "person-written",
+      "tone": "violet",
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>The goal</h1><h2>Who it is for</h2><p>Small teams that send invoices every week and want it to take minutes, not an afternoon.</p><h2>The goal</h2><p>Ready for the first paying teams. Clarity and speed first.</p><ul><li><b>G1</b> New teams sign up and send their first invoice.</li><li><b>G2</b> A first import runs end to end.</li><li><b>G3</b> Every screen fits a phone.</li><li><b>G4</b> Feedback reaches the queue the same day.</li><li><b>G5</b> Install from the app store.</li></ul><h2>How it looks and feels</h2><p>Calm, light, precise. One accent; status as a dot and a word.</p><h2>How it speaks</h2><p>Plain words. Outcomes, never machinery.</p>",
+  "art_url": null
+ }
+}

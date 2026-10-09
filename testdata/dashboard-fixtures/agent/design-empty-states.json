@@ -1,0 +1,44 @@
+{
+ "agent": {
+  "name": "Empty states",
+  "family": "design",
+  "initials": "DS",
+  "role": "designer",
+  "doing": "Critic round 2 of 4",
+  "life_note": null,
+  "kv": [
+   {
+    "label": "Model",
+    "value": "Opus 5.5"
+   },
+   {
+    "label": "Effort",
+    "value": "medium"
+   },
+   {
+    "label": "Running",
+    "value": "74 min"
+   },
+   {
+    "label": "Cost",
+    "value": "$6.75"
+   }
+  ],
+  "task": "t-0014",
+  "kids": [
+   {
+    "id": "cr-ux",
+    "family": "design",
+    "initials": "DS",
+    "name": "critic-ux",
+    "doing": "Reading the flows",
+    "cost": "$0.48"
+   }
+  ],
+  "chat_url": null,
+  "actions": [
+   "stop"
+  ],
+  "version": "v1"
+ }
+}

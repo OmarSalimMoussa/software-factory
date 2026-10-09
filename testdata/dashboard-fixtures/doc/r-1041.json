@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1041",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "Login loop on Safari",
+  "when": "Oct 9, 09:12 UTC · 5 h ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1041",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "users",
+      "tone": "pink",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "waiting",
+      "tone": "info",
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Login loop on Safari</h1><p>A person says: Login loop on Safari.</p>",
+  "art_url": null
+ }
+}

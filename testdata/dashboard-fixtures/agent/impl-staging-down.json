@@ -1,0 +1,35 @@
+{
+ "agent": {
+  "name": "Staging is down",
+  "family": "impl",
+  "initials": "IM",
+  "role": "implementer, small",
+  "doing": "Building · slot 3",
+  "life_note": null,
+  "kv": [
+   {
+    "label": "Model",
+    "value": "Sonnet 5.5"
+   },
+   {
+    "label": "Effort",
+    "value": "medium"
+   },
+   {
+    "label": "Running",
+    "value": "31 min"
+   },
+   {
+    "label": "Cost",
+    "value": "$2.26"
+   }
+  ],
+  "task": "t-0021",
+  "kids": [],
+  "chat_url": null,
+  "actions": [
+   "stop"
+  ],
+  "version": "v1"
+ }
+}

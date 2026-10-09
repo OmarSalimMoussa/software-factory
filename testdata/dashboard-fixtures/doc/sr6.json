@@ -1,0 +1,63 @@
+{
+ "doc": {
+  "id": "sr6",
+  "kind": "reflection",
+  "kind_label": "Reflection",
+  "title": "Critics read the whole spec each round; a changed-sections note would …",
+  "when": "Oct 7, 13:30 UTC · 2 days ago",
+  "fm": [
+   {
+    "label": "Kind",
+    "values": [
+     {
+      "text": "discovery",
+      "tone": "good",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Who",
+    "values": [
+     {
+      "text": "designer",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Where",
+    "values": [
+     {
+      "text": "empty states",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "When",
+    "values": [
+     {
+      "text": "Oct 7, 13:30 UTC",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Repeats",
+    "values": [
+     {
+      "text": "1 time",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<p>Critics read the whole spec each round; a changed-sections note would cut each round by half.</p>",
+  "art_url": null
+ }
+}

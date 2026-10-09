@@ -1,0 +1,63 @@
+{
+ "doc": {
+  "id": "sr5",
+  "kind": "reflection",
+  "kind_label": "Reflection",
+  "title": "Restarted the orchestrator after 41 minutes of silence while idle.",
+  "when": "Oct 8, 03:12 UTC · yesterday",
+  "fm": [
+   {
+    "label": "Kind",
+    "values": [
+     {
+      "text": "incident",
+      "tone": "amber",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Who",
+    "values": [
+     {
+      "text": "warden",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Where",
+    "values": [
+     {
+      "text": "orchestrator",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "When",
+    "values": [
+     {
+      "text": "Oct 8, 03:12 UTC",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Repeats",
+    "values": [
+     {
+      "text": "1 time",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<p>Restarted the orchestrator after 41 minutes of silence while idle.</p>",
+  "art_url": null
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "history": {
+  "id": "h2",
+  "family": "design",
+  "initials": "DS",
+  "name": "Usage page",
+  "role": "designer",
+  "task": "t-0012",
+  "model": "Opus 5.5",
+  "started": "Oct 6, 09:10",
+  "started_by": "started by Orchestrator",
+  "ended": "Oct 6, 12:00",
+  "lasted": "after 2 h 50 min",
+  "why": {
+   "text": "finished",
+   "tone": "good"
+  },
+  "cost": "$8.00",
+  "note": "Spec approved"
+ }
+}

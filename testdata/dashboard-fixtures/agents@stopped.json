@@ -1,0 +1,9 @@
+{
+ "banner": {
+  "kind": "stopped",
+  "text": "The factory is stopped.",
+  "sub": "Nothing new starts until you start the orchestrator.",
+  "action": "start"
+ },
+ "tree": null
+}

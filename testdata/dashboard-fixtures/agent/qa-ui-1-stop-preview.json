@@ -1,0 +1,18 @@
+{
+ "preview": {
+  "title": "Stop qa-ui-function?",
+  "text": "This agent stops now.",
+  "rows": [
+   {
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-ui-function",
+    "role": "tester",
+    "model": "Haiku 5.5",
+    "cost": "$0.62"
+   }
+  ],
+  "button": "Stop it",
+  "coded": false
+ }
+}

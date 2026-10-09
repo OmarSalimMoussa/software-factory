@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1024",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "Sign in keeps looping on my phone",
+  "when": "Oct 6, 09:06 UTC · 3 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1024",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "users",
+      "tone": "pink",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "t-0017",
+      "tone": "accent",
+      "doc": "t-0017"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Sign in keeps looping on my phone</h1><p>A person says: Sign in keeps looping on my phone.</p><p>Became part of <span class=\"doclink\" data-open-doc=\"t-0017\" tabindex=\"0\">t-0017</span>.</p>",
+  "art_url": null
+ }
+}

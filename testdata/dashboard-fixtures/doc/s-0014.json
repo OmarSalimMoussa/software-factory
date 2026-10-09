@@ -1,0 +1,63 @@
+{
+ "doc": {
+  "id": "s-0014",
+  "kind": "spec",
+  "kind_label": "Spec",
+  "title": "Clearer empty states",
+  "when": "Oct 8, 10:00 UTC · yesterday",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "s-0014",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Task",
+    "values": [
+     {
+      "text": "t-0014",
+      "tone": null,
+      "doc": "t-0014"
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "G2",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "3",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "drafting",
+      "tone": "accent",
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Clearer empty states</h1><p>An empty Projects or Invoices page says what it is for and offers the one next step, with a picture of what will appear.</p>",
+  "art_url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000014"
+ }
+}

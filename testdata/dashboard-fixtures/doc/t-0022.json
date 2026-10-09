@@ -1,0 +1,88 @@
+{
+ "doc": {
+  "id": "t-0022",
+  "kind": "task",
+  "kind_label": "Task",
+  "title": "Retry an upload that drops midway",
+  "when": "Oct 8, 16:20 UTC · 22 h ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "t-0022",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "G2",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "major",
+      "tone": "warn",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Surfaces",
+    "values": [
+     {
+      "text": "API",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "2",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "building",
+      "tone": "accent",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Requests",
+    "values": [
+     {
+      "text": "r-1035",
+      "tone": null,
+      "doc": "r-1035"
+     },
+     {
+      "text": "r-1011",
+      "tone": null,
+      "doc": "r-1011"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Retry an upload that drops midway</h1><p>Cause: <code>upload: no resume after a dropped part</code>.</p><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li><span class=\"doclink\" data-open-doc=\"r-1035\" tabindex=\"0\">r-1035</span></li><li><span class=\"doclink\" data-open-doc=\"r-1011\" tabindex=\"0\">r-1011</span></li></ul>",
+  "art_url": null
+ }
+}

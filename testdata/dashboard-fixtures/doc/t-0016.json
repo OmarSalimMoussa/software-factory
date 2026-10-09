@@ -1,0 +1,83 @@
+{
+ "doc": {
+  "id": "t-0016",
+  "kind": "task",
+  "kind_label": "Task",
+  "title": "Billing page shows credit after a refund",
+  "when": "Oct 8, 08:00 UTC · yesterday",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "t-0016",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "G1",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "major",
+      "tone": "warn",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Surfaces",
+    "values": [
+     {
+      "text": "API",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "1",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "staging",
+      "tone": "good",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Requests",
+    "values": [
+     {
+      "text": "none",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Billing page shows credit after a refund</h1><p>Cause: <code>billing/credits.py: a refund never reversed its credit line</code>.</p><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li>none yet</li></ul>",
+  "art_url": null
+ }
+}

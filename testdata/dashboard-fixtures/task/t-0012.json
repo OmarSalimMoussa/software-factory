@@ -1,0 +1,117 @@
+{
+ "task": {
+  "id": "t-0012",
+  "title": "Usage page: totals per day",
+  "sheet_title": "Usage page: totals per day",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "good",
+   "word": "On staging"
+  },
+  "chips": [
+   {
+    "text": "t-0012",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G4",
+    "tone": "accent"
+   },
+   {
+    "text": "UI",
+    "tone": ""
+   },
+   {
+    "text": "API",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "3"
+   },
+   {
+    "label": "People",
+    "value": "2"
+   },
+   {
+    "label": "Score",
+    "value": "35"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$26.40"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 3,
+   "cause": null
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 9
+  },
+  "testers": {
+   "note": "4 required",
+   "rows": [
+    {
+     "name": "qa-ui-function",
+     "model": "Haiku 5.5",
+     "state": "pass",
+     "tone": "good",
+     "note": null,
+     "shots": []
+    }
+   ],
+   "empty": "Testers start once every slice is built."
+  },
+  "built_from": {
+   "kind": "spec",
+   "spec": "s-0012",
+   "summary": "Usage shows each day's spend as a bar, with the month's total on top and the days listed below.",
+   "picture": "/api/picture/spec/s-0012",
+   "art_url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000012",
+   "approved_by": "the orchestrator (rung 3)"
+  },
+  "requests": [
+   {
+    "id": "r-1019",
+    "text": "Usage page should show totals per day",
+    "age": "4 days ago"
+   }
+  ],
+  "log": [
+   {
+    "at": "Oct 5, 09:00",
+    "text": "Filed by triage"
+   }
+  ],
+  "branch": "worktree-t-0012",
+  "actions": [
+   "library"
+  ]
+ }
+}

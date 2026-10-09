@@ -1,0 +1,53 @@
+{
+ "header": {
+  "sub": "63 requests wait for triage · 4 tasks queued",
+  "triage_line": "Last triage, 2 h ago: 100 requests, 4 new tasks, 31 joined, 52 noise, 13 parked"
+ },
+ "tabs": [
+  [
+   "tasks",
+   "Tasks",
+   14
+  ],
+  [
+   "requests",
+   "Requests",
+   40
+  ],
+  [
+   "parked",
+   "Parked",
+   3
+  ],
+  [
+   "checks",
+   "Checks",
+   4
+  ]
+ ],
+ "parked": {
+  "rows": [
+   {
+    "id": "t-0009",
+    "title": "Export to a spreadsheet app",
+    "why": "No goal item asks for it",
+    "requests": 7,
+    "date": "Oct 5"
+   },
+   {
+    "id": "t-0010",
+    "title": "Team workspaces with roles",
+    "why": "Not for this goal",
+    "requests": 3,
+    "date": "Oct 6"
+   },
+   {
+    "id": "t-0011",
+    "title": "Keyboard shortcuts for invoices",
+    "why": "Too small to matter now",
+    "requests": 2,
+    "date": "Oct 7"
+   }
+  ]
+ }
+}

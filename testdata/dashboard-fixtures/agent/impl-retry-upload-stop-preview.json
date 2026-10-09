@@ -1,0 +1,18 @@
+{
+ "preview": {
+  "title": "Stop Retry an upload?",
+  "text": "This agent stops now. Its task, t-0022, goes back to the top of Proposed next with its work kept.",
+  "rows": [
+   {
+    "family": "impl",
+    "initials": "IM",
+    "name": "Retry an upload",
+    "role": "implementer, large",
+    "model": "Opus 5.5",
+    "cost": "$6.20"
+   }
+  ],
+  "button": "Stop it",
+  "coded": false
+ }
+}

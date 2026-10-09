@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1013",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "New error on staging: the relay cannot reach the network",
+  "when": "Oct 4, 07:48 UTC · 5 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1013",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "agents",
+      "tone": "amber",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "t-0021",
+      "tone": "accent",
+      "doc": "t-0021"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>New error on staging: the relay cannot reach the network</h1><p>New error on staging: the relay cannot reach the network.</p><p>Became part of <span class=\"doclink\" data-open-doc=\"t-0021\" tabindex=\"0\">t-0021</span>.</p>",
+  "art_url": null
+ }
+}

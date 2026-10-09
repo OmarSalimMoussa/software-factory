@@ -1,0 +1,83 @@
+{
+ "doc": {
+  "id": "t-0020",
+  "kind": "task",
+  "kind_label": "Task",
+  "title": "Long project names wrap badly",
+  "when": "Oct 8, 10:00 UTC · yesterday",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "t-0020",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "G2",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "minor",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Surfaces",
+    "values": [
+     {
+      "text": "UI",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "1",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "deprioritized",
+      "tone": "warn",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Requests",
+    "values": [
+     {
+      "text": "none",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Long project names wrap badly</h1><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li>none yet</li></ul>",
+  "art_url": null
+ }
+}

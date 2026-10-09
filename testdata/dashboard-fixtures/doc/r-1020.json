@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1020",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "intake: duplicate of the sign-in loop",
+  "when": "Oct 5, 14:54 UTC · 4 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1020",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "agents",
+      "tone": "amber",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "t-0017",
+      "tone": "accent",
+      "doc": "t-0017"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>intake: duplicate of the sign-in loop</h1><p>intake: duplicate of the sign-in loop.</p><p>Became part of <span class=\"doclink\" data-open-doc=\"t-0017\" tabindex=\"0\">t-0017</span>.</p>",
+  "art_url": null
+ }
+}

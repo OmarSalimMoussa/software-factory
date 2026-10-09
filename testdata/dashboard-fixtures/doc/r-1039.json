@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1039",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "Make the billing credit line clearer",
+  "when": "Oct 9, 01:36 UTC · 13 h ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1039",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "owner",
+      "tone": "accent",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "waiting",
+      "tone": "info",
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Make the billing credit line clearer</h1><p>Make the billing credit line clearer.</p>",
+  "art_url": null
+ }
+}

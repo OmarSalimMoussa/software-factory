@@ -1,0 +1,18 @@
+{
+ "preview": {
+  "title": "Stop qa-visual?",
+  "text": "This agent stops now.",
+  "rows": [
+   {
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-visual",
+    "role": "tester",
+    "model": "Sonnet 5.5",
+    "cost": "$1.12"
+   }
+  ],
+  "button": "Stop it",
+  "coded": false
+ }
+}

@@ -1,0 +1,8 @@
+{
+ "banner": {
+  "kind": "paused",
+  "text": "The factory is paused.",
+  "sub": "Every agent is benched with its work kept. Resume brings them back in order.",
+  "action": "resume"
+ }
+}

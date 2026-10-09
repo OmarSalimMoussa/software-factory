@@ -1,0 +1,116 @@
+{
+ "task": {
+  "id": "t-0027",
+  "title": "Billing: the credit line shows twice",
+  "sheet_title": "People see their credit once on Billing, not twice",
+  "version": "v1",
+  "proposal": {
+   "picture": "/api/picture/task/t-0027",
+   "why": "4 people reported it this week, and Billing has to look right before teams pay."
+  },
+  "status": {
+   "tone": "warn",
+   "word": "Waiting for you"
+  },
+  "chips": [
+   {
+    "text": "Billing: the credit line shows twice",
+    "tone": ""
+   },
+   {
+    "text": "t-0027",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G1",
+    "tone": "accent"
+   },
+   {
+    "text": "UI",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "4"
+   },
+   {
+    "label": "People",
+    "value": "3"
+   },
+   {
+    "label": "Score",
+    "value": "74"
+   },
+   {
+    "label": "Estimate",
+    "value": "≈ $6"
+   }
+  ],
+  "route": {
+   "label": "The run you approve",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 1,
+   "cause": null
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 2
+  },
+  "testers": {
+   "note": "3 required",
+   "rows": [],
+   "empty": "Testers start once every slice is built."
+  },
+  "built_from": null,
+  "requests": [
+   {
+    "id": "r-1015",
+    "text": "Make the billing credit line clearer",
+    "age": "5 days ago"
+   },
+   {
+    "id": "r-1014",
+    "text": "I see my credit twice on Billing",
+    "age": "5 days ago"
+   }
+  ],
+  "log": [
+   {
+    "at": "Oct 9, 08:40",
+    "text": "Filed by triage"
+   },
+   {
+    "at": "Oct 9, 09:02",
+    "text": "Proposed by the orchestrator"
+   }
+  ],
+  "branch": null,
+  "actions": [
+   "library",
+   "drop",
+   "later",
+   "approve"
+  ]
+ }
+}

@@ -1,0 +1,124 @@
+{
+ "slice": {
+  "tabs": [
+   [
+    "family",
+    "By family"
+   ],
+   [
+    "agent",
+    "By agent"
+   ],
+   [
+    "task",
+    "By task, start to merge"
+   ],
+   [
+    "model",
+    "By model"
+   ]
+  ],
+  "rows": [
+   {
+    "name": "Usage page: totals per day",
+    "value": 26.4,
+    "color": "--good",
+    "tag": {
+     "text": "merged",
+     "tone": "good"
+    }
+   },
+   {
+    "name": "Export of a long report times out",
+    "value": 21.75,
+    "color": "--accent",
+    "tag": {
+     "text": "in progress",
+     "tone": ""
+    }
+   },
+   {
+    "name": "Partner sign-in from the import step",
+    "value": 14.3,
+    "color": "--accent",
+    "tag": {
+     "text": "in progress",
+     "tone": ""
+    }
+   },
+   {
+    "name": "Sign-in sends people back to the sign-in page",
+    "value": 12.4,
+    "color": "--accent",
+    "tag": {
+     "text": "in progress",
+     "tone": ""
+    }
+   },
+   {
+    "name": "Invoice list loads slowly with 200 items",
+    "value": 9.6,
+    "color": "--good",
+    "tag": {
+     "text": "merged",
+     "tone": "good"
+    }
+   },
+   {
+    "name": "Clearer empty states on Projects and Invoices",
+    "value": 8.9,
+    "color": "--accent",
+    "tag": {
+     "text": "in progress",
+     "tone": ""
+    }
+   },
+   {
+    "name": "Invoice page: the Approve button jumps",
+    "value": 7.15,
+    "color": "--good",
+    "tag": {
+     "text": "merged",
+     "tone": "good"
+    }
+   },
+   {
+    "name": "Retry an upload that drops midway",
+    "value": 6.2,
+    "color": "--accent",
+    "tag": {
+     "text": "in progress",
+     "tone": ""
+    }
+   },
+   {
+    "name": "Billing page shows credit after a refund",
+    "value": 4.8,
+    "color": "--good",
+    "tag": {
+     "text": "merged",
+     "tone": "good"
+    }
+   },
+   {
+    "name": "Staging is down after the last deploy",
+    "value": 3.1,
+    "color": "--accent",
+    "tag": {
+     "text": "in progress",
+     "tone": ""
+    }
+   },
+   {
+    "name": "Long project names wrap badly",
+    "value": 2.1,
+    "color": "--accent",
+    "tag": {
+     "text": "in progress",
+     "tone": ""
+    }
+   }
+  ],
+  "more": false
+ }
+}

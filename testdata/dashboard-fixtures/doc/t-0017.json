@@ -1,0 +1,98 @@
+{
+ "doc": {
+  "id": "t-0017",
+  "kind": "task",
+  "kind_label": "Task",
+  "title": "Sign-in sends people back to the sign-in page",
+  "when": "Oct 8, 09:10 UTC · yesterday",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "t-0017",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "G1",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "major",
+      "tone": "warn",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Surfaces",
+    "values": [
+     {
+      "text": "UI, Access",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "1",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "qa",
+      "tone": "accent",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Requests",
+    "values": [
+     {
+      "text": "r-1024",
+      "tone": null,
+      "doc": "r-1024"
+     },
+     {
+      "text": "r-1020",
+      "tone": null,
+      "doc": "r-1020"
+     },
+     {
+      "text": "r-1018",
+      "tone": null,
+      "doc": "r-1018"
+     },
+     {
+      "text": "r-1017",
+      "tone": null,
+      "doc": "r-1017"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Sign-in sends people back to the sign-in page</h1><p>Cause: <code>auth/routes.py:41, the session cookie is dropped on redirect</code>.</p><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li><span class=\"doclink\" data-open-doc=\"r-1024\" tabindex=\"0\">r-1024</span></li><li><span class=\"doclink\" data-open-doc=\"r-1020\" tabindex=\"0\">r-1020</span></li><li><span class=\"doclink\" data-open-doc=\"r-1018\" tabindex=\"0\">r-1018</span></li><li><span class=\"doclink\" data-open-doc=\"r-1017\" tabindex=\"0\">r-1017</span></li></ul>",
+  "art_url": null
+ }
+}

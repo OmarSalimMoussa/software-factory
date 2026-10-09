@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1009",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "Can I export to a spreadsheet app?",
+  "when": "Oct 3, 16:36 UTC · 6 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1009",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "users",
+      "tone": "pink",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "parked",
+      "tone": "muted",
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Can I export to a spreadsheet app?</h1><p>A person says: Can I export to a spreadsheet app?.</p>",
+  "art_url": null
+ }
+}

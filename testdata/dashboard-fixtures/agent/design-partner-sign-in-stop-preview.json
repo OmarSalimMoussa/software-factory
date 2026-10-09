@@ -1,0 +1,18 @@
+{
+ "preview": {
+  "title": "Stop Partner sign-in?",
+  "text": "This agent stops now. Its task, t-0023, goes back to the top of Proposed next with its work kept.",
+  "rows": [
+   {
+    "family": "design",
+    "initials": "DS",
+    "name": "Partner sign-in",
+    "role": "designer",
+    "model": "Opus 5.5",
+    "cost": "$14.30"
+   }
+  ],
+  "button": "Stop it",
+  "coded": false
+ }
+}

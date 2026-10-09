@@ -1,0 +1,102 @@
+{
+ "task": {
+  "id": "t-0022",
+  "title": "Retry an upload that drops midway",
+  "sheet_title": "Retry an upload that drops midway",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "accent",
+   "word": "Building"
+  },
+  "chips": [
+   {
+    "text": "t-0022",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G2",
+    "tone": "accent"
+   },
+   {
+    "text": "API",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "4"
+   },
+   {
+    "label": "People",
+    "value": "4"
+   },
+   {
+    "label": "Score",
+    "value": "63"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$6.20"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 2,
+   "cause": "upload: no resume after a dropped part"
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 5
+  },
+  "testers": {
+   "note": "1 required",
+   "rows": [],
+   "empty": "Testers start once every slice is built."
+  },
+  "built_from": null,
+  "requests": [
+   {
+    "id": "r-1035",
+    "text": "The upload stopped at 80% and did not resume",
+    "age": "yesterday"
+   },
+   {
+    "id": "r-1011",
+    "text": "The upload stopped at 80% and did not resume",
+    "age": "6 days ago"
+   }
+  ],
+  "log": [
+   {
+    "at": "Oct 8, 16:20",
+    "text": "Filed by triage"
+   }
+  ],
+  "branch": "worktree-t-0022",
+  "actions": [
+   "library"
+  ]
+ }
+}

@@ -1,0 +1,94 @@
+{
+ "task": {
+  "id": "t-0031",
+  "title": "Prod returns 502 on every page",
+  "sheet_title": "Prod answers again",
+  "version": "v1",
+  "proposal": {
+   "picture": "/api/picture/task/t-0031",
+   "why": "Prod is down, and you stopped the fix the factory started."
+  },
+  "status": {
+   "tone": "accent",
+   "word": "Fixing prod"
+  },
+  "chips": [
+   {
+    "text": "t-0031",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "severe",
+    "tone": "bad"
+   },
+   {
+    "text": "API",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "1"
+   },
+   {
+    "label": "People",
+    "value": "0"
+   },
+   {
+    "label": "Score",
+    "value": "unknown"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$0.40"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 1,
+   "cause": "the web service exits on start: a renamed secret"
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 5
+  },
+  "testers": {
+   "note": "none required",
+   "rows": [],
+   "empty": "A small backend fix runs no testers."
+  },
+  "built_from": null,
+  "requests": [],
+  "log": [
+   {
+    "at": "Oct 9, 14:29",
+    "text": "Started without you: prod is down"
+   }
+  ],
+  "branch": "worktree-t-0031",
+  "actions": [
+   "library"
+  ]
+ }
+}

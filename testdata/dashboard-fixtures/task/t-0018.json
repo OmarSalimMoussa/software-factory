@@ -1,0 +1,103 @@
+{
+ "task": {
+  "id": "t-0018",
+  "title": "Dark-mode contrast on status words",
+  "sheet_title": "Dark-mode contrast on status words",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "ring",
+   "word": "Queued"
+  },
+  "chips": [
+   {
+    "text": "t-0018",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G3",
+    "tone": "accent"
+   },
+   {
+    "text": "UI",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "2"
+   },
+   {
+    "label": "People",
+    "value": "2"
+   },
+   {
+    "label": "Score",
+    "value": "31"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$0.00"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 1,
+   "cause": null
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 1
+  },
+  "testers": {
+   "note": "3 required",
+   "rows": [],
+   "empty": "Testers start once every slice is built."
+  },
+  "built_from": null,
+  "requests": [
+   {
+    "id": "r-1029",
+    "text": "Dark mode: the status words are hard to read",
+    "age": "2 days ago"
+   },
+   {
+    "id": "r-1005",
+    "text": "Dark mode: the status words are hard to read",
+    "age": "7 days ago"
+   }
+  ],
+  "log": [
+   {
+    "at": "Oct 7, 09:00",
+    "text": "Filed by triage"
+   }
+  ],
+  "branch": null,
+  "actions": [
+   "library",
+   "boost"
+  ]
+ }
+}

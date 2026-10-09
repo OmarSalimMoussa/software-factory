@@ -1,0 +1,35 @@
+{
+ "agent": {
+  "name": "qa-visual",
+  "family": "qa",
+  "initials": "QA",
+  "role": "tester",
+  "doing": "Rechecking the menu",
+  "life_note": null,
+  "kv": [
+   {
+    "label": "Model",
+    "value": "Sonnet 5.5"
+   },
+   {
+    "label": "Effort",
+    "value": "medium"
+   },
+   {
+    "label": "Running",
+    "value": "8 min"
+   },
+   {
+    "label": "Cost",
+    "value": "$1.12"
+   }
+  ],
+  "task": null,
+  "kids": [],
+  "chat_url": null,
+  "actions": [
+   "stop"
+  ],
+  "version": "v1"
+ }
+}

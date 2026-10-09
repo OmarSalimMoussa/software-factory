@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1028",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "Is there a keyboard shortcut to send an invoice?",
+  "when": "Oct 7, 00:18 UTC · 3 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1028",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "users",
+      "tone": "pink",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "parked",
+      "tone": "muted",
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Is there a keyboard shortcut to send an invoice?</h1><p>A person says: Is there a keyboard shortcut to send an invoice?.</p>",
+  "art_url": null
+ }
+}

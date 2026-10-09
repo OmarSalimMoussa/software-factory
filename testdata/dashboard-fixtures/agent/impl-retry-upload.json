@@ -1,0 +1,35 @@
+{
+ "agent": {
+  "name": "Retry an upload",
+  "family": "impl",
+  "initials": "IM",
+  "role": "implementer, large",
+  "doing": "Building slice 2 of 3 · slot 2",
+  "life_note": null,
+  "kv": [
+   {
+    "label": "Model",
+    "value": "Opus 5.5"
+   },
+   {
+    "label": "Effort",
+    "value": "medium"
+   },
+   {
+    "label": "Running",
+    "value": "96 min"
+   },
+   {
+    "label": "Cost",
+    "value": "$6.20"
+   }
+  ],
+  "task": "t-0022",
+  "kids": [],
+  "chat_url": null,
+  "actions": [
+   "stop"
+  ],
+  "version": "v1"
+ }
+}

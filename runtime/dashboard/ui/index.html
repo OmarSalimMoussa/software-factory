@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>software factory</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Pages">
+    <div class="brand"><span class="brand-mark" id="brand-mark"></span>software factory</div>
+    <nav id="sidenav"></nav>
+    <div class="side-foot">
+      <div class="prefs" id="prefs"><div class="prefs-menu" id="prefs-menu" hidden></div><button class="nav" data-action="prefs" id="prefs-btn" aria-expanded="false" aria-controls="prefs-menu"></button></div>
+    </div>
+  </aside>
+  <div class="main" id="main">
+    <header class="top">
+      <div class="repo" id="repo"></div>
+      <div class="env-pill" id="pill-staging"></div>
+      <div class="env-pill" id="pill-prod"></div>
+      <div class="gsearch" id="gsearch"><label class="gs-field"><span class="gs-ico"></span><input id="gq" placeholder="Search tasks, requests, specs, agents, settings…" aria-label="Search everything" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="gs-pop"><kbd class="hide-sm">/</kbd><button class="iconbtn gs-close" data-action="gs-close" aria-label="Close search"></button></label><div class="gs-pop" id="gs-pop" role="listbox" hidden></div></div>
+      <button class="iconbtn gs-open" data-action="gs-open" aria-label="Search" id="gs-open"></button>
+      <div class="live" id="live"><i class="dot good"></i><span id="live-text">Live</span></div>
+      <button class="btn primary" data-action="promote" data-write id="top-promote"></button>
+    </header>
+    <main class="page" id="page" tabindex="-1"></main>
+  </div>
+</div>
+<nav class="bottomnav" id="bottomnav" aria-label="Pages"></nav>
+<div class="scrim" id="scrim"></div>
+<aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+  <div class="sheet-h"><button class="iconbtn" data-action="sheet-back" aria-label="Back" id="sheet-back" hidden></button><h2 id="sheet-title"></h2><button class="iconbtn" data-action="close-sheet" aria-label="Close" id="sheet-x"></button></div>
+  <div class="sheet-b" id="sheet-body"></div>
+  <div class="sheet-f" id="sheet-foot"></div>
+</aside>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script src="icons.js"></script>
+<script src="js/core.js"></script>
+<script src="js/sheets.js"></script>
+<script src="js/home.js"></script>
+<script src="js/work.js"></script>
+<script src="js/agents.js"></script>
+<script src="js/spend.js"></script>
+<script src="js/library.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/reflect.js"></script>
+<script src="js/guard.js"></script>
+<script src="js/boot.js"></script>
+</body>
+</html>

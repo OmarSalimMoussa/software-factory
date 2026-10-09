@@ -1,0 +1,63 @@
+{
+ "doc": {
+  "id": "sr3",
+  "kind": "reflection",
+  "kind_label": "Reflection",
+  "title": "Three check runs were not enough after a rebase onto a moved migration.",
+  "when": "Oct 8, 19:20 UTC · 19 h ago",
+  "fm": [
+   {
+    "label": "Kind",
+    "values": [
+     {
+      "text": "friction",
+      "tone": "warn",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Who",
+    "values": [
+     {
+      "text": "implementer",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Where",
+    "values": [
+     {
+      "text": "slow export",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "When",
+    "values": [
+     {
+      "text": "Oct 8, 19:20 UTC",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Repeats",
+    "values": [
+     {
+      "text": "1 time",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<p>Three check runs were not enough after a rebase onto a moved migration.</p>",
+  "art_url": null
+ }
+}

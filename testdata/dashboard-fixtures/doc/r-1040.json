@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1040",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "qa-visual: account menu clips at 390 px",
+  "when": "Oct 9, 03:54 UTC · 11 h ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1040",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "agents",
+      "tone": "amber",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "waiting",
+      "tone": "info",
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>qa-visual: account menu clips at 390 px</h1><p>qa-visual: account menu clips at 390 px.</p>",
+  "art_url": null
+ }
+}

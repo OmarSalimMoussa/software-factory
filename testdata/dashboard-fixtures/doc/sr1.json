@@ -1,0 +1,63 @@
+{
+ "doc": {
+  "id": "sr1",
+  "kind": "reflection",
+  "kind_label": "Reflection",
+  "title": "A visual tester passed a menu that overflowed at 390 px: the phone-wid…",
+  "when": "Oct 9, 14:02 UTC · 28 min ago",
+  "fm": [
+   {
+    "label": "Kind",
+    "values": [
+     {
+      "text": "miss",
+      "tone": "bad",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Who",
+    "values": [
+     {
+      "text": "implementer",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Where",
+    "values": [
+     {
+      "text": "sign-in loop",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "When",
+    "values": [
+     {
+      "text": "Oct 9, 14:02 UTC",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Repeats",
+    "values": [
+     {
+      "text": "3 times",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<p>A visual tester passed a menu that overflowed at 390 px: the phone-width check was not in its brief.</p>",
+  "art_url": null
+ }
+}

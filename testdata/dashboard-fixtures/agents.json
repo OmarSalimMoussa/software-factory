@@ -1,0 +1,834 @@
+{
+ "header": {
+  "sub": "11 agents live · $62.12 so far today"
+ },
+ "capacity": [
+  {
+   "label": "Implementers",
+   "value": 3,
+   "max": 3,
+   "note": "1 deprioritized, back first when a slot frees"
+  },
+  {
+   "label": "Designers",
+   "value": 2,
+   "max": 2,
+   "note": null
+  },
+  {
+   "label": "Slots in use",
+   "value": 3,
+   "max": 3,
+   "note": null
+  }
+ ],
+ "legend": [
+  {
+   "family": "orch",
+   "label": "Orchestrator",
+   "count": 1
+  },
+  {
+   "family": "intake",
+   "label": "Intake and triage",
+   "count": 1
+  },
+  {
+   "family": "design",
+   "label": "Designers and critics",
+   "count": 3
+  },
+  {
+   "family": "impl",
+   "label": "Implementers",
+   "count": 4
+  },
+  {
+   "family": "qa",
+   "label": "Testers",
+   "count": 2
+  }
+ ],
+ "banner": null,
+ "tree": {
+  "id": "orchestrator",
+  "name": "Orchestrator",
+  "role": "orchestrator",
+  "family": "orch",
+  "initials": "OR",
+  "kids_label": " · 7",
+  "doing": "Checking the merge of t-0015",
+  "model": "Opus 5.5",
+  "marker": "working",
+  "state_word": "working",
+  "cost": "$18.20",
+  "can_stop": true,
+  "retired": false,
+  "kids": [
+   {
+    "id": "intake-1",
+    "name": "Intake",
+    "role": "intake",
+    "family": "intake",
+    "initials": "IN",
+    "kids_label": "",
+    "doing": "Debugging t-0021",
+    "model": "Sonnet 5.5",
+    "marker": "working",
+    "state_word": "working",
+    "cost": "$0.84",
+    "can_stop": true,
+    "retired": false,
+    "kids": []
+   },
+   {
+    "id": "impl-staging-down",
+    "name": "Staging is down",
+    "role": "implementer, small",
+    "family": "impl",
+    "initials": "IM",
+    "kids_label": "",
+    "doing": "Building · slot 3",
+    "model": "Sonnet 5.5",
+    "marker": "working",
+    "state_word": "working",
+    "cost": "$2.26",
+    "can_stop": true,
+    "retired": false,
+    "kids": []
+   },
+   {
+    "id": "impl-sign-in-loop",
+    "name": "Sign-in loop",
+    "role": "implementer, small",
+    "family": "impl",
+    "initials": "IM",
+    "kids_label": " · 3",
+    "doing": "QA round 2 of 4 · slot 1",
+    "model": "Sonnet 5.5",
+    "marker": "working",
+    "state_word": "working",
+    "cost": "$7.95",
+    "can_stop": true,
+    "retired": false,
+    "kids": [
+     {
+      "id": "qa-ui-1",
+      "name": "qa-ui-function",
+      "role": "tester",
+      "family": "qa",
+      "initials": "QA",
+      "kids_label": "",
+      "doing": "6 checks, 2 min each",
+      "model": "Haiku 5.5",
+      "marker": "working",
+      "state_word": "working",
+      "cost": "$0.62",
+      "can_stop": true,
+      "retired": false,
+      "kids": []
+     },
+     {
+      "id": "qa-vis-1",
+      "name": "qa-visual",
+      "role": "tester",
+      "family": "qa",
+      "initials": "QA",
+      "kids_label": "",
+      "doing": "Rechecking the menu",
+      "model": "Sonnet 5.5",
+      "marker": "working",
+      "state_word": "working",
+      "cost": "$1.12",
+      "can_stop": true,
+      "retired": false,
+      "kids": []
+     },
+     {
+      "id": "qa-sec-1",
+      "name": "qa-security",
+      "role": "tester",
+      "family": "qa",
+      "initials": "QA",
+      "kids_label": "",
+      "doing": "Passed",
+      "model": "Sonnet 5.5",
+      "marker": "done",
+      "state_word": "done",
+      "cost": "$1.30",
+      "can_stop": false,
+      "retired": true,
+      "kids": []
+     }
+    ]
+   },
+   {
+    "id": "impl-retry-upload",
+    "name": "Retry an upload",
+    "role": "implementer, large",
+    "family": "impl",
+    "initials": "IM",
+    "kids_label": "",
+    "doing": "Building slice 2 of 3 · slot 2",
+    "model": "Opus 5.5",
+    "marker": "working",
+    "state_word": "working",
+    "cost": "$6.20",
+    "can_stop": true,
+    "retired": false,
+    "kids": []
+   },
+   {
+    "id": "impl-project-names",
+    "name": "Project names",
+    "role": "implementer, small",
+    "family": "impl",
+    "initials": "IM",
+    "kids_label": "",
+    "doing": "Pushed out for “Staging is down” · comes back first",
+    "model": "Sonnet 5.5",
+    "marker": "depri",
+    "state_word": "deprioritized",
+    "cost": "$2.10",
+    "can_stop": true,
+    "retired": false,
+    "kids": []
+   },
+   {
+    "id": "design-empty-states",
+    "name": "Empty states",
+    "role": "designer",
+    "family": "design",
+    "initials": "DS",
+    "kids_label": " · 1",
+    "doing": "Critic round 2 of 4",
+    "model": "Opus 5.5",
+    "marker": "working",
+    "state_word": "working",
+    "cost": "$6.75",
+    "can_stop": true,
+    "retired": false,
+    "kids": [
+     {
+      "id": "cr-ux",
+      "name": "critic-ux",
+      "role": "critic",
+      "family": "design",
+      "initials": "DS",
+      "kids_label": "",
+      "doing": "Reading the flows",
+      "model": "Sonnet 5.5",
+      "marker": "working",
+      "state_word": "working",
+      "cost": "$0.48",
+      "can_stop": true,
+      "retired": false,
+      "kids": []
+     }
+    ]
+   },
+   {
+    "id": "design-partner-sign-in",
+    "name": "Partner sign-in",
+    "role": "designer",
+    "family": "design",
+    "initials": "DS",
+    "kids_label": "",
+    "doing": "Waiting for your Go",
+    "model": "Opus 5.5",
+    "marker": "waiting",
+    "state_word": "waiting for you",
+    "cost": "$14.30",
+    "can_stop": true,
+    "retired": false,
+    "kids": []
+   }
+  ]
+ },
+ "history": {
+  "rows": [
+   {
+    "id": "h9",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-ux",
+    "role": "tester",
+    "task": "t-0017",
+    "model": "Sonnet 5.5",
+    "started": "Oct 9, 13:40",
+    "started_by": "started by Sign-in loop",
+    "ended": "Oct 9, 13:49",
+    "lasted": "after 9 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.41"
+   },
+   {
+    "id": "h10",
+    "family": "design",
+    "initials": "DS",
+    "name": "critic-architecture",
+    "role": "critic",
+    "task": "t-0014",
+    "model": "Sonnet 5.5",
+    "started": "Oct 9, 13:20",
+    "started_by": "started by Empty states",
+    "ended": "Oct 9, 13:25",
+    "lasted": "after 5 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$0.71"
+   },
+   {
+    "id": "h4",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-backend",
+    "role": "tester",
+    "task": "t-0022",
+    "model": "Sonnet 5.5",
+    "started": "Oct 9, 12:05",
+    "started_by": "started by Retry an upload",
+    "ended": "Oct 9, 12:31",
+    "lasted": "after 26 min",
+    "why": {
+     "text": "crashed",
+     "tone": "bad"
+    },
+    "cost": "$0.66"
+   },
+   {
+    "id": "h3",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-backend",
+    "role": "tester",
+    "task": "t-0015",
+    "model": "Sonnet 5.5",
+    "started": "Oct 9, 10:20",
+    "started_by": "started by Invoice list",
+    "ended": "Oct 9, 10:41",
+    "lasted": "after 21 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.12"
+   },
+   {
+    "id": "h8",
+    "family": "intake",
+    "initials": "IN",
+    "name": "Intake",
+    "role": "intake",
+    "task": "t-0027",
+    "model": "Sonnet 5.5",
+    "started": "Oct 9, 08:35",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 9, 08:41",
+    "lasted": "after 6 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$0.31"
+   },
+   {
+    "broken": true,
+    "id": "h-orphan",
+    "error": "Its record has no end time."
+   },
+   {
+    "id": "h7",
+    "family": "intake",
+    "initials": "IN",
+    "name": "Triage",
+    "role": "triage",
+    "task": null,
+    "model": "Sonnet 5.5",
+    "started": "Oct 9, 08:00",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 9, 08:22",
+    "lasted": "after 22 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$2.40"
+   },
+   {
+    "id": "h1",
+    "family": "impl",
+    "initials": "IM",
+    "name": "Usage page",
+    "role": "implementer, large",
+    "task": "t-0012",
+    "model": "Opus 5.5",
+    "started": "Oct 8, 11:20",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 8, 15:02",
+    "lasted": "after 3 h 42 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$18.40"
+   },
+   {
+    "id": "h11",
+    "family": "design",
+    "initials": "DS",
+    "name": "critic-ux",
+    "role": "critic",
+    "task": "t-0012",
+    "model": "Sonnet 5.5",
+    "started": "Oct 7, 09:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 7, 09:50",
+    "lasted": "after 20 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$0.85"
+   },
+   {
+    "id": "h12",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-ui-function",
+    "role": "tester",
+    "task": "t-0013",
+    "model": "Haiku 5.5",
+    "started": "Oct 7, 06:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 7, 06:51",
+    "lasted": "after 21 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$0.90"
+   },
+   {
+    "id": "h13",
+    "family": "intake",
+    "initials": "IN",
+    "name": "Intake",
+    "role": "intake",
+    "task": "t-0016",
+    "model": "Sonnet 5.5",
+    "started": "Oct 7, 03:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 7, 03:52",
+    "lasted": "after 22 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$0.95"
+   },
+   {
+    "id": "h14",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-visual",
+    "role": "tester",
+    "task": "t-0015",
+    "model": "Sonnet 5.5",
+    "started": "Oct 7, 00:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 7, 00:53",
+    "lasted": "after 23 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.00"
+   },
+   {
+    "id": "h15",
+    "family": "design",
+    "initials": "DS",
+    "name": "critic-ux",
+    "role": "critic",
+    "task": "t-0012",
+    "model": "Sonnet 5.5",
+    "started": "Oct 6, 21:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 6, 21:54",
+    "lasted": "after 24 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.05"
+   },
+   {
+    "id": "h16",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-ui-function",
+    "role": "tester",
+    "task": "t-0013",
+    "model": "Haiku 5.5",
+    "started": "Oct 6, 18:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 6, 18:55",
+    "lasted": "after 25 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.10"
+   },
+   {
+    "id": "h17",
+    "family": "intake",
+    "initials": "IN",
+    "name": "Intake",
+    "role": "intake",
+    "task": "t-0016",
+    "model": "Sonnet 5.5",
+    "started": "Oct 6, 15:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 6, 15:56",
+    "lasted": "after 26 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.15"
+   },
+   {
+    "id": "h18",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-visual",
+    "role": "tester",
+    "task": "t-0015",
+    "model": "Sonnet 5.5",
+    "started": "Oct 6, 12:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 6, 12:57",
+    "lasted": "after 27 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.20"
+   },
+   {
+    "id": "h2",
+    "family": "design",
+    "initials": "DS",
+    "name": "Usage page",
+    "role": "designer",
+    "task": "t-0012",
+    "model": "Opus 5.5",
+    "started": "Oct 6, 09:10",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 6, 12:00",
+    "lasted": "after 2 h 50 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$8.00"
+   },
+   {
+    "id": "h19",
+    "family": "design",
+    "initials": "DS",
+    "name": "critic-ux",
+    "role": "critic",
+    "task": "t-0012",
+    "model": "Sonnet 5.5",
+    "started": "Oct 6, 09:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 6, 09:58",
+    "lasted": "after 28 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.25"
+   },
+   {
+    "id": "h20",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-ui-function",
+    "role": "tester",
+    "task": "t-0013",
+    "model": "Haiku 5.5",
+    "started": "Oct 6, 06:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 6, 06:59",
+    "lasted": "after 29 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.30"
+   },
+   {
+    "id": "h21",
+    "family": "intake",
+    "initials": "IN",
+    "name": "Intake",
+    "role": "intake",
+    "task": "t-0016",
+    "model": "Sonnet 5.5",
+    "started": "Oct 6, 03:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 6, 04:00",
+    "lasted": "after 30 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.35"
+   },
+   {
+    "id": "h22",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-visual",
+    "role": "tester",
+    "task": "t-0015",
+    "model": "Sonnet 5.5",
+    "started": "Oct 6, 00:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 6, 01:01",
+    "lasted": "after 31 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.40"
+   },
+   {
+    "id": "h23",
+    "family": "design",
+    "initials": "DS",
+    "name": "critic-ux",
+    "role": "critic",
+    "task": "t-0012",
+    "model": "Sonnet 5.5",
+    "started": "Oct 5, 21:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 5, 22:02",
+    "lasted": "after 32 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.45"
+   },
+   {
+    "id": "h24",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-ui-function",
+    "role": "tester",
+    "task": "t-0013",
+    "model": "Haiku 5.5",
+    "started": "Oct 5, 18:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 5, 19:03",
+    "lasted": "after 33 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.50"
+   },
+   {
+    "id": "h25",
+    "family": "intake",
+    "initials": "IN",
+    "name": "Intake",
+    "role": "intake",
+    "task": "t-0016",
+    "model": "Sonnet 5.5",
+    "started": "Oct 5, 15:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 5, 16:04",
+    "lasted": "after 34 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.55"
+   },
+   {
+    "id": "h26",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-visual",
+    "role": "tester",
+    "task": "t-0015",
+    "model": "Sonnet 5.5",
+    "started": "Oct 5, 12:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 5, 13:05",
+    "lasted": "after 35 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.60"
+   },
+   {
+    "id": "h5",
+    "family": "design",
+    "initials": "DS",
+    "name": "Spreadsheet export",
+    "role": "designer",
+    "task": "t-0009",
+    "model": "Opus 5.5",
+    "started": "Oct 5, 10:00",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 5, 10:40",
+    "lasted": "after 40 min",
+    "why": {
+     "text": "stopped by you",
+     "tone": "bad"
+    },
+    "cost": "$3.20"
+   },
+   {
+    "id": "h6",
+    "family": "design",
+    "initials": "DS",
+    "name": "critic-security",
+    "role": "critic",
+    "task": "t-0009",
+    "model": "Sonnet 5.5",
+    "started": "Oct 5, 10:25",
+    "started_by": "started by Spreadsheet export",
+    "ended": "Oct 5, 10:40",
+    "lasted": "after 15 min",
+    "why": {
+     "text": "stopped with its parent",
+     "tone": "bad"
+    },
+    "cost": "$0.35"
+   },
+   {
+    "id": "h27",
+    "family": "design",
+    "initials": "DS",
+    "name": "critic-ux",
+    "role": "critic",
+    "task": "t-0012",
+    "model": "Sonnet 5.5",
+    "started": "Oct 5, 09:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 5, 10:06",
+    "lasted": "after 36 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.65"
+   },
+   {
+    "id": "h28",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-ui-function",
+    "role": "tester",
+    "task": "t-0013",
+    "model": "Haiku 5.5",
+    "started": "Oct 5, 06:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 5, 07:07",
+    "lasted": "after 37 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.70"
+   },
+   {
+    "id": "h29",
+    "family": "intake",
+    "initials": "IN",
+    "name": "Intake",
+    "role": "intake",
+    "task": "t-0016",
+    "model": "Sonnet 5.5",
+    "started": "Oct 5, 03:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 5, 04:08",
+    "lasted": "after 38 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.75"
+   },
+   {
+    "id": "h30",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-visual",
+    "role": "tester",
+    "task": "t-0015",
+    "model": "Sonnet 5.5",
+    "started": "Oct 5, 00:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 5, 01:09",
+    "lasted": "after 39 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.80"
+   },
+   {
+    "id": "h31",
+    "family": "design",
+    "initials": "DS",
+    "name": "critic-ux",
+    "role": "critic",
+    "task": "t-0012",
+    "model": "Sonnet 5.5",
+    "started": "Oct 4, 21:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 4, 22:10",
+    "lasted": "after 40 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.85"
+   },
+   {
+    "id": "h32",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-ui-function",
+    "role": "tester",
+    "task": "t-0013",
+    "model": "Haiku 5.5",
+    "started": "Oct 4, 18:30",
+    "started_by": "started by Orchestrator",
+    "ended": "Oct 4, 19:11",
+    "lasted": "after 41 min",
+    "why": {
+     "text": "finished",
+     "tone": "good"
+    },
+    "cost": "$1.90"
+   }
+  ],
+  "more": false
+ }
+}

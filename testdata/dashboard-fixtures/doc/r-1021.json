@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1021",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "How do I cancel?",
+  "when": "Oct 5, 20:12 UTC · 4 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1021",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "users",
+      "tone": "pink",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "noise",
+      "tone": "muted",
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>How do I cancel?</h1><p>A person says: How do I cancel?.</p>",
+  "art_url": null
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "history": {
+  "id": "h3",
+  "family": "qa",
+  "initials": "QA",
+  "name": "qa-backend",
+  "role": "tester",
+  "task": "t-0015",
+  "model": "Sonnet 5.5",
+  "started": "Oct 9, 10:20",
+  "started_by": "started by Invoice list",
+  "ended": "Oct 9, 10:41",
+  "lasted": "after 21 min",
+  "why": {
+   "text": "finished",
+   "tone": "good"
+  },
+  "cost": "$1.12",
+  "note": "200 items in 240 ms"
+ }
+}

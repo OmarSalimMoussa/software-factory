@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1035",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "The upload stopped at 80% and did not resume",
+  "when": "Oct 8, 07:24 UTC · yesterday",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1035",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "users",
+      "tone": "pink",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "t-0022",
+      "tone": "accent",
+      "doc": "t-0022"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>The upload stopped at 80% and did not resume</h1><p>A person says: The upload stopped at 80% and did not resume.</p><p>Became part of <span class=\"doclink\" data-open-doc=\"t-0022\" tabindex=\"0\">t-0022</span>.</p>",
+  "art_url": null
+ }
+}

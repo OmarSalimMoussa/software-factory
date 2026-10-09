@@ -1,0 +1,52 @@
+{
+ "slice": {
+  "tabs": [
+   [
+    "family",
+    "By family"
+   ],
+   [
+    "agent",
+    "By agent"
+   ],
+   [
+    "task",
+    "By task, start to merge"
+   ],
+   [
+    "model",
+    "By model"
+   ]
+  ],
+  "rows": [
+   {
+    "name": "Opus 5.5",
+    "value": 576.64,
+    "color": "--f-design",
+    "tag": null
+   },
+   {
+    "name": "Sonnet 5.5",
+    "value": 338.03,
+    "color": "--f-impl",
+    "tag": null
+   },
+   {
+    "name": "Haiku 5.5",
+    "value": 79.53,
+    "color": "--f-qa",
+    "tag": null
+   },
+   {
+    "name": "A model with no price set",
+    "value": null,
+    "color": "--idle",
+    "tag": {
+     "text": "2 calls",
+     "tone": "warn"
+    }
+   }
+  ],
+  "more": false
+ }
+}

@@ -1,0 +1,35 @@
+{
+ "agent": {
+  "name": "qa-ui-function",
+  "family": "qa",
+  "initials": "QA",
+  "role": "tester",
+  "doing": "6 checks, 2 min each",
+  "life_note": null,
+  "kv": [
+   {
+    "label": "Model",
+    "value": "Haiku 5.5"
+   },
+   {
+    "label": "Effort",
+    "value": "medium"
+   },
+   {
+    "label": "Running",
+    "value": "7 min"
+   },
+   {
+    "label": "Cost",
+    "value": "$0.62"
+   }
+  ],
+  "task": null,
+  "kids": [],
+  "chat_url": null,
+  "actions": [
+   "stop"
+  ],
+  "version": "v1"
+ }
+}

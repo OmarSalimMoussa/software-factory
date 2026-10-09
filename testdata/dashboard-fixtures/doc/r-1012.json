@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1012",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "Export never finishes for my year-end report",
+  "when": "Oct 4, 05:30 UTC · 5 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1012",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "users",
+      "tone": "pink",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "t-0019",
+      "tone": "accent",
+      "doc": "t-0019"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Export never finishes for my year-end report</h1><p>A person says: Export never finishes for my year-end report.</p><p>Became part of <span class=\"doclink\" data-open-doc=\"t-0019\" tabindex=\"0\">t-0019</span>.</p>",
+  "art_url": null
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "preview": {
+  "title": "Stop Empty states?",
+  "text": "These 2 agents stop now: Empty states and everything under it. Its task, t-0014, goes back to the top of Proposed next with its work kept.",
+  "rows": [
+   {
+    "family": "design",
+    "initials": "DS",
+    "name": "Empty states",
+    "role": "designer",
+    "model": "Opus 5.5",
+    "cost": "$6.75"
+   },
+   {
+    "family": "design",
+    "initials": "DS",
+    "name": "critic-ux",
+    "role": "critic",
+    "model": "Sonnet 5.5",
+    "cost": "$0.48"
+   }
+  ],
+  "button": "Stop 2 agents",
+  "coded": false
+ }
+}

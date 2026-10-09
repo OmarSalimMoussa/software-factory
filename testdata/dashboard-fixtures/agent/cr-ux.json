@@ -1,0 +1,35 @@
+{
+ "agent": {
+  "name": "critic-ux",
+  "family": "design",
+  "initials": "DS",
+  "role": "critic",
+  "doing": "Reading the flows",
+  "life_note": null,
+  "kv": [
+   {
+    "label": "Model",
+    "value": "Sonnet 5.5"
+   },
+   {
+    "label": "Effort",
+    "value": "medium"
+   },
+   {
+    "label": "Running",
+    "value": "3 min"
+   },
+   {
+    "label": "Cost",
+    "value": "$0.48"
+   }
+  ],
+  "task": null,
+  "kids": [],
+  "chat_url": null,
+  "actions": [
+   "stop"
+  ],
+  "version": "v1"
+ }
+}

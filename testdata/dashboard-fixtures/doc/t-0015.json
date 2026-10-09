@@ -1,0 +1,83 @@
+{
+ "doc": {
+  "id": "t-0015",
+  "kind": "task",
+  "kind_label": "Task",
+  "title": "Invoice list loads slowly with 200 items",
+  "when": "Oct 7, 13:00 UTC · 2 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "t-0015",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "G2",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "minor",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Surfaces",
+    "values": [
+     {
+      "text": "API",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "2",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "staging",
+      "tone": "good",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Requests",
+    "values": [
+     {
+      "text": "r-1026",
+      "tone": null,
+      "doc": "r-1026"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Invoice list loads slowly with 200 items</h1><p>Cause: <code>the invoice list ran one query per item</code>.</p><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li><span class=\"doclink\" data-open-doc=\"r-1026\" tabindex=\"0\">r-1026</span></li></ul>",
+  "art_url": null
+ }
+}

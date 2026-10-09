@@ -1,0 +1,68 @@
+{
+ "hero": {
+  "label": "Today",
+  "total": 48.2,
+  "budget_pct": 32,
+  "today": "today $48 of $150, at API prices",
+  "kv": [
+   {
+    "label": "Average cost of a merge",
+    "value": "$12"
+   },
+   {
+    "label": "Per day, average",
+    "value": "$48"
+   }
+  ],
+  "unknown": "2 calls with unknown price"
+ },
+ "chart": {
+  "families": [
+   {
+    "key": "orch",
+    "label": "Orchestrator",
+    "color": "--f-orch"
+   },
+   {
+    "key": "intake",
+    "label": "Intake and triage",
+    "color": "--f-intake"
+   },
+   {
+    "key": "design",
+    "label": "Designers and critics",
+    "color": "--f-design"
+   },
+   {
+    "key": "impl",
+    "label": "Implementers",
+    "color": "--f-impl"
+   },
+   {
+    "key": "qa",
+    "label": "Testers",
+    "color": "--f-qa"
+   }
+  ],
+  "days": [
+   {
+    "label": "today",
+    "values": [
+     11.3,
+     3.1,
+     9.7,
+     14.6,
+     9.5
+    ],
+    "total": 48.2
+   }
+  ],
+  "max": 200,
+  "ticks": [
+   0,
+   100,
+   200
+  ],
+  "budget": 150
+ }
+}

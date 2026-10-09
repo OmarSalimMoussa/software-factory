@@ -1,0 +1,88 @@
+{
+ "doc": {
+  "id": "t-0025",
+  "kind": "task",
+  "kind_label": "Task",
+  "title": "Show who sent each piece of feedback",
+  "when": "Oct 6, 14:00 UTC · 3 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "t-0025",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "G4",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "minor",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Surfaces",
+    "values": [
+     {
+      "text": "UI, API",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "3",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "proposed",
+      "tone": "warn",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Requests",
+    "values": [
+     {
+      "text": "r-1030",
+      "tone": null,
+      "doc": "r-1030"
+     },
+     {
+      "text": "r-1006",
+      "tone": null,
+      "doc": "r-1006"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Show who sent each piece of feedback</h1><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li><span class=\"doclink\" data-open-doc=\"r-1030\" tabindex=\"0\">r-1030</span></li><li><span class=\"doclink\" data-open-doc=\"r-1006\" tabindex=\"0\">r-1006</span></li></ul>",
+  "art_url": null
+ }
+}

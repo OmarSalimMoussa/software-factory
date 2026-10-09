@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1003",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "This is great!",
+  "when": "Oct 2, 14:48 UTC · 7 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1003",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "users",
+      "tone": "pink",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "noise",
+      "tone": "muted",
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>This is great!</h1><p>A person says: This is great!.</p>",
+  "art_url": null
+ }
+}

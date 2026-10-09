@@ -1,0 +1,95 @@
+{
+ "task": {
+  "id": "t-0023",
+  "title": "Partner sign-in from the import step",
+  "sheet_title": "Partner sign-in from the import step",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "warn",
+   "word": "Needs your Go"
+  },
+  "chips": [
+   {
+    "text": "t-0023",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G2",
+    "tone": "accent"
+   },
+   {
+    "text": "UI",
+    "tone": ""
+   },
+   {
+    "text": "Access",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "2"
+   },
+   {
+    "label": "People",
+    "value": "2"
+   },
+   {
+    "label": "Score",
+    "value": "60"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$14.30"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 4,
+   "cause": null
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 4
+  },
+  "testers": {
+   "note": "4 required",
+   "rows": [],
+   "empty": "Testers start once every slice is built."
+  },
+  "built_from": null,
+  "requests": [],
+  "log": [
+   {
+    "at": "Oct 7, 15:45",
+    "text": "Filed by triage"
+   }
+  ],
+  "branch": "worktree-t-0023",
+  "actions": [
+   "library"
+  ]
+ }
+}

@@ -1,0 +1,60 @@
+{
+ "agent": {
+  "name": "Sign-in loop",
+  "family": "impl",
+  "initials": "IM",
+  "role": "implementer, small",
+  "doing": "QA round 2 of 4 · slot 1",
+  "life_note": null,
+  "kv": [
+   {
+    "label": "Model",
+    "value": "Sonnet 5.5"
+   },
+   {
+    "label": "Effort",
+    "value": "medium"
+   },
+   {
+    "label": "Running",
+    "value": "148 min"
+   },
+   {
+    "label": "Cost",
+    "value": "$7.95"
+   }
+  ],
+  "task": "t-0017",
+  "kids": [
+   {
+    "id": "qa-ui-1",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-ui-function",
+    "doing": "6 checks, 2 min each",
+    "cost": "$0.62"
+   },
+   {
+    "id": "qa-vis-1",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-visual",
+    "doing": "Rechecking the menu",
+    "cost": "$1.12"
+   },
+   {
+    "id": "qa-sec-1",
+    "family": "qa",
+    "initials": "QA",
+    "name": "qa-security",
+    "doing": "Passed",
+    "cost": "$1.30"
+   }
+  ],
+  "chat_url": null,
+  "actions": [
+   "stop"
+  ],
+  "version": "v1"
+ }
+}

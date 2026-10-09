@@ -1,0 +1,18 @@
+{
+ "preview": {
+  "title": "Stop Project names?",
+  "text": "This agent stops now. Its task, t-0020, goes back to the top of Proposed next with its work kept.",
+  "rows": [
+   {
+    "family": "impl",
+    "initials": "IM",
+    "name": "Project names",
+    "role": "implementer, small",
+    "model": "Sonnet 5.5",
+    "cost": "$2.10"
+   }
+  ],
+  "button": "Stop it",
+  "coded": false
+ }
+}

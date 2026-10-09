@@ -1,0 +1,18 @@
+{
+ "preview": {
+  "title": "Stop critic-ux?",
+  "text": "This agent stops now.",
+  "rows": [
+   {
+    "family": "design",
+    "initials": "DS",
+    "name": "critic-ux",
+    "role": "critic",
+    "model": "Sonnet 5.5",
+    "cost": "$0.48"
+   }
+  ],
+  "button": "Stop it",
+  "coded": false
+ }
+}

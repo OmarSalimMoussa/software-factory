@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1008",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "asdf test",
+  "when": "Oct 3, 11:18 UTC · 6 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1008",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "users",
+      "tone": "pink",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "noise",
+      "tone": "muted",
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>asdf test</h1><p>A person says: asdf test.</p>",
+  "art_url": null
+ }
+}

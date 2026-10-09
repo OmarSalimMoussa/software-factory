@@ -1,0 +1,88 @@
+{
+ "doc": {
+  "id": "t-0027",
+  "kind": "task",
+  "kind_label": "Task",
+  "title": "Billing: the credit line shows twice",
+  "when": "Oct 9, 08:40 UTC · 6 h ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "t-0027",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Goal item",
+    "values": [
+     {
+      "text": "G1",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "major",
+      "tone": "warn",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Surfaces",
+    "values": [
+     {
+      "text": "UI",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Rung",
+    "values": [
+     {
+      "text": "1",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Status",
+    "values": [
+     {
+      "text": "proposed",
+      "tone": "warn",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Requests",
+    "values": [
+     {
+      "text": "r-1015",
+      "tone": null,
+      "doc": "r-1015"
+     },
+     {
+      "text": "r-1014",
+      "tone": null,
+      "doc": "r-1014"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>Billing: the credit line shows twice</h1><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li><span class=\"doclink\" data-open-doc=\"r-1015\" tabindex=\"0\">r-1015</span></li><li><span class=\"doclink\" data-open-doc=\"r-1014\" tabindex=\"0\">r-1014</span></li></ul>",
+  "art_url": null
+ }
+}

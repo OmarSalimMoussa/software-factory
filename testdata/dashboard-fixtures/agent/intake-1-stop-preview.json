@@ -1,0 +1,18 @@
+{
+ "preview": {
+  "title": "Stop Intake?",
+  "text": "This agent stops now.",
+  "rows": [
+   {
+    "family": "intake",
+    "initials": "IN",
+    "name": "Intake",
+    "role": "intake",
+    "model": "Sonnet 5.5",
+    "cost": "$0.84"
+   }
+  ],
+  "button": "Stop it",
+  "coded": false
+ }
+}

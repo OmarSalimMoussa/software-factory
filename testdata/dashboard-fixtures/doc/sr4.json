@@ -1,0 +1,63 @@
+{
+ "doc": {
+  "id": "sr4",
+  "kind": "reflection",
+  "kind_label": "Reflection",
+  "title": "Routed to rung 1, but the cause spanned two services; the intake verdi…",
+  "when": "Oct 8, 16:00 UTC · 22 h ago",
+  "fm": [
+   {
+    "label": "Kind",
+    "values": [
+     {
+      "text": "misroute",
+      "tone": "violet",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Who",
+    "values": [
+     {
+      "text": "orchestrator",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Where",
+    "values": [
+     {
+      "text": "slow export",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "When",
+    "values": [
+     {
+      "text": "Oct 8, 16:00 UTC",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Repeats",
+    "values": [
+     {
+      "text": "1 time",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<p>Routed to rung 1, but the cause spanned two services; the intake verdict named only one.</p>",
+  "art_url": null
+ }
+}

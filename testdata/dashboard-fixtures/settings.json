@@ -1,0 +1,1242 @@
+{
+ "settings": {
+  "repo": {
+   "path": "/srv/products/acme-app"
+  },
+  "groups": [
+   {
+    "key": "models",
+    "title": "Models",
+    "hint": "A new model or effort applies when that kind of agent next starts. Agents already running keep theirs; none is stopped.",
+    "rows": [
+     {
+      "key": "models.orchestrator",
+      "label": "Orchestrator",
+      "control": "model",
+      "value": {
+       "model": "Opus 5.5",
+       "effort": "high"
+      },
+      "saved": {
+       "model": "Opus 5.5",
+       "effort": "high"
+      },
+      "default": {
+       "model": "Opus 5.5",
+       "effort": "high"
+      },
+      "applied": {
+       "model": "Opus 5.5",
+       "effort": "high"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.designer",
+      "label": "Designer",
+      "control": "model",
+      "value": {
+       "model": "Opus 5.5",
+       "effort": "high"
+      },
+      "saved": {
+       "model": "Opus 5.5",
+       "effort": "high"
+      },
+      "default": {
+       "model": "Opus 5.5",
+       "effort": "high"
+      },
+      "applied": {
+       "model": "Opus 5.5",
+       "effort": "high"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.implementer_large",
+      "label": "Implementer, large",
+      "control": "model",
+      "value": {
+       "model": "Opus 5.5",
+       "effort": "high"
+      },
+      "saved": {
+       "model": "Opus 5.5",
+       "effort": "high"
+      },
+      "default": {
+       "model": "Opus 5.5",
+       "effort": "high"
+      },
+      "applied": {
+       "model": "Opus 5.5",
+       "effort": "high"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.implementer_small",
+      "label": "Implementer, small",
+      "control": "model",
+      "value": {
+       "model": "Sonnet 5.5",
+       "effort": "high"
+      },
+      "saved": {
+       "model": "Sonnet 5.5",
+       "effort": "high"
+      },
+      "default": {
+       "model": "Sonnet 5.5",
+       "effort": "high"
+      },
+      "applied": {
+       "model": "Sonnet 5.5",
+       "effort": "high"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.intake",
+      "label": "Intake",
+      "control": "model",
+      "value": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "saved": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "default": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "applied": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.triage",
+      "label": "Triage",
+      "control": "model",
+      "value": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "saved": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "default": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "applied": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.critic",
+      "label": "Critics",
+      "control": "model",
+      "value": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "saved": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "default": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "applied": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.qa_backend",
+      "label": "qa-backend",
+      "control": "model",
+      "value": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "saved": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "default": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "applied": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.qa_security",
+      "label": "qa-security",
+      "control": "model",
+      "value": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "saved": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "default": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "applied": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.qa_ux",
+      "label": "qa-ux",
+      "control": "model",
+      "value": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "saved": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "default": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "applied": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.qa_visual",
+      "label": "qa-visual",
+      "control": "model",
+      "value": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "saved": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "default": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "applied": {
+       "model": "Sonnet 5.5",
+       "effort": "medium"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.qa_ui_function",
+      "label": "qa-ui-function",
+      "control": "model",
+      "value": {
+       "model": "Haiku 5.5",
+       "effort": "high"
+      },
+      "saved": {
+       "model": "Haiku 5.5",
+       "effort": "high"
+      },
+      "default": {
+       "model": "Haiku 5.5",
+       "effort": "high"
+      },
+      "applied": {
+       "model": "Haiku 5.5",
+       "effort": "high"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.qa_regression",
+      "label": "qa-regression",
+      "control": "model",
+      "value": {
+       "model": "Haiku 5.5",
+       "effort": "high"
+      },
+      "saved": {
+       "model": "Haiku 5.5",
+       "effort": "high"
+      },
+      "default": {
+       "model": "Haiku 5.5",
+       "effort": "high"
+      },
+      "applied": {
+       "model": "Haiku 5.5",
+       "effort": "high"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     },
+     {
+      "key": "models.qa_prod",
+      "label": "qa-prod",
+      "control": "model",
+      "value": {
+       "model": "Haiku 5.5",
+       "effort": "high"
+      },
+      "saved": {
+       "model": "Haiku 5.5",
+       "effort": "high"
+      },
+      "default": {
+       "model": "Haiku 5.5",
+       "effort": "high"
+      },
+      "applied": {
+       "model": "Haiku 5.5",
+       "effort": "high"
+      },
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": {
+       "models": [
+        "Opus 5.5",
+        "Sonnet 5.5",
+        "Haiku 5.5"
+       ],
+       "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      },
+      "when": "Next start"
+     }
+    ]
+   },
+   {
+    "key": "caps",
+    "title": "Caps",
+    "hint": "Applies as soon as you save. Running agents keep running; a lower cap only holds back new starts.",
+    "rows": [
+     {
+      "key": "caps.implementers",
+      "label": "Implementers at once",
+      "control": "number",
+      "value": 4,
+      "saved": 4,
+      "default": 3,
+      "applied": 4,
+      "pending": null,
+      "low": 1,
+      "high": 6,
+      "step": 1,
+      "hint": "From 1 to 6.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "caps.designers",
+      "label": "Designers at once",
+      "control": "number",
+      "value": 2,
+      "saved": 2,
+      "default": 2,
+      "applied": 2,
+      "pending": null,
+      "low": 1,
+      "high": 4,
+      "step": 1,
+      "hint": "From 1 to 4.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "caps.subagents_at_once",
+      "label": "Subagents at once",
+      "control": "number",
+      "value": 4,
+      "saved": 4,
+      "default": 4,
+      "applied": 4,
+      "pending": null,
+      "low": 1,
+      "high": 8,
+      "step": 1,
+      "hint": "From 1 to 8.",
+      "options": null,
+      "when": "At once"
+     }
+    ]
+   },
+   {
+    "key": "rounds",
+    "title": "Rounds",
+    "hint": "Applies as soon as you save, to every task in progress.",
+    "rows": [
+     {
+      "key": "rounds.qa",
+      "label": "QA rounds",
+      "control": "number",
+      "value": 4,
+      "saved": 4,
+      "default": 4,
+      "applied": 4,
+      "pending": null,
+      "low": 1,
+      "high": 8,
+      "step": 1,
+      "hint": "From 1 to 8.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "rounds.critic",
+      "label": "Critic rounds",
+      "control": "number",
+      "value": 4,
+      "saved": 4,
+      "default": 4,
+      "applied": 4,
+      "pending": null,
+      "low": 1,
+      "high": 8,
+      "step": 1,
+      "hint": "From 1 to 8.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "rounds.check_runs",
+      "label": "Check runs on a merge turn",
+      "control": "number",
+      "value": 3,
+      "saved": 3,
+      "default": 3,
+      "applied": 3,
+      "pending": null,
+      "low": 1,
+      "high": 6,
+      "step": 1,
+      "hint": "From 1 to 6.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "rounds.extend_by",
+      "label": "One extension adds",
+      "control": "number",
+      "value": 2,
+      "saved": 2,
+      "default": 2,
+      "applied": 2,
+      "pending": null,
+      "low": 1,
+      "high": 4,
+      "step": 1,
+      "hint": "From 1 to 4.",
+      "options": null,
+      "when": "At once"
+     }
+    ]
+   },
+   {
+    "key": "qa",
+    "title": "QA",
+    "hint": "Applies to the next tester brief.",
+    "rows": [
+     {
+      "key": "qa.seconds_per_item",
+      "label": "Seconds per item",
+      "control": "number",
+      "value": 120,
+      "saved": 120,
+      "default": 120,
+      "applied": 120,
+      "pending": null,
+      "low": 30,
+      "high": 600,
+      "step": 10,
+      "hint": "From 30 to 600.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "qa.max_items",
+      "label": "Items per brief",
+      "control": "number",
+      "value": 10,
+      "saved": 10,
+      "default": 10,
+      "applied": 10,
+      "pending": null,
+      "low": 1,
+      "high": 20,
+      "step": 1,
+      "hint": "From 1 to 20.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "qa.desktop_seconds",
+      "label": "Desktop seconds per tester",
+      "control": "number",
+      "value": 300,
+      "saved": 300,
+      "default": 300,
+      "applied": 300,
+      "pending": null,
+      "low": 60,
+      "high": 900,
+      "step": 10,
+      "hint": "From 60 to 900.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "qa.evidence_days",
+      "label": "Days evidence is kept",
+      "control": "number",
+      "value": 14,
+      "saved": 14,
+      "default": 14,
+      "applied": 14,
+      "pending": null,
+      "low": 1,
+      "high": 60,
+      "step": 1,
+      "hint": "From 1 to 60.",
+      "options": null,
+      "when": "At once"
+     }
+    ]
+   },
+   {
+    "key": "intake",
+    "title": "Intake",
+    "hint": "Applies to the next triage pass.",
+    "rows": [
+     {
+      "key": "intake.batch_size",
+      "label": "Triage batch size",
+      "control": "number",
+      "value": 100,
+      "saved": 100,
+      "default": 100,
+      "applied": 100,
+      "pending": null,
+      "low": 10,
+      "high": 500,
+      "step": 10,
+      "hint": "From 10 to 500.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "intake.batch_max_wait_hours",
+      "label": "Longest wait, hours",
+      "control": "number",
+      "value": 6,
+      "saved": 6,
+      "default": 6,
+      "applied": 6,
+      "pending": null,
+      "low": 1,
+      "high": 48,
+      "step": 1,
+      "hint": "From 1 to 48.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "intake.fast_lane_minutes",
+      "label": "Fast-lane minutes",
+      "control": "number",
+      "value": 20,
+      "saved": 20,
+      "default": 20,
+      "applied": 20,
+      "pending": null,
+      "low": 5,
+      "high": 60,
+      "step": 1,
+      "hint": "From 5 to 60.",
+      "options": null,
+      "when": "At once"
+     }
+    ]
+   },
+   {
+    "key": "routing",
+    "title": "Routing",
+    "hint": "Applies to the next proposal the orchestrator makes. Proposals already on Home stay.",
+    "rows": [
+     {
+      "key": "routing.max_proposals",
+      "label": "Proposals at once",
+      "control": "number",
+      "value": 3,
+      "saved": 3,
+      "default": 3,
+      "applied": 3,
+      "pending": null,
+      "low": 1,
+      "high": 5,
+      "step": 1,
+      "hint": "From 1 to 5.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "routing.small_max_slices",
+      "label": "Rung 1: most slices",
+      "control": "number",
+      "value": 1,
+      "saved": 1,
+      "default": 1,
+      "applied": 1,
+      "pending": null,
+      "low": 1,
+      "high": 3,
+      "step": 1,
+      "hint": "From 1 to 3.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "routing.large_max_slices",
+      "label": "Rung 2: most slices",
+      "control": "number",
+      "value": 3,
+      "saved": 3,
+      "default": 3,
+      "applied": 3,
+      "pending": null,
+      "low": 1,
+      "high": 6,
+      "step": 1,
+      "hint": "From 1 to 6.",
+      "options": null,
+      "when": "At once"
+     }
+    ]
+   },
+   {
+    "key": "cost",
+    "title": "Cost",
+    "hint": "Applies as soon as you save. Nothing stops at the budget.",
+    "rows": [
+     {
+      "key": "cost.daily_budget_usd",
+      "label": "Daily budget at API prices, $",
+      "control": "number",
+      "value": 150,
+      "saved": 150,
+      "default": 150,
+      "applied": 150,
+      "pending": null,
+      "low": 10,
+      "high": 2000,
+      "step": 10,
+      "hint": "From 10 to 2000.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "cost.plan_stale_minutes",
+      "label": "Minutes before a plan reading counts as unknown",
+      "control": "number",
+      "value": 45,
+      "saved": 45,
+      "default": 45,
+      "applied": 45,
+      "pending": null,
+      "low": 5,
+      "high": 240,
+      "step": 1,
+      "hint": "From 5 to 240.",
+      "options": null,
+      "when": "At once"
+     }
+    ]
+   },
+   {
+    "key": "watch",
+    "title": "Watch",
+    "hint": "Applies as soon as you save.",
+    "rows": [
+     {
+      "key": "watch.loop_minutes",
+      "label": "Loop every, minutes",
+      "control": "number",
+      "value": 30,
+      "saved": 30,
+      "default": 30,
+      "applied": 30,
+      "pending": null,
+      "low": 5,
+      "high": 120,
+      "step": 1,
+      "hint": "From 5 to 120.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "watch.probe_seconds",
+      "label": "Probe every, seconds",
+      "control": "number",
+      "value": 60,
+      "saved": 60,
+      "default": 60,
+      "applied": 60,
+      "pending": null,
+      "low": 15,
+      "high": 600,
+      "step": 1,
+      "hint": "From 15 to 600.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "watch.resume_tries",
+      "label": "Resumes to try before a crashed agent retires",
+      "control": "number",
+      "value": 2,
+      "saved": 2,
+      "default": 2,
+      "applied": 2,
+      "pending": null,
+      "low": 1,
+      "high": 5,
+      "step": 1,
+      "hint": "From 1 to 5.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "watch.bench_grace_seconds",
+      "label": "Seconds a pushed-out agent gets to commit",
+      "control": "number",
+      "value": 60,
+      "saved": 60,
+      "default": 60,
+      "applied": 60,
+      "pending": null,
+      "low": 10,
+      "high": 300,
+      "step": 1,
+      "hint": "From 10 to 300.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "watch.outage_after",
+      "label": "Failed prod probes in a row that mean an outage",
+      "control": "number",
+      "value": 2,
+      "saved": 2,
+      "default": 2,
+      "applied": 2,
+      "pending": null,
+      "low": 2,
+      "high": 5,
+      "step": 1,
+      "hint": "From 2 to 5.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "watch.orchestrator_silent_minutes",
+      "label": "Restart a silent orchestrator after, minutes",
+      "control": "number",
+      "value": 40,
+      "saved": 40,
+      "default": 40,
+      "applied": 40,
+      "pending": null,
+      "low": 10,
+      "high": 180,
+      "step": 1,
+      "hint": "From 10 to 180.",
+      "options": null,
+      "when": "At once"
+     }
+    ]
+   },
+   {
+    "key": "dashboard",
+    "title": "Dashboard",
+    "hint": "Applies as soon as you save.",
+    "rows": [
+     {
+      "key": "dashboard.retired_linger_minutes",
+      "label": "Minutes a retired agent stays in the live tree",
+      "control": "number",
+      "value": 3,
+      "saved": 3,
+      "default": 3,
+      "applied": 3,
+      "pending": null,
+      "low": 1,
+      "high": 30,
+      "step": 1,
+      "hint": "From 1 to 30.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "dashboard.hosts",
+      "label": "Addresses the dashboard answers",
+      "control": "list",
+      "value": [
+       "127.0.0.1",
+       "localhost"
+      ],
+      "saved": [
+       "127.0.0.1",
+       "localhost"
+      ],
+      "default": [
+       "127.0.0.1",
+       "localhost"
+      ],
+      "applied": [
+       "127.0.0.1",
+       "localhost"
+      ],
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": null,
+      "when": "At once"
+     }
+    ]
+   },
+   {
+    "key": "slots",
+    "title": "Slots",
+    "hint": "The slot count applies at the next slot claim; the memory cap within a minute.",
+    "rows": [
+     {
+      "key": "slots.count",
+      "label": "Agent slots",
+      "control": "number",
+      "value": 4,
+      "saved": 4,
+      "default": 3,
+      "applied": 3,
+      "pending": "4 at the next slot claim",
+      "low": 1,
+      "high": 6,
+      "step": 1,
+      "hint": "From 1 to 6.",
+      "options": null,
+      "when": "Next slot claim"
+     },
+     {
+      "key": "slots.memory_max_gib",
+      "label": "Factory memory cap, GiB",
+      "control": "number",
+      "value": 12,
+      "saved": 12,
+      "default": 12,
+      "applied": 12,
+      "pending": null,
+      "low": 4,
+      "high": 28,
+      "step": 1,
+      "hint": "From 4 to 28.",
+      "options": null,
+      "when": "Next slot claim"
+     }
+    ]
+   },
+   {
+    "key": "sandbox",
+    "title": "Sandbox",
+    "hint": "Applies to each agent that starts after you save.",
+    "rows": [
+     {
+      "key": "sandbox.allowed_domains",
+      "label": "Sites agents may reach",
+      "control": "list",
+      "value": [
+       "github.com",
+       "api.github.com",
+       "pypi.org"
+      ],
+      "saved": [
+       "github.com",
+       "api.github.com",
+       "pypi.org"
+      ],
+      "default": [
+       "github.com",
+       "api.github.com",
+       "pypi.org"
+      ],
+      "applied": [
+       "github.com",
+       "api.github.com",
+       "pypi.org"
+      ],
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": null,
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "sandbox.prod_health_url",
+      "label": "Prod health address",
+      "control": "text",
+      "value": "https://acme-app.example/health",
+      "saved": "https://acme-app.example/health",
+      "default": "https://acme-app.example/health",
+      "applied": "https://acme-app.example/health",
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": "A full https address.",
+      "options": null,
+      "when": "At once"
+     }
+    ]
+   },
+   {
+    "key": "install",
+    "title": "Install",
+    "hint": "Set by the installer. Change them by reinstalling.",
+    "rows": [
+     {
+      "key": "install.models_allowed",
+      "label": "Models agents may use",
+      "control": "readonly",
+      "value": [
+       "Opus 5.5",
+       "Sonnet 5.5",
+       "Haiku 5.5"
+      ],
+      "saved": [
+       "Opus 5.5",
+       "Sonnet 5.5",
+       "Haiku 5.5"
+      ],
+      "default": [
+       "Opus 5.5",
+       "Sonnet 5.5",
+       "Haiku 5.5"
+      ],
+      "applied": [
+       "Opus 5.5",
+       "Sonnet 5.5",
+       "Haiku 5.5"
+      ],
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": "Set by the installer.",
+      "options": null,
+      "when": "Reinstall"
+     },
+     {
+      "key": "install.prices",
+      "label": "Prices per million tokens",
+      "control": "readonly",
+      "value": "Opus 5.5 $15 in, $75 out · Sonnet 5.5 $3 in, $15 out · Haiku 5.5 $1 in, $5 out",
+      "saved": "Opus 5.5 $15 in, $75 out · Sonnet 5.5 $3 in, $15 out · Haiku 5.5 $1 in, $5 out",
+      "default": "Opus 5.5 $15 in, $75 out · Sonnet 5.5 $3 in, $15 out · Haiku 5.5 $1 in, $5 out",
+      "applied": "Opus 5.5 $15 in, $75 out · Sonnet 5.5 $3 in, $15 out · Haiku 5.5 $1 in, $5 out",
+      "pending": null,
+      "low": null,
+      "high": null,
+      "step": null,
+      "hint": "Set by the installer.",
+      "options": null,
+      "when": "Reinstall"
+     }
+    ]
+   }
+  ],
+  "audit": [
+   {
+    "what": "Implementers at once 3 → 4",
+    "sha": "4be21c0",
+    "ago": "yesterday"
+   },
+   {
+    "what": "QA rounds 3 → 4",
+    "sha": "a91f3d2",
+    "ago": "yesterday"
+   },
+   {
+    "what": "Intake model to Sonnet 5.5",
+    "sha": "77c0e19",
+    "ago": "2 days ago"
+   }
+  ]
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "history": {
+  "id": "h5",
+  "family": "design",
+  "initials": "DS",
+  "name": "Spreadsheet export",
+  "role": "designer",
+  "task": "t-0009",
+  "model": "Opus 5.5",
+  "started": "Oct 5, 10:00",
+  "started_by": "started by Orchestrator",
+  "ended": "Oct 5, 10:40",
+  "lasted": "after 40 min",
+  "why": {
+   "text": "stopped by you",
+   "tone": "bad"
+  },
+  "cost": "$3.20",
+  "note": "You stopped it and parked the task"
+ }
+}

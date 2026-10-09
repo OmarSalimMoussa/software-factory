@@ -1,0 +1,18 @@
+{
+ "plan": {
+  "stale": true,
+  "age": "reading too old to trust",
+  "windows": [
+   {
+    "name": "5-hour window",
+    "pct": null,
+    "note": "No reading for 52 min"
+   },
+   {
+    "name": "This week",
+    "pct": null,
+    "note": "No reading for 52 min"
+   }
+  ]
+ }
+}

@@ -1,0 +1,97 @@
+{
+ "task": {
+  "id": "t-0028",
+  "title": "Store listing screenshots",
+  "sheet_title": "Store listing screenshots",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "ring",
+   "word": "Queued"
+  },
+  "chips": [
+   {
+    "text": "t-0028",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G5",
+    "tone": "accent"
+   },
+   {
+    "text": "No runtime change",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "1"
+   },
+   {
+    "label": "People",
+    "value": "0"
+   },
+   {
+    "label": "Score",
+    "value": "12"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$0.00"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 0,
+   "cause": null
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 1
+  },
+  "testers": {
+   "note": "none required",
+   "rows": [],
+   "empty": "A small backend fix runs no testers."
+  },
+  "built_from": null,
+  "requests": [
+   {
+    "id": "r-1025",
+    "text": "Prepare the store listing screenshots",
+    "age": "3 days ago"
+   }
+  ],
+  "log": [
+   {
+    "at": "Oct 9, 07:15",
+    "text": "Filed by triage"
+   }
+  ],
+  "branch": null,
+  "actions": [
+   "library"
+  ]
+ }
+}

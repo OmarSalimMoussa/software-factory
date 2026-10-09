@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1023",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "I want teams with roles",
+  "when": "Oct 6, 03:48 UTC · 3 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1023",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "users",
+      "tone": "pink",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "parked",
+      "tone": "muted",
+      "doc": null
+     }
+    ]
+   }
+  ],
+  "html": "<h1>I want teams with roles</h1><p>A person says: I want teams with roles.</p>",
+  "art_url": null
+ }
+}

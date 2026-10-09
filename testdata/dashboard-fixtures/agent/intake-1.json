@@ -1,0 +1,35 @@
+{
+ "agent": {
+  "name": "Intake",
+  "family": "intake",
+  "initials": "IN",
+  "role": "intake",
+  "doing": "Debugging t-0021",
+  "life_note": null,
+  "kv": [
+   {
+    "label": "Model",
+    "value": "Sonnet 5.5"
+   },
+   {
+    "label": "Effort",
+    "value": "medium"
+   },
+   {
+    "label": "Running",
+    "value": "6 min"
+   },
+   {
+    "label": "Cost",
+    "value": "$0.84"
+   }
+  ],
+  "task": null,
+  "kids": [],
+  "chat_url": null,
+  "actions": [
+   "stop"
+  ],
+  "version": "v1"
+ }
+}

@@ -1,0 +1,53 @@
+{
+ "doc": {
+  "id": "r-1007",
+  "kind": "request",
+  "kind_label": "Request",
+  "title": "tracker: 3 timeouts on the export endpoint",
+  "when": "Oct 3, 06:00 UTC · 6 days ago",
+  "fm": [
+   {
+    "label": "Id",
+    "values": [
+     {
+      "text": "r-1007",
+      "tone": null,
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Inbox",
+    "values": [
+     {
+      "text": "agents",
+      "tone": "amber",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Severity",
+    "values": [
+     {
+      "text": "normal",
+      "tone": "",
+      "doc": null
+     }
+    ]
+   },
+   {
+    "label": "Outcome",
+    "values": [
+     {
+      "text": "t-0019",
+      "tone": "accent",
+      "doc": "t-0019"
+     }
+    ]
+   }
+  ],
+  "html": "<h1>tracker: 3 timeouts on the export endpoint</h1><p>tracker: 3 timeouts on the export endpoint.</p><p>Became part of <span class=\"doclink\" data-open-doc=\"t-0019\" tabindex=\"0\">t-0019</span>.</p>",
+  "art_url": null
+ }
+}

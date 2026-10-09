@@ -1,0 +1,134 @@
+{
+ "hero": {
+  "label": "Last 7 days",
+  "total": 566.2,
+  "budget_pct": 32,
+  "today": "today $48 of $150, at API prices",
+  "kv": [
+   {
+    "label": "Average cost of a merge",
+    "value": "$12"
+   },
+   {
+    "label": "Per day, average",
+    "value": "$81"
+   }
+  ],
+  "unknown": "2 calls with unknown price"
+ },
+ "chart": {
+  "families": [
+   {
+    "key": "orch",
+    "label": "Orchestrator",
+    "color": "--f-orch"
+   },
+   {
+    "key": "intake",
+    "label": "Intake and triage",
+    "color": "--f-intake"
+   },
+   {
+    "key": "design",
+    "label": "Designers and critics",
+    "color": "--f-design"
+   },
+   {
+    "key": "impl",
+    "label": "Implementers",
+    "color": "--f-impl"
+   },
+   {
+    "key": "qa",
+    "label": "Testers",
+    "color": "--f-qa"
+   }
+  ],
+  "days": [
+   {
+    "label": "Oct 3",
+    "values": [
+     10,
+     4,
+     13,
+     29,
+     21
+    ],
+    "total": 77
+   },
+   {
+    "label": "Oct 4",
+    "values": [
+     12,
+     3,
+     16,
+     33,
+     26
+    ],
+    "total": 90
+   },
+   {
+    "label": "Oct 5",
+    "values": [
+     11,
+     5,
+     10,
+     30,
+     24
+    ],
+    "total": 80
+   },
+   {
+    "label": "Oct 6",
+    "values": [
+     13,
+     4,
+     12,
+     35,
+     27
+    ],
+    "total": 91
+   },
+   {
+    "label": "Oct 7",
+    "values": [
+     9,
+     3,
+     15,
+     26,
+     20
+    ],
+    "total": 73
+   },
+   {
+    "label": "Oct 8",
+    "values": [
+     14,
+     6,
+     18,
+     38,
+     31
+    ],
+    "total": 107
+   },
+   {
+    "label": "today",
+    "values": [
+     11.3,
+     3.1,
+     9.7,
+     14.6,
+     9.5
+    ],
+    "total": 48.2
+   }
+  ],
+  "max": 200,
+  "ticks": [
+   0,
+   100,
+   200
+  ],
+  "budget": 150
+ }
+}

@@ -1,0 +1,132 @@
+{
+ "task": {
+  "id": "t-0013",
+  "title": "Invoice page: the Approve button jumps",
+  "sheet_title": "Invoice page: the Approve button jumps",
+  "version": "v1",
+  "proposal": null,
+  "status": {
+   "tone": "good",
+   "word": "On staging"
+  },
+  "chips": [
+   {
+    "text": "t-0013",
+    "tone": "",
+    "mono": true
+   },
+   {
+    "text": "G2",
+    "tone": "accent"
+   },
+   {
+    "text": "UI",
+    "tone": ""
+   }
+  ],
+  "kv": [
+   {
+    "label": "Requests",
+    "value": "2"
+   },
+   {
+    "label": "People",
+    "value": "2"
+   },
+   {
+    "label": "Score",
+    "value": "40"
+   },
+   {
+    "label": "Cost so far",
+    "value": "$7.15"
+   }
+  ],
+  "route": {
+   "label": "Route",
+   "steps": [
+    "0 · no build",
+    "1 · Sonnet",
+    "2 · Opus",
+    "3 · spec",
+    "4 · your Go"
+   ],
+   "current": 1,
+   "cause": "invoice page: the Approve label changed width on hover"
+  },
+  "progress": {
+   "stages": [
+    "Request",
+    "Triage",
+    "Proposed",
+    "Approved",
+    "Design",
+    "Build",
+    "QA",
+    "Merge",
+    "Check",
+    "Staging",
+    "Prod"
+   ],
+   "at": 9
+  },
+  "testers": {
+   "note": "3 required",
+   "rows": [
+    {
+     "name": "qa-ui-function",
+     "model": "Haiku 5.5",
+     "state": "pass",
+     "tone": "good",
+     "note": null,
+     "shots": []
+    }
+   ],
+   "empty": "Testers start once every slice is built."
+  },
+  "built_from": {
+   "kind": "fix",
+   "rung_label": "rung 1 · no spec",
+   "cause": "invoice page: the Approve label changed width on hover",
+   "fix": "A fixed-width label, checked at three widths.",
+   "qa": {
+    "kind": "ui",
+    "note": null,
+    "shots": [
+     {
+      "tester": "qa-ui-function",
+      "url": "/api/evidence/t-0013/page.svg",
+      "verdict": "pass"
+     },
+     {
+      "tester": "qa-visual",
+      "url": "/api/evidence/t-0013/button.svg",
+      "verdict": "pass"
+     },
+     {
+      "tester": "qa-ux",
+      "url": "/api/evidence/t-0013/phone.svg",
+      "verdict": "pass"
+     }
+    ]
+   }
+  },
+  "requests": [
+   {
+    "id": "r-1022",
+    "text": "The approve button moves when I hover it",
+    "age": "4 days ago"
+   }
+  ],
+  "log": [
+   {
+    "at": "Oct 7, 10:00",
+    "text": "Filed by triage"
+   }
+  ],
+  "branch": "worktree-t-0013",
+  "actions": [
+   "library"
+  ]
+ }
+}
