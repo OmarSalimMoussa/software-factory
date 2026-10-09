@@ -81,7 +81,8 @@ class Queue:
     def add(self, task_id: str, **fields: Any) -> Task:
         base: dict[str, Any] = dict(title=f"Task {task_id}", requests=["r-2026-10-09-0001"], goal_item="G1",
                                     severity="major", surfaces=["api"], status="approved",
-                                    created="2026-10-01T00:00:00Z", body="", run=1, slices=1)  # fmt: skip
+                                    created="2026-10-01T00:00:00Z", body="", run=1, slices=1,
+                                    why="It was proposed.", picture="t.svg")  # fmt: skip
         task = Task(id=task_id, **{**base, **fields})
         self.tasks[task_id] = task
         return task

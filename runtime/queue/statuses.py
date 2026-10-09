@@ -59,13 +59,14 @@ MOVES: tuple[Move, ...] = (
     _m({"decide"}, {"building"}, "extend", OWNER),
     _m({"decide"}, {"parked"}, "park", OWNER),
     _m({"decide"}, {"proposed"}, "to-designer", OWNER),
-    _m(OPEN, {"proposed"}, "stop", OWNER),
     _m(OPEN, {"proposed"}, "rung-up", ORCH),
     _m(OPEN, {"proposed"}, "void", WARDEN),
-    _m(OPEN, {"proposed"}, "outage-stopped", WARDEN),
-    # A run that ended without finishing comes back as a proposal; the event names why for the task's log.
-    _m(OPEN, {"proposed"}, "crashed", WARDEN),
-    _m(OPEN, {"proposed"}, "stopped", WARDEN),
+    # A run that ended without finishing comes back as a proposal; the event names why for the task's log. A run
+    # that never was one (prod's outage fix) has no why or picture to propose with, so it goes back to the queue.
+    _m(OPEN, {"proposed", "queued"}, "stop", OWNER),
+    _m(OPEN, {"proposed", "queued"}, "outage-stopped", WARDEN),
+    _m(OPEN, {"proposed", "queued"}, "crashed", WARDEN),
+    _m(OPEN, {"proposed", "queued"}, "stopped", WARDEN),
     _m(NOT_CLOSED, {"closed"}, "drop", OWNER),
     _m(NOT_CLOSED, {"closed"}, "rung-0", ORCH),
     _m(NOT_CLOSED, {"closed"}, "noise", ORCH),

@@ -94,12 +94,13 @@ def after_retire(ctx: Context, retired: list[Session]) -> None:
             except LaunchError as exc:
                 log.warning("stop of retired session %s failed (%s); the backstop retries", s.id, type(exc).__name__)
         unfinished = s.task and not s.parent and s.role in CAP and s.retired != models.FINISHED
-        if unfinished and permits.read_task(ctx, s.task).status in statuses.OPEN:
+        task = permits.read_task(ctx, s.task) if unfinished else None
+        if task is not None and task.status in statuses.OPEN:
             if s.retired_by == OWNER:
                 event, by = "stop", OWNER
             else:
                 event, by = ("crashed" if s.retired == models.CRASHED else "stopped"), WARDEN
-            permits.move_task(ctx, s.task, "proposed", event, by)
+            permits.move_task(ctx, s.task, "proposed" if task.why and task.picture else "queued", event, by)
 
 
 def retire_session(ctx: Context, ref: str, kind: str, by: str) -> list[Session]:

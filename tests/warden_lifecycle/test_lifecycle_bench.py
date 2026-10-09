@@ -101,3 +101,10 @@ def test_pause_benches_every_session_and_resume_brings_them_back_in_order(world:
     assert world.launcher.resumed == ["0c0c0c0c", "1a1a1a1a", "2b2b2b2b"]
     assert {world.session(s).state for s in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {WORKING}
     assert [kind for kind, _ in world.events] == ["paused", "benched", "benched", "benched", "resumed"]
+
+
+def test_a_stopped_run_that_never_was_a_proposal_goes_back_to_the_queue(world: World) -> None:
+    world.queue.add("t-0001", status="building", why="", picture="")
+    world.seat("5e550001", task="t-0001")
+    lifecycle.stop(world.ctx(), {"session": "5e550001"}, None)
+    assert world.queue.tasks["t-0001"].status == "queued"
