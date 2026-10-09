@@ -70,6 +70,8 @@ SCHEMA: dict[str, Spec] = {
     "qa.quiet_seconds": Spec("int", 30, 900),
     "qa.stale_seconds": Spec("int", 60, 3600),
     "qa.screenshots_for_owner_only": Spec("list"),
+    "qa.max_steps": Spec("int", 1, 20),  # contract: the most numbered steps a standing scenario has
+    "qa.viewport_height": Spec("int", 400, 2000),  # contract: the tester browser's height; widths come from qa.widths
     "intake.batch_size": Spec("int", 10, 500),
     "intake.batch_max_wait_hours": Spec("int", 1, 48),
     "intake.fast_lane_minutes": Spec("int", 5, 60),
@@ -87,6 +89,8 @@ SCHEMA: dict[str, Spec] = {
     "slots.count": Spec("int", 1, 6, when="At the next slot claim"),
     "slots.port_base": Spec("int", 1024, 65000, when=NEXT_START),
     "slots.log_tail_lines": Spec("int", 0, 500),
+    "slots.api_timeout_seconds": Spec("int", 1, 300),  # contract: one slot API or health call
+    "slots.api_max_kib": Spec("int", 16, 8192),  # contract: the largest slot API answer a session sees
     "budget.slice_memory_high": Spec("size", when=MINUTE),
     "budget.slice_memory_max": Spec("size", when=MINUTE),
     "budget.slice_cpu_weight": Spec("int", 1, 10000, when=MINUTE),
@@ -99,15 +103,21 @@ SCHEMA: dict[str, Spec] = {
     "watch.tick_seconds": Spec("int", 5, 120),
     "watch.probe_seconds": Spec("int", 15, 600),
     "watch.outage_after": Spec("int", 2, 5),
+    "watch.http_timeout_seconds": Spec("int", 1, 60),  # contract: added by 1B-2
+    "watch.inbox_wait_seconds": Spec("int", 5, 300),  # contract: added by 1B-2
+    "watch.push_wait_minutes": Spec("int", 5, 240),  # contract: added by 1B-2
     "watch.resume_tries": Spec("int", 1, 5),
     "watch.bench_grace_seconds": Spec("int", 10, 300),
+    "watch.start_grace_seconds": Spec("int", 30, 600),  # contract: a start's process must appear within this
     "watch.loop_minutes": Spec("int", 5, 120),
     "watch.orchestrator_silent_minutes": Spec("int", 10, 180),
     "watch.orchestrator_busy_silent_minutes": Spec("int", 10, 600),
     "watch.refusals_to_notify": Spec("int", 1, 50),
     "watch.refusal_window_minutes": Spec("int", 5, 1440),
+    "watch.socket_read_seconds": Spec("int", 1, 120),  # contract: added by 1B-3, a request line must arrive by then
     "queue.max_upload_kib": Spec("int", 16, 8192),
     "reflect.fold_hours": Spec("int", 1, 168),
+    "reflect.max_chars": Spec("int", 80, 4000),  # contract: added by 1B-3
     "cost.daily_budget_usd": Spec("float", 1, 100000),
     "cost.plan_stale_minutes": Spec("int", 5, 240),
     "cost.plan_amber_percent": Spec("int", 1, 100),
@@ -126,9 +136,19 @@ SCHEMA: dict[str, Spec] = {
     "dashboard.working_now_max": Spec("int", 1, 24),
     "dashboard.max_threads": Spec("int", 2, 64, when="Next warden start"),
     "dashboard.retired_linger_minutes": Spec("int", 1, 30),
+    "dashboard.idempotency_hours": Spec("int", 1, 168),  # contract: added by 1B-3
     "gc.prune_hour": Spec("int", 0, 23),
     "gc.images_keep_days": Spec("int", 1, 90),
     "gc.docker_budget_gib": Spec("int", 5, 2000),
+    # contract: added by 1B-3. The warden's own clone of the factory repo, where each settings save is committed.
+    "factory.clone": Spec("str", when="Next warden start"),
+    "factory.command_seconds": Spec("int", 10, 900),  # contract: added by 1B-3
+    # contract: added by builder 3, read by the installer only.
+    "install.drill": Spec("model", when="Next install"),
+    "install.drill_seconds": Spec("int", 30, 900, when="Next install"),
+    "install.hook_timeout_seconds": Spec("int", 2, 60, when="Next install"),
+    "install.healthchecks_grace_minutes": Spec("int", 1, 120, when="Next install"),
+    "install.heartbeat_minutes": Spec("int", 1, 60, when="Next install"),
 }
 
 _PRICE_KEYS = ("input", "output", "cache_read", "cache_write")

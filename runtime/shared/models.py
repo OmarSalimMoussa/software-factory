@@ -82,6 +82,8 @@ class Session:
     rung: int | None = None
     chat_link: str = ""
     agent_id: str = ""  # a subagent's id in its parent's transcript
+    # contract: when the session entered its state; the bench grace and a pending start's grace count from it.
+    since: str = ""
     extensions: dict[str, int] = field(default_factory=dict)
 
 
@@ -129,6 +131,7 @@ class Approval:
     model: str
     by: str
     at: str
+    digest: str = ""  # contract: R20, the hash of the title, rung, model and picture the owner approved
 
 
 @dataclass(slots=True)
@@ -145,6 +148,8 @@ class Card:
     brief: str = ""
     comments: int = 0
     answered: str = ""
+    asked_by: str = ""  # contract: R15, the session a question's answer goes back to
+    comments_at: str = ""  # contract: R14, when the designer last counted the comments
 
 
 @dataclass(slots=True)
@@ -178,6 +183,9 @@ class Probe:
     commit: str
     ms: int | None
     error: str = ""
+    # contract: added by 1B-2. A failure that counts toward an outage: the host itself answered with an HTTP error
+    # or timed out, and the control probe (GitHub) answered. A network failure on this side never counts.
+    counts: bool = False
 
 
 @dataclass(slots=True)

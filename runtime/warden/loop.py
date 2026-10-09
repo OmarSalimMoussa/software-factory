@@ -1,0 +1,151 @@
+"""The warden's tick, and the events that start the orchestrator's loop passes.
+
+wardend calls run_tick every watch.tick_seconds. It reads the vitals; probes staging and prod every
+watch.probe_seconds (prod every tick while a push to prod is in flight or just landed); moves the outage along; and
+posts to the orchestrator's inbox: loop due once watch.loop_minutes pass after its last pass, staging red the moment
+staging fails, and triage due when intake.batch_size requests wait or the oldest has waited
+intake.batch_max_wait_hours. The orchestrator's `factory tick` acknowledges each pass.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from runtime.queue import formats
+from runtime.queue.book import Queue
+from runtime.shared import models, store
+from runtime.shared.models import Probe
+from runtime.shared.paths import Places
+from runtime.shared.protocol import ok
+from runtime.warden import github_push, inbox, outage, probes, vitals
+from runtime.warden.context import Context
+
+_FRESH: dict[str, Any] = {"probed": {}, "staging_red": False, "loop_due": None, "triage_due": None}
+
+
+def _memo_path(places: Places) -> Path:
+    return places.state / "loop.json"
+
+
+def _tick_path(places: Places) -> Path:
+    return places.state / "loop-tick.json"
+
+
+def _memo(places: Places) -> dict[str, Any]:
+    raw = store.read_json_or(_memo_path(places), None)
+    if raw is None:
+        return {**_FRESH, "probed": {}}
+    if not isinstance(raw, dict) or raw.keys() != _FRESH.keys():
+        raise store.StoreError(f"{_memo_path(places)}: want exactly {sorted(_FRESH)}")
+    return raw
+
+
+def last_tick(places: Places) -> float | None:
+    """When the orchestrator last acknowledged a loop pass, for its silence watch; None before its first."""
+    raw = store.read_json_or(_tick_path(places), None)
+    if raw is None:
+        return None
+    at = raw.get("at") if isinstance(raw, dict) else None
+    if not isinstance(at, int | float):
+        raise store.StoreError(f"{_tick_path(places)}: no at")
+    return float(at)
+
+
+def tick(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
+    """The orchestrator finished a loop pass; the next loop due counts from now."""
+    now = ctx.clock.now()
+    store.write_json(_tick_path(ctx.places), {"at": now, "iso": ctx.clock.iso()})
+    due = formats.iso(now + ctx.settings().get_int("watch.loop_minutes") * 60)
+    return ok(message=f"Loop pass recorded; the next loop due comes by {due} unless an event comes first")
+
+
+def run_tick(
+    ctx: Context, fetch: probes.Fetch = probes.http_get, proc: Path = vitals.PROC, supplies: Path = vitals.POWER
+) -> None:
+    settings = ctx.settings()
+    now = ctx.clock.now()
+    vitals.refresh(ctx, proc, supplies)
+    memo = _memo(ctx.places)
+    every = settings.get_int("watch.probe_seconds")
+    for env in probes.ENVS:
+        last = memo["probed"].get(env)
+        close = env == probes.PROD and github_push.watching(ctx)
+        if last is None or close or now - last >= every:
+            memo["probed"][env] = now
+            probe = probes.take(ctx, env, fetch)
+            if env == probes.PROD:
+                outage.observe(ctx, probe)
+            else:
+                _staging(ctx, memo, probe)
+            store.write_json(_memo_path(ctx.places), memo)
+    _loop_due(ctx, memo, now)
+    _fix(ctx)
+    _triage_due(ctx, memo, now)
+
+
+def _staging(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
+    """Staging red is posted once per red spell, at its first counted failure; a network failure changes nothing."""
+    if probe.ok:
+        memo["staging_red"] = False
+    elif probe.counts and not memo["staging_red"]:
+        memo["staging_red"] = True
+        ctx.post_event(inbox.STAGING_RED, {
+            "probe": models.dump(probe),
+            "request": {
+                "inbox": "agents",
+                "severity": "severe",
+                "where": "staging",
+                "body": f"Staging's health check failed at {probe.at}: {probe.error}. Revert the change that broke "
+                        "it at once, or fix it forward.",
+            },
+        })  # fmt: skip
+
+
+def _fix(ctx: Context) -> None:
+    current = outage.read(ctx.places)
+    if current is None or current.stage != outage.FIXING:
+        return
+    outage.fix_status(ctx, Queue.of(ctx).task(current.task).status)
+
+
+def _loop_due(ctx: Context, memo: dict[str, Any], now: float) -> None:
+    passes = [t for t in (memo["loop_due"], last_tick(ctx.places)) if t is not None]
+    if passes and now - max(passes) < ctx.settings().get_int("watch.loop_minutes") * 60:
+        return
+    if inbox.pending(ctx.places, inbox.LOOP_DUE):
+        return
+    ctx.post_event(inbox.LOOP_DUE, {})
+    memo["loop_due"] = now
+    store.write_json(_memo_path(ctx.places), memo)
+
+
+def _triage_due(ctx: Context, memo: dict[str, Any], now: float) -> None:
+    settings = ctx.settings()
+    waiting = _waiting(ctx)
+    if not waiting:
+        return
+    ages = [now - at for at in waiting if at is not None]
+    oldest = max(ages, default=None)
+    due = len(waiting) >= settings.get_int("intake.batch_size") or (
+        oldest is not None and oldest >= settings.get_int("intake.batch_max_wait_hours") * 3600
+    )
+    # A triage pass takes a while and the batch still waits while it runs: one reminder per loop period is enough.
+    recent = memo["triage_due"] is not None and now - memo["triage_due"] < settings.get_int("watch.loop_minutes") * 60
+    if not due or recent or inbox.pending(ctx.places, inbox.TRIAGE_DUE):
+        return
+    ctx.post_event(
+        inbox.TRIAGE_DUE, {"waiting": len(waiting), "oldest_hours": None if oldest is None else oldest / 3600}
+    )
+    memo["triage_due"] = now
+    store.write_json(_memo_path(ctx.places), memo)
+
+
+def _waiting(ctx: Context) -> list[float | None]:
+    """When each request that waits for triage arrived: no outcome yet, and not severe (those take the fast lane).
+
+    A request that cannot be read still waits, with no known age; the queue-format sweep reports it.
+    """
+    good, broken = Queue.of(ctx).requests()
+    ages: list[float | None] = [formats.epoch(r.at) for r in good if not r.outcome and r.severity != "severe"]
+    return ages + [None] * len(broken)

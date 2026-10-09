@@ -15,6 +15,7 @@ RUN = Path("/run/software-factory")
 MANAGED_SETTINGS = Path("/etc/claude-code/managed-settings.json")
 WARDEN_USER = "software-warden"
 AGENT_USER = "software-agent"
+DASHBOARD_USER = "software-dashboard"  # contract: added by 1B-3, the one other user owner.sock answers
 SLICE = "software-factory.slice"
 
 
@@ -144,7 +145,8 @@ class Places:
 
     @property
     def rendered_plugin(self) -> Path:
-        return self.state / "plugin"
+        # contract: changed by 1B-3 to public/, where agent sessions can read it; procedures/ and rules/ sit beside it
+        return self.state / "public" / "plugin"
 
     # sockets
     @property
@@ -154,6 +156,14 @@ class Places:
     @property
     def refusal_socket(self) -> Path:
         return self.run / "refusals.sock"
+
+    @property
+    def owner_socket(self) -> Path:  # contract: added by 1B-3, the dashboard's and the owner's door
+        return self.run / "owner.sock"
+
+    @property
+    def owner(self) -> Path:  # contract: added by 1B-3, {"user": "<the owner's login>"}, written by the installer
+        return self.state / "owner.json"
 
 
 def queue_dir(repo: Path) -> Path:

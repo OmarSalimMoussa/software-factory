@@ -1,0 +1,230 @@
+"""The warden's door to GitHub's REST API: compare, the promote workflow, its runs, deployments, and a reachability
+probe that serves as the outage's control.
+
+The token is read from the warden's secrets on every call and never appears in an error or a log line. Every
+failure raises GitHubError with one line that says what failed; a rate limit says when it resets.
+"""
+
+from __future__ import annotations
+
+import json
+import urllib.error
+import urllib.parse
+import urllib.request
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from runtime.shared.paths import Places
+from runtime.shared.settings import Settings
+
+API = "https://api.github.com"
+PROMOTE_WORKFLOW = "promote.yml"
+_PAGE = 100  # GitHub's largest page
+
+
+class GitHubError(Exception):
+    """A GitHub call failed; the message says which and why, never the token."""
+
+
+@dataclass(frozen=True, slots=True)
+class Reply:
+    status: int
+    headers: dict[str, str]
+    body: bytes
+
+
+# Raises OSError (URLError included) or TimeoutError when GitHub cannot be reached; any HTTP answer is a Reply.
+Transport = Callable[[urllib.request.Request, float], Reply]
+
+
+def urlopen_transport(request: urllib.request.Request, timeout: float) -> Reply:
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 -- a fixed https API
+            return Reply(response.status, {k.lower(): v for k, v in response.headers.items()}, response.read())
+    except urllib.error.HTTPError as exc:
+        return Reply(exc.code, {k.lower(): v for k, v in exc.headers.items()}, exc.read())
+
+
+def token_path(places: Places) -> Path:
+    return places.state / "secrets" / "github.token"
+
+
+class RestGitHub:
+    """runtime.warden.context.GitHub over the REST API; the repo, branch and timeout are read fresh on each call."""
+
+    def __init__(self, places: Places, settings: Callable[[], Settings], transport: Transport) -> None:
+        self._token_file = token_path(places)
+        self._settings = settings
+        self._transport = transport
+
+    def compare(self, base: str, head: str) -> list[dict[str, Any]]:
+        """The commits ``head`` has that ``base`` lacks, oldest first: sha, title, author, at."""
+        path = f"/repos/{self._repo()}/compare/{_seg(base)}...{_seg(head)}"
+        commits: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            body = self._json("GET", f"{path}?per_page={_PAGE}&page={page}")
+            batch = body.get("commits")
+            total = body.get("total_commits")
+            if not isinstance(batch, list) or not isinstance(total, int):
+                raise GitHubError(f"GitHub's compare of {base[:12]}...{head[:12]} has no commit list")
+            commits += [_commit(c) for c in batch]
+            if len(commits) >= total or not batch:
+                break
+            page += 1
+        if len(commits) != total:
+            raise GitHubError(f"GitHub listed {len(commits)} of {total} commits in {base[:12]}...{head[:12]}")
+        return commits
+
+    def dispatch_promote(self, sha: str) -> str:
+        """Start promote.yml for ``sha`` on the default branch; the id of the run it started."""
+        branch = self._settings().get_str("repo.default_branch")
+        body = {"ref": branch, "inputs": {"sha": sha}, "return_run_details": True}
+        reply = self._json("POST", f"/repos/{self._repo()}/actions/workflows/{PROMOTE_WORKFLOW}/dispatches", body)
+        run_id = reply.get("workflow_run_id")
+        if not isinstance(run_id, int):
+            raise GitHubError("GitHub started the push workflow but did not name its run")
+        return str(run_id)
+
+    def run(self, run_id: str) -> dict[str, Any]:
+        """A workflow run: id, status (queued, waiting, in_progress, completed), conclusion, url, head_sha."""
+        body = self._json("GET", f"/repos/{self._repo()}/actions/runs/{_seg(run_id)}")
+        status = body.get("status")
+        if not isinstance(status, str):
+            raise GitHubError(f"GitHub's run {run_id} has no status")
+        return {
+            "id": str(body.get("id")),
+            "status": status,
+            "conclusion": body.get("conclusion"),
+            "url": body.get("html_url"),
+            "head_sha": body.get("head_sha"),
+        }
+
+    def deployment(self, environment: str) -> dict[str, Any]:
+        """The environment's current and previous successful deployments, each {sha, at, url}, or None if none."""
+        query = urllib.parse.urlencode({"environment": environment, "per_page": _PAGE})
+        listed = self._json_list("GET", f"/repos/{self._repo()}/deployments?{query}")
+        current: dict[str, Any] | None = None
+        for row in listed:  # newest first
+            state = self._latest_state(row)
+            if current is None and state == "success":
+                current = _deployment(row)
+            elif current is not None and state in ("success", "inactive") and row.get("sha") != current["sha"]:
+                return {"current": current, "previous": _deployment(row)}
+        return {"current": current, "previous": None}
+
+    def reachable(self) -> bool:
+        """Whether GitHub's API answers at all: the control probe for an outage. Any HTTP answer below 500 counts."""
+        request = urllib.request.Request(f"{API}/rate_limit", headers=_HEADERS)
+        try:
+            reply = self._transport(request, self._timeout())
+        except (OSError, TimeoutError):
+            return False
+        return reply.status < 500
+
+    def _latest_state(self, deployment: dict[str, Any]) -> str:
+        statuses = self._json_list(
+            "GET", f"/repos/{self._repo()}/deployments/{deployment.get('id')}/statuses?per_page=1"
+        )
+        return str(statuses[0].get("state")) if statuses else ""
+
+    def _repo(self) -> str:
+        repo = self._settings().get_str("repo.github")
+        owner, _, name = repo.partition("/")
+        if not owner or not name or "/" in name:
+            raise GitHubError(f"repo.github must be owner/name, not {repo!r}")
+        return f"{_seg(owner)}/{_seg(name)}"
+
+    def _timeout(self) -> float:
+        return float(self._settings().get_int("watch.http_timeout_seconds"))
+
+    def _token(self) -> str:
+        try:
+            token = self._token_file.read_text().strip()
+        except OSError as exc:
+            raise GitHubError(f"cannot read the GitHub token at {self._token_file}: {type(exc).__name__}") from exc
+        if not token:
+            raise GitHubError(f"the GitHub token at {self._token_file} is empty")
+        return token
+
+    def _json(self, method: str, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+        parsed = self._call(method, path, body)
+        if not isinstance(parsed, dict):
+            raise GitHubError(f"GitHub answered {method} {path.split('?')[0]} with no object")
+        return parsed
+
+    def _json_list(self, method: str, path: str) -> list[dict[str, Any]]:
+        parsed = self._call(method, path, None)
+        if not isinstance(parsed, list) or not all(isinstance(row, dict) for row in parsed):
+            raise GitHubError(f"GitHub answered {method} {path.split('?')[0]} with no list")
+        return parsed
+
+    def _call(self, method: str, path: str, body: dict[str, Any] | None) -> Any:
+        where = f"{method} {path.split('?')[0]}"
+        headers = {**_HEADERS, "Authorization": f"Bearer {self._token()}"}
+        data = None
+        if body is not None:
+            data = json.dumps(body).encode()
+            headers["Content-Type"] = "application/json"
+        request = urllib.request.Request(API + path, data=data, headers=headers, method=method)
+        try:
+            reply = self._transport(request, self._timeout())
+        except (OSError, TimeoutError) as exc:
+            raise GitHubError(f"GitHub did not answer {where}: {type(exc).__name__}") from exc
+        if reply.status in (403, 429) and (reply.headers.get("x-ratelimit-remaining") == "0"
+                                           or "retry-after" in reply.headers):  # fmt: skip
+            raise GitHubError(f"GitHub's rate limit stops {where} until {_reset(reply.headers)}")
+        if reply.status >= 400:
+            raise GitHubError(f"GitHub refused {where}: HTTP {reply.status} {_message(reply.body)}".rstrip())
+        if reply.status == 204 or not reply.body:
+            return None
+        try:
+            return json.loads(reply.body)
+        except ValueError as exc:
+            raise GitHubError(f"GitHub answered {where} with something that is not JSON") from exc
+
+
+_HEADERS = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+
+
+def _seg(value: str) -> str:
+    return urllib.parse.quote(value, safe="")
+
+
+def _commit(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, dict) or not isinstance(raw.get("sha"), str):
+        raise GitHubError("GitHub listed a commit with no sha")
+    detail = raw.get("commit") or {}
+    author = detail.get("author") or {}
+    return {
+        "sha": raw["sha"],
+        "title": str(detail.get("message", "")).split("\n", 1)[0],
+        "author": author.get("name"),
+        "at": author.get("date"),
+    }
+
+
+def _deployment(raw: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(raw.get("sha"), str):
+        raise GitHubError("GitHub listed a deployment with no sha")
+    return {"sha": raw["sha"], "at": raw.get("created_at"), "url": raw.get("url")}
+
+
+def _message(body: bytes) -> str:
+    try:
+        parsed = json.loads(body)
+    except ValueError:
+        return ""
+    message = parsed.get("message") if isinstance(parsed, dict) else None
+    return " ".join(str(message).split())[:200] if message else ""
+
+
+def _reset(headers: dict[str, str]) -> str:
+    reset = headers.get("x-ratelimit-reset", "")
+    if reset.isdigit():
+        return datetime.fromtimestamp(int(reset), UTC).strftime("%H:%M UTC")
+    retry = headers.get("retry-after", "")
+    return f"{retry} seconds from now" if retry.isdigit() else "an unknown time"

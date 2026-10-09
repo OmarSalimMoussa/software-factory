@@ -63,16 +63,19 @@ VERBS: dict[str, Verb] = {
     "card.comments": _v("runtime.queue.verbs:card_comments", DESIGN),
     "needs-owner": _v("runtime.queue.verbs:needs_owner", ORCH, DESIGN),
     "merge.recorded": _v("runtime.queue.verbs:merge_recorded", ORCH),
+    "queue.check": _v("runtime.queue.verbs:check_save", ORCH),  # contract: a saved check of the default branch
     # slots and QA (1C)
     "slot": _v("runtime.slots.verbs:slot", ORCH, IMPL),
     "qa.plan": _v("runtime.qa.verbs:qa_plan", IMPL),
     "qa-ready": _v("runtime.qa.verbs:qa_ready", IMPL),
     "qa-clean": _v("runtime.qa.verbs:qa_clean", IMPL),
     "ready-check": _v("runtime.qa.verbs:ready_check", IMPL),
+    "qa.result": _v("runtime.qa.verbs:qa_result", IMPL),  # contract: a tester's verdict on the head, for qa-clean
     # the owner, from the dashboard or their own terminal
     "snapshot": _o("runtime.warden.snapshot:snapshot"),
     "op.get": _o("runtime.warden.ops:get"),
     "device.admit": _o("runtime.warden.codes:admit_device", coded=True),
+    "device.verify": _o("runtime.warden.codes:verify_device"),  # contract: added by 1B-3, a device token ok/expired
     "proposal.approve": _o("runtime.queue.verbs:owner_approve"),
     "proposal.later": _o("runtime.queue.verbs:owner_later"),
     "proposal.drop": _o("runtime.queue.verbs:owner_drop"),

@@ -54,6 +54,8 @@ widths = [1440, 1024, 390]
 quiet_seconds = 120     # a tester with no result stops holding a place after this much quiet, its budget spent
 stale_seconds = 300     # or after this much quiet, whatever its budget
 screenshots_for_owner_only = ["qa-prod"]
+viewport_height = 900   # a tester browser's height; its width is the first of widths
+max_steps = 6           # numbered steps a standing scenario may have; one scenario fits seconds_per_item
 
 [intake]                # see the intake spec
 batch_size = 100
@@ -77,6 +79,8 @@ cause_tries = 3         # tries to confirm a cause before an implementer asks fo
 count = 3
 port_base = 8100
 log_tail_lines = 40     # lines of scripts/dev output an agent sees, secrets redacted
+api_timeout_seconds = 30  # one call to a slot's API or health address
+api_max_kib = 256       # the largest slot API answer a session sees
 
 [budget]
 slice_memory_high = "11G"
@@ -95,13 +99,18 @@ battery_red = 15
 tick_seconds = 15
 probe_seconds = 60
 outage_after = 2        # failed prod probes in a row that count as an outage
+http_timeout_seconds = 10  # a probe or a GitHub call that takes longer has timed out
+inbox_wait_seconds = 50    # `factory inbox --wait` asks again after this much quiet
+push_wait_minutes = 30     # a push to prod that has not answered on the new build by then has failed
 resume_tries = 2        # a crashed session is retired after this many failed resumes
 bench_grace_seconds = 60  # time a pushed-out session gets to commit before it pauses
+start_grace_seconds = 120  # a started session that has not appeared by then is retired as crashed
 loop_minutes = 30
 orchestrator_silent_minutes = 40
 orchestrator_busy_silent_minutes = 120
 refusals_to_notify = 5
 refusal_window_minutes = 60  # the window for refusals_to_notify
+socket_read_seconds = 10  # a caller that has not sent its request line by then is dropped
 
 [cost]
 daily_budget_usd = 150  # at API prices: an estimate on a subscription
@@ -116,6 +125,7 @@ max_upload_kib = 512    # a picture, spec or triage plan sent with a factory com
 
 [reflect]
 fold_hours = 24         # the same kind and text within this window bumps a count instead of a new entry
+max_chars = 600         # the longest reflection an agent may write
 
 [sandbox]
 allowed_domains = ["pypi.org", "files.pythonhosted.org", "registry.npmjs.org"]
@@ -133,8 +143,20 @@ probe_strip = 10        # probes the outage band shows
 working_now_max = 6
 max_threads = 16
 retired_linger_minutes = 3  # a retired agent stays in the live tree this long, then moves to History
+idempotency_hours = 24  # how long the answer to a write is kept for a retry with the same key
 
 [gc]                    # the nightly prune; reaping a retired session is immediate
 prune_hour = 3
 images_keep_days = 7
 docker_budget_gib = 60
+
+[factory]               # the warden's own clone of the factory repo; the installer sets it
+clone = ""
+command_seconds = 120   # how long the warden waits for one of its own commands (git, systemctl)
+
+[install]               # read by the installer: a change takes effect at the next install
+drill = { model = "claude-haiku-5-5", effort = "low" }  # the model the drills drive a sandboxed command with
+drill_seconds = 180     # the longest one drill may run
+hook_timeout_seconds = 10  # how long Claude Code waits for the guard; a timeout lets the call through
+healthchecks_grace_minutes = 10  # how late a Healthchecks.io check-in may be before the owner is told
+heartbeat_minutes = 5   # how often the product's heartbeat workflow checks prod; its schedule must match
