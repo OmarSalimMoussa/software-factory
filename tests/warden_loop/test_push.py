@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from loop_fakes import World
 
+from checks.runner import passes
 from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.protocol import Refused
@@ -87,9 +88,14 @@ def test_push_refuses_a_range_touching_a_protected_path(
     assert git(github_repo, "rev-parse", "master") == before
 
 
-def test_push_sends_a_checked_commit_that_is_not_the_branch_tip(world: World, github_repo: Path) -> None:
+def test_push_sends_only_a_commit_whose_tree_passed_the_checks(world: World, github_repo: Path) -> None:
     checked = commit(world.checkout, write("src/app.py"))
     commit(world.checkout, write("src/later.py"))
+    with pytest.raises(Refused) as refused:
+        github_push.push_checked(world.ctx, {"sha": checked}, None)
+    assert refused.value.rule == "unchecked"
+
+    passes.record(world.checkout, git(world.checkout, "rev-parse", f"{checked}^{{tree}}"), "master", "now")
     answer = github_push.push_checked(world.ctx, {"sha": checked}, None)
     assert answer["commits"] == 1
     assert git(github_repo, "rev-parse", "master") == checked

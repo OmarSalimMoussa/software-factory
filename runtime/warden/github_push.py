@@ -19,6 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from checks.runner import passes
 from runtime.shared import store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
@@ -82,9 +83,23 @@ def push_checked(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
         if bad:
             raise Refused("protected-path", f"the range touches {', '.join(bad[:5])}, which only the owner changes: "
                                             "revert those changes, or ask the owner")  # fmt: skip
+        tree = git.run("rev-parse", f"{sha}^{{tree}}").strip()
+        if not _passed(Path(checkout), tree):
+            raise Refused("unchecked", f"{sha[:12]} has not passed factory check: check {branch}, then push")
         count = int(git.run("rev-list", "--count", f"{remote}..{sha}"))
         git.run("push", "--quiet", url, f"{sha}:refs/heads/{branch}")
     return ok(sha=sha, commits=count, message=f"Pushed {count} commits; CI takes {sha[:12]} to staging")
+
+
+def _passed(checkout: Path, tree: str) -> bool:
+    """Whether `factory check` recorded ``tree`` in the checkout's pass record; a link there is never followed."""
+    try:
+        fd = os.open(checkout / ".git" / passes.RECORD, os.O_RDONLY | os.O_NOFOLLOW)
+    # telemetry: expected — no check has passed in this checkout yet
+    except FileNotFoundError:
+        return False
+    with os.fdopen(fd, encoding="utf-8") as record:
+        return any(line.split(" ", 1)[0] == tree for line in record)
 
 
 class _Git:
