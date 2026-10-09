@@ -98,6 +98,7 @@ VERBS: dict[str, Verb] = {
     "needs.designer": _o("runtime.queue.verbs:owner_to_designer"),
     "needs.park": _o("runtime.queue.verbs:owner_park"),
     "needs.answer": _o("runtime.queue.verbs:owner_answer"),
+    "agent.message": _o("runtime.warden.messages:send"),  # contract: the owner's message to a running session
     "agent.stop": _o("runtime.warden.lifecycle:owner_stop"),  # coded for the orchestrator: checked in the handler
     "orchestrator.start": _o("runtime.warden.lifecycle:owner_start_orchestrator"),
     "factory.pause": _o("runtime.warden.lifecycle:owner_pause", coded=True),

@@ -19,9 +19,12 @@ from runtime.system.runners import launch_file as lf  # noqa: E402 - the path li
 def main(argv: list[str]) -> int:
     state, request_id = Path(argv[0]), argv[1]
     try:
-        raw = lf.read(state, request_id, (lf.SESSION, lf.COMMAND))
+        raw = lf.read(state, request_id, (lf.SESSION, lf.COMMAND, lf.MESSAGE))
         settings, _ = lf.published(state)
         environ = dict(os.environ)
+        if raw["kind"] == lf.MESSAGE:
+            command, repo = lf.message_argv(raw), Path(settings.get_str("repo.path"))
+            return lf.run_in_terminal(command, repo, lf.claude_env(environ), settings.get_int("watch.message_seconds"))
         if raw["kind"] == lf.SESSION:
             command, cwd = lf.session_argv(raw, state), Path(settings.get_str("repo.path"))
         else:

@@ -115,6 +115,14 @@ class Units:
         if code != 0:
             raise LaunchError(f"claude stop {session_id} failed: {output.strip()[-300:]}")
 
+    def message_session(self, session_id: str, text: str) -> None:
+        """Hand the session ``text`` as its next user turn (runtime/system/runners/agent_run.py holds it out)."""
+        request_id = f"msg-{uuid.uuid4().hex}"
+        self._request(request_id, {"kind": "message", "session": session_id, "text": text})
+        code, output = self._wait(AGENT_UNIT.format(request_id), request_id)
+        if code != 0:
+            raise LaunchError(f"claude --resume exited {code}: {output.strip()[-300:]}")
+
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         request_id = f"stack-{uuid.uuid4().hex}"
         self._request(request_id, {"kind": "stack", "slot": slot, "verb": verb, "session": session})

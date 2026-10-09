@@ -39,6 +39,7 @@ class FakeLauncher:
         self.stacks: list[tuple[int, list[str]]] = []
         self.remote = REMOTE
         self.copy = False  # the next resume starts a copy instead
+        self.messages: list[tuple[str, str]] = []
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
         self.started.append((request_id, launch))
@@ -57,6 +58,9 @@ class FakeLauncher:
         if argv[1:3] == ["worktree", "remove"]:
             return 1, "fatal: it contains modified or untracked files"
         return 0, ""
+
+    def message_session(self, session_id: str, text: str) -> None:
+        self.messages.append((session_id, text))
 
     def stop_session(self, session_id: str) -> None:
         self.stopped.append(session_id)

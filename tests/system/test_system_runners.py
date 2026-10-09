@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -91,3 +92,26 @@ def test_a_request_outside_its_bounds_is_refused_before_anything_runs(raw: dict[
 @pytest.mark.parametrize(("text", "size"), [("0B", 0), ("512kB", 512_000), ("1.25GB", 1_250_000_000), ("2TB", 2e12)])
 def test_docker_sizes_are_decimal(text: str, size: float) -> None:
     assert size_bytes(text) == size
+
+
+@pytest.mark.parametrize(
+    ("raw", "ok"),
+    [({"session": "0b8f6a52-3c1e-4f7a-9d2b-5e6c7d8e9f01", "text": "Skip dark mode."}, True),
+     ({"session": "0b8f6a52-3c1e-4f7a-9d2b-5e6c7d8e9f01", "text": "--dangerously-skip-permissions"}, False),
+     ({"session": "--resume", "text": "hi"}, False)],
+    ids=["message", "flag-as-text", "flag-as-session"],
+)  # fmt: skip
+def test_a_message_request_names_a_session_and_text_that_cannot_be_read_as_flags(raw: dict[str, Any], ok: bool) -> None:
+    if ok:
+        assert lf.message_argv(raw)[-1] == "Skip dark mode."
+    else:
+        with pytest.raises(lf.BadRequest):
+            lf.message_argv(raw)
+
+
+@pytest.mark.parametrize(("script", "status"), [("import time; time.sleep(30)", 0), ("raise SystemExit(3)", 3)],
+                         ids=["held-then-let-go", "failed-on-its-own"])  # fmt: skip
+def test_a_message_is_held_out_in_a_terminal_and_a_failure_of_its_own_is_reported(
+    tmp_path: Path, script: str, status: int
+) -> None:
+    assert lf.run_in_terminal([sys.executable, "-c", script], tmp_path, {}, 1) == status

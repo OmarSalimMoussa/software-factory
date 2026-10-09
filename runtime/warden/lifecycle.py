@@ -307,15 +307,18 @@ def bench(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
     return ok(name=s.name, grace_seconds=ctx.settings().get_int("watch.bench_grace_seconds"))
 
 
-def bring_back(ctx: Context, sid: str, by: str) -> str:
-    """Resume a session already marked reviving, claiming a slot for an implementer; why it failed, or nothing."""
+def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
+    """Resume a session already marked reviving, claiming a slot for an implementer; why it failed, or nothing.
+
+    ``note`` follows the warden's own words in the message it comes back to: the owner's message, when one brought it.
+    """
     s = read(ctx)[sid]
     slot = None
     try:
         if s.role == IMPL:
             slot = permits.claim_slot(ctx, s)
         rebuild = f" Slot {slot} is yours again: rebuild it with factory slot up." if slot is not None else ""
-        launch.resume(ctx, s, REVIVED + rebuild)
+        launch.resume(ctx, s, REVIVED + rebuild + (f"\n\n{note}" if note else ""))
     except (LaunchError, Refused) as exc:
         if slot is not None:
             permits.free_slot(ctx, slot)

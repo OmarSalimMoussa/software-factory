@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import json
 import os
+import pty
 import re
+import select
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +22,7 @@ from runtime.shared.settings import Settings
 from runtime.system import layout
 from runtime.warden import launch, session_settings
 
-SESSION, COMMAND, STACK = "session", "command", "stack"
+SESSION, COMMAND, STACK, MESSAGE = "session", "command", "stack", "message"
 REFUSED = 2
 TIMED_OUT = 124
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,96}$")
@@ -173,6 +176,62 @@ def claude_env(environ: dict[str, str]) -> dict[str, str]:
     except OSError as exc:
         raise BadRequest(f"the sign-in token cannot be read ({type(exc).__name__})") from exc
     return {**environ, "CLAUDE_CODE_OAUTH_TOKEN": token, "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"}
+
+
+def message_argv(raw: dict[str, Any]) -> list[str]:
+    """`claude --resume <session> <text>`: the owner's message as the running session's next user turn."""
+    session, text = raw.get("session"), raw.get("text")
+    if not isinstance(session, str) or not _UUID.match(session):
+        raise BadRequest("session must be a session uuid")
+    # Read as a flag, a text starting with a dash would change what claude does instead of being sent.
+    if not isinstance(text, str) or not text.strip() or text.startswith("-") or len(text) > 65536:
+        raise BadRequest("text must be a message that does not start with a dash")
+    return [PROGRAMS["claude"], "--resume", session, text]
+
+
+def run_in_terminal(argv: list[str], cwd: Path, env: dict[str, str], hold: int) -> int:
+    """Run ``argv`` in a pseudo-terminal for ``hold`` seconds, then let go of it.
+
+    `claude --resume <id> <text>` on a running background session sends the text as its next turn, then attaches,
+    and with no terminal it sends nothing. Ctrl+Z leaves the attached view and the session keeps running. An exit of
+    its own before ``hold`` is a failure to deliver, reported by its status.
+    """
+    leader, follower = pty.openpty()
+    try:
+        proc = subprocess.Popen(argv, cwd=cwd, env={**env, "TERM": "xterm-256color"}, stdin=follower,
+                                stdout=follower, stderr=follower, start_new_session=True)  # fmt: skip
+    except OSError as exc:
+        os.close(leader)
+        os.close(follower)
+        print(f"runner: {Path(argv[0]).name} could not start ({type(exc).__name__})", flush=True)
+        return REFUSED
+    os.close(follower)
+    seen = b""
+    deadline = time.monotonic() + hold
+    while time.monotonic() < deadline and proc.poll() is None:
+        ready, _, _ = select.select([leader], [], [], 0.5)
+        if ready:
+            try:
+                seen = (seen + os.read(leader, 65536))[-4096:]
+            except OSError:
+                break
+    if proc.poll() is None:
+        os.write(leader, b"\x1a")
+        try:
+            proc.wait(5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(5)
+        os.close(leader)
+        return 0
+    os.close(leader)
+    if proc.returncode != 0:
+        print(f"runner: claude exited {proc.returncode}: {_plain(seen)[-300:]}", flush=True)
+    return proc.returncode
+
+
+def _plain(raw: bytes) -> str:
+    return re.sub(r"\x1b\[[0-9;?]*[ -/]*[@-~]", "", raw.decode(errors="replace")).strip()
 
 
 def run(argv: list[str], cwd: Path, env: dict[str, str], timeout: int) -> int:

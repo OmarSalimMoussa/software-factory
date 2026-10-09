@@ -110,6 +110,7 @@ SCHEMA: dict[str, Spec] = {
     "watch.resume_tries": Spec("int", 1, 5),
     "watch.bench_grace_seconds": Spec("int", 10, 300),
     "watch.start_grace_seconds": Spec("int", 30, 600),  # contract: a start's process must appear within this
+    "watch.message_seconds": Spec("int", 3, 60),  # contract: how long the owner's message is held out to a session
     "watch.loop_minutes": Spec("int", 5, 120),
     "watch.orchestrator_silent_minutes": Spec("int", 10, 180),
     "watch.orchestrator_busy_silent_minutes": Spec("int", 10, 600),
@@ -140,6 +141,9 @@ SCHEMA: dict[str, Spec] = {
     "dashboard.idempotency_hours": Spec("int", 1, 168),  # contract: added by 1B-3
     "dashboard.warden_seconds": Spec("int", 1, 60),  # contract: added by 2A, its longest wait on the warden
     "dashboard.settled_seconds": Spec("int", 1, 30),  # contract: added by 2A, an acted-on card says so this long
+    "dashboard.message_max_chars": Spec("int", 100, 20000),  # contract: the longest message the owner sends
+    "dashboard.thread_messages": Spec("int", 1, 50),  # contract: the owner's messages a session's thread shows
+    "dashboard.thread_tail_kib": Spec("int", 64, 65536),  # contract: how much of a transcript the thread reads
     "gc.prune_hour": Spec("int", 0, 23),
     "gc.images_keep_days": Spec("int", 1, 90),
     "gc.docker_budget_gib": Spec("int", 5, 2000),
