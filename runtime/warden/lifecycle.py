@@ -17,7 +17,7 @@ from runtime.queue import statuses
 from runtime.shared import models, store
 from runtime.shared.models import RETIRED, WAITING, WORKING, RecordError, Session, Task
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import backstop, doing, launch, outage, permits, registry
+from runtime.warden import backstop, doing, launch, ops, outage, permits, registry
 from runtime.warden.context import Context
 from runtime.warden.launch import LaunchError
 from runtime.warden.permits import CAP, DESIGN, FAMILY, IMPL, ORCH, SEVERE, actor
@@ -26,6 +26,7 @@ log = logging.getLogger(__name__)
 OWNER, WARDEN = "owner", "warden"
 LIMITS = ("qa", "critic", "check_runs")
 FIRST_LINE = "Start your loop."
+PAUSED = {"message": "The factory is paused; every session keeps its context.", "refresh": "all"}
 REVIVED = "The warden brought you back: carry on with your task from your branch."
 _NAME = re.compile(r"[^a-z0-9]+")
 
@@ -369,9 +370,24 @@ def owner_pause(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
         for s in ranked:
             begin_bench(ctx, s, OWNER, "paused with the factory")
         registry.write(ctx.places, sessions)
-        store.write_json(paused_path(ctx), {"at": ctx.clock.iso(), "sessions": [s.id for s in ranked]}, mode=0o600)
+        # One step per session; the crash watch completes each as it settles that bench (pause_progress).
+        op_id = ops.start(ctx, "pause", ["Ask every session to commit and stop", *(f"Bench {s.name}" for s in ranked)])
+        for index in range(1, len(ranked) + 1):
+            ops.step(ctx, op_id, index, ops.RUNNING)
+        ops.complete(ctx, op_id, 0, f"{len(ranked)} told", PAUSED)
+        record = {"at": ctx.clock.iso(), "sessions": [s.id for s in ranked], "op": op_id}
+        store.write_json(paused_path(ctx), record, mode=0o600)
     ctx.post_event("paused", {"sessions": [s.id for s in ranked]})
-    return ok(benched=[s.name for s in ranked], grace_seconds=ctx.settings().get_int("watch.bench_grace_seconds"))
+    return ok(op=op_id, benched=[s.name for s in ranked],
+              grace_seconds=ctx.settings().get_int("watch.bench_grace_seconds"))  # fmt: skip
+
+
+def pause_progress(ctx: Context, sid: str, detail: str) -> None:
+    """A session the pause benched has settled: its step is done, and the last one finishes the pause."""
+    record = store.read_json_or(paused_path(ctx), None)
+    if record is None or sid not in record["sessions"]:
+        return
+    ops.complete(ctx, record["op"], 1 + record["sessions"].index(sid), detail, PAUSED)
 
 
 def owner_resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:

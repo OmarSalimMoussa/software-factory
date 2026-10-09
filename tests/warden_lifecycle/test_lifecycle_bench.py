@@ -7,7 +7,7 @@ from lifecycle_fakes import World
 
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, STOPPED, WAITING, WORKING
 from runtime.shared.protocol import Refused
-from runtime.warden import crashwatch, lifecycle
+from runtime.warden import crashwatch, lifecycle, ops
 
 
 def rule(call: Any, *args: Any) -> str:
@@ -89,12 +89,14 @@ def test_pause_benches_every_session_and_resume_brings_them_back_in_order(world:
     world.seat("1a1a1a1a", task="t-0001", state=WAITING)
     for sid in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a"):
         world.run(sid)
-    lifecycle.owner_pause(world.owner(), {}, None)
+    op_id = lifecycle.owner_pause(world.owner(), {}, None)["op"]
     assert {world.session(s).state for s in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {BENCH_PENDING}
+    assert ops.get(world.owner(), {"id": op_id}, None)["op"]["state"] == ops.RUNNING
     assert rule(lifecycle.owner_resume, world.owner(), {}, None) == "settling"
     world.later(world.settings.get_int("watch.bench_grace_seconds"))
     crashwatch.watch_sessions(world.ctx())
     assert {world.session(s).state for s in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {DEPRIORITIZED}
+    assert ops.get(world.owner(), {"id": op_id}, None)["op"]["state"] == ops.DONE
     lifecycle.owner_resume(world.owner(), {}, None)
     assert world.launcher.resumed == ["0c0c0c0c", "1a1a1a1a", "2b2b2b2b"]
     assert {world.session(s).state for s in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {WORKING}

@@ -74,6 +74,16 @@ def step(ctx: Context, op_id: str, index: int, state: str, detail: str = "") -> 
         _write(ctx.places, op)
 
 
+def complete(ctx: Context, op_id: str, index: int, detail: str, result: dict[str, Any]) -> None:
+    """Mark one step done from outside the operation's own thread; the last step done finishes it with ``result``."""
+    with _lock:
+        op = _read(ctx.places, op_id)
+        op.steps[index] = {"text": op.steps[index]["text"], "state": DONE, "detail": detail}
+        if all(s["state"] == DONE for s in op.steps):
+            op.state, op.result = DONE, dict(result)
+        _write(ctx.places, op)
+
+
 def finish(ctx: Context, op_id: str, state: str, result: dict[str, Any] | None = None) -> None:
     with _lock:
         op = _read(ctx.places, op_id)

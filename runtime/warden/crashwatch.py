@@ -77,6 +77,7 @@ def _settle(ctx: Context, s: Session, procs: dict[str, Proc]) -> None:
         current = sessions.get(s.id)
         # Retired by the owner meanwhile: its lease stays, so the reap still empties the slot and then releases it.
         if current is None or current.state != BENCH_PENDING:
+            lifecycle.pause_progress(ctx, s.id, "already off the bench's list")
             return
         if current.slot is not None:
             permits.free_slot(ctx, current.slot)
@@ -88,6 +89,7 @@ def _settle(ctx: Context, s: Session, procs: dict[str, Proc]) -> None:
         registry.write(ctx.places, sessions)
     if s.task and permits.read_task(ctx, s.task).status in ("building", "designing"):
         permits.move_task(ctx, s.task, "deprioritized", "bench")
+    lifecycle.pause_progress(ctx, s.id, "on the bench")
     ctx.post_event(inbox.BENCHED, {"session": s.id, "name": s.name, "task": s.task})
 
 

@@ -42,7 +42,8 @@ def locked_until(places: Places, now: float) -> float | None:
 
 
 def _clock_time(when: float) -> str:
-    return datetime.fromtimestamp(when).astimezone().strftime("%H:%M")
+    # UTC, as every time the dashboard shows: the warden's own zone is the machine's, not the owner's.
+    return datetime.fromtimestamp(when, UTC).strftime("%H:%M UTC")
 
 
 def _step_of(secret: str, code: str, now: float) -> int | None:
