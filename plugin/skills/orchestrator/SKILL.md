@@ -42,6 +42,8 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 | `extend`, `park`, `to-designer` | The owner decided a stuck task: tell its session. `to-designer`: propose it at rung 3. |
 | `answered` | The owner answered a question: pass the answer to the session that asked, or act on it if it was yours. |
 | `stopped` | The owner stopped a run. Its task is back in Proposed with its branch kept: nothing to undo. |
+| `benched` | A session you benched has stopped and keeps its context. Start the run it made room for. |
+| `crashed` | A session kept dying and was retired. Its task is back in Proposed with its branch kept: propose it again. |
 | `paused`, `resumed` | Pause: start nothing, end your turn. Resume: run the start steps again. |
 | `goal-changed` | Reread `GOAL.md` and fill the proposal slots again. |
 
@@ -100,7 +102,7 @@ scenarios that waited longest.
    until it merges.
 2. **Merge.** When it asks, with its tree's pass: `git merge-base --is-ancestor <default branch> <branch>` must
    hold, then `git merge --no-ff <branch> -m "Merge <branch>: <the outcome in one line>"`. The merge hook finds the
-   pass for that tree and records the merge.
+   pass for that tree. Then record the merge in a call of its own: `factory merge recorded <branch> <merge sha>`.
 3. **Check.** Rebuild slot 0 with what the merge touched (`factory slot up [service…]`). Pick the scenarios whose
    `protects` names a path the merge changed (`git diff --name-only <merge>^1 <merge>`), the one that waited
    longest, and the merged spec's own checks. Load the seeds they need (`factory slot seed load <name>`). Start the
