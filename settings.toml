@@ -71,10 +71,12 @@ large_max_slices = 3
 max_proposals = 3       # open proposals on the dashboard at once
 estimate_min_runs = 5   # runs at a rung before its estimate is shown; unknown until then
 estimate_window = 20    # the estimate is the median of the last this-many runs at the rung
+cause_tries = 3         # tries to confirm a cause before an implementer asks for a higher rung
 
 [slots]
 count = 3
 port_base = 8100
+log_tail_lines = 40     # lines of scripts/dev output an agent sees, secrets redacted
 
 [budget]
 slice_memory_high = "11G"
@@ -99,6 +101,7 @@ loop_minutes = 30
 orchestrator_silent_minutes = 40
 orchestrator_busy_silent_minutes = 120
 refusals_to_notify = 5
+refusal_window_minutes = 60  # the window for refusals_to_notify
 
 [cost]
 daily_budget_usd = 150  # at API prices: an estimate on a subscription
@@ -108,6 +111,12 @@ plan_red_percent = 95
 
 [prices]                # dollars per million tokens, per allowed model; a model without one costs "unknown"
 
+[queue]
+max_upload_kib = 512    # a picture, spec or triage plan sent with a factory command
+
+[reflect]
+fold_hours = 24         # the same kind and text within this window bumps a count instead of a new entry
+
 [sandbox]
 allowed_domains = ["pypi.org", "files.pythonhosted.org", "registry.npmjs.org"]
 
@@ -116,6 +125,13 @@ port = 8300
 refresh_seconds = 15
 stale_seconds = 45      # data older than this is marked old
 wrong_codes_to_lock = 5
+lock_minutes = 60       # how long coded actions stay locked; Pause and Stop are never locked
+device_days = 30        # how long a device stays admitted after one code
+hosts = ["127.0.0.1", "localhost"]  # Host and Origin the dashboard answers; the installer adds the tailnet name
+page_size = 50
+probe_strip = 10        # probes the outage band shows
+working_now_max = 6
+max_threads = 16
 retired_linger_minutes = 3  # a retired agent stays in the live tree this long, then moves to History
 
 [gc]                    # the nightly prune; reaping a retired session is immediate

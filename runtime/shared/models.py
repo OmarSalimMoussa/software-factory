@@ -15,8 +15,10 @@ T = TypeVar("T")
 # Lifecycle (factory spec, "Agent lifecycle"): working and waiting hold a cap slot; deprioritized keeps its full
 # context; retired is final and can never be resumed.
 WORKING, WAITING, DEPRIORITIZED, RETIRED = "working", "waiting", "deprioritized", "retired"
-STATES = (WORKING, WAITING, DEPRIORITIZED, RETIRED)
-HOLDS_SLOT = (WORKING, WAITING)
+# Written before the warden acts, so the crash watch and the backstop never misread a session in between.
+BENCH_PENDING, REVIVING = "bench-pending", "reviving"
+STATES = (WORKING, WAITING, BENCH_PENDING, DEPRIORITIZED, REVIVING, RETIRED)
+HOLDS_SLOT = (WORKING, WAITING, BENCH_PENDING, REVIVING)
 FINISHED, STOPPED, WITH_PARENT, CRASHED = "finished", "stopped", "with-parent", "crashed"
 RETIRE_KINDS = (FINISHED, STOPPED, WITH_PARENT, CRASHED)
 
@@ -25,11 +27,12 @@ INBOXES = ("agents", "owner", "users")
 TASK_SEVERITIES = ("severe", "major", "minor")
 REQUEST_SEVERITIES = ("severe", "normal")
 SURFACES = ("ui", "api", "access", "desktop", "none")
-# The order a task's status may move in; closed can follow any status.
+# Every task status. Moves follow runtime/queue/statuses.py's table, never "forward" alone.
 TASK_STATUSES = (
-    "queued", "proposed", "approved", "designing", "building", "deprioritized", "qa-clean", "turn", "merged",
-    "checked", "on-staging", "promoted", "closed",
+    "queued", "parked", "proposed", "approved", "designing", "review", "building", "deprioritized", "qa",
+    "qa-clean", "turn", "merged", "checked", "on-staging", "promoted", "decide", "closed",
 )  # fmt: skip
+CARD_KINDS = ("spec", "decide", "question")
 
 
 class RecordError(ValueError):
@@ -78,6 +81,7 @@ class Session:
     merge_turn: bool = False
     rung: int | None = None
     chat_link: str = ""
+    agent_id: str = ""  # a subagent's id in its parent's transcript
     extensions: dict[str, int] = field(default_factory=dict)
 
 
@@ -141,6 +145,29 @@ class Card:
     brief: str = ""
     comments: int = 0
     answered: str = ""
+
+
+@dataclass(slots=True)
+class Outage:
+    """A clear prod outage and the one bypass run it allows (routing spec)."""
+
+    since: str
+    stage: str  # down, fixing, on-staging, stopped
+    task: str = ""
+    session: str = ""
+    bypass_used: bool = False
+
+
+@dataclass(slots=True)
+class Operation:
+    """A long owner action whose steps the dashboard shows, surviving a reload."""
+
+    id: str
+    kind: str
+    started: str
+    steps: list[dict[str, str]]  # each {"text": ..., "state": "waiting|running|done|failed", "detail": ...}
+    state: str  # running, done, failed
+    result: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
