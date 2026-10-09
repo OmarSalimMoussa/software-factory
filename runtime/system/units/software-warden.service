@@ -1,0 +1,42 @@
+# The warden: the one service that starts sessions, and only through the two template units polkit allows it.
+[Unit]
+Description=software factory: the warden
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=@warden_user@
+Group=@warden_user@
+# Lets new slot env files take the slots' group, so the stack user's runs can read them.
+SupplementaryGroups=@slots_group@
+ExecStart=@python@ -I @install@/runtime/system/runners/start.py runtime.warden.wardend
+ExecStopPost=@python@ -I @install@/runtime/system/pause_checks.py stop
+Restart=always
+RestartSec=@restart_seconds@
+# Reads every transcript and checkout to price calls and check heads; read and search only, never write.
+AmbientCapabilities=CAP_DAC_READ_SEARCH
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+NoNewPrivileges=yes
+# The state folder itself is 0700, so only public/ (bound into the other units) is ever read by anyone else.
+UMask=0022
+RuntimeDirectory=@run_name@
+RuntimeDirectoryMode=0755
+ProtectSystem=strict
+ReadWritePaths=@state@
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,45 @@
+# Where each part of the notes app runs, and where its errors go. The error-telemetry check reads these values.
+
+python_roots = ["."]
+first_party = ["app"]
+test_support_dirs = []
+scanned_testdata = []
+vendored = []
+vendored_prefix = "LOCAL:"
+typescript_from = ""
+quiet_calls = []
+floating_entries = []
+floating_components = []
+vite_configs = []
+
+[excluded]
+"web/" = "plain page scripts with no TypeScript toolchain in the repo to parse them; they log through web/log.js"
+
+[[components]]
+prefix = "app/"
+name = "app"
+sink = "sdk-logging"
+grounds = "the app reports through stdlib logging, which its process routes to the error tracker"
+reporters = []
+seams = []
+log_modules = []
+
+[[components]]
+prefix = "scripts/"
+name = "dev-cli"
+sink = "exit"
+grounds = "the stack script and the CI steps run in a terminal or in CI, where stderr and the exit code are seen"
+reporters = []
+seams = []
+log_modules = []
+
+[processes]
+
+[non_booting]
+"scripts/" = "the stack script runs in a terminal or for the factory, which reads its exit code and output"
+
+[sdk_owners]
+
+[entry_owns_runtime]
+
+[dist_to_src]

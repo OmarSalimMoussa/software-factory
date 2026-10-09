@@ -1,0 +1,10 @@
+exempt = []
+
+[[rules]]
+name = "the log module never imports the page"
+importers = ["web/log.js"]
+targets = ["web/app.js"]
+owners = []
+types_allowed = false
+allowed_names = []
+remedy = "the log module stays a leaf that every page module can import"

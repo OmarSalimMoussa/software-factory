@@ -1,0 +1,25 @@
+// What the warden may ask systemd and logind for, and nothing more: start and stop the two template units that run
+// as the agent and stack users, set the factory slice's budget, and hold the sleep and lid locks while agents work.
+// It can start nothing as root and no unit of any other name.
+polkit.addRule(function (action, subject) {
+  if (subject.user !== "@warden_user@") {
+    return polkit.Result.NOT_HANDLED;
+  }
+  if (action.id === "org.freedesktop.systemd1.manage-units") {
+    var unit = action.lookup("unit") || "";
+    var verb = action.lookup("verb") || "";
+    if (/^software-(agent|stack)-run@[A-Za-z0-9_-]+\.service$/.test(unit) && (verb === "start" || verb === "stop")) {
+      return polkit.Result.YES;
+    }
+    if (unit === "@slice@" && verb === "set-property") {
+      return polkit.Result.YES;
+    }
+    return polkit.Result.NO;
+  }
+  if (action.id === "org.freedesktop.login1.inhibit-block-sleep" ||
+      action.id === "org.freedesktop.login1.inhibit-block-idle" ||
+      action.id === "org.freedesktop.login1.inhibit-handle-lid-switch") {
+    return polkit.Result.YES;
+  }
+  return polkit.Result.NOT_HANDLED;
+});

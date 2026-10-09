@@ -1,0 +1,25 @@
+# The factory's own CI: its tests, lint, format and types on every push.
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen --extra dev
+      - name: pytest
+        run: uv run --frozen --extra dev pytest -q
+      - name: ruff
+        run: |
+          uv run --frozen --extra dev ruff check .
+          uv run --frozen --extra dev ruff format --check .
+      - name: mypy
+        run: uv run --frozen --extra dev mypy

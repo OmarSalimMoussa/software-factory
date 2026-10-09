@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# The notes app has no image: this step says what a real product's smoke would do.
+set -euo pipefail
+echo "smoke ${1:?usage: smoke <sha>}: the notes app has nothing to smoke"

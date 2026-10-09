@@ -1,0 +1,2 @@
+# The notes app has no Dockerfile that copies single source files.
+images = []

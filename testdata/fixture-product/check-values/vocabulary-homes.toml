@@ -1,0 +1,7 @@
+[[vocabularies]]
+name = "settings keys"
+words = ["NOTES_STORE", "NOTES_SYNC_URL"]
+home = ["app/config.py"]
+suffixes = [".py", ".js"]
+allow = {}
+remedy = "read the value from app.config's Settings; only the config module spells a key"

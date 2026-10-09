@@ -1,0 +1,14 @@
+# Loads the factory's own nftables table, which keeps the agent user away from the owner's dashboard.
+[Unit]
+Description=software factory: the agent user's firewall
+Wants=network-pre.target
+Before=network-pre.target @daemon_unit@
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f @nft_file@
+ExecStop=/usr/sbin/nft delete table inet @nft_table@
+
+[Install]
+WantedBy=multi-user.target

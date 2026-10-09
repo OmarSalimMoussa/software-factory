@@ -1,0 +1,67 @@
+"""Documents sessions save into the queue through the warden: a designer's draft spec, and the orchestrator's
+saved check of the default branch. Each arrives as bytes the caller read itself, and must parse before it is kept.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+
+from runtime.queue import formats, intake, records
+from runtime.queue.book import Queue, spec_rel
+from runtime.queue.formats import FormatError
+from runtime.queue.records import CheckRecord, Spec
+from runtime.shared.protocol import Refused
+from runtime.warden.context import Context
+
+DESIGNED = ("designing", "review")
+
+
+def _parsed(text: str, what: str) -> tuple[str, str]:
+    head, _, body = text.strip().partition("\n")
+    if not head.startswith("# ") or not body.strip():
+        raise Refused(what, f"the {what} starts with its # title and has text under it")
+    return head[2:].strip(), body.strip()
+
+
+def save_spec(ctx: Context, task_id: str, data: bytes | None) -> Spec:
+    """A designer's draft spec of its task; a revision keeps the spec's status and brief."""
+    text = intake.body_text(data, "spec", ctx.settings().get_int("queue.max_upload_kib"))
+    title, body = _parsed(text, "spec")
+    queue = Queue.of(ctx)
+    with ctx.lock, queue.lock():
+        task = queue.task(task_id)
+        if task.status not in DESIGNED:
+            raise Refused("spec", f"{task_id} is {task.status}; a spec is saved while it is designed")
+        old = queue.spec(task_id)
+        spec = Spec(task_id, task.goal_item, task.run, "draft", "", ctx.clock.iso(), title, body)
+        if old is not None:
+            spec = dataclasses.replace(spec, status=old.status, brief=old.brief)
+        queue.write({spec_rel(task_id): records.dump_spec(spec)})
+        queue.log(task_id, ctx.clock.iso(), "designer", "spec", f"spec saved: {title}")
+    return spec
+
+
+def save_check(ctx: Context, commit: str, data: bytes | None) -> CheckRecord:
+    """A check of the default branch: the report's # title, its ## Scenarios table and any notes."""
+    if not formats.SHA.match(commit):
+        raise Refused("check", "name the commit the check ran on")
+    text = intake.body_text(data, "check", ctx.settings().get_int("queue.max_upload_kib"))
+    now = ctx.clock.iso()
+    record_id = f"c-{now.replace('-', '').replace(':', '')}-{commit[:7]}"
+    full = f"---\nid: {record_id}\ncommit: {commit}\nat: {now}\n---\n{text.strip()}\n"
+    try:
+        record = records.parse_check(full, f"checks/{record_id}.md")
+    except FormatError as exc:
+        raise Refused("check", "; ".join(exc.problems)) from exc
+    queue = Queue.of(ctx)
+    with ctx.lock, queue.lock():
+        queue.write({f"checks/{record_id}.md": records.dump_check(record)})
+    return record
+
+
+def approve_spec(ctx: Context, queue: Queue, task_id: str) -> None:
+    """The spec of a task whose build may start is approved; the caller holds the queue lock."""
+    spec = queue.spec(task_id)
+    if spec is not None:
+        approved = dataclasses.replace(spec, status="approved", updated=ctx.clock.iso())
+        queue.write({spec_rel(task_id): records.dump_spec(approved)})

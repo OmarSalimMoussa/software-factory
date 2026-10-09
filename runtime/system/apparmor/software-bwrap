@@ -1,0 +1,10 @@
+# Lets bubblewrap create the user namespace Claude Code's sandbox runs in. Ubuntu blocks unprivileged user
+# namespaces by default (kernel.apparmor_restrict_unprivileged_userns), which would leave every session unsandboxed.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile software-bwrap @bwrap@ flags=(unconfined) {
+  userns,
+
+  include if exists <local/software-bwrap>
+}

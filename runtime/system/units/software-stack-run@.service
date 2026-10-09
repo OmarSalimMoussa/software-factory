@@ -1,0 +1,33 @@
+# One `scripts/dev` verb the warden wrote to public/launch/<id>.json, run as the stack user with its rootless Docker.
+# Product code runs here, never as root: a container's root is this user on the host.
+[Unit]
+Description=software factory: stack request %i
+CollectMode=inactive-or-failed
+
+[Service]
+Type=oneshot
+User=@stack_user@
+Group=@stack_user@
+# The slots' group reads their env files; the agent's group reads the checkout the verb builds.
+SupplementaryGroups=@slots_group@ @agent_user@
+Slice=@slice@
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+Environment=DOCKER_HOST=unix:///run/user/%U/docker.sock
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=@python@ -I @install@/runtime/system/runners/stack_run.py @state@ %i
+StandardOutput=truncate:@runs@/%i.log
+StandardError=inherit
+ExecStopPost=+@python@ -I @install@/runtime/system/runners/record_exit.py @runs@/%i.exit
+UMask=0027
+TemporaryFileSystem=@state@:ro
+BindReadOnlyPaths=@public@ @slots@
+ProtectHome=tmpfs
+BindPaths=%h
+BindReadOnlyPaths=@agent_home@
+InaccessiblePaths=-/run/docker.sock
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectKernelModules=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes

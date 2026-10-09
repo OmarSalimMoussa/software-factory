@@ -1,0 +1,13 @@
+# The agent user never reaches the owner's dashboard: not its port on any address, and nothing on the tailnet, where
+# the dashboard is published. Loaded by software-firewall.service; the table is the factory's alone.
+table inet @nft_table@ {}
+delete table inet @nft_table@
+table inet @nft_table@ {
+  chain output {
+    type filter hook output priority filter; policy accept;
+    meta skuid "@agent_user@" tcp dport @dashboard_port@ reject with tcp reset
+    # Tailscale's fixed address ranges: the dashboard's tailnet address lies in them.
+    meta skuid "@agent_user@" ip daddr 100.64.0.0/10 meta l4proto tcp reject with tcp reset
+    meta skuid "@agent_user@" ip6 daddr fd7a:115c:a1e0::/48 meta l4proto tcp reject with tcp reset
+  }
+}

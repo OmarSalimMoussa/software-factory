@@ -1,0 +1,8 @@
+skip = []
+claims = []
+
+[copies]
+server = ["app/"]
+web = ["web/"]
+generated_markers = []
+rows = []

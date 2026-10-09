@@ -1,0 +1,46 @@
+# Reusable: the factory's standard checks over every file of the product, on every push. A product calls it at a
+# pinned factory commit, and passes that same commit as factory-ref:
+#   uses: <owner>/software-factory/.github/workflows/check.yml@<sha>
+#   with: { factory-repo: <owner>/software-factory, factory-ref: <sha> }
+#   secrets: inherit
+name: check
+
+on:
+  workflow_call:
+    inputs:
+      factory-repo:
+        description: owner/name of the factory's repo
+        required: true
+        type: string
+      factory-ref:
+        description: The factory commit the uses line pins
+        required: true
+        type: string
+    secrets:
+      FACTORY_READ_TOKEN:
+        description: A token that can read the factory's private repo
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: product
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.factory-repo }}
+          ref: ${{ inputs.factory-ref }}
+          token: ${{ secrets.FACTORY_READ_TOKEN }}
+          path: factory
+      - uses: astral-sh/setup-uv@v5
+      - name: The factory's pinned check tools
+        run: uv sync --frozen --extra dev --project factory
+      - name: factory check --all
+        working-directory: product
+        run: uv run --frozen --extra dev --project ../factory python ../factory/runtime/cli/factory check --all

@@ -1,0 +1,2 @@
+# Each env template and the local env file made from it. The notes app takes its settings from the factory's slot.
+pairs = []

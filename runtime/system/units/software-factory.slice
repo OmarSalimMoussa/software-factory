@@ -1,0 +1,11 @@
+# Every factory session and what it starts, inside one memory and CPU budget from the settings. A runaway slows at
+# MemoryHigh and stops at MemoryMax inside the slice, so the owner's own work keeps its memory and its speed. The
+# warden changes the budget at run time with `systemctl set-property`, which polkit allows it for this slice alone.
+[Unit]
+Description=software factory: every agent session and what it starts
+Before=slices.target
+
+[Slice]
+MemoryHigh=@memory_high@
+MemoryMax=@memory_max@
+CPUWeight=@cpu_weight@

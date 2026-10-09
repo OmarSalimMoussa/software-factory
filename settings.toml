@@ -81,6 +81,7 @@ port_base = 8100
 log_tail_lines = 40     # lines of scripts/dev output an agent sees, secrets redacted
 api_timeout_seconds = 30  # one call to a slot's API or health address
 api_max_kib = 256       # the largest slot API answer a session sees
+verb_minutes = 30       # the longest one scripts/dev verb may run before it is stopped
 
 [budget]
 slice_memory_high = "11G"

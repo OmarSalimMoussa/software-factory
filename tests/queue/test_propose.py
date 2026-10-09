@@ -1,0 +1,98 @@
+"""`factory propose` (routing spec, R4, R21): the place limit, the picture, the why and the reason for another run."""
+
+from __future__ import annotations
+
+import pytest
+from queue_kit import PICTURE, World
+
+from runtime.queue import owner, pictures, proposals
+from runtime.queue.propose import propose, propose_none
+from runtime.shared.protocol import Refused
+
+PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\x00" * 17
+
+
+def _propose(world: World, task_id: str, run: int = 1, reason: str = "", picture: bytes | None = PICTURE) -> None:
+    propose(world.ctx(), task_id, run, "every new user meets it", reason, picture)
+
+
+def test_no_more_proposals_than_places(world: World) -> None:
+    world.with_settings(routing__max_proposals=2)
+    first, second, third = world.task(), world.task(), world.task()
+    _propose(world, first.id)
+    _propose(world, second.id)
+    with pytest.raises(Refused) as refused:
+        _propose(world, third.id)
+    assert refused.value.rule == "max-proposals"
+    assert world.queue().task(third.id).status == "queued"
+    owner.later(world.owner(), first.id)
+    _propose(world, third.id)
+    assert proposals.read(world.places).open == [third.id, second.id]
+
+
+@pytest.mark.parametrize(
+    "picture",
+    [
+        None,
+        b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+        b'<svg xmlns="http://www.w3.org/2000/svg"><foreignObject><p>x</p></foreignObject></svg>',
+        b'<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>',
+        b'<svg xmlns="http://www.w3.org/2000/svg" xmlns:x="http://www.w3.org/1999/xlink">'
+        b'<use x:href="https://evil.example/a.svg#b"/></svg>',
+        b'<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:url(https://evil.example/x)"/></svg>',
+        b'<!DOCTYPE svg [<!ENTITY a "aaaa">]><svg xmlns="http://www.w3.org/2000/svg">&a;</svg>',
+        b'<svg xmlns="http://www.w3.org/2000/svg"><style>@import url(https://evil.example)</style></svg>',
+        b"<html><body>not a picture</body></html>",
+        b"\x89PNG\r\n\x1a\nnot really",
+    ],
+)
+def test_a_proposal_needs_a_plain_picture(world: World, picture: bytes | None) -> None:
+    task = world.task()
+    with pytest.raises(Refused) as refused:
+        _propose(world, task.id, picture=picture)
+    assert refused.value.rule == "picture"
+    assert world.queue().task(task.id).status == "queued"
+    assert proposals.read(world.places).open == []
+
+
+def test_a_clean_picture_is_kept_without_its_comments_and_named_by_its_content(world: World) -> None:
+    data, kind = pictures.clean(PICTURE.replace(b"<rect", b"<!-- note --><rect"), 512)
+    assert kind == "svg" and b"note" not in data and b"<rect" in data
+    assert pictures.clean(PNG, 512) == (PNG, "png")
+    with pytest.raises(Refused, match="larger"):
+        pictures.clean(PNG + b"\x00" * 2048, 1)
+
+
+def test_a_run_other_than_the_route_needs_a_reason(world: World) -> None:
+    task = world.task()  # its facts route it to rung 1
+    with pytest.raises(Refused, match="needs --reason"):
+        _propose(world, task.id, run=2)
+    _propose(world, task.id, run=2, reason="the cause is shaky")
+    proposed = world.queue().task(task.id)
+    assert (proposed.status, proposed.run) == ("proposed", 2)
+    assert "the cause is shaky" in world.queue().read_log(task.id)[-1]["text"]
+
+
+def test_a_proposal_says_why_in_one_line(world: World) -> None:
+    task = world.task()
+    with pytest.raises(Refused, match="why"):
+        propose(world.ctx(), task.id, 1, "", "", PICTURE)
+
+
+def test_nothing_else_fills_every_free_place_until_a_proposal_takes_one(world: World) -> None:
+    task = world.task()
+    _propose(world, task.id)
+    propose_none(world.ctx())
+    assert proposals.read(world.places).open == [task.id, proposals.NONE, proposals.NONE]
+    _propose(world, world.task().id)
+    assert proposals.read(world.places).open[1] not in (None, proposals.NONE)
+
+
+def test_a_task_the_owner_said_not_now_to_waits_for_a_change(world: World) -> None:
+    task = world.task()
+    _propose(world, task.id)
+    owner.later(world.owner(), task.id)
+    with pytest.raises(Refused, match="not now"):
+        _propose(world, task.id)
+    owner.boost(world.owner(), task.id, on=True)
+    _propose(world, task.id)

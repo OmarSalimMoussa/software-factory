@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# The notes app has no image: this step says what a real product's deploy-staging would do.
+set -euo pipefail
+echo "deploy-staging ${1:?usage: deploy-staging <sha>}: the notes app has nothing to deploy-staging"

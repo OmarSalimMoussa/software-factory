@@ -1,0 +1,11 @@
+# The environment is read only in config modules; every key a service reads reaches it.
+config_files = ["config.py"]   # file names that are config modules
+readers = []                   # shared env readers a config module builds on
+python_trees = ["app"]
+script_trees = ["web"]
+rust_trees = []
+allow = {}                     # path = grounds, for a read outside a config module
+accessors = {}                 # reader method = position of its key argument
+optional = []                  # reader methods whose key may be absent
+env_files = {}                 # an env_file a compose service loads = the tracked file listing its keys
+services = []                  # the notes app runs no compose stack

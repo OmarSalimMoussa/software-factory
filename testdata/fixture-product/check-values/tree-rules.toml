@@ -1,0 +1,8 @@
+product_python = ["app"]
+service_frameworks = []
+
+[entrypoints]
+
+[readme_exempt]
+
+[env_allow]

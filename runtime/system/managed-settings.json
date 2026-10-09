@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {"matcher": "*", "hooks": [{"type": "command", "command": "@guard@", "timeout": @hook_timeout@}]}
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {"type": "command", "command": "@guard@", "timeout": @hook_timeout@},
+          {"type": "command", "command": "@loader@", "timeout": @hook_timeout@}
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {"type": "command", "command": "@guard@", "timeout": @hook_timeout@},
+          {"type": "command", "command": "@loader@", "timeout": @hook_timeout@}
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {"hooks": [{"type": "command", "command": "@guard@", "timeout": @hook_timeout@}]}
+    ],
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "@guard@", "timeout": @hook_timeout@}]}
+    ]
+  }
+}

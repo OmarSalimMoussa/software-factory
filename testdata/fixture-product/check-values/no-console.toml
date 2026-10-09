@@ -1,0 +1,4 @@
+roots = ["web/"]
+suffixes = [".js", ".mjs", ".ts"]
+log_modules = ["web/log.js"]
+remedy = "log through web/log.js, which also reports the failure to the server"

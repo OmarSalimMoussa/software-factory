@@ -1,0 +1,14 @@
+# Which tests read which paths. A changed path picks the tests of its longest matching prefix in [readers].
+always = []
+full = ["pyproject.toml"]
+skip_suffixes = [".md", ".svg"]
+
+[readers]
+"app/" = ["tests"]
+"tests/" = ["tests"]
+"web/" = []
+"qa/" = []
+"goal/" = []
+"scripts/" = []
+"check-values/" = []
+".gitignore" = []

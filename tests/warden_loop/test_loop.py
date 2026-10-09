@@ -10,6 +10,8 @@ from runtime.queue import formats
 from runtime.shared.models import INBOXES, Request
 from runtime.warden import inbox, loop
 
+ROOT = Path(__file__).resolve().parents[2]
+
 
 def kernel(tmp_path: Path) -> tuple[Path, Path]:
     proc, power = tmp_path / "proc", tmp_path / "power" / "AC"
@@ -47,6 +49,8 @@ def tick(world: World, tmp_path: Path) -> list[str]:
 @pytest.fixture
 def ticking(world: World) -> World:
     world.ctx.post_event = inbox.poster(world.ctx.places, world.clock)
+    world.checkout.mkdir(parents=True, exist_ok=True)
+    (world.checkout / "GOAL.md").write_bytes((ROOT / "testdata" / "fixture-product" / "GOAL.md").read_bytes())
     small = world.ctx.settings().with_changes({"intake.batch_size": 10, "intake.batch_max_wait_hours": 6})
     world.ctx.settings = lambda: small
     return world

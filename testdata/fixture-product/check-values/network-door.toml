@@ -1,0 +1,28 @@
+# Every outbound link goes through a door that sets its deadline and names its failure.
+
+[[doors]]
+name = "server HTTP"
+scans = ["app/"]
+suffixes = [".py"]
+calls = [
+  '\burllib\.request\.urlopen\b',
+  '^\s*from\s+urllib\.request\s+import\b',
+  '\bhttp\.client\.HTTPS?Connection\(',
+  '^\s*(import|from)\s+(requests|httpx|aiohttp|urllib3)\b',
+]
+unless = []
+owners = ["app/net.py"]
+allow = {}
+code_only = true
+remedy = "call through app/net.py's fetch_json, which sets the deadline and names the failure"
+
+[[doors]]
+name = "page links"
+scans = ["web/"]
+suffixes = [".js", ".mjs", ".ts"]
+calls = ['\bfetch\(', '\bnew\s+WebSocket\(']
+unless = ['^\s*(export\s+|declare\s+)?(import\s+)?type\b']
+owners = []
+allow = {}
+code_only = true
+remedy = "the page draws what the server sends; ask the server for the value instead"

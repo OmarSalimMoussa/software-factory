@@ -1,0 +1,33 @@
+# One request the warden wrote to public/launch/<id>.json, run as the agent user in the factory's slice: a session's
+# start or one short command. polkit lets the warden start this template and the stack's, and nothing else.
+[Unit]
+Description=software factory: agent request %i
+Requires=@daemon_unit@
+After=@daemon_unit@
+CollectMode=inactive-or-failed
+
+[Service]
+Type=oneshot
+User=@agent_user@
+Group=@agent_user@
+Slice=@slice@
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+LoadCredential=@claude_token@:@secrets@/claude.token
+ExecStart=@python@ -I @install@/runtime/system/runners/agent_run.py @state@ %i
+# systemd opens the output file and runs the exit recorder as root, so this user never reaches the warden's state.
+StandardOutput=truncate:@runs@/%i.log
+StandardError=inherit
+ExecStopPost=+@python@ -I @install@/runtime/system/runners/record_exit.py @runs@/%i.exit
+UMask=0027
+TemporaryFileSystem=@state@:ro
+BindReadOnlyPaths=@public@
+ProtectHome=tmpfs
+BindPaths=%h
+InaccessiblePaths=-/run/docker.sock
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectKernelModules=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes

@@ -1,0 +1,43 @@
+# The agent user's long-lived Claude daemon, which hosts every background session inside the factory's slice, so a
+# session outlives the short unit that asked for it.
+[Unit]
+Description=software factory: the agents' Claude daemon
+Wants=network-online.target
+After=network-online.target @warden_unit@ @firewall_unit@
+# No agent runs while the firewall that keeps it off the dashboard is down.
+Requires=@firewall_unit@
+
+[Service]
+Type=simple
+User=@agent_user@
+Group=@agent_user@
+Slice=@slice@
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1
+LoadCredential=@claude_token@:@secrets@/claude.token
+ExecStart=@python@ -I @install@/runtime/system/runners/with_token.py @claude@ daemon run
+Restart=always
+RestartSec=@restart_seconds@
+# Stopping the daemon stops every session it hosts.
+KillMode=control-group
+# Files stay readable by the agent's group, which the stack user's runs join to build the checkout.
+UMask=0027
+# Of the warden's state, public/ alone, read-only; of /home, the agent's own home.
+TemporaryFileSystem=@state@:ro
+BindReadOnlyPaths=@public@
+ProtectHome=tmpfs
+BindPaths=%h
+InaccessiblePaths=-/run/docker.sock
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectKernelModules=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+# Not ProtectKernelTunables, ProtectProc, PrivateTmp or RestrictNamespaces: bubblewrap mounts its own /proc inside a
+# user namespace, which the kernel refuses while parts of /proc are covered, and `claude --bg` finds this daemon
+# through the shared /tmp.
+
+[Install]
+WantedBy=multi-user.target

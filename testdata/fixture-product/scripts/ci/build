@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# The notes app has no image: this step says what a real product's build would do.
+set -euo pipefail
+echo "build ${1:?usage: build <sha>}: the notes app has nothing to build"

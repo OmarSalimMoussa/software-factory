@@ -10,11 +10,12 @@ intake.batch_max_wait_hours. The orchestrator's `factory tick` acknowledges each
 from __future__ import annotations
 
 import copy
+import hashlib
 import logging
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import formats, tasks
+from runtime.queue import files, format_check, formats, goal, tasks
 from runtime.queue.book import Queue
 from runtime.shared import models, store
 from runtime.shared.models import Probe
@@ -26,7 +27,10 @@ from runtime.warden.context import Context
 log = logging.getLogger(__name__)
 
 # deployed: the build each environment last answered with, so tasks advance once per new build.
-_FRESH: dict[str, Any] = {"probed": {}, "deployed": {}, "staging_red": False, "loop_due": None, "triage_due": None}
+# goal: the hash of GOAL.md the scores were last made from.
+_FRESH: dict[str, Any] = {
+    "probed": {}, "deployed": {}, "staging_red": False, "loop_due": None, "triage_due": None, "goal": None,
+}  # fmt: skip
 
 
 def _memo_path(places: Places) -> Path:
@@ -88,6 +92,8 @@ def run_tick(
     _loop_due(ctx, memo, now)
     _fix(ctx)
     _triage_due(ctx, memo, now)
+    format_check.sweep(ctx)
+    _goal(ctx, memo)
 
 
 def _staging(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
@@ -123,6 +129,20 @@ def _deployed(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
         return
     if moved:
         log.info("warden: tasks advanced to the %s build: %s", probe.env, ", ".join(moved))
+
+
+def _goal(ctx: Context, memo: dict[str, Any]) -> None:
+    """A change to GOAL.md scores every waiting task again."""
+    settings = ctx.settings()
+    raw = files.read_repo_file(Path(settings.get_str("repo.path")), goal.GOAL_FILE,
+                               settings.get_int("queue.max_upload_kib") * 1024)  # fmt: skip
+    digest = hashlib.sha256(raw).hexdigest()
+    if memo["goal"] == digest:
+        return
+    changed = tasks.rescore(ctx)
+    memo["goal"] = digest
+    store.write_json(_memo_path(ctx.places), memo)
+    log.info("warden: GOAL.md changed; %d task scores changed", changed)
 
 
 def _fix(ctx: Context) -> None:

@@ -1,0 +1,31 @@
+# Reusable: build one commit of the product, then smoke-test what was built. A product calls it on every push to its
+# default branch; its own scripts/ci decide what building and smoking mean.
+name: build
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: The commit to build
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+      - name: Build
+        env:
+          SHA: ${{ inputs.sha }}
+        run: scripts/ci/build "$SHA"
+      - name: Smoke-test what was built
+        env:
+          SHA: ${{ inputs.sha }}
+        run: scripts/ci/smoke "$SHA"

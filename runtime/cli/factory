@@ -1,0 +1,10 @@
+#!/usr/bin/python3 -I
+# The installed `factory` command. Isolated mode leaves the install off sys.path, so its root is put first.
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from runtime.cli.factory import main  # noqa: E402
+
+sys.exit(main(sys.argv[1:]))

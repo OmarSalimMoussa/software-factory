@@ -1,0 +1,10 @@
+[[computations]]
+name = "search matching"
+scans = ["app/", "web/"]
+suffixes = [".py", ".js"]
+when = [['\.casefold\('], ['\.toLowerCase\('], ['\.toUpperCase\(']]
+code_only = true
+remedy = "the page lists what the server's search returns; matching happens only in app/notes.py's find"
+
+[computations.owners]
+"app/notes.py" = "find is the one rule for whether a note holds a search word"

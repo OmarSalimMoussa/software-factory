@@ -1,0 +1,2 @@
+# The folders comment density is measured over.
+trees = ["app", "tests", "web"]

@@ -1,0 +1,13 @@
+[[pins]]
+file = "pyproject.toml"
+format = "toml"
+path = ["tool", "mypy", "strict"]
+value = true
+reason = "every module is typed in full; a looser mode lets an untyped call hide a wrong value"
+
+[[pins]]
+file = "pyproject.toml"
+format = "toml"
+path = ["tool", "importlinter", "contracts", "0", "forbidden_modules"]
+value = ["app.net"]
+reason = "the notes never reach the network: only the sync step goes through the door"

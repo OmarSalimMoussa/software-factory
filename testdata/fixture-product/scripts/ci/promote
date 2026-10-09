@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# The notes app has no image: this step says what a real product's promote would do.
+set -euo pipefail
+echo "promote ${1:?usage: promote <sha>}: the notes app has nothing to promote"

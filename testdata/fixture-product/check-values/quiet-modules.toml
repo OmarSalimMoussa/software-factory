@@ -1,0 +1,8 @@
+loud = [
+  '\blogger\.(warning|error|exception|critical)\(',
+  '\blogging\.(warning|error|exception|critical)\(',
+]
+remedy = "a note the person left empty is theirs to fix: raise a typed error the page shows, and log nothing above info"
+
+[modules]
+"app/notes.py" = "it refuses what a person wrote, a workflow failure the page shows, never a fault to report"

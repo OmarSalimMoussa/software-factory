@@ -91,6 +91,7 @@ SCHEMA: dict[str, Spec] = {
     "slots.log_tail_lines": Spec("int", 0, 500),
     "slots.api_timeout_seconds": Spec("int", 1, 300),  # contract: one slot API or health call
     "slots.api_max_kib": Spec("int", 16, 8192),  # contract: the largest slot API answer a session sees
+    "slots.verb_minutes": Spec("int", 1, 240),  # contract: added by builder 3, one scripts/dev verb
     "budget.slice_memory_high": Spec("size", when=MINUTE),
     "budget.slice_memory_max": Spec("size", when=MINUTE),
     "budget.slice_cpu_weight": Spec("int", 1, 10000, when=MINUTE),
