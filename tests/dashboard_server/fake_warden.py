@@ -49,6 +49,9 @@ class Launcher:
     def stop_session(self, session_id: str) -> None:
         self.calls.append(("stop", session_id))
 
+    def message_session(self, session_id: str, text: str) -> None:
+        self.calls.append(("message", (session_id, text)))
+
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         return StackResult(exit=0, tail="", log="stack.log")
 
@@ -97,13 +100,18 @@ class FakeWarden:
         self.server: socketserver.UnixStreamServer | None = None
         # An abstract socket: a temporary folder's path is often longer than a socket path may be.
         self.address = Path(f"\0dashboard-test-{os.getpid()}-{next(_numbers)}")
-        # No Claude session runs on a test machine, and its agent user does not exist here. stop() puts the real
-        # ones back, so a later test in the same run never inherits these.
+        self.accept = accept
+        self._real: tuple[Any, ...] | None = None
+
+    def _patch(self) -> None:
+        """No Claude session runs on a test machine, and its agent user does not exist here: while this warden
+        answers, the module functions that look for them see the seeded agent home instead. stop() puts the real ones
+        back, so a later test in the same run never inherits these."""
         self._real = (backstop.processes, launch.agent_home, codes.check_code)
+        places, accept, real = self.places, self.accept, codes.check_code
         backstop.processes = dict
         launch.agent_home = lambda: places.state / "agent-home"
         if accept is not None:
-            real = codes.check_code
 
             def check(ctx: Any, code: object, *, lock_exempt: bool = False) -> None:
                 if code == accept and codes.locked_until(ctx.places, ctx.clock.now()) is None:
@@ -117,6 +125,7 @@ class FakeWarden:
         return settings_module.load(self.places.defaults, self.places.overrides)
 
     def start(self) -> FakeWarden:
+        self._patch()
         dispatcher = self.dispatcher
 
         class Handler(socketserver.StreamRequestHandler):
@@ -134,4 +143,6 @@ class FakeWarden:
             self.server.shutdown()
             self.server.server_close()
             self.server = None
-        backstop.processes, launch.agent_home, codes.check_code = self._real
+        if self._real is not None:
+            backstop.processes, launch.agent_home, codes.check_code = self._real
+            self._real = None

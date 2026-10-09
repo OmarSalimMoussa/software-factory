@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from runtime.dashboard.views import agentwords as words
+from runtime.dashboard.views import messaging
 from runtime.dashboard.views.agents import history_row, in_tree
 from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, epoch, version
 from runtime.dashboard.views.shell import factory_state
@@ -31,6 +32,7 @@ def agent_version(row: dict[str, Any]) -> str:
 def panel(snap: Snap, row: dict[str, Any]) -> dict[str, Any]:
     rows = words.by_id(snap)
     end = epoch(row["ended"]) if row["ended"] else snap.now
+    chat_url, chat_note = messaging.chat(row)
     kids = [k for k in words.kids(rows, row) if in_tree(snap, k)]
     life = None
     if row["state"] == DEPRIORITIZED:
@@ -67,7 +69,10 @@ def panel(snap: Snap, row: dict[str, Any]) -> dict[str, Any]:
             }
             for k in kids
         ],
-        "chat_url": row["chat_link"] or None,
+        "thread": messaging.thread(snap, row),
+        "message": messaging.box(snap, row),
+        "chat_url": chat_url,
+        "chat_note": chat_note,
         "actions": actions,
         "version": agent_version(row),
     }
@@ -133,6 +138,9 @@ def record(snap: Snap, row: dict[str, Any]) -> dict[str, Any]:
 
 
 def wants(query: Query) -> dict[str, Any]:
+    # The thread is read from the agent's transcript, so only for the panel that is open.
+    if query.get("view", "agent") == "agent":
+        return {"want": [*WANTS, "thread"], "days": 1, "session": query.get("id", "")}
     return {"want": list(WANTS), "days": 1}
 
 

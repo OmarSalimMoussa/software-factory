@@ -49,7 +49,25 @@ function agentBody(a) {
     <div class="kv">${a.kv.map(kvBox).join('')}</div>
     ${life}
     ${a.task ? `<button class="btn" data-task="${esc(a.task)}">${icon('queue-list', 'sm')}Open task ${esc(a.task)}</button>` : ''}
-    ${a.kids.length ? `<div class="section"><div class="label">Under it</div><div class="card rows">${a.kids.map(k => `<div class="row" style="grid-template-columns:34px minmax(0,1fr) auto;min-height:52px" data-agent="${esc(k.id)}">${ava(k.family, k.initials, 28)}<span class="tt" style="font-weight:500">${esc(k.name)} <span class="faint">· ${esc(k.doing)}</span></span><span class="cost">${esc(k.cost)}</span></div>`).join('')}</div></div>` : ''}`;
+    ${a.kids.length ? `<div class="section"><div class="label">Under it</div><div class="card rows">${a.kids.map(k => `<div class="row" style="grid-template-columns:34px minmax(0,1fr) auto;min-height:52px" data-agent="${esc(k.id)}">${ava(k.family, k.initials, 28)}<span class="tt" style="font-weight:500">${esc(k.name)} <span class="faint">· ${esc(k.doing)}</span></span><span class="cost">${esc(k.cost)}</span></div>`).join('')}</div></div>` : ''}
+    ${threadHTML(a.thread)}${a.message ? msgBox(a.message) : ''}`;
+}
+/* ---------- messages: the thread read back from the transcript, and the box that sends the next one ---------- */
+UI.drafts = {};
+function threadHTML(rows) {
+  if (!rows.length) return '';
+  return `<div class="section"><div class="label">Your messages</div><ul class="thread">${rows.map(r => r.broken ? `<li>${brokenRow(r)}</li>` : `<li><div class="who">${esc(r.who)}${r.at ? ` · ${esc(r.at)}` : ''}</div><div class="said">${esc(r.text)}</div></li>`).join('')}</ul></div>`;
+}
+function msgBox(m, extra = '') {
+  const s = esc(m.session);
+  return `<div class="msg" data-msgbox="${s}"><textarea data-msg="${s}" rows="3" maxlength="${m.max_chars}" placeholder="${esc(m.placeholder)}" aria-label="${esc(m.placeholder)}">${esc(UI.drafts[m.session] || '')}</textarea>
+    <div class="msg-a"><span class="note">${esc(m.note)}</span><span class="msg-b">${extra}<button class="btn sm primary" data-send-msg="${s}" data-write>${icon('chat-bubble-left-right', 'sm')}${esc(m.label)}</button></span></div></div>`;
+}
+/* The text stays in the box until the warden takes it: a refusal leaves it for the owner to change and send again. */
+function sendMessage(session, btn) {
+  const text = (UI.drafts[session] || '').trim();
+  if (!text) { alertToast('msg:' + session, 'Write the message first.'); return; }
+  act('/api/agent/message', {session, text}, {btn, icon: 'chat-bubble-left-right', onOk: () => { delete UI.drafts[session]; $$(`[data-msg="${CSS.escape(session)}"]`).forEach(x => { x.value = ''; }); }});
 }
 function agentFoot(a, id) {
   const B = {
@@ -57,7 +75,7 @@ function agentFoot(a, id) {
     'stop-factory': () => `<button class="btn danger" data-stop="${esc(id)}" data-write>${icon('stop-circle', 'sm')}Stop the factory</button>`,
     'pause-factory': () => `<button class="btn" data-action="pause" data-write>${icon('pause-circle', 'sm')}Pause the factory</button>`
   };
-  const chat = a.chat_url ? `<a class="btn" href="${esc(a.chat_url)}" target="_blank" rel="noopener">${icon('chat-bubble-left-right', 'sm')}Open chat</a>` : `<button class="btn" disabled title="This session has no chat link">${icon('chat-bubble-left-right', 'sm')}Open chat</button>`;
+  const chat = a.chat_url ? `<a class="btn" href="${esc(a.chat_url)}" target="_blank" rel="noopener">${icon('chat-bubble-left-right', 'sm')}Open chat</a>` : `<button class="btn" disabled title="${esc(a.chat_note || '')}" data-chat-note>${icon('chat-bubble-left-right', 'sm')}Open chat</button>`;
   return a.actions.map(x => B[x] ? B[x]() : '').join('') + chat;
 }
 SHEETS.agent = {what: 'This agent', url: id => '/api/agent/' + encodeURIComponent(id), draw: (env, id) => { const p = onlyPart(env); return p && p.ok ? [p.data.name, agentBody(p.data), agentFoot(p.data, id)] : ['Agent', failedPart(p ? p.error : 'The answer was empty.'), '']; }};

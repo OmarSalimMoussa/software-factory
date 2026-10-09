@@ -56,6 +56,8 @@ def shape(mine: Any, theirs: Any, where: str = "") -> list[str]:
 
 def _fixture(name: str) -> dict[str, Any]:
     raw: dict[str, Any] = json.loads((FIXTURES / name).read_text())
+    if name.startswith("agent/") and "agent" in raw:  # what the panel gained after the fixtures were drawn
+        raw["agent"].update(thread=[], message=None, chat_note=None)
     if name == "settings.json":  # a row's control decides its value's kind, whatever its group
         every = [row for group in raw["settings"]["groups"] for row in group["rows"]]
         raw["settings"]["groups"] = [{**g, "rows": every} for g in raw["settings"]["groups"]]

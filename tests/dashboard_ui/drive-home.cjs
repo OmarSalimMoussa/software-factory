@@ -8,6 +8,7 @@ drive('home', async t => {
   const lastCall = async path => (await t.srv.calls()).filter(c => c.method === 'POST' && c.path === path).at(-1);
   const p = await t.open(1440, 900);
   t.check((await p.$$('#props .prop:not(.slot)')).length === 3, 'expected 3 proposals');
+  t.check(await p.$('#page [data-msg="orchestrator"]') && await p.$('#page [data-agent="orchestrator"]'), 'no box addressed to the orchestrator on Home');
   t.check((await p.$$('#props .prop .sk img')).length === 3, 'a proposal lacks its sketch');
   t.check((await p.textContent('#props')).includes('People see their credit once'), 'goal line missing');
   t.check((await p.$$('#needs .need.pic .sk img')).length === 2, 'the spec and decide cards lack pictures');

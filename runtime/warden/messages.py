@@ -42,22 +42,20 @@ def send(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
         sessions = lifecycle.read(ctx)
         s = lifecycle.find(ctx, sessions, session)
         if s.parent:
-            parent = sessions.get(s.parent)
-            raise Refused("subagent", f"{s.name} runs inside {parent.name if parent else 'its parent'}'s session: "
-                                      "message that session")  # fmt: skip
+            raise Refused("subagent", "a subagent runs inside its parent's session: message that session")
         if s.state == RETIRED:
-            raise Refused("retired", f"{s.name} is retired and can never act again")
+            raise Refused("retired", "this session is retired and can never act again")
         if s.state in (models.BENCH_PENDING, models.REVIVING):
             moving = "going to" if s.state == models.BENCH_PENDING else "coming back from"
-            raise Refused("settling", f"{s.name} is {moving} the bench; send it again in a minute")
+            raise Refused("settling", f"this session is {moving} the bench; send it again in a minute")
     if s.state == DEPRIORITIZED:
         _bring_back(ctx, s, PREFIX + text)
-        return ok(message=f"{s.name} is coming back from the bench with your message.")
+        return ok(message="It is coming back from the bench with your message.")
     try:
         ctx.launcher.message_session(s.id, PREFIX + text)
     except LaunchError as exc:
-        raise Refused("message", f"the message did not reach {s.name}: {exc}") from exc
-    return ok(message=f"Sent. {s.name} reads it as soon as its current turn ends.")
+        raise Refused("message", f"the message did not reach the session: {exc}") from exc
+    return ok(message="Sent. It reads your message as soon as its current turn ends.")
 
 
 def _bring_back(ctx: Context, s: Session, message: str) -> None:
@@ -69,7 +67,7 @@ def _bring_back(ctx: Context, s: Session, message: str) -> None:
         sessions = lifecycle.read(ctx)
         s = sessions[s.id]
         if s.state != DEPRIORITIZED:
-            raise Refused("state", f"{s.name} is {s.state} now; send the message again")
+            raise Refused("state", f"this session is {s.state} now; send the message again")
         task = permits.read_task(ctx, s.task) if s.task else None
         permits.check_vitals(ctx, task is None or task.severity == SEVERE)
         if s.role in CAP and task is not None:
@@ -78,7 +76,7 @@ def _bring_back(ctx: Context, s: Session, message: str) -> None:
         registry.write(ctx.places, sessions)
     failed = lifecycle.bring_back(ctx, s.id, OWNER, note=message)
     if failed:
-        raise Refused("revive", f"{s.name} stays on the bench: {failed}")
+        raise Refused("revive", f"it stays on the bench: {failed}")
 
 
 def thread(ctx: Context, s: Session) -> list[dict[str, Any]]:

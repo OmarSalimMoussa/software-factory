@@ -86,6 +86,7 @@ document.addEventListener('click', e => {
   if (d.gs !== undefined) { pickGs(+d.gs); return; }
   if (d.more) { moreRows(d.more, t); return; }
   if (d.needAct) { needAct(d.id, d.needAct, t, close); return; }
+  if (d.sendMsg) { e.stopPropagation(); sendMessage(d.sendMsg, t); return; }
   if (d.propAct) { e.stopPropagation(); propAct(d.id, d.propAct, t, close); return; }
   if (d.propMove) { e.stopPropagation(); propMove(d.id, +d.propMove, t); return; }
   if (d.apprMove) { e.stopPropagation(); apprMove(d.id, +d.apprMove, t); return; }
@@ -140,6 +141,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'gq') gsInput(t.value);
   else if (t.dataset.answer) UI.answers[t.dataset.answer] = t.value;
+  else if (t.dataset.msg) UI.drafts[t.dataset.msg] = t.value;
 });
 document.addEventListener('change', e => {
   const t = e.target, d = t.dataset;

@@ -28,10 +28,22 @@ from runtime.shared import models, protocol, store
 from runtime.shared.models import RETIRED
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
-from runtime.warden import codes, doing, gc, outage, plan, probes, public, reflections, registry, settings_save
+from runtime.warden import (
+    codes,
+    doing,
+    gc,
+    lifecycle,
+    messages,
+    outage,
+    plan,
+    probes,
+    public,
+    reflections,
+    registry,
+    settings_save,
+)
 from runtime.warden.context import Context
 from runtime.warden.github import GitHubError
-from runtime.warden.lifecycle import paused_path
 
 log = logging.getLogger("factory.warden")
 
@@ -328,6 +340,14 @@ def _cost(ctx: Context, args: dict[str, Any]) -> Any:
     return copy.deepcopy(book.answer(days))
 
 
+def _thread(ctx: Context, args: dict[str, Any]) -> Any:
+    """The owner's messages to one session and its replies, read back from its transcript: only for an open panel."""
+    ref = args.get("session")
+    if not isinstance(ref, str) or not ref:
+        raise Refused("snapshot", "session names the agent whose thread to read")
+    return messages.thread(ctx, lifecycle.find(ctx, lifecycle.read(ctx), ref))
+
+
 def _history(ctx: Context, args: dict[str, Any]) -> Any:
     book = _kept(_History, ctx.places.history)
     book.read(ctx.places.history)
@@ -379,7 +399,7 @@ def _memory() -> int | None:
 
 
 def _factory(ctx: Context, args: dict[str, Any]) -> Any:
-    paused = store.read_json_or(paused_path(ctx), None)
+    paused = store.read_json_or(lifecycle.paused_path(ctx), None)
     until = codes.locked_until(ctx.places, ctx.clock.now())
     triage = store.read_json_or(ctx.places.state / "triage-last.json", None)
     return {"paused": paused, "locked_until": until, "triage": triage}
@@ -406,6 +426,7 @@ READERS: dict[str, Reader] = {
     "docker": lambda ctx, args: store.read_json_or(gc.disk_path(ctx.places), None),
     "reflections": lambda ctx, args: reflections.entries(ctx.places),
     "history": _history,
+    "thread": _thread,
     "cost": _cost,
 }
 

@@ -714,3 +714,14 @@ body.has-savebar .toasts{bottom:84px}
   .code-boxes input{width:40px;height:48px}
 }
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* messages to a session: a box with its note and button, and the thread as a quiet list */
+.msg{display:flex;flex-direction:column;gap:8px;min-width:0}
+.msg textarea{width:100%;min-height:76px;resize:vertical;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--fg);padding:8px 10px;font:inherit;line-height:1.45}
+.msg textarea:focus{border-color:var(--accent);outline:0;box-shadow:0 0 0 3px var(--accent-soft)}
+.msg-a{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;min-width:0}
+.msg-a .note{font-size:12px;color:var(--muted);min-width:0;flex:1 1 220px}
+.msg-b{display:flex;gap:8px;align-items:center;margin-left:auto}
+.thread{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.thread .who{font-size:12px;color:var(--muted)}
+.thread .said{margin-top:2px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45}

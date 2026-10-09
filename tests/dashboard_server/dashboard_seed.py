@@ -20,7 +20,7 @@ from runtime.shared import models, store, totp
 from runtime.shared import settings as settings_module
 from runtime.shared.models import CostRecord, Request, Session, Task
 from runtime.shared.paths import Places
-from runtime.warden import public, settings_save
+from runtime.warden import messages, public, settings_save
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "testdata" / "dashboard-fixtures"
@@ -604,6 +604,7 @@ def seed(root: Path, now: float = T0) -> Places:
         },
     )
     _evidence(places, now)
+    _transcript(places, now)
     # The queue is the warden's own and writable by no one else, or it refuses to read it.
     for folder in [repo, *(d for d in repo.rglob("*") if d.is_dir())]:
         os.chmod(folder, 0o755)
@@ -667,3 +668,25 @@ def _evidence(places: Places, now: float) -> None:
                     "files": [f"{shot}.svg"],
                 },
             )
+
+
+def _transcript(places: Places, now: float) -> None:
+    """The sign-in loop's transcript, where the dashboard reads the owner's thread with it: a prompt that is not the
+    owner's, then one message from the owner and the agent's two replies."""
+    folder = places.state / "agent-home" / ".claude" / "projects" / "-srv-wt-impl-sign-in-loop"
+    folder.mkdir(parents=True)
+
+    def say(kind: str, back: int, content: Any) -> str:
+        stamp = datetime.fromtimestamp(now - back, UTC).strftime("%Y-%m-%dT%H:%M:%S.123Z")
+        return json.dumps({"type": kind, "timestamp": stamp, "message": {"role": kind, "content": content}})
+
+    lines = [
+        say("user", 900, "Task: t-0017"),
+        say("assistant", 880, [{"type": "text", "text": "Starting on the sign-in loop."}]),
+        say("user", 600, messages.PREFIX + "Check Safari first: most of the reports come from it."),
+        say("assistant", 590, [{"type": "text", "text": "Safari drops the session cookie on the redirect."}]),
+        say(
+            "assistant", 580, [{"type": "tool_use", "name": "Bash"}, {"type": "text", "text": "A test now covers it."}]
+        ),
+    ]
+    (folder / "impl-sign-in-loop.jsonl").write_text("\n".join(lines) + "\n")

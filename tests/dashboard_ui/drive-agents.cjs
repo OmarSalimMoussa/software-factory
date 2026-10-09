@@ -37,6 +37,24 @@ drive('agents', async t => {
   t.check(!(await p.$('#sheet [data-stop], #sheet [data-stopnow]')), 'a History record offers an action');
   t.check((await p.textContent('#sheet-body')).includes('can never be resumed'), 'History record does not say it is final');
   await p.keyboard.press('Escape'); await p.waitForTimeout(350);
+  // a message from a working session's panel: its thread above, the warden's word in a toast, the box cleared
+  await p.click('[data-agent="impl-sign-in-loop"] .nname'); await p.waitForTimeout(400);
+  t.check((await p.textContent('#sheet-body .thread')).includes('Check Safari first'), 'no thread in the panel');
+  await p.fill('#sheet-body [data-msg="impl-sign-in-loop"]', 'Look at Safari first, please.');
+  await p.click('#sheet-body [data-send-msg="impl-sign-in-loop"]'); await p.waitForTimeout(600);
+  t.check((await p.textContent('#toasts')).includes('as soon as its current turn ends'), 'no toast for the message');
+  t.check(await p.inputValue('#sheet-body [data-msg="impl-sign-in-loop"]') === '', 'the message box was not cleared');
+  const sent = (await t.srv.calls()).filter(c => c.path === '/api/agent/message').at(-1);
+  t.check(sent && sent.body.session === 'impl-sign-in-loop' && sent.body.text === 'Look at Safari first, please.', 'the message was not sent');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(350);
+  // a benched session comes back with the message; a subagent has no box, and Open chat says why it is grey
+  await p.click('[data-agent="impl-project-names"] .nname'); await p.waitForTimeout(400);
+  t.check((await p.textContent('#sheet-body [data-send-msg="impl-project-names"]')).includes('Bring back with this message'), 'a benched panel lacks Bring back');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(350);
+  await p.click('[data-agent="qa-ui-1"] .nname'); await p.waitForTimeout(400);
+  t.check(!(await p.$('#sheet-body [data-msg]')), 'a subagent offers a message box');
+  t.check(await p.$eval('#sheet-foot [data-chat-note]', e => e.disabled && e.title === "A subagent runs inside its parent's session: open the parent's chat."), 'Open chat does not say why it is grey');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(350);
   // stop a tester: the server lists what stops; the tester stops and its parent keeps working
   await p.click('[data-stop="qa-vis-1"]'); await p.waitForTimeout(400);
   t.check((await p.textContent('#sheet-title')) === 'Stop qa-visual?', 'no confirm for a tester');

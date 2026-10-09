@@ -147,6 +147,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("watch.refusals_to_notify", "Refusals in a row that file an incident"),
             ("watch.refusal_window_minutes", "Minutes those refusals count over"),
             ("watch.socket_read_seconds", "Seconds a caller gets to send its request"),
+            ("watch.message_seconds", "Seconds your message is held out to a session"),
         ],
     ),
     (
@@ -169,6 +170,9 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("dashboard.max_threads", "Requests served at once"),
             ("dashboard.warden_seconds", "Seconds the dashboard waits for the warden"),
             ("dashboard.settled_seconds", "Seconds a card you acted on says what happened"),
+            ("dashboard.message_max_chars", "Longest message to a session, characters"),
+            ("dashboard.thread_messages", "Your messages a session's thread shows"),
+            ("dashboard.thread_tail_kib", "End of a transcript the thread reads, KiB"),
         ],
     ),
     (

@@ -9,7 +9,8 @@ PAGE.home = {
   ${needsSection(env)}
   <section class="section"><div class="sec-h"><div class="label">At a glance</div></div>${part(env, 'tiles', tilesHTML)}</section>
   ${goalSection(env)}
-  <section class="section"><div class="sec-h"><div class="label">Working now</div><button class="btn sm quiet" data-go="agents">All agents${icon('chevron-right', 'sm')}</button></div>${part(env, 'working', workingHTML)}</section>`,
+  <section class="section"><div class="sec-h"><div class="label">Working now</div><button class="btn sm quiet" data-go="agents">All agents${icon('chevron-right', 'sm')}</button></div>${part(env, 'working', workingHTML)}</section>
+  ${orchestratorBox(env)}`,
   /* A settled card is the server's brief "Approved." moment, and a choosing slot is waiting on the orchestrator:
      look again soon, so the slot moves on without waiting a whole poll. */
   soon: env => { const p = env.parts.proposals, kinds = p && p.ok ? p.data.slots.map(s => s.kind) : []; return kinds.includes('settled') ? 1600 : kinds.includes('choosing') ? 4000 : 0; }
@@ -135,6 +136,12 @@ function goalSection(env) {
   return `<section class="section"><div class="sec-h"><div class="label">Goal</div>${g ? `<button class="btn sm quiet" data-open-doc="${esc(g.doc)}">${icon('document-text', 'sm')}${esc(g.doc)}</button>` : ''}</div>${part(env, 'goal', d => `<div class="card goals">${d.items.length ? d.items.map(goalRow).join('') : '<div class="empty">The goal has no items yet.</div>'}</div>`)}</section>`;
 }
 const goalRow = g => g.broken ? `<div class="goal"><span class="gid">${icon('exclamation-triangle', 'sm')}</span><span class="gname">This item could not be read: ${esc(g.error)}</span><span></span><span></span></div>` : `<div class="goal"><span class="gid">${esc(g.id)}</span><span class="gname">${esc(g.name)}</span><div class="gbar"><i class="${g.progress >= 1 ? 'done' : ''}" style="width:${g.progress * 100}%"></i></div><span class="gstate">${esc(g.state)}</span></div>`;
+/* Under Working now, so a message box appearing or going never moves anything above it. */
+function orchestratorBox(env) {
+  const p = env.parts.message;
+  if (p && p.ok && !p.data) return '';
+  return `<section class="section"><div class="sec-h"><div class="label">Message the orchestrator</div>${p && p.ok ? `<button class="btn sm quiet" data-agent="${esc(p.data.session)}">See the thread${icon('chevron-right', 'sm')}</button>` : ''}</div>${part(env, 'message', m => `<div class="card">${msgBox(m)}</div>`)}</section>`;
+}
 function workingHTML(list) {
   if (!list.length) return '<div class="card empty">Nobody is working right now.</div>';
   return `<div class="now">${list.map(a => a.broken ? `<div class="card nowcard" role="status">${icon('exclamation-triangle')}<span class="s">${esc(a.error)}</span></div>` : `<button class="card nowcard" data-agent="${esc(a.session)}">${ava(a.family, a.initials)}<span style="min-width:0"><div class="t">${esc(a.name)}</div><div class="s"><i class="dot ${a.dot}"></i>${esc(a.doing)}</div></span></button>`).join('')}</div>`;

@@ -122,6 +122,14 @@ def _said(answer: dict[str, Any], fallback: str) -> str:
     return message if isinstance(message, str) and message else fallback
 
 
+def _said_text(body: Body) -> str:
+    """The message as typed; the warden says what is wrong with it (empty, too long)."""
+    text = body.get("text")
+    if not isinstance(text, str):
+        raise PartError("Write the message first.")
+    return text
+
+
 def _stopped(answer: dict[str, Any]) -> str:
     return f"Stopped {plural(len(answer.get('retired', [])), 'agent')}."
 
@@ -183,6 +191,8 @@ WRITES: list[tuple[re.Pattern[str], Write]] = [
     _needs("answer", "needs.answer", lambda b, r, s: {"card": r, "answer": _text(b, "text")}),
     _w(f"agents/{_P}/stop", "agent.stop", lambda b, r, s: {"session": r, "code": b.get("code")},
        lambda a, s: _stopped(a), ["agents", "home", "shell"], _agent_check, ("sessions",)),
+    _w("agent/message", "agent.message", lambda b, r, s: {"session": _text(b, "session"), "text": _said_text(b)},
+       lambda a, s: _said(a, "Sent."), ["agent", "home"]),
     _w("outage/stop", "outage.stop", lambda b, r, s: {}, lambda a, s: _said(a, "The fix is stopped."), _HOME),
     _w("orchestrator/start", "orchestrator.start", lambda b, r, s: {},
        lambda a, s: "The orchestrator is starting.", ["agents", "shell"]),

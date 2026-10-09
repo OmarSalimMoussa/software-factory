@@ -6,7 +6,7 @@ import html
 import re
 from typing import Any
 
-from runtime.dashboard.views import agentwords, proposals, taskwords
+from runtime.dashboard.views import agentwords, messaging, proposals, taskwords
 from runtime.dashboard.views.kit import Parts, Query, Snap, clock, epoch, iso, model_word, span, when
 from runtime.dashboard.views.shell import github_url, health
 from runtime.shared.models import RETIRED, WAITING
@@ -267,4 +267,5 @@ def parts(snap: Snap, query: Query) -> Parts:
         "tiles": lambda: tiles(snap),
         "goal": lambda: goal(snap),
         "working": lambda: working(snap),
+        "message": lambda: messaging.orchestrator(snap),
     }
