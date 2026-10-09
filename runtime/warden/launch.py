@@ -26,7 +26,7 @@ from runtime.shared.paths import AGENT_USER, Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.warden import reap, registry, session_settings
-from runtime.warden.context import Context, Launcher, StackResult
+from runtime.warden.context import Context, StackResult
 
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
@@ -50,12 +50,16 @@ def agent_home() -> Path:
     return Path(pwd.getpwnam(AGENT_USER).pw_dir)
 
 
+def _carried(launch: dict[str, Any]) -> list[str]:
+    """What a session runs under. A resume passes all of it again: Claude Code promises none of it carries over, and
+    a session resumed without its --settings would run outside the sandbox."""
+    return ["--remote-control", launch["name"], "--model", launch["model"], "--effort", launch["effort"],
+            "--agent", launch["agent"], "--settings", launch["settings"], "--agents", launch["agents"]]  # fmt: skip
+
+
 def session_argv(launch: dict[str, Any]) -> list[str]:
     """The `claude` command a session request names; the agent-run unit's runner executes exactly this."""
-    argv = ["claude", "--bg", "--session-id", launch["session_id"], "--name", launch["name"]]
-    argv += ["--remote-control", launch["name"]]
-    argv += ["--model", launch["model"], "--effort", launch["effort"], "--agent", launch["agent"]]
-    argv += ["--settings", launch["settings"], "--agents", launch["agents"]]
+    argv = ["claude", "--bg", "--session-id", launch["session_id"], "--name", launch["name"], *_carried(launch)]
     if launch["worktree"]:
         argv += ["--worktree", launch["worktree"]]
     # Without the --, a prompt that starts with a dash would be read as a flag.
@@ -147,22 +151,35 @@ def redact(text: str, secrets: list[str]) -> str:
     return text
 
 
-def resume(launcher: Launcher, session_id: str, message: str, cwd: str) -> None:
+def _options(ctx: Context, settings_id: str, role: str, model: str, effort: str, place: Path) -> dict[str, str]:
+    """The sandbox settings and agent definitions a session runs under, rendered from the current settings."""
+    settings = ctx.settings()
+    path = session_settings.write(settings, ctx.places, settings_id, role, place, agent_home())
+    try:
+        agents = session_settings.agents(settings, ctx.places, role, model, effort)
+    except (OSError, ValueError) as exc:
+        raise Refused("launch", f"the agent launchers cannot be read ({exc}); the factory needs a reinstall") from exc
+    return {"model": model, "effort": effort, "agent": role, "settings": str(path), "agents": json.dumps(agents)}
+
+
+def resume(ctx: Context, s: Session, message: str) -> None:
     """Resume a stopped session under its own id with a message; raises LaunchError when it did not.
 
-    Any flag beside --resume makes Claude Code start a copy under a new id without the session's saved options. A
-    copy it starts anyway (it can count a just-stopped session as running for a moment) is removed at once.
+    A copy Claude Code starts instead (it does when it still counts the session as running) is removed at once.
     """
-    if not message.strip() or message.startswith("-"):
-        raise LaunchError("a resume needs a message that is not a flag")
-    code, output = launcher.agent_command(["claude", "--resume", session_id, "--bg", message], cwd)
+    if not message.strip():
+        raise LaunchError("a resume needs a message")
+    cwd = ctx.settings().get_str("repo.path")
+    options = _options(ctx, s.id, s.role, s.model, s.effort, Path(s.worktree))
+    argv = ["claude", "--resume", s.id, "--bg", *_carried({"name": s.name, **options}), "--", message]
+    code, output = ctx.launcher.agent_command(argv, cwd)
     if code != 0:
         raise LaunchError(f"claude --resume failed: {output.strip()[-300:]}")
     started = _BACKGROUNDED.search(output)
     if started is None:
         raise LaunchError("claude --resume named no session it started")
-    if not session_id.startswith(started.group(1)):
-        launcher.agent_command(["claude", "rm", started.group(1)], cwd)
+    if not s.id.startswith(started.group(1)):
+        ctx.launcher.agent_command(["claude", "rm", started.group(1)], cwd)
         raise LaunchError(f"Claude Code started a copy ({started.group(1)}) instead; it was removed, try again")
 
 
@@ -183,19 +200,14 @@ def start_session(
     request_id = f"{PENDING}{session_id}"
     repo = Path(settings.get_str("repo.path"))
     place = session_settings.worktrees(repo) / worktree if worktree else repo
-    path = session_settings.write(settings, ctx.places, request_id, fields["role"], place, agent_home())
-    try:
-        agents = session_settings.agents(settings, ctx.places, fields["role"], fields["model"], fields["effort"])
-    except (OSError, ValueError) as exc:
-        raise Refused("launch", f"the agent launchers cannot be read ({exc}); the factory needs a reinstall") from exc
+    options = _options(ctx, request_id, fields["role"], fields["model"], fields["effort"], place)
     now = ctx.clock.iso()
     s = Session(id=request_id, parent="", worktree=str(place), slot=None, state=WORKING, started=now, since=now,
                 note="started", **fields)  # fmt: skip
     sessions[request_id] = s
     registry.write(ctx.places, sessions)
-    request = {"name": s.name, "session_id": session_id, "cwd": str(repo), "worktree": worktree, "model": s.model,
-               "effort": s.effort,
-               "agent": s.role, "prompt": prompt, "settings": str(path), "agents": json.dumps(agents)}  # fmt: skip
+    request = {"name": s.name, "session_id": session_id, "cwd": str(repo), "worktree": worktree, "prompt": prompt,
+               **options}  # fmt: skip
     try:
         ctx.launcher.start_agent(request_id, request)
     except LaunchError as exc:

@@ -21,7 +21,7 @@ from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import github_push, inbox, outage, probes, reflections, vitals
+from runtime.warden import github_push, heartbeat, inbox, outage, probes, reflections, vitals
 from runtime.warden.context import Context
 
 log = logging.getLogger(__name__)
@@ -65,6 +65,7 @@ def tick(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     """The orchestrator finished a loop pass; the next loop due counts from now."""
     now = ctx.clock.now()
     store.write_json(_tick_path(ctx.places), {"at": now, "iso": ctx.clock.iso()})
+    heartbeat.ping(ctx, heartbeat.ORCHESTRATOR)
     due = formats.iso(now + ctx.settings().get_int("watch.loop_minutes") * 60)
     return ok(message=f"Loop pass recorded; the next loop due comes by {due} unless an event comes first")
 
@@ -89,6 +90,8 @@ def run_tick(
                 _staging(ctx, memo, probe)
             _deployed(ctx, memo, probe)
             store.write_json(_memo_path(ctx.places), memo)
+            if env == probes.STAGING:
+                heartbeat.ping(ctx, heartbeat.WARDEN)
     _loop_due(ctx, memo, now)
     _fix(ctx)
     _triage_due(ctx, memo, now)

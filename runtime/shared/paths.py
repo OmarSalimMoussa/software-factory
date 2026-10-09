@@ -13,6 +13,8 @@ INSTALL = Path("/opt/software-factory")
 STATE = Path("/var/lib/software-factory")
 RUN = Path("/run/software-factory")
 MANAGED_SETTINGS = Path("/etc/claude-code/managed-settings.json")
+# On every user's PATH, so a session types the bare word: the sandbox exempts a call by its text, `factory …` alone.
+FACTORY_BIN = Path("/usr/local/bin/factory")
 WARDEN_USER = "software-warden"
 AGENT_USER = "software-agent"
 DASHBOARD_USER = "software-dashboard"  # contract: added by 1B-3, the one other user owner.sock answers

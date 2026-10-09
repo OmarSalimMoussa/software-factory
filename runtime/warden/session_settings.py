@@ -27,11 +27,6 @@ _FIELD = re.compile(r"^([A-Za-z][\w-]*):\s*(.*)$")
 _LISTS = ("tools", "disallowedTools")  # a comma-separated line in a launcher, an array in --agents
 
 
-def factory_command(places: Places) -> Path:
-    """The `factory` command's absolute path: the one program a session may run outside the sandbox."""
-    return places.install / "bin" / "factory"
-
-
 def worktrees(repo: Path) -> Path:
     """Where `claude --worktree <name>` puts each session's worktree."""
     return repo / ".claude" / "worktrees"
@@ -56,7 +51,8 @@ def render(settings: Settings, places: Places, role: str, worktree: Path, agent_
             "enabled": True,
             "failIfUnavailable": True,
             "allowUnsandboxedCommands": False,
-            "excludedCommands": [str(factory_command(places))],
+            # Matched against the call's text: only a call that is `factory` alone, no redirect or pipe, runs outside.
+            "excludedCommands": ["factory", "factory *"],
             "network": {"allowedDomains": settings.get_list("sandbox.allowed_domains")},
             "filesystem": filesystem,
         },

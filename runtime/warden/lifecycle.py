@@ -122,7 +122,7 @@ def wake(ctx: Context, s: Session, message: str, force: bool = False) -> None:
             if s.state == WORKING and not force:
                 raise Refused("working", f"{s.name} is working; message it when it waits")
             ctx.launcher.stop_session(s.id)
-        launch.resume(ctx.launcher, s.id, message, ctx.settings().get_str("repo.path"))
+        launch.resume(ctx, s, message)
 
 
 def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
@@ -313,7 +313,7 @@ def bring_back(ctx: Context, sid: str, by: str) -> str:
         if s.role == IMPL:
             slot = permits.claim_slot(ctx, s)
         rebuild = f" Slot {slot} is yours again: rebuild it with factory slot up." if slot is not None else ""
-        launch.resume(ctx.launcher, sid, REVIVED + rebuild, ctx.settings().get_str("repo.path"))
+        launch.resume(ctx, s, REVIVED + rebuild)
     except (LaunchError, Refused) as exc:
         if slot is not None:
             permits.free_slot(ctx, slot)

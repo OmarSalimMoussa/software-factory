@@ -25,10 +25,10 @@ from typing import Any
 from runtime.shared import settings as settings_module
 from runtime.shared import store
 from runtime.shared.models import RETIRED
-from runtime.shared.paths import SLICE, Places
+from runtime.shared.paths import FACTORY_BIN, SLICE, Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings, SettingsError
-from runtime.warden import ops, public, registry, session_settings
+from runtime.warden import ops, public, registry
 from runtime.warden.context import Context
 from runtime.warden.verbs import OWNER
 
@@ -341,7 +341,7 @@ def change_repo(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
     result: dict[str, Any] = {}
 
     def shape() -> str:
-        argv = [str(session_settings.factory_command(ctx.places)), "check", "--only", "repo-shape"]
+        argv = [str(FACTORY_BIN), "check", "--only", "repo-shape"]
         code, out = ctx.launcher.agent_command(argv, str(path))
         if code != 0:
             raise Refused("repo-shape", (out.strip().splitlines() or ["the repo-shape check failed"])[-1][:300])

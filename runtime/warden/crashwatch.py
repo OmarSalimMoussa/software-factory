@@ -123,7 +123,7 @@ def watch(ctx: Context) -> None:
                 s.resume_tries += 1  # never reset by a resume, so a session that keeps dying is retired
                 registry.write(ctx.places, sessions)
                 try:
-                    launch.resume(ctx.launcher, sid, RESTARTED, settings.get_str("repo.path"))
+                    launch.resume(ctx, s, RESTARTED)
                 except LaunchError as exc:
                     log.warning("resume %d of crashed session %s failed (%s)", s.resume_tries, sid, type(exc).__name__)
                 if s.role == ORCH:

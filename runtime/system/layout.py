@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from runtime.shared import paths
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER
 
 STACK_USER = "software-stack"
@@ -23,7 +24,7 @@ STACK_HOME = Path("/home") / STACK_USER
 
 PYTHON = "/usr/bin/python3"
 # The sandbox lets exactly this path out, so a `factory` found earlier on PATH stays inside it.
-FACTORY_BIN = Path("/usr/local/bin/factory")
+FACTORY_BIN = paths.FACTORY_BIN
 # The agents' own Claude Code: root-owned, so no session can replace the program that runs its guard.
 CLAUDE_BIN = Path("/usr/local/libexec/software-factory/claude")
 TOOLS = Path("/opt/software-factory-tools")  # the pinned check tools' virtual environment, beside the install

@@ -24,7 +24,7 @@ def test_each_session_starts_sandboxed_in_its_worktree(world: World, tmp_path: P
         True,
         False,
     )
-    assert sandbox["excludedCommands"] == [str(world.places.install / "bin" / "factory")]
+    assert sandbox["excludedCommands"] == ["factory", "factory *"]
     assert sandbox["filesystem"]["allowWrite"] == [str(own)]
     assert str(repo / ".claude" / "worktrees") in sandbox["filesystem"]["denyRead"]
     assert str(tmp_path / "agent" / ".claude" / ".credentials.json") in sandbox["filesystem"]["denyRead"]
@@ -63,10 +63,18 @@ def test_a_stack_run_hands_back_a_redacted_tail(world: World) -> None:
     assert not list((world.places.state / "runs").iterdir())
 
 
+def test_a_resume_runs_under_the_sessions_sandbox_settings_again(world: World) -> None:
+    s = world.seat("1234abcd-0000", worktree=world.settings.get_str("repo.path"))
+    launch.resume(world.ctx(), s, "carry on")
+    argv = world.launcher.commands[-1]
+    settings = json.loads(Path(argv[argv.index("--settings") + 1]).read_text())
+    assert settings["sandbox"]["enabled"] is True and "implementer" in json.loads(argv[argv.index("--agents") + 1])
+
+
 def test_a_resume_that_starts_a_copy_removes_it_and_fails(world: World) -> None:
     world.launcher.copy = True
     with pytest.raises(LaunchError):
-        launch.resume(world.launcher, "1234abcd-0000", "carry on", "/repo")
+        launch.resume(world.ctx(), world.seat("1234abcd-0000"), "carry on")
     assert ["claude", "rm", "0badc0de"] in world.launcher.commands
 
 
