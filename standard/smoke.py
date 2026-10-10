@@ -141,8 +141,9 @@ class Smoke:
         self._wait_ready(ids)
         self._check_health(ids)
         self._run_check(env_file)
-        for service, container in ids.items():
-            self._alive(service, self._state(container))
+        # Asked again by service: the product's check may have recreated a container, which gives it a new id.
+        for service in self.built:
+            self._alive(service, self._state(self._container(service)))
 
     def _docker(self, argv: list[str], what: str, logs: tuple[str, ...] = ()) -> Result:
         done = self.run(argv)

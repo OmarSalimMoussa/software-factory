@@ -69,9 +69,13 @@ class Docker:
         if step.startswith("network inspect"):
             made = ["docker", "network", "create", argv[3]] in self.calls
             return Result(0 if made else 1, "", "")
+        # The product's check recreates the app's container, as a check that restarts a service does: a new id.
+        recreated = any(label(call) == "check" for call in self.calls)
         if step == "compose ps":
-            return Result(0, "c0ffee\n", "")
+            return Result(0, "beef42\n" if recreated else "c0ffee\n", "")
         if step == "inspect":
+            if recreated and argv[-1] == "c0ffee":
+                return Result(1, "", "Error: No such object: c0ffee")
             return Result(0, json.dumps([self.state]), "")
         if step.startswith("probe "):
             return Result(0, self.answer(step.removeprefix("probe ")), "")
@@ -145,6 +149,7 @@ def test_the_steps_run_in_order_against_a_scratch_workspace_and_leave_nothing_be
         "inspect",
         "probe /healthz",
         "check",
+        "compose ps",
         "inspect",
         *TEARDOWN,
     ]
