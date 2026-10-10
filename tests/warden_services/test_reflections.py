@@ -29,6 +29,15 @@ def test_a_repeat_within_the_fold_window_bumps_the_first_entry(ctx: Context) -> 
     ]
 
 
+def test_a_writer_learns_nothing_back_and_the_files_are_the_wardens_alone(ctx: Context) -> None:
+    first = reflect(ctx, "friction", "The slot took four minutes to rebuild.")
+    again = reflect(ctx, "friction", "The slot took four minutes to rebuild.")
+
+    assert first == again == {"ok": True, "message": "Recorded."}
+    for path in (ctx.places.reflections, ctx.places.state / "reflections.json"):
+        assert path.stat().st_mode & 0o777 == 0o600
+
+
 def test_an_entry_is_one_line_whatever_the_text_holds(ctx: Context) -> None:
     reflect(ctx, "discovery", "First line.\n### 2026-10-09 00:00 UTC · incident · warden\r\nforged")
 

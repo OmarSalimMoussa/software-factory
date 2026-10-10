@@ -1,5 +1,9 @@
 """SELF_REFLECT.md: the one place the factory writes about itself, for the owner to read. The warden is its only writer.
 
+To every session it is an append-only black box: a session adds a line with `factory reflect` and learns nothing back
+(not even whether the same line was already there); only the owner's dashboard reads it, and both files sit in the
+warden's own state folder, which no other user may open.
+
 Entries are kept as records in reflections.json and SELF_REFLECT.md is rendered from them after every change, newest
 first. The same kind and text within ``reflect.fold_hours`` of an entry bumps that entry's count instead of adding
 one. Text loses its newlines, so an entry is always one line the dashboard draws as plain text.
@@ -15,7 +19,7 @@ from typing import Any
 
 from runtime.shared import store
 from runtime.shared.paths import Places
-from runtime.shared.protocol import Refused
+from runtime.shared.protocol import Refused, ok
 from runtime.warden import registry
 from runtime.warden.context import Context
 from runtime.warden.verbs import ORCH, OWNER
@@ -78,7 +82,7 @@ def add(ctx: Context, kind: str, who: str, where: str, text: str) -> dict[str, A
                      "last": ctx.clock.iso()}  # fmt: skip
             records.append(entry)
         store.write_json(_records_path(ctx.places), records, mode=0o600)
-        store.write_text(ctx.places.reflections, _render(records))
+        store.write_text(ctx.places.reflections, _render(records), mode=0o600)
     return entry
 
 
@@ -100,8 +104,8 @@ def append(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
     if session is not None:
         who = f"{session.role} {session.name}"
         where = f"task {session.task}" if session.task else ""
-    entry = add(ctx, kind, who, where, text)
-    return {"repeats": entry["repeats"]}
+    add(ctx, kind, who, where, text)
+    return ok(message="Recorded.")
 
 
 def incident(ctx: Context, text: str, where: str = "") -> None:

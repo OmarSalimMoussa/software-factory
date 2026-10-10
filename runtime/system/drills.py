@@ -168,11 +168,12 @@ def edit_other_worktree(rig: Rig) -> Result:
 
 
 def secrets_unreadable(rig: Rig) -> Result:
-    name = "another slot's env file and the secrets cannot be read"
+    name = "another slot's env file, the secrets and SELF_REFLECT.md cannot be read"
     state = rig.places.state
     # Every slot's env file lies in the stack user's folder of slots, which no other user may even list.
     targets = [f"dir:{rig.places.stack_slots}", f"file:{layout.secrets(state) / 'claude.token'}",
-               f"file:{rig.places.totp_secret}", f"file:{rig.places.services / stack.ENV_FILE}"]  # fmt: skip
+               f"file:{rig.places.totp_secret}", f"file:{rig.places.services / stack.ENV_FILE}",
+               f"file:{rig.places.reflections}", f"file:{state / 'reflections.json'}"]  # fmt: skip
     plain = rig.as_user(AGENT_USER, _probe(rig, *targets))
     inside = _sandboxed_probe(rig, name, f"file:{layout.AGENT_HOME}/.claude/.credentials.json",
                               "env:CLAUDE_CODE_OAUTH_TOKEN")  # fmt: skip
