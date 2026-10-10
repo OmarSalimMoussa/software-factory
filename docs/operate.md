@@ -20,8 +20,17 @@ authenticator app set up at install.
 
 ## Ship
 
-When staging looks right, press Push to prod in the top bar and enter the code. Prod is redeployed at exactly the
-commit staging runs. If prod misbehaves, push back the same way: prod returns to the commit it ran before.
+The product keeps its own CI and hosting, and brings three things ([repo-shape.md](repo-shape.md) has the details):
+
+- staging and prod health addresses that answer JSON naming the running commit as `build_commit`;
+- a CI that deploys staging on every push to the default branch;
+- one workflow, named in `repo.promote_workflow`, that runs on `workflow_dispatch` with an input `sha` and puts that
+  commit on prod.
+
+When staging looks right, press Push to prod in the top bar and enter the code. The warden starts the product's prod
+workflow with exactly the commit staging runs, then watches prod until it answers on it. If prod misbehaves, push
+back the same way: the warden starts the same workflow with the commit prod ran before. It knows that commit from
+its deploy log, which records each new build staging and prod answer with.
 
 ## Pause, stop, resume
 

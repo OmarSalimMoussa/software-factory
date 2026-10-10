@@ -21,7 +21,8 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> World:
     repo.mkdir()
     defaults = tomllib.loads((ROOT / "settings.toml").read_text())
     overrides = {"repo.path": str(repo), "repo.github": "acme/product", "repo.staging_health": "https://s/health",
-                 "repo.prod_health": "https://p/health", "repo.owner_login": "owner",
+                 "repo.prod_health": "https://p/health", "repo.promote_workflow": "deploy-prod.yml",
+                 "repo.owner_login": "owner",
                  "caps.implementers": 1, "caps.designers": 1}  # fmt: skip
     procs: dict[str, Proc] = {}
     built = World(

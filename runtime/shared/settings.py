@@ -46,6 +46,7 @@ SCHEMA: dict[str, Spec] = {
     "repo.github": Spec("str", required=True, when=ORCH),
     "repo.staging_health": Spec("str", required=True),
     "repo.prod_health": Spec("str", required=True),
+    "repo.promote_workflow": Spec("str", required=True),  # contract: the product's prod workflow the warden starts
     "repo.owner_login": Spec("str", required=True),
     "models.allowed": Spec("list", required=True, when=NEXT_START),
     "models.efforts": Spec("list", required=True, when=NEXT_START),
@@ -155,7 +156,6 @@ SCHEMA: dict[str, Spec] = {
     "install.drill_seconds": Spec("int", 30, 900, when="Next install"),
     "install.hook_timeout_seconds": Spec("int", 2, 60, when="Next install"),
     "install.healthchecks_grace_minutes": Spec("int", 1, 120, when="Next install"),
-    "install.heartbeat_minutes": Spec("int", 1, 60, when="Next install"),
 }
 
 _PRICE_KEYS = ("input", "output", "cache_read", "cache_write")

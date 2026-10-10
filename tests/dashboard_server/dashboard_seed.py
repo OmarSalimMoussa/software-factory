@@ -1,8 +1,9 @@
 """A warden state folder and a product checkout that hold what the UI's fixtures show, in the real formats.
 
 The fixtures (testdata/dashboard-fixtures) are the UI's picture of one busy afternoon; this module writes the same
-afternoon as the warden keeps it: registry, queue files, cards, proposals, costs, probes, plan limits, vitals and
-reflections. The dashboard's views are then built from it, and must give back payloads of the fixtures' shapes.
+afternoon as the warden keeps it: registry, queue files, cards, proposals, costs, probes, deploys, plan limits,
+vitals and reflections. The dashboard's views are then built from it, and must give back payloads of the fixtures'
+shapes.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from runtime.shared import models, store, totp
 from runtime.shared import settings as settings_module
 from runtime.shared.models import CostRecord, Request, Session, Task
 from runtime.shared.paths import Places
-from runtime.warden import messages, public, settings_save
+from runtime.warden import deploys, messages, public, settings_save
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "testdata" / "dashboard-fixtures"
@@ -107,6 +108,7 @@ def defaults_text(repo: Path) -> str:
         "repo.owner_login": "owner",
         "repo.staging_health": "https://staging.invalid/health",
         "repo.prod_health": "https://prod.invalid/health",
+        "repo.promote_workflow": "deploy-prod.yml",
     }.items():
         text = settings_save.set_line(text, key, value)
     prices = "".join(
@@ -539,6 +541,9 @@ def seed(root: Path, now: float = T0) -> Places:
                 iso(now - minute * 60), env, ok, commit if ok else "", 80, "" if ok else "HTTP 502", counts=not ok
             )
             store.append_jsonl(places.probes, models.dump(probe))
+    for when, env, commit in (("Oct 5, 09:12", "prod", PREVIOUS), ("Oct 7, 10:05", "prod", PROD),
+                              ("Oct 9, 11:18", "staging", STAGING)):  # fmt: skip
+        deploys.record(places, env, commit, iso(_when(when, now)))
     store.write_json(
         places.plan,
         {

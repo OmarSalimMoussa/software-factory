@@ -25,6 +25,7 @@ REQUIRED = {
     "repo.github": "owner/product",
     "repo.staging_health": "https://staging.example/health",
     "repo.prod_health": "https://prod.example/health",
+    "repo.promote_workflow": "deploy-prod.yml",
     "repo.owner_login": "owner",
     "repo.default_branch": "main",
 }

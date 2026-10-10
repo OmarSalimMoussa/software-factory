@@ -48,7 +48,7 @@ class Install:
     first: bool = True  # no earlier install recorded
     product_origin: str = ""
     factory_origin: str = ""
-    tools: dict[str, str] = field(default_factory=dict)  # the owner's uv, claude and gh
+    tools: dict[str, str] = field(default_factory=dict)  # the owner's uv and claude
     drilled: list[dict[str, object]] = field(default_factory=list)  # each drill's name, verdict and evidence
 
     def tree(self) -> Path:

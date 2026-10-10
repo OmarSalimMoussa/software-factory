@@ -13,7 +13,7 @@ from checks.runner import passes
 from runtime.queue.book import Queue
 from runtime.queue.format_check import check_queue
 from runtime.shared.models import FINISHED, RETIRED, WORKING
-from runtime.warden import loop, registry
+from runtime.warden import deploys, loop, registry
 
 TASK = "t-0001"
 PICTURE = (
@@ -127,9 +127,11 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
     r.session(orch, ["queue", "task", "status", TASK, "checked"])
     assert r.session(orch, ["push", merge])["commits"] == 2
 
-    # The warden's tick sees staging answer on the pushed commit; prod still runs the first build.
+    # The warden's tick sees staging answer on the pushed commit, and logs it; prod still runs the first build.
     proc, power = kernel(tmp_path)
     loop.run_tick(r.warden(), r.health(staging=merge, prod=first), proc, power)
+    logged = {env: deploys.builds(r.places, env)["current"] for env in ("staging", "prod")}
+    assert {env: row["commit"] for env, row in logged.items() if row} == {"staging": merge, "prod": first}
 
     # The orchestrator's loop pass: its inbox, staging's health in its status, then its tick.
     events = [e["kind"] for e in r.session(orch, ["inbox"])["events"]]

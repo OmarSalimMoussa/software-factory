@@ -1,7 +1,8 @@
 """The warden's tick, and the events that start the orchestrator's loop passes.
 
 wardend calls run_tick every watch.tick_seconds. It reads the vitals; probes staging and prod every
-watch.probe_seconds (prod every tick while a push to prod is in flight or just landed); moves the outage along; and
+watch.probe_seconds (prod every tick while a push to prod is in flight or just landed) and logs each new build they
+answer with; moves the outage along; and
 posts to the orchestrator's inbox: loop due once watch.loop_minutes pass after its last pass, staging red the moment
 staging fails, and triage due when intake.batch_size requests wait or the oldest has waited
 intake.batch_max_wait_hours. The orchestrator's `factory tick` acknowledges each pass.
@@ -21,7 +22,7 @@ from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import github_push, heartbeat, inbox, outage, probes, reflections, vitals
+from runtime.warden import deploys, github_push, heartbeat, inbox, outage, probes, reflections, vitals
 from runtime.warden.context import Context
 
 log = logging.getLogger(__name__)
@@ -119,10 +120,12 @@ def _staging(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
 
 
 def _deployed(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
-    """A new build on staging or prod moves the tasks it includes along: checked to on-staging to promoted."""
+    """A new build on staging or prod goes in the deploy log, and moves the tasks it includes along: checked to
+    on-staging to promoted."""
     if not probe.ok or memo["deployed"].get(probe.env) == probe.commit:
         return
     memo["deployed"][probe.env] = probe.commit
+    deploys.record(ctx.places, probe.env, probe.commit, probe.at)
     try:
         moved = tasks.advance_deployed(ctx, memo["deployed"].get(probes.STAGING), memo["deployed"].get(probes.PROD))
     except Refused as exc:

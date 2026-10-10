@@ -49,7 +49,6 @@ FIREWALL_UNIT = "software-firewall.service"
 AGENT_RUN = "software-agent-run@.service"
 STACK_RUN = "software-stack-run@.service"
 SERVICES = (WARDEN_UNIT, DASHBOARD_UNIT, DAEMON_UNIT)
-PROMOTE_ENVIRONMENT = "prod"  # promote.yml's environment; the owner is its required reviewer
 
 PACKAGES = ("bubblewrap", "socat", "uidmap", "nftables", "apparmor-utils")
 ROOTLESS_SETUP = "dockerd-rootless-setuptool.sh"

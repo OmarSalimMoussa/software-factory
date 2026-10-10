@@ -12,8 +12,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from dashboard_seed import PREVIOUS, PROD, STAGING, iso
-
 from runtime.shared import settings as settings_module
 from runtime.shared import store
 from runtime.shared.paths import Places
@@ -57,9 +55,6 @@ class Launcher:
 
 
 class GitHub:
-    def __init__(self, now: Callable[[], float]) -> None:
-        self.now = now
-
     def compare(self, base: str, head: str) -> list[dict[str, Any]]:
         return []
 
@@ -68,12 +63,6 @@ class GitHub:
 
     def run(self, run_id: str) -> dict[str, Any]:
         return {"id": run_id, "status": "completed", "conclusion": "success", "url": "https://github.invalid/run"}
-
-    def deployment(self, environment: str) -> dict[str, Any]:
-        sha = STAGING if environment == "staging" else PROD
-        current = {"sha": sha, "at": iso(self.now() - 3 * 3600), "url": "https://api.github.invalid/d/1"}
-        previous = {"sha": PREVIOUS, "at": iso(self.now() - 2 * 86400), "url": "https://api.github.invalid/d/0"}
-        return {"current": current, "previous": previous}
 
     def reachable(self) -> bool:
         return True
@@ -93,7 +82,7 @@ class FakeWarden:
             if on_event is not None:
                 on_event(kind, data)
 
-        self.doors = Doors(places, self._settings, clock, self.launcher, github or GitHub(clock.now), post,
+        self.doors = Doors(places, self._settings, clock, self.launcher, github or GitHub(), post,
                            threading.RLock())  # fmt: skip
         owner = {name: verb for name, verb in VERBS.items() if verb.owner_socket}
         self.dispatcher = Dispatcher(self.doors, resolve(owner), owner)

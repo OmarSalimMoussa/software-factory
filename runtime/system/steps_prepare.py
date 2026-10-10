@@ -15,7 +15,7 @@ from runtime.system.job import Install, github_name, refuse
 from runtime.warden import registry
 
 _MACHINE_TOOLS = ("git", "tar", "systemctl", "systemd-run", "runuser", "loginctl", "useradd", "nft", "tailscale")
-_OWNER_TOOLS = ("uv", "claude", "gh")
+_OWNER_TOOLS = ("uv", "claude")
 # A session in any other state is working, waiting or between the two: reinstalling under it would lose its work.
 _RESTING = (DEPRIORITIZED, RETIRED)
 

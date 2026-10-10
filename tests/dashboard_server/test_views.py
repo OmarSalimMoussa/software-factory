@@ -97,7 +97,6 @@ PAGES = [
 
 @pytest.mark.parametrize(("url", "fixtures"), PAGES)
 def test_every_page_has_the_fixture_shapes(rig: Rig, url: str, fixtures: list[str]) -> None:
-    rig.get(url)  # the first answer starts GitHub's deployments in the background
     parts = rig.parts(url)
     failed = {name: part["error"] for name, part in parts.items() if not part["ok"]}
     assert not failed

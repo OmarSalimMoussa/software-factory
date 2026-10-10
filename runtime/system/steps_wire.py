@@ -1,5 +1,5 @@
 """The steps that wire the factory in: managed settings, units, polkit, the firewall, the factory command, the git
-hooks, the tailnet, starting it, promotion's GitHub environment, and the record a finished install leaves."""
+hooks, the tailnet, starting it, and the record a finished install leaves."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from pathlib import Path
 
 from runtime.shared.paths import AGENT_USER, MANAGED_SETTINGS, SCRATCH, SLICE, WARDEN_USER
 from runtime.system import layout, render
-from runtime.system.host import CommandError
 from runtime.system.job import Install, refuse
 
 _HTTPS = 443
@@ -79,24 +78,6 @@ def start(ctx: Install) -> None:
     host.run(["systemctl", "enable", layout.FIREWALL_UNIT, *layout.SERVICES])
     host.run(["systemctl", "restart", layout.FIREWALL_UNIT])
     host.run(["systemctl", "restart", *layout.SERVICES])
-
-
-def github_environment(ctx: Install) -> None:
-    """Promotion's second lock: GitHub asks the owner to approve every run of the production environment."""
-    settings, owner = ctx.need_settings(), ctx.owner.name
-    repo, login = settings.get_str("repo.github"), settings.get_str("repo.owner_login")
-    gh = ctx.tool("gh")
-    try:
-        user_id = ctx.host.run([gh, "api", f"users/{login}", "--jq", ".id"], user=owner).strip()
-        if not user_id.isdigit() and not ctx.host.dry:
-            raise refuse(f"GitHub names no user {login}: check repo.owner_login")
-        reviewer = int(user_id) if user_id.isdigit() else f"<id of {login}>"
-        body = json.dumps({"reviewers": [{"type": "User", "id": reviewer}]})
-        ctx.host.run([gh, "api", "--method", "PUT", f"repos/{repo}/environments/{layout.PROMOTE_ENVIRONMENT}",
-                      "--input", "-"], user=owner, stdin=body)  # fmt: skip
-    except CommandError as exc:
-        environment = layout.PROMOTE_ENVIRONMENT
-        raise refuse(f"GitHub refused the {environment} environment for {repo}: {exc.output[-300:]}") from exc
 
 
 def install_digest(ctx: Install) -> str:

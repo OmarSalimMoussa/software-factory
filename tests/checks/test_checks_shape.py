@@ -45,7 +45,7 @@ def test_the_fixture_has_the_standard_shape(fixture_product: Path) -> None:
         (_edit(".gitignore", "queue/\n", ""), ".gitignore does not ignore queue/"),
         (_edit("scripts/dev", '"reports")', '"reports", "logs")'), "lists logs, which is not a standard verb"),
         (_edit("scripts/dev", '"verbs", "test",', '"verbs",'), "scripts/dev verbs does not list test"),
-        (_chmod("scripts/ci/promote"), "scripts/ci/promote is not executable"),
+        (_chmod("scripts/dev"), "scripts/dev is not executable"),
         (_add("check-values/lint.toml", "x = 1\n"), "check-values/lint.toml feeds no standard check"),
     ],
 )

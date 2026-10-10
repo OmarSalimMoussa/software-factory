@@ -7,7 +7,8 @@ default_branch = "master"
 github = ""             # required: owner/name of the product on GitHub
 staging_health = ""     # required: answers JSON naming the running commit as build_commit
 prod_health = ""        # required
-owner_login = ""        # required: the owner's GitHub login; promote.yml refuses any other actor
+promote_workflow = ""   # required: file name of the product's workflow that puts its input sha on prod
+owner_login = ""        # required: the owner's GitHub login
 
 [models]                # model and effort for every role
 allowed = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
@@ -166,4 +167,3 @@ drill = { model = "claude-haiku-5-5", effort = "low" }  # the model the drills d
 drill_seconds = 180     # the longest one drill may run
 hook_timeout_seconds = 10  # how long Claude Code waits for the guard; a timeout lets the call through
 healthchecks_grace_minutes = 10  # how late a Healthchecks.io check-in may be before the owner is told
-heartbeat_minutes = 5   # how often the product's heartbeat workflow checks prod; its schedule must match

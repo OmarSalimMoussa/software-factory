@@ -6,7 +6,7 @@ own: it only supplies the values a check compares against, in `check-values/`.
 ## The command
 
 - `factory check` checks what the branch adds, and records a pass keyed by the git tree when nothing was skipped.
-- `factory check --all` checks everything; CI runs it on every push.
+- `factory check --all` checks everything.
 - `factory check --only <ids>` runs those checks; `factory check --list` prints every check with its rule.
 - A merge whose tree already has a pass is not checked again: the merge hook finds the pass.
 - Tests run through the product's `scripts/dev test [path…]`. The factory picks the paths from the diff with

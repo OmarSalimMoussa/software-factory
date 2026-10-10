@@ -111,7 +111,7 @@ def _push_back_args(body: Body, ref: str, snap: Snap | None) -> dict[str, Any]:
     in full, and refuses if prod's previous build has moved on since."""
     assert snap is not None
     sent = _text(body, "expected_sha")
-    previous = ((snap.get("deployments").get("prod") or {}).get("previous") or {}).get("sha")
+    previous = (snap.get("deploys")["prod"]["previous"] or {}).get("commit")
     if not previous or not previous.startswith(sent):
         raise Stale(STALE)
     return {"expected_sha": previous, "code": body.get("code")}
@@ -210,7 +210,7 @@ WRITES: list[tuple[re.Pattern[str], Write]] = [
                                               "code": b.get("code")},
        lambda a, s: _said(a, "Pushing to prod."), ["home", "shell"]),
     _w("push/back", "push.back", _push_back_args, lambda a, s: _said(a, "Pushing prod back."), ["home", "shell"],
-       wants=("deployments",)),
+       wants=("deploys",)),
 ]
 # fmt: on
 

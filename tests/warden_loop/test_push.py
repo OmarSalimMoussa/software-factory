@@ -11,7 +11,7 @@ from checks.runner import passes
 from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.protocol import Refused
-from runtime.warden import github_push, inbox, ops, probes
+from runtime.warden import deploys, github_push, inbox, ops, probes
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -107,7 +107,7 @@ def probe(world: World, env: str, ok: bool, commit: str = "") -> None:
     store.append_jsonl(world.ctx.places.probes, models.dump(record))
 
 
-STAGING, PROD = "a" * 40, "b" * 40
+STAGING, PROD, OLD = "a" * 40, "b" * 40, "c" * 40
 
 
 @pytest.mark.parametrize(
@@ -137,3 +137,22 @@ def test_push_to_prod_runs_its_steps_and_asks_for_a_qa_prod_pass(world: World) -
     assert world.github.dispatched == [STAGING]
     assert world.events == [(inbox.QA_PROD_DUE, {"sha": STAGING, "kind": "push"})]
     assert github_push.watching(world.ctx)
+
+
+def test_push_back_goes_only_to_the_build_before_prods_current_one_in_the_deploy_log(world: World) -> None:
+    places, at = world.ctx.places, world.clock.iso()
+    with pytest.raises(Refused) as refused:
+        github_push.push_back(world.ctx, {"expected_sha": OLD}, None)
+    assert refused.value.rule == "no-previous"
+
+    for env, commit in ((probes.PROD, OLD), (probes.STAGING, STAGING), (probes.PROD, PROD), (probes.PROD, PROD)):
+        deploys.record(places, env, commit, at)
+    assert deploys.builds(places, probes.PROD) == {
+        "current": {"at": at, "env": probes.PROD, "commit": PROD},
+        "previous": {"at": at, "env": probes.PROD, "commit": OLD},
+    }
+    assert deploys.builds(places, probes.STAGING)["previous"] is None
+    with pytest.raises(Refused) as refused:
+        github_push.push_back(world.ctx, {"expected_sha": STAGING}, None)
+    assert refused.value.rule == "stale"
+    assert world.github.dispatched == []

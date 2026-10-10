@@ -1,8 +1,8 @@
 """Repo shape: the one shape every product takes, so the factory needs no per-product configuration.
 
 GOAL.md with its four headings and a ranked G1..Gn checklist; ``queue/`` ignored by git and never tracked;
-``qa/scenarios/``; ``check-values/`` holding only files named for what they feed; ``scripts/dev`` with the fixed
-verbs, which ``scripts/dev verbs`` lists; and the four ``scripts/ci/`` steps, each executable.
+``qa/scenarios/``; ``check-values/`` holding only files named for what they feed; and an executable ``scripts/dev``
+with the fixed verbs, which ``scripts/dev verbs`` lists.
 """
 
 from __future__ import annotations
@@ -23,7 +23,6 @@ VALUES = None
 HEADINGS = ("Who it is for", "The goal", "How it looks and feels", "How it speaks")
 VERBS = ("up", "down", "empty", "health", "sign-in", "seed", "desktop", "verbs", "test")
 OPTIONAL_VERBS = ("reports",)
-CI_STEPS = ("build", "smoke", "deploy-staging", "promote")
 _ITEM_RE = re.compile(r"^- G(\d+) \S.*\. Done when \S.*\.$")
 
 
@@ -85,19 +84,16 @@ def _executable(repo: Repo, rel: str) -> list[str]:
 
 
 def script_problems(repo: Repo) -> list[str]:
-    out = [p for step in CI_STEPS for p in _executable(repo, f"scripts/ci/{step}")]
     dev = _executable(repo, "scripts/dev")
     if dev:
-        return dev + out
+        return dev
     done = subprocess.run(
         [str(repo.root / "scripts" / "dev"), "verbs"], cwd=repo.root, capture_output=True, text=True, check=False
     )
     if done.returncode != 0:
-        return [*out, f"scripts/dev verbs exited {done.returncode}: {done.stderr.strip()[-300:]}"]
+        return [f"scripts/dev verbs exited {done.returncode}: {done.stderr.strip()[-300:]}"]
     listed = done.stdout.split()
-    out += [
-        f"scripts/dev verbs does not list {verb}: every product supports it" for verb in VERBS if verb not in listed
-    ]
+    out = [f"scripts/dev verbs does not list {verb}: every product supports it" for verb in VERBS if verb not in listed]
     out += [
         f"scripts/dev verbs lists {verb}, which is not a standard verb: the factory never calls it"
         for verb in listed

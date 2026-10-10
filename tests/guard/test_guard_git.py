@@ -76,7 +76,7 @@ def test_the_orchestrator_leaves_finished_branches_to_the_warden(kit: Kit) -> No
         ("scripts/ci/promote abc1234", "prod-frozen"),
         ("bash scripts/ci/deploy-staging abc1234", "prod-frozen"),
         ("cd scripts/ci && ./promote abc1234", "prod-frozen"),
-        ("gh workflow run promote.yml", "prod-frozen"),
+        ("gh workflow run deploy-prod.yml", "prod-frozen"),
         ("gh run rerun 123", "prod-frozen"),
         ("gh api -X POST repos/o/r/actions/workflows/9/dispatches", "prod-frozen"),
         ("git push origin v1.0", "prod-frozen"),

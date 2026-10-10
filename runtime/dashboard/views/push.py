@@ -10,15 +10,15 @@ from runtime.dashboard.views.kit import Parts, Query, Snap, epoch, span, when
 from runtime.dashboard.views.shell import health
 from runtime.dashboard.views.task import built_from
 
-WANTS = ("settings", "probes", "queue", "deployments", "sessions", "cost", "cards", "qa", "specs", "rules", "outage")
+WANTS = ("settings", "probes", "queue", "deploys", "sessions", "cost", "cards", "qa", "specs", "rules", "outage")
 
 
 def _build(snap: Snap, env: str) -> dict[str, Any]:
     card = env_card(snap, env)
-    current = (snap.get("deployments").get(env) or {}).get("current")
+    current = snap.get("deploys")[env]["current"]
     return {
         "sha": card["sha"],
-        "deployed": when(epoch(current["at"]), utc=True) if current and current.get("at") else None,
+        "deployed": when(epoch(current["at"]), utc=True) if current else None,
         "run_url": card["deployment_url"],
         "commit_url": card["commit_url"],
     }
@@ -31,8 +31,7 @@ def push(snap: Snap) -> dict[str, Any]:
     healthy = pill["state"] == "healthy" and streak is not None and streak["ok"]
     staging["healthy_for"] = span(snap.now - epoch(streak["since"])) if healthy and streak else None
     latest = snap.get("probes")["recent"]["staging"]
-    prod_deploys = snap.get("deployments").get("prod") or {}
-    previous = prod_deploys.get("previous")
+    previous = snap.get("deploys")["prod"]["previous"]
     tasks = []
     specs = snap.get("specs")
     for task in sorted(taskwords.tasks(snap).values(), key=lambda t: t["created"]):
@@ -53,7 +52,7 @@ def push(snap: Snap) -> dict[str, Any]:
         "prod": _build(snap, "prod"),
         "staging": staging,
         "tasks": tasks,
-        "previous_prod": previous["sha"][:7] if previous else None,
+        "previous_prod": previous["commit"][:7] if previous else None,
         "expected_staging_sha": latest[-1]["commit"] if latest and latest[-1]["ok"] else None,
         "blocked": blocked,
     }

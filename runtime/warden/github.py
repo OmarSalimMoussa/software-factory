@@ -1,4 +1,4 @@
-"""The warden's door to GitHub's REST API: compare, the promote workflow, its runs, deployments, and a reachability
+"""The warden's door to GitHub's REST API: compare, the product's prod workflow and its runs, and a reachability
 probe that serves as the outage's control.
 
 The token is read from the warden's secrets on every call and never appears in an error or a log line. Every
@@ -21,7 +21,6 @@ from runtime.shared.paths import Places
 from runtime.shared.settings import Settings
 
 API = "https://api.github.com"
-PROMOTE_WORKFLOW = "promote.yml"
 _PAGE = 100  # GitHub's largest page
 
 
@@ -80,10 +79,12 @@ class RestGitHub:
         return commits
 
     def dispatch_promote(self, sha: str) -> str:
-        """Start promote.yml for ``sha`` on the default branch; the id of the run it started."""
-        branch = self._settings().get_str("repo.default_branch")
-        body = {"ref": branch, "inputs": {"sha": sha}, "return_run_details": True}
-        reply = self._json("POST", f"/repos/{self._repo()}/actions/workflows/{PROMOTE_WORKFLOW}/dispatches", body)
+        """Start the product's prod workflow (repo.promote_workflow) for ``sha`` on the default branch; the id of the
+        run it started."""
+        settings = self._settings()
+        workflow = _seg(settings.get_str("repo.promote_workflow"))
+        body = {"ref": settings.get_str("repo.default_branch"), "inputs": {"sha": sha}, "return_run_details": True}
+        reply = self._json("POST", f"/repos/{self._repo()}/actions/workflows/{workflow}/dispatches", body)
         run_id = reply.get("workflow_run_id")
         if not isinstance(run_id, int):
             raise GitHubError("GitHub started the push workflow but did not name its run")
@@ -103,19 +104,6 @@ class RestGitHub:
             "head_sha": body.get("head_sha"),
         }
 
-    def deployment(self, environment: str) -> dict[str, Any]:
-        """The environment's current and previous successful deployments, each {sha, at, url}, or None if none."""
-        query = urllib.parse.urlencode({"environment": environment, "per_page": _PAGE})
-        listed = self._json_list("GET", f"/repos/{self._repo()}/deployments?{query}")
-        current: dict[str, Any] | None = None
-        for row in listed:  # newest first
-            state = self._latest_state(row)
-            if current is None and state == "success":
-                current = _deployment(row)
-            elif current is not None and state in ("success", "inactive") and row.get("sha") != current["sha"]:
-                return {"current": current, "previous": _deployment(row)}
-        return {"current": current, "previous": None}
-
     def reachable(self) -> bool:
         """Whether GitHub's API answers at all: the control probe for an outage. Any HTTP answer below 500 counts."""
         request = urllib.request.Request(f"{API}/rate_limit", headers=_HEADERS)
@@ -124,12 +112,6 @@ class RestGitHub:
         except (OSError, TimeoutError):
             return False
         return reply.status < 500
-
-    def _latest_state(self, deployment: dict[str, Any]) -> str:
-        statuses = self._json_list(
-            "GET", f"/repos/{self._repo()}/deployments/{deployment.get('id')}/statuses?per_page=1"
-        )
-        return str(statuses[0].get("state")) if statuses else ""
 
     def _repo(self) -> str:
         repo = self._settings().get_str("repo.github")
@@ -154,12 +136,6 @@ class RestGitHub:
         parsed = self._call(method, path, body)
         if not isinstance(parsed, dict):
             raise GitHubError(f"GitHub answered {method} {path.split('?')[0]} with no object")
-        return parsed
-
-    def _json_list(self, method: str, path: str) -> list[dict[str, Any]]:
-        parsed = self._call(method, path, None)
-        if not isinstance(parsed, list) or not all(isinstance(row, dict) for row in parsed):
-            raise GitHubError(f"GitHub answered {method} {path.split('?')[0]} with no list")
         return parsed
 
     def _call(self, method: str, path: str, body: dict[str, Any] | None) -> Any:
@@ -205,12 +181,6 @@ def _commit(raw: Any) -> dict[str, Any]:
         "author": author.get("name"),
         "at": author.get("date"),
     }
-
-
-def _deployment(raw: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(raw.get("sha"), str):
-        raise GitHubError("GitHub listed a deployment with no sha")
-    return {"sha": raw["sha"], "at": raw.get("created_at"), "url": raw.get("url")}
 
 
 def _message(body: bytes) -> str:

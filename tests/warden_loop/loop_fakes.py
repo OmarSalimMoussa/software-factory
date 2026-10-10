@@ -22,7 +22,6 @@ class FakeClock(Clock):
 @dataclass
 class FakeGitHub:
     up: bool = True
-    previous: dict[str, Any] | None = None
     on_run: Callable[[], None] | None = None
     dispatched: list[str] = field(default_factory=list)
 
@@ -37,9 +36,6 @@ class FakeGitHub:
         if self.on_run is not None:
             self.on_run()
         return {"id": run_id, "status": "completed", "conclusion": "success", "url": "https://github.test/42"}
-
-    def deployment(self, environment: str) -> dict[str, Any]:
-        return {"current": None, "previous": self.previous}
 
     def reachable(self) -> bool:
         return self.up

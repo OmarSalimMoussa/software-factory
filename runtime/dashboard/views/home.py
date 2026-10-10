@@ -23,7 +23,7 @@ WANTS = (
     "vitals",
     "goal",
     "factory",
-    "deployments",
+    "deploys",
     "rules",
 )
 SPARK_DAYS = 14
@@ -57,15 +57,17 @@ def env_card(snap: Snap, env: str) -> dict[str, Any]:
             chips.append({"text": f"{ahead} {'task' if ahead == 1 else 'tasks'} ahead of prod", "tone": "accent"})
     elif "prod-frozen" not in snap.get("rules")["off"]:
         chips.append({"text": "frozen", "tone": "muted"})
-    current = (snap.get("deployments").get(env) or {}).get("current")
+    current = snap.get("deploys")[env]["current"]
+    workflow = snap.settings.get_str("repo.promote_workflow")
     return {
         "name": env.title(),
         "state": pill["state"],
         "state_word": pill["state"].title(),
         "sha": pill["sha"],
-        "deployed": when(epoch(str(current["at"]))) if current and current.get("at") else None,
+        "deployed": when(epoch(current["at"])) if current else None,
         "chips": chips,
-        "deployment_url": f"{github_url(snap)}/deployments/{env}",
+        # Only prod's deploying workflow is known: staging's is the product's own CI.
+        "deployment_url": f"{github_url(snap)}/actions/workflows/{workflow}" if env == "prod" else None,
         "commit_url": f"{github_url(snap)}/commit/{pill['sha']}" if pill["sha"] else None,
     }
 

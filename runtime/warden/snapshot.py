@@ -2,8 +2,7 @@
 
 The dashboard names what it wants; each name is read on its own, and one that cannot be read comes back as an error
 for that name alone, so a broken file fails one part of a page, never the page. Cost, probe streaks and refusals are
-folded from their logs as the logs grow, so a poll reads only the lines added since the last one. GitHub's
-deployments are asked in the background, at most once per watch.probe_seconds, never while the lock is held.
+folded from their logs as the logs grow, so a poll reads only the lines added since the last one.
 """
 
 from __future__ import annotations
@@ -30,6 +29,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import (
     codes,
+    deploys,
     doing,
     gc,
     lifecycle,
@@ -43,12 +43,10 @@ from runtime.warden import (
     settings_save,
 )
 from runtime.warden.context import Context
-from runtime.warden.github import GitHubError
 
 log = logging.getLogger("factory.warden")
 
 Reader = Callable[[Context, dict[str, Any]], Any]
-ENVIRONMENTS = ("staging", "prod")  # the GitHub environments CI deploys to
 _SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _IMAGES = {
     "png": "image/png",
@@ -176,41 +174,8 @@ class _Refusals(_Fold):
         day[str(raw["rule"])] = day.get(str(raw["rule"]), 0) + 1
 
 
-class _Deployments:
-    """Each environment's deployments on GitHub, refreshed in the background so no poll waits for GitHub."""
-
-    def __init__(self) -> None:
-        self.lock = threading.Lock()
-        self.fetched = 0.0
-        self.running = False
-        self.found: dict[str, Any] = {}
-
-    def get(self, ctx: Context) -> dict[str, Any]:
-        with self.lock:
-            due = ctx.clock.now() - self.fetched >= ctx.settings().get_int("watch.probe_seconds")
-            if due and not self.running:
-                self.running = True
-                threading.Thread(target=self._refresh, args=(ctx,), name="deployments", daemon=True).start()
-            return dict(self.found)
-
-    def _refresh(self, ctx: Context) -> None:
-        found: dict[str, Any] = {}
-        for env in ENVIRONMENTS:
-            try:
-                found[env] = ctx.github.deployment(env)
-            # telemetry: surfaced — the dashboard draws the deployment as unknown, with GitHub's reason
-            except GitHubError as exc:
-                found[env] = {"error": str(exc)}
-            except Exception as exc:
-                log.exception("warden: reading the %s deployments failed (%s)", env, type(exc).__name__)
-                found[env] = {"error": f"the warden failed reading them ({type(exc).__name__})"}
-        with self.lock:
-            self.found, self.fetched, self.running = found, ctx.clock.now(), False
-
-
 _folds: dict[tuple[str, str], Any] = {}
 _folds_lock = threading.Lock()
-_deployments: dict[str, _Deployments] = {}
 
 
 def _kept(kind: type[Any], path: Path) -> Any:
@@ -413,6 +378,7 @@ READERS: dict[str, Reader] = {
     "outage": lambda ctx, args: (lambda o: None if o is None else models.dump(o))(outage.read(ctx.places)),
     "factory": _factory,
     "probes": _probes,
+    "deploys": lambda ctx, args: {env: deploys.builds(ctx.places, env) for env in probes.ENVS},
     "plan": lambda ctx, args: plan.reading(ctx),
     "vitals": lambda ctx, args: {"reading": store.read_json_or(ctx.places.vitals, None), "memory": _memory()},
     "rules": lambda ctx, args: {"rules": RULES, "off": sorted(public.read_switches(ctx.places))},
@@ -446,8 +412,8 @@ def snapshot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     """{"want": [names], "tasks"?: [ids], "specs"?: [ids], "days"?: n} → each name's state, or its error."""
     want = args.get("want")
     if not isinstance(want, list) or not want or not all(isinstance(w, str) for w in want):
-        raise Refused("snapshot", f"want is a list of: {', '.join(sorted([*READERS, 'deployments']))}")
-    unknown = sorted(set(want) - set(READERS) - {"deployments"})
+        raise Refused("snapshot", f"want is a list of: {', '.join(sorted(READERS))}")
+    unknown = sorted(set(want) - set(READERS))
     if unknown:
         raise Refused("snapshot", f"no such state: {', '.join(unknown)}")
     state: dict[str, Any] = {}
@@ -455,16 +421,10 @@ def snapshot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     with ctx.lock:
         now = ctx.clock.now()
         for name in dict.fromkeys(want):
-            if name == "deployments":
-                continue
             state[name], error = _read_one(ctx, name, args)
             if error is not None:
                 errors[name] = error
                 del state[name]
-    if "deployments" in want:
-        with _folds_lock:
-            keeper = _deployments.setdefault(str(ctx.places.state), _Deployments())
-        state["deployments"] = keeper.get(ctx)
     return {"now": now, "state": state, "errors": errors}
 
 

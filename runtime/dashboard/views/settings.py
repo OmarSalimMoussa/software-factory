@@ -259,6 +259,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("repo.github", "On GitHub"),
             ("repo.staging_health", "Staging health address"),
             ("repo.prod_health", "Prod health address"),
+            ("repo.promote_workflow", "Workflow that deploys prod"),
             ("repo.owner_login", "Your GitHub login"),
         ],
     ),
@@ -280,7 +281,6 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("install.drill_seconds", "Longest drill, seconds"),
             ("install.hook_timeout_seconds", "Seconds Claude Code waits for the guard"),
             ("install.healthchecks_grace_minutes", "Minutes a check-in may be late"),
-            ("install.heartbeat_minutes", "Prod heartbeat every, minutes"),
         ],
     ),
 ]

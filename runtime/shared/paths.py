@@ -90,6 +90,10 @@ class Places:
         return self.state / "probes.jsonl"
 
     @property
+    def deploys(self) -> Path:  # contract: each new build staging and prod answered with, appended by the loop
+        return self.state / "deploys.jsonl"
+
+    @property
     def inbox(self) -> Path:
         return self.state / "inbox.jsonl"
 

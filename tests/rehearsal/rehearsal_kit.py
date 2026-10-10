@@ -82,9 +82,6 @@ class FakeGitHub:
     def run(self, run_id: str) -> dict[str, Any]:
         raise AssertionError("the walk never promotes")
 
-    def deployment(self, environment: str) -> dict[str, Any]:
-        raise AssertionError("the walk never promotes")
-
     def reachable(self) -> bool:
         return True
 
@@ -239,7 +236,8 @@ class Rehearsal:
 def _settings_text(repo: Path) -> str:
     text = (ROOT / "settings.toml").read_text()
     for key, value in {"repo.path": str(repo), "repo.github": GITHUB, "repo.staging_health": STAGING,
-                       "repo.prod_health": PROD, "repo.owner_login": "owner"}.items():  # fmt: skip
+                       "repo.prod_health": PROD, "repo.promote_workflow": "deploy-prod.yml",
+                       "repo.owner_login": "owner"}.items():  # fmt: skip
         text = settings_save.set_line(text, key, value)
     return text
 

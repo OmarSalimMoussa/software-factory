@@ -16,6 +16,7 @@ REPO = {
     "repo.github": "depot/product",
     "repo.staging_health": "https://staging.invalid/health",
     "repo.prod_health": "https://prod.invalid/health",
+    "repo.promote_workflow": "deploy-prod.yml",
     "repo.owner_login": "owner",
 }
 OWNER_CALLER = Caller(kind="owner", role="owner")
@@ -63,9 +64,6 @@ class FakeGitHub:
         return "run"
 
     def run(self, run_id: str) -> dict[str, Any]:
-        return {}
-
-    def deployment(self, environment: str) -> dict[str, Any]:
         return {}
 
     def reachable(self) -> bool:

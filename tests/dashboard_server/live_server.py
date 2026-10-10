@@ -35,7 +35,7 @@ from runtime.dashboard.client import Warden  # noqa: E402
 from runtime.queue import formats, propose  # noqa: E402
 from runtime.shared import models, store  # noqa: E402
 from runtime.shared import settings as settings_module  # noqa: E402
-from runtime.warden import crashwatch, public, registry, settings_save  # noqa: E402
+from runtime.warden import crashwatch, deploys, public, registry, settings_save  # noqa: E402
 from runtime.warden.context import Caller, Clock  # noqa: E402
 
 CODE = "123456"
@@ -61,18 +61,19 @@ class Running(Clock):
 
 
 class Deploys(GitHub):
-    """GitHub whose push workflow redeploys prod: prod then answers on the new build, unless told to fail."""
+    """GitHub whose push workflow redeploys prod: prod then answers on the new build, which the warden's tick would
+    log, unless told to fail."""
 
     def __init__(self, live: Live) -> None:
-        super().__init__(live.clock.now)
         self.live = live
 
     def run(self, run_id: str) -> dict[str, Any]:
         if self.live.switches.get("op_fail"):
             return {"id": run_id, "status": "completed", "conclusion": "failure", "url": "https://github.invalid/r"}
         sha = store.read_json(self.live.places.state / "push.json")["sha"]
-        probe = models.Probe(iso(self.now() + 2), "prod", True, sha, 80)
-        store.append_jsonl(self.live.places.probes, models.dump(probe))
+        at = iso(self.live.clock.now() + 2)
+        store.append_jsonl(self.live.places.probes, models.dump(models.Probe(at, "prod", True, sha, 80)))
+        deploys.record(self.live.places, "prod", sha, at)
         return super().run(run_id)
 
 

@@ -12,10 +12,23 @@ Every product takes one shape, so the factory needs no per-product configuration
 │   └── fixtures/           inputs scenarios use (optional)
 ├── check-values/           values the standard checks compare against
 ├── scripts/
-│   ├── dev                 the stack, with fixed verbs
-│   └── ci/                 build, smoke, deploy-staging, promote
+│   └── dev                 the stack, with fixed verbs
+├── .github/workflows/      the product's own CI, and its workflow that deploys prod
 └── .gitignore              lists queue/
 ```
+
+## What a product brings for staging and prod
+
+The product keeps its own CI and hosting. The factory only pushes to the default branch, watches the two health
+addresses, and starts one workflow when the owner pushes to prod.
+
+- **Two health addresses**, `repo.staging_health` and `repo.prod_health`. Each answers JSON naming the running
+  commit as `build_commit`.
+- **A CI that deploys staging** on every push to the default branch.
+- **One workflow that deploys prod**, named in `repo.promote_workflow`. It runs on `workflow_dispatch` with one input,
+  `sha`, and puts that commit on prod. The warden starts it on the default branch when the owner presses Push to prod
+  and enters the 6-digit code: with the commit staging runs, or, for a push back, the commit prod ran before. That
+  code is the only lock on prod, so the workflow needs no approval step of its own.
 
 ## GOAL.md
 
@@ -55,11 +68,6 @@ after the cursor it last saw, and files each as a request in the users' inbox. E
 report's id (also the next cursor), when it arrived, an id for the user, where in the product it is about, and the
 user's words. The words stay in `queue/reports/`; tasks describe them in the factory's own words.
 
-## scripts/ci
-
-`build <sha>`, `smoke <sha>`, `deploy-staging <sha>` and `promote <sha>`. The factory's reusable workflows call them;
-the product decides what each does. Only the owner can run a promote.
-
 ## qa/scenarios
 
 One Markdown file per scenario, with three labels in front matter and at most six steps:
@@ -83,4 +91,5 @@ runs: in-turn
 
 Only values, never code. Each file is named for the check it feeds (see [checks.md](checks.md)), plus
 `surfaces.toml`, the path prefixes that give a diff its QA surfaces. Agents may not change `surfaces.toml`,
-`GOAL.md`, `goal/`, `.github/workflows/` or `scripts/ci/promote`.
+`GOAL.md`, `goal/`, `.github/workflows/` or `scripts/ci/`: keep the scripts your workflows run under `scripts/ci/`
+to keep them out of agents' reach too.

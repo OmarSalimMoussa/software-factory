@@ -2,7 +2,7 @@
 would do and changes nothing: the same step functions run against a DryHost.
 
 A real Host runs as root. Commands as another user go through ``runuser`` with that user's home and runtime folder,
-so a user's own tools (git, gh, uv, systemctl --user) see their own configuration.
+so a user's own tools (git, uv, systemctl --user) see their own configuration.
 """
 
 from __future__ import annotations

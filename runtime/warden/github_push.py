@@ -2,9 +2,10 @@
 
 The warden pushes from its own mirror with the deploy key, which no agent can read. It fetches the checked commit
 from the agent's checkout and refuses a range that touches a path only the owner's hand may change (plan section 1).
-A push to prod, or back, is an operation the dashboard follows step by step: it starts promote.yml for exactly the
-commit staging runs (or prod ran before), waits for prod to answer on it, then asks the orchestrator for a qa-prod
-pass. While a push to prod is in flight, and for watch.loop_minutes after it lands, the loop probes prod every tick.
+A push to prod, or back, is an operation the dashboard follows step by step: it starts the product's prod workflow
+(repo.promote_workflow) for exactly the commit staging runs, or the one prod ran before as the deploy log has it,
+waits for prod to answer on it, then asks the orchestrator for a qa-prod pass. The owner's code is the only lock on
+it. While a push to prod is in flight, and for watch.loop_minutes after it lands, the loop probes prod every tick.
 """
 
 from __future__ import annotations
@@ -24,12 +25,11 @@ from runtime.shared import store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import inbox, ops, probes
+from runtime.warden import deploys, inbox, ops, probes
 from runtime.warden.context import Context
 from runtime.warden.github import GitHubError
 
 PROTECTED = (".github/workflows/", "scripts/ci/", "check-values/surfaces.toml", "GOAL.md", "goal/")
-PROD_ENVIRONMENT = "prod"  # the GitHub environment promote.yml deploys to
 _FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 _SHA = re.compile(r"^[0-9a-f]{7,40}$")
 # One push at a time, of either kind: the check that none runs and the start happen together.
@@ -230,15 +230,10 @@ def _staging_build(ctx: Context) -> str:
 
 
 def _previous_prod(ctx: Context) -> str:
-    try:
-        deployment = ctx.github.deployment(PROD_ENVIRONMENT)
-    except GitHubError as exc:
-        raise Refused("github", f"{exc}: try again shortly") from exc
-    previous = deployment.get("previous")
-    if not isinstance(previous, dict) or not isinstance(previous.get("sha"), str):
-        raise Refused("no-previous", "GitHub lists no earlier prod build to go back to")
-    sha: str = previous["sha"]
-    return sha
+    previous = deploys.builds(ctx.places, probes.PROD)["previous"]
+    if previous is None:
+        raise Refused("no-previous", "the deploy log holds no earlier prod build to go back to")
+    return previous["commit"]
 
 
 def _start(ctx: Context, kind: str, sha: str) -> dict[str, Any]:

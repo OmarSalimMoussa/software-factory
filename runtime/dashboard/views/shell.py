@@ -7,8 +7,7 @@ from typing import Any
 from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, clock
 from runtime.shared.models import RETIRED
 
-# Deployments are not drawn here: asking for them on every poll keeps GitHub's answer fresh for Home and Push to prod.
-WANTS = ("settings", "probes", "factory", "sessions", "queue", "reflections", "deployments")
+WANTS = ("settings", "probes", "factory", "sessions", "queue", "reflections")
 PAGES = [
     ["home", "Home", "home", "h"],
     ["work", "Work", "queue-list", "w"],

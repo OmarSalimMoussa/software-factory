@@ -77,7 +77,6 @@ STEPS: tuple[tuple[str, Callable[[Install], None]], ...] = (
     ("Start the factory", steps_wire.start),
     ("Run the drills", run_drills),
     ("Create the Healthchecks.io checks", healthchecks.create),
-    ("Ask GitHub for the owner's approval of every promotion", steps_wire.github_environment),
     ("Record the install", record),
 )
 

@@ -16,7 +16,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 
 | Group | Holds |
 | --- | --- |
-| `repo` | The product's checkout, default branch, GitHub name, the staging and prod health URLs, the owner's login |
+| `repo` | The product's checkout, default branch, GitHub name, health URLs, prod workflow and the owner's login |
 | `models` | The allowed models and efforts, and the model and effort of every role |
 | `caps` | Implementers, designers and subagents at once |
 | `subagents` | Which subagent kinds each role may start |

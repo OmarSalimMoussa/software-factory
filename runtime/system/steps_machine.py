@@ -233,7 +233,7 @@ def secrets(ctx: Install) -> None:
         host.say(f"  Add this as a deploy key with write access to {github}:")
         host.say("    " + (host.read(key.with_suffix(".pub")).strip() if not host.dry else "<the public key>"))
     asks = (
-        ("github.token", "Your GitHub token (Actions: write, Deployments: read) for the warden: "),
+        ("github.token", "Your GitHub token (Actions: write) for the warden: "),
         ("claude.token", "The token `claude setup-token` printed, for the agents' sessions: "),
     )
     for name, prompt in asks:
