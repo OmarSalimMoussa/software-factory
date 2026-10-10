@@ -29,6 +29,7 @@ def kit(tmp_path: Path) -> Kit:
         ("{worktree}/goal/hero.png", "protected-paths"),
         ("{worktree}/.github/workflows/ci.yml", "protected-paths"),
         ("{worktree}/scripts/ci/promote", "protected-paths"),
+        ("{worktree}/deploy/promote", "protected-paths"),
         ("{worktree}/check-values/surfaces.toml", "protected-paths"),
         ("{worktree}/.git", "protected-paths"),
         ("{repo}/queue/tasks/t-0001.md", "queue-status"),

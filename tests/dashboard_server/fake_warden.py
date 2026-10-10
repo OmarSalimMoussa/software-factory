@@ -55,9 +55,6 @@ class Launcher:
 
 
 class GitHub:
-    def compare(self, base: str, head: str) -> list[dict[str, Any]]:
-        return []
-
     def dispatch_promote(self, sha: str) -> str:
         return "1"
 

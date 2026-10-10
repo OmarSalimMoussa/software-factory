@@ -15,11 +15,12 @@ from pathlib import Path, PurePosixPath
 from runtime.guard import shell
 from runtime.guard.facts import Call, Decision, Refusal, inside, resolve
 from runtime.shared.paths import MANAGED_SETTINGS
+from runtime.shared.settings import Settings
 
-# The product's paths only a person changes: the goal and its pictures, git's own folder (config, hooks, refs and the
-# pass record `factory check` keeps there), the workflows and CI scripts that reach staging and prod, and the
-# surfaces that decide which testers a change needs.
-PRODUCT_PROTECTED = ("GOAL.md", "goal", ".git", ".github/workflows", "scripts/ci", "check-values/surfaces.toml")
+# The paths only a person changes in every product: the goal and its pictures, git's own folder (config, hooks, refs
+# and the pass record `factory check` keeps there), the surfaces that decide which testers a change needs, and the
+# workflows and CI scripts that reach staging and prod. A product adds its own in repo.protected_paths.
+ALWAYS_PROTECTED = ("GOAL.md", "goal/", ".git", "check-values/surfaces.toml", ".github/workflows/", "scripts/ci/")
 QUEUE = "queue"
 EDIT_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
 _MUTATORS = frozenset(
@@ -60,14 +61,24 @@ def _with_real(paths: list[Path]) -> list[Path]:
     return list(dict.fromkeys(paths + [Path(os.path.realpath(p)) for p in paths]))
 
 
+def protected_paths(settings: Settings) -> tuple[str, ...]:
+    """Every protected path prefix of the product; a trailing / names a folder."""
+    return ALWAYS_PROTECTED + tuple(str(p) for p in settings.get_list("repo.protected_paths") if str(p).strip())
+
+
+def is_protected(path: str, prefixes: tuple[str, ...]) -> bool:
+    """Whether a repo-relative path is a protected prefix or inside one."""
+    return any(_matches(PurePosixPath(path), prefix, removes=False) for prefix in prefixes)
+
+
 def _matches(rel: PurePosixPath, fragment: str, removes: bool) -> bool:
     """Whether ``rel`` is the fragment or inside it, or, for a removal, holds it."""
     parts, frag = rel.parts, PurePosixPath(fragment).parts
     return parts[: len(frag)] == frag or (removes and frag[: len(parts)] == parts)
 
 
-def _refuse_product(rel: PurePosixPath, removes: bool) -> Refusal | None:
-    for fragment in PRODUCT_PROTECTED:
+def _refuse_product(call: Call, rel: PurePosixPath, removes: bool) -> Refusal | None:
+    for fragment in protected_paths(call.settings):
         if _matches(rel, fragment, removes):
             return Refusal(
                 "protected-paths",
@@ -90,7 +101,7 @@ def protected(call: Call, word: str, cwd: Path, *, removes: bool = False) -> Ref
                 return Refusal("protected-paths", f"{root} is the factory's own; only the owner changes it")
         for root in product_roots(call):
             if inside(path, root):
-                found = _refuse_product(PurePosixPath(os.path.relpath(path, root)), removes)
+                found = _refuse_product(call, PurePosixPath(os.path.relpath(path, root)), removes)
             elif removes and inside(root, path):
                 found = Refusal("protected-paths", f"{root} is a checkout of the product; the warden removes those")
             else:
@@ -99,7 +110,7 @@ def protected(call: Call, word: str, cwd: Path, *, removes: bool = False) -> Ref
                 return found
         written = PurePosixPath(os.path.normpath(candidate))
         if not candidate.startswith(("/", "~")) and written.parts[:1] != ("..",):
-            found = _refuse_product(written, removes=False)
+            found = _refuse_product(call, written, removes=False)
             if found is not None:
                 return found
     return None

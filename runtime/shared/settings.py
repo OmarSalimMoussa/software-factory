@@ -47,7 +47,8 @@ SCHEMA: dict[str, Spec] = {
     "repo.staging_health": Spec("str", required=True),
     "repo.prod_health": Spec("str", required=True),
     "repo.promote_workflow": Spec("str", required=True),  # contract: the product's prod workflow the warden starts
-    "repo.owner_login": Spec("str", required=True),
+    # contract: the product's extra paths only a person changes, beyond the factory's own protected set.
+    "repo.protected_paths": Spec("list", required=True),
     "models.allowed": Spec("list", required=True, when=NEXT_START),
     "models.efforts": Spec("list", required=True, when=NEXT_START),
     **{f"models.{role}": Spec("model", when=NEXT_START) for role in _ROLES},

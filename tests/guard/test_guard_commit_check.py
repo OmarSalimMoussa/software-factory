@@ -11,6 +11,7 @@ import pytest
 
 from checks.runner.passes import RECORD
 from runtime.guard.commit_check import is_factory_repo, passed, refusal
+from runtime.guard.writes import ALWAYS_PROTECTED
 from runtime.shared.paths import INSTALL
 
 HOOKS = Path(__file__).resolve().parents[2] / "checks" / "git-hooks"
@@ -35,7 +36,15 @@ HOOKS = Path(__file__).resolve().parents[2] / "checks" / "git-hooks"
 def test_inside_the_slice_no_change_to_a_protected_path_lands_and_nothing_is_pushed(
     paths: list[str], in_slice: bool, hook: str, on_default: bool, merging: bool, refused: bool
 ) -> None:
-    reason = refusal(paths, in_slice=in_slice, hook=hook, on_default=on_default, merging=merging, factory=False)
+    reason = refusal(
+        paths,
+        prefixes=ALWAYS_PROTECTED,
+        in_slice=in_slice,
+        hook=hook,
+        on_default=on_default,
+        merging=merging,
+        factory=False,
+    )
     assert bool(reason) is refused
 
 
@@ -51,7 +60,15 @@ def test_inside_the_slice_no_change_to_a_protected_path_lands_and_nothing_is_pus
 )
 def test_the_factory_never_commits_to_its_own_repo(url: str, factory: bool) -> None:
     assert is_factory_repo(url) is factory
-    reason = refusal(["src/x.py"], in_slice=True, hook="pre-commit", on_default=False, merging=False, factory=factory)
+    reason = refusal(
+        ["src/x.py"],
+        prefixes=ALWAYS_PROTECTED,
+        in_slice=True,
+        hook="pre-commit",
+        on_default=False,
+        merging=False,
+        factory=factory,
+    )
     assert bool(reason) is factory
 
 

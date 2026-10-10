@@ -25,9 +25,6 @@ class FakeGitHub:
     on_run: Callable[[], None] | None = None
     dispatched: list[str] = field(default_factory=list)
 
-    def compare(self, base: str, head: str) -> list[dict[str, Any]]:
-        raise AssertionError("not used")
-
     def dispatch_promote(self, sha: str) -> str:
         self.dispatched.append(sha)
         return "42"

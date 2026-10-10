@@ -1,5 +1,6 @@
-"""`prod-frozen`: nothing an agent runs reaches prod. CI deploys staging from the default branch, and only the owner
-promotes; so no agent runs a deploy script by hand, starts a workflow, or pushes a tag or another branch."""
+"""`prod-frozen`: nothing an agent runs reaches prod. CI deploys staging from the default branch, and only the owner's
+push to prod starts the prod workflow; so no agent runs a deploy script by hand, starts a workflow, or pushes a tag
+or another branch."""
 
 from __future__ import annotations
 

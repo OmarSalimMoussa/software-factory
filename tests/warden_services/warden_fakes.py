@@ -17,7 +17,6 @@ REPO = {
     "repo.staging_health": "https://staging.invalid/health",
     "repo.prod_health": "https://prod.invalid/health",
     "repo.promote_workflow": "deploy-prod.yml",
-    "repo.owner_login": "owner",
 }
 OWNER_CALLER = Caller(kind="owner", role="owner")
 
@@ -57,9 +56,6 @@ class FakeLauncher:
 
 
 class FakeGitHub:
-    def compare(self, base: str, head: str) -> list[dict[str, Any]]:
-        return []
-
     def dispatch_promote(self, sha: str) -> str:
         return "run"
 

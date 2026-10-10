@@ -148,7 +148,6 @@ def make_world(tmp_path: Path) -> World:
         "repo.staging_health": "https://s/health",
         "repo.prod_health": "https://p/health",
         "repo.promote_workflow": "deploy-prod.yml",
-        "repo.owner_login": "owner",
     }
     return World(places, repo, settings_mod.build(defaults, overrides), FakeClock(), FakeLauncher(), [])
 

@@ -92,4 +92,6 @@ runs: in-turn
 Only values, never code. Each file is named for the check it feeds (see [checks.md](checks.md)), plus
 `surfaces.toml`, the path prefixes that give a diff its QA surfaces. Agents may not change `surfaces.toml`,
 `GOAL.md`, `goal/`, `.github/workflows/` or `scripts/ci/`: keep the scripts your workflows run under `scripts/ci/`
-to keep them out of agents' reach too.
+to keep them out of agents' reach too. A product names any other path only a person may change, such as a deploy
+script kept elsewhere, in `repo.protected_paths` (a trailing `/` names a folder); the guard, the git hooks and the
+warden's push refuse a change to it as they do the others.

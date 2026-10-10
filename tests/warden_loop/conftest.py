@@ -24,7 +24,6 @@ def world(tmp_path: Path) -> World:
         "repo.staging_health": "https://staging.test/health",
         "repo.prod_health": "https://prod.test/health",
         "repo.promote_workflow": "deploy-prod.yml",
-        "repo.owner_login": "owner",
     })  # fmt: skip
     github, clock = FakeGitHub(), FakeClock()
     events: list[tuple[str, dict[str, Any]]] = []

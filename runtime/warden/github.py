@@ -1,5 +1,5 @@
-"""The warden's door to GitHub's REST API: compare, the product's prod workflow and its runs, and a reachability
-probe that serves as the outage's control.
+"""The warden's door to GitHub's REST API: the product's prod workflow and its runs, and a reachability probe that
+serves as the outage's control.
 
 The token is read from the warden's secrets on every call and never appears in an error or a log line. Every
 failure raises GitHubError with one line that says what failed; a rate limit says when it resets.
@@ -21,7 +21,6 @@ from runtime.shared.paths import Places
 from runtime.shared.settings import Settings
 
 API = "https://api.github.com"
-_PAGE = 100  # GitHub's largest page
 
 
 class GitHubError(Exception):
@@ -58,25 +57,6 @@ class RestGitHub:
         self._token_file = token_path(places)
         self._settings = settings
         self._transport = transport
-
-    def compare(self, base: str, head: str) -> list[dict[str, Any]]:
-        """The commits ``head`` has that ``base`` lacks, oldest first: sha, title, author, at."""
-        path = f"/repos/{self._repo()}/compare/{_seg(base)}...{_seg(head)}"
-        commits: list[dict[str, Any]] = []
-        page = 1
-        while True:
-            body = self._json("GET", f"{path}?per_page={_PAGE}&page={page}")
-            batch = body.get("commits")
-            total = body.get("total_commits")
-            if not isinstance(batch, list) or not isinstance(total, int):
-                raise GitHubError(f"GitHub's compare of {base[:12]}...{head[:12]} has no commit list")
-            commits += [_commit(c) for c in batch]
-            if len(commits) >= total or not batch:
-                break
-            page += 1
-        if len(commits) != total:
-            raise GitHubError(f"GitHub listed {len(commits)} of {total} commits in {base[:12]}...{head[:12]}")
-        return commits
 
     def dispatch_promote(self, sha: str) -> str:
         """Start the product's prod workflow (repo.promote_workflow) for ``sha`` on the default branch; the id of the
@@ -168,19 +148,6 @@ _HEADERS = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "20
 
 def _seg(value: str) -> str:
     return urllib.parse.quote(value, safe="")
-
-
-def _commit(raw: Any) -> dict[str, Any]:
-    if not isinstance(raw, dict) or not isinstance(raw.get("sha"), str):
-        raise GitHubError("GitHub listed a commit with no sha")
-    detail = raw.get("commit") or {}
-    author = detail.get("author") or {}
-    return {
-        "sha": raw["sha"],
-        "title": str(detail.get("message", "")).split("\n", 1)[0],
-        "author": author.get("name"),
-        "at": author.get("date"),
-    }
 
 
 def _message(body: bytes) -> str:

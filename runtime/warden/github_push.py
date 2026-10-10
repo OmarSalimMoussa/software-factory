@@ -21,15 +21,16 @@ from pathlib import Path
 from typing import Any
 
 from checks.runner import passes
+from runtime.guard.writes import is_protected, protected_paths
 from runtime.shared import store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
+from runtime.shared.settings import Settings
 from runtime.warden import deploys, inbox, ops, probes
 from runtime.warden.context import Context
 from runtime.warden.github import GitHubError
 
-PROTECTED = (".github/workflows/", "scripts/ci/", "check-values/surfaces.toml", "GOAL.md", "goal/")
 _FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 _SHA = re.compile(r"^[0-9a-f]{7,40}$")
 # One push at a time, of either kind: the check that none runs and the start happen together.
@@ -49,8 +50,9 @@ def _watch_path(places: Places) -> Path:
     return places.state / "push.json"
 
 
-def protected(path: str) -> bool:
-    return any(path == p or (p.endswith("/") and path.startswith(p)) for p in PROTECTED)
+def protected(path: str, settings: Settings) -> bool:
+    """Whether a path is one only the owner's hand changes: the guard's own list, so a push refuses what it does."""
+    return is_protected(path, protected_paths(settings))
 
 
 # ---- the orchestrator's push of a checked commit ---------------------------------------------------------------
@@ -79,7 +81,7 @@ def push_checked(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
             return ok(sha=sha, commits=0, message=f"GitHub's {branch} already is {sha[:12]}")
         if not git.is_ancestor(remote, sha):
             raise Refused("push", f"{branch} on GitHub has commits {sha[:12]} lacks: merge them, check, then push")
-        bad = sorted({p for p in git.touched(remote, sha) if protected(p)})
+        bad = sorted({p for p in git.touched(remote, sha) if protected(p, settings)})
         if bad:
             raise Refused("protected-path", f"the range touches {', '.join(bad[:5])}, which only the owner changes: "
                                             "revert those changes, or ask the owner")  # fmt: skip
