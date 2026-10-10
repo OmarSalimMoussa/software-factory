@@ -37,7 +37,7 @@ log = logging.getLogger("factory.warden")
 # Set by the installer; the dashboard shows them read-only.
 READ_ONLY = frozenset({"models.allowed", "prices", "factory.clone"})
 REPO_KEYS = ("repo.path", "repo.default_branch", "repo.github", "repo.staging_health", "repo.prod_health",
-             "repo.promote_workflow", "repo.protected_paths")  # fmt: skip
+             "repo.protected_paths")  # fmt: skip
 _save_lock = threading.Lock()
 # owner/name at the end of any git remote URL: git@host:owner/name.git, https://host/owner/name, ssh://...
 _REMOTE = re.compile(r"[:/]([^/:]+/[^/]+?)(?:\.git)?/?$")

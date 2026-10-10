@@ -1,0 +1,37 @@
+# The factory's prod deploy, copied unchanged into a product's .github/workflows/ beside ci.yml. The warden starts it
+# by this file name, with the commit staging runs, or with the one prod ran before for a push back.
+name: deploy-prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: The commit to put on prod
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    # Shares ci.yml's deploy group: one deploy at a time, never cancelled half way.
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+      - name: Promote
+        env:
+          SHA: ${{ inputs.sha }}
+          CI_SECRETS: ${{ toJSON(secrets) }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/ci/promote "$SHA"

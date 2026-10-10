@@ -259,7 +259,6 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("repo.github", "On GitHub"),
             ("repo.staging_health", "Staging health address"),
             ("repo.prod_health", "Prod health address"),
-            ("repo.promote_workflow", "Workflow that deploys prod"),
             ("repo.protected_paths", "Paths only you change"),
         ],
     ),

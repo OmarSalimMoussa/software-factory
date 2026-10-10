@@ -10,6 +10,7 @@ from runtime.dashboard.views import agentwords, messaging, proposals, taskwords
 from runtime.dashboard.views.kit import Parts, Query, Snap, clock, epoch, iso, model_word, span, when
 from runtime.dashboard.views.shell import github_url, health
 from runtime.shared.models import RETIRED, WAITING
+from runtime.shared.paths import PROMOTE_WORKFLOW
 
 WANTS = (
     "settings",
@@ -58,7 +59,6 @@ def env_card(snap: Snap, env: str) -> dict[str, Any]:
     elif "prod-frozen" not in snap.get("rules")["off"]:
         chips.append({"text": "frozen", "tone": "muted"})
     current = snap.get("deploys")[env]["current"]
-    workflow = snap.settings.get_str("repo.promote_workflow")
     return {
         "name": env.title(),
         "state": pill["state"],
@@ -67,7 +67,7 @@ def env_card(snap: Snap, env: str) -> dict[str, Any]:
         "deployed": when(epoch(current["at"])) if current else None,
         "chips": chips,
         # Only prod's deploying workflow is known: staging's is the product's own CI.
-        "deployment_url": f"{github_url(snap)}/actions/workflows/{workflow}" if env == "prod" else None,
+        "deployment_url": f"{github_url(snap)}/actions/workflows/{PROMOTE_WORKFLOW}" if env == "prod" else None,
         "commit_url": f"{github_url(snap)}/commit/{pill['sha']}" if pill["sha"] else None,
     }
 

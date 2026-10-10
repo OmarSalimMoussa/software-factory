@@ -72,7 +72,7 @@ STEPS: tuple[tuple[str, Callable[[Install], None]], ...] = (
     ("Write the polkit rule", steps_wire.polkit),
     ("Write the firewall", steps_wire.firewall),
     ("Install the factory command", steps_wire.factory_command),
-    ("Point the product checkout at the factory's git hooks", steps_wire.git_hooks),
+    ("Point both product checkouts at the factory's git hooks", steps_wire.git_hooks),
     ("Publish the dashboard on the tailnet", steps_wire.tailnet),
     ("Start the factory", steps_wire.start),
     ("Run the drills", run_drills),

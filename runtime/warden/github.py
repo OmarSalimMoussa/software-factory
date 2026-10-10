@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from runtime.shared.paths import Places
+from runtime.shared.paths import PROMOTE_WORKFLOW, Places
 from runtime.shared.settings import Settings
 
 API = "https://api.github.com"
@@ -59,16 +59,22 @@ class RestGitHub:
         self._transport = transport
 
     def dispatch_promote(self, sha: str) -> str:
-        """Start the product's prod workflow (repo.promote_workflow) for ``sha`` on the default branch; the id of the
-        run it started."""
-        settings = self._settings()
-        workflow = _seg(settings.get_str("repo.promote_workflow"))
-        body = {"ref": settings.get_str("repo.default_branch"), "inputs": {"sha": sha}, "return_run_details": True}
-        reply = self._json("POST", f"/repos/{self._repo()}/actions/workflows/{workflow}/dispatches", body)
+        """Start the product's prod workflow for ``sha`` on the default branch; the id of the run it started."""
+        branch = self._settings().get_str("repo.default_branch")
+        body = {"ref": branch, "inputs": {"sha": sha}, "return_run_details": True}
+        reply = self._json("POST", f"/repos/{self._repo()}/actions/workflows/{PROMOTE_WORKFLOW}/dispatches", body)
         run_id = reply.get("workflow_run_id")
         if not isinstance(run_id, int):
             raise GitHubError("GitHub started the push workflow but did not name its run")
         return str(run_id)
+
+    def full_sha(self, sha: str) -> str:
+        """The full commit a short one names on GitHub; products may report short builds, a workflow needs the full."""
+        body = self._json("GET", f"/repos/{self._repo()}/commits/{_seg(sha)}")
+        full = body.get("sha")
+        if not isinstance(full, str) or len(full) != 40:
+            raise GitHubError(f"GitHub names no full commit for {sha}")
+        return full
 
     def run(self, run_id: str) -> dict[str, Any]:
         """A workflow run: id, status (queued, waiting, in_progress, completed), conclusion, url, head_sha."""

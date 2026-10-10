@@ -29,6 +29,9 @@ class FakeGitHub:
         self.dispatched.append(sha)
         return "42"
 
+    def full_sha(self, sha: str) -> str:
+        return sha + "f" * (40 - len(sha))
+
     def run(self, run_id: str) -> dict[str, Any]:
         if self.on_run is not None:
             self.on_run()

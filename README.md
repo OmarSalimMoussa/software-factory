@@ -10,6 +10,8 @@ Claude agents, holds the code to one standard set of checks, ships to staging, a
 - **The dashboard** is the owner's one window: proposals to approve, staging and prod, the work, the agents,
   spend, the library, settings, self-reflections and the guard.
 - **The checks** are one standard set for every product, fed only with values from the product's `check-values/`.
+- **The CI template** in `templates/ci/` is every product's CI, copied in unchanged; it calls the product's own
+  steps in `scripts/ci/`.
 - **The plugin** carries the roles (orchestrator, designers, implementers, intake, triage, critics and testers).
 
 Install (owner only, from a reviewed commit): `sudo python3 runtime/system/install.py --commit <sha> --repo <path>`;

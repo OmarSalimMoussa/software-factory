@@ -76,7 +76,7 @@ def folder_problems(repo: Repo) -> list[str]:
     return out
 
 
-def _executable(repo: Repo, rel: str) -> list[str]:
+def executable(repo: Repo, rel: str) -> list[str]:
     path = repo.root / rel
     if rel not in repo.tracked:
         return [f"{rel} is missing (or not committed)"]
@@ -84,7 +84,7 @@ def _executable(repo: Repo, rel: str) -> list[str]:
 
 
 def script_problems(repo: Repo) -> list[str]:
-    dev = _executable(repo, "scripts/dev")
+    dev = executable(repo, "scripts/dev")
     if dev:
         return dev
     done = subprocess.run(

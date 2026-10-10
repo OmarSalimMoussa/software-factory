@@ -76,6 +76,9 @@ class FakeGitHub:
     def dispatch_promote(self, sha: str) -> str:
         raise AssertionError("the walk never promotes")
 
+    def full_sha(self, sha: str) -> str:
+        return sha + "f" * (40 - len(sha))
+
     def run(self, run_id: str) -> dict[str, Any]:
         raise AssertionError("the walk never promotes")
 
@@ -233,7 +236,7 @@ class Rehearsal:
 def _settings_text(repo: Path) -> str:
     text = (ROOT / "settings.toml").read_text()
     for key, value in {"repo.path": str(repo), "repo.github": GITHUB, "repo.staging_health": STAGING,
-                       "repo.prod_health": PROD, "repo.promote_workflow": "deploy-prod.yml"}.items():  # fmt: skip
+                       "repo.prod_health": PROD}.items():  # fmt: skip
         text = settings_save.set_line(text, key, value)
     return text
 

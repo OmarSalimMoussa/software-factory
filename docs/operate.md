@@ -20,17 +20,18 @@ authenticator app set up at install.
 
 ## Ship
 
-The product keeps its own CI and hosting, and brings three things ([repo-shape.md](repo-shape.md) has the details):
+The product's CI is the factory's template, copied in unchanged. It checks every push, and takes each push to the
+default branch to staging through the product's own steps in `scripts/ci/`. The product also brings staging and prod
+health addresses that answer JSON naming the running commit as `build_commit` ([repo-shape.md](repo-shape.md) has
+the details).
 
-- staging and prod health addresses that answer JSON naming the running commit as `build_commit`;
-- a CI that deploys staging on every push to the default branch;
-- one workflow, named in `repo.promote_workflow`, that runs on `workflow_dispatch` with an input `sha` and puts that
-  commit on prod.
+When staging looks right, press Push to prod in the top bar and enter the code. The warden starts the product's
+`deploy-prod.yml` with exactly the commit staging runs, then watches prod until it answers on it. If prod misbehaves,
+push back the same way: the warden starts the same workflow with the commit prod ran before. It knows that commit
+from its deploy log, which records each new build staging and prod answer with.
 
-When staging looks right, press Push to prod in the top bar and enter the code. The warden starts the product's prod
-workflow with exactly the commit staging runs, then watches prod until it answers on it. If prod misbehaves, push
-back the same way: the warden starts the same workflow with the commit prod ran before. It knows that commit from
-its deploy log, which records each new build staging and prod answer with.
+Your own checkout of the product runs the factory's git hooks too: a merge into the default branch there lands only
+with a tree that passed `factory check`.
 
 ## Pause, stop, resume
 
@@ -53,7 +54,8 @@ To act on one:
 2. Change the factory's repo by hand: branch, test, merge, push.
 3. Reinstall from the reviewed commit: `sudo python3 runtime/system/install.py --commit <sha> --repo <path>`. The
    installer refuses while any factory session is live.
-4. Start the orchestrator again.
+4. In the product, move `.github/factory-ref` to that commit, and copy in `templates/ci/` again if it changed.
+5. Start the orchestrator again.
 
 ## When something is wrong
 

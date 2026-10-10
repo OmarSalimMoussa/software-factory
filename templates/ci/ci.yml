@@ -1,0 +1,94 @@
+# The factory's CI, copied unchanged into a product's .github/workflows/: the factory's ci-shape check refuses a copy
+# that differs by one byte. The product's own work lives in the scripts/ci/ steps it calls.
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+
+permissions:
+  contents: read
+  packages: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: product
+      - name: Read the factory commit the product pins
+        id: factory
+        run: |
+          ref="$(cat product/.github/factory-ref)"
+          if [[ ! "$ref" =~ ^([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@([0-9a-f]{40})$ ]]; then
+            echo "::error::.github/factory-ref must hold one line: owner/name@<40-character sha>"
+            exit 1
+          fi
+          echo "repo=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          echo "sha=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.factory.outputs.repo }}
+          ref: ${{ steps.factory.outputs.sha }}
+          ssh-key: ${{ secrets.FACTORY_READ_KEY }}
+          persist-credentials: false
+          path: factory
+      - uses: astral-sh/setup-uv@v5
+      - name: Install the factory's pinned tools
+        working-directory: factory
+        run: uv sync --frozen --extra dev --no-install-project
+      - name: Run the factory's checks
+        working-directory: product
+        env:
+          CI: "true"
+          PYTHONPATH: ${{ github.workspace }}/factory
+        # -P keeps the product's root off the import path, so no product folder can stand in for the factory's code.
+        run: ../factory/.venv/bin/python -P -m checks.runner --all
+
+  build:
+    needs: checks
+    # Skipped on any other branch, so smoke and deploy-staging, which need it, are skipped too.
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        env:
+          SHA: ${{ github.sha }}
+          CI_SECRETS: ${{ toJSON(secrets) }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/ci/build "$SHA"
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Smoke-test the build
+        env:
+          SHA: ${{ github.sha }}
+          CI_SECRETS: ${{ toJSON(secrets) }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/ci/smoke "$SHA"
+
+  deploy-staging:
+    needs: smoke
+    runs-on: ubuntu-latest
+    # One deploy at a time, to staging or prod, never cancelled half way. GitHub keeps one waiting run per group: a
+    # newer waiting deploy cancels an older waiting one, and the warden reports a push to prod cancelled that way.
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy staging
+        env:
+          SHA: ${{ github.sha }}
+          CI_SECRETS: ${{ toJSON(secrets) }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/ci/deploy-staging "$SHA"

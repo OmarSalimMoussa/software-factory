@@ -10,7 +10,7 @@ from runtime.shared import totp
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER
 from runtime.shared.settings import overrides_toml
 from runtime.system import layout, render
-from runtime.system.job import Install, refuse
+from runtime.system.job import Install, github_name, refuse
 
 # Claude Code carries its seccomp helper (which blocks Unix sockets in the sandbox) inside its own binary; a version
 # without it finds the sandbox runtime's copy in the global npm folder instead.
@@ -217,9 +217,15 @@ def rootless_docker(ctx: Install) -> None:
     host.run(["systemctl", "--user", "enable", "--now", "docker.service"], user=stack)
 
 
+def _public_half(key: Path) -> Path:
+    return key.with_name(key.name + ".pub")  # where ssh-keygen -f <key> writes it
+
+
 def secrets(ctx: Install) -> None:
-    """The 6-digit code's secret (shown once), the deploy key, the owner's GitHub token and the sign-in token."""
+    """The 6-digit code's secret (shown once), the deploy key, the product CI's read key for the factory repo, the
+    owner's GitHub token and the sign-in token."""
     host, folder = ctx.host, layout.secrets(ctx.places.state)
+    github = ctx.need_settings().get_str("repo.github")
     if not host.exists(ctx.places.totp_secret):
         secret = totp.new_secret()
         host.write(ctx.places.totp_secret, secret + "\n", mode=0o600, owner=WARDEN_USER)
@@ -229,9 +235,19 @@ def secrets(ctx: Install) -> None:
     if not host.exists(key):
         host.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "software-factory deploy", "-f", str(key)],
                  user=WARDEN_USER)  # fmt: skip
-        github = ctx.need_settings().get_str("repo.github")
         host.say(f"  Add this as a deploy key with write access to {github}:")
-        host.say("    " + (host.read(key.with_suffix(".pub")).strip() if not host.dry else "<the public key>"))
+        host.say("    " + (host.read(_public_half(key)).strip() if not host.dry else "<the public key>"))
+    # Only the product's CI uses the private half, so the machine keeps just the public half, the mark it was made.
+    read_key = folder / "factory-read.key"
+    if not host.exists(_public_half(read_key)):
+        host.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "software-factory read", "-f", str(read_key)],
+                 user=WARDEN_USER)  # fmt: skip
+        factory = github_name(ctx.factory_origin) or ctx.factory_origin
+        host.say(f"  Add this as a deploy key to {factory}, read-only, so {github}'s CI can check out the factory:")
+        host.say("    " + (host.read(_public_half(read_key)).strip() if not host.dry else "<the public key>"))
+        host.say(f"  Save the lines below, unchanged, as {github}'s secret FACTORY_READ_KEY. They are shown once, now:")
+        host.say(host.read(read_key).strip() if not host.dry else "<the private key>")
+        host.remove(read_key)
     asks = (
         ("github.token", "Your GitHub token (Actions: write) for the warden: "),
         ("claude.token", "The token `claude setup-token` printed, for the agents' sessions: "),

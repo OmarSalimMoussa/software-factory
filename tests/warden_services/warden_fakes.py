@@ -16,7 +16,6 @@ REPO = {
     "repo.github": "depot/product",
     "repo.staging_health": "https://staging.invalid/health",
     "repo.prod_health": "https://prod.invalid/health",
-    "repo.promote_workflow": "deploy-prod.yml",
 }
 OWNER_CALLER = Caller(kind="owner", role="owner")
 
@@ -58,6 +57,9 @@ class FakeLauncher:
 class FakeGitHub:
     def dispatch_promote(self, sha: str) -> str:
         return "run"
+
+    def full_sha(self, sha: str) -> str:
+        return sha + "f" * (40 - len(sha))
 
     def run(self, run_id: str) -> dict[str, Any]:
         return {}

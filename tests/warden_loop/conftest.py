@@ -23,7 +23,6 @@ def world(tmp_path: Path) -> World:
         "repo.github": "owner/name",
         "repo.staging_health": "https://staging.test/health",
         "repo.prod_health": "https://prod.test/health",
-        "repo.promote_workflow": "deploy-prod.yml",
     })  # fmt: skip
     github, clock = FakeGitHub(), FakeClock()
     events: list[tuple[str, dict[str, Any]]] = []

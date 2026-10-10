@@ -58,6 +58,9 @@ class GitHub:
     def dispatch_promote(self, sha: str) -> str:
         return "1"
 
+    def full_sha(self, sha: str) -> str:
+        return sha + "f" * (40 - len(sha))
+
     def run(self, run_id: str) -> dict[str, Any]:
         return {"id": run_id, "status": "completed", "conclusion": "success", "url": "https://github.invalid/run"}
 

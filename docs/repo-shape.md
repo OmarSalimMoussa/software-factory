@@ -1,6 +1,7 @@
 # The repo shape
 
-Every product takes one shape, so the factory needs no per-product configuration. The `repo-shape` check enforces it.
+Every product takes one shape, so the factory needs no per-product configuration. The `repo-shape` and `ci-shape`
+checks enforce it.
 
 ```text
 <product>/
@@ -12,23 +13,41 @@ Every product takes one shape, so the factory needs no per-product configuration
 │   └── fixtures/           inputs scenarios use (optional)
 ├── check-values/           values the standard checks compare against
 ├── scripts/
-│   └── dev                 the stack, with fixed verbs
-├── .github/workflows/      the product's own CI, and its workflow that deploys prod
+│   ├── dev                 the stack, with fixed verbs
+│   └── ci/                 build, smoke, deploy-staging, promote
+├── .github/
+│   ├── workflows/          the factory's CI template, copied unchanged
+│   └── factory-ref         the factory commit CI checks with
 └── .gitignore              lists queue/
 ```
 
-## What a product brings for staging and prod
+## CI
 
-The product keeps its own CI and hosting. The factory only pushes to the default branch, watches the two health
-addresses, and starts one workflow when the owner pushes to prod.
+Every product runs the same CI: the factory's template in `templates/ci/`. The product copies `ci.yml` and
+`deploy-prod.yml` into `.github/workflows/` and never edits them; the `ci-shape` check refuses a copy that differs by
+one byte. GitHub's free plan cannot share a workflow from a private repo, so the template is copied, never called.
+Other workflows, such as the product's own heartbeat, may sit beside the two.
 
+- **`ci.yml`** runs on every push. Its checks job checks out the factory at the commit `.github/factory-ref` pins and
+  runs the factory's checks over the whole product. On a push to the default branch it then runs `build`, `smoke` and
+  `deploy-staging`, in that order.
+- **`deploy-prod.yml`** runs `promote`. The warden starts it when the owner presses Push to prod and enters the
+  6-digit code: with the commit staging runs, or, for a push back, the commit prod ran before. That code is the only
+  lock on prod.
+- A deploy to staging and a deploy to prod never run at once, and neither is cancelled half way.
+
+The product brings the rest:
+
+- **Four executable steps in `scripts/ci/`**: `build`, `smoke`, `deploy-staging` and `promote`. Each is called with
+  the commit and decides everything about building and hosting it. Each finds the repo's secrets as one JSON object
+  in `CI_SECRETS`, and GitHub's token in `GITHUB_TOKEN`; it may read the code and write packages.
+- **`.github/factory-ref`**: one line, `owner/name@<40-character sha>`, naming the factory repo and the commit CI
+  checks with. The owner moves it to each factory commit they install.
+- **The secret `FACTORY_READ_KEY`**: the private half of a read-only deploy key on the factory repo, so CI can check
+  the factory out. The installer makes the pair and prints both halves once; the owner adds the public half to the
+  factory repo on GitHub and saves the private half as the product's secret.
 - **Two health addresses**, `repo.staging_health` and `repo.prod_health`. Each answers JSON naming the running
   commit as `build_commit`.
-- **A CI that deploys staging** on every push to the default branch.
-- **One workflow that deploys prod**, named in `repo.promote_workflow`. It runs on `workflow_dispatch` with one input,
-  `sha`, and puts that commit on prod. The warden starts it on the default branch when the owner presses Push to prod
-  and enters the 6-digit code: with the commit staging runs, or, for a push back, the commit prod ran before. That
-  code is the only lock on prod, so the workflow needs no approval step of its own.
 
 ## GOAL.md
 
@@ -90,8 +109,11 @@ runs: in-turn
 ## check-values/
 
 Only values, never code. Each file is named for the check it feeds (see [checks.md](checks.md)), plus
-`surfaces.toml`, the path prefixes that give a diff its QA surfaces. Agents may not change `surfaces.toml`,
-`GOAL.md`, `goal/`, `.github/workflows/` or `scripts/ci/`: keep the scripts your workflows run under `scripts/ci/`
-to keep them out of agents' reach too. A product names any other path only a person may change, such as a deploy
-script kept elsewhere, in `repo.protected_paths` (a trailing `/` names a folder); the guard, the git hooks and the
-warden's push refuse a change to it as they do the others.
+`surfaces.toml`, the path prefixes that give a diff its QA surfaces.
+
+## What only a person changes
+
+Agents may never change `GOAL.md`, `goal/`, `check-values/surfaces.toml`, `.github/workflows/`, `.github/factory-ref`
+or `scripts/ci/`. A product names any other path only a person may change, such as a deploy script its `scripts/ci/`
+steps call, in `repo.protected_paths` (a trailing `/` names a folder). The guard, the git hooks and the warden's push
+refuse a change to any of them.

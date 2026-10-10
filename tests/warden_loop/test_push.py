@@ -126,16 +126,18 @@ def test_push_to_prod_refuses_a_stale_sha_or_a_red_staging(
     assert world.github.dispatched == []
 
 
-def test_push_to_prod_runs_its_steps_and_asks_for_a_qa_prod_pass(world: World) -> None:
-    probe(world, probes.STAGING, True, STAGING)
+@pytest.mark.parametrize("build", [STAGING, "abcd1234"], ids=["full-build", "short-build"])
+def test_push_to_prod_runs_its_steps_and_asks_for_a_qa_prod_pass(world: World, build: str) -> None:
+    probe(world, probes.STAGING, True, build)
     probe(world, probes.PROD, True, PROD)
-    world.github.on_run = lambda: probe(world, probes.PROD, True, STAGING)  # the loop sees prod on the new build
-    started = github_push.push_prod(world.ctx, {"expected_staging_sha": STAGING}, None)
+    world.github.on_run = lambda: probe(world, probes.PROD, True, build)  # the loop sees prod on the new build
+    started = github_push.push_prod(world.ctx, {"expected_staging_sha": build}, None)
     ops.join(started["op"], timeout=30)
     op = ops.get(world.ctx, {"id": started["op"]}, None)["op"]
     assert [step["state"] for step in op["steps"]] == [ops.DONE] * 4, op
-    assert world.github.dispatched == [STAGING]
-    assert world.events == [(inbox.QA_PROD_DUE, {"sha": STAGING, "kind": "push"})]
+    # A product may report a short build; its prod workflow checks out the full commit.
+    assert world.github.dispatched == [world.github.full_sha(build)]
+    assert world.events == [(inbox.QA_PROD_DUE, {"sha": build, "kind": "push"})]
     assert github_push.watching(world.ctx)
 
 

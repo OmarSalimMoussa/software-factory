@@ -7,10 +7,9 @@ default_branch = "master"
 github = ""             # required: owner/name of the product on GitHub
 staging_health = ""     # required: answers JSON naming the running commit as build_commit
 prod_health = ""        # required
-promote_workflow = ""   # required: file name of the product's workflow that puts its input sha on prod
 protected_paths = []    # the product's extra paths only a person changes, such as its deploy scripts; a trailing /
-                        # names a folder. GOAL.md, goal/, .git, check-values/surfaces.toml, .github/workflows/ and
-                        # scripts/ci/ always are
+                        # names a folder. GOAL.md, goal/, .git, check-values/surfaces.toml, .github/workflows/,
+                        # .github/factory-ref and scripts/ci/ always are
 
 [models]                # model and effort for every role
 allowed = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]

@@ -27,7 +27,7 @@ PYTHON = "/usr/bin/python3"
 FACTORY_BIN = paths.FACTORY_BIN
 # The agents' own Claude Code: root-owned, so no session can replace the program that runs its guard.
 CLAUDE_BIN = Path("/usr/local/libexec/software-factory/claude")
-TOOLS = Path("/opt/software-factory-tools")  # the pinned check tools' virtual environment, beside the install
+TOOLS = paths.CHECK_TOOLS
 STAGE_PREFIX = "software-factory-stage-"
 
 UNITS_DIR = Path("/etc/systemd/system")

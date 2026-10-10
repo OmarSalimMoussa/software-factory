@@ -107,7 +107,6 @@ def defaults_text(repo: Path) -> str:
         "repo.github": "acme/acme-app",
         "repo.staging_health": "https://staging.invalid/health",
         "repo.prod_health": "https://prod.invalid/health",
-        "repo.promote_workflow": "deploy-prod.yml",
     }.items():
         text = settings_save.set_line(text, key, value)
     prices = "".join(

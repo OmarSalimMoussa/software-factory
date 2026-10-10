@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from checks.runner.repo import Repo
-from checks.standard import repo_shape
+from checks.standard import ci_shape, repo_shape
 
 Break = Callable[[Path], None]
 
@@ -55,4 +55,34 @@ def test_a_broken_shape_fails_naming_the_problem(
     damage(fixture_product)
     commit(fixture_product, "damage")
     problems = repo_shape.run(Repo.open(fixture_product), {})
+    assert any(said in p for p in problems), problems
+
+
+def _remove(rel: str) -> Break:
+    return lambda root: (root / rel).unlink()
+
+
+def test_the_fixture_carries_the_factorys_ci(fixture_product: Path) -> None:
+    assert ci_shape.run(Repo.open(fixture_product), {}) == []
+
+
+@pytest.mark.parametrize(
+    ("damage", "said"),
+    [
+        (
+            _edit(".github/workflows/ci.yml", "--all", "--all --only tools"),
+            ".github/workflows/ci.yml differs from the factory's template at line",
+        ),
+        (_edit(".github/workflows/deploy-prod.yml", "\n", "\r\n"), "deploy-prod.yml differs from the factory's"),
+        (_remove("scripts/ci/smoke"), "scripts/ci/smoke is missing"),
+        (_chmod("scripts/ci/promote"), "scripts/ci/promote is not executable"),
+        (_add(".github/factory-ref", "owner/software-factory@main\n"), ".github/factory-ref must hold one line"),
+    ],
+)
+def test_a_ci_that_drifts_from_the_template_fails_naming_the_problem(
+    fixture_product: Path, commit: Callable[[Path, str], None], damage: Break, said: str
+) -> None:
+    damage(fixture_product)
+    commit(fixture_product, "damage")
+    problems = ci_shape.run(Repo.open(fixture_product), {})
     assert any(said in p for p in problems), problems

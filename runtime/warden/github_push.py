@@ -3,9 +3,10 @@
 The warden pushes from its own mirror with the deploy key, which no agent can read. It fetches the checked commit
 from the agent's checkout and refuses a range that touches a path only the owner's hand may change (plan section 1).
 A push to prod, or back, is an operation the dashboard follows step by step: it starts the product's prod workflow
-(repo.promote_workflow) for exactly the commit staging runs, or the one prod ran before as the deploy log has it,
-waits for prod to answer on it, then asks the orchestrator for a qa-prod pass. The owner's code is the only lock on
-it. While a push to prod is in flight, and for watch.loop_minutes after it lands, the loop probes prod every tick.
+(the factory's template, copied in) for exactly the commit staging runs, or the one prod ran before as the deploy log
+has it, waits for prod to answer on it, then asks the orchestrator for a qa-prod pass. The owner's code is the only
+lock on it. While a push to prod is in flight, and for watch.loop_minutes after it lands, the loop probes prod every
+tick.
 """
 
 from __future__ import annotations
@@ -276,7 +277,7 @@ def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list
 
     def dispatch() -> str:
         try:
-            run["id"] = ctx.github.dispatch_promote(sha)
+            run["id"] = ctx.github.dispatch_promote(sha if _FULL_SHA.match(sha) else ctx.github.full_sha(sha))
         except GitHubError as exc:
             raise ops.StepError(str(exc)) from exc
         return f"workflow run {run['id']}"

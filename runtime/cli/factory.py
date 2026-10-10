@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import sys
 from collections.abc import Callable
@@ -20,9 +21,13 @@ from pathlib import Path
 from typing import IO, Any
 
 from runtime.shared import protocol
-from runtime.shared.paths import Places
+from runtime.shared.paths import CHECK_TOOLS, Places
 
 LOCAL = ("check", "qa-browser", "slot-api")
+# Run under the tools' Python in isolated mode: the install's root comes in as the first argument.
+_RUN_CHECKS = (
+    "import sys; sys.path.insert(0, sys.argv.pop(1)); from checks.runner.cli import main; sys.exit(main(sys.argv[1:]))"
+)
 UNREACHABLE = 3
 
 
@@ -350,9 +355,12 @@ def show(answer: dict[str, Any], out: IO[str], err: IO[str]) -> int:
 
 def _local(argv: list[str], places: Places) -> int:
     if argv[0] == "check":
-        from checks.runner import cli as check_cli  # the checks need their pinned tools; only `check` loads them
-
-        return check_cli.main(argv[1:])
+        # The checks find ruff, mypy and lint-imports beside the Python they run under: the pinned tools' own.
+        python = CHECK_TOOLS / "bin" / "python"
+        if not python.is_file():
+            raise CliError(f"the check tools are not installed at {CHECK_TOOLS}: reinstall the factory")
+        root = str(Path(__file__).resolve().parents[2])
+        os.execv(python, [str(python), "-I", "-c", _RUN_CHECKS, root, *argv[1:]])
     if argv[0] == "qa-browser":
         from runtime.qa import qa_browser
 

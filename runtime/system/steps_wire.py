@@ -54,9 +54,12 @@ def factory_command(ctx: Install) -> None:
 
 
 def git_hooks(ctx: Install) -> None:
-    """The product checkout takes its hooks from the install, which no agent can write; the vitals watch this."""
+    """Both checkouts of the product take their hooks from the install, which no agent can write: the agent's, which
+    the vitals watch, and the owner's own, so a merge there into the default branch also needs a tree that passed
+    `factory check`."""
     hooks = ctx.places.install / "checks" / "git-hooks"
     ctx.host.run(["git", "-C", str(ctx.checkout()), "config", "core.hooksPath", str(hooks)], user=AGENT_USER)
+    ctx.host.run(["git", "-C", str(ctx.product), "config", "core.hooksPath", str(hooks)], user=ctx.owner.name)
     exclude = ctx.checkout() / ".git" / "info" / "exclude"
     code, text = ctx.host.query(["cat", str(exclude)], user=AGENT_USER)
     current = text if code == 0 else ""

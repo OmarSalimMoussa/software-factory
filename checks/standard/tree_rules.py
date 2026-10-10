@@ -2,7 +2,8 @@
 
 1. An ``__init__.py`` holds nothing but comments: importers name the module that owns the symbol.
 2. No barrel: no ``index.(ts|tsx|js|jsx|mjs)`` and no module that only re-exports, unless it is a listed entrypoint.
-3. Every folder holding tracked files has a README.md (check-values/ holds values only and is exempt).
+3. Every folder holding tracked files has a README.md, except check-values/ (values only) and .github/ (the
+   factory's CI template).
 4. Product Python reads no environment default (``environ.get(k, d)``, ``getenv(k, d)``, ``... or d``,
    ``environ.setdefault(``): config loads once, every key required.
 5. A service module (``service.py``, ``*_service.py``) imports no HTTP framework: routes parse, services decide.
@@ -31,7 +32,8 @@ VALUES = {
     "env_allow": {str: str},
 }
 
-STANDARD_README_EXEMPT = ("check-values",)
+# A README.md in .github/ would stand in for the repo's own on its GitHub page.
+STANDARD_README_EXEMPT = ("check-values", ".github")
 _WEB = (".ts", ".tsx", ".js", ".jsx", ".mjs")
 _INDEX_RE = re.compile(r"(^|/)index\.(ts|tsx|js|jsx|mjs)$")
 _RE_EXPORT_RE = re.compile(r"\bexport\s+(type\s+)?(\*|\{[^}]*\})[^;]*?\bfrom\b\s*[^;\n]*;?")

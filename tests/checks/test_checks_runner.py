@@ -25,7 +25,6 @@ def settings() -> Settings:
             "repo.github": "owner/product",
             "repo.staging_health": "https://staging.invalid/health",
             "repo.prod_health": "https://prod.invalid/health",
-            "repo.promote_workflow": "deploy-prod.yml",
         },
     )
 

@@ -31,7 +31,8 @@ check that reads no values needs no file.
 | `env-template-sync`, `pinned-config`, `generated-current` | the file of the same name, `.toml` |
 | `size-ceilings`, `complexity-ratchet`, `count-claims`, `history-narrative` | `baseline.json` |
 
-`repo-shape`, `testing-imports`, `qa-scenarios`, `seeds-current` and `queue-format` read no values.
+`repo-shape`, `ci-shape`, `testing-imports`, `qa-scenarios`, `seeds-current` and `queue-format` read no
+values.
 
 ## Ratchets and pins
 

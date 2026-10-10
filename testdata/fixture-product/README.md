@@ -7,4 +7,5 @@ person, standing QA scenarios, values for the standard checks, and one script wi
 - `web/` holds the page that lists the notes.
 - `tests/` holds the tests `scripts/dev test` runs.
 - `qa/` holds the scenarios testers walk.
-- `scripts/` holds the stack script.
+- `scripts/` holds the stack script and the steps CI calls.
+- `.github/` holds the factory's CI, copied unchanged, and the factory commit it checks with.

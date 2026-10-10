@@ -12,7 +12,6 @@ from runtime.system.job import REPO_ROOT, Install
 GIVEN = {
     "repo.staging_health": "https://staging.example.test/health",
     "repo.prod_health": "https://example.test/health",
-    "repo.promote_workflow": "deploy-prod.yml",
 }
 PRODUCT_ORIGIN = "git@github.com:acme/shop.git"
 FACTORY_ORIGIN = "git@github.com:acme/software-factory.git"

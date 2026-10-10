@@ -19,8 +19,17 @@ from runtime.shared.settings import Settings
 
 # The paths only a person changes in every product: the goal and its pictures, git's own folder (config, hooks, refs
 # and the pass record `factory check` keeps there), the surfaces that decide which testers a change needs, and the
-# workflows and CI scripts that reach staging and prod. A product adds its own in repo.protected_paths.
-ALWAYS_PROTECTED = ("GOAL.md", "goal/", ".git", "check-values/surfaces.toml", ".github/workflows/", "scripts/ci/")
+# workflows and CI scripts that reach staging and prod, and the factory commit CI checks with. A product adds its own
+# in repo.protected_paths.
+ALWAYS_PROTECTED = (
+    "GOAL.md",
+    "goal/",
+    ".git",
+    "check-values/surfaces.toml",
+    ".github/workflows/",
+    ".github/factory-ref",
+    "scripts/ci/",
+)
 QUEUE = "queue"
 EDIT_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
 _MUTATORS = frozenset(

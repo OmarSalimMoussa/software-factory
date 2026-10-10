@@ -15,9 +15,13 @@ RUN = Path("/run/software-factory")
 MANAGED_SETTINGS = Path("/etc/claude-code/managed-settings.json")
 # On every user's PATH, so a session types the bare word: the sandbox exempts a call by its text, `factory …` alone.
 FACTORY_BIN = Path("/usr/local/bin/factory")
+# The pinned check tools' virtual environment: `factory check` runs under its Python, with ruff and mypy beside it.
+CHECK_TOOLS = Path("/opt/software-factory-tools")
 # Where a session writes a body it hands the factory command, inside its worktree; git ignores it (the installer adds
 # it to the checkout's info/exclude), so it never counts as uncommitted work.
 SCRATCH = ".factory"
+# contract: the product's prod workflow, the factory's CI template copied under this name; the warden starts it.
+PROMOTE_WORKFLOW = "deploy-prod.yml"
 WARDEN_USER = "software-warden"
 AGENT_USER = "software-agent"
 DASHBOARD_USER = "software-dashboard"  # contract: added by 1B-3, the one other user owner.sock answers
