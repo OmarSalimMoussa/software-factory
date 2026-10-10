@@ -5,7 +5,8 @@ watch.probe_seconds (prod every tick while a push to prod is in flight or just l
 answer with; moves the outage along; and
 posts to the orchestrator's inbox: loop due once watch.loop_minutes pass after its last pass, staging red the moment
 staging fails, and triage due when intake.batch_size requests wait or the oldest has waited
-intake.batch_max_wait_hours. The orchestrator's `factory tick` acknowledges each pass.
+intake.batch_max_wait_hours. Last, it files prod's new GlitchTip issues as requests (errors_import), whose failure
+never stops a tick. The orchestrator's `factory tick` acknowledges each pass.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import deploys, github_push, heartbeat, inbox, outage, probes, reflections, vitals
+from runtime.warden import deploys, errors_import, github_push, heartbeat, inbox, outage, probes, reflections, vitals
 from runtime.warden.context import Context
 
 log = logging.getLogger(__name__)
@@ -98,6 +99,7 @@ def run_tick(
     _triage_due(ctx, memo, now)
     format_check.sweep(ctx)
     _goal(ctx, memo)
+    errors_import.poll(ctx)
 
 
 def _staging(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:

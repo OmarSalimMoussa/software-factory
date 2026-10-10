@@ -18,13 +18,13 @@ from runtime.shared import store
 from runtime.shared.paths import Places
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+# The product's settings, as the fixture product sets them: they name the hook scripts the guard protects.
+FACTORY_TOML = REPO_ROOT / "testdata" / "fixture-product" / "factory.toml"
 NOW = datetime(2026, 10, 9, 12, 0, tzinfo=UTC)
 SID = "0f6c2a3e-1111-4222-8333-944455556666"
 TESTER_ID = "a1234567890abc"
 REQUIRED = {
     "repo.github": "owner/product",
-    "repo.staging_health": "https://staging.example/health",
-    "repo.prod_health": "https://prod.example/health",
     "repo.default_branch": "main",
     "repo.protected_paths": ["scripts/deploy.sh", "deploy/"],
 }
@@ -47,6 +47,7 @@ class Kit:
         self.session_transcript = self.root / "transcripts" / f"{SID}.jsonl"
         for folder in (self.home, self.worktree, self.session_transcript.parent):
             folder.mkdir(parents=True, exist_ok=True)
+        (self.repo / "factory.toml").write_bytes(FACTORY_TOML.read_bytes())
         self.places.plugin.mkdir(parents=True)
         (self.places.plugin / "self-reflect.md").write_text("Write to SELF_REFLECT.md when a miss got past you.\n")
         self.settings()

@@ -11,7 +11,7 @@ import copy
 import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 
@@ -44,8 +44,6 @@ SCHEMA: dict[str, Spec] = {
     "repo.path": Spec("str", required=True, when=ORCH),
     "repo.default_branch": Spec("str", required=True, when=ORCH),
     "repo.github": Spec("str", required=True, when=ORCH),
-    "repo.staging_health": Spec("str", required=True),
-    "repo.prod_health": Spec("str", required=True),
     # contract: the product's extra paths only a person changes, beyond the factory's own protected set.
     "repo.protected_paths": Spec("list", required=True),
     "models.allowed": Spec("list", required=True, when=NEXT_START),
@@ -119,6 +117,11 @@ SCHEMA: dict[str, Spec] = {
     "watch.refusal_window_minutes": Spec("int", 5, 1440),
     "watch.socket_read_seconds": Spec("int", 1, 120),  # contract: added by 1B-3, a request line must arrive by then
     "queue.max_upload_kib": Spec("int", 16, 8192),
+    "errors.poll_minutes": Spec("int", 1, 120),  # contract: added by FB6, prod's GlitchTip issues become requests
+    "errors.max_pages": Spec("int", 1, 50),
+    "telemetry.max_items": Spec("int", 1, 200),  # contract: added by FB6, `factory errors` and `factory traces`
+    "telemetry.max_kib": Spec("int", 4, 1024),
+    "telemetry.timeout_seconds": Spec("int", 1, 120),
     "reflect.fold_hours": Spec("int", 1, 168),
     "reflect.max_chars": Spec("int", 80, 4000),  # contract: added by 1B-3
     "cost.daily_budget_usd": Spec("float", 1, 100000),
@@ -127,6 +130,8 @@ SCHEMA: dict[str, Spec] = {
     "cost.plan_red_percent": Spec("int", 1, 100),
     "prices": Spec("prices"),
     "sandbox.allowed_domains": Spec("list", when=NEXT_START),
+    # contract: added by FB8. Folders in the agent's home every session may write; the install makes them.
+    "sandbox.writable_caches": Spec("list", when="Next install"),
     "dashboard.port": Spec("int", 1024, 65535, when="Next warden start"),
     "dashboard.refresh_seconds": Spec("int", 5, 120),
     "dashboard.stale_seconds": Spec("int", 15, 600),
@@ -156,9 +161,15 @@ SCHEMA: dict[str, Spec] = {
     "install.drill_seconds": Spec("int", 30, 900, when="Next install"),
     "install.hook_timeout_seconds": Spec("int", 2, 60, when="Next install"),
     "install.healthchecks_grace_minutes": Spec("int", 1, 120, when="Next install"),
+    # contract: added by FB7. The programs the product's scripts need, copied from the owner's PATH for the agents and
+    # the stack.
+    "install.toolchain": Spec("list", when="Next install"),
 }
 
 _PRICE_KEYS = ("input", "output", "cache_read", "cache_write")
+# A session that could write Claude Code's settings, a tool's configuration, a program on a login shell's PATH or a
+# key would act outside its sandbox the next time something read it, so no writable cache lies under these.
+_UNWRITABLE = frozenset({".claude", ".config", ".local", ".ssh", "bin"})
 _WEIGHT_KEYS = ("severity", "goal", "requests", "users", "age")
 
 
@@ -177,6 +188,14 @@ def _set_leaf(tree: dict[str, Any], key: str, value: Any) -> None:
     for part in heads:
         node = node.setdefault(part, {})
     node[last] = value
+
+
+def _home_folder(path: object) -> bool:
+    """A folder inside a home, named relative to it, outside the folders no session may write."""
+    if not isinstance(path, str):
+        return False
+    parts = PurePosixPath(path).parts
+    return bool(parts) and not path.startswith("/") and ".." not in parts and parts[0] not in _UNWRITABLE
 
 
 def _size_ok(value: object) -> bool:
@@ -315,6 +334,12 @@ def build(defaults: dict[str, Any], overrides: Mapping[str, Any]) -> Settings:
         problems.append("vitals.memory_red_gib must be below vitals.memory_amber_gib")
     if not problems and tree["cost"]["plan_amber_percent"] >= tree["cost"]["plan_red_percent"]:
         problems.append("cost.plan_amber_percent must be below cost.plan_red_percent")
+    if not problems:
+        problems += [
+            f"sandbox.writable_caches: {path!r} must be a folder inside the agent's home, such as .cache/uv, and not "
+            f"under {', '.join(sorted(_UNWRITABLE))}"
+            for path in tree["sandbox"]["writable_caches"] if not _home_folder(path)
+        ]  # fmt: skip
     if problems:
         raise SettingsError(problems)
     return Settings(tree, defaults, dict(overrides))

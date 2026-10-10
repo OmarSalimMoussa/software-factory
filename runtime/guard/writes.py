@@ -16,11 +16,12 @@ from runtime.guard import shell
 from runtime.guard.facts import Call, Decision, Refusal, inside, resolve
 from runtime.shared.paths import MANAGED_SETTINGS
 from runtime.shared.settings import Settings
+from standard import config as product_config
 
 # The paths only a person changes in every product: the goal and its pictures, git's own folder (config, hooks, refs
-# and the pass record `factory check` keeps there), the surfaces that decide which testers a change needs, and the
-# workflows and CI scripts that reach staging and prod, and the factory commit CI checks with. A product adds its own
-# in repo.protected_paths.
+# and the pass record `factory check` keeps there), the surfaces that decide which testers a change needs, the
+# workflows that reach staging and prod, the factory commit CI checks with, and factory.toml. Every script
+# factory.toml names is protected too, and a product adds its own paths in repo.protected_paths.
 ALWAYS_PROTECTED = (
     "GOAL.md",
     "goal/",
@@ -28,7 +29,7 @@ ALWAYS_PROTECTED = (
     "check-values/surfaces.toml",
     ".github/workflows/",
     ".github/factory-ref",
-    "scripts/ci/",
+    product_config.FILE,
 )
 QUEUE = "queue"
 EDIT_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
@@ -70,9 +71,26 @@ def _with_real(paths: list[Path]) -> list[Path]:
     return list(dict.fromkeys(paths + [Path(os.path.realpath(p)) for p in paths]))
 
 
+class UnknownProtectedPaths(Exception):
+    """The main checkout's factory.toml cannot be read, so which scripts it protects is unknown."""
+
+
 def protected_paths(settings: Settings) -> tuple[str, ...]:
-    """Every protected path prefix of the product; a trailing / names a folder."""
-    return ALWAYS_PROTECTED + tuple(str(p) for p in settings.get_list("repo.protected_paths") if str(p).strip())
+    """Every protected path prefix of the product; a trailing / names a folder.
+
+    The hooks come from the main checkout's factory.toml, which only a person changes: a worktree's copy could name
+    fewer.
+    """
+    checkout = Path(settings.get_str("repo.path"))
+    try:
+        hooks = product_config.load(checkout).hooks()
+    except product_config.ConfigError as exc:
+        raise UnknownProtectedPaths(
+            f"{checkout / product_config.FILE} cannot be read ({'; '.join(exc.problems)[:300]}), so the scripts it "
+            "protects are unknown"
+        ) from exc
+    extras = tuple(str(p) for p in settings.get_list("repo.protected_paths") if str(p).strip())
+    return ALWAYS_PROTECTED + hooks + extras
 
 
 def is_protected(path: str, prefixes: tuple[str, ...]) -> bool:
@@ -86,8 +104,8 @@ def _matches(rel: PurePosixPath, fragment: str, removes: bool) -> bool:
     return parts[: len(frag)] == frag or (removes and frag[: len(parts)] == parts)
 
 
-def _refuse_product(call: Call, rel: PurePosixPath, removes: bool) -> Refusal | None:
-    for fragment in protected_paths(call.settings):
+def _refuse_product(rel: PurePosixPath, prefixes: tuple[str, ...], removes: bool) -> Refusal | None:
+    for fragment in prefixes:
         if _matches(rel, fragment, removes):
             return Refusal(
                 "protected-paths",
@@ -101,7 +119,15 @@ def _refuse_product(call: Call, rel: PurePosixPath, removes: bool) -> Refusal | 
 
 
 def protected(call: Call, word: str, cwd: Path, *, removes: bool = False) -> Refusal | None:
-    """Whether writing (or, with ``removes``, removing) the path a word names is refused, and by which rule."""
+    """Whether writing (or, with ``removes``, removing) the path a word names is refused, and by which rule.
+
+    While the protected paths are unknown every write is refused: the guard fails closed.
+    """
+    try:
+        prefixes = protected_paths(call.settings)
+    except UnknownProtectedPaths as exc:
+        remedy = "every write is refused until the owner fixes it: file a request with `factory request new`"
+        return Refusal("protected-paths", f"{exc}; {remedy}")
     candidates = [word] + ([word.split("=", 1)[1]] if "=" in word else [])
     for candidate in filter(None, candidates):
         path = resolve(candidate, cwd, call.home)
@@ -110,7 +136,7 @@ def protected(call: Call, word: str, cwd: Path, *, removes: bool = False) -> Ref
                 return Refusal("protected-paths", f"{root} is the factory's own; only the owner changes it")
         for root in product_roots(call):
             if inside(path, root):
-                found = _refuse_product(call, PurePosixPath(os.path.relpath(path, root)), removes)
+                found = _refuse_product(PurePosixPath(os.path.relpath(path, root)), prefixes, removes)
             elif removes and inside(root, path):
                 found = Refusal("protected-paths", f"{root} is a checkout of the product; the warden removes those")
             else:
@@ -119,7 +145,7 @@ def protected(call: Call, word: str, cwd: Path, *, removes: bool = False) -> Ref
                 return found
         written = PurePosixPath(os.path.normpath(candidate))
         if not candidate.startswith(("/", "~")) and written.parts[:1] != ("..",):
-            found = _refuse_product(call, written, removes=False)
+            found = _refuse_product(written, prefixes, removes=False)
             if found is not None:
                 return found
     return None

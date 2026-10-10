@@ -19,7 +19,7 @@ from checks.runner.values import Schema
 
 IDS: tuple[str, ...] = (
     "repo-shape",
-    "ci-shape",
+    "deploy-shape",
     "tools",
     "comment-budgets",
     "error-telemetry",
@@ -41,9 +41,7 @@ IDS: tuple[str, ...] = (
     "vocabulary-homes",
     "computation-owners",
     "quiet-modules",
-    "image-roster",
     "image-sources",
-    "deploy-bundle",
     "pinned-config",
     "generated-current",
     "seeds-current",

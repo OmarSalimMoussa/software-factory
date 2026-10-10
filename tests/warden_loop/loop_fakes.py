@@ -24,6 +24,7 @@ class FakeGitHub:
     up: bool = True
     on_run: Callable[[], None] | None = None
     dispatched: list[str] = field(default_factory=list)
+    releases: str = "success"  # how the prod workflow's jobs after its deploy job end
 
     def dispatch_promote(self, sha: str) -> str:
         self.dispatched.append(sha)
@@ -35,7 +36,13 @@ class FakeGitHub:
     def run(self, run_id: str) -> dict[str, Any]:
         if self.on_run is not None:
             self.on_run()
-        return {"id": run_id, "status": "completed", "conclusion": "success", "url": "https://github.test/42"}
+        return {
+            "id": run_id,
+            "status": "completed",
+            "conclusion": self.releases,
+            "url": "https://github.test/42",
+            "jobs": {"deploy": {"status": "completed", "conclusion": "success"}},
+        }
 
     def reachable(self) -> bool:
         return self.up

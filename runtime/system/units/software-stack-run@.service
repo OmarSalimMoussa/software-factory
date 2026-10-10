@@ -11,9 +11,10 @@ Group=@stack_user@
 # The slots' group reads their env files; the agent's group reads the checkout the verb builds.
 SupplementaryGroups=@slots_group@ @agent_user@
 Slice=@slice@
-Environment=XDG_RUNTIME_DIR=/run/user/%U
-Environment=DOCKER_HOST=unix:///run/user/%U/docker.sock
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=XDG_RUNTIME_DIR=/run/user/@stack_uid@
+Environment=DOCKER_HOST=unix://@stack_socket@
+Environment=PATH=@path@
+Environment=@uv_env@
 ExecStart=@python@ -I @install@/runtime/system/runners/stack_run.py @state@ %i
 StandardOutput=truncate:@runs@/%i.log
 StandardError=inherit
@@ -22,7 +23,7 @@ UMask=0027
 TemporaryFileSystem=@state@:ro
 BindReadOnlyPaths=@public@ @slots@
 ProtectHome=tmpfs
-BindPaths=%h
+BindPaths=@stack_home@
 BindReadOnlyPaths=@agent_home@
 InaccessiblePaths=-/run/docker.sock
 NoNewPrivileges=yes

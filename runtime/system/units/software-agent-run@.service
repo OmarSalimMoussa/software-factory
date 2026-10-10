@@ -11,8 +11,9 @@ Type=oneshot
 User=@agent_user@
 Group=@agent_user@
 Slice=@slice@
-Environment=XDG_RUNTIME_DIR=/run/user/%U
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=XDG_RUNTIME_DIR=/run/user/@agent_uid@
+Environment=PATH=@path@
+Environment=@uv_env@
 LoadCredential=@claude_token@:@secrets@/claude.token
 ExecStart=@python@ -I @install@/runtime/system/runners/agent_run.py @state@ %i
 # systemd opens the output file and runs the exit recorder as root, so this user never reaches the warden's state.
@@ -23,7 +24,7 @@ UMask=0027
 TemporaryFileSystem=@state@:ro
 BindReadOnlyPaths=@public@
 ProtectHome=tmpfs
-BindPaths=%h
+BindPaths=@agent_home@
 InaccessiblePaths=-/run/docker.sock
 NoNewPrivileges=yes
 ProtectSystem=full

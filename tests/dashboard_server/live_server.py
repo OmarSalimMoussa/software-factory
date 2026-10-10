@@ -69,7 +69,13 @@ class Deploys(GitHub):
 
     def run(self, run_id: str) -> dict[str, Any]:
         if self.live.switches.get("op_fail"):
-            return {"id": run_id, "status": "completed", "conclusion": "failure", "url": "https://github.invalid/r"}
+            return {
+                "id": run_id,
+                "status": "completed",
+                "conclusion": "failure",
+                "url": "https://github.invalid/r",
+                "jobs": {"deploy": {"status": "completed", "conclusion": "failure"}},
+            }
         sha = store.read_json(self.live.places.state / "push.json")["sha"]
         at = iso(self.live.clock.now() + 2)
         store.append_jsonl(self.live.places.probes, models.dump(models.Probe(at, "prod", True, sha, 80)))

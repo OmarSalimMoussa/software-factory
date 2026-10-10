@@ -8,6 +8,7 @@ or the drill fails as inconclusive. The installer refuses to finish while any dr
 from __future__ import annotations
 
 import json
+import shlex
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +18,8 @@ from runtime.shared.paths import AGENT_USER, Places
 from runtime.shared.settings import Settings
 from runtime.system import layout
 from runtime.system.drill_probe import BREACHES
+from runtime.system.steps_toolchain import python_request
+from standard.services import stack
 
 UNREACHABLE = "cannot be reached"  # how the factory command says it found no warden
 _POLL_S = 1.0
@@ -167,12 +170,14 @@ def edit_other_worktree(rig: Rig) -> Result:
 def secrets_unreadable(rig: Rig) -> Result:
     name = "another slot's env file and the secrets cannot be read"
     state = rig.places.state
-    files = [rig.places.slot(1) / "env", layout.secrets(state) / "claude.token", rig.places.totp_secret]
-    plain = rig.as_user(AGENT_USER, _probe(rig, *(f"file:{f}" for f in files)))
+    # Every slot's env file lies in the stack user's folder of slots, which no other user may even list.
+    targets = [f"dir:{rig.places.stack_slots}", f"file:{layout.secrets(state) / 'claude.token'}",
+               f"file:{rig.places.totp_secret}", f"file:{rig.places.services / stack.ENV_FILE}"]  # fmt: skip
+    plain = rig.as_user(AGENT_USER, _probe(rig, *targets))
     inside = _sandboxed_probe(rig, name, f"file:{layout.AGENT_HOME}/.claude/.credentials.json",
                               "env:CLAUDE_CODE_OAUTH_TOKEN")  # fmt: skip
     breached = _breached(plain.out)
-    ok = not breached and len(outcomes(plain.out)) == len(files) and inside.ok
+    ok = not breached and len(outcomes(plain.out)) == len(targets) and inside.ok
     return Result(name, ok, f"as the agent: {', '.join(outcomes(plain.out).values())}; sandboxed: {inside.evidence}")
 
 
@@ -270,12 +275,47 @@ def path_shadow(rig: Rig) -> Result:
     return Result(name, not breached, "the shadow reached the warden" if breached else _first(run.result))
 
 
+def toolchain_answers(rig: Rig) -> Result:
+    """Each program of the product's toolchain runs inside a session, and uv finds the Python the product asks for
+    where the install put it, which also takes the uv cache the session may write."""
+    name = "the product's toolchain and its Python answer inside a session"
+    toolchain = [str(program) for program in rig.settings.get_list("install.toolchain")]
+    commands = [f"{program} --version" for program in toolchain]
+    request = python_request(rig.worktree_a)
+    find = f"uv python find {shlex.quote(request)}" if request and "uv" in toolchain else ""
+    if find:
+        commands.append(find)
+    if not commands:
+        return Result(name, True, "the product needs no toolchain and no Python")
+    ran = rig.sandboxed(*commands)
+    runs = [(command, exact_run(ran, command)) for command in commands]
+    done = [(command, run) for command, run in runs if run is not None]
+    if len(done) < len(commands):
+        return Result(name, False, "inconclusive: the drill session did not run every command as asked")
+    failed = [f"{command}: {_first(run.result)}" for command, run in done if run.error]
+    found = next((_first(run.result) for command, run in done if command == find and not run.error), "")
+    if found and not (found.startswith(f"{layout.TOOLCHAIN_PYTHON}/") or str(Path(found).parent) in layout.SYSTEM_PATH):
+        failed.append(f"{find} found {found}, not the toolchain's copy")
+    evidence = "; ".join(failed or [f"{command}: {_first(run.result)}" for command, run in done])
+    return Result(name, not failed, evidence)
+
+
 def stack_not_root(rig: Rig) -> Result:
     name = "scripts/dev cannot reach the host as root"
     info = rig.as_user(layout.STACK_USER, ["docker", "info", "--format", "{{json .SecurityOptions}}"])
     system = rig.as_user(layout.STACK_USER, _probe(rig, "unix:/run/docker.sock"))
     ok = info.code == 0 and "rootless" in info.out and not _breached(system.out)
     return Result(name, ok, f"security options {_first(info.out)}; system socket: {_first(system.out)}")
+
+
+def shared_services_answer(rig: Rig) -> Result:
+    """The stack user's Docker publishes GlitchTip and Langfuse on the loopback, where the slots' stacks and the
+    warden reach them."""
+    ran = rig.as_user(layout.STACK_USER, _probe(rig, f"get:{layout.GLITCHTIP_HEALTH}", f"get:{layout.LANGFUSE_HEALTH}"))
+    found = outcomes(ran.out)
+    ok = len(found) == 2 and set(found.values()) == {"answered 200"}
+    evidence = "; ".join(f"{target} -> {outcome}" for target, outcome in found.items()) or _first(ran.out)
+    return Result("GlitchTip and Langfuse answer the stack user on the loopback", ok, evidence)
 
 
 def dashboard_unreachable(rig: Rig) -> Result:
@@ -306,7 +346,9 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
     other_branch,
     factory_in_sandbox,
     path_shadow,
+    toolchain_answers,
     stack_not_root,
+    shared_services_answer,
     dashboard_unreachable,
 )
 

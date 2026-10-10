@@ -7,7 +7,7 @@ import tomllib
 from typing import Any
 
 from checks.runner.repo import Repo
-from checks.standard.infra import yaml_subset
+from standard import yaml_subset
 
 FORMATS = ("toml", "json", "yaml")
 

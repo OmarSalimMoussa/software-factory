@@ -23,8 +23,6 @@ def settings() -> Settings:
             "repo.path": "/product",
             "repo.default_branch": "main",
             "repo.github": "owner/product",
-            "repo.staging_health": "https://staging.invalid/health",
-            "repo.prod_health": "https://prod.invalid/health",
         },
     )
 

@@ -24,8 +24,8 @@ from runtime.dashboard import auth, cache, pictures
 from runtime.dashboard.client import Warden, WardenDown
 from runtime.dashboard.views import ops, proposals, routes, writes
 from runtime.dashboard.views.kit import PartError, Snap, clock
+from runtime.shared import error_reports, store
 from runtime.shared import settings as settings_module
-from runtime.shared import store
 from runtime.shared.paths import Places
 from runtime.shared.settings import Settings
 
@@ -349,6 +349,7 @@ def main() -> int:
     places = Places.system()
     settings = PublicSettings(places)
     current = settings()
+    error_reports.install(places, timeout=current.get_int("watch.http_timeout_seconds"))
     warden = Warden(places.owner_socket, lambda: float(settings().get_int("dashboard.warden_seconds")))
     app = App(settings, warden, time.time)
     server = serve(

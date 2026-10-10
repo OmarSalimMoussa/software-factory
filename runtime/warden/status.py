@@ -8,7 +8,7 @@ from typing import Any
 from runtime.queue import proposals
 from runtime.shared import models
 from runtime.slots import leases
-from runtime.warden import codes, plan, probes, registry, settings_save
+from runtime.warden import codes, errors_import, plan, probes, registry, settings_save
 from runtime.warden.context import Context
 
 
@@ -33,6 +33,7 @@ def status(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
         "approved": found.approved,
         **health,
         "plan": plan.reading(ctx),
+        "errors_import": errors_import.note(ctx.places),
         "code_locked_until": None
         if until is None
         else datetime.fromtimestamp(until, UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),

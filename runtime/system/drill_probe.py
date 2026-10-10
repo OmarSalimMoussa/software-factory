@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 """A drill's probe: tries each target and prints, one line each, what happened. It never prints what it read.
 
-    drill_probe.py --seconds N file:/path unix:/path tcp:host:port env:NAME ...
+    drill_probe.py --seconds N file:/path dir:/path unix:/path tcp:host:port env:NAME get:http://... ...
 
-Each line reads ``<target> -> <outcome>``: opened, connected or set when the wall let it through; the errno's name
-(EACCES, EPERM, ECONNREFUSED, ENOENT...) or unset when it did not. Stdlib only, so it runs inside any sandbox.
+Each line reads ``<target> -> <outcome>``: opened, listed, connected or set when the wall let it through; the errno's
+name (EACCES, EPERM, ECONNREFUSED, ENOENT...) or unset when it did not. A ``get`` is the one target meant to get
+through: it answers with the HTTP status. Stdlib only, so it runs inside any sandbox.
 """
 
 from __future__ import annotations
@@ -13,8 +14,24 @@ import errno
 import os
 import socket
 import sys
+import urllib.error
+import urllib.request
 
-BREACHES = frozenset({"opened", "connected", "set"})
+BREACHES = frozenset({"opened", "listed", "connected", "set"})
+
+
+def _errno(exc: OSError) -> str:
+    return errno.errorcode.get(exc.errno or 0, type(exc).__name__)
+
+
+def _get(url: str, seconds: float) -> str:
+    try:
+        with urllib.request.urlopen(url, timeout=seconds) as answer:  # noqa: S310 -- the drill's own loopback URL
+            return f"answered {answer.status}"
+    except urllib.error.HTTPError as exc:
+        return f"answered {exc.code}"
+    except urllib.error.URLError as exc:
+        return _errno(exc.reason) if isinstance(exc.reason, OSError) else type(exc).__name__
 
 
 def probe(target: str, seconds: float) -> str:
@@ -23,6 +40,11 @@ def probe(target: str, seconds: float) -> str:
         if kind == "file":
             with open(rest, "rb"):
                 return "opened"
+        if kind == "dir":
+            os.listdir(rest)
+            return "listed"
+        if kind == "get":
+            return _get(rest, seconds)
         if kind == "unix":
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
                 sock.settimeout(seconds)
@@ -35,7 +57,7 @@ def probe(target: str, seconds: float) -> str:
         if kind == "env":
             return "set" if os.environ.get(rest) else "unset"
     except OSError as exc:
-        return errno.errorcode.get(exc.errno or 0, type(exc).__name__)
+        return _errno(exc)
     except ValueError:
         return "unreadable target"
     return "unknown kind"

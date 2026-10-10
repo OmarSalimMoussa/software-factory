@@ -6,7 +6,9 @@ from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
+from loop_fakes import World, healthy
 
+from runtime.warden import probes
 from runtime.warden.probes import Answer, NetworkFailure, http_get
 
 
@@ -46,3 +48,31 @@ def test_a_refused_connection_is_a_network_failure_not_a_timeout() -> None:
         port = probe.getsockname()[1]
     with pytest.raises(NetworkFailure):
         http_get(f"http://127.0.0.1:{port}/health", 5)
+
+
+@pytest.mark.parametrize(
+    ("factory_toml", "asked", "error"),
+    [
+        (None, ["https://staging.notes.example.com/healthz"], ""),
+        ("", [], "no health address: factory.toml is missing"),
+        ("[product]\nname = 'Notes!'\n", [], "no health address: factory.toml is not usable: "),
+    ],
+    ids=["from-the-checkout", "missing", "broken"],
+)
+def test_the_health_address_comes_from_the_checkouts_factory_toml_and_is_never_guessed(
+    world: World, factory_toml: str | None, asked: list[str], error: str
+) -> None:
+    path = world.checkout / "factory.toml"
+    if factory_toml == "":
+        path.unlink()
+    elif factory_toml is not None:
+        path.write_text(factory_toml)
+    urls: list[str] = []
+
+    def fetch(url: str, timeout: float) -> Answer:
+        urls.append(url)
+        return healthy("a" * 40)
+
+    probe = probes.take(world.ctx, probes.STAGING, fetch)
+    assert urls == asked
+    assert probe.ok == (not error) and not probe.counts and probe.error.startswith(error)

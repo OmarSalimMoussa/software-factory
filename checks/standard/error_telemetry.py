@@ -57,6 +57,8 @@ def collect(repo: Repo, registry: Registry) -> tuple[list[FileFacts], list[tuple
     problems: list[str] = []
     ts_paths: list[str] = []
     for rel in repo.tracked:
+        if repo.excluded(rel):
+            continue
         language = registry.language_of(rel, _first_line(repo, rel))
         if language is None:
             continue

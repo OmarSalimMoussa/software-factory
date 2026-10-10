@@ -151,6 +151,18 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         ],
     ),
     (
+        "telemetry",
+        "Errors and traces",
+        "Applies as soon as you save.",
+        [
+            ("errors.poll_minutes", "Read prod's new errors every, minutes"),
+            ("errors.max_pages", "Pages of errors one read covers"),
+            ("telemetry.max_items", "Errors or traces one answer lists"),
+            ("telemetry.max_kib", "Largest errors or traces answer, KiB"),
+            ("telemetry.timeout_seconds", "Seconds a GlitchTip or Langfuse call may take"),
+        ],
+    ),
+    (
         "dashboard",
         "Dashboard",
         "Applies as soon as you save; the port, addresses and threads at the next start.",
@@ -226,8 +238,11 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
     (
         "sandbox",
         "Sandbox",
-        "Applies to each agent that starts after you save.",
-        [("sandbox.allowed_domains", "Sites agents may reach")],
+        "Sites apply to each agent that starts after you save; cache folders at the next install, which makes them.",
+        [
+            ("sandbox.allowed_domains", "Sites agents may reach"),
+            ("sandbox.writable_caches", "Tool caches agents may write, in their home"),
+        ],
     ),
     (
         "records",
@@ -257,8 +272,6 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("repo.path", "Checkout"),
             ("repo.default_branch", "Default branch"),
             ("repo.github", "On GitHub"),
-            ("repo.staging_health", "Staging health address"),
-            ("repo.prod_health", "Prod health address"),
             ("repo.protected_paths", "Paths only you change"),
         ],
     ),
@@ -280,6 +293,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("install.drill_seconds", "Longest drill, seconds"),
             ("install.hook_timeout_seconds", "Seconds Claude Code waits for the guard"),
             ("install.healthchecks_grace_minutes", "Minutes a check-in may be late"),
+            ("install.toolchain", "Programs the product's scripts need"),
         ],
     ),
 ]

@@ -37,7 +37,7 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
     found: dict[str, list[tuple[int, str, str]]] = {}
     problems: list[str] = []
     for rel in repo.tracked:
-        if scope.classify(rel) != "source" or not rel.endswith(scope.COMMENT_SUFFIXES):
+        if scope.classify(rel) != "source" or not rel.endswith(scope.COMMENT_SUFFIXES) or repo.excluded(rel):
             continue
         try:
             found[rel] = hits(rel, repo.read(rel))

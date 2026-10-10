@@ -79,6 +79,7 @@ def _parser() -> argparse.ArgumentParser:
     reflect.add_argument("text")
     sub.add_parser("status")
     sub.add_parser("settings").add_argument("what", choices=["show"])
+    _telemetry(sub)
     request = sub.add_parser("request", help="request new --from … --severity … --where … --body <file>")
     request.add_argument("what", choices=["new"])
     request.add_argument("--from", dest="sender", default="")
@@ -163,6 +164,13 @@ def _queue(sub: Any) -> None:
     status.add_argument("--note", default="")
 
 
+def _telemetry(sub: Any) -> None:
+    for verb, flag, what in (("errors", "--issue", "a GlitchTip issue"), ("traces", "--trace", "a Langfuse trace")):
+        parser = sub.add_parser(verb, help=f"{verb} of prod, staging or a slot, or {what}; read-only")
+        parser.add_argument("--where", nargs="+", default=["prod"], metavar="prod|staging|slot N")
+        parser.add_argument(flag, dest="one")
+
+
 def _slot(sub: Any) -> None:
     slot = sub.add_parser("slot", help="your stack slot")
     ops = slot.add_subparsers(dest="op", required=True)
@@ -242,6 +250,8 @@ def _call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
         return Call("reflect", {"kind": ns.kind, "text": ns.text})
     if cmd == "settings":
         return Call("settings.show", {})
+    if cmd in ("errors", "traces"):
+        return _telemetry_call(ns)
     if cmd == "request":
         args = {"severity": ns.severity, "where": ns.where, **({"from": ns.sender} if ns.sender else {})}
         return Call("request.new", args, read_file(ns.body))
@@ -293,6 +303,19 @@ def _propose_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> 
         raise CliError("factory propose <task> --picture <file> --why '…' [--run N --reason '…']")
     args = {"task": ns.task, "why": ns.why, **({"run": ns.run} if ns.run is not None else {})}
     return Call("propose", {**args, **({"reason": ns.reason} if ns.reason else {})}, read_file(ns.picture))
+
+
+def _telemetry_call(ns: argparse.Namespace) -> Call:
+    where = _words(ns.where)
+    if where in (["prod"], ["staging"]):
+        args: dict[str, Any] = {"where": where[0]}
+    elif len(where) == 2 and where[0] == "slot" and where[1].isdigit():
+        args = {"where": "slot", "slot": int(where[1])}
+    else:
+        raise CliError("--where is prod, staging or slot <n>")
+    if ns.one is not None:
+        args["issue" if ns.cmd == "errors" else "trace"] = ns.one
+    return Call(ns.cmd, args)
 
 
 def _slot_call(ns: argparse.Namespace) -> Call:

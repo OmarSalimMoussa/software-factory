@@ -1,7 +1,8 @@
 """What the product's git hooks check: inside the factory's slice, no commit or merge into the default branch changes
 a protected path, nothing is committed to the factory's own repo, and no push leaves (the warden pushes). A merge
 into the default branch lands only with a tree that passed `factory check` on its branch, so it is never checked
-twice and never unchecked.
+twice and never unchecked. The protected paths are the guard's, scripts the main checkout's factory.toml names
+included; while that file cannot be read, nothing is committed inside the slice.
 
 The guard reads each tool call, but a script run from the shell can write a file it never sees; every change reaches
 the default branch through a commit or a merge, so the hooks check both. The hooks run this installed, root-owned
@@ -108,10 +109,12 @@ def main(argv: list[str]) -> int:
         default = settings.get_str("repo.default_branch")
         paths = [] if hook == "pre-push" else _git("diff", "--cached", "--name-only", "--no-renames", "-z").split("\0")
         factory = is_factory_repo(_optional_git("remote", "get-url", "origin"))
+        in_slice = _in_slice()
+        # Read only inside the slice: the owner's own commit, which may be the fix to factory.toml, never needs them.
         reason = refusal(
             [p for p in paths if p],
-            prefixes=protected_paths(settings),
-            in_slice=_in_slice(),
+            prefixes=protected_paths(settings) if in_slice else (),
+            in_slice=in_slice,
             hook=hook,
             on_default=branch == default,
             merging=merging,

@@ -44,7 +44,8 @@ in every state, and you prove each finding with a screenshot.
 - **Forms:** validation says what is wrong; what you entered is what is saved and used.
 - **Destructive actions ask first.** State survives a refresh. Nothing hangs: no frozen page, endless spinner or
   button with no effect.
-- **Console and network:** no new console errors, no unexpected 4xx or 5xx, no dead links.
+- **Console and network:** no new console errors, no unexpected 4xx or 5xx, no dead links. `factory ready-check`
+  names your slot: after your items, `factory errors --where slot <n>` shows no new issue your steps raised.
 - **Widths and themes:** both themes, at each width your brief lists. Resize with the resize tool, then read
   `window.innerWidth` to prove the width took. At phone width, run the edge check in
   `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/phone-width.md` on each screen and use every control there.

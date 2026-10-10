@@ -1,9 +1,11 @@
 """Probing staging's and prod's health addresses, and telling a failure of the host from a failure on this side.
 
-A probe asks the address repo.staging_health or repo.prod_health names for a JSON object naming the running commit
-as build_commit. A failure counts toward an outage only when the host itself answered wrongly (an HTTP error, a
-redirect or an answer with no build_commit) or timed out, and the control probe reached GitHub at that moment. A
-failure to reach the host at all (no name, refused, unreachable, TLS) is this side's network and never counts.
+Each address is https://<domain><[deploy].health>, from factory.toml in the product's main checkout, read at every
+probe: only a person changes that file. A probe asks it for a JSON object naming the running commit as build_commit.
+A failure counts toward an outage only when the host itself answered wrongly (an HTTP error, a redirect or an answer
+with no build_commit) or timed out, and the control probe reached GitHub at that moment. A failure to reach the host
+at all (no name, refused, unreachable, TLS) is this side's network and never counts, and neither is a factory.toml
+that cannot be read: the probe then has no address, says why, and never guesses one.
 """
 
 from __future__ import annotations
@@ -17,12 +19,16 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+from runtime.queue import files
 from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
+from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
+from standard import config
 
 STAGING, PROD = "staging", "prod"
 ENVS = (STAGING, PROD)
@@ -33,6 +39,10 @@ _SHA = re.compile(r"^[0-9a-f]{7,40}$")
 
 class NetworkFailure(Exception):
     """The request never reached the host; the message names the failure's class."""
+
+
+class NoAddress(Exception):
+    """factory.toml in the main checkout cannot give an environment's health address; the message says why."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,15 +80,34 @@ def http_get(url: str, timeout: float) -> Answer:
         raise NetworkFailure(type(exc).__name__) from exc
 
 
+def address(ctx: Context, env: str) -> str:
+    """``env``'s health address, from factory.toml in the main checkout (repo.path), read without following a
+    symlink as GOAL.md is."""
+    settings = ctx.settings()
+    repo = Path(settings.get_str("repo.path"))
+    try:
+        raw = files.read_repo_file(repo, config.FILE, settings.get_int("queue.max_upload_kib") * 1024)
+        product = config.parse_text(raw.decode(), repo / config.FILE)
+    except FileNotFoundError as exc:
+        raise NoAddress(f"{config.FILE} is missing from {repo}") from exc
+    except config.ConfigError as exc:
+        raise NoAddress(f"{config.FILE} is not usable: {'; '.join(exc.problems)}") from exc
+    except Refused as exc:
+        raise NoAddress(exc.reason) from exc
+    except (OSError, UnicodeDecodeError) as exc:
+        raise NoAddress(f"{config.FILE} cannot be read ({type(exc).__name__})") from exc
+    return f"https://{product.workspace(env).domain}{product.deploy.health}"
+
+
 def take(ctx: Context, env: str, fetch: Fetch) -> Probe:
     """Probe one environment now and record it in probes.jsonl."""
-    settings = ctx.settings()
-    url = settings.get_str(f"repo.{env}_health")
-    timeout = float(settings.get_int("watch.http_timeout_seconds"))
+    timeout = float(ctx.settings().get_int("watch.http_timeout_seconds"))
     at = ctx.clock.iso()
     started = time.monotonic()
     try:
-        answer = fetch(url, timeout)
+        answer = fetch(address(ctx, env), timeout)
+    except NoAddress as exc:
+        probe = Probe(at, env, False, "", None, f"no health address: {exc}; not counted")
     except TimeoutError:
         probe = _failed(ctx, at, env, _ms(started), f"no answer within {timeout:g} s")
     except NetworkFailure as exc:

@@ -74,12 +74,16 @@ def _nonblank_span(lines: list[str], start: int, end: int) -> set[int]:
 
 def py_comment_lines(text: str) -> set[int]:
     """1-based line numbers holding a `#` comment (never a first-line `#!`, which only tells the kernel how to run the
-    file) or a docstring line (module, class, function), each counted once; blank lines inside a docstring are not."""
+    file) or a docstring line (module, class, function), each counted once; blank lines inside a docstring are not.
+    Raises SyntaxError when the text does not parse."""
     lines = text.splitlines()
     result: set[int] = set()
-    for tok in tokenize.generate_tokens(io.StringIO(text).readline):
-        if tok.type == tokenize.COMMENT:
-            result.add(tok.start[0])
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+            if tok.type == tokenize.COMMENT:
+                result.add(tok.start[0])
+    except tokenize.TokenError as exc:
+        raise SyntaxError(exc.args[0]) from exc  # args: the message, then where
     for _, doc in _docstrings(text):
         result |= _nonblank_span(lines, doc.lineno, doc.end_lineno or doc.lineno)
     return result - {1} if text.startswith("#!") else result

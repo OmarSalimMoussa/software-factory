@@ -4,8 +4,9 @@
 
 Add ``--dry-run`` (no sudo needed) to print every step and what it would do, changing nothing. The install archives
 the commit, tests that copy, and places it read-only; sets up the users, the units, polkit, the firewall, Claude Code's
-managed settings and the sandbox's needs; starts the factory; and runs the drills. It refuses to begin while any
-session is working or waiting, and refuses to finish while any drill fails. Rerun it after every change to the factory.
+managed settings and the sandbox's needs; starts the shared services every slot uses, then the factory; and runs the
+drills. It refuses to begin while any session is working or waiting, and refuses to finish while any drill fails.
+Rerun it after every change to the factory.
 """
 
 from __future__ import annotations
@@ -23,7 +24,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from runtime.shared.paths import Places  # noqa: E402 - the path line above must run first
 from runtime.shared.protocol import Refused  # noqa: E402
-from runtime.system import drills, healthchecks, steps_machine, steps_prepare, steps_wire  # noqa: E402
+from runtime.system import (  # noqa: E402
+    drills,
+    healthchecks,
+    steps_machine,
+    steps_prepare,
+    steps_services,
+    steps_toolchain,
+    steps_wire,
+)
 from runtime.system.host import CommandError, DryHost, Host, RealHost  # noqa: E402
 from runtime.system.job import REPO_ROOT, Install, refuse  # noqa: E402
 
@@ -62,10 +71,12 @@ STEPS: tuple[tuple[str, Callable[[Install], None]], ...] = (
     ("Lay out the state folder", steps_machine.state_tree),
     ("Place the factory, read-only", steps_machine.place),
     ("Install Claude Code for the agents", steps_machine.claude_binary),
+    ("Install the product's toolchain", steps_toolchain.toolchain),
     ("Let bubblewrap run", steps_machine.apparmor),
     ("Give the agent user its checkout", steps_machine.agent_checkout),
     ("Give the warden its clone of the factory", steps_machine.warden_clone),
     ("Set up the stack user's rootless Docker", steps_machine.rootless_docker),
+    ("Place the shared services", steps_services.place),
     ("Keep the secrets", steps_machine.secrets),
     ("Write Claude Code's managed settings", steps_wire.managed_settings),
     ("Install the units", steps_wire.units),
@@ -74,6 +85,8 @@ STEPS: tuple[tuple[str, Callable[[Install], None]], ...] = (
     ("Install the factory command", steps_wire.factory_command),
     ("Point both product checkouts at the factory's git hooks", steps_wire.git_hooks),
     ("Publish the dashboard on the tailnet", steps_wire.tailnet),
+    ("Start the shared services", steps_services.start),
+    ("Keep the shared services' keys", steps_services.keys),
     ("Start the factory", steps_wire.start),
     ("Run the drills", run_drills),
     ("Create the Healthchecks.io checks", healthchecks.create),

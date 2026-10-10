@@ -52,6 +52,9 @@ VERBS: dict[str, Verb] = {
     "reflect": _v("runtime.warden.reflections:append", *ANY),
     "status": _v("runtime.warden.status:status", *ANY),
     "settings.show": _v("runtime.warden.status:settings_show", *ANY),
+    # contract: added by FB6, read-only telemetry; the guard lets only intake, triage and testers among subagents ask
+    "errors": _v("runtime.warden.telemetry:errors", *SESSIONS),
+    "traces": _v("runtime.warden.telemetry:traces", *SESSIONS),
     # the queue (1C)
     "request.new": _v("runtime.queue.verbs:request_new", *ANY),
     "triage.apply": _v("runtime.queue.verbs:triage_apply", ORCH),

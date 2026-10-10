@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -12,6 +13,8 @@ from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.protocol import Refused
 from runtime.warden import deploys, github_push, inbox, ops, probes
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -53,8 +56,10 @@ def github_repo(world: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(config))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     git(tmp_path, "init", "-q", "--bare", str(remote))
-    world.checkout.mkdir()
+    world.checkout.mkdir(exist_ok=True)
     git(world.checkout, "init", "-q")
+    # The settings name the hook scripts a push refuses to change.
+    shutil.copy(ROOT / "testdata" / "fixture-product" / "factory.toml", world.checkout / "factory.toml")
     commit(world.checkout, write(".github/workflows/ci.yml"))
     git(world.checkout, "push", "-q", str(remote), "master")
     key = github_push.deploy_key(world.ctx.places)
@@ -67,14 +72,15 @@ def github_repo(world: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     "change",
     [
         write(".github/workflows/deploy.yml"),
-        write("scripts/ci/promote"),
+        write("factory.toml"),
+        write("scripts/smoke-check"),
         write("check-values/surfaces.toml"),
         write("GOAL.md"),
         write("goal/G1.md"),
         write('.github/workflows/a"b\tc.yml'),
         move(".github/workflows/ci.yml", "docs/ci.yml"),
     ],
-    ids=["workflow", "ci-script", "surfaces", "goal-file", "goal-folder", "quoted-name", "renamed-away"],
+    ids=["workflow", "settings", "hook", "surfaces", "goal-file", "goal-folder", "quoted-name", "renamed-away"],
 )
 def test_push_refuses_a_range_touching_a_protected_path(
     world: World, github_repo: Path, change: Callable[[Path], None]
@@ -134,11 +140,23 @@ def test_push_to_prod_runs_its_steps_and_asks_for_a_qa_prod_pass(world: World, b
     started = github_push.push_prod(world.ctx, {"expected_staging_sha": build}, None)
     ops.join(started["op"], timeout=30)
     op = ops.get(world.ctx, {"id": started["op"]}, None)["op"]
-    assert [step["state"] for step in op["steps"]] == [ops.DONE] * 4, op
+    assert [step["state"] for step in op["steps"]] == [ops.DONE] * 5, op
     # A product may report a short build; its prod workflow checks out the full commit.
     assert world.github.dispatched == [world.github.full_sha(build)]
     assert world.events == [(inbox.QA_PROD_DUE, {"sha": build, "kind": "push"})]
     assert github_push.watching(world.ctx)
+
+
+def test_a_failed_release_after_a_good_deploy_fails_only_the_last_step(world: World) -> None:
+    probe(world, probes.STAGING, True, STAGING)
+    probe(world, probes.PROD, True, PROD)
+    world.github.on_run = lambda: probe(world, probes.PROD, True, STAGING)
+    world.github.releases = "failure"
+    started = github_push.push_prod(world.ctx, {"expected_staging_sha": STAGING}, None)
+    ops.join(started["op"], timeout=30)
+    steps = ops.get(world.ctx, {"id": started["op"]}, None)["op"]["steps"]
+    assert [step["state"] for step in steps[:-1]] == [ops.DONE] * 4 and steps[-1]["state"] != ops.DONE
+    assert "prod is live" in str(steps[-1])
 
 
 def test_push_back_goes_only_to_the_build_before_prods_current_one_in_the_deploy_log(world: World) -> None:

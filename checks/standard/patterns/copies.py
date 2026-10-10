@@ -88,7 +88,7 @@ def find(repo: Repo, server: Sequence[str], web: Sequence[str], markers: Sequenc
     python = [
         (rel, name, line, items_found)
         for rel in repo.tracked
-        if _in(rel, server, (".py",))
+        if _in(rel, server, (".py",)) and not repo.excluded(rel)
         for name, line, items_found in python_collections(repo.read(rel))
     ]
     found: list[Found] = []

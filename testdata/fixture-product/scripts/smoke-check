@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""The notes app's own smoke check, which the factory's smoke test runs after its own: the page's
+script answers inside the stack. FACTORY_COMPOSE is the stack's compose command, shell-quoted."""
+
+from __future__ import annotations
+
+import os
+import shlex
+import subprocess
+import sys
+
+PROBE = ["wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8000/app.js"]
+
+if __name__ == "__main__":
+    compose = shlex.split(os.environ["FACTORY_COMPOSE"])
+    sys.exit(subprocess.run([*compose, "exec", "-T", "app", *PROBE], check=False).returncode)

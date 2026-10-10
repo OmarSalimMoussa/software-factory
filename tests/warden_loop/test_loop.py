@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
@@ -7,8 +8,9 @@ import pytest
 from loop_fakes import World, healthy
 
 from runtime.queue import formats
+from runtime.shared import store
 from runtime.shared.models import INBOXES, Request
-from runtime.warden import inbox, loop
+from runtime.warden import errors_import, inbox, loop, telemetry
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -79,3 +81,32 @@ def test_loop_due_comes_once_per_loop_period_after_the_last_pass(ticking: World,
     assert tick(ticking, tmp_path) == []
     ticking.clock.t += 1
     assert tick(ticking, tmp_path) == [inbox.LOOP_DUE]
+
+
+def test_a_failed_errors_read_never_stops_the_loop_and_is_logged_once_a_run(
+    ticking: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    file_requests(ticking, 0, 0)
+    store.write_json(telemetry.server_json(ticking.ctx.places), {
+        "glitchtip": {"url": "https://box.test:8200", "org": "notes", "token": "tok-read"},
+        "langfuse": {"url": "https://box.test:3100", "public_key": "pk-lf-1", "secret_key": "sk-lf-1"},
+    })  # fmt: skip
+    reads: list[str] = []
+
+    def down(url: str, headers: dict[str, str], timeout: float) -> telemetry.Reply:
+        reads.append(url)
+        raise TimeoutError(url)
+
+    monkeypatch.setattr(telemetry, "http_get", down)
+    period = ticking.ctx.settings().get_int("errors.poll_minutes") * 60
+    events = []
+    with caplog.at_level(logging.WARNING, logger=errors_import.__name__):
+        for _ in range(2):
+            events += tick(ticking, tmp_path)
+            ticking.clock.t += period
+    assert len(reads) == 2 and inbox.LOOP_DUE in events  # read again at the next poll; the tick went on
+    assert [r.getMessage() for r in caplog.records] == [
+        "warden: importing prod's errors failed (GlitchTip did not answer /api/0/organizations/notes/issues/ "
+        "(TimeoutError)); it runs again at the next poll"
+    ]
+    assert "(TimeoutError)" in str(errors_import.note(ticking.ctx.places))

@@ -5,11 +5,9 @@
 path = ""               # required: the factory's own checkout of the product, owned by software-agent
 default_branch = "master"
 github = ""             # required: owner/name of the product on GitHub
-staging_health = ""     # required: answers JSON naming the running commit as build_commit
-prod_health = ""        # required
-protected_paths = []    # the product's extra paths only a person changes, such as its deploy scripts; a trailing /
-                        # names a folder. GOAL.md, goal/, .git, check-values/surfaces.toml, .github/workflows/,
-                        # .github/factory-ref and scripts/ci/ always are
+protected_paths = []    # the product's extra paths only a person changes; a trailing / names a folder. GOAL.md,
+                        # goal/, .git, check-values/surfaces.toml, .github/workflows/, .github/factory-ref,
+                        # factory.toml and every script factory.toml names always are
 
 [models]                # model and effort for every role
 allowed = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
@@ -127,12 +125,22 @@ plan_red_percent = 95
 [queue]
 max_upload_kib = 512    # a picture, spec or triage plan sent with a factory command
 
+[errors]                # prod's unresolved GlitchTip issues, each filed once as a request from glitchtip
+poll_minutes = 5        # how often the warden reads them
+max_pages = 5           # pages of issues one read covers, newest first
+
+[telemetry]             # `factory errors` and `factory traces`: agents read GlitchTip and Langfuse through the warden
+max_items = 20          # issues or traces one answer lists
+max_kib = 64            # the largest answer an agent gets; longer lists and texts are cut to fit
+timeout_seconds = 20    # one call to GlitchTip or Langfuse
+
 [reflect]
 fold_hours = 24         # the same kind and text within this window bumps a count instead of a new entry
 max_chars = 600         # the longest reflection an agent may write
 
 [sandbox]
 allowed_domains = ["pypi.org", "files.pythonhosted.org", "registry.npmjs.org"]
+writable_caches = [".cache/uv", ".npm"]  # folders in the agent's home a session may write: its tools' caches
 
 [dashboard]
 port = 8300
@@ -168,3 +176,4 @@ drill = { model = "claude-haiku-5-5", effort = "low" }  # the model the drills d
 drill_seconds = 180     # the longest one drill may run
 hook_timeout_seconds = 10  # how long Claude Code waits for the guard; a timeout lets the call through
 healthchecks_grace_minutes = 10  # how late a Healthchecks.io check-in may be before the owner is told
+toolchain = ["uv", "node"]  # programs the product's scripts need, copied from the owner's PATH for the agents and stack

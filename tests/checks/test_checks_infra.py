@@ -9,15 +9,13 @@ import pytest
 from checks.runner.repo import Repo
 from checks.standard import (
     config_readers,
-    deploy_bundle,
     env_template_sync,
     generated_current,
-    image_roster,
     image_sources,
     pinned_config,
     seeds_current,
 )
-from checks.standard.infra import yaml_subset
+from standard import yaml_subset
 
 MakeRepo = Callable[[dict[str, str]], Path]
 
@@ -57,38 +55,6 @@ def test_a_key_a_service_reads_but_is_not_supplied_fails(make_repo: MakeRepo) ->
     problems = config_readers.run(Repo.open(root), READERS)
     assert [p.split(" lacks ")[1].split(" ")[0] for p in problems] == ["DB_URL", "TOKEN", "TRACE"]
     assert "interpolate it as `${TOKEN:?}`" in problems[1]
-
-
-def test_a_mount_outside_the_bundle_and_a_singleton_with_an_env_file_fail(make_repo: MakeRepo) -> None:
-    compose = (
-        "services:\n  api:\n    container_name: app-${WS}-api\n    volumes:\n      - ./conf/api.toml:/etc/api.toml\n"
-        "      - data:/data\n  db:\n    container_name: shared-db\n    env_file: app.env\n"
-        "    volumes:\n      - type: bind\n        source: ./db/init.sql\n        target: /init.sql\n"
-    )  # fmt: skip
-    dockerfile = "FROM base\nCOPY conf /app/deploy/conf\nCOPY --from=x db /app/deploy/db\n"
-    root = make_repo({"compose.yml": compose, "Dockerfile": dockerfile})
-    values = {"bundles": [{"compose": "compose.yml", "dockerfile": "Dockerfile", "bundle_dir": "/app/deploy",
-                           "required": ["deploy.sh"], "workspace_variable": "WS"}]}  # fmt: skip
-    problems = deploy_bundle.run(Repo.open(root), values)
-    assert len(problems) == 3
-    assert "mounts ./db/init.sql" in problems[0]
-    assert "lacks deploy.sh" in problems[1]
-    assert "host singleton db" in problems[2]
-
-
-def test_an_image_the_code_names_but_ci_never_builds_fails(make_repo: MakeRepo) -> None:
-    root = make_repo({
-        "ci.yml": "matrix:\n  - {name: api, x: 1}\n  - {name: web-ui, x: 1}\n",
-        "deploy.sh": "for img in api web-ui; do pull $img; done\n",
-        "run.py": 'IMAGE = "reg.io/org/app-worker"\nPREFIX = "reg.io/org/app-web-"\n',
-        "docs/images.md": "reg.io/org/app-ghost\n",
-    })  # fmt: skip
-    values = {"rosters": [{"registry": "reg.io/org/app-", "skipped": ["docs/"], "skipped_suffixes": [".md"],
-                           "built": {"file": "ci.yml", "pattern": r"^\s*-\s*\{\s*name:\s*([a-z0-9-]+)\s*,"},
-                           "pulled": {"file": "deploy.sh", "pattern": r"^for img in ([a-z0-9 -]+);"}}]}  # fmt: skip
-    problems = image_roster.run(Repo.open(root), values)
-    assert len(problems) == 1
-    assert "run.py runs the image reg.io/org/app-worker, which CI never builds" in problems[0]
 
 
 def test_a_copied_file_importing_an_uncopied_one_fails_with_its_copy_line(make_repo: MakeRepo) -> None:
@@ -148,11 +114,6 @@ def test_a_failing_seed_check_fails_with_what_it_printed(make_repo: MakeRepo) ->
 @pytest.mark.parametrize(
     ("check", "values"),
     [
-        (deploy_bundle, {"bundles": [{"compose": "compose.yml", "dockerfile": "Dockerfile", "bundle_dir": "/b",
-                                      "required": [], "workspace_variable": "WS"}]}),
-        (image_roster, {"rosters": [{"registry": "r/", "skipped": [], "skipped_suffixes": [],
-                                     "built": {"file": "ci.yml", "pattern": "(x)"},
-                                     "pulled": {"file": "deploy.sh", "pattern": "(x)"}}]}),
         (image_sources, {"images": [{"dockerfile": "Dockerfile", "context": "."}]}),
         (pinned_config, {"pins": [{"file": "app.toml", "format": "toml", "path": ["a"], "value": 1, "reason": "r"}]}),
         (generated_current, {"check_commands": [], "print_commands": [{"name": "g", "command": ["true"],

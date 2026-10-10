@@ -20,18 +20,39 @@ authenticator app set up at install.
 
 ## Ship
 
-The product's CI is the factory's template, copied in unchanged. It checks every push, and takes each push to the
-default branch to staging through the product's own steps in `scripts/ci/`. The product also brings staging and prod
-health addresses that answer JSON naming the running commit as `build_commit` ([repo-shape.md](repo-shape.md) has
-the details).
+The product's CI is the factory's templates, copied in unchanged. It checks every push, and builds each push to the
+default branch, smoke-tests it and deploys it to staging, the standard way the product's `factory.toml` describes
+([ci.md](ci.md)). The server's deploy command does the rest ([deploy.md](deploy.md)). Staging and prod each answer a
+health address with JSON naming the workspace, the running commit as `build_commit`, and the work still running as
+`busy`.
 
 When staging looks right, press Push to prod in the top bar and enter the code. The warden starts the product's
-`deploy-prod.yml` with exactly the commit staging runs, then watches prod until it answers on it. If prod misbehaves,
-push back the same way: the warden starts the same workflow with the commit prod ran before. It knows that commit
-from its deploy log, which records each new build staging and prod answer with.
+`deploy-prod.yml` with exactly the commit staging runs, follows its deploy job, then watches prod until it answers on
+it. The release steps run last (a browser extension's store upload, when it changed); a failed release shows as the
+push's last step, with prod already live. If prod misbehaves, push back the same way: the warden starts the same
+workflow with the commit prod ran before. It knows that commit from its deploy log, which records each new build
+staging and prod answer with.
 
 Your own checkout of the product runs the factory's git hooks too: a merge into the default branch there lands only
 with a tree that passed `factory check`.
+
+## Errors and traces
+
+Every product gets a database, traces (Langfuse) and errors (GlitchTip) from the factory: on the server for staging
+and prod ([server.md](server.md)), and on the laptop for the stack slots ([laptop-services.md](laptop-services.md)).
+Each new prod error arrives once as a request in the agents' inbox, for triage beside your feedback. Agents read
+errors and traces with `factory errors` and `factory traces`; the factory's own failures report to the laptop's
+GlitchTip too.
+
+## The product's tools
+
+The agents and the stack run the product's scripts with your own tools: the install copies each program in
+`install.toolchain` from your PATH, and the Python the product asks for (its `.python-version`, else its
+`requires-python`) from your uv, into `/opt/software-factory-toolchain/`. The copies are root-owned and read-only, and
+the factory's uv finds its Python there and never downloads one. When the product asks for a Python you have not
+installed, the install stops and names it: run `uv python install <version>`, then install again. Sessions may also
+write their tools' caches in the agent's home (`sandbox.writable_caches`), so the product's tests run inside their
+sandbox. At every install, a drill runs each tool and finds the product's Python from inside a session.
 
 ## Pause, stop, resume
 
@@ -54,8 +75,10 @@ To act on one:
 2. Change the factory's repo by hand: branch, test, merge, push.
 3. Reinstall from the reviewed commit: `sudo python3 runtime/system/install.py --commit <sha> --repo <path>`. The
    installer refuses while any factory session is live.
-4. In the product, move `.github/factory-ref` to that commit, and copy in `templates/ci/` again if it changed.
-5. Start the orchestrator again.
+4. Run the server set-up again from that commit (`python3 -m standard.server.setup --product <path>`): a deploy
+   refuses a build planned by another factory commit than the server runs.
+5. In the product, move `.github/factory-ref` to that commit, and copy in `templates/ci/` again if it changed.
+6. Start the orchestrator again.
 
 ## When something is wrong
 

@@ -77,17 +77,27 @@ class RestGitHub:
         return full
 
     def run(self, run_id: str) -> dict[str, Any]:
-        """A workflow run: id, status (queued, waiting, in_progress, completed), conclusion, url, head_sha."""
+        """A workflow run: id, status (queued, waiting, in_progress, completed), conclusion, url, head_sha, and
+        jobs: each job's status and conclusion by its name."""
         body = self._json("GET", f"/repos/{self._repo()}/actions/runs/{_seg(run_id)}")
         status = body.get("status")
         if not isinstance(status, str):
             raise GitHubError(f"GitHub's run {run_id} has no status")
+        listed = self._json("GET", f"/repos/{self._repo()}/actions/runs/{_seg(run_id)}/jobs").get("jobs")
+        if not isinstance(listed, list):
+            raise GitHubError(f"GitHub's run {run_id} has no list of jobs")
+        jobs = {
+            str(job.get("name")): {"status": job.get("status"), "conclusion": job.get("conclusion")}
+            for job in listed
+            if isinstance(job, dict)
+        }
         return {
             "id": str(body.get("id")),
             "status": status,
             "conclusion": body.get("conclusion"),
             "url": body.get("html_url"),
             "head_sha": body.get("head_sha"),
+            "jobs": jobs,
         }
 
     def reachable(self) -> bool:

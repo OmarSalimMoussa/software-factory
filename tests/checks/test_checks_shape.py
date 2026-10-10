@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from checks.runner.repo import Repo
-from checks.standard import ci_shape, repo_shape
+from checks.standard import deploy_shape, repo_shape
 
 Break = Callable[[Path], None]
 
@@ -62,27 +64,66 @@ def _remove(rel: str) -> Break:
     return lambda root: (root / rel).unlink()
 
 
-def test_the_fixture_carries_the_factorys_ci(fixture_product: Path) -> None:
-    assert ci_shape.run(Repo.open(fixture_product), {}) == []
+def _derive_twice(root: Path) -> None:
+    """app builds FROM mid, which builds FROM base: two levels."""
+    toml = root / "factory.toml"
+    extras = ", ".join(f'{{ name = "{n}", dockerfile = "{n}/Dockerfile", context = "." }}' for n in ("mid", "base"))
+    toml.write_text(toml.read_text().replace("extra_images = []", f"extra_images = [{extras}]"))
+    for name, base in (("mid", "notes-base:${NOTES_IMAGE_TAG}"), ("base", None), ("app", "notes-mid:$NOTES_IMAGE_TAG")):
+        (root / name).mkdir(exist_ok=True)
+        (root / name / "Dockerfile").write_text(f"FROM ghcr.io/owner/{base}\n" if base else "FROM busybox:1.37\n")
+
+
+@pytest.fixture
+def standard_product(fixture_product: Path) -> Path:
+    """The fixture product carrying the factory's current workflow templates, whether or not its copies match yet."""
+    for template in deploy_shape.TEMPLATES.iterdir():
+        shutil.copy(template, fixture_product / ".github" / "workflows" / template.name)
+    for args in (["add", "-A"], ["commit", "-q", "--no-verify", "--allow-empty", "-m", "the factory's workflows"]):
+        subprocess.run(["git", *args], cwd=fixture_product, check=True, capture_output=True)
+    return fixture_product
+
+
+def test_the_fixture_has_the_standard_deploy_shape(standard_product: Path) -> None:
+    assert deploy_shape.run(Repo.open(standard_product), {}) == []
 
 
 @pytest.mark.parametrize(
     ("damage", "said"),
     [
-        (
-            _edit(".github/workflows/ci.yml", "--all", "--all --only tools"),
-            ".github/workflows/ci.yml differs from the factory's template at line",
-        ),
-        (_edit(".github/workflows/deploy-prod.yml", "\n", "\r\n"), "deploy-prod.yml differs from the factory's"),
-        (_remove("scripts/ci/smoke"), "scripts/ci/smoke is missing"),
-        (_chmod("scripts/ci/promote"), "scripts/ci/promote is not executable"),
+        (_edit("factory.toml", 'name = "notes"', 'name = "Notes"'), "factory.toml: [product].name: 'Notes' is not"),
+        (_edit("factory.toml", '"ghcr.io/owner"', '"registry.example.com/owner"'),
+         "[product].registry is registry.example.com/owner, but CI pushes only to ghcr.io/<owner>"),
+        (_edit(".github/workflows/ci.yml", "\n", "\r\n"), ".github/workflows/ci.yml differs from the factory's"),
+        (_remove(".github/workflows/heartbeat.yml"), ".github/workflows/heartbeat.yml is missing"),
         (_add(".github/factory-ref", "owner/software-factory@main\n"), ".github/factory-ref must hold one line"),
+        (_chmod("scripts/smoke-check"), "factory.toml names scripts/smoke-check as a hook, but it is not executable"),
+        (_edit("factory.toml", 'expect = [{ service = "app"', 'expect = [{ service = "db"'),
+         "[smoke] names the service db, which compose.yml does not build"),
+        (_edit("factory.toml", "extra_images = []",
+               'extra_images = [{ name = "worker", dockerfile = "worker/Dockerfile", context = "." }]'),
+         "worker/Dockerfile is missing"),
+        (_derive_twice, "app derives from mid, which itself derives from base"),
+        (_edit("compose.yml", "notes-app:", "notes-web:"), "service app builds an image, so its image must be"),
+        (_edit("compose.yml", "    ports:", "    volumes:\n      - ./app/seed.json:/seed.json\n    ports:"),
+         "service app mounts ./app/seed.json, which a deploy does not copy"),
+        (_edit("factory.toml", '"compose.yml", "notes', '"compose.yml", "Caddyfile", "notes'),
+         "[deploy].files names Caddyfile, which is not tracked"),
+        (_edit("factory.toml", '"compose.yml", "notes.env.template"]', '"compose.yml"]'),
+         "[deploy].files lacks notes.env.template"),
+        (_add("qa/README.md", "Pull ghcr.io/owner/notes-worker:latest first.\n"),
+         "qa/README.md names the image ghcr.io/owner/notes-worker, which CI never builds"),
+        (_edit("notes.env.template", "NOTES_ORIGIN=\n", ""), "[env.set] writes NOTES_ORIGIN, which notes.env.template"),
+        (_edit("compose.yml", '"127.0.0.1:${NOTES_PORT:?}:8000"', '"${NOTES_PORT:?}:8000"'),
+         "service app publishes '${NOTES_PORT:?}:8000' beyond this machine"),
     ],
-)
-def test_a_ci_that_drifts_from_the_template_fails_naming_the_problem(
-    fixture_product: Path, commit: Callable[[Path, str], None], damage: Break, said: str
+    ids=["settings", "registry", "workflow", "workflow-missing", "factory-ref", "hook", "smoke", "extra-image",
+         "two-levels", "image-name", "bind-mount", "untracked-file", "deploy-files", "named-image", "env-key", "port"],
+)  # fmt: skip
+def test_a_product_off_the_standard_deploy_fails_naming_what_to_do(
+    standard_product: Path, commit: Callable[[Path, str], None], damage: Break, said: str
 ) -> None:
-    damage(fixture_product)
-    commit(fixture_product, "damage")
-    problems = ci_shape.run(Repo.open(fixture_product), {})
+    damage(standard_product)
+    commit(standard_product, "damage")
+    problems = deploy_shape.run(Repo.open(standard_product), {})
     assert any(said in p for p in problems), problems

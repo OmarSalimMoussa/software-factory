@@ -63,7 +63,7 @@ def measure(repo: Repo, trees: list[str]) -> tuple[dict[str, dict[str, int]], li
     tree_total: Counter[str] = Counter()
     outside: list[str] = []
     for rel in repo.tracked:
-        if not measured_file(rel):
+        if not measured_file(rel) or repo.excluded(rel):
             continue
         try:
             docblock[rel], docstrings[rel], discretionary, nonblank = file_counts(rel, repo.read(rel))

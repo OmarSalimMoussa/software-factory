@@ -1,0 +1,12 @@
+# A server's edge: one Caddy owning 80 and 443 for every workspace on the host. It ends TLS and passes each host
+# name to that workspace's own loopback port. Each deploy writes its workspace's site file into the sites folder, so
+# nothing here names a product or a workspace.
+{
+	email {$ACME_EMAIL}
+	# No HTTP/3: the firewall allows only TCP 443, so an advertised h3 endpoint is a black hole every browser probes.
+	servers {
+		protocols h1 h2
+	}
+}
+
+import /etc/caddy/sites/*.caddy

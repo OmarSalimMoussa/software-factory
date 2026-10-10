@@ -15,9 +15,10 @@ import shutil
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from runtime.system import layout
 
@@ -29,6 +30,10 @@ class Account:
     gid: int
     home: Path
     groups: tuple[str, ...]
+
+
+# A command whose exit code the caller reads itself: argv and its standard input, as standard/services runs them.
+Runner = Callable[[list[str], str | None], subprocess.CompletedProcess[str]]
 
 
 class CommandError(Exception):
@@ -60,6 +65,10 @@ class Host(ABC):
     @abstractmethod
     def query(self, argv: list[str], *, user: str = "", cwd: Path | None = None) -> tuple[int, str]:
         """Run a command that only reads; its exit code and output."""
+
+    @abstractmethod
+    def runner(self, user: str, env: Mapping[str, str]) -> Runner:
+        """Commands as ``user`` for code that reads each exit code itself; each is printed as it runs."""
 
     @abstractmethod
     def write(self, path: Path, text: str, *, mode: int, owner: str = "root", group: str = "") -> None: ...
@@ -130,6 +139,16 @@ class RealHost(Host):
     def query(self, argv: list[str], *, user: str = "", cwd: Path | None = None) -> tuple[int, str]:
         done = subprocess.run(self._argv(argv, user, None), cwd=cwd, text=True, capture_output=True, check=False)
         return done.returncode, done.stdout + done.stderr
+
+    def runner(self, user: str, env: Mapping[str, str]) -> Runner:
+        def run(argv: list[str], stdin: str | None) -> subprocess.CompletedProcess[str]:
+            self.say(f"  run: {' '.join(argv)[:160]} (as {user})")
+            # Without input of its own, a command reads nothing: never the owner's terminal.
+            feed: dict[str, Any] = {"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}
+            done = subprocess.run(self._argv(argv, user, env), text=True, capture_output=True, check=False, **feed)
+            return subprocess.CompletedProcess(argv, done.returncode, done.stdout, done.stderr)
+
+        return run
 
     def write(self, path: Path, text: str, *, mode: int, owner: str = "root", group: str = "") -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -210,6 +229,14 @@ class DryHost(Host):
 
     def query(self, argv: list[str], *, user: str = "", cwd: Path | None = None) -> tuple[int, str]:
         return self.answers.get(" ".join(argv), (0, ""))
+
+    def runner(self, user: str, env: Mapping[str, str]) -> Runner:
+        def run(argv: list[str], stdin: str | None) -> subprocess.CompletedProcess[str]:
+            self._do(f"run: {' '.join(argv)} (as {user})")
+            code, out = self.answers.get(" ".join(argv), (0, ""))
+            return subprocess.CompletedProcess(argv, code, out, "")
+
+        return run
 
     def write(self, path: Path, text: str, *, mode: int, owner: str = "root", group: str = "") -> None:
         self._do(f"write: {path} ({mode:o}, {owner}:{group or owner})")

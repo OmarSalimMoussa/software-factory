@@ -48,7 +48,7 @@ def measure(repo: Repo) -> dict[str, dict[str, int]]:
     gates: dict[str, dict[str, int]] = {gate: {} for gate in CEILINGS}
     folders: Counter[str] = Counter()
     for rel in repo.tracked:
-        kind = scope.classify(rel)
+        kind = None if repo.excluded(rel) else scope.classify(rel)
         if kind == "readme":
             gates["readme-size"][rel] = _lines(repo, rel)
         elif kind == "tests":

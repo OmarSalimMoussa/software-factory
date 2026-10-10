@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -8,11 +9,10 @@ from runtime.shared.settings import Settings, build
 from runtime.system.host import Account, DryHost
 from runtime.system.job import REPO_ROOT, Install
 
-# What only the owner can give; the install derives the rest of repo.* itself.
-GIVEN = {
-    "repo.staging_health": "https://staging.example.test/health",
-    "repo.prod_health": "https://example.test/health",
-}
+FIXTURE = REPO_ROOT / "testdata" / "fixture-product"
+
+# What only the owner can give with --set; the install derives every repo.* setting itself.
+GIVEN: dict[str, Any] = {}
 PRODUCT_ORIGIN = "git@github.com:acme/shop.git"
 FACTORY_ORIGIN = "git@github.com:acme/software-factory.git"
 
@@ -27,6 +27,8 @@ def dry_job(tmp_path: Path, *, healthchecks: bool = False) -> Install:
     from runtime.shared.paths import Places
 
     product = tmp_path / "shop"
+    product.mkdir(exist_ok=True)
+    shutil.copy(FIXTURE / "factory.toml", product / "factory.toml")
     host = DryHost(
         answers={
             f"git -C {REPO_ROOT} remote get-url origin": (0, FACTORY_ORIGIN),

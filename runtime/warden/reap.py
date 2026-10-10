@@ -26,7 +26,7 @@ from runtime.warden.verbs import ORCH
 log = logging.getLogger("factory.warden")
 
 # The stack unit's own verb, beside the product's scripts/dev verbs: remove every container, volume, network and
-# image labelled with the request's slot.
+# image labelled with the request's slot, and every container still on one of its networks.
 SWEEP_SLOT = "factory-sweep-slot"
 
 

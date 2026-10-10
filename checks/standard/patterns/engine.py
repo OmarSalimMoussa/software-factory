@@ -94,7 +94,10 @@ def files_of(repo: Repo, scans: Sequence[str], suffixes: Sequence[str]) -> list[
     return [
         rel
         for rel in repo.tracked
-        if scope.under(rel, scans) and (not suffixes or rel.endswith(tuple(suffixes))) and not out_of_scope(rel)
+        if scope.under(rel, scans)
+        and (not suffixes or rel.endswith(tuple(suffixes)))
+        and not out_of_scope(rel)
+        and not repo.excluded(rel)
     ]
 
 

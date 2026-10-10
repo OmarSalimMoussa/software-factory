@@ -1,6 +1,7 @@
 """The rehearsal's world: the fixture product checked out in the agent's home, a bare repo standing in for GitHub,
 and the warden wired as wardend wires it. Fakes stand only at the machine's edges: systemctl, the kernel's process
-table with Claude Code's session records, the slot's running stack, the health addresses and GitHub's API.
+table with Claude Code's session records, the slot's running stack, the shared services' Docker, the health addresses
+and GitHub's API.
 
 systemctl is the one fake with logic: a session start passes the agent-run unit's own check of its request and is
 recorded (no claude ever runs), while a command or a stack request runs the real unit runner, which runs git or the
@@ -45,15 +46,40 @@ from runtime.warden.context import Caller, Clock, Context
 from runtime.warden.dispatch import AGENT_SOCKET, OWNER_SOCKET, Dispatcher, Doors, resolve
 from runtime.warden.probes import Answer
 from runtime.warden.verbs import VERBS
+from standard import config
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "testdata" / "fixture-product"
 RUNNERS = ROOT / "runtime" / "system" / "runners"
 GITHUB = "acme/notes"
-STAGING, PROD = "https://staging.notes.test/health", "https://notes.test/health"
 AGENT_UID, OWNER_UID, DASHBOARD_UID = 2001, 1000, 2002
 T0 = datetime(2026, 10, 9, 9, 0, tzinfo=UTC).timestamp()
 SNAPSHOT = "runtime.warden.snapshot:"
+SERVICES_ENV = (
+    "POSTGRES_PASSWORD=pg\nLANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-1\nLANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-1\n"
+    "GLITCHTIP_OWNER_PASSWORD=gt\n"
+)
+# docker as a slot's provisioning drives it: networks are made and joined, psql takes its statements, and GlitchTip's
+# shell answers with a DSN for each project it is asked for. Anything else fails, naming itself.
+DOCKER = f"""#!{sys.executable}
+import ast, json, re, sys
+sys.path.insert(0, {str(ROOT)!r})
+from standard.services import glitchtip_bootstrap as glitchtip
+args = sys.argv[1:]
+if args[:2] in (["network", "ls"], ["network", "create"], ["network", "connect"], ["network", "disconnect"],
+                ["network", "rm"]):
+    sys.exit(0)
+if args[:2] == ["network", "inspect"]:
+    sys.exit(print("{{}}"))
+if args[:4] == ["exec", "-i", "factory-postgres", "psql"]:
+    sys.stdin.read()
+    sys.exit(0)
+if args[:5] == ["exec", "-i", "factory-glitchtip", "./manage.py", "shell"]:
+    params = json.loads(ast.literal_eval(re.search(r"^PARAMS = json.loads\\((.*)\\)$", sys.stdin.read(), re.M)[1]))
+    dsns = {{name: f"http://key{{n}}@127.0.0.1:8200/{{n}}" for n, name in enumerate(params["projects"], 1)}}
+    sys.exit(print(glitchtip.RESULT + json.dumps({{"dsns": dsns}})))
+sys.exit(f"the rehearsal's docker does not do: {{' '.join(args)}}")
+"""
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -92,6 +118,7 @@ class Systemd:
 
     places: Places
     agent_home: Path
+    bin: Path  # where the rehearsal's docker is, first on the units' PATH
     sessions: list[dict[str, Any]] = field(default_factory=list)
 
     def __call__(self, argv: list[str]) -> subprocess.CompletedProcess[str]:
@@ -111,7 +138,7 @@ class Systemd:
         runs = self.places.state / "runs"
         runs.mkdir(parents=True, exist_ok=True)
         # The unit runs as the agent (or stack) user, whose home holds the product checkout.
-        env = {**os.environ, "HOME": str(self.agent_home)}
+        env = {**os.environ, "HOME": str(self.agent_home), "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}"}
         with (runs / f"{request_id}.log").open("w") as log:
             done = subprocess.run([sys.executable, "-I", str(runner), str(self.places.state), request_id],
                                   stdout=log, stderr=subprocess.STDOUT, env=env, timeout=60, check=False)  # fmt: skip
@@ -226,17 +253,20 @@ class Rehearsal:
         return session_id
 
     def health(self, staging: str, prod: str) -> Any:
+        """Staging and prod, answering on the health addresses the product's factory.toml names."""
+        product = config.load(self.repo)
+        addresses = {f"https://{product.workspace(env).domain}{product.deploy.health}": commit
+                     for env, commit in (("staging", staging), ("prod", prod))}  # fmt: skip
+
         def fetch(url: str, timeout: float) -> Answer:
-            commit = {STAGING: staging, PROD: prod}[url]
-            return Answer(200, json.dumps({"build_commit": commit}).encode())
+            return Answer(200, json.dumps({"build_commit": addresses[url]}).encode())
 
         return fetch
 
 
 def _settings_text(repo: Path) -> str:
     text = (ROOT / "settings.toml").read_text()
-    for key, value in {"repo.path": str(repo), "repo.github": GITHUB, "repo.staging_health": STAGING,
-                       "repo.prod_health": PROD}.items():  # fmt: skip
+    for key, value in {"repo.path": str(repo), "repo.github": GITHUB}.items():
         text = settings_save.set_line(text, key, value)
     return text
 
@@ -296,7 +326,12 @@ def build(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Rehearsal:
     monkeypatch.setattr(qa_browser, "runs_root", lambda: agent_home / qa_browser.RUNS)
     monkeypatch.setattr(health, "http_get", stack.http_get)
 
-    systemd = Systemd(places, agent_home)
+    places.services.mkdir(parents=True)
+    (places.services / "services.env").write_text(SERVICES_ENV)
+    (tmp / "bin").mkdir()
+    (tmp / "bin" / "docker").write_text(DOCKER)
+    (tmp / "bin" / "docker").chmod(0o755)
+    systemd = Systemd(places, agent_home, tmp / "bin")
     doors = Doors(places, settings, clock, launch.Units(places, settings, run=systemd), FakeGitHub(),
                   inbox.poster(places, clock), threading.RLock())  # fmt: skip
     # The dashboard's snapshot is being rebuilt beside this rehearsal; every other verb resolves as wardend's do.

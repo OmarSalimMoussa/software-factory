@@ -1,9 +1,10 @@
 """What each session starts with: its own settings file (--settings) and its agent definitions (--agents).
 
 The settings file outranks the project's and the user's. It forces the sandbox on and walls the session into its
-worktree: shell commands write only there, read no other worktree and not Claude Code's sign-in token, and reach
-only the allowed hosts. The one command let out of the sandbox is the factory's own, so it can reach the warden. The
-orchestrator's file also runs the status line that records the plan's limits.
+worktree: shell commands write only there and in their tools' caches in the agent's home, read no other worktree
+and not Claude Code's sign-in token, and reach only the allowed hosts. The one command let out of the sandbox is the
+factory's own, so it can reach the warden. The orchestrator's file also runs the status line that records the plan's
+limits.
 
 The agent definitions come from the rendered plugin's launchers, passed as JSON because Claude Code ignores a plugin
 agent's mcpServers and initialPrompt (the browser testers need their browser server). A session gets its own
@@ -36,8 +37,9 @@ def render(settings: Settings, places: Places, role: str, worktree: Path, agent_
     repo = Path(settings.get_str("repo.path"))
     others = worktrees(repo)
     credentials = agent_home / ".claude" / ".credentials.json"
+    caches = [str(agent_home / cache) for cache in settings.get_list("sandbox.writable_caches")]
     filesystem: dict[str, list[str]] = {
-        "allowWrite": [str(worktree)],
+        "allowWrite": [str(worktree), *caches],
         "denyRead": [str(others), str(credentials)],
     }
     if role == ORCHESTRATOR:

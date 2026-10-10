@@ -11,9 +11,10 @@ Group=@dashboard_user@
 ExecStart=@python@ -I @install@/runtime/system/runners/start.py runtime.dashboard.server
 Restart=always
 RestartSec=@restart_seconds@
-# Of the warden's state it sees public/ alone, read-only; everything else it asks the warden for.
+# Of the warden's state it sees public/ alone, read-only, and the address its own errors go to, when the install
+# has set one up; everything else it asks the warden for.
 TemporaryFileSystem=@state@:ro
-BindReadOnlyPaths=@public@
+BindReadOnlyPaths=@public@ -@factory_dsn@
 NoNewPrivileges=yes
 CapabilityBoundingSet=
 UMask=0077

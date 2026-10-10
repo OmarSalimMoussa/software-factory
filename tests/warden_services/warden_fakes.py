@@ -14,8 +14,6 @@ T0 = 1_791_546_000.0  # 2026-10-09 11:40:00 UTC, on a 30-second step boundary
 REPO = {
     "repo.path": "/srv/checkout",
     "repo.github": "depot/product",
-    "repo.staging_health": "https://staging.invalid/health",
-    "repo.prod_health": "https://prod.invalid/health",
 }
 OWNER_CALLER = Caller(kind="owner", role="owner")
 

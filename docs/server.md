@@ -1,0 +1,116 @@
+# The server set-up
+
+The set-up readies the product's one server for the standard deploy: staging and prod, the shared services, and the
+key CI deploys with. You run it on your laptop, from a checkout of the factory, against the server named in the
+product's `factory.toml`. It is safe to run again at any time: it changes only what differs, and says so.
+
+```bash
+python3 -m standard.server.setup --product <product checkout> --dry-run   # read everything, change nothing
+python3 -m standard.server.setup --product <product checkout>             # do it
+```
+
+Options: `--fresh` also sets up the machine itself (a new server only). `--ci-key <file.pub>` uses your own key for
+CI instead of a pair the set-up makes. `--lockdown` only locks SSH down, as its own step.
+
+## Before you start
+
+- The server runs Ubuntu 24.04 and you can sign in as the `[server] admin` user with your SSH key. That user needs
+  sudo without a password. On a brand-new server, create it once as root:
+  `adduser --disabled-password --gecos "" <admin>`, add your public key to `/home/<admin>/.ssh/authorized_keys`,
+  and allow it sudo in `/etc/sudoers.d/<admin>` with `<admin> ALL=(ALL) NOPASSWD:ALL` (mode 0440).
+- `[server] host_key` holds the server's SSH host key. The set-up trusts that key only, and stops if the server shows
+  another. Read it from the provider's console, or with `ssh-keyscan -t ed25519 <host>` on a network you trust.
+- The factory checkout has no uncommitted changes. The server runs exactly one commit of the factory.
+
+## A new server: `--fresh`
+
+On a new server, run the set-up with `--fresh`. It does what an existing server never gets from it:
+
+1. The firewall: ufw allows 22, then 80 and 443, and only then is turned on, so it never locks you out.
+2. A 4 GB swapfile, so running out of memory slows the server down instead of killing a database.
+3. Docker and its compose plugin, from Docker's own package repository.
+4. Tailscale, installed only. Joining the tailnet is your step: on the server, run
+   `sudo tailscale up --hostname=<first part of [server] tailnet>`, then run the set-up again. The tailnet needs
+   MagicDNS and HTTPS certificates turned on in its DNS settings.
+
+The set-up never installs git: the server runs images, never a checkout.
+
+Lock SSH down last, as a separate run. First check from another terminal that `ssh <admin>@<host>` signs you in with
+your key. Then run the set-up with `--lockdown`. SSH then takes keys only and refuses root. The set-up checks the
+settings before SSH restarts, and takes them back out if SSH refuses them.
+
+## An existing server
+
+Without `--fresh`, the set-up only checks the machine and changes none of it:
+
+| Check | It wants |
+|---|---|
+| Firewall | ufw on, allowing exactly 22, 80 and 443 inbound |
+| SSH | passwords and keyboard sign-in off, root sign-in off |
+| Tailscale | installed, running, and joined as `[server] tailnet` |
+| Swap | some swap |
+| Docker | Docker and its compose plugin |
+
+If one fails, the set-up stops before it changes anything and says what to do.
+
+## What the set-up places
+
+- **Users.** The admin user joins the docker group. A `ci` user gets exactly one key, which can only run the
+  factory's deploy gate: no shell, no terminal, no forwarding. The gate accepts only a deploy of staging or prod.
+- **The CI key.** Without `--ci-key`, the set-up makes a key pair once, in `~/.config/software-factory/`, and keeps
+  it. Save the private half as the product's GitHub secret `SERVER_DEPLOY_KEY`; the summary names the file.
+- **The factory's code.** The factory's `standard/` folder and its commit, in `/usr/local/lib/software-factory/`,
+  owned by root. The commands `factory-deploy`, `factory-ci-gate` and `factory-gc` in `/usr/local/bin/` run that
+  code. A copy of the product's `factory.toml` goes to `/etc/software-factory/product.toml`. One sudo rule lets
+  `ci` run `factory-deploy` as the admin user, and nothing else; it is checked before it is placed.
+- **Folders.** `/srv/factory/` for the shared services, the edge's site files and the deploy lock, and
+  `/srv/<product>/<workspace>/` for each workspace's stack, env file and deploy records. The admin user owns them.
+- **The shared services.** Their compose file, the edge's settings and their own `services.env`, in
+  `/srv/factory/services/`. The set-up brings them up and waits until every one is healthy. Then it creates
+  GlitchTip's organization, your GlitchTip user, a read-only token and a project for the factory's own errors.
+- **The weekly clean-up.** Every Sunday at 04:17, as the admin user. It drops build cache older than a week and
+  images no tag names, and logs one line to `/srv/factory/state/gc.log`. It never removes volumes or tagged images:
+  volumes hold the databases and certificates, and tagged images are what a deploy or a rollback runs.
+- **The tailnet.** The shared services' addresses below. With `--fresh` the set-up adds missing ones; otherwise it
+  lists the commands to add them.
+- **The warden's copy.** `~/.config/software-factory/server.json` on your laptop (only you can read it): the
+  GlitchTip address, organization and read-only token, and the Langfuse address and keys. The factory's installer
+  copies it for the warden.
+
+## The shared services
+
+One stack per server, compose project `factory-services`. Each workspace gets its own database, GlitchTip projects
+and Langfuse environment from it at every deploy ([deploy.md](deploy.md)). Every port is bound to the server's
+loopback address; only the tailnet reaches them, and only the edge answers on the internet (80 and 443).
+
+| Service | Address on the tailnet |
+|---|---|
+| GlitchTip (errors and logs; its MCP endpoint is `/mcp`) | `https://<tailnet>:8200` |
+| Langfuse (AI traces) | `https://<tailnet>:3100` |
+| Langfuse's media store | `https://<tailnet>:9090` |
+| pgweb (no sign-in of its own: the tailnet is its lock) | `https://<tailnet>:8081` |
+| Postgres, for a desktop client (user `postgres`) | `<tailnet>:5434` |
+
+Sign in to GlitchTip and Langfuse with `[services] owner_email`.
+
+## Where the secrets live
+
+- **On the server**, in `/srv/factory/services/services.env` (the admin user's, mode 0600): every shared service's
+  passwords and keys, your GlitchTip password (`GLITCHTIP_OWNER_PASSWORD`), your Langfuse password
+  (`LANGFUSE_INIT_USER_PASSWORD`) and the Postgres password (`POSTGRES_PASSWORD`). They are made once and kept: the
+  databases were created with them. Read one with `ssh <admin>@<host> grep <KEY> /srv/factory/services/services.env`.
+- **On your laptop**, the CI key pair and `server.json`, in `~/.config/software-factory/`.
+- **In GitHub**, `SERVER_DEPLOY_KEY`, which only you put there.
+
+## Run it again
+
+Run the set-up again, from a factory checkout at the right commit:
+
+- **After a factory change** the product moves to. A deploy refuses to run while the server's factory code is not the
+  commit the product's `.github/factory-ref` names. Check out that commit of the factory, then run the set-up.
+- **After a change to `factory.toml`** that touches the server: a deploy refuses while the server's copy of those
+  settings differs from the one the product ships.
+- **After a change to the shared services**, which comes with a factory change. The set-up brings them up again and
+  joins them back to each workspace's networks.
+
+Each run prints what it found and what it changed, and ends with "Changed nothing" when the server already matched.

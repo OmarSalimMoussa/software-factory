@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from runtime.shared import error_reports
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER, Places
 from runtime.shared.settings import Settings
 from runtime.system import layout
@@ -41,6 +42,7 @@ UNIT_FILES = (
     Artifact(f"units/{layout.DAEMON_UNIT}", layout.UNITS_DIR / layout.DAEMON_UNIT, 0o644),
     Artifact(f"units/{layout.AGENT_RUN}", layout.UNITS_DIR / layout.AGENT_RUN, 0o644),
     Artifact(f"units/{layout.STACK_RUN}", layout.UNITS_DIR / layout.STACK_RUN, 0o644),
+    Artifact(f"units/{layout.SERVICES_UNIT}", layout.UNITS_DIR / layout.SERVICES_UNIT, 0o644),
     Artifact("units/system-sleep.sh", layout.SLEEP_HOOK, 0o755),
 )
 POLKIT = Artifact("polkit/50-software-factory.rules", layout.POLKIT_RULE, 0o644)
@@ -56,8 +58,9 @@ def render(text: str, values: Mapping[str, str]) -> str:
     return TOKEN.sub(lambda found: values[found.group(1)], text)
 
 
-def values(places: Places, settings: Settings) -> dict[str, str]:
-    """Every value a unit, rule or firewall template may name."""
+def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str) -> dict[str, str]:
+    """Every value a unit, rule or firewall template may name. The users' ids are the machine's, so a unit never
+    uses %U or %h: in a system unit those name root, whatever its User= says."""
     return {
         "python": layout.PYTHON,
         "install": str(places.install),
@@ -65,6 +68,7 @@ def values(places: Places, settings: Settings) -> dict[str, str]:
         "public": str(layout.public(places.state)),
         "runs": str(layout.runs(places.state)),
         "secrets": str(layout.secrets(places.state)),
+        "factory_dsn": str(error_reports.dsn_path(places)),
         "slots": str(places.slots),
         "run_name": places.run.name,
         "claude": str(layout.CLAUDE_BIN),
@@ -76,6 +80,12 @@ def values(places: Places, settings: Settings) -> dict[str, str]:
         "dashboard_user": DASHBOARD_USER,
         "slots_group": layout.SLOTS_GROUP,
         "agent_home": str(layout.AGENT_HOME),
+        "stack_home": str(layout.STACK_HOME),
+        "agent_uid": agent_uid,
+        "stack_uid": stack_uid,
+        "stack_socket": layout.rootless_socket(stack_uid),
+        "path": layout.UNIT_PATH,
+        "uv_env": " ".join(f"{key}={value}" for key, value in layout.UV_ENV.items()),
         "slice": SLICE,
         "warden_unit": layout.WARDEN_UNIT,
         "daemon_unit": layout.DAEMON_UNIT,

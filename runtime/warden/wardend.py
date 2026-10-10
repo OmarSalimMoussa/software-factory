@@ -15,8 +15,8 @@ import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
+from runtime.shared import error_reports, store
 from runtime.shared import settings as settings_module
-from runtime.shared import store
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, Places
 from runtime.shared.settings import Settings
 from runtime.warden import (
@@ -106,6 +106,7 @@ def main() -> int:
     places = Places.system()
     settings = FreshSettings(places)
     current = settings()
+    error_reports.install(places, timeout=current.get_int("watch.http_timeout_seconds"))
     clock = Clock()
     owner, agent_home = _owner(places), launch.agent_home()
     doors = Doors(places, settings, clock, launch.Units(places, settings),

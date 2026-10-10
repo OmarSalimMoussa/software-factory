@@ -120,7 +120,7 @@ drive('errors', async t => {
   await t.srv.set({op_fail: true, op_ms: 400});
   await o.click('#top-promote'); await o.waitForTimeout(400); await t.code(o);
   await o.waitForFunction(() => document.querySelector('#toasts').textContent.includes('failed at'), null, {timeout: 6000}).catch(() => t.errors.push('a failed operation did not say so'));
-  t.check((await toastText(o)).includes('Pushing to prod failed at “Redeploying prod at a1b2c3d”. The push workflow ended failure: https://github.invalid/r'), 'failed step not named: ' + await toastText(o));
+  t.check((await toastText(o)).includes('Pushing to prod failed at “Redeploying prod at a1b2c3d”. The deploy ended failure: https://github.invalid/r'), 'failed step not named: ' + await toastText(o));
   t.check(await o.$('.steps li.failed') && await o.$('#sheet-foot [data-action="close-sheet"]'), 'the failed step is not marked in the panel');
   await t.shot(o, 'op-failed-1440.png');
   await o.close();

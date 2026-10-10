@@ -11,6 +11,13 @@ own: it only supplies the values a check compares against, in `check-values/`.
 - A merge whose tree already has a pass is not checked again: the merge hook finds the pass.
 - Tests run through the product's `scripts/dev test [path…]`. The factory picks the paths from the diff with
   `check-values/test-map.toml`, and each test must finish within 45 seconds.
+- `tools` runs ruff, mypy and import-linter at the versions the product pins. When the product has a `uv.lock`, the
+  check first syncs the product's environment (`uv sync --frozen --all-extras`); a failed sync fails the check. Each
+  tool then runs from the product's `.venv`, so mypy loads the product's own plugins. A tool the product does not
+  pin runs at the factory's version.
+- A Python file the product's ruff configuration excludes (`exclude` or `extend-exclude` under `[tool.ruff]`) is not
+  code: no check parses or measures it. A file that is not excluded and does not parse fails each check that reads
+  it, with one line naming it.
 
 ## Values
 
@@ -27,12 +34,13 @@ check that reads no values needs no file.
 | `tree-rules`, `doc-refs`, `no-console` | `tree-rules.toml`, `doc-refs.toml`, `no-console.toml` |
 | `network-door`, `config-readers`, `js-import-rules` | `network-door.toml`, `config-readers.toml`, `js-import-rules.toml` |
 | `vocabulary-homes`, `computation-owners`, `quiet-modules` | the file of the same name, `.toml` |
-| `image-roster`, `image-sources`, `deploy-bundle` | the file of the same name, `.toml` |
-| `env-template-sync`, `pinned-config`, `generated-current` | the file of the same name, `.toml` |
+| `image-sources`, `env-template-sync`, `pinned-config`, `generated-current` | the file of the same name, `.toml` |
 | `size-ceilings`, `complexity-ratchet`, `count-claims`, `history-narrative` | `baseline.json` |
 
-`repo-shape`, `ci-shape`, `testing-imports`, `qa-scenarios`, `seeds-current` and `queue-format` read no
-values.
+`repo-shape`, `deploy-shape`, `testing-imports`, `qa-scenarios`, `seeds-current` and `queue-format` read no
+values. `deploy-shape` reads the product's `factory.toml` instead: it holds the product to the standard build and
+deploy, from the workflows and the hooks to the images, the deploy files and the ports
+([repo-shape.md](repo-shape.md)).
 
 ## Ratchets and pins
 

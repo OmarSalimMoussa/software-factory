@@ -64,8 +64,21 @@ def users(ctx: Install) -> None:
             raise refuse(f"{name} is in {', '.join(privileged)}: remove it (gpasswd -d {name} <group>), then reinstall")
         if name in homes and account.home != homes[name]:
             raise refuse(f"{name}'s home is {account.home}, not {homes[name]}: the units bind that path")
+    # The stack user's rootless Docker reads a slot's checkout, in the agent's home, for bind mounts and build
+    # contexts. The daemon runs with the account's own groups, never a unit's, so the membership is the account's.
+    stack = host.account(layout.STACK_USER)
+    if stack is None or AGENT_USER not in stack.groups:
+        host.run(["gpasswd", "-a", layout.STACK_USER, AGENT_USER])
     host.run(["chmod", "0750", str(layout.AGENT_HOME)])
     host.mkdir(layout.AGENT_HOME / ".claude", mode=0o700, owner=AGENT_USER)
+    # A session cannot make its tools' caches itself: it may write in each one, never in the home around it. Every
+    # folder on the way is the agent's too, so a tool run outside the sandbox can still add its own beside them.
+    folders: dict[Path, None] = {}
+    for cache in ctx.need_settings().get_list("sandbox.writable_caches"):
+        parts = Path(cache).parts
+        folders.update({layout.AGENT_HOME.joinpath(*parts[: n + 1]): None for n in range(len(parts))})
+    for folder in folders:
+        host.mkdir(folder, mode=0o700, owner=AGENT_USER)
     for name in (AGENT_USER, layout.STACK_USER):
         host.run(["loginctl", "enable-linger", name])
 
@@ -78,8 +91,10 @@ def state_tree(ctx: Install) -> None:
         host.mkdir(folder, mode=0o755, owner=WARDEN_USER)
     for folder in (layout.secrets(state), layout.runs(state), ctx.places.overrides.parent):
         host.mkdir(folder, mode=0o700, owner=WARDEN_USER)
-    # setgid: each slot's folder and env file take the slots' group, which the stack user's runs join.
+    # setgid: each slot's folder takes the slots' group, which the stack user's runs join.
     host.mkdir(ctx.places.slots, mode=0o2750, owner=WARDEN_USER, group=layout.SLOTS_GROUP)
+    # Each slot's env file and provisioning state, written by the stack user's runs; no other user may list it.
+    host.mkdir(ctx.places.stack_slots, mode=0o700, owner=layout.STACK_USER)
     host.write(ctx.places.overrides, overrides_toml(ctx.overrides), mode=0o600, owner=WARDEN_USER)
     host.write(ctx.places.owner, json.dumps({"user": ctx.owner.name}) + "\n", mode=0o644, owner=WARDEN_USER)
 
@@ -92,6 +107,8 @@ def place(ctx: Install) -> None:
         if host.exists(leftover):
             host.remove(leftover)
     host.copy_tree(ctx.tree(), fresh)
+    # The release the warden's and the dashboard's own error reports name.
+    host.write(fresh / "COMMIT", ctx.sha + "\n", mode=0o644)
     host.run(["chown", "-R", "root:root", str(fresh)])
     host.run(["chmod", "-R", "u=rwX,go=rX", str(fresh)])
     if host.exists(install):
@@ -223,7 +240,7 @@ def _public_half(key: Path) -> Path:
 
 def secrets(ctx: Install) -> None:
     """The 6-digit code's secret (shown once), the deploy key, the product CI's read key for the factory repo, the
-    owner's GitHub token and the sign-in token."""
+    owner's GitHub token, the sign-in token, and the server's keys the server set-up saved for the owner."""
     host, folder = ctx.host, layout.secrets(ctx.places.state)
     github = ctx.need_settings().get_str("repo.github")
     if not host.exists(ctx.places.totp_secret):
@@ -258,3 +275,20 @@ def secrets(ctx: Install) -> None:
             if not value:
                 raise refuse(f"{name} is needed: run the install again and paste it")
             host.write(folder / name, value + "\n", mode=0o600, owner=WARDEN_USER)
+    _server_keys(ctx, folder)
+
+
+def _server_keys(ctx: Install, folder: Path) -> None:
+    """The server's GlitchTip and Langfuse keys, for the warden alone: it imports prod's errors with them."""
+    host, theirs = ctx.host, ctx.owner.home / layout.OWNER_SERVER_KEYS
+    if not host.exists(theirs):
+        host.say(f"  {theirs} is missing: the server set-up has not run, so the warden reads no server errors yet")
+        return
+    text = host.read(theirs)
+    try:
+        keys = json.loads(text)
+    except ValueError as exc:
+        raise refuse(f"{theirs} is not JSON ({exc}): run the server set-up again") from exc
+    if not isinstance(keys, dict):
+        raise refuse(f"{theirs} is not a JSON object: run the server set-up again")
+    host.write(folder / layout.SERVER_KEYS, text, mode=0o600, owner=WARDEN_USER)

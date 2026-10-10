@@ -22,10 +22,10 @@ from pathlib import Path
 from typing import Any
 
 from checks.runner import passes
-from runtime.guard.writes import is_protected, protected_paths
+from runtime.guard.writes import UnknownProtectedPaths, is_protected, protected_paths
 from runtime.shared import store
 from runtime.shared.models import Probe
-from runtime.shared.paths import Places
+from runtime.shared.paths import PROMOTE_JOB, Places
 from runtime.shared.protocol import Refused, ok
 from runtime.shared.settings import Settings
 from runtime.warden import deploys, inbox, ops, probes
@@ -51,9 +51,13 @@ def _watch_path(places: Places) -> Path:
     return places.state / "push.json"
 
 
-def protected(path: str, settings: Settings) -> bool:
-    """Whether a path is one only the owner's hand changes: the guard's own list, so a push refuses what it does."""
-    return is_protected(path, protected_paths(settings))
+def protected_prefixes(settings: Settings) -> tuple[str, ...]:
+    """The paths only the owner's hand changes: the guard's own list, so a push refuses what it does. While the main
+    checkout's factory.toml cannot be read the list is unknown, and no push goes."""
+    try:
+        return protected_paths(settings)
+    except UnknownProtectedPaths as exc:
+        raise Refused("protected-path", f"{exc}: no push until the owner fixes it") from exc
 
 
 # ---- the orchestrator's push of a checked commit ---------------------------------------------------------------
@@ -67,6 +71,7 @@ def push_checked(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
     settings = ctx.settings()
     checkout, branch = settings.get_str("repo.path"), settings.get_str("repo.default_branch")
     url = f"git@github.com:{settings.get_str('repo.github')}.git"
+    prefixes = protected_prefixes(settings)
     with _pushing:
         git = _Git(ctx)
         git.run("fetch", "--no-tags", "--quiet", url, f"+refs/heads/{branch}:refs/github/{branch}")
@@ -82,7 +87,7 @@ def push_checked(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
             return ok(sha=sha, commits=0, message=f"GitHub's {branch} already is {sha[:12]}")
         if not git.is_ancestor(remote, sha):
             raise Refused("push", f"{branch} on GitHub has commits {sha[:12]} lacks: merge them, check, then push")
-        bad = sorted({p for p in git.touched(remote, sha) if protected(p, settings)})
+        bad = sorted({p for p in git.touched(remote, sha) if is_protected(p, prefixes)})
         if bad:
             raise Refused("protected-path", f"the range touches {', '.join(bad[:5])}, which only the owner changes: "
                                             "revert those changes, or ask the owner")  # fmt: skip
@@ -282,7 +287,8 @@ def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list
             raise ops.StepError(str(exc)) from exc
         return f"workflow run {run['id']}"
 
-    def redeploy() -> str:
+    def finished(what: str, done: Callable[[dict[str, Any]], dict[str, Any] | None]) -> dict[str, Any]:
+        """Ask GitHub about the run until ``done`` finds what finished in it; GitHub's own trouble is retried."""
         trouble = ""
         while True:
             try:
@@ -290,13 +296,33 @@ def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list
             except GitHubError as exc:  # the run goes on at GitHub; keep asking until the deadline
                 trouble = f"; GitHub last said: {exc}"
             else:
-                if state["status"] == "completed":
-                    if state["conclusion"] == "success":
-                        return f"the push workflow finished: {state['url']}"
-                    raise ops.StepError(f"the push workflow ended {state['conclusion']}: {state['url']}")
+                found = done(state)
+                if found is not None:
+                    return found
             if time.monotonic() > deadline:
-                raise ops.StepError(f"the push workflow did not finish in {wait_s // 60} minutes{trouble}")
+                raise ops.StepError(f"the push workflow's {what} did not finish in {wait_s // 60} minutes{trouble}")
             time.sleep(tick)
+
+    def redeploy() -> str:
+        # Prod's deploy is the workflow's `deploy` job; the releases after it must not decide whether prod moved.
+        def deploy_job(state: dict[str, Any]) -> dict[str, Any] | None:
+            job = state["jobs"].get(PROMOTE_JOB)
+            if job is not None and job["status"] == "completed":
+                return {**job, "url": state["url"]}
+            if state["status"] == "completed":
+                return {"conclusion": f"without a {PROMOTE_JOB} job", "url": state["url"]}
+            return None
+
+        job = finished("deploy", deploy_job)
+        if job["conclusion"] == "success":
+            return f"the deploy finished: {job['url']}"
+        raise ops.StepError(f"the deploy ended {job['conclusion']}: {job['url']}")
+
+    def releases() -> str:
+        state = finished("releases", lambda state: state if state["status"] == "completed" else None)
+        if state["conclusion"] == "success":
+            return f"the releases finished: {state['url']}"
+        raise ops.StepError(f"prod is live at {sha[:12]}, but the releases ended {state['conclusion']}: {state['url']}")
 
     def answer() -> str:
         since = ctx.clock.iso()
@@ -319,4 +345,5 @@ def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list
         (f"Redeploying prod at {sha[:12]}", redeploy),
         ("Waiting for prod to answer on the new build", answer),
         ("Starting a qa-prod pass", qa_prod),
+        ("Releasing what changed", releases),
     ]

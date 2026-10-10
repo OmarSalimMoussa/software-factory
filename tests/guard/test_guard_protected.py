@@ -1,16 +1,20 @@
-"""A product's own protected paths (repo.protected_paths) are refused at every door: the guard's write rule, the
-git hook's commit check and the warden's push."""
+"""The protected paths are refused at every door: the guard's write rule, the git hook's commit check and the
+warden's push. They are the fixed set, factory.toml and every script it names (read from the main checkout), and the
+product's own (repo.protected_paths). While that factory.toml cannot be read, every door fails closed."""
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
 from guard_kit import Kit
 
+from runtime.guard import commit_check
 from runtime.guard.commit_check import refusal
 from runtime.guard.facts import read_settings
-from runtime.guard.writes import protected_paths
+from runtime.guard.writes import is_protected, protected_paths
+from runtime.shared.protocol import Refused
 from runtime.warden import github_push
 
 
@@ -19,9 +23,11 @@ from runtime.warden import github_push
     [
         ("scripts/deploy.sh", True),
         ("deploy/prod/run.sh", True),
-        ("scripts/ci/build", True),
+        ("factory.toml", True),
+        ("scripts/smoke-check", True),
         ("GOAL.md", True),
         ("scripts/deploy.sh.bak", False),
+        ("scripts/smoke-check.md", False),
         ("src/deploy/app.py", False),
     ],
 )
@@ -37,5 +43,36 @@ def test_a_protected_path_is_refused_at_every_door(tmp_path: Path, door: str, pa
         found = bool(refusal([path], prefixes=prefixes, in_slice=True, hook="pre-commit", on_default=False,
                              merging=False, factory=False))  # fmt: skip
     else:
-        found = github_push.protected(path, settings)
+        found = is_protected(path, github_push.protected_prefixes(settings))
     assert found is refused
+
+
+@pytest.mark.parametrize("damage", ["missing", "not toml", "breaks the schema"])
+def test_an_unreadable_factory_toml_fails_closed_at_every_door(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], damage: str
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    toml = kit.repo / "factory.toml"
+    if damage == "missing":
+        toml.unlink()
+    else:
+        toml.write_text("[product\n" if damage == "not toml" else toml.read_text() + "\n[surprise]\n")
+    settings = read_settings(kit.places)
+
+    assert kit.rule("Write", {"file_path": str(kit.worktree / "src" / "app.py"), "content": "x"}) == "protected-paths"
+
+    product = tmp_path / "commit"
+    product.mkdir()
+    for args in (["init", "-q"], ["add", "app.py"]):
+        (product / "app.py").write_text("x = 1\n")
+        subprocess.run(["git", *args], cwd=product, check=True)
+    monkeypatch.chdir(product)
+    monkeypatch.setattr(commit_check, "read_settings", lambda places: settings)
+    monkeypatch.setattr(commit_check, "_in_slice", lambda: True)
+    assert commit_check.main(["pre-commit"]) == 1
+    assert "factory.toml cannot be read" in capsys.readouterr().err
+
+    with pytest.raises(Refused) as push:
+        github_push.protected_prefixes(settings)
+    assert push.value.rule == "protected-path"

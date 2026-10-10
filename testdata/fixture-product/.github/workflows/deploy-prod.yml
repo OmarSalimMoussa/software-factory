@@ -6,32 +6,113 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: The commit to put on prod
+        description: The full commit to put on prod
         required: true
         type: string
 
 permissions:
   contents: read
-  packages: write
+  packages: read
 
 defaults:
   run:
     shell: bash
 
 jobs:
-  promote:
+  deploy:
     runs-on: ubuntu-latest
     # Shares ci.yml's deploy group: one deploy at a time, never cancelled half way.
     concurrency:
       group: deploy
       cancel-in-progress: false
+    outputs:
+      previous: ${{ steps.deploy.outputs.previous }}
+    steps:
+      - name: Refuse anything but a full commit
+        env:
+          SHA: ${{ inputs.sha }}
+        run: |
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::sha must be a full commit: 40 lowercase hex characters"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+          sparse-checkout: factory.toml
+          sparse-checkout-cone-mode: false
+      - name: Deploy prod
+        id: deploy
+        env:
+          SERVER_DEPLOY_KEY: ${{ secrets.SERVER_DEPLOY_KEY }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          test -n "$SERVER_DEPLOY_KEY" || { echo "::error::the secret SERVER_DEPLOY_KEY is not set"; exit 1; }
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SERVER_DEPLOY_KEY" > ~/.ssh/deploy
+          host="$(python3 - <<'PY'
+          import os, tomllib
+          with open("factory.toml", "rb") as f:
+              server = tomllib.load(f)["server"]
+          with open(os.path.expanduser("~/.ssh/known_hosts"), "w") as out:
+              out.write(f"{server['host']} {server['host_key']}\n")
+          print(server["host"])
+          PY
+          )"
+          short="${SHA:0:8}"
+          printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ServerAliveInterval=30 \
+            "ci@$host" "deploy prod $short" | tee "$RUNNER_TEMP/deploy.out"
+          # The deploy's last line names the commit prod ran before, which the releases compare against.
+          last="$(tail -n 1 "$RUNNER_TEMP/deploy.out")"
+          pattern="^deployed prod $short previous ([0-9a-f]{7,40}|-)$"
+          if [[ ! "$last" =~ $pattern ]]; then
+            echo "::error::the deploy did not end with 'deployed prod $short previous <commit or ->'"
+            exit 1
+          fi
+          echo "previous=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+
+  releases:
+    needs: deploy
+    runs-on: ubuntu-latest
+    concurrency:
+      group: releases
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - name: Promote
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Read the factory commit the product pins
+        id: factory
+        run: |
+          ref="$(cat .github/factory-ref)"
+          if [[ ! "$ref" =~ ^([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@([0-9a-f]{40})$ ]]; then
+            echo "::error::.github/factory-ref must hold one line: owner/name@<40-character sha>"
+            exit 1
+          fi
+          echo "repo=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          echo "sha=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.factory.outputs.repo }}
+          ref: ${{ steps.factory.outputs.sha }}
+          ssh-key: ${{ secrets.FACTORY_READ_KEY }}
+          persist-credentials: false
+          path: factory
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Release what changed
         env:
           SHA: ${{ inputs.sha }}
-          CI_SECRETS: ${{ toJSON(secrets) }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: scripts/ci/promote "$SHA"
+          PREVIOUS: ${{ needs.deploy.outputs.previous }}
+          RUN: ${{ github.run_number }}
+          PYTHONPATH: ${{ github.workspace }}/factory
+          EXTENSION_STORE_EXTENSION_ID: ${{ secrets.EXTENSION_STORE_EXTENSION_ID }}
+          EXTENSION_STORE_PUBLISHER_ID: ${{ secrets.EXTENSION_STORE_PUBLISHER_ID }}
+          EXTENSION_STORE_CLIENT_ID: ${{ secrets.EXTENSION_STORE_CLIENT_ID }}
+          EXTENSION_STORE_CLIENT_SECRET: ${{ secrets.EXTENSION_STORE_CLIENT_SECRET }}
+          EXTENSION_STORE_REFRESH_TOKEN: ${{ secrets.EXTENSION_STORE_REFRESH_TOKEN }}
+        run: python3 -P -m standard.release --repo . --sha "$SHA" --previous "$PREVIOUS" --run "$RUN"

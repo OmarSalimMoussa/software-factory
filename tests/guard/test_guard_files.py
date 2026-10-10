@@ -28,7 +28,7 @@ def kit(tmp_path: Path) -> Kit:
         ("{worktree}/GOAL.md", "protected-paths"),
         ("{worktree}/goal/hero.png", "protected-paths"),
         ("{worktree}/.github/workflows/ci.yml", "protected-paths"),
-        ("{worktree}/scripts/ci/promote", "protected-paths"),
+        ("{worktree}/factory.toml", "protected-paths"),
         ("{worktree}/deploy/promote", "protected-paths"),
         ("{worktree}/check-values/surfaces.toml", "protected-paths"),
         ("{worktree}/.git", "protected-paths"),

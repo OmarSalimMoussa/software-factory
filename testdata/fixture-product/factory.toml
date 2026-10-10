@@ -1,0 +1,59 @@
+# The notes app's settings for the factory's standard build and deploy. Only a person changes this file, and every
+# script it names.
+
+[product]
+name = "notes"
+registry = "ghcr.io/owner"
+
+[build]
+commit_arg = "NOTES_BUILD_COMMIT"
+tag_arg = "NOTES_IMAGE_TAG"
+extra_images = []
+
+[smoke]
+timeout_seconds = 60
+health = { service = "app", port = 8000 }
+expect = [{ service = "app", port = 8000, path = "/app.js", status = 200 }]
+check = "scripts/smoke-check"
+
+[services]
+owner_email = "owner@example.com"
+errors = ["app", "web"]
+
+[env]
+file = "notes.env"
+template = "notes.env.template"
+
+[env.set]
+NOTES_WORKSPACE = "{workspace}"
+NOTES_ORIGIN = "{origin}"
+NOTES_PORT = "{port}"
+NOTES_IMAGE_TAG = "{commit}"
+
+[server]
+host = "notes.example.com"
+host_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINotesFixtureHostKeyNotesFixtureHostKey0000"
+admin = "deploy"
+tailnet = "notes-box.example.ts.net"
+acme_email = "owner@example.com"
+
+[workspaces.staging]
+domain = "staging.notes.example.com"
+port = 8301
+after_deploy = []
+
+[workspaces.prod]
+domain = "notes.example.com"
+port = 8300
+after_deploy = []
+
+[deploy]
+health = "/healthz"
+answer_seconds = 120
+drain_minutes = 5
+files = ["compose.yml", "notes.env.template"]
+keep_images = 3
+
+[edge]
+blocked_paths = []
+routes = []

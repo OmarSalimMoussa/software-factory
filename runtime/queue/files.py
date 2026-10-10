@@ -204,6 +204,23 @@ class QueueFiles:
                 for dir_fd in dirs.values():
                     os.close(dir_fd)
 
+    def remove(self, rel: str) -> bool:
+        """Delete one file (a link is removed, never followed); whether it was there."""
+        *parent, name = _parts(rel)
+        with self._root() as root:
+            try:
+                dir_fd = self._walk(root, parent, create=False)
+            except FileNotFoundError:
+                return False
+            try:
+                os.unlink(name, dir_fd=dir_fd)
+                os.fsync(dir_fd)
+            except FileNotFoundError:
+                return False
+            finally:
+                os.close(dir_fd)
+        return True
+
     def append(self, rel: str, line: bytes) -> None:
         """One line added to the end of a file, created if missing; the caller holds the queue lock."""
         *parent, name = _parts(rel)

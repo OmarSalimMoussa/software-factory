@@ -85,6 +85,12 @@ def port(settings: Settings, n: int) -> int:
     return settings.get_int("slots.port_base") + n
 
 
-def env(places: Places, settings: Settings, n: int) -> dict[str, str]:
-    """What the product's scripts/dev is told about its slot (factory spec, "scripts/dev")."""
-    return {"FACTORY_SLOT": str(n), "FACTORY_PORT": str(port(settings, n)), "FACTORY_SLOT_DIR": str(places.slot(n))}
+def env(places: Places, settings: Settings, n: int, env_file: Path) -> dict[str, str]:
+    """What the product's scripts/dev is told about its slot (factory spec, "scripts/dev"): ``env_file`` is the
+    slot's env file, which the factory writes before each verb."""
+    return {
+        "FACTORY_SLOT": str(n),
+        "FACTORY_PORT": str(port(settings, n)),
+        "FACTORY_SLOT_DIR": str(places.slot(n)),
+        "FACTORY_ENV_FILE": str(env_file),
+    }

@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from checks.runner import excludes
 from checks.runner import values as values_mod
 from checks.runner.values import BASELINE, VALUES_DIR, Schema, ValuesError
 
@@ -45,6 +46,8 @@ class Repo:
     test_memory: tuple[int, int] | None = None
     _baseline: dict[str, Any] | None = field(default=None, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    _excluded: frozenset[str] | None = field(default=None, repr=False)
+    _excluded_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @classmethod
     def open(cls, root: Path, changed: Sequence[str] | None = None) -> Repo:
@@ -55,6 +58,15 @@ class Repo:
 
     def git(self, *args: str) -> str:
         return git(self.root, *args)
+
+    def excluded(self, rel: str) -> bool:
+        """Whether ``rel`` is Python the product's ruff configuration excludes: no check parses or measures it."""
+        if not rel.endswith(excludes.SUFFIXES):
+            return False
+        with self._excluded_lock:
+            if self._excluded is None:
+                self._excluded = excludes.excluded(self.root, self.tracked)
+        return rel in self._excluded
 
     def values(self, name: str, schema: Schema) -> dict[str, Any]:
         return values_mod.load(self.root, name, schema)

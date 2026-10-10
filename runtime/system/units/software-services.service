@@ -1,0 +1,37 @@
+# The laptop's shared services: Postgres, pgweb, Langfuse and GlitchTip, run by the stack user on its rootless Docker,
+# so a container's root is that user on the host. Every slot's stack uses them. Active while they are up; a stop keeps
+# the containers, so each slot's network connections outlive it.
+[Unit]
+Description=software factory: the shared services every slot uses
+Wants=network-online.target user@@stack_uid@.service
+After=network-online.target user@@stack_uid@.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=@stack_user@
+Group=@stack_user@
+Slice=@slice@
+Environment=XDG_RUNTIME_DIR=/run/user/@stack_uid@
+Environment=DOCKER_HOST=unix://@stack_socket@
+Environment=PATH=@path@
+Environment=@uv_env@
+ExecStart=@python@ -I @install@/runtime/system/runners/services_run.py up
+ExecReload=@python@ -I @install@/runtime/system/runners/services_run.py up
+ExecStop=@python@ -I @install@/runtime/system/runners/services_run.py stop
+# After a boot the stack user's Docker may still be starting: try again rather than stay down.
+Restart=on-failure
+RestartSec=@restart_seconds@
+UMask=0027
+TemporaryFileSystem=@state@:ro
+ProtectHome=tmpfs
+BindPaths=@stack_home@
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectKernelModules=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

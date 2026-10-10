@@ -1,0 +1,22 @@
+# The notes app's stack. The factory writes notes.env for each workspace and laptop slot and runs this file with it.
+services:
+  app:
+    image: ghcr.io/owner/notes-app:${NOTES_IMAGE_TAG:?}
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+      args:
+        NOTES_BUILD_COMMIT: ${NOTES_IMAGE_TAG:?}
+    env_file:
+      - notes.env
+    ports:
+      - "127.0.0.1:${NOTES_PORT:?}:8000"
+    networks:
+      - default
+      - services
+
+networks:
+  # The workspace's own way to the shared services; the factory creates it.
+  services:
+    external: true
+    name: ${FACTORY_SERVICES_NETWORK:?}

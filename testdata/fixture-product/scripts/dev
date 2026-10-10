@@ -2,7 +2,8 @@
 """The notes app's stack, with the factory's fixed verbs.
 
 The notes app has no containers, so the stack verbs say what a real stack would do. `test` runs the real tests.
-The factory sets FACTORY_SLOT, FACTORY_PORT and FACTORY_SLOT_DIR before a stack verb.
+The factory sets FACTORY_SLOT, FACTORY_PORT, FACTORY_SLOT_DIR and FACTORY_ENV_FILE before a stack
+verb.
 """
 
 from __future__ import annotations

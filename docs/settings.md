@@ -16,7 +16,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 
 | Group | Holds |
 | --- | --- |
-| `repo` | The product's checkout, default branch, GitHub name, health URLs and the paths only the owner changes |
+| `repo` | The product's checkout, default branch, GitHub name and the paths only the owner changes |
 | `models` | The allowed models and efforts, and the model and effort of every role |
 | `caps` | Implementers, designers and subagents at once |
 | `subagents` | Which subagent kinds each role may start |
@@ -27,22 +27,35 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `slots` | How many, the first port, the output lines an agent sees |
 | `budget` | The slice's memory and CPU, and the memory a test run needs |
 | `vitals`, `watch` | Amber and red levels; probe, loop, grace and silence times |
+| `errors` | How often the warden reads prod's new GlitchTip issues into requests, and how many pages one read covers |
+| `telemetry` | What `factory errors` and `factory traces` give an agent: how many items, how large, how long a call |
 | `cost`, `prices` | The daily budget, the plan-limit levels, and dollars per million tokens per model |
-| `sandbox` | The hosts a session may reach |
+| `sandbox` | The hosts a session may reach, and the tool caches in the agent's home it may write |
 | `dashboard` | Port, refresh and stale times, the code lock, page size, the hosts it answers |
 | `gc` | The nightly prune's hour, how long images stay, the Docker disk budget |
+| `install` | The drills' model and time, the guard's timeout, the check-ins' grace, the product's toolchain |
 
-`models.allowed` and `prices` are set at install and are read-only on the dashboard.
+`models.allowed` and `prices` are set at install and are read-only on the dashboard. Staging's and prod's health
+addresses are not settings: the warden reads them from `factory.toml` in the product's checkout at every probe.
+
+`install.toolchain` names the programs the product's scripts need, such as `uv` and `node`. The install copies each
+one from the owner's PATH, so the agents and the stack run the same tools as the owner.
+
+`sandbox.writable_caches` names the folders in the agent's home where sessions may write, besides their own
+worktree: the caches of the tools the product's tests run, such as `.cache/uv` and `.npm`. The install makes each
+folder for the agent user. A cache cannot lie in `.claude`, `.config`, `.local`, `.ssh` or `bin`, because a session
+that wrote there could act outside its sandbox.
 
 ## When a change takes effect
 
 | Setting | Takes effect |
 | --- | --- |
-| Caps, rounds, QA, vitals, watch, intake and routing values | At once: every guard call and warden pass reads them fresh |
+| Caps, rounds, QA, vitals, watch, errors, telemetry, intake and routing values | At once: every guard call and warden pass reads them fresh |
 | A session's or a subagent's model and effort | At its next start |
 | The slice budget | Within a minute |
 | The slot count | At the next slot claim |
 | The repo | At the next orchestrator start; stop the old one first |
 | The dashboard's port, hosts and threads | At the next warden start |
+| The sandbox's writable caches and the `install` group | At the next install |
 
 The dashboard shows the value running now beside one that waits, such as "4 at the next slot claim".

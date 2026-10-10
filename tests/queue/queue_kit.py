@@ -54,6 +54,9 @@ class FakeLauncher:
     def stop_session(self, session_id: str) -> None:
         raise AssertionError("the queue stops no session")
 
+    def message_session(self, session_id: str, text: str) -> None:
+        raise AssertionError("the queue messages no session")
+
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         self.stacks.append((slot, verb))
         return self.stack(slot, verb)
@@ -142,12 +145,7 @@ def make_world(tmp_path: Path) -> World:
     (repo / "queue").chmod(0o755)
     (repo / "GOAL.md").write_text(GOAL)
     defaults = tomllib.loads((ROOT / "settings.toml").read_text())
-    overrides = {
-        "repo.path": str(repo),
-        "repo.github": "acme/product",
-        "repo.staging_health": "https://s/health",
-        "repo.prod_health": "https://p/health",
-    }
+    overrides = {"repo.path": str(repo), "repo.github": "acme/product"}
     return World(places, repo, settings_mod.build(defaults, overrides), FakeClock(), FakeLauncher(), [])
 
 

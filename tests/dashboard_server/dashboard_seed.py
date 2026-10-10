@@ -105,8 +105,6 @@ def defaults_text(repo: Path) -> str:
     for key, value in {
         "repo.path": str(repo),
         "repo.github": "acme/acme-app",
-        "repo.staging_health": "https://staging.invalid/health",
-        "repo.prod_health": "https://prod.invalid/health",
     }.items():
         text = settings_save.set_line(text, key, value)
     prices = "".join(

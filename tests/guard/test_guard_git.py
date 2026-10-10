@@ -73,9 +73,6 @@ def test_the_orchestrator_leaves_finished_branches_to_the_warden(kit: Kit) -> No
 @pytest.mark.parametrize(
     ("command", "rule"),
     [
-        ("scripts/ci/promote abc1234", "prod-frozen"),
-        ("bash scripts/ci/deploy-staging abc1234", "prod-frozen"),
-        ("cd scripts/ci && ./promote abc1234", "prod-frozen"),
         ("gh workflow run deploy-prod.yml", "prod-frozen"),
         ("gh run rerun 123", "prod-frozen"),
         ("gh api -X POST repos/o/r/actions/workflows/9/dispatches", "prod-frozen"),
@@ -83,12 +80,10 @@ def test_the_orchestrator_leaves_finished_branches_to_the_warden(kit: Kit) -> No
         ("git push --tags origin", "prod-frozen"),
         ("git push origin HEAD:release", "prod-frozen"),
         ("git push origin abc1234:main", "git-bypass"),
-        ("scripts/ci/build abc1234", None),
         ("gh run list --limit 3", None),
     ],
 )
 def test_nothing_the_orchestrator_runs_reaches_prod(tmp_path: Path, command: str, rule: str | None) -> None:
     kit = Kit(tmp_path)
     kit.session("orchestrator", worktree=kit.repo)
-    (kit.repo / "scripts" / "ci").mkdir(parents=True)
     assert kit.bash(command, cwd=str(kit.repo)) == rule

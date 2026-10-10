@@ -1,6 +1,6 @@
-"""The factory command in a shell command: who may run which verb (`factory-verbs`), a task's status set only by the
-orchestrator (`queue-status`), the command alone in its line (`factory-alone`), and an implementer's check runs
-(`check-runs`).
+"""The factory command in a shell command: who may run which verb (`factory-verbs`, which also keeps the read-only
+telemetry verbs to intake, triage and the testers among subagents), a task's status set only by the orchestrator
+(`queue-status`), the command alone in its line (`factory-alone`), and an implementer's check runs (`check-runs`).
 
 The factory command runs outside the sandbox so it can reach the warden. Claude Code exempts a call only when its
 whole text is `factory` or `factory …`, so the guard asks for exactly that: one plain command, the bare word first,
@@ -36,6 +36,10 @@ SESSION_ONLY = frozenset(
      "propose.none", "route", "queue.next", "task.status", "merge.recorded", "needs-owner", "spec.save",
      "card.comments", "qa-ready", "qa-clean", "check"}
 )  # fmt: skip
+# Errors and traces: of the subagents, only these kinds read them (a tester's kind starts with the prefix).
+TELEMETRY = frozenset({"errors", "traces"})
+TELEMETRY_SUBAGENTS = frozenset({"intake", "triage"})
+TESTER_PREFIX = "qa-"  # must mirror runtime.guard.subagents.TESTER
 _HELP = frozenset({"-h", "--help", "help"})
 _FLAG_VERBS = {("inbox", "--wait"): "inbox.wait", ("propose", "--none"): "propose.none"}
 _STARTS = frozenset({"implementer", "designer"})
@@ -85,6 +89,9 @@ def check_verb(call: Call, inv: shell.Invocation) -> Decision:
         return Refusal("factory-verbs", f"`factory {verb}` is not for {actor}; see `factory --help`")
     if call.in_subagent and verb in SESSION_ONLY:
         return Refusal("factory-verbs", f"`factory {verb}` is your parent's to run; report to it instead")
+    reader = call.agent_type in TELEMETRY_SUBAGENTS or call.agent_type.startswith(TESTER_PREFIX)
+    if call.in_subagent and verb in TELEMETRY and not reader:
+        return Refusal("factory-verbs", f"`factory {verb}` is for intake, triage and testers; ask your parent instead")
     words = [w for w in inv.argv[2:] if not w.startswith("-")]
     if verb == "start" and words[:1] and words[0] not in _STARTS:
         return Refusal("factory-verbs", "the orchestrator starts implementers and designers; the owner starts the rest")

@@ -22,8 +22,13 @@ def managed_settings(ctx: Install) -> None:
     host.write(MANAGED_SETTINGS, text, mode=render.MANAGED.mode)
 
 
+def _given(ctx: Install) -> dict[str, str]:
+    return render.values(ctx.places, ctx.need_settings(), agent_uid=ctx.uid(AGENT_USER),
+                         stack_uid=ctx.uid(layout.STACK_USER))  # fmt: skip
+
+
 def units(ctx: Install) -> None:
-    given = render.values(ctx.places, ctx.need_settings())
+    given = _given(ctx)
     for item in render.UNIT_FILES:
         ctx.host.write(item.dest, render.artifact(item, ctx.templates(), given), mode=item.mode)
     # The warden's run-time budget changes live here; the slice just written already holds the settled values.
@@ -34,12 +39,12 @@ def units(ctx: Install) -> None:
 
 
 def polkit(ctx: Install) -> None:
-    given = render.values(ctx.places, ctx.need_settings())
+    given = _given(ctx)
     ctx.host.write(render.POLKIT.dest, render.artifact(render.POLKIT, ctx.templates(), given), mode=render.POLKIT.mode)
 
 
 def firewall(ctx: Install) -> None:
-    given = render.values(ctx.places, ctx.need_settings())
+    given = _given(ctx)
     ctx.host.mkdir(layout.CONFIG, mode=0o755)
     text = render.artifact(render.FIREWALL, ctx.templates(), given)
     ctx.host.write(render.FIREWALL.dest, text, mode=render.FIREWALL.mode)

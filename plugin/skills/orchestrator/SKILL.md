@@ -49,10 +49,10 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 
 ## A loop pass
 
-`factory tick` runs the warden's part: probes, the user-report pull, sweeps. Then: staging's health in
-`factory status`; new error-tracker issues, by title and count only, if your session has the tracker's tools, each
-filed as a request; and when no implementer is live and nothing merged for a while, a regression walk of the
-scenarios that waited longest.
+`factory tick` runs the warden's part: probes, the user-report pull, sweeps; the warden itself files each new prod
+error-tracker issue as a request from `glitchtip`. Then: staging's health in `factory status`; staging's new issues
+from `factory errors --where staging`, by title and count only, each filed as a request; and when no implementer is
+live and nothing merged for a while, a regression walk of the scenarios that waited longest.
 
 ## Requests and triage
 

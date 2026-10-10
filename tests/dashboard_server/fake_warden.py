@@ -62,7 +62,13 @@ class GitHub:
         return sha + "f" * (40 - len(sha))
 
     def run(self, run_id: str) -> dict[str, Any]:
-        return {"id": run_id, "status": "completed", "conclusion": "success", "url": "https://github.invalid/run"}
+        return {
+            "id": run_id,
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.invalid/run",
+            "jobs": {"deploy": {"status": "completed", "conclusion": "success"}},
+        }
 
     def reachable(self) -> bool:
         return True

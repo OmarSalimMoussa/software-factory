@@ -6,7 +6,7 @@ or a rehearsal builds ``Places`` on a temporary root instead, so nothing here is
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 INSTALL = Path("/opt/software-factory")
@@ -22,10 +22,18 @@ CHECK_TOOLS = Path("/opt/software-factory-tools")
 SCRATCH = ".factory"
 # contract: the product's prod workflow, the factory's CI template copied under this name; the warden starts it.
 PROMOTE_WORKFLOW = "deploy-prod.yml"
+# The job in it that moves prod; the template names it so, and the warden judges a push by it alone.
+PROMOTE_JOB = "deploy"
 WARDEN_USER = "software-warden"
 AGENT_USER = "software-agent"
 DASHBOARD_USER = "software-dashboard"  # contract: added by 1B-3, the one other user owner.sock answers
 SLICE = "software-factory.slice"
+# contract: added by FB5. The stack user's own folder of slots: each slot's env file and provisioning state, which
+# the stack user's runs write and the warden reads only to redact.
+STACK_SLOTS = Path("/home/software-stack/slots")
+# contract: added by FB5. The laptop's shared services: their compose file and services.env, root's, read by the stack
+# user. Not in the state folder, whose 0700 the stack user's Docker could not pass to bind a file from it.
+SERVICES = Path("/var/lib/software-factory-services")
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +41,8 @@ class Places:
     install: Path
     state: Path
     run: Path
+    stack_slots: Path = STACK_SLOTS
+    services: Path = SERVICES
 
     @classmethod
     def system(cls) -> Places:
@@ -41,7 +51,15 @@ class Places:
     @classmethod
     def under(cls, root: Path) -> Places:
         """A self-contained tree for tests and the rehearsal."""
-        return cls(root / "install", root / "state", root / "run")
+        return cls(root / "install", root / "state", root / "run", root / "stack-slots", root / "services")
+
+    @classmethod
+    def for_runner(cls, install: Path, state: Path) -> Places:
+        """A unit runner's places, from the state folder its unit names: the machine's, or those of a tree laid out
+        as ``under`` lays one out (the rehearsal's)."""
+        if state == STATE:
+            return cls(install, STATE, RUN)
+        return replace(cls.under(state.parent), install=install)
 
     # the install
     @property
@@ -135,6 +153,14 @@ class Places:
 
     def slot(self, n: int) -> Path:
         return self.slots / str(n)
+
+    # contract: added by FB5. The slot's env file (FACTORY_ENV_FILE), and what the product's scripts/dev writes beside
+    # it, such as seeds and temporary files: the factory reads and removes the env file alone.
+    def slot_env_dir(self, n: int) -> Path:
+        return self.stack_slots / str(n) / "env"
+
+    def slot_state_dir(self, n: int) -> Path:  # contract: added by FB5; the slot's provisioning state
+        return self.stack_slots / str(n) / "state"
 
     @property
     def evidence(self) -> Path:

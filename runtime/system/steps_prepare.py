@@ -20,13 +20,20 @@ _OWNER_TOOLS = ("uv", "claude")
 _RESTING = (DEPRIORITIZED, RETIRED)
 
 
+def owner_tool(ctx: Install, name: str) -> tuple[int, str]:
+    """The file the owner's login shell runs for ``name``, every link followed, kept for ``ctx.tool``; the shell's exit
+    code beside it."""
+    code, out = ctx.host.query(["sh", "-lc", f'readlink -f "$(command -v {name})"'], user=ctx.owner.name)
+    ctx.tools[name] = out.strip()
+    return code, out.strip()
+
+
 def check_machine(ctx: Install) -> None:
     host, owner = ctx.host, ctx.owner.name
     problems = [f"{tool} is not installed" for tool in _MACHINE_TOOLS if host.query(["which", tool])[0] != 0]
     for tool in _OWNER_TOOLS:
-        code, out = host.query(["sh", "-lc", f'readlink -f "$(command -v {tool})"'], user=owner)
-        ctx.tools[tool] = out.strip()
-        if (code != 0 or not out.strip()) and not host.dry:
+        code, found = owner_tool(ctx, tool)
+        if (code != 0 or not found) and not host.dry:
             problems.append(f"{tool} is not on {owner}'s PATH")
     for name, path in (("factory", ctx.factory), ("product", ctx.product)):
         code, out = host.query(["git", "-C", str(path), "remote", "get-url", "origin"], user=owner)

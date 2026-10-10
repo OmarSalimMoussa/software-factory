@@ -11,11 +11,16 @@ from runtime.system import render
 
 HERE = render.HERE
 PLACES = Places.system()
+AGENT_UID, STACK_UID = "1001", "1002"
+
+
+def _values(**changes: object) -> dict[str, str]:
+    return render.values(PLACES, settings(**changes), agent_uid=AGENT_UID, stack_uid=STACK_UID)
 
 
 def _unit(name: str, **changes: object) -> str:
     item = next(a for a in render.UNIT_FILES if a.source.endswith(name))
-    return render.artifact(item, HERE, render.values(PLACES, settings(**changes)))
+    return render.artifact(item, HERE, _values(**changes))
 
 
 @pytest.mark.parametrize(
@@ -35,20 +40,23 @@ def test_the_slice_takes_its_budget_from_the_settings(changes: dict[str, object]
 
 
 def test_every_unit_renders_whole() -> None:
-    given = render.values(PLACES, settings())
+    given = _values()
     for item in (*render.UNIT_FILES, render.POLKIT, render.FIREWALL):
         assert render.TOKEN.search(render.artifact(item, HERE, given)) is None, item.source
 
 
 @pytest.mark.parametrize(
-    ("name", "user", "runner"),
+    ("name", "user", "uid", "runner"),
     [
-        ("software-agent-run@.service", "software-agent", "runners/agent_run.py /var/lib/software-factory %i"),
-        ("software-stack-run@.service", "software-stack", "runners/stack_run.py /var/lib/software-factory %i"),
-        ("software-agent-daemon.service", "software-agent", "runners/with_token.py"),
+        ("software-agent-run@.service", "software-agent", AGENT_UID,
+         "runners/agent_run.py /var/lib/software-factory %i"),
+        ("software-stack-run@.service", "software-stack", STACK_UID,
+         "runners/stack_run.py /var/lib/software-factory %i"),
+        ("software-agent-daemon.service", "software-agent", AGENT_UID, "runners/with_token.py"),
+        ("software-services.service", "software-stack", STACK_UID, "runners/services_run.py up"),
     ],
-)
-def test_agent_and_stack_units_fix_their_user_and_slice(name: str, user: str, runner: str) -> None:
+)  # fmt: skip
+def test_agent_and_stack_units_fix_their_user_home_and_slice(name: str, user: str, uid: str, runner: str) -> None:
     lines = _unit(name).splitlines()
 
     assert f"User={user}" in lines
@@ -56,6 +64,16 @@ def test_agent_and_stack_units_fix_their_user_and_slice(name: str, user: str, ru
     assert any(line.startswith("ExecStart=") and runner in line for line in lines)
     # Of the warden's state, only public/ is visible, read-only.
     assert "TemporaryFileSystem=/var/lib/software-factory:ro" in lines
+    # %U and %h name root in a system unit, whatever User= says: the user's own id and home are written in.
+    assert f"Environment=XDG_RUNTIME_DIR=/run/user/{uid}" in lines
+    assert f"BindPaths=/home/{user}" in lines
+    # Product code finds the product's toolchain first, never the owner's home it was copied from.
+    assert "Environment=PATH=/opt/software-factory-toolchain/bin:/usr/local/bin:/usr/bin:/bin" in lines
+    # uv finds the product's Python among the toolchain's copies, and never downloads one.
+    uv = "UV_PYTHON_INSTALL_DIR=/opt/software-factory-toolchain/python UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy"
+    assert f"Environment={uv}" in lines
+    if user == "software-stack":
+        assert f"Environment=DOCKER_HOST=unix:///run/user/{uid}/docker.sock" in lines
 
 
 def test_the_warden_reads_transcripts_but_writes_nothing_outside_its_state() -> None:
@@ -83,4 +101,4 @@ def test_managed_settings_hold_only_the_guard_and_the_rulebook_loader() -> None:
 
 def test_a_template_naming_an_unknown_value_fails_loudly(tmp_path: Path) -> None:
     with pytest.raises(render.RenderError, match="nobody_gave_this"):
-        render.render("User=@nobody_gave_this@\n", render.values(PLACES, settings()))
+        render.render("User=@nobody_gave_this@\n", _values())

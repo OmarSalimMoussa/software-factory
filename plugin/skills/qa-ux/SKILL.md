@@ -46,6 +46,8 @@ Nielsen's ten usability heuristics, and the voice `GOAL.md` sets:
 - **Control.** Back, cancel and undo where a person expects them; destructive actions confirm.
 - **Errors** say what went wrong and what to do next, in plain words: never a stack trace or a bare "server error".
 - **Friction.** Extra clicks, waiting with no feedback, state lost on refresh, a flow that breaks between two pages.
+- **Hidden failures.** `factory ready-check` names your slot: after your flows, `factory errors --where slot <n>`
+  shows no new issue they raised, even where the screen looked fine.
 
 ## Report
 

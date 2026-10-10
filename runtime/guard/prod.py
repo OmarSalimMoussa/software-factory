@@ -1,15 +1,14 @@
 """`prod-frozen`: nothing an agent runs reaches prod. CI deploys staging from the default branch, and only the owner's
-push to prod starts the prod workflow; so no agent runs a deploy script by hand, starts a workflow, or pushes a tag
-or another branch."""
+push to prod starts the prod workflow; a deploy runs on the server, through a key only CI holds. So no agent starts a
+workflow, or pushes a tag or another branch."""
 
 from __future__ import annotations
 
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from runtime.guard import git_rules, nested, shell
-from runtime.guard.facts import Call, Decision, Refusal, resolve
+from runtime.guard.facts import Call, Decision, Refusal
 
-_DEPLOYS = ("scripts/ci/promote", "scripts/ci/deploy-staging")
 _INTERPRETERS = nested.SHELLS | {"python", "python3", "node", "perl", "ruby"}
 _WORKFLOW_STARTS = frozenset({("workflow", "run"), ("workflow", "enable"), ("workflow", "disable"), ("run", "rerun")})
 _SHIPS_ALL = frozenset({"--tags", "--follow-tags", "--mirror", "--all"})
@@ -28,10 +27,6 @@ def script_of(inv: shell.Invocation) -> str:
 def check(call: Call, inv: shell.Invocation, cwd: Path) -> Decision:
     if call.off("prod-frozen") or not inv.argv:
         return None
-    script = script_of(inv)
-    ran = PurePosixPath(resolve(script, cwd, call.home)).as_posix() if script else ""
-    if any(ran == d or ran.endswith("/" + d) for d in _DEPLOYS):
-        return Refusal("prod-frozen", "CI deploys staging and only the owner promotes; ship with `factory push`")
     words = inv.argv[1:]
     dispatch = words[:1] == ["api"] and any("dispatches" in a for a in words) and git_rules.api_writes(words)
     if inv.program == "gh" and (tuple(words[:2]) in _WORKFLOW_STARTS or dispatch):

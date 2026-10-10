@@ -104,6 +104,7 @@ def _product_python(repo: Repo, trees: list[str]) -> list[str]:
         and not scope.PY_TEST_RE.search(rel)
         and scope.under(rel, trees)
         and not scope.vendored(rel)
+        and not repo.excluded(rel)
     ]
 
 

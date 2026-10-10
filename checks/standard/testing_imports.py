@@ -56,6 +56,8 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
     for rel in repo.tracked:
         if not rel.endswith(".py") or may_import(rel) or scope.in_testdata(rel) or scope.vendored(rel):
             continue
+        if repo.excluded(rel):
+            continue
         try:
             found = list(scaffolding_imports(repo.read(rel)))
         except SyntaxError as exc:

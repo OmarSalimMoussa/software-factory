@@ -81,7 +81,7 @@ def read_problems(repo: Repo, values: Mapping[str, Any]) -> list[str]:
     answered: set[str] = set()
     for rel in repo.tracked:
         kind = _kind(rel, values)
-        if kind is None or rel in values["readers"] or _is_config(rel, config_names):
+        if kind is None or rel in values["readers"] or _is_config(rel, config_names) or repo.excluded(rel):
             continue
         try:
             hits = _env_lines(repo.read(rel), kind)

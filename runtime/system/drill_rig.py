@@ -128,7 +128,8 @@ class RealRig:
         cmd = ["systemd-run", "--quiet", "--collect", "--wait", "--pipe", f"--uid={user}", f"--gid={user}",
                f"--slice={SLICE}", f"--working-directory={self.worktree_a if user == AGENT_USER else account.home}",
                f"--setenv=HOME={account.home}", f"--setenv=XDG_RUNTIME_DIR={runtime}",
-               "--setenv=PATH=/usr/local/bin:/usr/bin:/bin"]  # fmt: skip
+               f"--setenv=PATH={layout.UNIT_PATH}",
+               *(f"--setenv={key}={value}" for key, value in layout.UV_ENV.items())]  # fmt: skip
         if user == layout.STACK_USER:
             cmd.append(f"--setenv=DOCKER_HOST=unix://{runtime}/docker.sock")
         if view:
