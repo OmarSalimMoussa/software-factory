@@ -110,6 +110,7 @@ stack.
 | `desktop up <email>`, `desktop down` | A remote desktop for steps outside the web UI, or "not supported" |
 | `test [path…]` | Runs the product's tests: all of them, or those under the paths |
 | `verbs` | Lists the verbs it supports |
+| `deps` | Optional: installs what the checks and tests read (package trees, tools); `factory check` runs it first |
 | `reports --since <cursor>` | Optional: prints erased reports, then new user reports, as JSON lines |
 
 Everything a slot creates (containers, volumes, networks, images) carries a label naming its slot, so the warden

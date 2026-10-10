@@ -22,7 +22,7 @@ VALUES = None
 
 HEADINGS = ("Who it is for", "The goal", "How it looks and feels", "How it speaks")
 VERBS = ("up", "down", "empty", "health", "sign-in", "seed", "desktop", "verbs", "test")
-OPTIONAL_VERBS = ("reports",)
+OPTIONAL_VERBS = ("reports", "deps")
 _ITEM_RE = re.compile(r"^- G(\d+) \S.*\. Done when \S.*\.$")
 
 

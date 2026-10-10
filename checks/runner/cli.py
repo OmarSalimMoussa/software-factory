@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -27,6 +28,7 @@ from runtime.shared.paths import Places
 from runtime.shared.settings import Settings, SettingsError
 
 LAST = "tests"  # the heaviest check runs alone, after the others
+DEPS = "deps"  # the optional scripts/dev verb that installs what the product's checks and tests read
 
 
 class Refusal(Exception):
@@ -124,6 +126,10 @@ def run(argv: list[str], cwd: Path, settings: Settings | None, out: TextIO) -> i
             "(--all checks everything)\n"
         )
         return 0
+    unprepared = prepare(root)
+    if unprepared:
+        out.write(f"factory check: {unprepared}\n")
+        return 1
     repo = Repo.open(root, changed)
     if settings is not None and not on_ci():
         ceiling = settings.get_int("budget.test_memory_ceiling_mib")
@@ -145,6 +151,22 @@ def run(argv: list[str], cwd: Path, settings: Settings | None, out: TextIO) -> i
     out.write(f"factory check: {len(ids)} passed in {seconds:.0f}s\n")
     _record(root, checked_tree, args.only is not None, out)
     return 0
+
+
+def prepare(root: Path) -> str:
+    """Runs the product's ``scripts/dev deps`` first when it has one, since several checks read what it installs (a
+    product's own type checker, its package trees); "" when done or not offered, else why the checks cannot start."""
+    dev = root / "scripts" / "dev"
+    if not os.access(dev, os.X_OK):
+        return ""
+    listed = subprocess.run([str(dev), "verbs"], cwd=root, capture_output=True, text=True, check=False)
+    if listed.returncode != 0 or DEPS not in listed.stdout.split():
+        return ""
+    done = subprocess.run([str(dev), DEPS], cwd=root, capture_output=True, text=True, check=False)
+    if done.returncode != 0:
+        said = (done.stderr.strip() or done.stdout.strip())[-1500:]
+        return f"scripts/dev deps failed (exit {done.returncode}), so no check can read the product's packages: {said}"
+    return ""
 
 
 def _record(root: Path, tree: str, partial: bool, out: TextIO) -> None:
