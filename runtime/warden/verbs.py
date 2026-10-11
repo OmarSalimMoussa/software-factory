@@ -20,6 +20,7 @@ VERDICTS = frozenset({"qa-backend", "qa-security", "qa-ui-function", "qa-ux", "q
 TESTERS = VERDICTS | {"qa-regression", "qa-prod"}
 INTAKE, TRIAGE = "intake", "triage"
 READERS = TESTERS | {INTAKE, TRIAGE}
+CRITICS = frozenset({"critic-architecture", "critic-product", "critic-reliability", "critic-security", "critic-ux"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +71,7 @@ VERBS: dict[str, Verb] = {
     "task.new": _v("runtime.queue.verbs:task_new", ORCH, kinds=frozenset({INTAKE})),
     "task.facts": _v("runtime.queue.verbs:task_facts", ORCH, kinds=frozenset({INTAKE})),
     "task.status": _v("runtime.queue.verbs:task_status", ORCH),
+    "task.show": _v("runtime.queue.verbs:task_show", *SESSIONS, kinds=READERS | CRITICS),
     "queue.next": _v("runtime.queue.verbs:queue_next", ORCH, kinds=frozenset({INTAKE, TRIAGE})),
     "route": _v("runtime.queue.verbs:route", ORCH),
     "propose": _v("runtime.queue.verbs:propose", ORCH),

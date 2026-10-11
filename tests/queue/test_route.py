@@ -61,3 +61,14 @@ def test_an_implementers_cause_tries_are_counted_and_the_last_tells_the_orchestr
         queue_verbs.cause_try(ctx, {"tried": "one more"}, None)
     logged = [e for e in world.queue().read_log(task.id) if e["event"] == queue_verbs.CAUSE_TRY]
     assert len(logged) == limit and logged[0]["text"] == "idea 0: the log showed otherwise"
+
+
+def test_a_session_in_a_worktree_reads_its_task_whole_through_the_warden(world: World) -> None:
+    task = world.task()
+    world.session("s-impl", "implementer", "implementer-t-0001", task=task.id)
+
+    shown = queue_verbs.task_show(world.ctx(role="implementer", session="s-impl"), {"task": task.id}, None)
+
+    assert shown["task"].startswith("---\n") and "Fix the loop." in shown["task"]
+    assert list(shown["requests"]) == task.requests and shown["spec"] is None
+    assert shown["log"] and shown["log"] == world.queue().read_log(task.id)

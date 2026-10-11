@@ -60,7 +60,8 @@ def test_a_session_gets_its_role_agents_with_their_browser_servers(world: World)
     assert agents["qa-ui-function"]["mcpServers"][0]["qa-browser"]["args"] == ["qa-browser", "qa-ui-function"]
     assert launch.session_argv(request)[-2:] == [
         "--",
-        "Task: t-0001\n\nSlot 1 is yours: bring it up with factory slot up.",
+        "Task: t-0001, Task t-0001\n\n`factory queue task show t-0001` gives its log, its requests and its spec."
+        "\n\nSlot 1 is yours: bring it up with factory slot up.",
     ]
 
 

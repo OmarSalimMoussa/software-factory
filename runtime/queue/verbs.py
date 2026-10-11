@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.queue import cards, documents, formats, intake, owner, tasks, triage, turn
+from runtime.queue import cards, documents, formats, intake, owner, records, tasks, triage, turn
 from runtime.queue import propose as proposing
 from runtime.queue import route as ladders
 from runtime.queue.book import Queue
@@ -49,6 +49,21 @@ def cause_try(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
     ctx.post_event(inbox.NEEDS_RUNG, {"session": session.id, "name": session.name, "task": session.task, "why": why})
     return ok(tries_left=0, message="That was your last try: stop, and report what you know and what you ruled out. "
                                     "The warden told the orchestrator, which moves the task up a rung.")  # fmt: skip
+
+
+def task_show(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
+    """A task as a session in a worktree reads it, where queue/ is not: the task's file, its log, its requests' files
+    and its spec's file, if it has one."""
+    task_id = _text(args, "task")
+    queue = Queue.of(ctx)
+    try:
+        task = queue.task(task_id)
+    except FileNotFoundError as exc:
+        raise Refused("task", f"there is no task {task_id}") from exc
+    requests = {r: formats.dump_request(queue.request(r)) for r in task.requests}
+    spec = queue.spec(task_id)
+    return ok(task=formats.dump_task(task), log=queue.read_log(task_id), requests=requests,
+              spec=records.dump_spec(spec) if spec is not None else None)  # fmt: skip
 
 
 def request_new(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:

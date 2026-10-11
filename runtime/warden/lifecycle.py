@@ -194,6 +194,13 @@ def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
     return ok(session=s.id, name=s.name, model=s.model, rung=s.rung)
 
 
+def first_prompt(task: Task, held: str, note: str) -> str:
+    """A run's first prompt: its task's essentials, since queue/ is not in its worktree, and the rest a command away."""
+    body = f"\n\n{task.body.strip()}" if task.body.strip() else ""
+    rest = f"\n\n`factory queue task show {task.id}` gives its log, its requests and its spec."
+    return f"Task: {task.id}, {task.title}{body}{rest}{held}\n\n{note}".strip()
+
+
 def brief_path(ctx: Context, task_id: str) -> Path:
     """The brief the orchestrator wrote when it proposed the task, which its run starts with."""
     return ctx.places.state / "briefs" / f"{task_id}.md"
@@ -222,7 +229,7 @@ def start_run(ctx: Context, role: str, task: Task, note: str, outage_fix: bool) 
         slot = _claim_at_start(ctx, name, role, task.id)
         held = f"\n\nSlot {slot} is yours: bring it up with factory slot up." if slot is not None else ""
         try:
-            s = launch.start_session(ctx, sessions, fields, f"Task: {task.id}{held}\n\n{note}".strip(), worktree=name)
+            s = launch.start_session(ctx, sessions, fields, first_prompt(task, held, note), worktree=name)
         except Refused:
             if slot is not None:
                 permits.free_slot(ctx, slot)

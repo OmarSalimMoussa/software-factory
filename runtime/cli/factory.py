@@ -161,6 +161,7 @@ def _queue(sub: Any) -> None:
     facts = task.add_parser("facts")
     facts.add_argument("task")
     _facts(facts)
+    task.add_parser("show", help="the task, its log, its requests and its spec, from any worktree").add_argument("task")
     status = task.add_parser("status")
     status.add_argument("task")
     status.add_argument("to")
@@ -298,6 +299,8 @@ def _queue_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Ca
         return Call("queue.check", {"commit": ns.commit}, read_file(ns.body))
     if ns.task_cmd == "new":
         return Call("task.new", {"requests": _words(ns.requests), **_fact_args(ns)}, read_file(ns.body))
+    if ns.task_cmd == "show":
+        return Call("task.show", {"task": ns.task})
     if ns.task_cmd == "facts":
         return Call("task.facts", {"task": ns.task, **_fact_args(ns)})
     args = {"task": ns.task, "to": ns.to, **({"event": ns.event} if ns.event else {})}
