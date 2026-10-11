@@ -22,7 +22,7 @@ from runtime.shared import environment
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.shared.settings import Settings
-from runtime.warden import checks
+from runtime.warden import checks, pins
 from runtime.warden.context import Context
 from runtime.warden.delivery import deploys
 from runtime.warden.health import probes
@@ -82,20 +82,21 @@ def push_checked(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
             sha = _newest_shippable(ctx, git, remote, f"refs/checkout/{branch}")
         if not git.is_ancestor(sha, f"refs/checkout/{branch}"):
             raise Refused("push", f"{sha[:12]} is not on {branch} in the checkout: merge it, check it, then push")
-        if remote == sha:
-            return ok(sha=sha, commits=0, message=f"GitHub's {branch} already is {sha[:12]}")
+        if git.is_ancestor(sha, remote):
+            return ok(sha=sha, commits=0, message=f"GitHub's {branch} already holds {sha[:12]}")
         if not git.is_ancestor(remote, sha):
             raise Refused("push", f"{branch} on GitHub has commits {sha[:12]} lacks: merge them, check, then push")
         unchecked = _unchecked_merges(ctx, git, remote, sha)
         if unchecked:
             raise Refused("unchecked", f"{sha[:12]} would ship {', '.join(unchecked)}, whose check of the default "
                                        "branch has not passed: check it first, or revert it")  # fmt: skip
-        bad = sorted({p for p in git.touched(remote, sha) if is_protected(p, prefixes)})
+        owners = pins.allowed(git.run, ctx.places, remote, sha)
+        bad = sorted({p for p in git.touched(remote, sha) if is_protected(p, prefixes)} - owners)
         if bad:
             raise Refused("protected-path", f"the range touches {', '.join(bad[:5])}, which only the owner changes: "
                                             "revert those changes, or ask the owner")  # fmt: skip
         tree = git.run("rev-parse", f"{sha}^{{tree}}").strip()
-        if not checks.passed(ctx.places, tree):
+        if not checks.passed(ctx.places, tree) and not pins.tree_passes(git.run, ctx.places, sha):
             raise Refused("unchecked", f"{sha[:12]} has not passed factory check: run factory check on {branch}, "
                                        "then push")  # fmt: skip
         count = int(git.run("rev-list", "--count", f"{remote}..{sha}"))
@@ -152,7 +153,8 @@ def _newest_shippable(ctx: Context, git: Git, remote: str, tip: str) -> str:
     merges; refused, with why the tip is not shippable, when there is none."""
     candidates = git.run("rev-list", "--first-parent", f"{remote}..{tip}").split()
     for commit in candidates:
-        if checks.passed(ctx.places, git.run("rev-parse", f"{commit}^{{tree}}").strip()) and not _unchecked_merges(
+        passed = checks.passed(ctx.places, git.run("rev-parse", f"{commit}^{{tree}}").strip())
+        if (passed or pins.tree_passes(git.run, ctx.places, commit)) and not _unchecked_merges(
             ctx, git, remote, commit
         ):
             return commit

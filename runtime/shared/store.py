@@ -9,6 +9,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import stat
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -33,6 +34,27 @@ def write_text(path: Path, text: str, mode: int = 0o644) -> None:
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
         raise
+
+
+def read_inside(root: Path, rel: Path) -> str:
+    """The text of ``root``/``rel``, read by root from a folder another user writes: no part of ``rel`` may be a
+    link, and the file must be a plain one, so nothing there sends the read elsewhere or blocks it."""
+    fds = [os.open(root, os.O_RDONLY | os.O_DIRECTORY)]
+    try:
+        for part in rel.parts[:-1]:
+            fds.append(os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fds[-1]))
+        fds.append(os.open(rel.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fds[-1]))
+        if not stat.S_ISREG(os.fstat(fds[-1]).st_mode):
+            raise StoreError(f"{root / rel}: not a plain file")
+        with os.fdopen(os.dup(fds[-1]), encoding="utf-8") as fh:
+            return fh.read()
+    except FileNotFoundError:
+        raise
+    except OSError as exc:
+        raise StoreError(f"{root / rel}: {exc}") from exc
+    finally:
+        for fd in fds:
+            os.close(fd)
 
 
 def write_json(path: Path, data: Any, mode: int = 0o644) -> None:

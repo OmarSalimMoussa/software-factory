@@ -25,7 +25,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.shared import environment  # noqa: E402 - the path line above must run first
+from runtime.shared import environment, store, upgrades  # noqa: E402 - the path line above must run first
 from runtime.shared.paths import Places  # noqa: E402
 from runtime.shared.protocol import Refused  # noqa: E402
 from runtime.system import ci_check, healthchecks, layout, release, sealed
@@ -42,6 +42,7 @@ from runtime.system.install_steps import (
 from runtime.system.job import REPO_ROOT, Install, refuse  # noqa: E402
 from runtime.system.journal import Journal  # noqa: E402
 from runtime.system.real_host import RealHost  # noqa: E402
+from runtime.system.unattended import UnattendedHost  # noqa: E402
 from runtime.system.uninstall import LookingHost  # noqa: E402
 
 PROGRAM = "install.py"
@@ -115,6 +116,7 @@ PHASES: tuple[Phase, ...] = (
         ("Writing the factory's firewall", steps_wire.firewall),
         ("Installing the factory command", steps_wire.factory_command),
         ("Adding the factory's checks to the product", steps_wire.git_hooks),
+        ("Moving the product to this factory", steps_wire.product_pin),
         ("Publishing the dashboard on your tailnet", steps_wire.tailnet),
     )),
     Phase("Starting up", (
@@ -251,10 +253,44 @@ def from_commit(commit: str, owner: str, argv: list[str]) -> int:
     sealed.exec_staged(sha, stage, "runtime/system/install.py", argv, checkout=REPO_ROOT)
 
 
+def upgrade(commit: str) -> int:
+    """The dashboard's upgrade, run by root's upgrade service from the release's sealed copy. Whose laptop it is and
+    which product checkout come from root's own record of the last install; a step that would ask stops it."""
+    places = Places.system()
+    if os.geteuid() != 0 or environment.staged() is None:
+        print(f"{PROGRAM}: --upgrade runs as root, from a release's sealed copy", file=sys.stderr)
+        return 2
+    try:
+        installed = upgrades.read_installed(places)
+    except store.StoreError as exc:
+        print(f"{PROGRAM}: the record of the last install cannot be read ({exc}): upgrade by hand", file=sys.stderr)
+        return 2
+    owner = RealHost().account(installed["owner"]) if installed else None
+    if installed is None or owner is None:
+        print(f"{PROGRAM}: there is no install to upgrade, or its owner's account is gone", file=sys.stderr)
+        return 2
+    journal = Journal.create(layout.LOGS, "upgrade", group=owner.groups[0], verbose=False, terminal=False)
+    host = UnattendedHost(journal, places, installed["commit"], commit)
+    ctx = job(host, places, owner, Path(installed["product"]), commit, {}, False)
+    ctx.unattended = True
+    problem: str | None = "The upgrade was stopped before it finished. Upgrade again to finish the job."
+    try:
+        if ctx.first:
+            raise refuse("There is no install to upgrade: install the factory by hand first")
+        problem = perform(ctx, keep=False)
+        if problem is None:
+            host.progress(upgrades.DONE, "")
+    finally:
+        sealed.finish(RealHost(journal), ctx.stage, kept=False)
+    return 0 if problem is None else 1
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog=PROGRAM, description=__doc__.splitlines()[0])
     parser.add_argument("--commit", required=True, help="the factory commit to install")
-    parser.add_argument("--repo", required=True, type=Path, help="your checkout of the product the factory works on")
+    parser.add_argument("--repo", type=Path, help="your checkout of the product the factory works on")
+    parser.add_argument("--upgrade", action="store_true",
+                        help="the dashboard's upgrade, as root's upgrade service runs it: it asks nothing")  # fmt: skip
     parser.add_argument("--healthchecks", action="store_true", help="create the Healthchecks.io checks")
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="a setting to save")
     parser.add_argument("--dry-run", action="store_true", help="go through every step; change nothing")
@@ -262,6 +298,10 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--keep-on-failure", action="store_true", help=keep)
     parser.add_argument("--verbose", action="store_true", help="print every detail the log keeps")
     args = parser.parse_args(argv)
+    if args.upgrade:
+        return upgrade(args.commit)
+    if args.repo is None:
+        parser.error("--repo is required: your checkout of the product")
     # sudo names the owner who ran it; a dry run without sudo has none, and is then the owner's own.
     sudo_user = environment.sudo_user()
     root = os.geteuid() == 0 and sudo_user is not None
@@ -280,7 +320,7 @@ def main(argv: list[str]) -> int:
         journal = Journal(verbose=True)  # a dry run as the owner keeps no log: what it would do is its whole point
     host: Host = LookingHost(journal) if args.dry_run else RealHost(journal)
     ctx = job(host, Places.system(), owner, args.repo, args.commit, parse_changes(args.set), args.healthchecks)
-    verb = "Reinstalling" if not ctx.first else "Installing"
+    verb = "Upgrading" if not ctx.first else "Installing"
     journal.screen(f"{'Dry run: ' if args.dry_run else ''}{verb} the factory at {(ctx.sha or ctx.commit)[:12]}"
                    f"{f': {ctx.subject}' if ctx.subject else ''}")  # fmt: skip
     problem: str | None = "interrupted"

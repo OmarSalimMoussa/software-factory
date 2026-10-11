@@ -4,6 +4,7 @@ install form offers, and how each action ended. Every sentence the page draws is
 from __future__ import annotations
 
 import json
+import tomllib
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime
@@ -14,7 +15,7 @@ from runtime.dashboard.client import Warden, WardenDown
 from runtime.shared import settings as settings_module
 from runtime.shared import store
 from runtime.shared.paths import Places
-from runtime.system import ci_check, github_keys, install, layout, uninstall
+from runtime.system import ci_check, github_keys, healthchecks, install, layout, uninstall
 from runtime.system.host import Account, Host
 from runtime.system.install_console.console_run import FAILED, Run
 from runtime.system.install_steps import steps_wire
@@ -131,27 +132,70 @@ def address(host: Host) -> dict[str, str] | None:
 # ---- the install form --------------------------------------------------------------------------------------------
 
 
-def install_form(offered: dict[str, Any], ci: dict[str, Any] | None, repo: Path | None,
-                 record: dict[str, Any] | None, checked: dict[str, bool]) -> dict[str, Any]:  # fmt: skip
-    """The form, with ``checked`` saying which choices start on (the console's own flags)."""
+def install_form(
+    offered: dict[str, Any],
+    ci: dict[str, Any] | None,
+    repo: Path | None,
+    record: dict[str, Any] | None,
+    checked: dict[str, bool],
+    places: Places,
+) -> dict[str, Any]:
+    """The form, with ``checked`` saying which choices start on (the console's own flags). An installed factory is
+    upgraded: the form says from which commit, and what the upgrade keeps."""
     # --repo, else the checkout the last install named; with neither, the field is empty for the owner to fill.
     named = record.get("product") if record else None
     product = str(repo) if repo else named if isinstance(named, str) else ""
-    verb = "Reinstall" if record else "Install"
+    verb = "Upgrade" if record else "Install"
+    watched = healthchecks.keys_path(places.state).exists()
+    if record and watched:
+        checks = {"id": "healthchecks", "label": "Set up the Healthchecks.io checks again", "checked": False,
+                  "hint": "They are set up, and the upgrade keeps them. Check this only to make them again with a "
+                          "new API key."}  # fmt: skip
+    else:
+        checks = {"id": "healthchecks", "label": "Create the Healthchecks.io checks",
+                  "checked": checked["healthchecks"],
+                  "hint": "They tell you when the warden or the orchestrator goes quiet. Asks for an API "
+                          "key."}  # fmt: skip
+    keep = {"id": "keep", "label": "Keep a failed first install", "checked": checked["keep"],
+            "hint": "Leave what it made in place to look at, instead of taking it back."}  # fmt: skip
     return {
         "heading": verb,
-        "commit": {"label": "Factory commit", **offered, "ci": ci},
+        "commit": {"label": "Upgrade to" if record else "Factory commit", **offered, "ci": ci},
+        "installed": {"label": "Installed now", "short": str(record["commit"])[:7], "subject": record["subject"]}
+        if record else None,
+        "kept": {"label": "Kept as it is", "items": kept(places, watched)} if record else None,
         "repo": {"label": "Product checkout", "value": product,
                  "hint": "Your own checkout of the product the factory works on."},  # fmt: skip
-        "healthchecks": {"label": "Create the Healthchecks.io checks", "checked": checked["healthchecks"],
-                         "hint": "They tell you when the warden or the orchestrator goes quiet. Asks for an API key."},
-        "keep": {"label": "Keep a failed first install", "checked": checked["keep"],
-                 "hint": "Leave what it made in place to look at, instead of taking it back."},
+        "choices": [checks] if record else [checks, keep],
         "dry": {"label": "Dry run", "checked": checked["dry"],
                 "hint": "Go through every step, reading this computer and changing nothing."},
         "button": verb,
         "dry_button": "Dry run",
     }  # fmt: skip
+
+
+def kept(places: Places, watched: bool) -> list[str]:
+    """What an upgrade keeps, in the owner's words: everything the installed factory holds."""
+    try:
+        changed = len(settings_module.flatten(tomllib.loads(places.overrides.read_text(encoding="utf-8"))))
+    except FileNotFoundError:
+        changed = 0
+    except (OSError, ValueError) as exc:
+        return [f"Your settings: their file cannot be read ({type(exc).__name__}), and the upgrade will say why"]
+    settings = (
+        f"Your settings: the {changed} {'value' if changed == 1 else 'values'} you changed, the rest at the "
+        "new release's defaults"
+        if changed
+        else "Your settings: all at the new release's defaults, as now"
+    )
+    return [
+        settings,
+        "Your Claude accounts, GitHub token and keys",
+        "The 6-digit code on your phone",
+        *(["The Healthchecks.io checks"] if watched else []),
+        "The agents' copy of the product, its queue and their paused work",
+        "The shared services and their data",
+    ]
 
 
 _CI = {

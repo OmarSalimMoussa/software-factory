@@ -54,6 +54,9 @@ class Launcher:
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         return StackResult(exit=0, tail="", log="stack.log")
 
+    def start_upgrade(self, commit: str) -> None:
+        self.calls.append(("upgrade", commit))
+
     def restart_daemon(self) -> None:
         self.calls.append(("restart", None))
 

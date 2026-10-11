@@ -10,10 +10,10 @@ import pytest
 from loop_fakes import World
 
 from runtime.queue import formats, records, turn
-from runtime.shared import models, store
+from runtime.shared import models, store, upgrades
 from runtime.shared.models import Probe, Task
 from runtime.shared.protocol import Refused
-from runtime.warden import inbox
+from runtime.warden import inbox, pins
 from runtime.warden.delivery import deploys, github_push, prod_push
 from runtime.warden.health import probes
 from runtime.warden.owner import ops
@@ -348,3 +348,73 @@ def test_whether_a_commit_is_on_the_default_branch_is_asked_of_github_itself(wor
     shutil.rmtree(github_repo)  # GitHub does not answer
     with pytest.raises(Refused, match="git fetch failed"):
         prod_push.on_default(world.ctx, pushed)
+
+
+def _pin(world: World, ref: str = "acme/software-factory@" + "d" * 40) -> str:
+    """The commit an upgrade makes, as root, recorded as the owner's with each path's blob."""
+    parent = git(world.checkout, "rev-parse", "HEAD")
+
+    def change(root: Path) -> None:
+        (root / ".github").mkdir(exist_ok=True)
+        (root / ".github" / "factory-ref").write_text(ref + "\n")
+        write(".github/workflows/ci.yml")(root)
+
+    made = commit(world.checkout, change)
+    places = world.ctx.places
+    places.upgrade.mkdir(parents=True, exist_ok=True)
+    blobs = {
+        ".github/factory-ref": upgrades.blob_id(ref + "\n"),
+        ".github/workflows/ci.yml": upgrades.blob_id("changed\n"),
+    }
+    store.write_json(upgrades.pins_path(places),
+                     [*upgrades.read_pins(places), {"commit": made, "parent": parent, "blobs": blobs}])  # fmt: skip
+    return made
+
+
+@pytest.mark.parametrize(
+    ("after", "ships"),
+    [(None, True), ("src/app.py", True), (".github/factory-ref", False)],
+    ids=["the-pin-alone", "a-checked-commit-on-top", "the-pin's-file-changed-again"],
+)
+def test_the_owners_pin_ships_on_its_parents_check_and_lets_nothing_else_through(
+    world: World, github_repo: Path, after: str | None, ships: bool
+) -> None:
+    passed(world, git(world.checkout, "rev-parse", "HEAD^{tree}"))
+    pin = _pin(world)
+    head = commit(world.checkout, write(after)) if after else pin
+    if after:
+        passed(world, git(world.checkout, "rev-parse", f"{head}^{{tree}}"))
+
+    if ships:
+        assert github_push.push_checked(world.ctx, {"sha": head}, None)["sha"] == head
+        assert git(github_repo, "rev-parse", "master") == head
+    else:
+        with pytest.raises(Refused) as refused:
+            github_push.push_checked(world.ctx, {"sha": head}, None)
+        assert refused.value.rule == "protected-path"
+
+
+def test_a_change_to_the_pins_files_that_root_did_not_make_is_refused(world: World, github_repo: Path) -> None:
+    passed(world, git(world.checkout, "rev-parse", "HEAD^{tree}"))
+    sha = commit(world.checkout, write(".github/factory-ref"))  # an agent's, not in root's record
+    passed(world, git(world.checkout, "rev-parse", f"{sha}^{{tree}}"))
+    with pytest.raises(Refused) as refused:
+        github_push.push_checked(world.ctx, {"sha": sha}, None)
+    assert refused.value.rule == "protected-path"
+
+
+def test_the_warden_pushes_a_pin_itself_and_only_tries_again_after_a_while(
+    world: World, github_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    passed(world, git(world.checkout, "rev-parse", "HEAD^{tree}"))
+    pin = _pin(world)
+    tries: list[str] = []
+    real = github_push.push_checked
+    monkeypatch.setattr(
+        github_push, "push_checked", lambda ctx, args, data: tries.append(args["sha"]) or real(ctx, args, data)
+    )
+
+    pins.push_pending(world.ctx)
+    pins.push_pending(world.ctx)
+
+    assert tries == [pin] and git(github_repo, "rev-parse", "master") == pin

@@ -4,7 +4,8 @@ The factory is a frozen dev-workflow harness: it runs Claude agents on one produ
 This file is for the owner and any session the owner opens on the factory itself.
 
 - **Frozen.** Agents never edit the factory, and the factory never works on its own repo. Every change is the
-  owner's, made by hand with the factory fully stopped, then reinstalled.
+  owner's, made by hand, and installed only with the factory paused: from the release file, or with the dashboard's
+  Upgrade and the owner's 6-digit code, which installs only a release CI made.
 - **No product here.** No product's name, path, port, host or rule belongs in this repo. A product describes itself
   only in its own `GOAL.md`, and supplies values to the standard checks in its `check-values/`.
 - **Every value is a setting.** Caps, models, rounds, times and thresholds live in `settings.toml`, read once
@@ -17,4 +18,4 @@ This file is for the owner and any session the owner opens on the factory itself
 - **Its own checks, too.** The factory meets every standard check that fits a dev tool, with no debt deferred.
   `tests/self_check/` names the product-only checks with their grounds, and CI runs it before any release.
 - **No mirrored constants.** A value two parts share lives in one module or file that both read, never in a hand copy.
-- **Changes go:** branch, test, merge, push, reinstall. `SELF_REFLECT.md` on the machine says what to change next.
+- **Changes go:** branch, test, merge, push, upgrade. `SELF_REFLECT.md` on the machine says what to change next.

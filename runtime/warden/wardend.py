@@ -22,7 +22,7 @@ from runtime.shared import environment, error_reports, store
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, Places
 from runtime.shared.settings import Settings
-from runtime.warden import gc, imports, inbox, loop, public, schedule, server, upgrade
+from runtime.warden import factory_upgrade, gc, imports, inbox, loop, pins, public, schedule, server, upgrade
 from runtime.warden.context import Caller, Clock, Context
 from runtime.warden.delivery import github, prod_push
 from runtime.warden.dispatch import Dispatcher, Doors, resolve
@@ -74,6 +74,16 @@ def _ask_branch(ctx: Context) -> None:
     loop.run_once(ctx, "the branch ask", lambda: prod_push.ask_branch(ctx))
 
 
+def _check_releases(ctx: Context) -> None:
+    # In its own thread: GitHub may be slow, and a failure is reported there, once while it lasts.
+    loop.run_once(ctx, "the release check", lambda: factory_upgrade.poll(ctx))
+
+
+def _push_pins(ctx: Context) -> None:
+    # In its own thread: a push fetches from GitHub and the agents' checkout.
+    loop.run_once(ctx, "the product pin's push", lambda: pins.push_pending(ctx))
+
+
 def _pull_reports(ctx: Context) -> None:
     # In its own thread: a failure is reported there, once while it lasts, as a pass's is.
     loop.run_once(ctx, "the reports pull", lambda: reports.poll(ctx))
@@ -88,6 +98,8 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
         # It runs the product's scripts on a slot, for up to slots.verb_minutes: never inside the tick.
         ("reports", imports.Background(_pull_reports, imports.in_thread("reports")).run_pass),
         ("branch", imports.Background(_ask_branch, imports.in_thread("branch")).run_pass),
+        ("releases", imports.Background(_check_releases, imports.in_thread("releases")).run_pass),
+        ("pins", imports.Background(_push_pins, imports.in_thread("pins")).run_pass),
         ("schedule", schedule.run_pass),
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),
         ("plan", watch.run_pass),

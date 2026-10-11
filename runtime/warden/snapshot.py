@@ -26,7 +26,7 @@ from runtime.shared import models, protocol, store
 from runtime.shared.models import RETIRED
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
-from runtime.warden import gc, public
+from runtime.warden import factory_upgrade, gc, public
 from runtime.warden.context import Context
 from runtime.warden.delivery import ci_watch, deploys, outage, prod_push
 from runtime.warden.folds import Cost, History, Refusals, Streaks, kept
@@ -270,6 +270,7 @@ READERS: dict[str, Reader] = {
         "staging_pinned": _staging_pinned(ctx),
     },
     "ci": lambda ctx, args: ci_watch.read(ctx.places),
+    "upgrade": lambda ctx, args: factory_upgrade.view(ctx),
     "plan": lambda ctx, args: plan.reading(ctx),
     "vitals": lambda ctx, args: {"reading": store.read_json_or(ctx.places.vitals, None), "memory": _memory()},
     "rules": lambda ctx, args: {"rules": RULES, "off": sorted(public.read_switches(ctx.places))},

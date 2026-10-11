@@ -24,7 +24,7 @@ from typing import Any
 
 from runtime.shared import store
 from runtime.shared.models import PENDING, WORKING, Session
-from runtime.shared.paths import AGENT_USER, Places
+from runtime.shared.paths import AGENT_USER, UPGRADE_UNIT, Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.system.layout import DAEMON_UNIT
@@ -140,6 +140,13 @@ class Units:
         request_id = f"check-{uuid.uuid4().hex}"
         self._request(request_id, {"kind": "check", "checkout": checkout, "args": args})
         return self._wait(CHECK_UNIT.format(request_id), request_id)
+
+    def start_upgrade(self, commit: str) -> None:
+        """Start the owner's upgrade to the release of ``commit``, as root, and return at once: the install it runs
+        stops this warden."""
+        done = self.run(["start", "--no-block", UPGRADE_UNIT.format(commit)])
+        if done.returncode != 0:
+            raise LaunchError(f"the upgrade did not start: {done.stderr.strip()[-300:]}")
 
     def restart_daemon(self) -> None:
         """Restart the daemon that hosts every session: it loads the sign-in token again, and its sessions end."""

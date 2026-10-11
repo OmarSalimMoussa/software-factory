@@ -1,20 +1,24 @@
 from __future__ import annotations
 
+import functools
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
-from system_fakes import dry_job, settings
+from system_fakes import FACTORY_ORIGIN, dry_job, settings
 
+from runtime.shared import releases, upgrades
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
 from runtime.system import ci_check, install, layout, render, uninstall
 from runtime.system.host import DryHost
 from runtime.system.install_steps import steps_machine, steps_prepare, steps_secrets, steps_services, steps_wire
-from runtime.system.job import Install
+from runtime.system.job import REPO_ROOT, Install
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
+from runtime.warden import pins
 from runtime.warden.sessions import registry
 
 
@@ -228,6 +232,8 @@ def test_the_secrets_step_keeps_the_agents_claude_accounts(
         folder / "deploy.key",
         folder / "factory-read.key.pub",
         folder / "github.token",
+        folder / "factory.token",
+        upgrades.token_path(job.places),
     }
     host.files.update({folder / name: text for name, text in present.items()})
 
@@ -239,6 +245,47 @@ def test_the_secrets_step_keeps_the_agents_claude_accounts(
     assert [a for a in host.actions if a.startswith("write: ")] == [
         f"write: {folder}/{w} {WARDEN_OWNED}" for w in written
     ]
+
+
+@pytest.mark.parametrize(
+    ("kept", "github", "refused"),
+    [(True, None, False), (False, None, False), (False, "HTTP 404", True)],
+    ids=["kept-from-before", "asked-and-checked", "one-github-refuses"],
+)
+def test_the_install_asks_once_for_a_factory_token_that_github_lets_read_the_releases(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kept: bool, github: str | None, refused: bool
+) -> None:
+    job = dry_job(tmp_path)
+    job.settings = settings(**{"factory.github": "acme/software-factory"})
+    host, folder = job.host, job.places.state / "secrets"
+    assert isinstance(host, DryHost)
+    host.dry = False  # decides like a real install; a dry host still changes nothing
+    host.paths |= {job.places.totp_secret, folder / "deploy.key", folder / "factory-read.key.pub",
+                   folder / "github.token", folder / "claude-accounts" / "active"}  # fmt: skip
+    if kept:
+        host.files[folder / "factory.token"] = "github_pat_read_only\n"
+    checked: list[str] = []
+
+    def check(repo: str, token: str, timeout: float) -> None:
+        checked.append(repo)
+        if github:
+            raise releases.ReleaseError(f"GitHub refused GET /repos/acme/software-factory: {github}")
+
+    monkeypatch.setattr(steps_secrets, "check_factory_token", check)
+    if refused:
+        with pytest.raises(Refused, match="That token cannot read the factory's releases"):
+            steps_secrets.secrets(job)
+    else:
+        steps_secrets.secrets(job)
+
+    asked = [a for a in host.actions if a.startswith("ask the owner: A read-only GitHub token for the factory")]
+    wrote = [a for a in host.actions if a.startswith(f"write: {folder}/factory.token")]
+    assert (len(asked), checked, len(wrote)) == (
+        (0, [], 0) if kept else (1, ["acme/software-factory"], 0 if refused else 1)
+    )
+    # Root keeps its own copy for the upgrade unit, which never reads the warden's.
+    copied = [a for a in host.actions if a.startswith(f"write: {upgrades.token_path(job.places)} (600, root:root)")]
+    assert len(copied) == (0 if refused else 1)
 
 
 @pytest.mark.parametrize(
@@ -404,3 +451,53 @@ def test_the_stack_users_systemd_is_walled_off_the_tailnet_before_its_containers
     started = acts.index(f"run: systemctl start {unit}")
     assert (wrote is not None) is (not walled) and (wrote is None or wrote < started)
     assert (f"run: systemctl restart {unit}" in acts) is restarts
+
+
+def _product(tmp_path: Path) -> Path:
+    """The agents' checkout of a product on an older factory: its pin, an old workflow and the retired heartbeat."""
+    repo = tmp_path / "agents-shop"
+    (repo / ".github" / "workflows").mkdir(parents=True)
+    (repo / ".github" / "factory-ref").write_text(f"acme/software-factory@{'a' * 40}\n")
+    (repo / ".github" / "workflows" / "ci.yml").write_text("old ci\n")
+    (repo / ".github" / "workflows" / "heartbeat.yml").write_text("old heartbeat\n")
+    (repo / "app.py").write_text("print('shop')\n")
+    for argv in (["init", "-q", "-b", "master"], ["add", "."], ["-c", "user.name=t", "-c", "user.email=t@invalid",
+                                                                  "commit", "-q", "-m", "The shop"]):  # fmt: skip
+        subprocess.run(["git", "-C", str(repo), *argv], check=True)
+    return repo
+
+
+@pytest.mark.parametrize(
+    ("first", "dirty", "moves"),
+    [(False, False, True), (True, False, False), (False, True, False)],
+    ids=["an-upgrade-moves-it", "a-first-install-leaves-it", "uncommitted-work-leaves-it"],
+)
+def test_an_upgrade_moves_the_agents_product_to_its_factory_in_one_commit_root_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, first: bool, dirty: bool, moves: bool
+) -> None:
+    repo = _product(tmp_path)
+    before = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True).stdout
+    if dirty:
+        (repo / "app.py").write_text("print('half done')\n")
+    job = dry_job(tmp_path)
+    job.host = RealHost(Journal(terminal=False))
+    job.settings = settings(**{"repo.path": str(repo)})
+    job.first, job.sha, job.factory_origin, job.stage = first, "e" * 40, FACTORY_ORIGIN, REPO_ROOT
+    monkeypatch.setattr(steps_wire, "AGENT_USER", "")  # this test's user stands in for the agent's
+    monkeypatch.setattr(job.host, "write", lambda path, text, **how: (path.parent.mkdir(parents=True, exist_ok=True),
+                                                                      path.write_text(text)))  # fmt: skip
+
+    steps_wire.product_pin(job)
+
+    git = functools.partial(lambda *argv: subprocess.run(["git", "-C", str(repo), *argv], capture_output=True,
+                                                         text=True, check=True).stdout)  # fmt: skip
+    head = git("rev-parse", "HEAD")
+    if not moves:
+        assert head == before and not upgrades.pins_path(job.places).exists()
+        return
+    assert (repo / ".github" / "factory-ref").read_text() == f"acme/software-factory@{'e' * 40}\n"
+    assert (repo / ".github" / "workflows" / "ci.yml").read_text() == (REPO_ROOT / "templates/ci/ci.yml").read_text()
+    assert not (repo / ".github" / "workflows" / "heartbeat.yml").exists() and git("status", "--porcelain") == ""
+    [pin] = upgrades.read_pins(job.places)
+    assert (pin["commit"], pin["parent"]) == (head.strip(), before.strip())
+    assert pins._pin(git, job.places, head.strip()) == set(pin["blobs"])  # the warden lets exactly this through

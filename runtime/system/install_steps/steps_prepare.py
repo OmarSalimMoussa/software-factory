@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import json
 import tomllib
+from pathlib import PurePosixPath
 from typing import Any
 
-from runtime.shared.models import DEPRIORITIZED, RETIRED
-from runtime.shared.settings import SettingsError, _flatten, build
-from runtime.shared.settings_schema import SCHEMA
+from runtime.shared import store, upgrades
+from runtime.shared.models import RESTING
+from runtime.shared.settings import SettingsError, build, flatten
+from runtime.shared.settings_schema import AT_INSTALL, SCHEMA
 from runtime.system import layout
 from runtime.system.host import Account, Host
 from runtime.system.job import Install, github_name, github_origin, refuse
@@ -18,8 +20,6 @@ from runtime.warden.sessions import registry
 # What the owner sets up before an install; the packages step installs the rest (nftables among them).
 _MACHINE_TOOLS = ("git", "tar", "systemctl", "systemd-run", "runuser", "loginctl", "useradd", "tailscale")
 _OWNER_TOOLS = ("uv", "claude")
-# A session in any other state is working, waiting or between the two: reinstalling under it would lose its work.
-_RESTING = (DEPRIORITIZED, RETIRED)
 
 
 # The shell's start-up files may print; only what follows this line is the lookup's answer.
@@ -88,7 +88,7 @@ def refuse_live_sessions(ctx: Install) -> None:
             raise
         ctx.host.say("(a dry run as you cannot read the registry; the install checks it as root)")
         return
-    live = sorted(s.name for s in sessions.values() if s.state not in _RESTING)
+    live = sorted(s.name for s in sessions.values() if s.state not in RESTING)
     if live:
         raise refuse(f"Pause the factory on the dashboard first, then try again: {len(live)} of its agents are still "
                      f"working or waiting ({', '.join(live)})")  # fmt: skip
@@ -116,16 +116,21 @@ def sealed_copy(ctx: Install) -> None:
 
 def _saved_overrides(ctx: Install) -> dict[str, Any]:
     try:
-        text = ctx.host.read(ctx.places.overrides)
+        # Unattended, root reads the warden's file as one that could point anywhere.
+        rel = ctx.places.overrides.relative_to(ctx.places.state)
+        text = store.read_inside(ctx.places.state, rel) if ctx.unattended else ctx.host.read(ctx.places.overrides)
     except FileNotFoundError:
         return {}
+    except store.StoreError as exc:
+        raise refuse(f"Your saved settings cannot be read safely ({exc}): upgrade by hand from the release "
+                     "file") from exc  # fmt: skip
     except PermissionError:
         if not ctx.host.dry:
             raise
         ctx.host.say("(a dry run as you cannot read the saved settings; the install reads them as root)")
         return {}
     try:
-        return _flatten(tomllib.loads(text))
+        return flatten(tomllib.loads(text))
     except tomllib.TOMLDecodeError as exc:
         raise refuse(
             f"Your saved settings in {ctx.places.overrides} cannot be read ({exc}): fix the file by hand, "
@@ -189,9 +194,30 @@ def settle_settings(ctx: Install) -> None:
             f"The settings cannot be used: {problems}. Set each with --set key=value, then install again"
         ) from exc
     ctx.overrides = overrides
-    if not str(ctx.settings.get_str("repo.path")).startswith(f"{layout.AGENT_HOME}/"):
+    if ctx.unattended:
+        _as_last_installed(ctx, overrides)
+    repo = PurePosixPath(ctx.settings.get_str("repo.path"))
+    if not str(repo).startswith(f"{layout.AGENT_HOME}/") or ".." in repo.parts:
         raise refuse(f"The setting repo.path must be a folder inside {layout.AGENT_HOME}, the agents' home: set it "
                      "with --set repo.path=..., then install again")  # fmt: skip
+
+
+# The settings an install acts on as root: the rest the running factory applies itself.
+ROOT_APPLIED = frozenset(
+    k for k, s in SCHEMA.items() if s.when in ("Next install", AT_INSTALL) or k.startswith("repo.")
+)
+
+
+def _as_last_installed(ctx: Install, overrides: dict[str, Any]) -> None:
+    """Unattended, only the owner's own run of the release file may change what root acts on: not the warden."""
+    last = upgrades.read_settings(ctx.places)
+    if last is None:
+        raise refuse("This laptop's last install kept no record of its settings: upgrade once by hand from the "
+                     "release file")  # fmt: skip
+    changed = sorted(k for k in ROOT_APPLIED if overrides.get(k) != last.get(k))
+    if changed:
+        raise refuse(f"Settings an install applies changed since the last one ({', '.join(changed)}): upgrade by hand "
+                     "from the release file to apply them")  # fmt: skip
 
 
 def stop_factory(ctx: Install) -> None:

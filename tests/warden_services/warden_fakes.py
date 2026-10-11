@@ -34,6 +34,7 @@ class FakeLauncher:
         self.calls: list[tuple[str, Any]] = []
         self.commands: dict[tuple[str, ...], tuple[int, str]] = {}
         self.stack: dict[str, StackResult] = {}
+        self.upgrades: list[str] = []
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
         self.calls.append(("start", request_id))
@@ -47,6 +48,9 @@ class FakeLauncher:
 
     def stop_session(self, session_id: str) -> None:
         self.calls.append(("stop", session_id))
+
+    def start_upgrade(self, commit: str) -> None:
+        self.upgrades.append(commit)
 
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         self.calls.append(("stack", (slot, verb, session)))

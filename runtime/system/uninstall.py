@@ -45,7 +45,7 @@ UNITS = (
     layout.FIREWALL_UNIT,
     layout.SERVICES_UNIT,
 )
-TEMPLATES = (layout.AGENT_RUN, layout.STACK_RUN, layout.CHECK_RUN)
+TEMPLATES = (layout.AGENT_RUN, layout.STACK_RUN, layout.CHECK_RUN, layout.UPGRADE_RUN)
 GUARD = "/opt/software-factory/runtime/guard/hook.py"  # the installed guard, named in the factory's managed settings
 HOOKS = str(paths.INSTALL / "checks" / "git-hooks")
 
@@ -130,7 +130,8 @@ def _with_leftovers(path: Path) -> tuple[Path, ...]:
 
 def programs(host: Host, places: Places, dashboard_port: str | None) -> None:
     for path in (paths.FACTORY_BIN, layout.CLAUDE_BIN.parent, *_with_leftovers(paths.INSTALL), layout.TOOLS,
-                 *_with_leftovers(layout.TOOLCHAIN), paths.RUN, paths.FIREWALL, layout.DRILLS):  # fmt: skip
+                 *_with_leftovers(layout.TOOLCHAIN), paths.RUN, paths.FIREWALL, paths.UPGRADE,
+                 layout.DRILLS):  # fmt: skip
         _remove(host, path)
     sealed_copies(host)
     tailnet(host, places, dashboard_port)

@@ -165,3 +165,12 @@ def test_the_agents_daemon_starts_only_with_the_firewall_loaded_and_never_restar
     # Requires= would pass on the firewall unit's restarts with nftables.service, and each ends every session.
     assert not any(line.startswith(("Requires=", "BindsTo=", "Requisite=")) for line in daemon)
     assert "ExecStartPre=+/usr/sbin/nft list table inet software_factory" in daemon
+
+
+def test_the_one_unit_the_warden_starts_as_root_is_the_upgrade_to_a_full_commit() -> None:
+    rules = render.artifact(render.POLKIT, HERE, _values())
+    assert 'if (/^software-upgrade@[0-9a-f]{40}\\.service$/.test(unit) && verb === "start") {' in rules
+    unit = _unit("software-upgrade@.service").splitlines()
+    assert {"User=root", "ExecStart=/usr/bin/python3 -I /opt/software-factory/runtime/system/runners/upgrade.py %i",
+            "TimeoutStartSec=90min"} <= set(unit)  # fmt: skip
+    assert not any(line.startswith("Slice=") for line in unit)
