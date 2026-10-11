@@ -134,7 +134,7 @@ class Console:
             return refused(415, "A change is sent as JSON.")
         try:
             data = json.loads(body)
-        # telemetry: surfaced — the page is told its change was not JSON
+        # telemetry: surfaced — a change that is not JSON is `refused` below, and the page says why
         except ValueError:
             data = None
         if not isinstance(data, dict):
@@ -191,7 +191,7 @@ class Console:
     def page(self) -> dict[str, Any]:
         try:
             record = console_page.read_record(self.places)
-        # telemetry: surfaced — the status draws the record that cannot be read
+        # telemetry: surfaced — the `status` below reads the record again and shows the owner it is unreadable
         except (OSError, ValueError):
             record = None
         with self._lock:

@@ -117,7 +117,6 @@ def main(argv: list[str]) -> int:
         return ended(places, commit)
     try:
         return upgrade(places, commit)
-    # telemetry: last-resort — whatever stopped it, root's progress says so and the unit's log has the trace
     except Exception as exc:
         said = str(exc) if isinstance(exc, Stop) else f"The upgrade stopped: {exc}. Upgrade again, or by hand."
         print(f"upgrade: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
@@ -125,8 +124,8 @@ def main(argv: list[str]) -> int:
             traceback.print_exc()
         try:
             frm = (upgrades.read_installed(places) or {}).get("commit", "")
-        # telemetry: last-resort — the record is unreadable; the progress still says the upgrade stopped, and why
-        except store.StoreError:
+        except store.StoreError as record:
+            print(f"upgrade: the install record cannot be read ({record})", file=sys.stderr, flush=True)
             frm = ""
         upgrades.write_progress(places, frm, commit, upgrades.FAILED, "", said)
         return 1

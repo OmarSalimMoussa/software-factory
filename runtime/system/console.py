@@ -84,7 +84,7 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         try:
             size = int(self.headers.get("Content-Length") or 0)
-        # telemetry: surfaced — the caller is told the change is not one the console takes
+        # telemetry: surfaced — a length that is no number is `refused` below as no change the console takes
         except ValueError:
             size = -1
         if not 0 <= size <= MAX_BODY:
@@ -199,6 +199,7 @@ def until_stopped(console: Console) -> int:
     try:
         try:
             console.stopped.wait()
+        # telemetry: expected — Ctrl-C is the owner stopping the console: it stops the action next
         except KeyboardInterrupt:
             print(flush=True)
         console.stop()

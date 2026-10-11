@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 import subprocess
 from pathlib import Path
 
@@ -328,6 +329,29 @@ def test_a_saved_value_for_a_setting_the_release_no_longer_has_is_dropped_and_th
 def _serving(*handlers: tuple[str, str]) -> str:
     web = {"box.tail0.ts.net:443": {"Handlers": {path: {"Proxy": target} for path, target in handlers}}}
     return json.dumps({"TCP": {"443": {"HTTPS": True}}, "Web": web})
+
+
+@pytest.mark.parametrize(
+    ("said", "address", "reported"),
+    [
+        (json.dumps({"Self": {"DNSName": "laptop.tail1.ts.net."}}), "https://laptop.tail1.ts.net/", False),
+        (json.dumps({"Self": {"DNSName": ""}}), "", False),
+        ("tailscale: not JSON", "", True),
+    ],
+    ids=["named", "no-machine", "unreadable"],
+)
+def test_the_dashboards_address_is_tailscales_name_and_an_unreadable_answer_is_reported(
+    said: str, address: str, reported: bool, caplog: pytest.LogCaptureFixture
+) -> None:
+    host = DryHost()
+    host.answers["tailscale status --json"] = (0, said)
+
+    with caplog.at_level(logging.WARNING):
+        assert steps_wire.dashboard_address(host) == address
+
+    warned = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert bool(warned) is reported
+    assert not reported or "tailscale status --json" in warned[0] and "JSONDecodeError" in warned[0]
 
 
 def test_the_dashboard_never_takes_a_tailnet_port_that_serves_something_else(tmp_path: Path) -> None:

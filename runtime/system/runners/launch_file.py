@@ -233,6 +233,7 @@ def run_in_terminal(argv: list[str], cwd: Path, env: dict[str, str], hold: int, 
     try:
         proc = subprocess.Popen(argv, cwd=cwd, env={**env, "TERM": "xterm-256color"}, stdin=follower,
                                 stdout=follower, stderr=follower, start_new_session=True, pass_fds=fds)  # fmt: skip
+    # telemetry: surfaced — the failed start is `print`ed to the unit's log, and the exit says so
     except OSError as exc:
         os.close(leader)
         os.close(follower)
@@ -246,12 +247,14 @@ def run_in_terminal(argv: list[str], cwd: Path, env: dict[str, str], hold: int, 
         if ready:
             try:
                 seen = (seen + os.read(leader, 65536))[-4096:]
+            # telemetry: expected — the terminal closed: the session's output has ended
             except OSError:
                 break
     if proc.poll() is None:
         os.write(leader, b"\x1a")
         try:
             proc.wait(5)
+        # telemetry: expected — a process that does not stop within its five seconds is killed
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(5)
@@ -273,9 +276,11 @@ def run_captured(argv: list[str], cwd: Path, env: dict[str, str], timeout: int) 
     try:
         done = subprocess.run(argv, cwd=cwd, env=env, timeout=timeout, check=False, stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT, text=True, errors="replace")  # fmt: skip
+    # telemetry: surfaced — the timeout is told in what `run_captured` returns, with the run's own output
     except subprocess.TimeoutExpired as exc:
         said = exc.output.decode(errors="replace") if isinstance(exc.output, bytes) else (exc.output or "")
         return TIMED_OUT, said + f"\nrunner: {Path(argv[0]).name} ran past {timeout} s and was stopped\n"
+    # telemetry: surfaced — a failed start is told in what `run_captured` returns
     except OSError as exc:
         return REFUSED, f"runner: {Path(argv[0]).name} could not start ({type(exc).__name__})\n"
     return done.returncode, done.stdout
@@ -285,9 +290,11 @@ def run(argv: list[str], cwd: Path, env: dict[str, str], timeout: int, fds: tupl
     """Run with the unit's own output (the warden's runs/<id>.log); the exit status is the unit's."""
     try:
         return subprocess.run(argv, cwd=cwd, env=env, timeout=timeout, pass_fds=fds, check=False).returncode
+    # telemetry: surfaced — the timeout is `print`ed to the unit's log, and the exit says so
     except subprocess.TimeoutExpired:
         print(f"runner: {Path(argv[0]).name} ran past {timeout} s and was stopped", flush=True)
         return TIMED_OUT
+    # telemetry: surfaced — the failed start is `print`ed to the unit's log, and the exit says so
     except OSError as exc:
         print(f"runner: {Path(argv[0]).name} could not start ({type(exc).__name__})", flush=True)
         return REFUSED

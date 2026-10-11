@@ -21,6 +21,7 @@ def main(argv: list[str]) -> int:
     if argv == ["up"]:
         try:
             stack.up(provision.real_run, folder, edge=False)
+        # telemetry: surfaced — the failure is `print`ed to the unit's log, and the exit says so
         except (stack.StackError, ValueError, KeyError) as exc:
             print(f"services: {type(exc).__name__}: {exc}", flush=True)
             return 1

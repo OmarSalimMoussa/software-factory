@@ -119,6 +119,7 @@ def _saved_overrides(ctx: Install) -> dict[str, Any]:
         # Unattended, root reads the warden's file as one that could point anywhere.
         rel = ctx.places.overrides.relative_to(ctx.places.state)
         text = store.read_inside(ctx.places.state, rel) if ctx.unattended else ctx.host.read(ctx.places.overrides)
+    # telemetry: expected — no saved settings yet: the owner changed none
     except FileNotFoundError:
         return {}
     except store.StoreError as exc:

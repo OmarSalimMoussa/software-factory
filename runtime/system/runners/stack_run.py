@@ -111,6 +111,7 @@ def disk(timeout: int) -> int:
         return 1
     try:
         total = sum(size_bytes(json.loads(line)["Size"]) for line in done.stdout.splitlines() if line.strip())
+    # telemetry: surfaced — the unreadable answer is `print`ed to the unit's log, and the exit says so
     except (ValueError, KeyError, TypeError) as exc:
         print(f"disk: docker system df printed something unreadable ({exc})", flush=True)
         return 1
@@ -146,6 +147,7 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
         if problems:
             raise envfile.EnvError(problems)
         hidden += provision.secret_values(config, {**written, **values})
+    # telemetry: surfaced — why the slot could not be provisioned is `print`ed to the run's log
     except (product_config.ConfigError, provision.ProvisionError, envfile.EnvError, OSError, ValueError) as exc:
         said = provision.redact(str(exc), hidden)
         print(f"stack-run: slot {slot} could not be provisioned, so {verb[0]} did not run: {said}", flush=True)
@@ -161,6 +163,7 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
         provision.drop(config, services, run, workspace=workspace, state=state)
         env_file.unlink(missing_ok=True)
         envfile.defaults_path(env_file).unlink(missing_ok=True)
+    # telemetry: surfaced — what is left of the slot is `print`ed to the run's log, and the exit says so
     except (provision.ProvisionError, OSError) as exc:
         print(f"stack-run: slot {slot} is empty, but its database or env file is still there: {exc}", flush=True)
         return 1
@@ -182,9 +185,11 @@ def main(argv: list[str]) -> int:
         if verb[0] == lf.DISK:
             return disk(timeout)
         checkout = lf.checkout_for(session, settings, sessions)
+    # telemetry: surfaced — the refusal is `print`ed to the unit's log, and the exit says it was refused
     except lf.BadRequest as exc:
         print(f"stack-run: refused: {exc}", flush=True)
         return lf.REFUSED
+    # telemetry: surfaced — the timeout is `print`ed to the unit's log, and the exit says so
     except subprocess.TimeoutExpired:
         print("stack-run: docker did not answer in time", flush=True)
         return lf.TIMED_OUT

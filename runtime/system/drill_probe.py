@@ -29,8 +29,10 @@ def _get(url: str, seconds: float) -> str:
     try:
         with urllib.request.urlopen(url, timeout=seconds) as answer:  # noqa: S310 -- the drill's own loopback URL
             return f"answered {answer.status}"
+    # telemetry: expected — an error status is an answer, the outcome this probe reports
     except urllib.error.HTTPError as exc:
         return f"answered {exc.code}"
+    # telemetry: expected — a refused or unreachable address is the outcome this probe reports
     except urllib.error.URLError as exc:
         return _errno(exc.reason) if isinstance(exc.reason, OSError) else type(exc).__name__
 
@@ -60,8 +62,10 @@ def probe(target: str, seconds: float) -> str:
                 return "connected"
         if kind == "env":
             return "set" if os.environ.get(rest) else "unset"
+    # telemetry: expected — a refusal by the wall is the outcome this probe reports
     except OSError as exc:
         return _errno(exc)
+    # telemetry: surfaced — a target it cannot read comes back from `probe` as such, and the drill fails
     except ValueError:
         return "unreadable target"
     return "unknown kind"

@@ -57,6 +57,7 @@ def status(places: Places, host: Host) -> dict[str, Any]:
                              "services": [], "address": None, "problem": ""}  # fmt: skip
     try:
         record = read_record(places)
+    # telemetry: surfaced — the status shows the owner the `problem` with the record
     except (OSError, ValueError) as exc:
         return {**blank, "installed": True, "headline": "Installed", "tone": "warn",
                 "problem": f"The install record {path} cannot be read ({exc}): install again."}  # fmt: skip
@@ -89,7 +90,7 @@ _STATUS_KEYS = ("watch.http_timeout_seconds", "dashboard.warden_seconds", "dashb
 def _services(places: Places) -> tuple[list[dict[str, Any]], str]:
     try:
         values = settings_module.read_some(store.read_json(places.state / "public" / "settings.json"), _STATUS_KEYS)
-    # telemetry: surfaced — the status draws why nothing was checked
+    # telemetry: surfaced — the status draws `why` nothing was checked
     except (OSError, store.StoreError, settings_module.SettingsError) as exc:
         why = f"The warden's published settings cannot be read ({type(exc).__name__})"
         return [], f"{why}, so the warden, the dashboard and the shared services were not checked."
@@ -99,7 +100,7 @@ def _services(places: Places) -> tuple[list[dict[str, Any]], str]:
             "snapshot", {"want": ["factory"]}
         )
         warden = True
-    # telemetry: surfaced — the status draws it as the warden not answering
+    # telemetry: surfaced — the status draws the `warden` as not answering
     except WardenDown:
         warden = False
     port = values["dashboard.port"]
@@ -116,9 +117,10 @@ def _answers(url: str, timeout: float, *, any_status: bool) -> bool:
     try:
         with _DIRECT.open(url, timeout=timeout) as reply:
             return any_status or reply.status == 200
-    # telemetry: surfaced — the status draws each service that does not answer
+    # telemetry: surfaced — an error status is an answer; the status draws what `_answers` says
     except urllib.error.HTTPError:
         return any_status
+    # telemetry: surfaced — a service that does not answer is drawn so, from what `_answers` returns
     except (OSError, ValueError):
         return False
 
@@ -178,8 +180,10 @@ def kept(places: Places, watched: bool) -> list[str]:
     """What an upgrade keeps, in the owner's words: everything the installed factory holds."""
     try:
         changed = len(settings_module.flatten(tomllib.loads(places.overrides.read_text(encoding="utf-8"))))
+    # telemetry: expected — no saved settings: the owner changed none, so nothing is kept
     except FileNotFoundError:
         changed = 0
+    # telemetry: surfaced — the owner reads in what `kept` returns that the settings cannot be read
     except (OSError, ValueError) as exc:
         return [f"Your settings: their file cannot be read ({type(exc).__name__}), and the upgrade will say why"]
     settings = (

@@ -190,6 +190,7 @@ def perform(ctx: Install, *, keep: bool) -> str | None:
     failed first install is taken back; returns what stopped it, in plain words, or None once the install finished."""
     try:
         run(ctx)
+    # telemetry: surfaced — what stopped the install is the `problem` the owner reads; the log has the trace
     except (Exception, KeyboardInterrupt) as exc:
         problem = plain(ctx, exc)
         ctx.host.say(f"stopped at step {ctx.reached} ({ctx.doing}): {type(exc).__name__}: {exc}")
@@ -219,7 +220,7 @@ def roll_back(ctx: Install) -> None:
     ctx.host.phase(len(PHASES) + 1, ROLL_BACK)
     try:
         uninstall.remove_all(ctx.host, ctx.places, ctx.owner.name, ctx.product, phases=False)
-    # What is left, the uninstaller removes: it finds each part that is there and takes it away.
+    # telemetry: surfaced — the owner is told through `fail` to uninstall, then install again
     except (Exception, KeyboardInterrupt) as exc:
         ctx.host.say(f"the roll-back stopped: {type(exc).__name__}: {exc}")
         ctx.host.fail("The install could not take back everything it made: uninstall the factory, then install again.")
@@ -237,6 +238,7 @@ def parse_changes(items: list[str]) -> dict[str, Any]:
             raise refuse(f"--set {item}: write it as key=value")
         try:
             changes[key.strip()] = tomllib.loads(f"value = {raw}")["value"]
+        # telemetry: expected — a value that is not TOML is kept as the text it is, as --set says
         except tomllib.TOMLDecodeError:
             changes[key.strip()] = raw
     return changes

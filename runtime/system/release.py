@@ -296,6 +296,7 @@ def launch(here: str, argv: list[str]) -> int:
     try:
         archive = Archive.load(Path(here))
         problems = [] if args.version else archive.problems()
+    # telemetry: surfaced — a damaged release file is one of the `problems` printed below
     except ReleaseError as exc:
         problems, archive = [str(exc)], None
     if problems or archive is None:

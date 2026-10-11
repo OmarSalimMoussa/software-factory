@@ -80,6 +80,7 @@ def pause(state: Path, settings: Settings) -> list[str]:
     """Pause every check; the problems, one per check that could not be paused."""
     try:
         record = json.loads(keys_path(state).read_text(encoding="utf-8"))
+    # telemetry: expected — no record: the install made no Healthchecks.io checks, so none are paused
     except FileNotFoundError:
         return []
     timeout = settings.get_int("watch.http_timeout_seconds")
@@ -87,6 +88,7 @@ def pause(state: Path, settings: Settings) -> list[str]:
     for name, uuid in record["checks"].items():
         try:
             _call(f"{API}{uuid}/pause", record["api_key"], None, timeout)
+        # telemetry: surfaced — a check that could not be paused is one of the `problems` returned
         except (OSError, ValueError) as exc:
             problems.append(f"{name}: {type(exc).__name__}")
     return problems

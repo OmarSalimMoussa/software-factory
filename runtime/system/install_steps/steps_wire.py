@@ -4,6 +4,7 @@ hooks, the tailnet, starting it, and the record a finished install leaves."""
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from runtime.system import layout, render
 from runtime.system.host import CommandError, Host
 from runtime.system.job import Install, github_name, refuse
 
+log = logging.getLogger(__name__)
 _HTTPS = 443
 _TAILSCALE_LINK = re.compile(r"https://login\.tailscale\.com/\S+")
 
@@ -97,7 +99,7 @@ def product_pin(ctx: Install) -> None:
     pins.py). A move that cannot be made is told and left to the owner: the factory itself is upgraded either way."""
     try:
         _pin(ctx)
-    # telemetry: surfaced — the owner is told the product stays where it was, and to move its pin by hand
+    # telemetry: surfaced — the owner is told, through `tell`, to move the product's pin by hand
     except (CommandError, Refused) as exc:
         ctx.host.tell(f"The product stays on its factory for now ({exc}): move .github/factory-ref by hand.")
 
@@ -147,6 +149,7 @@ def https_handlers(status: str) -> dict[str, str] | None:
     when the answer cannot be read."""
     try:
         data = json.loads(status or "{}")
+    # telemetry: surfaced — an unreadable answer is None from `https_handlers`, and the install refuses why
     except ValueError:
         return None
     if not isinstance(data, dict):
@@ -182,6 +185,7 @@ def _operator(prefs: str) -> str | None:
     """The Tailscale operator `tailscale debug prefs` names: "" for none, None when its answer cannot be read."""
     try:
         found = json.loads(prefs).get("OperatorUser", "")
+    # telemetry: surfaced — an unreadable answer is None from `_operator`, and the uninstall tells the owner
     except (ValueError, AttributeError):
         return None
     return found if isinstance(found, str) else None
@@ -264,7 +268,7 @@ def dashboard_address(host: Host) -> str:
     code, out = host.query(["tailscale", "status", "--json"])
     try:
         name = json.loads(out)["Self"]["DNSName"] if code == 0 else ""
-    # telemetry: surfaced — the owner is shown no address
-    except (ValueError, KeyError, TypeError):
+    except (ValueError, KeyError, TypeError) as exc:
+        log.warning("install: tailscale status --json cannot be read (%s), so no dashboard address", type(exc).__name__)
         return ""
     return f"https://{name.strip('.')}/" if isinstance(name, str) and name.strip(".") else ""

@@ -71,7 +71,7 @@ prefix = "runtime/system/install_console/console_ui/"
 name = "install page"
 sink = "surface"
 grounds = "browser code: an error shows on the page, where the owner sees it"
-reporters = []
+reporters = ["toast"]
 seams = []
 log_modules = []
 

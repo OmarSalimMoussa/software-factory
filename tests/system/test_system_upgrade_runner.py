@@ -10,7 +10,8 @@ from typing import Any
 
 import pytest
 
-from runtime.shared import releases
+from runtime.shared import releases, upgrades
+from runtime.shared.paths import Places
 from runtime.system import release
 from runtime.system.runners import upgrade
 
@@ -95,3 +96,27 @@ def test_a_release_it_cannot_trust_is_never_installed(tmp_path: Path, wrong: dic
     with pytest.raises((upgrade.Stop, releases.ReleaseError), match=says):
         upgrade.fetch(rel, upgrade.check(rel, OLD, commit), commit, folder)
     assert list(folder.iterdir()) == []
+
+
+def test_a_stopped_upgrade_reports_an_unreadable_install_record_and_still_says_it_stopped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    places = Places.under(tmp_path)
+    places.upgrade.mkdir(parents=True)
+    upgrades.installed_path(places).write_text("{}")  # a record with none of its keys
+    monkeypatch.setattr(upgrade.Places, "system", classmethod(lambda cls: places))
+
+    def stopped(places: Places, commit: str) -> int:
+        raise upgrade.Stop("GitHub did not answer")
+
+    monkeypatch.setattr(upgrade, "upgrade", stopped)
+
+    assert upgrade.main(["b" * 40]) == 1
+
+    assert "the install record cannot be read" in capsys.readouterr().err
+    said = upgrades.read_progress(places)
+    assert said is not None and (said["state"], said["from"], said["problem"]) == (
+        upgrades.FAILED,
+        "",
+        "GitHub did not answer",
+    )

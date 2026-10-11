@@ -257,8 +257,10 @@ def perform(host: Host, places: Places, owner: Account, repo: Path | None) -> st
                 raise
             host.say("(a dry run cannot read the sessions' registry; the uninstall checks it as root)")
         remove_all(host, places, owner.name, repo.resolve() if repo else None, phases=True)
+    # telemetry: surfaced — the refusal is the `problem` the uninstall ends with
     except Refused as exc:
         problem = exc.reason[:1].upper() + exc.reason[1:]
+    # telemetry: surfaced — the failed command is told, and the `problem` the uninstall ends with says what to do
     except CommandError as exc:
         host.say(str(exc))
         problem = ("The uninstall could not finish: a command it ran failed. Run it again; if it stops here again, the "
@@ -311,7 +313,7 @@ def dashboard_port(places: Places) -> str | None:
     published = places.state / "public" / "settings.json"
     try:
         return str(settings_module.read_some(store.read_json(published), ("dashboard.port",))["dashboard.port"])
-    # telemetry: surfaced — the uninstall says it could not tell the dashboard's port, and takes nothing off the tailnet
+    # telemetry: surfaced — the uninstall says it could not tell the port `dashboard_port` returns as None
     except (OSError, store.StoreError, settings_module.SettingsError):
         return None
 

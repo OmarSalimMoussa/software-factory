@@ -78,9 +78,11 @@ def main(argv: list[str]) -> int:
         timeout = settings.get_int("checks.run_minutes") * 60
         caches = [home / rel for rel in settings.get_list("sandbox.writable_caches")]
         argv_ = command(checkout, args, home, caches, settings.get_int("factory.command_seconds"))
+    # telemetry: surfaced — the refusal is `print`ed to the unit's log, and the exit says it was refused
     except lf.BadRequest as exc:
         print(f"check-run: refused: {exc}", flush=True)
         return lf.REFUSED
+    # telemetry: surfaced — the timeout is `print`ed to the unit's log, and the exit says so
     except subprocess.TimeoutExpired:
         print("check-run: git did not answer in time", flush=True)
         return lf.TIMED_OUT

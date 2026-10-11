@@ -35,6 +35,7 @@ def main(argv: list[str]) -> int:
             if command[0] == lf.PROGRAMS["claude"]
             else (inherited, ())
         )
+    # telemetry: surfaced — the refusal is `print`ed to the unit's log, and the exit says it was refused
     except lf.BadRequest as exc:
         print(f"agent-run: refused: {exc}", flush=True)
         return lf.REFUSED

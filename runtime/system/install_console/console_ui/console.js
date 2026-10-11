@@ -17,6 +17,7 @@ async function api(method, url, body) {
   try {
     const res = await fetch(url, {method, credentials: 'same-origin', cache: 'no-store', signal: ctl.signal,
       headers: method === 'POST' ? {'Content-Type': 'application/json'} : {}, body: body ? JSON.stringify(body) : undefined});
+    // telemetry: surfaced — a body that is not JSON leaves `data` null, and the line below throws why
     const data = await res.json().catch(() => null);
     if (!data) throw new Error(`The console answered ${res.status}.`);
     return data;

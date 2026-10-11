@@ -180,6 +180,7 @@ class RealRig:
         try:
             done = subprocess.run([*cmd, "--", *argv], input=stdin, capture_output=True, text=True,
                                   timeout=self.timeout, check=False)  # fmt: skip
+        # telemetry: surfaced — a drill past its time comes back as a failed `Ran` naming it
         except subprocess.TimeoutExpired:
             return Ran(124, f"the drill ran past {self.timeout} s")
         return Ran(done.returncode, done.stdout + done.stderr)
@@ -241,6 +242,7 @@ class RealRig:
         try:
             with socket.create_connection((host, port), timeout=self.settings.get_int("watch.http_timeout_seconds")):
                 return "connected"
+        # telemetry: expected — a refused connection is the outcome this drill reads
         except OSError as exc:
             return type(exc).__name__
 
@@ -300,6 +302,7 @@ class RealRig:
             host.run(["git", "-C", str(checkout), *argv], user=AGENT_USER)
         try:
             code, out = Units(self.places, lambda: self.settings).run_check(str(checkout), ["--only", "repo-shape"])
+        # telemetry: surfaced — a check that could not start comes back as a failed `Ran` naming why
         except LaunchError as exc:
             return checkout, Ran(-1, str(exc))
         finally:
@@ -324,6 +327,7 @@ class RealRig:
         }
         try:
             code, out = Units(self.places, lambda: self.settings).start_waiting(request_id, request)
+        # telemetry: surfaced — a session that could not start comes back as a failed `Ran` naming why
         except LaunchError as exc:
             return Ran(-1, str(exc))
         return Ran(code, out)
@@ -335,6 +339,7 @@ class RealRig:
     def stop_session(self, short_id: str) -> Ran:
         try:
             Units(self.places, lambda: self.settings).stop_session(short_id)
+        # telemetry: surfaced — a stop that failed comes back as a failed `Ran` naming why
         except LaunchError as exc:
             return Ran(1, str(exc))
         return Ran(0, "")
@@ -343,6 +348,7 @@ class RealRig:
         """``argv`` as the agent, the way the warden runs it: its launcher, through the agent-run template unit."""
         try:
             code, out = Units(self.places, lambda: self.settings).agent_command(argv, str(self.ctx.checkout()))
+        # telemetry: surfaced — a command that could not run comes back as a failed `Ran` naming why
         except LaunchError as exc:
             return Ran(-1, str(exc))
         return Ran(code, out)

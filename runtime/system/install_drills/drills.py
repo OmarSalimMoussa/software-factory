@@ -361,7 +361,7 @@ SESSIONS = frozenset({sandbox_runs, shell_write_other_worktree, secrets_unreadab
 def _one(drill: Callable[[Rig], Result], rig: Rig) -> Result:
     try:
         return drill(rig)
-    # A drill that breaks has proved nothing: it fails, named, and the others still run.
+    # telemetry: surfaced — a drill that breaks proved nothing: its `Result` fails, named, and the rest run
     except Exception as exc:  # noqa: BLE001
         return Result(drill.__name__, False, f"the drill broke: {type(exc).__name__}: {exc}")
 

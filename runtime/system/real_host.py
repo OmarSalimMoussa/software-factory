@@ -47,6 +47,7 @@ class RealHost(Host):
         try:
             done: subprocess.CompletedProcess[str] = subprocess.run(command, text=True, capture_output=True,
                                                                     check=False, **how)  # fmt: skip
+        # telemetry: surfaced — a program that is not there comes back as a failed `CompletedProcess`
         except FileNotFoundError as exc:
             return subprocess.CompletedProcess(command, 127, "", f"cannot start {command[0]}: {exc.strerror}")
         return done
