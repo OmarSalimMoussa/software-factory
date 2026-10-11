@@ -20,9 +20,10 @@ from urllib.parse import parse_qsl, urlsplit
 
 from runtime.shared.environment import Staged
 from runtime.shared.paths import Places
-from runtime.system import ci_check, console_page, install, release, uninstall
-from runtime.system.console_run import Run
+from runtime.system import ci_check, install, release, uninstall
 from runtime.system.host import Account, Host
+from runtime.system.install_console import console_page
+from runtime.system.install_console.console_run import Run
 from runtime.system.job import REPO_ROOT
 from runtime.system.journal import Journal
 

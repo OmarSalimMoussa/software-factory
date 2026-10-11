@@ -14,8 +14,9 @@ from system_fakes import dry_job, settings
 
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.system import drills, install
-from runtime.system.drills import Ran, Result
+from runtime.system import install
+from runtime.system.install_drills import drills
+from runtime.system.install_drills.drills import Ran, Result
 
 
 def _stream(command: str, result: str) -> str:
@@ -242,7 +243,7 @@ def test_session_drills_run_side_by_side_and_every_drill_reports_once_in_order()
 
 
 def test_the_install_refuses_to_finish_while_a_drill_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from runtime.system import drill_rig
+    from runtime.system.install_drills import drill_rig
 
     @contextmanager
     def opened(ctx: object) -> Iterator[FakeRig]:

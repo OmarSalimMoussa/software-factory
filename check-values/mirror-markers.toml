@@ -7,6 +7,6 @@ claims = []
 [copies]
 # Server vocabularies copied, undeclared, into the browser code of the dashboard and the install console.
 server = ["runtime/"]
-web = ["runtime/dashboard/ui/", "runtime/system/console_ui/"]
+web = ["runtime/dashboard/ui/", "runtime/system/install_console/console_ui/"]
 generated_markers = []
 rows = []

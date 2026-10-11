@@ -23,9 +23,9 @@ from system_fakes import FACTORY_ORIGIN, FIXTURE, PASSING, PRODUCT_ORIGIN, ci_an
 
 from runtime.shared.paths import Places  # noqa: E402
 from runtime.system.console import serve  # noqa: E402
-from runtime.system.console_app import Choices, Console, Hosts  # noqa: E402
-from runtime.system.console_run import ConsoleDryHost, Run  # noqa: E402
 from runtime.system.host import Account, DryHost, Host  # noqa: E402
+from runtime.system.install_console.console_app import Choices, Console, Hosts  # noqa: E402
+from runtime.system.install_console.console_run import ConsoleDryHost, Run  # noqa: E402
 from runtime.system.job import REPO_ROOT  # noqa: E402
 
 NEWEST = "0123456789abcdef0123456789abcdef01234567"

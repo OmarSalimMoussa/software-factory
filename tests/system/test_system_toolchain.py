@@ -9,8 +9,9 @@ import pytest
 from system_fakes import dry_job, lookup
 
 from runtime.shared.protocol import Refused
-from runtime.system import install, steps_prepare, steps_toolchain
+from runtime.system import install
 from runtime.system.host import DryHost
+from runtime.system.install_steps import steps_prepare, steps_toolchain
 from runtime.system.job import Install
 
 NEW, LIVE = "/opt/software-factory-toolchain.new", "/opt/software-factory-toolchain"

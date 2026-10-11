@@ -14,8 +14,9 @@ from pathlib import Path
 
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER, queue_dir
 from runtime.shared.settings import overrides_toml
-from runtime.system import layout, render, steps_wire
+from runtime.system import layout, render
 from runtime.system.host import CommandError, Host
+from runtime.system.install_steps import steps_wire
 from runtime.system.job import Install, refuse
 
 # Claude Code carries its seccomp helper (which blocks Unix sockets in the sandbox) inside its own binary; a version

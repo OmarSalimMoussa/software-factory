@@ -11,10 +11,11 @@ import pytest
 from system_fakes import PASSING, SHA, ci_answers, ci_link, dry_job
 
 from runtime.shared.paths import Places
-from runtime.system import console_page, install, layout, uninstall
-from runtime.system.console_app import Choices, Console, Hosts, Reply
-from runtime.system.console_run import ConsoleDryHost, Run
+from runtime.system import install, layout, uninstall
 from runtime.system.host import CommandError, DryHost, Host
+from runtime.system.install_console import console_page
+from runtime.system.install_console.console_app import Choices, Console, Hosts, Reply
+from runtime.system.install_console.console_run import ConsoleDryHost, Run
 from runtime.system.job import REPO_ROOT
 from runtime.system.journal import Journal
 

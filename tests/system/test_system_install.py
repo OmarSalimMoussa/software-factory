@@ -9,19 +9,9 @@ from system_fakes import dry_job, settings
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
-from runtime.system import (
-    ci_check,
-    install,
-    layout,
-    render,
-    steps_machine,
-    steps_prepare,
-    steps_secrets,
-    steps_services,
-    steps_wire,
-    uninstall,
-)
+from runtime.system import ci_check, install, layout, render, uninstall
 from runtime.system.host import DryHost, RealHost
+from runtime.system.install_steps import steps_machine, steps_prepare, steps_secrets, steps_services, steps_wire
 from runtime.system.job import Install
 from runtime.system.journal import Journal
 from runtime.warden.sessions import registry

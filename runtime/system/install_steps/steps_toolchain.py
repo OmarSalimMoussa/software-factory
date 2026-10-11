@@ -25,8 +25,8 @@ from pathlib import Path
 
 from runtime.shared.paths import FACTORY_BIN
 from runtime.system import layout
+from runtime.system.install_steps.steps_prepare import login_path, owner_tool
 from runtime.system.job import Install, refuse
-from runtime.system.steps_prepare import login_path, owner_tool
 
 # Each name goes into a shell command line, so it is a plain program name and nothing else.
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")

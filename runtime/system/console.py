@@ -30,9 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from runtime.shared import environment  # noqa: E402 - the path line above must run first
 from runtime.shared.paths import Places  # noqa: E402
 from runtime.shared.protocol import Refused  # noqa: E402
-from runtime.system import console_page, install, layout, sealed  # noqa: E402
-from runtime.system.console_app import Choices, Console, Hosts, Reply, refused  # noqa: E402
-from runtime.system.console_run import ConsoleHost, ConsoleLookingHost  # noqa: E402
+from runtime.system import install, layout, sealed
 from runtime.system.host import (  # noqa: E402
     Account,
     CommandError,  # noqa: E402
@@ -40,6 +38,9 @@ from runtime.system.host import (  # noqa: E402
     RealHost,
     as_user,
 )
+from runtime.system.install_console import console_page  # noqa: E402
+from runtime.system.install_console.console_app import Choices, Console, Hosts, Reply, refused  # noqa: E402
+from runtime.system.install_console.console_run import ConsoleHost, ConsoleLookingHost  # noqa: E402
 from runtime.system.job import REPO_ROOT  # noqa: E402
 
 log = logging.getLogger("factory.console")

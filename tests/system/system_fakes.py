@@ -6,8 +6,9 @@ from pathlib import Path
 from typing import Any
 
 from runtime.shared.settings import Settings, build
-from runtime.system import ci_check, steps_prepare
+from runtime.system import ci_check
 from runtime.system.host import Account, DryHost
+from runtime.system.install_steps import steps_prepare
 from runtime.system.job import REPO_ROOT, Install
 
 FIXTURE = REPO_ROOT / "testdata" / "fixture-product"

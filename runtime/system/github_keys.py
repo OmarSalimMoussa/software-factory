@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from runtime.system import steps_prepare
 from runtime.system.host import Account, Host
+from runtime.system.install_steps import steps_prepare
 from runtime.system.job import Install, github_name
 
 WARDEN_TITLE = "software-factory warden"

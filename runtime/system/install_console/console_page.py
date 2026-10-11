@@ -14,9 +14,10 @@ from runtime.dashboard.client import Warden, WardenDown
 from runtime.shared import settings as settings_module
 from runtime.shared import store
 from runtime.shared.paths import Places
-from runtime.system import ci_check, github_keys, install, layout, steps_wire, uninstall
-from runtime.system.console_run import FAILED, Run
+from runtime.system import ci_check, github_keys, install, layout, uninstall
 from runtime.system.host import Account, Host
+from runtime.system.install_console.console_run import FAILED, Run
+from runtime.system.install_steps import steps_wire
 from runtime.system.job import Install
 
 # Loopback only: a proxy from the environment must never carry these probes off the machine.

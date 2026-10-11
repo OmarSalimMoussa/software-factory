@@ -28,13 +28,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from runtime.shared import environment  # noqa: E402 - the path line above must run first
 from runtime.shared.paths import Places  # noqa: E402
 from runtime.shared.protocol import Refused  # noqa: E402
-from runtime.system import (  # noqa: E402
-    ci_check,
-    drills,
-    healthchecks,
-    layout,
-    release,
-    sealed,
+from runtime.system import ci_check, healthchecks, layout, release, sealed
+from runtime.system.host import Account, CommandError, Host, RealHost  # noqa: E402
+from runtime.system.install_drills import drills
+from runtime.system.install_steps import (
     steps_machine,
     steps_prepare,
     steps_secrets,
@@ -42,7 +39,6 @@ from runtime.system import (  # noqa: E402
     steps_toolchain,
     steps_wire,
 )
-from runtime.system.host import Account, CommandError, Host, RealHost  # noqa: E402
 from runtime.system.job import REPO_ROOT, Install, refuse  # noqa: E402
 from runtime.system.journal import Journal  # noqa: E402
 from runtime.system.uninstall import LookingHost  # noqa: E402
@@ -55,7 +51,7 @@ def run_drills(ctx: Install) -> None:
         for drill in drills.DRILLS:
             ctx.host.say(f"would drill: {drill.__name__}")
         return
-    from runtime.system import drill_rig
+    from runtime.system.install_drills import drill_rig
 
     with drill_rig.opened(ctx) as rig:
         results = drills.run_all(rig, ctx.need_settings().get_int("install.drills_at_once"))
