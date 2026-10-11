@@ -39,6 +39,7 @@ from runtime.warden import (
     schedule,
     server,
     settings_save,
+    upgrade,
 )
 from runtime.warden.context import Caller, Clock, Context
 from runtime.warden.dispatch import Dispatcher, Doors, resolve
@@ -132,6 +133,7 @@ def main() -> int:
     public.write_switches(places, public.read_switches(places))
     # The unit runners refuse every request until public/sessions.json exists, the first start's git call included.
     registry.write(places, registry.read(places))
+    upgrade.migrate(doors.context(WARDEN))  # before any request or pass reads the state an earlier factory left
     settings_save.render_plugin(places, current)
     peers = server.Peers(
         agent_uid=pwd.getpwnam(AGENT_USER).pw_uid,

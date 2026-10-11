@@ -362,17 +362,17 @@ def _running(ctx: Context, op_id: object) -> bool:
         return False
 
 
-def _released_path(places: Places) -> Path:
+def released_path(places: Places) -> Path:
     return places.state / "released.json"
 
 
 def released(places: Places) -> str | None:
     """The commit the last releases that finished ran at; None before any did."""
-    found = store.read_json_or(_released_path(places), None)
+    found = store.read_json_or(released_path(places), None)
     if found is None:
         return None
     if not isinstance(found, dict) or not isinstance(found.get("commit"), str):
-        raise store.StoreError(f"{_released_path(places)}: want a commit")
+        raise store.StoreError(f"{released_path(places)}: want a commit")
     return str(found["commit"])
 
 
@@ -444,7 +444,7 @@ def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list
         state = finished("releases", lambda state: state if state["status"] == "completed" else None)
         if state["conclusion"] == "success":
             # The next push's releases compare with this commit; one that failed is tried again then.
-            store.write_json(_released_path(ctx.places), {"commit": full["sha"], "at": ctx.clock.iso()})
+            store.write_json(released_path(ctx.places), {"commit": full["sha"], "at": ctx.clock.iso()})
             return f"the releases finished: {state['url']}"
         raise ops.StepError(f"prod is live at {sha[:12]}, but the releases ended {state['conclusion']}: {state['url']}")
 
