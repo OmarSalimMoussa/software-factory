@@ -4,7 +4,7 @@ comes back after its fix reached that environment.
 The loop calls poll on every tick; every errors.poll_minutes it reads the server's GlitchTip, with the read-only token
 the server set-up saved, and keeps each environment's unresolved issues (its projects' slugs start with its name). An
 issue not filed before is filed from glitchtip. One filed before is filed again when GlitchTip saw it after the task
-its request became reached that environment (on-staging for staging, promoted for prod). Its severity comes from the
+its request became reached that environment (on staging for staging, promoted for prod). Its severity comes from the
 issue: a fatal one, or one with at least errors.severe_events events, is severe and goes to intake at once. Each
 environment keeps its own record, errors-<env>.json: the issues it filed with their request, and the timer
 runtime/warden/imports.py keeps.
@@ -20,6 +20,7 @@ from typing import Any
 from runtime.queue import formats, intake
 from runtime.queue.book import Queue
 from runtime.shared import store
+from runtime.shared.models import ON_STAGING
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden import imports
@@ -32,7 +33,7 @@ log = logging.getLogger(__name__)
 SENDER = "glitchtip"
 ENVS = (telemetry.PROD, telemetry.STAGING)
 # The status a task reaches when its fix runs in the environment: an issue seen after that came back.
-REACHED = {telemetry.PROD: "promoted", telemetry.STAGING: "on-staging"}
+REACHED = {telemetry.PROD: "promoted", telemetry.STAGING: ON_STAGING}
 _FRESH: dict[str, Any] = {"filed": {}, **imports.fresh()}
 
 

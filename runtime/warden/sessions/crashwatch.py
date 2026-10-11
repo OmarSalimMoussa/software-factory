@@ -27,7 +27,9 @@ from runtime.shared.models import (
     CRASHED,
     DEPRIORITIZED,
     FINISHED,
+    ON_STAGING,
     PENDING,
+    QA_CLEAN,
     WAITING,
     WORKING,
     Session,
@@ -51,8 +53,8 @@ OWED = " Events you have not acted on yet: {kinds}. `factory inbox` lists them."
 IDLE = "idle"
 # A session whose task has moved past its part is finished; a process that ends before that crashed.
 DONE_AT = {
-    IMPL: frozenset({"checked", "on-staging", "promoted", "closed"}),
-    DESIGN: frozenset({"building", "qa", "qa-clean", "turn", "merged", "checked", "on-staging", "promoted", "closed"}),
+    IMPL: frozenset({"checked", ON_STAGING, "promoted", "closed"}),
+    DESIGN: frozenset({"building", "qa", QA_CLEAN, "turn", "merged", "checked", ON_STAGING, "promoted", "closed"}),
 }
 
 

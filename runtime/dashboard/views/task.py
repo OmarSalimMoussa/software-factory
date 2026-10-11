@@ -21,7 +21,7 @@ from runtime.dashboard.views.kit import (
 )
 from runtime.dashboard.views.words import taskwords
 from runtime.queue.formats import TASK_ID
-from runtime.shared.models import RETIRED
+from runtime.shared.models import OPEN_SEVERITIES, RETIRED
 
 WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "cards", "logs", "qa", "specs")
 _IMAGE = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")
@@ -67,9 +67,9 @@ def testers(snap: Snap, task: dict[str, Any]) -> dict[str, Any]:
         result = results.get(name)
         if result is None:
             state, tone, note = ("running", "accent", None) if name in live else ("waiting", "", None)
-        elif result["blockers"] or result["majors"]:
+        elif any(result[f"{s}s"] for s in OPEN_SEVERITIES):
             state, tone = "fail", "bad"
-            note = f"{plural(result['blockers'], 'blocker')}, {plural(result['majors'], 'major')}"
+            note = ", ".join(plural(result[f"{s}s"], s) for s in OPEN_SEVERITIES)
         else:
             state, tone, note = "pass", "good", None
         model = settings.model(name.replace("-", "_"))[0]
@@ -92,7 +92,7 @@ def testers(snap: Snap, task: dict[str, Any]) -> dict[str, Any]:
 
 def built_from(snap: Snap, task: dict[str, Any]) -> dict[str, Any] | None:
     """What a change on its way to prod was built from: a spec, or a fix with its cause and its QA."""
-    if task["status"] not in ("merged", "checked", "on-staging", "promoted"):
+    if task["status"] not in taskwords.LANDED:
         return None
     spec = snap.get("specs").get(task["id"])
     if spec is not None:
@@ -133,7 +133,7 @@ def built_from(snap: Snap, task: dict[str, Any]) -> dict[str, Any] | None:
 def _verdict(result: dict[str, Any] | None) -> str:
     if result is None:
         return "no result"
-    return "fail" if result["blockers"] or result["majors"] else "pass"
+    return "fail" if any(result[f"{s}s"] for s in OPEN_SEVERITIES) else "pass"
 
 
 def sheet(snap: Snap, task_id: str) -> dict[str, Any]:

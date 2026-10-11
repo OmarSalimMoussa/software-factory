@@ -16,6 +16,7 @@ from typing import Any
 from runtime.queue import approvals, formats, turn
 from runtime.queue.book import Queue
 from runtime.shared import store
+from runtime.shared.models import SEVERITIES
 from runtime.slots import leases
 from runtime.warden import imports
 from runtime.warden.context import Context
@@ -145,7 +146,7 @@ def _released(ctx: Context) -> str:
 
 
 def _typed_verdicts(ctx: Context) -> str:
-    """A verdict a tester typed (it names no agent) becomes findings of its counts, so qa-clean still sees what it
+    """A verdict a tester typed (it names no agent) becomes findings of its counts, so the QA gate still sees what it
     found open."""
     sessions = registry.read(ctx.places)
     carried = 0
@@ -156,7 +157,7 @@ def _typed_verdicts(ctx: Context) -> str:
         if session is None or not session.task or not typed:
             continue
         for row in typed:
-            for severity, key in (("blocker", "blockers"), ("major", "majors"), ("minor", "minors")):
+            for severity, key in ((s, f"{s}s") for s in SEVERITIES):
                 for _ in range(int(row.get(key) or 0)):
                     carried += 1
                     _finding(ctx, session.task, row, severity)

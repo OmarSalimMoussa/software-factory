@@ -9,7 +9,7 @@ from runtime.dashboard.views import messaging, proposals
 from runtime.dashboard.views.kit import Parts, Query, Snap, clock, epoch, iso, model_word, plural, span, when
 from runtime.dashboard.views.shell import STATE_COLOR, github_url, health, prod_runs_staging
 from runtime.dashboard.views.words import agentwords, taskwords
-from runtime.shared.models import RETIRED, WAITING
+from runtime.shared.models import ON_STAGING, QA_CLEAN, RETIRED, WAITING
 from runtime.shared.paths import PROMOTE_WORKFLOW
 
 WANTS = (
@@ -40,7 +40,7 @@ _LAPTOP = {
 _STAGES = (
     ("designing", "designing", "--f-design", ("designing",)),
     ("building", "building", "--f-impl", ("building", "deprioritized", "turn", "merged", "checked")),
-    ("qa", "in QA", "--f-qa", ("qa", "qa-clean")),
+    ("qa", "in QA", "--f-qa", ("qa", QA_CLEAN)),
     ("needs", "need you", "--warn", ("review", "decide")),
 )
 
@@ -54,7 +54,7 @@ def env_card(snap: Snap, env: str) -> dict[str, Any]:
         word, tone = ("healthy", "good") if pill["state"] == "healthy" else ("down", "bad")
         chips.append({"text": f"{word} {span(now - epoch(streak['since']))}", "tone": tone})
     if env == "staging":
-        ahead = sum(1 for t in snap.get("queue")["tasks"] if t["status"] == "on-staging")
+        ahead = sum(1 for t in snap.get("queue")["tasks"] if t["status"] == ON_STAGING)
         if ahead:
             chips.append({"text": f"{ahead} {'task' if ahead == 1 else 'tasks'} ahead of prod", "tone": "accent"})
         ci = snap.get("ci")
@@ -123,7 +123,7 @@ def memory_used(snap: Snap) -> int | None:
 
 
 def envs(snap: Snap) -> dict[str, Any]:
-    ahead = sum(1 for t in snap.get("queue")["tasks"] if t["status"] == "on-staging")
+    ahead = sum(1 for t in snap.get("queue")["tasks"] if t["status"] == ON_STAGING)
     return {
         "staging": env_card(snap, "staging"),
         "prod": env_card(snap, "prod"),
@@ -151,7 +151,7 @@ def outage(snap: Snap) -> dict[str, Any] | None:
         how = f" · {model_word(fixer['model'])} · rung {fixer['rung']}" if fixer else ""
         message = f"The factory started a fix without you: <b>{title}</b>{how}. Everything else still waits for you."
         actions = ["watch", "stop"]
-    elif found["stage"] == "on-staging":
+    elif found["stage"] == ON_STAGING:
         message, actions = f"The fix <b>{title}</b> is on staging. Push it to prod, or push prod back.", ["push"]
     elif found["stage"] == "stopped":
         message = "You stopped the fix. Prod stays down until you push a build or push prod back."
@@ -198,7 +198,7 @@ def tiles(snap: Snap) -> dict[str, Any]:
             ],
         },
         "staging": {
-            "count": sum(1 for t in queue["tasks"] if t["status"] == "on-staging"),
+            "count": sum(1 for t in queue["tasks"] if t["status"] == ON_STAGING),
             "foot": "waiting to push to prod",
         },
         "requests": {

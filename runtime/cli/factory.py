@@ -23,6 +23,7 @@ from typing import IO, Any
 
 from runtime.cli import commands
 from runtime.shared import protocol
+from runtime.shared.models import SEVERITIES
 from runtime.shared.paths import Places
 
 LOCAL = ("qa-browser", "slot-api")
@@ -217,7 +218,7 @@ def _qa_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
     if ns.what == "result":
         return Call("qa.result", {"head": ns.head})
     if not (ns.severity and ns.where and ns.body):
-        raise CliError("factory qa finding --head <sha> --severity blocker|major|minor --where '…' --body <file>")
+        raise CliError(f"factory qa finding --head <sha> --severity {'|'.join(SEVERITIES)} --where '…' --body <file>")
     args = {"head": ns.head, "severity": ns.severity, "where": ns.where}
     return Call("qa.finding", args, read_file(ns.body))
 

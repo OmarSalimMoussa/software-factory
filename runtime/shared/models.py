@@ -34,10 +34,13 @@ TASK_SEVERITIES = ("severe", "major", "minor")
 REQUEST_SEVERITIES = ("severe", "normal")
 SURFACES = ("ui", "api", "access", "desktop", "none")
 # Every task status. Moves follow runtime/queue/statuses.py's table, never "forward" alone.
+QA_CLEAN, ON_STAGING = "qa-clean", "on-staging"
 TASK_STATUSES = (
     "queued", "parked", "proposed", "approved", "designing", "review", "building", "deprioritized", "qa",
-    "qa-clean", "turn", "merged", "checked", "on-staging", "promoted", "decide", "closed",
+    QA_CLEAN, "turn", "merged", "checked", ON_STAGING, "promoted", "decide", "closed",
 )  # fmt: skip
+SEVERITIES = ("blocker", "major", "minor")
+OPEN_SEVERITIES = SEVERITIES[:2]
 CARD_KINDS = ("spec", "decide", "question")
 
 

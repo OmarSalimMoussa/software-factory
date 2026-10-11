@@ -9,6 +9,7 @@ from runtime.dashboard.views.kit import Parts, Query, Snap, epoch, span, when
 from runtime.dashboard.views.shell import health, prod_runs_staging
 from runtime.dashboard.views.task import built_from
 from runtime.dashboard.views.words import taskwords
+from runtime.shared.models import ON_STAGING
 
 WANTS = ("settings", "probes", "queue", "deploys", "ci", "sessions", "cost", "cards", "qa", "specs", "rules", "outage")
 
@@ -37,7 +38,7 @@ def push(snap: Snap) -> dict[str, Any]:
     tasks = []
     specs = snap.get("specs")
     for task in sorted(taskwords.tasks(snap).values(), key=lambda t: t["created"]):
-        if task["status"] != "on-staging":
+        if task["status"] != ON_STAGING:
             continue
         n = taskwords.rung(task, snap.settings)
         chip = (
@@ -65,7 +66,7 @@ def push(snap: Snap) -> dict[str, Any]:
 
 
 def wants(query: Query) -> dict[str, Any]:
-    return {"want": list(WANTS), "statuses": ["on-staging"], "tasks": []}
+    return {"want": list(WANTS), "statuses": [ON_STAGING], "tasks": []}
 
 
 def parts(snap: Snap, query: Query) -> Parts:

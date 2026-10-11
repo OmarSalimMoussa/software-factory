@@ -176,7 +176,7 @@ def file_red(ctx: Context, where: str, body: str) -> str:
 
 def _deployed(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
     """A new build on staging or prod goes in the deploy log, and moves the tasks it includes along: checked to
-    on-staging to promoted."""
+    on staging to promoted."""
     if not probe.ok or memo["deployed"].get(probe.env) == probe.commit:
         return
     memo["deployed"][probe.env] = probe.commit

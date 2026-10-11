@@ -12,7 +12,7 @@ from runtime.dashboard.views.kit import SURFACES, Snap, cost_of, model_word, ord
 from runtime.qa import plan as qa_plan
 from runtime.queue import route
 from runtime.shared import models
-from runtime.shared.models import RETIRED, Task
+from runtime.shared.models import ON_STAGING, QA_CLEAN, RETIRED, Task
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 
@@ -28,18 +28,18 @@ _AT = {
     "deprioritized": 5,
     "decide": 5,
     "qa": 6,
-    "qa-clean": 6,
+    QA_CLEAN: 6,
     "turn": 7,
     "merged": 7,
     "checked": 8,
-    "on-staging": 9,
+    ON_STAGING: 9,
     "promoted": 10,
 }
 # Each task status's tone, the one table every page draws a status by.
 TONES = {
     "queued": "ring", "parked": "ring", "proposed": "warn", "approved": "good", "designing": "accent",
     "review": "warn", "building": "accent", "deprioritized": "warn", "decide": "warn", "qa": "accent",
-    "qa-clean": "accent", "turn": "accent", "merged": "accent", "checked": "good", "on-staging": "good",
+    QA_CLEAN: "accent", "turn": "accent", "merged": "accent", "checked": "good", ON_STAGING: "good",
     "promoted": "good", "closed": "ring",
 }  # fmt: skip
 _WORDS = {
@@ -49,11 +49,11 @@ _WORDS = {
     "designing": "Designing",
     "review": "Needs your Go",
     "deprioritized": "Deprioritized, back first",
-    "qa-clean": "QA passed, waiting to merge",
+    QA_CLEAN: "QA passed, waiting to merge",
     "turn": "Merging",
     "merged": "Merged, being checked",
     "checked": "Checked, on its way to staging",
-    "on-staging": "On staging",
+    ON_STAGING: "On staging",
     "promoted": "On prod",
     "decide": "Needs your decision",
     "closed": "Closed",
@@ -68,14 +68,14 @@ NEED_ACTIONS: dict[str, dict[str, Any]] = {
     "answer": {"label": "Send answer", "icon": "check", "primary": True},
 }
 _TASK_FIELDS = frozenset(f.name for f in dataclasses.fields(Task))
-LANDED = ("merged", "checked", "on-staging", "promoted")
+LANDED = ("merged", "checked", ON_STAGING, "promoted")
 IN_PROGRESS = (
     "designing",
     "review",
     "building",
     "deprioritized",
     "qa",
-    "qa-clean",
+    QA_CLEAN,
     "turn",
     "merged",
     "checked",

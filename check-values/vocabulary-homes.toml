@@ -1,0 +1,35 @@
+# The words for tasks, sessions and verdicts. Each is a token that means only its vocabulary; plain words such as
+# "approved" or "closed" are English too, so no word scan can hold them. Code outside a home reads the constants in
+# runtime/shared/models.py. The tests spell each word as the wire and the files carry it, which is what they check.
+
+[[vocabularies]]
+name = "task statuses"
+words = ["on-staging", "qa-clean"]
+home = ["runtime/shared/models.py", "runtime/queue/", "runtime/qa/", "tests/"]
+suffixes = [".py", ".js"]
+remedy = "read the status from runtime/shared/models.py; only the queue and QA, which move tasks, spell one"
+
+[vocabularies.allow]
+"runtime/cli/commands.py" = "`factory qa-clean` is the command named for the status it asks QA to record"
+"runtime/cli/factory.py" = "`factory qa-clean` is the command named for the status it asks QA to record"
+"runtime/warden/verbs.py" = "the qa-clean verb is named for the status it records; the CLI's tests send it"
+
+[[vocabularies]]
+name = "session states"
+words = ["bench-pending", "with-parent"]
+home = ["runtime/shared/models.py", "runtime/warden/sessions/", "tests/"]
+suffixes = [".py", ".js"]
+remedy = "read the state from runtime/shared/models.py; only the sessions' lifecycle spells one"
+
+[vocabularies.allow]
+"runtime/guard/rules.py" = "the guard's rule is named for the session state it guards; the guard's tests send it"
+"runtime/guard/decide.py" = "the guard's rule is named for the session state it guards; the guard's tests send it"
+"runtime/system/runners/check_run.py" = "bubblewrap's own --die-with-parent flag, not the session state"
+
+[[vocabularies]]
+name = "QA verdicts"
+words = ["blocker"]
+home = ["runtime/shared/models.py", "runtime/qa/", "tests/"]
+suffixes = [".py", ".js"]
+allow = {}
+remedy = "read the severities from runtime/shared/models.py's SEVERITIES; only QA spells one"

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from runtime.dashboard.views.kit import INITIALS, Snap, cost_of, model_label
-from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, PAUSED, RETIRED, REVIVING, WAITING, WORKING
+from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, PAUSED, RETIRED, REVIVING, WAITING, WITH_PARENT, WORKING
 
 _ROLE_WORDS = {"orchestrator": "orchestrator", "designer": "designer", "intake": "intake", "triage": "triage"}
 # Marker and state word for each live state; a retired agent shows how it ended.
@@ -19,13 +19,13 @@ _LIVE = {
 _ENDED = {
     "finished": ("good", "done"),
     "stopped": ("stop", "stopped"),
-    "with-parent": ("stop", "stopped"),
+    WITH_PARENT: ("stop", "stopped"),
     "crashed": ("stop", "crashed"),
 }
 _KID_ORDER = ("intake", "impl", "design", "qa", "orch")
 WHY = {
     "finished": ("finished", "good"),
-    "with-parent": ("stopped with its parent", "bad"),
+    WITH_PARENT: ("stopped with its parent", "bad"),
     "crashed": ("crashed", "bad"),
 }
 

@@ -14,11 +14,11 @@ from typing import Any
 
 from runtime.queue import formats, intake
 from runtime.shared import store
+from runtime.shared.models import OPEN_SEVERITIES, SEVERITIES
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
 
-SEVERITIES = ("blocker", "major", "minor")
-OPEN = ("blocker", "major")
+OPEN = OPEN_SEVERITIES
 _ID = re.compile(r"^f-\d{1,6}$")
 
 

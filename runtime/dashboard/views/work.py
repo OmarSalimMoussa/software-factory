@@ -22,6 +22,7 @@ from runtime.dashboard.views.shell import prod_runs_staging
 from runtime.dashboard.views.words import taskwords
 from runtime.queue.formats import outcome
 from runtime.shared import order
+from runtime.shared.models import ON_STAGING
 
 # A row keeps its key as it moves between these groups and Home's proposals, so it slides instead of jumping.
 _FLIP = {"approved": "appr", "proposed": "prop"}
@@ -97,7 +98,7 @@ def groups(snap: Snap) -> list[dict[str, Any]]:
         "proposed": [_row(snap, tasks[i], n, "approve", []) for n, i in enumerate(proposed, 1)],
         "queue": [broken(b["file"], b["error"]) for b in queue["broken"] if b["file"].startswith("tasks/")]
         + [_row(snap, t, n, _boost(t, snap), []) for n, t in enumerate(ranked(("queued",)), 1)],
-        "staging": [_row(snap, t, None, None, []) for t in ranked(("on-staging",))],
+        "staging": [_row(snap, t, None, None, []) for t in ranked((ON_STAGING,))],
     }
     # The approved group shows only while something approved waits, as the prototype draws it.
     # No task on staging is no proof staging runs prod's build: a push back or a pin leaves it different.

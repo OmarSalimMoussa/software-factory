@@ -19,6 +19,7 @@ from runtime.guard.writes import UnknownProtectedPaths, is_protected, protected_
 from runtime.queue.book import Queue
 from runtime.queue.turn import merges
 from runtime.shared import environment
+from runtime.shared.models import ON_STAGING
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.shared.settings import Settings
@@ -32,7 +33,7 @@ FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 _REVERTS = re.compile(r"This reverts commit ([0-9a-f]{40})")
 # A task whose merge passed its check of the default branch. A closed task's merge ships only on a saved check of
 # that merge that passed: a task may be closed before its check.
-SHIPPABLE = frozenset({"checked", "on-staging", "promoted"})
+SHIPPABLE = frozenset({"checked", ON_STAGING, "promoted"})
 # One push at a time, of either kind: the check that none runs and the start happen together.
 pushing = threading.Lock()
 

@@ -1,7 +1,7 @@
 """A clear prod outage, and the one fix it lets start without the owner (plan R18, the routing spec).
 
 outage.json holds the outage while it lasts, through its stages: down (the last watch.outage_after prod probes all
-counted as failures), fixing (the one bypass run started, at rung 1 or 2), on-staging (staging runs the fix and the
+counted as failures), fixing (the one bypass run started, at rung 1 or 2), on staging (staging runs the fix and the
 owner decides the push), stopped (the owner stopped the fix). The outage ends, and the file goes, when prod's probe
 is green again. bypass_used is set once a run started, so no second run ever skips the owner for the same outage.
 """
@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.shared import models, store
-from runtime.shared.models import Outage, Probe
+from runtime.shared.models import ON_STAGING, Outage, Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.warden import inbox
@@ -22,8 +22,8 @@ from runtime.warden.health import probes
 from runtime.warden.owner import reflections
 from runtime.warden.sessions import registry
 
-DOWN, FIXING, ON_STAGING, STOPPED = "down", "fixing", "on-staging", "stopped"
-FIX_ON_STAGING = ("on-staging", "promoted")  # task statuses that mean staging's build includes the fix
+DOWN, FIXING, STOPPED = "down", "fixing", "stopped"
+FIX_ON_STAGING = (ON_STAGING, "promoted")  # task statuses that mean staging's build includes the fix
 
 
 def path(places: Places) -> Path:
