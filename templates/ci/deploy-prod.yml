@@ -21,9 +21,10 @@ defaults:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Shares ci.yml's deploy group: one deploy at a time, never cancelled half way.
+    # One prod deploy at a time, never cancelled half way; staging has its own group, so its deploys never replace
+    # this one. The server's lock runs a staging and a prod deploy one at a time.
     concurrency:
-      group: deploy
+      group: deploy-prod
       cancel-in-progress: false
     outputs:
       previous: ${{ steps.deploy.outputs.previous }}

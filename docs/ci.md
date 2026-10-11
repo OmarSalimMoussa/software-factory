@@ -30,8 +30,10 @@ For a push to the default branch, or a run started by hand, these jobs follow, i
 6. **deploy-staging** asks the server to deploy staging, over SSH as its `ci` user. The server accepts nothing but a
    deploy command, and pulls the images with the run's own registry token.
 
-A deploy to staging and a deploy to prod never run at once, and neither is cancelled half way. GitHub keeps one
-waiting deploy: a newer one replaces an older one that has not started.
+A deploy to staging and a deploy to prod never run at once on the server, and neither is cancelled half way. Each
+has its own queue on GitHub, so a staging deploy never replaces a waiting prod deploy: in each queue, a newer waiting
+deploy replaces an older one that has not started. A push deploys staging only while it is still the default
+branch's newest commit, so an older run that reaches its deploy late never takes staging back.
 
 ### The smoke test
 

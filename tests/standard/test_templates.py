@@ -62,11 +62,39 @@ def test_no_workflow_hands_a_step_every_secret() -> None:
         assert not re.search(r"tojson\(\s*secrets\s*\)", (TEMPLATES / name).read_text().lower()), name
 
 
-def test_deploys_share_one_group_and_none_is_cancelled_half_way() -> None:
+def test_staging_and_prod_queue_apart_and_no_deploy_is_cancelled_half_way() -> None:
     deploys = [workflow("ci.yml")["jobs"]["deploy-staging"], workflow("deploy-prod.yml")["jobs"]["deploy"]]
 
-    assert [job["concurrency"] for job in deploys] == [{"group": "deploy", "cancel-in-progress": False}] * 2
+    assert [job["concurrency"] for job in deploys] == [
+        {"group": "deploy-staging", "cancel-in-progress": False},
+        {"group": "deploy-prod", "cancel-in-progress": False},
+    ]
     assert not any("concurrency" in workflow(name) for name in NAMES)
+
+
+def _default_branch_at(tmp_path: Path, branch: str, tip: str) -> dict[str, str]:
+    """GitHub's API, as a file the step reads: the default branch's newest commit is ``tip``; this run's is SHA."""
+    ref = tmp_path / "api" / "repos" / "acme" / "shop" / "git" / "ref" / "heads" / branch
+    ref.parent.mkdir(parents=True)
+    ref.write_text(f'{{"object": {{"sha": "{tip}"}}}}')
+    return {"COMMIT": SHA, "REPO": "acme/shop", "API": f"file://{tmp_path / 'api'}"}
+
+
+@pytest.mark.parametrize(
+    ("event", "tip", "deployed"),
+    [("push", SHA, True), ("push", "f" * 40, False), ("workflow_dispatch", "f" * 40, True)],
+    ids=["newest", "overtaken", "by-hand"],
+)
+def test_a_push_deploys_staging_only_while_it_is_the_default_branch_s_newest_commit(
+    tmp_path: Path, event: str, tip: str, deployed: bool
+) -> None:
+    env = {"EVENT": event, "REF": "master", "DEFAULT_BRANCH": "master", "SHORT": SHA[:8], "FAKE_LAST": "deployed",
+           **_default_branch_at(tmp_path, "master", tip)}  # fmt: skip
+
+    done = run_step("ci.yml", "deploy-staging", "Deploy staging", tmp_path, env)
+
+    assert done.returncode == 0, done.stderr
+    assert (tmp_path / "home" / "ssh-args").exists() is deployed
 
 
 def test_only_the_default_branch_or_a_run_by_hand_builds_and_deploys() -> None:
@@ -97,7 +125,8 @@ def test_only_the_default_branch_or_a_run_by_hand_builds_and_deploys() -> None:
 def test_the_staging_deploy_follows_on_a_push_and_pins_a_run_by_hand(
     tmp_path: Path, event: str, ref: str, mode: str
 ) -> None:
-    env = {"EVENT": event, "REF": ref, "DEFAULT_BRANCH": "main", "SHORT": SHA[:8], "FAKE_LAST": ""}
+    env = {"EVENT": event, "REF": ref, "DEFAULT_BRANCH": "main", "SHORT": SHA[:8], "FAKE_LAST": "",
+           **_default_branch_at(tmp_path, "main", SHA)}  # fmt: skip
 
     done = run_step("ci.yml", "deploy-staging", "Deploy staging", tmp_path, env)
 
