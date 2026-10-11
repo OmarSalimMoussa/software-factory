@@ -18,7 +18,7 @@ from runtime.warden.inbox import SEVERE_REQUEST
 def body_text(data: bytes | None, what: str, limit_kib: int) -> str:
     """Uploaded text, checked: present, within the upload cap and UTF-8."""
     if not data or not data.strip():
-        raise Refused("body", f"the {what} is empty: give it on stdin with a heredoc or a redirect")
+        raise Refused("body", f"the {what} is empty: write it to a file and pass it with --body <file>")
     if len(data) > limit_kib * 1024:
         raise Refused("too-large", f"the {what} is larger than queue.max_upload_kib ({limit_kib} KiB)")
     try:

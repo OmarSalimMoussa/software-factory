@@ -15,8 +15,9 @@ from runtime.queue import pictures, proposals, route, statuses, tasks
 from runtime.queue.book import Queue
 from runtime.queue.formats import one_line
 from runtime.shared import store
+from runtime.shared.models import RETIRED, STOPPED, Session
 from runtime.shared.protocol import Refused
-from runtime.warden import lifecycle
+from runtime.warden import lifecycle, registry
 from runtime.warden.context import Context
 
 
@@ -77,7 +78,22 @@ def propose(
             store.write_text(brief_file, brief.strip() + "\n", mode=0o600)
         else:
             brief_file.unlink(missing_ok=True)
+        stopped = _stop_runs(ctx, task_id, run) if event == "rung-up" else []
+    # A run moved up a rung is done at the old one: its session stops (its branch stays) so it cannot work on.
+    lifecycle.after_retire(ctx, stopped)
     return {"task": moved.id, "place": place, "run": run, "route": planned}
+
+
+def _stop_runs(ctx: Context, task_id: str, run: int) -> list[Session]:
+    """Retire the task's live implementer or designer, and what runs under it; what was retired."""
+    sessions = lifecycle.read(ctx)
+    retired: list[Session] = []
+    for s in [s for s in sessions.values() if s.task == task_id and not s.parent and s.state != RETIRED]:
+        retired += lifecycle.retire(ctx, registry.subtree(sessions, s.id), s, STOPPED, statuses.ORCH,
+                                    f"its task moved up to rung {run}")  # fmt: skip
+    if retired:
+        registry.write(ctx.places, sessions)
+    return retired
 
 
 def propose_none(ctx: Context) -> dict[str, Any]:

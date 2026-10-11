@@ -94,6 +94,10 @@ def parse_text(text: str, path: Path) -> Compose:
         raise ComposeError(path, [str(exc)]) from exc
     problems: list[str] = []
     services: dict[str, Service] = {}
+    # This reader and `docker compose config` must see the same services: neither key is read here, so a file
+    # that uses one is refused rather than read as less than docker sees.
+    if isinstance(data, dict) and "include" in data:
+        problems.append("include is not read by the factory: put every service in this one file")
     found = data.get("services") if isinstance(data, dict) else None
     if not isinstance(found, dict) or not found:
         problems.append("has no services mapping")
@@ -102,6 +106,8 @@ def parse_text(text: str, path: Path) -> Compose:
         if not isinstance(entry, dict):
             problems.append(f"service {name}: must be a mapping")
             continue
+        if "extends" in entry:
+            problems.append(f"service {name}: extends is not read by the factory: write the service out whole")
         services[name] = _service(name, entry, problems)
     networks = _networks(data.get("networks") if isinstance(data, dict) else None, problems)
     if problems:

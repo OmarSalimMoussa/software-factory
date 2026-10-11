@@ -34,7 +34,7 @@ from standard.config import Config, ConfigError
 from standard.envfile import EnvError, atomic_write
 from standard.plan import DEPLOY_IMAGE, PlanError
 from standard.server import deploy_steps as steps
-from standard.server import edge
+from standard.server import edge, gc
 from standard.server.deploy_steps import SHORT, DeployError, Get
 from standard.services import provision
 from standard.services.provision import ProvisionError, Run, checked
@@ -93,6 +93,7 @@ class Paths:
     edge_sites: Path = Path("/srv/factory/edge/sites")
     product_toml: Path = Path("/etc/software-factory/product.toml")
     docker_socket: str = "/var/run/docker.sock"
+    gc_log: Path = gc.LOG
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,6 +186,10 @@ class _Deploy:
             self.log(f"staging is pinned to {pinned.read_text().strip()}: this follow changes nothing")
             return 0
         with _lock(self.paths.lock, self.log):
+            # The server has no mail: a failed weekly clean-up shows in every deploy's log, CI's, until one passes.
+            failed = gc.last_failure(self.paths.gc_log)
+            if failed is not None:
+                self.log(f"warning: the weekly clean-up failed ({failed}); the server's disk fills until it passes")
             for folder, mode in ((self.stack, 0o755), (self.env_dir, 0o700), (self.state, 0o755)):
                 folder.mkdir(parents=True, exist_ok=True, mode=mode)
             token = stdin.read().strip()

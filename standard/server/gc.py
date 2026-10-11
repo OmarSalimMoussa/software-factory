@@ -29,6 +29,16 @@ class _Failed(Exception):
     pass
 
 
+def last_failure(log: Path) -> str | None:
+    """What the last sweep said when it failed; None when it passed or never ran. Every deploy repeats it."""
+    try:
+        lines = log.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return None
+    last = lines[-1] if lines else ""
+    return last if " FAILED at " in last else None
+
+
 def _ok(run: Run, argv: list[str], step: str) -> str:
     done = run(argv, None)
     if done.returncode != 0:

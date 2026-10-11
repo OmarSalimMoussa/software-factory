@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from standard import plan
+from standard import compose, plan
 
 FIXTURE = Path(__file__).resolve().parents[2] / "testdata" / "fixture-product"
 COMMIT, FACTORY = "0123456789abcdef0123456789abcdef01234567", "89abcdef0123456789abcdef0123456789abcdef"
@@ -84,3 +84,16 @@ def test_a_derived_image_builds_after_its_base_and_nothing_needs_the_products_en
     assert [i["name"] for i in written["images"]] == ["base", "app"]
     assert written["files"] == ["compose.yml", "notes.env.template", "factory.toml"]
     assert written["images"][1]["ref"] == REF + "app" and written["factory_commit"] == FACTORY
+
+
+@pytest.mark.parametrize(
+    ("text", "says"),
+    [
+        ("include:\n  - other.yml\nservices:\n  app:\n    image: x\n", "include is not read by the factory"),
+        ("services:\n  app:\n    extends:\n      file: base.yml\n      service: app\n", "extends is not read"),
+    ],
+)
+def test_a_compose_file_using_what_the_factory_does_not_read_is_refused(tmp_path: Path, text: str, says: str) -> None:
+    with pytest.raises(compose.ComposeError) as refused:
+        compose.parse_text(text, tmp_path / "compose.yml")
+    assert any(says in p for p in refused.value.problems)

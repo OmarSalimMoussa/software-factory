@@ -108,10 +108,11 @@ class Units:
         return int(status), output
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
-        self._request(request_id, {"kind": "session", **launch})
-        done = self.run(["start", AGENT_UNIT.format(request_id)])
-        if done.returncode != 0:
-            raise LaunchError(f"the session did not start: {done.stderr.strip()[-300:]}")
+        """Start a session and wait for `claude --bg` to hand it to the daemon; its request and output are removed
+        then, so none is left behind for anyone to read."""
+        code, output = self.start_waiting(request_id, launch)
+        if code != 0:
+            raise LaunchError(f"the session did not start (exit {code}): {output.strip()[-300:]}")
 
     def start_waiting(self, request_id: str, launch: dict[str, Any]) -> tuple[int, str]:
         """A session's start, waited on: how it exited and what `claude --bg` printed (the install's drill reads it)."""

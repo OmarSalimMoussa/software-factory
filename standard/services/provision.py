@@ -174,27 +174,50 @@ def workspace(
     dsns = _glitchtip(run, glitchtip.workspace_params(config.product.name, slugs)).get("dsns")
     if not isinstance(dsns, dict) or set(dsns) != set(slugs) or not all(isinstance(v, str) for v in dsns.values()):
         raise ProvisionError(f"GlitchTip's answer lacks a DSN for some of {', '.join(slugs)}")
+    public = urlsplit(origin)
+    keys = {errors: _dsn_parts(dsns[errors]) for errors in config.services.errors}
+    return env_values(
+        config, workspace=workspace, commit=commit, networks=(net, telemetry_net),
+        database_url=f"postgresql://{name}:{password}@{POSTGRES}:5432/{name}", langfuse=(LANGFUSE_HOST,
+        services["LANGFUSE_INIT_PROJECT_PUBLIC_KEY"], services["LANGFUSE_INIT_PROJECT_SECRET_KEY"]),
+        ingest=f"http://{GLITCHTIP_INGEST}",
+        dsn=lambda errors: f"http://{keys[errors][0]}@{GLITCHTIP_INGEST}/{keys[errors][1]}",
+        public_dsn=lambda errors: f"{public.scheme}://{keys[errors][0]}@{public.netloc}"
+        f"{config.services.errors_public_path}/{keys[errors][1]}",
+    )  # fmt: skip
+
+
+def env_values(
+    config: Config,
+    *,
+    workspace: str,
+    commit: str,
+    networks: tuple[str, str],
+    database_url: str,
+    langfuse: tuple[str, str, str],
+    ingest: str,
+    dsn: Callable[[str], str],
+    public_dsn: Callable[[str], str],
+) -> dict[str, str]:
+    """Every env value the factory writes for a workspace, the one list of their keys: ``langfuse`` is its host,
+    public key and secret key, and ``dsn`` and ``public_dsn`` give each error project's addresses."""
     values = {
-        "FACTORY_SERVICES_NETWORK": net,
-        "FACTORY_TELEMETRY_NETWORK": telemetry_net,
-        "DATABASE_URL": f"postgresql://{name}:{password}@{POSTGRES}:5432/{name}",
-        "LANGFUSE_HOST": LANGFUSE_HOST,
-        "LANGFUSE_PUBLIC_KEY": services["LANGFUSE_INIT_PROJECT_PUBLIC_KEY"],
-        "LANGFUSE_SECRET_KEY": services["LANGFUSE_INIT_PROJECT_SECRET_KEY"],
+        "FACTORY_SERVICES_NETWORK": networks[0],
+        "FACTORY_TELEMETRY_NETWORK": networks[1],
+        "DATABASE_URL": database_url,
+        "LANGFUSE_HOST": langfuse[0],
+        "LANGFUSE_PUBLIC_KEY": langfuse[1],
+        "LANGFUSE_SECRET_KEY": langfuse[2],
         "LANGFUSE_TRACING_ENVIRONMENT": workspace,
         "SENTRY_ENVIRONMENT": workspace,
         "SENTRY_RELEASE": commit,
-        "SENTRY_INGEST_URL": f"http://{GLITCHTIP_INGEST}",
+        "SENTRY_INGEST_URL": ingest,
     }
-    public = urlsplit(origin)
     for errors in config.services.errors:
-        key, project = _dsn_parts(dsns[errors])
         suffix = errors.upper().replace("-", "_")
-        values[f"SENTRY_DSN_{suffix}"] = f"http://{key}@{GLITCHTIP_INGEST}/{project}"
+        values[f"SENTRY_DSN_{suffix}"] = dsn(errors)
         if config.services.errors_public_path:
-            values[f"SENTRY_PUBLIC_DSN_{suffix}"] = (
-                f"{public.scheme}://{key}@{public.netloc}{config.services.errors_public_path}/{project}"
-            )
+            values[f"SENTRY_PUBLIC_DSN_{suffix}"] = public_dsn(errors)
     return values
 
 

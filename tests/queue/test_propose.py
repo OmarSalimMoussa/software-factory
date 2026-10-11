@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 from queue_kit import PICTURE, World
 
-from runtime.queue import owner, pictures, proposals
+from runtime.queue import formats, owner, pictures, proposals
+from runtime.queue.book import task_rel
 from runtime.queue.propose import propose, propose_none
 from runtime.shared.protocol import Refused
+from runtime.warden import backstop, registry
+from runtime.warden.backstop import Proc
 
 PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\x00" * 17
 
@@ -96,3 +101,16 @@ def test_a_task_the_owner_said_not_now_to_waits_for_a_change(world: World) -> No
         _propose(world, task.id)
     owner.boost(world.owner(), task.id, on=True)
     _propose(world, task.id)
+
+
+def test_a_run_moved_up_a_rung_stops_its_running_session(world: World, monkeypatch: pytest.MonkeyPatch) -> None:
+    task = world.task()
+    world.write_raw(task_rel(task.id), formats.dump_task(dataclasses.replace(task, status="building", run=1)))
+    world.session("s-impl", "implementer", "impl-t-0001", task.id)
+    monkeypatch.setattr(backstop, "processes", lambda: {"s-impl": Proc(1, "s-impl", "impl-t-0001", "", "idle")})
+
+    propose(world.ctx(), task.id, 2, "it needs the larger model", "it touches billing", PICTURE, "")
+
+    row = registry.read(world.places)["s-impl"]
+    assert (row.state, row.retired, world.launcher.stopped) == ("retired", "stopped", ["s-impl"])
+    assert world.queue().task(task.id).status == "proposed"

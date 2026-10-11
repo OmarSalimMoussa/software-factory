@@ -99,3 +99,23 @@ def test_a_resume_that_starts_a_copy_removes_it_and_fails(world: World) -> None:
 def test_a_session_own_doing_line_stays_short_and_plain(text: str) -> None:
     with pytest.raises(Refused):
         doing.clean(text)
+
+
+@pytest.mark.parametrize("exit_code", [0, 1])
+def test_a_session_start_is_waited_on_and_leaves_no_request_or_output_behind(world: World, exit_code: int) -> None:
+    def systemctl(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        assert argv[0] == "--wait"
+        request = argv[-1].split("@", 1)[1].removesuffix(".service")
+        store.write_text(world.places.state / "runs" / f"{request}.log", "backgrounded · 0f00ba12\n")
+        store.write_text(world.places.state / "runs" / f"{request}.exit", f"{exit_code}\n")
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    units = launch.Units(world.places, lambda: world.settings, systemctl)
+    if exit_code:
+        with pytest.raises(launch.LaunchError, match="did not start"):
+            units.start_agent("pending-1", {"name": "impl-t-0001"})
+    else:
+        units.start_agent("pending-1", {"name": "impl-t-0001"})
+
+    assert not list((world.places.state / "public" / "launch").iterdir())
+    assert not list((world.places.state / "runs").iterdir())

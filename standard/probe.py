@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-IMAGE = "python:3.12-alpine"
+IMAGE = "python:3.12.11-alpine"
 SECONDS = 5
 
 # One GET: prints the status (0 when nothing answered), a newline, then the body. A redirect is an answer, not followed.

@@ -49,6 +49,7 @@ class Server:
             services_env=self.root / "srv" / "factory" / "services" / "services.env",
             edge_sites=self.root / "srv" / "factory" / "edge" / "sites",
             product_toml=self.root / "etc" / "product.toml",
+            gc_log=self.root / "srv" / "factory" / "state" / "gc.log",
         )
         tools = Tools(
             run=self.docker,
@@ -277,3 +278,15 @@ def test_a_pin_holds_only_once_its_deploy_succeeded(server: Server, answers: boo
 
     assert (code == 0) is answers
     assert (server.root / "srv/notes/staging/state/pinned").exists() is pinned
+
+
+def test_a_failed_weekly_clean_up_shows_in_every_deploy_until_one_passes(
+    server: Server, capsys: pytest.CaptureFixture[str]
+) -> None:
+    log = server.root / "srv" / "factory" / "state" / "gc.log"
+    log.parent.mkdir(parents=True)
+    log.write_text("2026-10-04T03:00:00Z FAILED at pruning the build cache: no space left on device\n")
+
+    server.deploy("prod", "abcdef12")
+
+    assert "warning: the weekly clean-up failed (2026-10-04T03:00:00Z FAILED at pruning" in capsys.readouterr().out

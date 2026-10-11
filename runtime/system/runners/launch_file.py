@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from runtime.shared.settings import Settings
+from runtime.shared.settings import SCHEMA, Settings
 from runtime.slots import leases
 from runtime.system import layout
 from runtime.warden import launch, session_settings
@@ -146,8 +146,11 @@ def command_argv(raw: dict[str, Any], home: Path, state: Path) -> tuple[list[str
 
 def stack_parts(raw: dict[str, Any], settings: Settings) -> tuple[int, list[str], str]:
     slot, verb, session = raw.get("slot"), raw.get("verb"), raw.get("session")
-    if isinstance(slot, bool) or not isinstance(slot, int) or not 0 <= slot <= settings.get_int("slots.count"):
-        raise BadRequest(f"slot must be from 0 to {settings.get_int('slots.count')}")
+    # A slot past a lowered slots.count still holds its lease until it is freed, so the bound is the most slots
+    # the setting may ever name; the warden names only slots it leased.
+    top = int(SCHEMA["slots.count"].high or 0)
+    if isinstance(slot, bool) or not isinstance(slot, int) or not 0 <= slot <= top:
+        raise BadRequest(f"slot must be from 0 to {top}")
     if not isinstance(verb, list) or not verb or not all(isinstance(w, str) and "\0" not in w for w in verb):
         raise BadRequest("verb must be a list of words")
     if verb[0] not in DEV_VERBS | OWN_VERBS:

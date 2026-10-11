@@ -220,9 +220,6 @@ WARDEN_OWNED = "(600, software-warden:software-warden)"
         (True, {}, ["The token `claude setup-token` printed, for the agents' sessions:",
                     "A name for this Claude account (Enter for main):"],
          ["claude-accounts/<answer>.token", "claude.token", "claude-accounts/active"]),
-        # A reinstall over an install that kept one token makes it the account main, and the agents keep using it.
-        (False, {"claude.token": "sk-ant-oat01-kept-from-before-a1b2\n"}, [],
-         ["claude-accounts/main.token", "claude.token", "claude-accounts/active"]),
         (False, {"claude.token": "sk-ant-oat01-kept-from-before-a1b2\n", "claude-accounts/active": "work\n"}, [], []),
     ],
 )  # fmt: skip

@@ -31,7 +31,7 @@ from standard.services import provision
 from standard.services.provision import POSTGRES
 
 WORKSPACE = "smoke"
-POSTGRES_IMAGE = "postgres:17"
+POSTGRES_IMAGE = "postgres:17.10"  # must mirror the shared services' postgres (standard/services/compose.yml)
 DEAD = "http://127.0.0.1:9"  # the discard port: nothing listens, so every telemetry send fails
 DOCKER_SOCKET = "/var/run/docker.sock"
 POLL_SECONDS = 2
@@ -170,26 +170,17 @@ class Smoke:
             self.sleep(POLL_SECONDS)
 
     def _services(self, password: str) -> dict[str, str]:
-        name = self.config.product.name
-        values = {
-            "FACTORY_SERVICES_NETWORK": self.network,
-            "FACTORY_TELEMETRY_NETWORK": self.telemetry_network,
-            "DATABASE_URL": f"postgresql://{self.database}:{password}@{POSTGRES}:5432/{self.database}",
-            "LANGFUSE_HOST": DEAD,
-            "LANGFUSE_PUBLIC_KEY": "pk-lf-smoke",
-            "LANGFUSE_SECRET_KEY": "sk-lf-smoke",
-            "LANGFUSE_TRACING_ENVIRONMENT": WORKSPACE,
-            "SENTRY_ENVIRONMENT": WORKSPACE,
-            "SENTRY_RELEASE": self.short,
-            "SENTRY_INGEST_URL": DEAD,
-        }
+        """The factory's env values for the smoke workspace (provision.env_values names them all), every telemetry
+        address the discard port."""
+        name, numbers = self.config.product.name, {e: n for n, e in enumerate(self.config.services.errors, 1)}
         public = self.config.services.errors_public_path
-        for number, errors in enumerate(self.config.services.errors, 1):
-            suffix = errors.upper().replace("-", "_")
-            values[f"SENTRY_DSN_{suffix}"] = f"http://{name}@127.0.0.1:9/{number}"
-            if public:
-                values[f"SENTRY_PUBLIC_DSN_{suffix}"] = f"http://{name}@127.0.0.1:9{public}/{number}"
-        return values
+        return provision.env_values(
+            self.config, workspace=WORKSPACE, commit=self.short, networks=(self.network, self.telemetry_network),
+            database_url=f"postgresql://{self.database}:{password}@{POSTGRES}:5432/{self.database}",
+            langfuse=(DEAD, "pk-lf-smoke", "sk-lf-smoke"), ingest=DEAD,
+            dsn=lambda errors: f"http://{name}@127.0.0.1:9/{numbers[errors]}",
+            public_dsn=lambda errors: f"http://{name}@127.0.0.1:9{public}/{numbers[errors]}",
+        )  # fmt: skip
 
     def _write_env(self, password: str) -> Path:
         # Compose reads the env file next to compose.yml, as on a server, where it links into the env folder.

@@ -18,7 +18,6 @@ import getpass
 import json
 import os
 import sys
-import tomllib
 from collections.abc import Callable
 from pathlib import Path
 
@@ -124,7 +123,7 @@ def _with_leftovers(path: Path) -> tuple[Path, ...]:
     return (path, *(path.with_name(f"{path.name}.{end}") for end in ("new", "old", "partial", "bundle")))
 
 
-def programs(host: Host, places: Places, dashboard_port: str) -> None:
+def programs(host: Host, places: Places, dashboard_port: str | None) -> None:
     for path in (paths.FACTORY_BIN, layout.CLAUDE_BIN.parent, *_with_leftovers(paths.INSTALL), layout.TOOLS,
                  *_with_leftovers(layout.TOOLCHAIN), paths.RUN, layout.DRILLS):  # fmt: skip
         _remove(host, path)
@@ -132,18 +131,22 @@ def programs(host: Host, places: Places, dashboard_port: str) -> None:
     tailnet(host, places, dashboard_port)
 
 
-def tailnet(host: Host, places: Places, dashboard_port: str) -> None:
+def tailnet(host: Host, places: Places, dashboard_port: str | None) -> None:
     """Take the dashboard off the tailnet, but never another handler on its port, and put back the operator the
     install cleared."""
-    ours = f"http://127.0.0.1:{dashboard_port}"
+    record = steps_wire.read_tailnet_record(host, places.state)
+    served = record.get("served") if isinstance(record.get("served"), str) else None
+    ours = f"http://127.0.0.1:{dashboard_port}" if dashboard_port is not None else served
     code, status = host.query(["tailscale", "serve", "status", "--json"])
     handlers = steps_wire.https_handlers(status) if code == 0 else None
-    if handlers and set(handlers.values()) == {ours}:
+    if ours is None:
+        host.tell("The dashboard's port could not be read, so nothing is taken off your tailnet: check "
+                  "tailscale serve status and remove the dashboard's entry yourself.")  # fmt: skip
+    elif handlers and set(handlers.values()) == {ours}:
         _try(host, ["tailscale", "serve", "--https=443", "off"])
     elif handlers and ours in handlers.values():
         host.tell("Your tailnet's port 443 serves more than the dashboard, so it stays: take the dashboard's handler "
                   "off it yourself (tailscale serve status shows it).")  # fmt: skip
-    record = steps_wire.read_tailnet_record(host, places.state)
     operator = record.get("operator")
     if isinstance(operator, str) and operator:
         _try(host, ["tailscale", "set", f"--operator={operator}"])
@@ -294,14 +297,15 @@ def main(argv: list[str]) -> int:
     return 1 if failed else 0
 
 
-def dashboard_port(places: Places) -> str:
-    """The port the dashboard was published on: the warden's published settings, or else this commit's default."""
+def dashboard_port(places: Places) -> str | None:
+    """The port the dashboard was published on, from the warden's published settings; None when they cannot be
+    read (no install, or one that never published them)."""
     published = places.state / "public" / "settings.json"
     try:
         return str(json.loads(published.read_text(encoding="utf-8"))["dashboard"]["port"])
-    # telemetry: expected — no install, or one that never published its settings: the commit's own default stands
+    # telemetry: surfaced — the uninstall says it could not tell the dashboard's port, and takes nothing off the tailnet
     except (OSError, ValueError, KeyError, TypeError):
-        return str(tomllib.loads((REPO_ROOT / "settings.toml").read_text(encoding="utf-8"))["dashboard"]["port"])
+        return None
 
 
 if __name__ == "__main__":

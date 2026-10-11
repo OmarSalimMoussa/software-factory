@@ -142,13 +142,15 @@ class Systemd:
         assert verb == "start", argv
         request_id = unit.split("@", 1)[1].removesuffix(".service")
         raw = store.read_json(self.places.state / "public" / "launch" / f"{request_id}.json")
-        if not wait:
-            assert raw["kind"] == "session", raw
-            launch_file.session_argv(raw, self.places.state)
-            self.sessions.append(raw)
-            return subprocess.CompletedProcess(argv, 0, "", "")
+        assert wait, f"every unit is waited on: {argv}"
         runs = self.places.state / "runs"
         runs.mkdir(parents=True, exist_ok=True)
+        if raw["kind"] == "session":
+            launch_file.session_argv(raw, self.places.state)
+            self.sessions.append(raw)
+            (runs / f"{request_id}.log").write_text("backgrounded · 0f00ba12\n")
+            (runs / f"{request_id}.exit").write_text("0\n")
+            return subprocess.CompletedProcess(argv, 0, "", "")
         if raw["kind"] == "message":
             launch_file.message_argv(raw)
             self.messages.append(raw)

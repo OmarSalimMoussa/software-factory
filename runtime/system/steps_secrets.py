@@ -112,28 +112,24 @@ def _read_key(ctx: Install, folder: Path, github: str, gh: str) -> None:
 
 
 def _claude_account(ctx: Install, folder: Path) -> None:
-    """The agents' first Claude account, asked for only when none exists. A lone claude.token, from an install before
-    accounts, becomes the account named main. The owner adds and switches the rest with `factory account`."""
+    """The agents' first Claude account, asked for only when none exists. The owner adds and switches the rest with
+    `factory account`."""
     host, accounts = ctx.host, claude_accounts.folder(folder)
     if host.exists(accounts / claude_accounts.ACTIVE):
         host.say("the agents' Claude accounts are kept")
         return
     lone = folder / claude_accounts.UNIT_TOKEN
-    if host.exists(lone):
-        name, token = claude_accounts.DEFAULT, host.read(lone) if not host.dry else "<the token>"
-        host.say(f"the agents' token becomes the Claude account {name}")
-    else:
-        token = host.ask(
-            "The token `claude setup-token` printed, for the agents' sessions: ", secret=True,
-            hint="Run `claude setup-token` in a terminal, sign in with the account the agents should use, and paste "
-                 "the token it prints.",
-            link="https://code.claude.com/docs/en/authentication#generate-a-long-lived-token",
-        )  # fmt: skip
-        if not token:
-            raise refuse("The agents need a Claude account: install again and paste its token when asked")
-        asked = f"A name for this Claude account (Enter for {claude_accounts.DEFAULT}): "
-        hint = f"Small letters, digits and dashes, to tell your accounts apart; empty for {claude_accounts.DEFAULT}."
-        name = host.ask(asked, secret=False, hint=hint, link="") or claude_accounts.DEFAULT
+    token = host.ask(
+        "The token `claude setup-token` printed, for the agents' sessions: ", secret=True,
+        hint="Run `claude setup-token` in a terminal, sign in with the account the agents should use, and paste "
+             "the token it prints.",
+        link="https://code.claude.com/docs/en/authentication#generate-a-long-lived-token",
+    )  # fmt: skip
+    if not token:
+        raise refuse("The agents need a Claude account: install again and paste its token when asked")
+    asked = f"A name for this Claude account (Enter for {claude_accounts.DEFAULT}): "
+    hint = f"Small letters, digits and dashes, to tell your accounts apart; empty for {claude_accounts.DEFAULT}."
+    name = host.ask(asked, secret=False, hint=hint, link="") or claude_accounts.DEFAULT
     if not host.dry:
         try:
             name, token = claude_accounts.check_name(name), claude_accounts.check_token(token)
