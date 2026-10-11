@@ -31,8 +31,8 @@ DONE_WORDS = {
 
 def card_version(snap: Snap, task_id: str) -> str:
     """What a proposal's actions carry: the task as proposed and its place."""
-    task = taskwords.tasks(snap).get(task_id)
-    return version(task, snap.get("proposals")["open"].index(task_id) if task else None)
+    task, places = taskwords.tasks(snap).get(task_id), snap.get("proposals")["open"]
+    return version(task, places.index(task_id) if task and task_id in places else None)
 
 
 def need_version(card: dict[str, Any]) -> str:
@@ -114,8 +114,14 @@ def slots(snap: Snap) -> dict[str, Any]:
             del _settled[index]
         settled = {i: {k: v for k, v in s.items() if k != "until"} for i, s in _settled.items()}
     places: list[dict[str, Any]] = []
-    for index, entry in enumerate(found["open"][:limit]):
+    # Every live proposal is drawn: one that came back past a full page, and one whose place a crash between its two
+    # writes never recorded, as much as the rest. Only empty places stop at the page's own number.
+    orphans = sorted(i for i, task in tasks.items() if task["status"] == "proposed" and i not in found["open"])
+    ids += orphans
+    for index, entry in enumerate([*found["open"], *orphans]):
         if entry is None or entry == "none":
+            if index >= limit:
+                continue
             if index in settled:
                 places.append(settled[index])
             elif entry is None:

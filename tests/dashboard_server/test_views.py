@@ -159,3 +159,11 @@ def test_the_push_sheet_says_prod_runs_staging_only_when_prod_answers_on_staging
         task.unlink()
 
     assert rig.parts("/api/push")["push"]["data"]["prod_runs_staging"] is runs
+
+
+def test_home_draws_every_live_proposal_even_one_a_crash_left_without_its_place(rig: Rig) -> None:
+    store.write_json(rig.places.proposals, {"open": ["t-0027", "t-0024", None], "approved": []})
+
+    slots = rig.parts("/api/home")["proposals"]["data"]["slots"]
+
+    assert [s["task"] for s in slots if s.get("task")] == ["t-0027", "t-0024", "t-0025"]
