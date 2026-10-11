@@ -35,6 +35,18 @@ def test_a_start_needs_an_approval_that_still_covers_the_task(world: World) -> N
 
 
 @pytest.mark.parametrize(
+    "facts", [{"owner_class": "migration"}, {"surfaces": ["api", "access"]}, {"cause": ""}], ids=str
+)
+def test_a_start_is_refused_when_the_facts_now_need_a_higher_rung_than_was_approved(
+    world: World, facts: dict[str, Any]
+) -> None:
+    task = world.approve()  # rung 1: a small fix with its cause at a line
+    world.queue.tasks["t-0001"] = dataclasses.replace(task, **facts)  # intake learned more after the approval
+
+    assert refusal(world) == "rung"
+
+
+@pytest.mark.parametrize(
     ("other", "refused"), [(WORKING, True), (WAITING, True), (DEPRIORITIZED, False), (RETIRED, False)]
 )
 def test_caps_count_only_working_and_waiting_sessions(world: World, other: str, refused: bool) -> None:

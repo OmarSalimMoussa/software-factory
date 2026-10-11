@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.queue import approvals, statuses, tasks
+from runtime.queue import route as ladders
 from runtime.queue.formats import FormatError
 from runtime.shared import order, store
 from runtime.shared.models import DEPRIORITIZED, RETIRED, WAITING, WORKING, Session, Task
@@ -192,6 +193,12 @@ def check_start(ctx: Context, sessions: dict[str, Session], role: str, task: Tas
     if not approvals.matches(approval, task):
         raise Refused("approval", f"{task.id} changed since the owner approved it; propose it again")
     rung = approval.rung
+    # The approval names a rung; the facts that made it allowed (slices, surfaces, owner class, cause) may have
+    # changed since, so the ladder runs again on the task as it is now.
+    needed = ladders.route(task, settings)
+    if needed > rung:
+        raise Refused("rung", f"{task.id}'s facts changed since the owner approved rung {rung}: it now needs rung "
+                              f"{needed}; propose it again at that rung")  # fmt: skip
     designed = rung >= 3 and role == IMPL
     if role == DESIGN and rung < 3:
         raise Refused("rung", f"the owner approved rung {rung}, which needs no designer; start an implementer")
