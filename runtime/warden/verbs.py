@@ -45,7 +45,7 @@ VERBS: dict[str, Verb] = {
     "start": _v("runtime.warden.sessions.lifecycle:start", ORCH, OWNER),
     "stop": _v("runtime.warden.sessions.lifecycle:stop", ORCH, OWNER),
     "resume": _v("runtime.warden.sessions.lifecycle:resume", ORCH, OWNER),
-    "extend": _v("runtime.warden.sessions.lifecycle:extend", ORCH, OWNER),
+    "extend": _v("runtime.warden.sessions.limits:extend", ORCH, OWNER),
     "doing": _v("runtime.warden.sessions.lifecycle:set_doing", *SESSIONS),
     # contract: added by the coordinator; the guard's SubagentStart and SubagentStop hooks report a subagent
     "subagent.start": _v("runtime.warden.sessions.subagents:started", *SESSIONS),
@@ -123,8 +123,8 @@ VERBS: dict[str, Verb] = {
         "runtime.warden.sessions.lifecycle:owner_stop"
     ),  # coded for the orchestrator: checked in the handler
     "orchestrator.start": _o("runtime.warden.sessions.lifecycle:owner_start_orchestrator"),
-    "factory.pause": _o("runtime.warden.sessions.lifecycle:owner_pause", coded=True),
-    "factory.resume": _o("runtime.warden.sessions.lifecycle:owner_resume"),
+    "factory.pause": _o("runtime.warden.sessions.revive:owner_pause", coded=True),
+    "factory.resume": _o("runtime.warden.sessions.revive:owner_resume"),
     "outage.stop": _o("runtime.warden.delivery.outage:owner_stop_fix"),
     "settings.save": _o("runtime.warden.owner.settings_save:save", coded=True),
     "repo.change": _o("runtime.warden.owner.settings_save:change_repo", coded=True),

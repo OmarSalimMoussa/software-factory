@@ -21,7 +21,7 @@ from runtime.shared.models import RETIRED, WAITING, WORKING, Session, Task
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.warden.context import Context
-from runtime.warden.sessions import lifecycle, permits, registry
+from runtime.warden.sessions import lifecycle, permits, registry, revive
 from runtime.warden.sessions.launch import LaunchError
 
 log = logging.getLogger(__name__)
@@ -189,5 +189,5 @@ def send_back(ctx: Context, task_id: str, note: str) -> Task:
         store.write_text(lifecycle.held_path(ctx, task_id), told + "\n", mode=0o600)
         awake = impl is not None and impl.state in (WORKING, WAITING)
     if awake and impl is not None:
-        lifecycle.hand_held(ctx, impl.id, task_id, told)
+        revive.hand_held(ctx, impl.id, task_id, told)
     return moved

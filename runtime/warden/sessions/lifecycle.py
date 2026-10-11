@@ -21,17 +21,13 @@ from runtime.slots import leases
 from runtime.warden import inbox
 from runtime.warden.context import Context
 from runtime.warden.delivery import outage
-from runtime.warden.owner import ops
 from runtime.warden.sessions import backstop, doing, launch, permits, registry
 from runtime.warden.sessions.launch import LaunchError
 from runtime.warden.sessions.permits import CAP, DESIGN, FAMILY, IMPL, ORCH, SEVERE, actor
 
 log = logging.getLogger(__name__)
 OWNER, WARDEN = "owner", "warden"
-LIMITS = ("qa", "critic", "check_runs")
 FIRST_LINE = "Start your loop."
-PAUSED = {"message": "The factory is paused; every session keeps its context.", "refresh": "all"}
-REVIVED = "The warden brought you back: carry on with your task from your branch."
 _NAME = re.compile(r"[^a-z0-9]+")
 
 
@@ -62,7 +58,7 @@ def _by(ctx: Context, role: str) -> dict[str, str]:
     return {"family": FAMILY[role], "started_by": actor(ctx)}
 
 
-def _text(args: dict[str, Any], key: str) -> str:
+def text_arg(args: dict[str, Any], key: str) -> str:
     value = args.get(key)
     if not isinstance(value, str) or not value.strip():
         raise Refused("args", f"name the {key}")
@@ -200,7 +196,7 @@ def deliver(ctx: Context, sid: str, message: str, by: str) -> None:
 
 
 def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    role = _text(args, "role")
+    role = text_arg(args, "role")
     if role == ORCH:
         if actor(ctx) != OWNER:
             raise Refused("role", "only the owner starts the orchestrator")
@@ -210,7 +206,7 @@ def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
     note = str(args.get("note", ""))
     if len(note.encode()) > ctx.settings().get_int("queue.max_upload_kib") * 1024:
         raise Refused("args", "the note is too long; put the detail in the task")
-    s = start_run(ctx, role, permits.read_task(ctx, _text(args, "task")), note, args.get("outage") is True)
+    s = start_run(ctx, role, permits.read_task(ctx, text_arg(args, "task")), note, args.get("outage") is True)
     return ok(session=s.id, name=s.name, model=s.model, rung=s.rung)
 
 
@@ -232,15 +228,15 @@ def held_path(ctx: Context, task_id: str) -> Path:
     return ctx.places.state / "briefs" / f"{task_id}.held.md"
 
 
-def _held(ctx: Context, task_id: str) -> str:
+def held_word(ctx: Context, task_id: str) -> str:
     path = held_path(ctx, task_id)
     return path.read_text(encoding="utf-8").strip() if task_id and path.is_file() else ""
 
 
-def _took_held(ctx: Context, task_id: str, sent: str) -> str:
+def took_held(ctx: Context, task_id: str, sent: str) -> str:
     """The held word went out as ``sent``: it is gone, unless a newer one was held meanwhile, which is returned to be
     handed over. The caller holds ctx.lock, as the writer of a held word does."""
-    late = _held(ctx, task_id)
+    late = held_word(ctx, task_id)
     if late != sent:
         return late
     if task_id:
@@ -270,7 +266,7 @@ def start_run(ctx: Context, role: str, task: Task, note: str, outage_fix: bool) 
                   "rung": permit.rung, **_by(ctx, role)}  # fmt: skip
         slot = _claim_at_start(ctx, name, role, task.id)
         took = f"\n\nSlot {slot} is yours: bring it up with factory slot up." if slot is not None else ""
-        held = _held(ctx, task.id)  # read and dropped under the lock its writer holds
+        held = held_word(ctx, task.id)  # read and dropped under the lock its writer holds
         said = "\n\n".join(part for part in (note.strip(), held) if part)
         try:
             s = launch.start_session(ctx, sessions, fields, first_prompt(task, took, said), worktree=name)
@@ -280,7 +276,7 @@ def start_run(ctx: Context, role: str, task: Task, note: str, outage_fix: bool) 
             raise
         if permit.bypass:
             outage.mark_bypass(ctx, task.id, s.id)
-        _took_held(ctx, task.id, held)
+        took_held(ctx, task.id, held)
     if task.status != "building":
         permits.move_task(ctx, task.id, "designing" if role == DESIGN else "building",
                           "outage" if permit.bypass else "start")  # fmt: skip
@@ -321,7 +317,7 @@ def stop(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     why = str(args.get("why", "")).strip() or "stopped by the orchestrator"
     with ctx.lock:
         sessions = read(ctx)
-        target = find(ctx, sessions, _text(args, "session"))
+        target = find(ctx, sessions, text_arg(args, "session"))
         if target.role == ORCH:
             raise Refused("orchestrator", "only the owner stops the orchestrator, which stops the factory")
         if target.state == RETIRED:
@@ -336,7 +332,7 @@ def owner_stop(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[s
     """Retire a session and all under it; the orchestrator takes the whole factory with it, and needs the code."""
     with ctx.lock:
         sessions = read(ctx)
-        target = find(ctx, sessions, _text(args, "session"))
+        target = find(ctx, sessions, text_arg(args, "session"))
         if target.state == RETIRED:
             raise Refused("retired", f"{target.name} is already retired")
         tree = registry.subtree(sessions, target.id)
@@ -356,10 +352,10 @@ def owner_stop(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[s
 
 def resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """Hand a session a message: it reads it when its current turn ends, and one whose process is gone resumes."""
-    message = _text(args, "message")
+    message = text_arg(args, "message")
     with ctx.lock:
         permits.check_daemon(ctx)
-        s = find(ctx, read(ctx), _text(args, "session"))
+        s = find(ctx, read(ctx), text_arg(args, "session"))
         if s.state == RETIRED:
             raise Refused("retired", f"{s.name} is retired, and a retired session can never be resumed")
         if s.state not in (WORKING, WAITING):
@@ -370,44 +366,6 @@ def resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
     except LaunchError as exc:
         raise Refused("resume", f"{s.name} did not get the message: {exc}") from exc
     return ok(name=s.name)
-
-
-def extended_once(s: Session, limit: str) -> bool:
-    """Whether the orchestrator used its one extension of ``limit`` on ``s``."""
-    return bool(s.extensions.get(f"{limit}:orchestrator"))
-
-
-def raise_limit(ctx: Context, sessions: dict[str, Session], s: Session, limit: str, by_orchestrator: bool) -> int:
-    """Add rounds.extend_by to ``s``'s ``limit``; the caller holds ctx.lock and writes the registry. The new extra."""
-    s.extensions[limit] = s.extensions.get(limit, 0) + ctx.settings().get_int("rounds.extend_by")
-    if by_orchestrator:
-        s.extensions[f"{limit}:orchestrator"] = 1
-    return s.extensions[limit]
-
-
-def extend(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """One more allowance of a limit: the orchestrator's once per session and limit, the owner's any time. The
-    orchestrator's second ask puts the task on the owner's decide card."""
-    from runtime.queue import cards  # cards moves sessions through this module
-
-    limit, who = _text(args, "limit"), actor(ctx)
-    if limit not in LIMITS:
-        raise Refused("args", f"extend one of {', '.join(LIMITS)}")
-    with ctx.lock:
-        sessions = read(ctx)
-        s = find(ctx, sessions, _text(args, "session"))
-        if s.state == RETIRED:
-            raise Refused("retired", f"{s.name} is retired")
-        if who != OWNER and extended_once(s, limit):
-            if cards.spent(ctx, s, limit, f"{s.name} used up its {limit} again after one extension"):
-                raise Refused("extend", f"{s.name}'s {limit} was extended once already; the owner decides now, on "
-                                        "the card on Home")  # fmt: skip
-            raise Refused("extend", f"{s.name}'s {limit} was extended once already, and its task is not running")
-        extra = raise_limit(ctx, sessions, s, limit, by_orchestrator=who != OWNER)
-        registry.write(ctx.places, sessions)
-    if who == OWNER:
-        ctx.post_event(inbox.LIMIT_EXTENDED, {"session": s.id, "name": s.name, "limit": limit, "extra": extra})
-    return ok(name=s.name, limit=limit, extra=extra)
 
 
 def set_doing(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
@@ -422,7 +380,7 @@ def set_doing(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
     return ok(doing=doing.describe(ctx.places, ctx.settings(), s))
 
 
-# ---- bench and revive ----------------------------------------------------------------------------------------------
+# ---- bench ---------------------------------------------------------------------------------------------------------
 
 
 def begin_bench(ctx: Context, s: Session, by: str, why: str, benched_for: str) -> None:
@@ -440,136 +398,3 @@ def make_room(ctx: Context, sessions: dict[str, Session], task: Task) -> Session
     begin_bench(ctx, choices[0], WARDEN, f"benched for the outage fix {task.id}", task.id)
     registry.write(ctx.places, sessions)
     return choices[0]
-
-
-def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
-    """Resume a session already marked reviving, claiming a slot for an implementer; why it failed, or nothing.
-
-    ``note`` follows the warden's own words in the message it comes back to: the owner's message, when one brought it.
-    """
-    s = read(ctx)[sid]
-    slot = None
-    try:
-        if s.role == IMPL:
-            slot = permits.claim_slot(ctx, s)
-        rebuild = f" Slot {slot} is yours again: rebuild it with factory slot up." if slot is not None else ""
-        held = _held(ctx, s.task)
-        said = "\n\n".join(part for part in (note, held) if part)
-        launch.resume(ctx, s, REVIVED + rebuild + (f"\n\n{said}" if said else ""))
-    except (LaunchError, Refused) as exc:
-        if slot is not None:
-            permits.free_slot(ctx, slot)
-        with ctx.lock:
-            sessions = read(ctx)
-            move(ctx, sessions[sid], models.DEPRIORITIZED, by, f"revive failed: {exc}")
-            registry.write(ctx.places, sessions)
-        return str(exc)
-    with ctx.lock:
-        sessions = read(ctx)
-        s = sessions[sid]
-        s.resume_tries, s.benched_for = 0, ""
-        move(ctx, s, WORKING, by, "revived")
-        registry.write(ctx.places, sessions)
-        # A word held while it came back (a revert said as it revived) was not in its message: it follows now.
-        late = _took_held(ctx, s.task, held)
-    if late:
-        hand_held(ctx, s.id, s.task, late)
-    if s.task and permits.read_task(ctx, s.task).status == "deprioritized":
-        permits.move_task(ctx, s.task, "designing" if s.role == DESIGN else "building", "revive")
-    return ""
-
-
-def hand_held(ctx: Context, sid: str, task_id: str, word: str) -> None:
-    """Hand a working session a word held for its task's run; one that does not arrive stays held for the run's
-    next start or revive."""
-    try:
-        deliver(ctx, sid, word, WARDEN)
-    # telemetry: surfaced — the word stays held, and the run's next start or revive carries it
-    except (LaunchError, Refused) as exc:
-        log.warning("warden: a word held for %s did not reach session %s (%s)", task_id, sid, type(exc).__name__)
-        return
-    with ctx.lock:
-        _took_held(ctx, task_id, word)
-
-
-def revive_session(ctx: Context, sid: str, by: str) -> str:
-    """Bring a deprioritized session back, as the orchestrator asked or the warden's scheduling pass decided; its
-    name. Raises Refused naming the rule it breaks."""
-    with ctx.lock:
-        sessions = read(ctx)
-        s = sessions[sid]
-        if s.state == RETIRED:
-            raise Refused("retired", f"{s.name} is retired, and a retired session can never be revived")
-        if s.state != models.DEPRIORITIZED:
-            raise Refused("state", f"{s.name} is {s.state}; only a deprioritized session is revived")
-        task = permits.read_task(ctx, s.task) if s.task else None
-        permits.check_vitals(ctx, task is None or task.severity == SEVERE)
-        permits.check_daemon(ctx)
-        if s.role in CAP and task is not None:
-            permits.check_cap(ctx.settings(), sessions.values(), s.role)
-            permits.check_revive_order(ctx, sessions, s.role, task, skip=s.id)
-        move(ctx, s, models.REVIVING, by, "reviving")
-        registry.write(ctx.places, sessions)
-    failed = bring_back(ctx, s.id, by)
-    if failed:
-        raise Refused("revive", f"{s.name} stays deprioritized: {failed}")
-    return s.name
-
-
-# ---- the owner's pause and resume ----------------------------------------------------------------------------------
-
-
-def owner_pause(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Bench every running session, the orchestrator included; nothing is lost, and resume brings them back in order."""
-    with ctx.lock:
-        if paused_path(ctx).exists():
-            raise Refused("paused", "the factory is already paused")
-        sessions = read(ctx)
-        if any(s.state == models.REVIVING for s in sessions.values()):
-            raise Refused("reviving", "a session is coming back right now; pause again in a moment")
-        ranked = permits.in_order(ctx, [s for s in sessions.values() if not s.parent and s.state in (WORKING, WAITING)])
-        for s in ranked:
-            begin_bench(ctx, s, OWNER, "paused with the factory", models.PAUSED)
-        registry.write(ctx.places, sessions)
-        # One step per session; the crash watch completes each as it settles that bench (pause_progress).
-        op_id = ops.start(ctx, "pause", ["Ask every session to commit and stop", *(f"Bench {s.name}" for s in ranked)])
-        for index in range(1, len(ranked) + 1):
-            ops.step(ctx, op_id, index, ops.RUNNING)
-        ops.complete(ctx, op_id, 0, f"{len(ranked)} told", PAUSED)
-        record = {"at": ctx.clock.iso(), "sessions": [s.id for s in ranked], "op": op_id}
-        store.write_json(paused_path(ctx), record, mode=0o600)
-    ctx.post_event(inbox.PAUSED, {"sessions": [s.id for s in ranked]})
-    return ok(op=op_id, benched=[s.name for s in ranked],
-              grace_seconds=ctx.settings().get_int("watch.bench_grace_seconds"))  # fmt: skip
-
-
-def pause_progress(ctx: Context, sid: str, detail: str) -> None:
-    """A session the pause benched has settled: its step is done, and the last one finishes the pause."""
-    record = store.read_json_or(paused_path(ctx), None)
-    if record is None or sid not in record["sessions"]:
-        return
-    ops.complete(ctx, record["op"], 1 + record["sessions"].index(sid), detail, PAUSED)
-
-
-def owner_resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Bring back every session the pause benched, in the order it benched them: the orchestrator first."""
-    with ctx.lock:
-        try:
-            record = store.read_json(paused_path(ctx))
-        except FileNotFoundError as exc:
-            raise Refused("paused", "the factory is not paused") from exc
-        sessions = read(ctx)
-        paused = [sessions[i] for i in record["sessions"] if i in sessions and sessions[i].state != RETIRED]
-        settling = [s.name for s in paused if s.state == models.BENCH_PENDING]
-        if settling:
-            raise Refused("settling", f"the pause is still settling ({', '.join(settling)}); resume in a minute")
-        permits.check_vitals(ctx, severe=True)
-        permits.check_daemon(ctx)
-        back = [s for s in paused if s.state == models.DEPRIORITIZED]
-        for s in back:
-            move(ctx, s, models.REVIVING, OWNER, "resuming with the factory")
-        registry.write(ctx.places, sessions)
-        paused_path(ctx).unlink()
-    failed = {s.name: why for s in back if (why := bring_back(ctx, s.id, OWNER))}
-    ctx.post_event(inbox.RESUMED, {"sessions": [s.id for s in back], "failed": sorted(failed)})
-    return ok(resumed=[s.name for s in back if s.name not in failed], failed=failed)

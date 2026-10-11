@@ -13,7 +13,7 @@ from runtime.queue.propose import propose
 from runtime.shared.models import RETIRED, STOPPED, WAITING, WORKING
 from runtime.shared.protocol import Refused
 from runtime.warden.owner import reflections
-from runtime.warden.sessions import backstop, lifecycle, registry
+from runtime.warden.sessions import backstop, limits, registry
 from runtime.warden.sessions.backstop import Proc
 
 
@@ -82,7 +82,7 @@ def _stuck(world: World, monkeypatch: pytest.MonkeyPatch, status: str = "qa") ->
     world.write_raw(task_rel(task.id), formats.dump_task(dataclasses.replace(task, status=status, run=1)))
     world.session("s-impl", "implementer", "impl-t-0001", task.id)
     monkeypatch.setattr(backstop, "processes", lambda: {"s-impl": Proc(1, "s-impl", "impl-t-0001", "", "idle")})
-    lifecycle.extend(world.ctx(), {"session": "s-impl", "limit": "qa"}, None)
+    limits.extend(world.ctx(), {"session": "s-impl", "limit": "qa"}, None)
     return task.id
 
 
@@ -92,7 +92,7 @@ def test_a_limit_spent_again_after_one_extension_goes_to_the_owners_decide_card(
     task_id = _stuck(world, monkeypatch)
 
     with pytest.raises(Refused, match="the owner decides now"):
-        lifecycle.extend(world.ctx(), {"session": "s-impl", "limit": "qa"}, None)
+        limits.extend(world.ctx(), {"session": "s-impl", "limit": "qa"}, None)
 
     card = next(c for c in cards.read(world.places) if c.kind == "decide")
     assert (card.task, card.limit, world.queue().task(task_id).status) == (task_id, "qa", "decide")
@@ -156,7 +156,7 @@ def test_the_owners_extend_of_a_designers_spent_limit_sends_the_task_back_to_its
     world.session("s-design", "designer", "design-t-0001", task.id)
     procs = {"s-design": Proc(1, "s-design", "design-t-0001", "", "idle")}
     monkeypatch.setattr(backstop, "processes", lambda: procs)
-    lifecycle.extend(world.ctx(), {"session": "s-design", "limit": "critic"}, None)
+    limits.extend(world.ctx(), {"session": "s-design", "limit": "critic"}, None)
     cards.spent(world.ctx(), registry.read(world.places)["s-design"], "critic", "spent again")
     card = next(c for c in cards.read(world.places) if c.kind == "decide")
 

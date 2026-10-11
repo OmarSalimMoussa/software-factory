@@ -15,7 +15,7 @@ from runtime.shared.models import WAITING, WORKING, Card, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
-from runtime.warden.sessions import lifecycle, registry
+from runtime.warden.sessions import lifecycle, limits, registry
 from runtime.warden.sessions.launch import LaunchError
 
 log = logging.getLogger(__name__)
@@ -126,7 +126,7 @@ def to_decide(ctx: Context, task_id: str, why: str, limit: str) -> Card:
 def spent(ctx: Context, s: Session, limit: str, why: str) -> bool:
     """``s`` used up ``limit`` again after the orchestrator's one extension: its running task goes to the owner's
     decide card, once. Whether the task now waits for the owner."""
-    if not s.task or s.parent or not lifecycle.extended_once(s, limit):
+    if not s.task or s.parent or not limits.extended_once(s, limit):
         return False
     with ctx.lock:
         task = Queue.of(ctx).task(s.task)

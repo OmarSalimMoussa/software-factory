@@ -13,7 +13,7 @@ from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
 from runtime.shared import store
 from runtime.shared.models import REVIVING, Task
 from runtime.shared.protocol import Refused
-from runtime.warden.sessions import backstop, launch, lifecycle, permits, registry
+from runtime.warden.sessions import backstop, launch, lifecycle, permits, registry, revive
 
 TASK = Task("t-0001", "T", ["r-2026-10-09-0001"], "G1", "major", ["ui"], "queued", "2026-10-09T12:00:00Z", "")
 
@@ -162,7 +162,7 @@ def test_a_revert_said_while_its_implementer_comes_back_follows_it_once_it_is_ba
 
     monkeypatch.setattr(launch, "resume", resume)
 
-    assert lifecycle.bring_back(world.ctx(), "s-impl", "warden") == ""
+    assert revive.bring_back(world.ctx(), "s-impl", "warden") == ""
 
     assert len(resumed) == 2 and "Your work was taken back off master" in resumed[1]
     assert not lifecycle.held_path(world.ctx(), task.id).exists()

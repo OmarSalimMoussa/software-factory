@@ -14,7 +14,7 @@ from runtime.shared import models
 from runtime.shared.models import DEPRIORITIZED, RETIRED, Session
 from runtime.shared.protocol import Refused, ok
 from runtime.warden.context import Context
-from runtime.warden.sessions import launch, lifecycle, permits, registry
+from runtime.warden.sessions import launch, lifecycle, permits, registry, revive
 from runtime.warden.sessions.launch import LaunchError
 from runtime.warden.sessions.lifecycle import OWNER
 from runtime.warden.sessions.permits import CAP, SEVERE
@@ -76,7 +76,7 @@ def _bring_back(ctx: Context, s: Session, message: str) -> None:
             permits.check_cap(ctx.settings(), sessions.values(), s.role)
         lifecycle.move(ctx, s, models.REVIVING, OWNER, "coming back with the owner's message")
         registry.write(ctx.places, sessions)
-    failed = lifecycle.bring_back(ctx, s.id, OWNER, note=message)
+    failed = revive.bring_back(ctx, s.id, OWNER, note=message)
     if failed:
         raise Refused("revive", f"it stays on the bench: {failed}")
 

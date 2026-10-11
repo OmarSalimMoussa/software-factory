@@ -38,7 +38,7 @@ from runtime.warden import imports, inbox, loop
 from runtime.warden.context import Context
 from runtime.warden.health import vitals
 from runtime.warden.owner import reflections
-from runtime.warden.sessions import backstop, launch, lifecycle, permits, registry
+from runtime.warden.sessions import backstop, launch, lifecycle, permits, registry, revive
 from runtime.warden.sessions.backstop import Proc
 from runtime.warden.sessions.launch import LaunchError
 from runtime.warden.sessions.permits import DESIGN, IMPL, ORCH
@@ -104,14 +104,14 @@ def _settle(ctx: Context, s: Session, procs: dict[str, Proc]) -> None:
         sessions = lifecycle.read(ctx)
         current = sessions.get(s.id)
         if current is None or current.state != BENCH_PENDING:
-            lifecycle.pause_progress(ctx, s.id, "already off the bench's list")
+            revive.pause_progress(ctx, s.id, "already off the bench's list")
             return
         lifecycle.move(ctx, current, DEPRIORITIZED, WARDEN, current.note)
         lifecycle.end_children(ctx, sessions, current, "ended with its benched parent")  # its revive starts them
         registry.write(ctx.places, sessions)
     if s.task and permits.read_task(ctx, s.task).status in ("building", "designing"):
         permits.move_task(ctx, s.task, "deprioritized", "bench")
-    lifecycle.pause_progress(ctx, s.id, "on the bench")
+    revive.pause_progress(ctx, s.id, "on the bench")
     ctx.post_event(inbox.BENCHED, {"session": s.id, "name": s.name, "task": s.task})
 
 

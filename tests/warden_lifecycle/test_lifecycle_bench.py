@@ -11,7 +11,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import schedule
 from runtime.warden.owner import ops
-from runtime.warden.sessions import crashwatch, lifecycle
+from runtime.warden.sessions import crashwatch, lifecycle, revive
 
 
 def rule(call: Any, *args: Any) -> str:
@@ -36,7 +36,7 @@ def test_only_the_owner_retires_a_session_that_is_out_of_its_place(world: World,
 def test_a_retired_session_is_never_revived_or_resumed(world: World, ref: str) -> None:
     world.seat("5e550001", task="t-0001", state=RETIRED, retired=STOPPED)
     assert rule(lifecycle.resume, world.ctx(), {"session": ref, "message": "carry on"}, None) == "retired"
-    assert rule(lifecycle.revive_session, world.ctx(), "5e550001", "warden") == "retired"
+    assert rule(revive.revive_session, world.ctx(), "5e550001", "warden") == "retired"
     assert world.launcher.resumed == []
 
 
@@ -93,7 +93,7 @@ def test_a_benched_session_settles_after_its_grace_and_revives_with_its_id(world
     assert world.launcher.stopped == ["5e550001"] and world.launcher.stacks == [(2, ["empty"]), (2, [leases.SWEEP])]
     assert world.queue.tasks["t-0001"].status == "deprioritized"
     store.write_text(lifecycle.held_path(world.ctx(), "t-0001"), "Your work was taken back off master.\n")
-    lifecycle.revive_session(world.ctx(), "5e550001", "warden")
+    revive.revive_session(world.ctx(), "5e550001", "warden")
     resumed = next(argv for argv in world.launcher.commands if argv[:2] == ["claude", "--resume"])
     assert any("Your work was taken back off master." in word for word in resumed)  # a word held for its run
     assert not lifecycle.held_path(world.ctx(), "t-0001").exists()
@@ -112,15 +112,15 @@ def test_pause_benches_every_session_and_resume_brings_them_back_in_order(world:
     world.seat("1a1a1a1a", task="t-0001", state=WAITING)
     for sid in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a"):
         world.run(sid)
-    op_id = lifecycle.owner_pause(world.owner(), {}, None)["op"]
+    op_id = revive.owner_pause(world.owner(), {}, None)["op"]
     assert {world.session(s).state for s in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {BENCH_PENDING}
     assert ops.get(world.owner(), {"id": op_id}, None)["op"]["state"] == ops.RUNNING
-    assert rule(lifecycle.owner_resume, world.owner(), {}, None) == "settling"
+    assert rule(revive.owner_resume, world.owner(), {}, None) == "settling"
     world.later(world.settings.get_int("watch.bench_grace_seconds"))
     crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
     assert {world.session(s).state for s in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {DEPRIORITIZED}
     assert ops.get(world.owner(), {"id": op_id}, None)["op"]["state"] == ops.DONE
-    lifecycle.owner_resume(world.owner(), {}, None)
+    revive.owner_resume(world.owner(), {}, None)
     assert world.launcher.resumed == ["0c0c0c0c", "1a1a1a1a", "2b2b2b2b"]
     assert {world.session(s).state for s in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {WORKING}
     assert [kind for kind, _ in world.events] == ["paused", "benched", "benched", "benched", "resumed"]

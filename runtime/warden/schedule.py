@@ -19,7 +19,7 @@ from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVIN
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
-from runtime.warden.sessions import lifecycle, permits, registry
+from runtime.warden.sessions import lifecycle, permits, registry, revive
 from runtime.warden.sessions.permits import DESIGN, IMPL
 
 log = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ def _role(ctx: Context, role: str, waiting: dict[str, str]) -> None:
             permits.check_vitals(ctx, task.severity == permits.SEVERE)
             permits.check_cap(ctx.settings(), sessions.values(), role)
             if benched is not None:
-                lifecycle.revive_session(ctx, benched.id, WARDEN)
+                revive.revive_session(ctx, benched.id, WARDEN)
             else:
                 lifecycle.start_run(ctx, role, task, "", outage_fix=False)
         # telemetry: surfaced — why it waits is kept for `factory status` and the dashboard

@@ -17,7 +17,7 @@ from runtime.shared.models import RETIRED, STOPPED, Task
 from runtime.shared.protocol import Refused
 from runtime.warden import inbox
 from runtime.warden.context import Context
-from runtime.warden.sessions import lifecycle, permits, registry
+from runtime.warden.sessions import lifecycle, limits, permits, registry
 from runtime.warden.sessions.launch import LaunchError
 
 log = logging.getLogger(__name__)
@@ -181,7 +181,7 @@ def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
         fields: dict[str, Any] = {"run": 3} if choice == "designer" else {}
         tasks.transition(ctx, queue, task, to, event, OWNER, f"{kind} by you", **fields)
         if choice == "extend" and live is not None:
-            extra = lifecycle.raise_limit(ctx, sessions, live, card.limit, by_orchestrator=False)
+            extra = limits.raise_limit(ctx, sessions, live, card.limit, by_orchestrator=False)
             registry.write(ctx.places, sessions)
         cards.settle(ctx, found, card, kind)
     if live is not None and choice == "extend":
