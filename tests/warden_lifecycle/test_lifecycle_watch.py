@@ -116,7 +116,11 @@ def test_a_restarted_orchestrator_is_told_the_events_it_has_not_acted_on(world: 
 def test_while_sessions_run_unseen_the_crash_watch_resumes_and_retires_none(world: World) -> None:
     world.queue.add("t-0001", status="building")
     world.seat("5e550001", task="t-0001")
-    blind = {"at": NOW, "level": "red", "readings": [{"name": "sessions", "level": "red", "value": "1 unseen"}]}
+    blind = {
+        "at": NOW,
+        "level": "red",
+        "readings": [{"name": "sessions", "level": "red", "value": "1 unseen", "figure": None}],
+    }
     store.write_json(world.ctx().places.vitals, blind)
 
     for _ in range(world.settings.get_int("watch.resume_tries") + 2):

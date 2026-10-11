@@ -43,7 +43,6 @@ _TYPES = {
     ".ico": "image/x-icon",
 }
 _STATIC = re.compile(r"^/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+$")
-_TRIES = re.compile(r"(\d+) tr(?:y|ies) left")
 
 
 @dataclass
@@ -249,8 +248,9 @@ class App:
     def _refused(self, answer: dict[str, Any]) -> Reply:
         rule, reason = str(answer.get("refused", "")), str(answer.get("reason", ""))
         out: dict[str, Any] = {"ok": False, "refused": rule, "reason": sentence(reason)}
-        if rule == "code" and (tries := _TRIES.search(reason)):
-            out["code"] = {"tries_left": int(tries.group(1))}
+        detail = answer.get("detail") or {}
+        if rule == "code" and isinstance(detail.get("tries_left"), int):
+            out["code"] = {"tries_left": detail["tries_left"]}
         elif rule == "code-locked":
             until = self.warden.call("snapshot", {"want": ["factory"]})["state"]["factory"]["locked_until"]
             if until is not None:

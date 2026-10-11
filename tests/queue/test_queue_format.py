@@ -123,3 +123,13 @@ def test_the_sweep_reads_nothing_while_the_queue_is_unchanged_and_a_rewrite_is_r
     world.queue().files.write("tasks/t-0042.md", b"still not a task")
     assert world.queue().blobs()["tasks/t-0042.md"] == b"still not a task"
     assert reads == ["tasks/t-0042.md"]
+
+
+@pytest.mark.parametrize(
+    ("text", "kind", "task", "reason"),
+    [("task t-0001", "task", "t-0001", ""), ("joined t-0042", "joined", "t-0042", ""),
+     ("parked waits on the billing rework", "parked", "", "waits on the billing rework"),
+     ("noise a test message", "noise", "", "a test message"), ("", "waiting", "", "")],
+)  # fmt: skip
+def test_an_outcome_is_read_one_way_into_its_kind_task_and_reason(text: str, kind: str, task: str, reason: str) -> None:
+    assert formats.outcome(text) == formats.Outcome(kind, task, reason)

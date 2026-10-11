@@ -97,7 +97,7 @@ def _make_room(ctx: Context, sessions: dict[str, Session], role: str, task: Task
     with ctx.lock:
         sessions = lifecycle.read(ctx)
         victim = sessions[choices[0].id]
-        lifecycle.begin_bench(ctx, victim, WARDEN, f"benched for {task.id}")
+        lifecycle.begin_bench(ctx, victim, WARDEN, f"benched for {task.id}", task.id)
         registry.write(ctx.places, sessions)
     log.info("warden: benched %s to make room for %s", victim.name, task.id)
     return True

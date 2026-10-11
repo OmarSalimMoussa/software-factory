@@ -122,7 +122,7 @@ class Dispatcher:
                 caller = subagents.acting_as(self.doors.places, caller, agent_id)
             verb = self._allowed(caller, socket, name)
         except Refused as exc:
-            return protocol.refused(exc.rule, exc.reason)
+            return protocol.refused(exc.rule, exc.reason, exc.detail)
         # telemetry: surfaced — the caller's answer says its upload was not base64
         except ValueError:
             return protocol.refused("protocol", "the request's bytes_b64 is not base64")
@@ -134,7 +134,7 @@ class Dispatcher:
         try:
             stored = self.idempotency.claim(key, name)
         except Refused as exc:
-            return protocol.refused(exc.rule, exc.reason)
+            return protocol.refused(exc.rule, exc.reason, exc.detail)
         if stored is not None:
             return stored
         reply, ran = protocol.refused("failed", "the warden stopped this action"), False
@@ -168,7 +168,7 @@ class Dispatcher:
                 codes.check_code(ctx, args.get("code"), lock_exempt=name in LOCK_EXEMPT)
             result = self.handlers[name](ctx, args, data)
         except Refused as exc:
-            return protocol.refused(exc.rule, exc.reason), False
+            return protocol.refused(exc.rule, exc.reason, exc.detail), False
         except Exception as exc:
             log.exception("warden: %s failed for %s %s (%s)", name, caller.kind, caller.session, type(exc).__name__)
             return protocol.refused(

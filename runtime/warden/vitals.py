@@ -35,7 +35,10 @@ _GIB_KB = 1024 * 1024
 class Reading:
     name: str
     level: str
-    value: str
+    value: str  # in words, for factory status
+    # The reading's number, for the dashboard: free memory in GiB, CPU pressure and battery charge in percent; None
+    # for a reading without one, one not read, and the power of a machine on mains.
+    figure: float | None = None
 
 
 def worst(readings: list[Reading]) -> str:
@@ -50,10 +53,10 @@ def memory(meminfo: str, settings: Settings) -> Reading:
     free = int(found.group(1)) / _GIB_KB
     value = f"{free:.1f} GiB free"
     if free < settings.get_float("vitals.memory_red_gib"):
-        return Reading("memory", RED, value)
+        return Reading("memory", RED, value, free)
     if free < settings.get_float("vitals.memory_amber_gib"):
-        return Reading("memory", AMBER, value)
-    return Reading("memory", GREEN, value)
+        return Reading("memory", AMBER, value, free)
+    return Reading("memory", GREEN, value, free)
 
 
 def cpu(pressure: str | None, settings: Settings) -> Reading:
@@ -64,7 +67,7 @@ def cpu(pressure: str | None, settings: Settings) -> Reading:
     if "some" not in psi:
         return Reading("cpu", UNKNOWN, "cannot read the CPU pressure")
     level = AMBER if psi["some"] > settings.get_float("vitals.cpu_pressure_amber") else GREEN
-    return Reading("cpu", level, f"pressure {psi['some']:.0f}% over a minute")
+    return Reading("cpu", level, f"pressure {psi['some']:.0f}% over a minute", psi["some"])
 
 
 def power(supplies: Path, settings: Settings) -> Reading:
@@ -91,7 +94,7 @@ def power(supplies: Path, settings: Settings) -> Reading:
     if battery is None:
         return Reading("power", AMBER, "on battery")
     level = RED if battery < settings.get_int("vitals.battery_red") else AMBER
-    return Reading("power", level, f"on battery, {battery}%")
+    return Reading("power", level, f"on battery, {battery}%", float(battery))
 
 
 def _files(root: Path) -> list[Path]:

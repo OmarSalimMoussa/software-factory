@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from runtime.dashboard.views import agentwords
@@ -12,7 +11,6 @@ from runtime.shared.models import RETIRED
 
 WANTS = ("settings", "vitals", "slots", "sessions", "queue", "refusals", "rules", "docker")
 _TONES = {"green": "good", "amber": "warn", "red": "bad", "unknown": "", "missing": ""}
-_PERCENT = re.compile(r"(\d+(?:\.\d+)?)%")
 _GIB = 1024**3
 
 
@@ -31,12 +29,13 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
         }
     )
     cpu = found.get("cpu")
-    pct = _PERCENT.search(cpu["value"]) if cpu and cpu["level"] != "unknown" else None
+    pct = cpu["figure"] if cpu else None
+    missing = cpu is not None and cpu["level"] == "missing"
     out.append(
         {
             "label": "CPU pressure",
-            "value": f"{pct.group(1)}%" if pct else "not reported" if cpu and cpu["level"] == "missing" else "unknown",
-            "pct": round(float(pct.group(1))) if pct else None,
+            "value": f"{pct:.0f}%" if pct is not None else "not reported" if missing else "unknown",
+            "pct": round(pct) if pct is not None else None,
             "tone": _TONES[cpu["level"] if cpu else "unknown"],
         }
     )
@@ -44,13 +43,13 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
     if power is None or power["level"] == "unknown":
         out.append({"label": "Power", "value": "unknown", "pct": None, "tone": ""})
     else:
-        battery = _PERCENT.search(power["value"])
+        battery = power["figure"]
         mains = power["level"] == "green"
         out.append(
             {
                 "label": "Power",
-                "value": "On mains" if mains else f"Battery {battery.group(1)}%" if battery else "On battery",
-                "pct": 100 if mains else round(float(battery.group(1))) if battery else None,
+                "value": "On mains" if mains else f"Battery {battery:.0f}%" if battery is not None else "On battery",
+                "pct": 100 if mains else round(battery) if battery is not None else None,
                 "tone": _TONES[power["level"]],
             }
         )

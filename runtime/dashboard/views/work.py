@@ -20,7 +20,7 @@ from runtime.dashboard.views.kit import (
     when,
 )
 from runtime.dashboard.views.shell import prod_runs_staging
-from runtime.queue.formats import outcome_task
+from runtime.queue.formats import outcome
 from runtime.shared import order
 
 WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "factory", "probes", "goal")
@@ -120,14 +120,10 @@ def _boost(task: dict[str, Any], snap: Snap) -> str | None:
 
 def _outcome(request: dict[str, Any]) -> tuple[str, dict[str, str]]:
     """The outcome filter's key, and the pill the row shows."""
-    outcome = request["outcome"]
-    task = outcome_task(outcome)
-    if task:
-        return "task", {"text": task, "tone": "accent"}
-    if not outcome:
-        return "waiting", {"text": "waiting", "tone": ""}
-    kind = outcome.split(" ", 1)[0]
-    return kind, {"text": kind, "tone": ""}
+    found = outcome(request["outcome"])
+    if found.task:
+        return "task", {"text": found.task, "tone": "accent"}
+    return found.kind, {"text": found.kind, "tone": ""}
 
 
 def requests(snap: Snap, query: Query) -> dict[str, Any]:
@@ -185,14 +181,14 @@ def parked(snap: Snap) -> dict[str, Any]:
                 )
             )
     for r in queue["requests"]:
-        if r["outcome"].startswith("parked "):
+        if outcome(r["outcome"]).kind == "parked":
             rows.append(
                 (
                     r["at"],
                     {
                         "id": r["id"],
                         "title": first_line(r["body"]),
-                        "why": r["outcome"][7:],
+                        "why": outcome(r["outcome"]).reason,
                         "requests": 1,
                         "date": when(epoch(r["at"]))[:-7],
                     },

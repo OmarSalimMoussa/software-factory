@@ -10,6 +10,7 @@ Cross-file rules (a task's requests point back at it) live in format_check.py.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from runtime.queue import goal
@@ -217,10 +218,23 @@ def dump_request(req: Request) -> str:
     return render(REQUEST_KEYS, values, req.body)
 
 
-def outcome_task(outcome: str) -> str:
-    """The task a request's outcome names, or "" for noise, parked or none yet."""
-    match = OUTCOME.match(outcome)
-    return match.group(2) if match and match.group(2) else ""
+@dataclass(frozen=True, slots=True)
+class Outcome:
+    """A request's outcome as values: what triage made of it, the task it became or joined, and why."""
+
+    kind: str  # task, joined, noise or parked; "waiting" while triage has not reached it
+    task: str  # "" for noise, parked or waiting
+    reason: str  # "" but for noise and parked
+
+
+def outcome(text: str) -> Outcome:
+    """The one reading of an outcome line ('task t-N', 'joined t-N', 'noise <why>', 'parked <why>', or empty)."""
+    match = OUTCOME.match(text)
+    if not text or match is None:
+        return Outcome("waiting", "", "")
+    if match.group(1):
+        return Outcome(match.group(1), match.group(2), "")
+    return Outcome(match.group(3), "", match.group(4))
 
 
 def parse_task(text: str, rel: str = "") -> Task:

@@ -77,11 +77,11 @@ def check(blobs: Mapping[str, bytes]) -> dict[str, list[str]]:
         for rid in task.requests:
             if rid not in requests:
                 problems[rel].append(f"request {rid} does not exist")
-            elif formats.outcome_task(requests[rid][1].outcome) != task_id:
+            elif formats.outcome(requests[rid][1].outcome).task != task_id:
                 problems[rel].append(f"request {rid}'s outcome does not name {task_id}")
         problems[rel] += [f"after {a} does not exist" for a in task.after if a not in tasks]
     for rid, (rel, req) in requests.items():
-        named = formats.outcome_task(req.outcome)
+        named = formats.outcome(req.outcome).task
         if named and (named not in tasks or rid not in tasks[named][1].requests):
             problems[rel].append(f"its outcome names {named}, which does not link it")
     for rel, spec in specs:

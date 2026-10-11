@@ -20,7 +20,7 @@ from runtime.dashboard.views.kit import (
     plural,
     when,
 )
-from runtime.queue.formats import outcome_task
+from runtime.queue.formats import outcome
 
 WANTS = (*docs.WANTS, "specs")
 _KIND_LABELS = {
@@ -75,7 +75,7 @@ def reader(snap: Snap, ref: str) -> dict[str, Any]:
         if raw["cause"]:
             text += f"\n\nCause: `{raw['cause']}`."
     elif doc.kind == "request":
-        task = outcome_task(raw["outcome"])
+        task = outcome(raw["outcome"]).task
         fm = [
             _fm("Id", _value(raw["id"])),
             _fm("Inbox", _value(raw["inbox"], INBOX_TONES[raw["inbox"]])),

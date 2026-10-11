@@ -8,7 +8,7 @@ from typing import Any
 
 from runtime.dashboard.views import taskwords
 from runtime.dashboard.views.kit import INBOX_TONES, KIND_LOOK, REFLECT_TONES, Snap, epoch, first_line
-from runtime.queue.formats import outcome_task
+from runtime.queue.formats import outcome
 
 WANTS = ("settings", "queue", "goal", "reflections", "proposals", "sessions", "outage")
 STATUS_TONES = {
@@ -64,10 +64,9 @@ def reflection_id(n: int) -> str:
     return f"sr{n}"
 
 
-def request_status(outcome: str) -> str:
-    if outcome_task(outcome):
-        return "task"
-    return outcome.split(" ", 1)[0] if outcome else "waiting"
+def request_status(text: str) -> str:
+    found = outcome(text)
+    return "task" if found.task else found.kind
 
 
 def index(snap: Snap) -> list[Doc]:

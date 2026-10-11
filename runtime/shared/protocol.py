@@ -15,10 +15,11 @@ MAX_LINE = 16 * 1024 * 1024
 
 
 class Refused(Exception):
-    """The warden refuses a request; ``rule`` names why, ``reason`` says what to do."""
+    """The warden refuses a request; ``rule`` names why, ``reason`` says what to do, and ``detail`` holds what a
+    caller acts on as values (a wrong code's tries left), so no caller reads them out of the words."""
 
-    def __init__(self, rule: str, reason: str) -> None:
-        self.rule, self.reason = rule, reason
+    def __init__(self, rule: str, reason: str, **detail: Any) -> None:
+        self.rule, self.reason, self.detail = rule, reason, detail
         super().__init__(f"{rule}: {reason}")
 
 
@@ -53,8 +54,8 @@ def ok(**fields: Any) -> dict[str, Any]:
     return {"ok": True, **fields}
 
 
-def refused(rule: str, reason: str) -> dict[str, Any]:
-    return {"ok": False, "refused": rule, "reason": reason}
+def refused(rule: str, reason: str, detail: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {"ok": False, "refused": rule, "reason": reason, **({"detail": detail} if detail else {})}
 
 
 def answer(reply: dict[str, Any]) -> bytes:

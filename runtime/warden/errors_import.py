@@ -13,7 +13,6 @@ runtime/warden/imports.py keeps.
 from __future__ import annotations
 
 import logging
-import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -33,7 +32,6 @@ SENDER = "glitchtip"
 ENVS = (telemetry.PROD, telemetry.STAGING)
 # The status a task reaches when its fix runs in the environment: an issue seen after that came back.
 REACHED = {telemetry.PROD: "promoted", telemetry.STAGING: "on-staging"}
-_TASK = re.compile(r"^(?:task|joined) (t-\d+)$")
 _FRESH: dict[str, Any] = {"filed": {}, **imports.fresh()}
 
 
@@ -98,10 +96,10 @@ def _time(text: str | None) -> float | None:
 
 def _came_back(queue: Queue, env: str, record: dict[str, str], issue: Issue) -> bool:
     """Whether GlitchTip saw the issue after the task its request became reached ``env``."""
-    found = _TASK.match(queue.request(record["request"]).outcome)
-    if found is None:
+    task = formats.outcome(queue.request(record["request"]).outcome).task
+    if not task:
         return False
-    reached = [e["at"] for e in queue.read_log(found.group(1)) if e.get("to") == REACHED[env]]
+    reached = [e["at"] for e in queue.read_log(task) if e.get("to") == REACHED[env]]
     seen = _time(issue.last_seen)
     return bool(reached) and seen is not None and seen > formats.epoch(reached[-1])
 

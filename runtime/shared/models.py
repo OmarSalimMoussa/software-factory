@@ -78,6 +78,7 @@ class Session:
     ended: str = ""
     resume_tries: int = 0  # resumes after crashes within the crash window
     crashed_at: str = ""  # when the crash watch last resumed it
+    benched_for: str = ""  # the task a bench made room for, or PAUSED when the owner paused the factory
     merge_turn: bool = False
     rung: int | None = None
     chat_link: str = ""
@@ -85,6 +86,9 @@ class Session:
     # contract: when the session entered its state; the bench grace and a pending start's grace count from it.
     since: str = ""
     extensions: dict[str, int] = field(default_factory=dict)
+
+
+PAUSED = "paused"  # a session's benched_for while the owner's pause holds it
 
 
 @dataclass(slots=True)

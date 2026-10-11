@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import html
-import re
 from typing import Any
 
 from runtime.dashboard.views import agentwords, messaging, proposals, taskwords
@@ -41,8 +40,6 @@ _STAGES = (
     ("qa", "in QA", "--f-qa", ("qa", "qa-clean")),
     ("needs", "need you", "--warn", ("review", "decide")),
 )
-_PERCENT = re.compile(r"(\d+(?:\.\d+)?)%")
-_GIB = re.compile(r"^(\d+(?:\.\d+)?) GiB free$")
 
 
 def env_card(snap: Snap, env: str) -> dict[str, Any]:
@@ -85,28 +82,20 @@ def laptop(snap: Snap) -> dict[str, Any]:
     readings = {r["name"]: r for r in vitals["readings"]}
     state, label = _LAPTOP[vitals["level"]]
     cpu, power = readings["cpu"], readings["power"]
-    cpu_pct = _PERCENT.search(cpu["value"]) if cpu["level"] != "unknown" else None
-    power_pct = _PERCENT.search(power["value"])
+    cpu_pct, power_pct = cpu["figure"], power["figure"]
     mains = power["level"] == "green"
     used = memory_used(snap)
+    cpu_words = f"{cpu_pct:.0f}%" if cpu_pct is not None else "not reported" if cpu["level"] == "missing" else "unknown"
     return {
         "state": state,
         "label": label,
         "rows": [
             {"label": "Memory", "pct": used, "value": "unknown" if used is None else f"{used}%"},
-            {
-                "label": "CPU",
-                "pct": round(float(cpu_pct.group(1))) if cpu_pct else None,
-                "value": f"{cpu_pct.group(1)}%"
-                if cpu_pct
-                else "not reported"
-                if cpu["level"] == "missing"
-                else "unknown",
-            },
+            {"label": "CPU", "pct": round(cpu_pct) if cpu_pct is not None else None, "value": cpu_words},
             {
                 "label": "Power",
-                "pct": 100 if mains else (round(float(power_pct.group(1))) if power_pct else None),
-                "value": "Mains" if mains else (f"{power_pct.group(1)}%" if power_pct else power["value"]),
+                "pct": 100 if mains else (round(power_pct) if power_pct is not None else None),
+                "value": "Mains" if mains else (f"{power_pct:.0f}%" if power_pct is not None else power["value"]),
             },
         ],
     }
@@ -116,10 +105,9 @@ def memory_free(snap: Snap) -> tuple[float, int] | None:
     """Free memory in GiB and as a share of all memory, from the warden's last reading."""
     vitals = snap.get("vitals")
     reading = next((r for r in (vitals["reading"] or {}).get("readings", []) if r["name"] == "memory"), None)
-    found = _GIB.match(reading["value"]) if reading and reading["level"] != "unknown" else None
-    if found is None or not vitals["memory"]:
+    free = reading["figure"] if reading else None
+    if free is None or not vitals["memory"]:
         return None
-    free = float(found.group(1))
     return free, round(free * 1024 * 1024 / vitals["memory"] * 100)
 
 

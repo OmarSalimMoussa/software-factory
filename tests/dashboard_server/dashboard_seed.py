@@ -322,6 +322,7 @@ def _sessions(now: float) -> list[Session]:
                 retired="finished" if state == "retired" else "",
                 ended=iso(now - 60) if state == "retired" else "",
                 note="benched for t-0021" if state == "deprioritized" else "",
+                benched_for="t-0021" if state == "deprioritized" else "",
                 rung=rung,
                 chat_link="https://claude.ai/code/session_0000example" if role == "orchestrator" else "",
                 agent_id=f"agent-{node['id']}" if parent and role not in ("implementer", "designer") else "",
@@ -549,17 +550,15 @@ def seed(root: Path, now: float = T0) -> Places:
         },
     )
     readings = [
-        ("memory", "green", "11.8 GiB free"),
-        ("cpu", "green", "pressure 34% over a minute"),
-        ("power", "green", "on mains power"),
-        ("install", "green", "install 0123456789ab"),
-        ("hooks", "green", "the checkout runs the factory's hooks"),
-        ("daemon", "green", "inside the slice"),
+        ("memory", "green", "11.8 GiB free", 11.8),
+        ("cpu", "green", "pressure 34% over a minute", 34.0),
+        ("power", "green", "on mains power", None),
+        ("install", "green", "install 0123456789ab", None),
+        ("hooks", "green", "the checkout runs the factory's hooks", None),
+        ("daemon", "green", "inside the slice", None),
     ]
-    store.write_json(
-        places.vitals,
-        {"at": iso(now), "level": "green", "readings": [{"name": n, "level": lv, "value": v} for n, lv, v in readings]},
-    )
+    rows = [{"name": n, "level": lv, "value": v, "figure": f} for n, lv, v, f in readings]
+    store.write_json(places.vitals, {"at": iso(now), "level": "green", "readings": rows})
     store.write_json(
         places.state / "docker-disk.json", {"at": iso(now), "bytes": 38 * 1024**3, "budget_bytes": 60 * 1024**3}
     )

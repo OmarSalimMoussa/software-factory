@@ -184,7 +184,7 @@ def serve(places: Places, peers: Peers, dispatcher: Dispatcher, threads: int) ->
             try:
                 caller = identify(places, peers, socket_kind, pid, uid)
             except Refused as exc:
-                return protocol.refused(exc.rule, exc.reason)
+                return protocol.refused(exc.rule, exc.reason, exc.detail)
             return dispatcher.answer(caller, socket_kind, line)
 
         return answer

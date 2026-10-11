@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from runtime.dashboard.views.kit import INITIALS, Snap, cost_of, model_label
-from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING
+from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, PAUSED, RETIRED, REVIVING, WAITING, WORKING
 
-_TASK = re.compile(r"\bt-\d{4,}\b")
 _ROLE_WORDS = {"orchestrator": "orchestrator", "designer": "designer", "intake": "intake", "triage": "triage"}
 # Marker and state word for each live state; a retired agent shows how it ended.
 _LIVE = {
@@ -67,10 +65,9 @@ def by_id(snap: Snap) -> dict[str, dict[str, Any]]:
 def doing(snap: Snap, row: dict[str, Any]) -> str:
     state = row["state"]
     if state == DEPRIORITIZED:
-        if row["note"] == "paused with the factory":
+        if row["benched_for"] == PAUSED:
             return "Paused with the factory · comes back when you resume"
-        found = _TASK.search(row["note"])
-        task = next((t for t in snap.get("queue")["tasks"] if found and t["id"] == found.group(0)), None)
+        task = next((t for t in snap.get("queue")["tasks"] if t["id"] == row["benched_for"]), None)
         return f"Pushed out for “{task['title']}” · comes back first" if task else "Pushed out · comes back first"
     if state == BENCH_PENDING:
         return "Moving to the bench, committing its work"

@@ -88,7 +88,7 @@ def check_code(ctx: Context, code: object, *, lock_exempt: bool = False) -> None
             state["wrong"] = wrong
             store.write_json(ctx.places.code_lock, state, mode=0o600)
             left = limit - len(wrong)
-            raise Refused("code", f"wrong code, {left} {'try' if left == 1 else 'tries'} left")
+            raise Refused("code", f"wrong code, {left} {'try' if left == 1 else 'tries'} left", tries_left=left)
         state.update(last_step=step, wrong=[])
         store.write_json(ctx.places.code_lock, state, mode=0o600)
 

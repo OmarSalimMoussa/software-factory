@@ -380,9 +380,11 @@ def set_doing(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
 # ---- bench and revive ----------------------------------------------------------------------------------------------
 
 
-def begin_bench(ctx: Context, s: Session, by: str, why: str) -> None:
+def begin_bench(ctx: Context, s: Session, by: str, why: str, benched_for: str) -> None:
     """The guard reads bench-pending and lets the session only commit and run factory until the grace ends; the
-    crash watch then stops it (crashwatch.finish_benches)."""
+    crash watch then stops it (crashwatch.finish_benches). ``benched_for`` is the task it makes room for, or
+    models.PAUSED."""
+    s.benched_for = benched_for
     move(ctx, s, models.BENCH_PENDING, by, why)
 
 
@@ -390,7 +392,7 @@ def make_room(ctx: Context, sessions: dict[str, Session], task: Task) -> Session
     choices = permits.benchable(ctx, sessions, IMPL, task.id)
     if not choices:
         raise Refused("cap", "no implementer can make room for the outage fix: each outranks it or holds a merge turn")
-    begin_bench(ctx, choices[0], WARDEN, f"benched for the outage fix {task.id}")
+    begin_bench(ctx, choices[0], WARDEN, f"benched for the outage fix {task.id}", task.id)
     registry.write(ctx.places, sessions)
     return choices[0]
 
@@ -418,7 +420,7 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
     with ctx.lock:
         sessions = read(ctx)
         s = sessions[sid]
-        s.resume_tries = 0
+        s.resume_tries, s.benched_for = 0, ""
         move(ctx, s, WORKING, by, "revived")
         registry.write(ctx.places, sessions)
     if s.task and permits.read_task(ctx, s.task).status == "deprioritized":
@@ -463,7 +465,7 @@ def owner_pause(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
             raise Refused("reviving", "a session is coming back right now; pause again in a moment")
         ranked = permits.in_order(ctx, [s for s in sessions.values() if not s.parent and s.state in (WORKING, WAITING)])
         for s in ranked:
-            begin_bench(ctx, s, OWNER, "paused with the factory")
+            begin_bench(ctx, s, OWNER, "paused with the factory", models.PAUSED)
         registry.write(ctx.places, sessions)
         # One step per session; the crash watch completes each as it settles that bench (pause_progress).
         op_id = ops.start(ctx, "pause", ["Ask every session to commit and stop", *(f"Bench {s.name}" for s in ranked)])
