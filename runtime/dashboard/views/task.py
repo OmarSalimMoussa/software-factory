@@ -53,9 +53,8 @@ def _shots(files: list[str], tester: str) -> list[str]:
 
 def testers(snap: Snap, task: dict[str, Any]) -> dict[str, Any]:
     settings = snap.settings
-    n = taskwords.rung(task, settings)
-    needed = taskwords.required_testers(task, n)
-    _, names, results, files = _latest_round(snap, task["id"])
+    # The testers a round needs are the warden's, from the task and its diff, recorded when QA was readied.
+    head, names, results, files = _latest_round(snap, task["id"])
     worker = taskwords.worker(snap, task["id"])
     live = {
         s["role"]
@@ -83,8 +82,11 @@ def testers(snap: Snap, task: dict[str, Any]) -> dict[str, Any]:
                 "shots": _shots(files, name),
             }
         )
-    empty = "Testers start once every slice is built." if needed else "A small backend fix runs no testers."
-    return {"note": f"{len(needed)} required" if needed else "none required", "rows": rows, "empty": empty}
+    if not head:
+        return {"note": "decided once every slice is built", "rows": rows, "empty": "Testers start once every slice "
+                "is built."}  # fmt: skip
+    empty = "This change needs no testers: its own tests cover it."
+    return {"note": f"{len(names)} required" if names else "none required", "rows": rows, "empty": empty}
 
 
 def built_from(snap: Snap, task: dict[str, Any]) -> dict[str, Any] | None:

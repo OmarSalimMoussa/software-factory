@@ -6,7 +6,7 @@ import html
 from typing import Any
 
 from runtime.dashboard.views import agentwords, messaging, proposals, taskwords
-from runtime.dashboard.views.kit import Parts, Query, Snap, clock, epoch, iso, model_word, span, when
+from runtime.dashboard.views.kit import Parts, Query, Snap, clock, epoch, iso, model_word, plural, span, when
 from runtime.dashboard.views.shell import github_url, health, prod_runs_staging
 from runtime.shared.models import RETIRED, WAITING
 from runtime.shared.paths import PROMOTE_WORKFLOW
@@ -26,6 +26,7 @@ WANTS = (
     "deploys",
     "ci",
     "rules",
+    "triage",
 )
 SPARK_DAYS = 14
 _LAPTOP = {
@@ -169,14 +170,20 @@ def tiles(snap: Snap) -> dict[str, Any]:
     settings = snap.settings
     queue = snap.get("queue")
     counts = {key: sum(1 for t in queue["tasks"] if t["status"] in states) for key, _, _, states in _STAGES}
-    waiting = sorted(r["at"] for r in queue["requests"] if not r["outcome"] and r["severity"] != "severe")
+    triage = snap.get("triage")
     batch = settings.get_int("intake.batch_size")
-    due = epoch(waiting[0]) + settings.get_int("intake.batch_max_wait_hours") * 3600 if waiting else None
     days = snap.get("cost")["days"]
     names = [iso(snap.now - n * 86400)[:10] for n in range(SPARK_DAYS - 1, -1, -1)]
     spark = [round(sum(c[0] for c in days.get(d, {}).get("family", {}).values()), 2) for d in names]
+    unknown = int(sum(c[1] for c in days.get(names[-1], {}).get("family", {}).values()))
     budget = settings.get_float("cost.daily_budget_usd")
-    pct = round(spark[-1] / budget * 100)
+    # Calls of unknown price add an unknown amount: today's known spend is the least it cost, and with no price
+    # known at all the day's spend is unknown, never $0.
+    today = None if unknown and not spark[-1] else spark[-1]
+    pct = None if today is None else round(today / budget * 100)
+    foot = f"{pct}% of the daily budget" if pct is not None else "unknown: no price is set for its models"
+    if unknown and today is not None:
+        foot += f", and {plural(unknown, 'call')} of unknown price"
     return {
         "work": {
             "count": sum(counts.values()),
@@ -189,34 +196,32 @@ def tiles(snap: Snap) -> dict[str, Any]:
             "foot": "waiting to push to prod",
         },
         "requests": {
-            "count": len(waiting),
+            "count": triage["waiting"],
             "batch": batch,
-            "triage_at": None if due is None else iso(due),
+            "triage_at": triage["due_at"],
             "foot_right": f"or at {batch}",
         },
         "spend": {
-            "today": spark[-1],
+            "today": today,
             "budget": budget,
             "pct": pct,
             "spark": spark,
-            "foot": f"{pct}% of the daily budget",
+            "foot": foot,
         },
     }
 
 
 def goal(snap: Snap) -> dict[str, Any]:
-    """Each goal item's bar is its tasks on prod over its tasks; Done once all are on prod and the last check of the
-    default branch passed every scenario."""
+    """Each goal item's bar is its tasks on prod over its tasks; Done once the owner checks it done in GOAL.md, the
+    one place that says so."""
     found = snap.get("goal")
     queue = snap.get("queue")
-    checks = sorted(queue["checks"], key=lambda c: c["at"])
-    walked = bool(checks) and all(r["result"] == "pass" for r in checks[-1]["rows"])
     items = []
     for item in found["items"]:
         mine = [t for t in queue["tasks"] if t["goal_item"] == item["id"] and _counts(t)]
         live = sum(1 for t in mine if _on_prod(t))
         progress = live / len(mine) if mine else 0.0
-        if mine and live == len(mine) and walked:
+        if item["done"]:
             state = "Done"
         elif any(t["status"] not in ("queued", "parked", "proposed") for t in mine):
             state = "Building"

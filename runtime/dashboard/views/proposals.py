@@ -12,7 +12,7 @@ from typing import Any
 
 from runtime.dashboard.views import agentwords, taskwords
 from runtime.dashboard.views.kit import Snap, ago, broken, epoch, plural, spelled, version
-from runtime.shared.models import RETIRED
+from runtime.shared.models import WAITING, WORKING
 
 _settled: dict[int, dict[str, Any]] = {}
 _done: dict[str, tuple[float, str]] = {}
@@ -108,7 +108,11 @@ def slots(snap: Snap) -> dict[str, Any]:
     found = snap.get("proposals")
     tasks = taskwords.tasks(snap)
     ids = [e for e in found["open"] if e and e != "none" and e in tasks]
-    choosing = any(s["role"] == "orchestrator" and s["state"] != RETIRED for s in snap.get("sessions").values())
+    # Only an orchestrator at work chooses: one benched by the owner's pause, or not running, chooses nothing.
+    working = any(
+        s["role"] == "orchestrator" and s["state"] in (WORKING, WAITING) for s in snap.get("sessions").values()
+    )
+    choosing = working and snap.get("factory")["paused"] is None
     with _lock:
         for index in [i for i, s in _settled.items() if s["until"] <= snap.now]:
             del _settled[index]
@@ -124,8 +128,10 @@ def slots(snap: Snap) -> dict[str, Any]:
                 continue
             if index in settled:
                 places.append(settled[index])
-            elif entry is None:
+            elif entry is None and choosing:
                 places.append({"kind": "choosing"})
+            elif entry is None:
+                places.append({"kind": "none", "message": ""})
             else:
                 places.append({"kind": "none", "message": "Nothing else worth proposing now."})
         elif entry not in tasks or tasks[entry]["status"] != "proposed":

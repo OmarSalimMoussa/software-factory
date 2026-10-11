@@ -41,12 +41,14 @@ function setRow(r) {
 }
 function setVal(key, v) {
   const r = rowOf(key); if (!r) return;
-  if (r.control === 'number') { let n = parseInt(v, 10); if (isNaN(n)) n = curOf(r); v = Math.max(r.low, Math.min(r.high, n)); }
+  /* Exactly what was typed goes to the warden, which says what is wrong with it: never clamped, rounded or dropped here. */
+  if (r.control === 'number') { const text = String(v).trim(), n = Number(text); v = text !== '' && Number.isFinite(n) ? n : text; }
   if (same(v, r.saved)) UI.edits.delete(key); else UI.edits.set(key, {value: v, base: JSON.stringify(r.saved)});
   const row = $(`[data-row="${CSS.escape(key)}"]`); if (row) row.outerHTML = setRow(r);
   updateSavebar();
 }
-const stepSetting = (key, dir) => { const r = rowOf(key); if (r) setVal(key, curOf(r) + dir * r.step); };
+/* The +/- buttons stop at the range the server sent; only typing can go past it, for the warden to refuse. */
+const stepSetting = (key, dir) => { const r = rowOf(key); if (r) setVal(key, Math.max(r.low, Math.min(r.high, curOf(r) + dir * r.step))); };
 const resetSetting = key => { const r = rowOf(key); if (r) setVal(key, r.saved); };
 const defaultSetting = key => { const r = rowOf(key); if (r) setVal(key, r.default); };
 DDPICK.model = (key, v) => { const r = rowOf(key); if (r) setVal(key, {...curOf(r), model: v}); };
@@ -109,6 +111,7 @@ async function addAccount(btn) {
   try { ans = await post(acctData().add.url, {name: $('#acct-name').value, token: $('#acct-token').value}); }
   catch (e) {
     if (e instanceof NeedsDevice) askDevice();
+    else if (e instanceof TimedOut) say('No answer came in time, so it may have been added: check the list before you try again.', true);
     else if (e instanceof ApiDown) { wardenDown(e.since); say('The warden did not answer, so nothing changed. Try again.', true); }
     else say(`That failed: ${e.message} Nothing changed.`, true);
     return;

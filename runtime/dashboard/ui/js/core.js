@@ -3,7 +3,10 @@
    The browser draws what the server sends. It formats numbers, lays things out and animates; it computes no state. */
 
 const UI_API = 1;
-const TIMEOUT_MS = 10000;
+/* How long a request waits: what the server last said (its own wait for the warden, and a margin). The first page
+   load waits this long before the server has said anything. */
+let TIMEOUT_MS = 60000;
+class TimedOut extends Error { constructor() { super('No answer came in time.'); } }
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -62,7 +65,7 @@ async function request(method, url, body) {
   if (method === 'POST') Object.assign(headers, {'Content-Type': 'application/json', 'X-Software': '1'});
   let res;
   try { res = await fetch(url, {method, headers, credentials: 'same-origin', cache: 'no-store', signal: ctl.signal, body: body ? JSON.stringify(body) : undefined}); }
-  catch (e) { throw new ApiDown(null); }
+  catch (e) { if (ctl.signal.aborted) throw new TimedOut(); throw new ApiDown(null); }
   finally { clearTimeout(timer); }
   if (res.status === 401) throw new NeedsDevice('This device is not signed in.');
   let data = null;
@@ -76,6 +79,7 @@ async function request(method, url, body) {
 function envOk(env) {
   if (!env || typeof env !== 'object' || !env.parts) throw new ApiFailed('The answer could not be read.');
   if (env.api !== UI_API) { factoryUpdated(); throw new Halted(); }
+  if (typeof env.timeout_ms === 'number') TIMEOUT_MS = env.timeout_ms;
   if (env.warden && env.warden.ok === false) wardenDown(env.warden.since);
   else { wardenUp(); UI.lastOk = Date.now(); }
   return env;
@@ -109,6 +113,7 @@ async function act(url, body = {}, opts = {}) {
   try { ans = await post(url, body, key); }
   catch (e) {
     if (e instanceof NeedsDevice) askDevice();
+    else if (e instanceof TimedOut) alertToast('write:' + url, 'No answer came in time, so it may have gone through. Retrying is safe: it is never done twice.', {retry: () => act(url, body, {...opts, key})});
     else if (e instanceof ApiDown) { wardenDown(e.since); alertToast('write:' + url, 'That did not go through: the warden did not answer. Nothing changed.', {retry: () => act(url, body, {...opts, key})}); }
     else alertToast('write:' + url, `That did not go through: ${e.message}`, {retry: () => act(url, body, {...opts, key})});
     return null;

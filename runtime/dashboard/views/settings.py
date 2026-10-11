@@ -182,6 +182,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("dashboard.retired_linger_minutes", "Minutes a retired agent stays in the live tree"),
             ("dashboard.refresh_seconds", "Refresh every, seconds"),
             ("dashboard.stale_seconds", "Seconds before data counts as old"),
+            ("dashboard.page_margin_seconds", "Seconds a page waits beyond the dashboard's own wait"),
             ("dashboard.page_size", "Rows per page"),
             ("dashboard.probe_strip", "Probes the outage band shows"),
             ("dashboard.working_now_max", "Agents under Working now"),

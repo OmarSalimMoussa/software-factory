@@ -84,13 +84,18 @@ def hero(snap: Snap, query: Query) -> dict[str, Any]:
     days = _days(snap, query)
     family = _cells(snap, days, "family")
     total, unknown = sum(c[0] for c in family.values()), int(sum(c[1] for c in family.values()))
-    today = sum(c[0] for c in _cells(snap, days[-1:], "family").values())
+    cells = _cells(snap, days[-1:], "family").values()
+    today, today_unknown = sum(c[0] for c in cells), int(sum(c[1] for c in cells))
     budget = snap.settings.get_float("cost.daily_budget_usd")
+    # With no price known for any of today's calls, today's spend is unknown, never $0.
+    known = not (today_unknown and not today)
     return {
         "label": RANGES[str(len(days))],
-        "total": round(total, 2),
-        "budget_pct": round(today / budget * 100),
-        "today": f"today ${today:,.0f} of ${budget:,.0f}, at API prices",
+        "total": None if unknown and not total else round(total, 2),
+        "budget_pct": round(today / budget * 100) if known else None,
+        "today": f"today {'≥ ' if today_unknown else ''}${today:,.0f} of ${budget:,.0f}, at API prices"
+        if known
+        else f"today unknown of ${budget:,.0f}: no price is set for its models",
         "kv": [
             {"label": "Average cost of a merge", "value": _merge_cost(snap)},
             {"label": "Per day, average", "value": f"${total / len(days):,.0f}"},

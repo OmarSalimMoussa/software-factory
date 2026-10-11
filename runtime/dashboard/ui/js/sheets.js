@@ -98,7 +98,7 @@ function codeSheet(title, intro, okWord, send, opts = {}) {
     catch (e) {
       boxes.forEach(b => b.disabled = false); ok.disabled = false;
       if (e instanceof NeedsDevice) { UI.device = false; closeSheet(); askDevice(); return; }
-      say(e instanceof ApiDown ? "The warden did not answer, so nothing changed. Try again." : `That failed: ${e.message} Nothing changed.`, true);
+      say(e instanceof TimedOut ? 'No answer came in time, so it may have gone through. Trying again is safe: it is never done twice.' : e instanceof ApiDown ? "The warden did not answer, so nothing changed. Try again." : `That failed: ${e.message} Nothing changed.`, true);
       return;
     }
     if (!ans.ok) {

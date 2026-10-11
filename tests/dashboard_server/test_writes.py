@@ -41,10 +41,12 @@ def test_an_approval_answers_with_its_toast_and_its_place_settles(rig: Rig) -> N
 
 def test_a_move_sends_the_warden_its_own_order_once_the_device_saw_the_same(rig: Rig) -> None:
     store.write_json(rig.places.proposals, {"open": ["t-0027", None, "t-0024", "t-0025"], "approved": []})
+    card = next(s for s in rig.parts("/api/home")["proposals"]["data"]["slots"] if s.get("task") == "t-0024")
     reply = rig.post(
         "/api/proposals/t-0024/move",
-        {"dir": -1, "seen_order": ["t-0027", "t-0024", "t-0025"], "idempotency_key": "move-0002"},
-    )
+        {"version": card["version"], "dir": -1, "seen_order": ["t-0027", "t-0024", "t-0025"],
+         "idempotency_key": "move-0002"},
+    )  # fmt: skip
     assert reply.status == 200
     assert store.read_json(rig.places.proposals)["open"] == ["t-0027", "t-0024", None, "t-0025"]
 
@@ -68,3 +70,10 @@ def test_the_claude_account_section_shows_no_token_and_switches_as_an_operation(
         "done",
     )
     assert op["result"]["message"] == "The agents now use work."
+
+
+def test_an_action_without_the_version_the_owner_saw_is_refused(rig: Rig) -> None:
+    reply = rig.post("/api/proposals/t-0027/approve", {"idempotency_key": "approve-03"})
+
+    assert (reply.status, json.loads(reply.body)["refused"]) == (409, "stale")
+    assert store.read_json(rig.places.proposals)["approved"] == []

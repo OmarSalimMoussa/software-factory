@@ -133,7 +133,7 @@ def money(usd: float | None) -> str:
 def cost_of(cell: list[float] | None) -> str:
     """A [dollars, unknown calls] total as the owner reads it."""
     if cell is None:
-        return "$0"
+        return "no calls yet"
     usd, unknown = cell
     if unknown and not usd:
         return "unknown"

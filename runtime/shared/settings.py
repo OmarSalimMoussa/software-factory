@@ -152,6 +152,7 @@ SCHEMA: dict[str, Spec] = {
     "dashboard.port": Spec("int", 1024, 65535, when=AT_INSTALL),
     "dashboard.refresh_seconds": Spec("int", 5, 120),
     "dashboard.stale_seconds": Spec("int", 15, 600),
+    "dashboard.page_margin_seconds": Spec("int", 1, 60),
     "dashboard.wrong_codes_to_lock": Spec("int", 1, 20),
     "dashboard.lock_minutes": Spec("int", 5, 1440),
     "dashboard.device_days": Spec("int", 1, 365),

@@ -12,7 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from runtime.dashboard.views import proposals, settings
+from runtime.dashboard.views import proposals, settings, taskwords
 from runtime.dashboard.views.agent import agent_version
 from runtime.dashboard.views.kit import PartError, Snap, plural
 
@@ -59,21 +59,33 @@ def _seen(body: Body) -> list[str]:
     return seen
 
 
-def _card_check(body: Body, ref: str, snap: Snap) -> None:
+def _version(body: Body) -> str:
+    """The version of the thing the owner saw, which every action on one carries: an action on what changed since
+    is refused, never applied to what the owner did not see."""
     sent = body.get("version")
-    if sent is not None and (ref not in snap.get("proposals")["open"] or proposals.card_version(snap, ref) != sent):
+    if not isinstance(sent, str) or not sent:
+        raise Stale(STALE)
+    return sent
+
+
+def _card_check(body: Body, ref: str, snap: Snap) -> None:
+    sent = _version(body)
+    tasks = taskwords.tasks(snap)
+    if ref not in tasks or tasks[ref]["status"] != "proposed" or proposals.card_version(snap, ref) != sent:
         raise Stale(STALE)
 
 
 def _need_check(body: Body, ref: str, snap: Snap) -> None:
+    sent = _version(body)
     card = next((c for c in snap.get("cards") if c["id"] == ref), None)
-    if body.get("version") is not None and (card is None or proposals.need_version(card) != body["version"]):
+    if card is None or proposals.need_version(card) != sent:
         raise Stale(STALE)
 
 
 def _agent_check(body: Body, ref: str, snap: Snap) -> None:
+    sent = _version(body)
     row = snap.get("sessions").get(ref)
-    if body.get("version") is not None and (row is None or agent_version(row) != body["version"]):
+    if row is None or agent_version(row) != sent:
         raise Stale(STALE)
 
 

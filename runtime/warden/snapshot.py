@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import copy
+import dataclasses
 import json
 import logging
 import os
@@ -20,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.guard.rules import RULES
-from runtime.queue import approvals, cards, files, goal, intake, pictures, proposals, records
+from runtime.queue import approvals, cards, files, goal, intake, pictures, proposals, records, triage
 from runtime.queue.book import Queue
 from runtime.queue.formats import TASK_ID
 from runtime.shared import models, protocol, store
@@ -400,6 +401,7 @@ READERS: dict[str, Reader] = {
     "specs": _spec_text,
     "qa": _qa,
     "goal": _goal,
+    "triage": lambda ctx, args: dataclasses.asdict(triage.batch(ctx)),
     "docker": lambda ctx, args: store.read_json_or(gc.disk_path(ctx.places), None),
     "reflections": lambda ctx, args: reflections.entries(ctx.places),
     "history": _history,

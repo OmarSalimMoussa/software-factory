@@ -131,11 +131,19 @@ class App:
         warden = {"ok": False, "since": clock(self.parts.down_since or self.now())}
         return _json(503, {"ok": False, "warden": warden, "error": "Can't reach the warden.", "reason": reason})
 
+    def _timed(self, envelope: dict[str, Any]) -> dict[str, Any]:
+        """The envelope with how long the page waits for an answer: the dashboard's own wait for the warden, and a
+        margin for the trip, so the page never gives up on a write the warden is still doing."""
+        wait = self.settings().get_int("dashboard.warden_seconds") + self.settings().get_int(
+            "dashboard.page_margin_seconds"
+        )
+        return {**envelope, "timeout_ms": wait * 1000}
+
     def _away(self, key: str) -> Reply:
         self._warden_lost()
         envelope = self.parts.stale(key, None)
         if envelope is not None:
-            return _json(200, envelope)
+            return _json(200, self._timed(envelope))
         return self._unreachable("Can't reach the warden.")
 
     def _warden_lost(self) -> None:
@@ -168,7 +176,7 @@ class App:
                     "ok": False,
                     "error": f"It could not be built ({type(exc).__name__}); the dashboard's log has the details.",
                 }
-        return _json(200, self.parts.fresh(key, built))
+        return _json(200, self._timed(self.parts.fresh(key, built)))
 
     def _op(self, op_id: str) -> Reply:
         answer = self.warden.call("op.get", {"id": op_id})
@@ -176,7 +184,7 @@ class App:
             part = {"ok": True, "as_of": _iso(self.now()), "data": ops.operation(answer)}
         else:
             part = {"ok": False, "error": sentence(str(answer.get("reason", "")))}
-        return _json(200, self.parts.fresh(f"/api/ops/{op_id}", {"op": part}))
+        return _json(200, self._timed(self.parts.fresh(f"/api/ops/{op_id}", {"op": part})))
 
     def _static(self, path: str) -> Reply:
         name = "index.html" if path in ("/", "/index.html") else path.lstrip("/")

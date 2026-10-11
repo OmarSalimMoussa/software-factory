@@ -40,6 +40,7 @@ class Batch:
     boosted: bool  # a request the owner boosted, alone
     waiting: int  # every request waiting for triage
     oldest_at: str | None  # when the oldest waiting request arrived; None when it cannot be read or none waits
+    due_at: str | None  # when the pass is due: now when it is, else when the oldest has waited long enough
 
 
 def batch(ctx: Context) -> Batch:
@@ -51,14 +52,15 @@ def batch(ctx: Context) -> Batch:
     waiting = sorted((r for r in good if not r.outcome and r.severity != "severe"), key=lambda r: (r.at, r.id))
     boosted = sorted((at, rid) for rid, at in intake.boosts(ctx).items() if rid in {r.id for r in waiting})
     count = len(waiting) + len(broken)
+    now = ctx.clock.iso()
     if boosted:
-        return Batch([boosted[0][1]], True, True, count, waiting[0].at if waiting else None)
+        return Batch([boosted[0][1]], True, True, count, waiting[0].at if waiting else None, now)
     size = settings.get_int("intake.batch_size")
     oldest = waiting[0].at if waiting else None
-    aged = oldest is not None and ctx.clock.now() - formats.epoch(oldest) >= (
-        settings.get_int("intake.batch_max_wait_hours") * 3600
-    )
-    return Batch([r.id for r in waiting[:size]], bool(waiting) and (count >= size or aged), False, count, oldest)
+    aged_at = formats.epoch(oldest) + settings.get_int("intake.batch_max_wait_hours") * 3600 if oldest else None
+    due = bool(waiting) and (count >= size or (aged_at is not None and ctx.clock.now() >= aged_at))
+    due_at = now if due else formats.iso(aged_at) if aged_at is not None else None
+    return Batch([r.id for r in waiting[:size]], due, False, count, oldest, due_at)
 
 
 def _plan_path(ctx: Context) -> Any:
