@@ -11,6 +11,7 @@ one. Text loses its newlines, so an entry is always one line the dashboard draws
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections import deque
 from datetime import UTC, datetime
@@ -23,6 +24,8 @@ from runtime.shared.protocol import Refused, ok
 from runtime.warden import registry
 from runtime.warden.context import Context
 from runtime.warden.verbs import ORCH, OWNER
+
+log = logging.getLogger(__name__)
 
 KINDS = ("owner-feedback", "miss", "friction", "discovery", "incident", "misroute")
 ORCHESTRATOR_KINDS = frozenset({"owner-feedback", "misroute"})
@@ -113,6 +116,24 @@ def incident(ctx: Context, text: str, where: str = "") -> None:
     add(ctx, INCIDENT, "warden", where, text)
 
 
+# The guard's refusals for a spent round limit, by the rounds.* name the limit extends.
+SPENT = {"qa-rounds": "qa", "critic-rounds": "critic"}
+
+
+def _spent(ctx: Context, sid: str, limit: str) -> None:
+    """A round limit refused again after the orchestrator's one extension: the task goes to the owner's card."""
+    from runtime.queue import cards  # cards reaches this module through the lifecycle
+
+    session = registry.read(ctx.places).get(sid)
+    if session is None:
+        return
+    try:
+        cards.spent(ctx, session, limit, f"{session.name} used up its {limit} rounds again")
+    # telemetry: last-resort — the refusal is kept either way; the orchestrator's next extend asks the owner too
+    except Exception:
+        log.exception("warden: putting %s's task on the owner's card failed", sid)
+
+
 class RefusalWatch:
     """Records each guard refusal and files an incident when one rule refuses the same session again and again."""
 
@@ -126,6 +147,8 @@ class RefusalWatch:
         # The guard's record: session, rule, tool and detail; the warden stamps its own time.
         fields = {k: str(line.get(k, ""))[:2000] for k in ("session", "rule", "tool", "detail")}
         store.append_jsonl(ctx.places.refusals, {"at": ctx.clock.iso(), **fields})
+        if fields["rule"] in SPENT:
+            _spent(ctx, fields["session"], SPENT[fields["rule"]])
         window = settings.get_int("watch.refusal_window_minutes") * 60
         limit = settings.get_int("watch.refusals_to_notify")
         key = (fields["session"], fields["rule"])

@@ -164,7 +164,7 @@ def watch_orchestrator(ctx: Context) -> None:
         if silent < limit:
             return
         try:
-            lifecycle.wake(ctx, orchestrator, SILENT.format(minutes=int(silent // 60)), force=True)
+            lifecycle.restart(ctx, orchestrator, SILENT.format(minutes=int(silent // 60)))
             reflections.incident(ctx, f"The orchestrator's loop was silent for {int(silent // 60)} min; the warden "
                                       "restarted it.")  # fmt: skip
         except LaunchError as exc:

@@ -27,10 +27,11 @@ QA_PROD_DUE = "qa-prod due"  # prod answers on a build the owner pushed: walk it
 # The crash watch: a run benched for higher work, or retired after its process kept ending.
 BENCHED, CRASHED = "benched", "crashed"
 GOAL_CHANGED = "goal-changed"  # the loop read a new GOAL.md: the scores changed, so the proposals may too
-# Every owner decision (plan R4), so the orchestrator acts at once; `answered` carries a question's answer (R15).
+# Every owner decision (plan R4), so the orchestrator acts at once; `answered` carries the answer to a question only
+# the orchestrator can act on (R15): the warden hands a session's own answer to it directly.
 OWNER_DECISIONS = (
-    "approved", "not-now", "dropped", "boosted", "go", "feedback", "extend", "to-designer", "park", "stopped",
-    "paused", "resumed", "proposal-slot-free", "goal-changed", "answered", "orchestrator-started",
+    "approved", "not-now", "dropped", "boosted", "go", "decided-extend", "limit-extended", "to-designer", "park",
+    "stopped", "paused", "resumed", "proposal-slot-free", "goal-changed", "answered", "orchestrator-started",
 )  # fmt: skip
 KINDS = frozenset(
     {LOOP_DUE, STAGING_RED, PROD_RED, SEVERE_REQUEST, TRIAGE_DUE, QA_PROD_DUE, BENCHED, CRASHED, *OWNER_DECISIONS}

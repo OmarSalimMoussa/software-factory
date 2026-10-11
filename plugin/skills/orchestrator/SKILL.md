@@ -38,9 +38,10 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 | `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed. |
 | `approved` | Start the run when a cap has room (below). The free proposal slot is filled next. |
 | `not-now`, `dropped`, `boosted`, `proposal-slot-free` | Fill the free proposal slots. |
-| `go`, `feedback` | Wake the spec's designer with it (`factory resume <session> "<event>"`). On `go`, start the build. |
-| `extend`, `park`, `to-designer` | The owner decided a stuck task: tell its session. `to-designer`: propose it at rung 3. |
-| `answered` | The owner answered a question: pass the answer to the session that asked, or act on it if it was yours. |
+| `go` | Start the build. The warden ends the spec's designer itself. |
+| `decided-extend`, `park`, `to-designer` | The owner decided a stuck task; the warden told its session or ended it. `to-designer`: propose it at rung 3. |
+| `limit-extended` | The owner gave a session more of a limit; the warden told it. Nothing to do. |
+| `answered` | The owner answered a question you asked: act on it. A session's own answer reaches it from the warden. |
 | `stopped` | The owner stopped a run. Its task is back in Proposed with its branch kept: nothing to undo. |
 | `benched` | A session you benched has stopped and keeps its context. Start the run it made room for. |
 | `crashed` | A session kept dying and was retired. Its task is back in Proposed with its branch kept: propose it again. |
@@ -93,7 +94,8 @@ live and nothing merged for a while, a regression walk of the scenarios that wai
   stays), propose the task again at that rung with the reason and a new picture, and write
   `factory reflect --kind misroute "<the facts that misled the plan>"`.
 - **Limits.** A session out of QA rounds, critic rounds or check runs reports to you with what is open. Extend once
-  (`factory extend <session> <limit>`), propose it one rung up, or park it. A second time is the owner's card.
+  (`factory extend <session> <limit>`), propose it one rung up, or park it. When it runs out a second time, the
+  warden puts the task on the owner's decide card itself.
 
 ## Merge turn, merge, check, ship
 

@@ -5,9 +5,9 @@ and GitHub's API.
 
 systemctl is the one fake with logic: a session start passes the agent-run unit's own check of its request and is
 recorded (no claude ever runs), and so is a `claude stop`, while a command or a stack request runs the real unit
-runner, which runs git or the product's own scripts/dev. A check request passes the check-run unit's own check of its request and passes: the
-checks themselves are tests/checks' to prove. Anything else the warden asks a unit to run fails the rehearsal before
-it runs.
+runner, which runs git or the product's own scripts/dev. A check request passes the check-run unit's own check of
+its request and passes: the checks themselves are tests/checks' to prove. Anything else the warden asks a unit to run
+fails the rehearsal before it runs.
 """
 
 from __future__ import annotations

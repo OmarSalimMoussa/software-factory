@@ -114,17 +114,37 @@ def retire_session(ctx: Context, ref: str, kind: str, by: str) -> list[Session]:
     return retired
 
 
-def wake(ctx: Context, s: Session, message: str, force: bool = False) -> None:
-    """Deliver ``message`` by resuming the session; a running one is stopped first (only when idle, or forced).
+def restart(ctx: Context, s: Session, message: str) -> None:
+    """Stop the session's process and resume it with ``message``: for one that went silent.
 
     Held under ctx.lock, so the crash watch never reads the moment between the stop and the resume as a crash.
     """
     with ctx.lock:
         if s.id in backstop.processes():
-            if s.state == WORKING and not force:
-                raise Refused("working", f"{s.name} is working; message it when it waits")
             ctx.launcher.stop_session(s.id)
         launch.resume(ctx, s, message)
+
+
+def deliver(ctx: Context, sid: str, message: str, by: str) -> None:
+    """Hand a working or waiting session ``message`` as its next turn, and a waiting one works again. A running
+    process reads it as soon as its turn ends, busy or idle, so no turn is cut short; one whose process is gone is
+    resumed with it (under ctx.lock, so the crash watch never resumes it too). Raises LaunchError when it did not
+    arrive, Refused when the session is not working or waiting."""
+    with ctx.lock:
+        s = read(ctx).get(sid)
+        if s is None or s.state not in (WORKING, WAITING):
+            raise Refused("state", f"{s.name if s else sid} is {s.state if s else 'unknown'}; nothing to hand over")
+        running = s.id in backstop.processes()
+        if not running:
+            launch.resume(ctx, s, message)
+    if running:
+        ctx.launcher.message_session(s.id, message)
+    with ctx.lock:
+        sessions = read(ctx)
+        current = sessions[sid]
+        if current.state == WAITING:
+            move(ctx, current, WORKING, by, "the owner's word reached it")
+            registry.write(ctx.places, sessions)
 
 
 def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
@@ -220,6 +240,7 @@ def owner_stop(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[s
 
 
 def resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
+    """Hand a session a message: it reads it when its current turn ends, and one whose process is gone resumes."""
     message = _text(args, "message")
     with ctx.lock:
         permits.check_daemon(ctx)
@@ -228,34 +249,49 @@ def resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
             raise Refused("retired", f"{s.name} is retired, and a retired session can never be resumed")
         if s.state not in (WORKING, WAITING):
             raise Refused("state", f"{s.name} is {s.state}; a deprioritized session comes back with factory revive")
-        try:
-            wake(ctx, s, message)
-        except LaunchError as exc:
-            raise Refused("resume", f"{s.name} did not resume: {exc}") from exc
+    try:
+        deliver(ctx, s.id, message, actor(ctx))
+    except LaunchError as exc:
+        raise Refused("resume", f"{s.name} did not get the message: {exc}") from exc
     return ok(name=s.name)
 
 
+def extended_once(s: Session, limit: str) -> bool:
+    """Whether the orchestrator used its one extension of ``limit`` on ``s``."""
+    return bool(s.extensions.get(f"{limit}:orchestrator"))
+
+
+def raise_limit(ctx: Context, sessions: dict[str, Session], s: Session, limit: str, by_orchestrator: bool) -> int:
+    """Add rounds.extend_by to ``s``'s ``limit``; the caller holds ctx.lock and writes the registry. The new extra."""
+    s.extensions[limit] = s.extensions.get(limit, 0) + ctx.settings().get_int("rounds.extend_by")
+    if by_orchestrator:
+        s.extensions[f"{limit}:orchestrator"] = 1
+    return s.extensions[limit]
+
+
 def extend(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """One more allowance of a limit: the orchestrator's once per session and limit, the owner's any time."""
+    """One more allowance of a limit: the orchestrator's once per session and limit, the owner's any time. The
+    orchestrator's second ask puts the task on the owner's decide card."""
+    from runtime.queue import cards  # cards moves sessions through this module
+
     limit, who = _text(args, "limit"), actor(ctx)
     if limit not in LIMITS:
         raise Refused("args", f"extend one of {', '.join(LIMITS)}")
-    by = ctx.settings().get_int("rounds.extend_by")
     with ctx.lock:
         sessions = read(ctx)
         s = find(ctx, sessions, _text(args, "session"))
         if s.state == RETIRED:
             raise Refused("retired", f"{s.name} is retired")
-        mark = f"{limit}:orchestrator"
-        if who != OWNER and s.extensions.get(mark):
-            raise Refused("extend", f"{s.name}'s {limit} was extended once already; the owner decides now")
-        s.extensions[limit] = s.extensions.get(limit, 0) + by
-        if who != OWNER:
-            s.extensions[mark] = 1
+        if who != OWNER and extended_once(s, limit):
+            if cards.spent(ctx, s, limit, f"{s.name} used up its {limit} again after one extension"):
+                raise Refused("extend", f"{s.name}'s {limit} was extended once already; the owner decides now, on "
+                                        "the card on Home")  # fmt: skip
+            raise Refused("extend", f"{s.name}'s {limit} was extended once already, and its task is not running")
+        extra = raise_limit(ctx, sessions, s, limit, by_orchestrator=who != OWNER)
         registry.write(ctx.places, sessions)
     if who == OWNER:
-        ctx.post_event("extend", {"session": s.id, "name": s.name, "limit": limit, "by": by})
-    return ok(name=s.name, limit=limit, extra=s.extensions[limit])
+        ctx.post_event("limit-extended", {"session": s.id, "name": s.name, "limit": limit, "extra": extra})
+    return ok(name=s.name, limit=limit, extra=extra)
 
 
 def set_doing(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:

@@ -45,6 +45,8 @@ class FakeLauncher:
     commands: list[list[str]] = field(default_factory=list)
     stacks: list[tuple[int, list[str]]] = field(default_factory=list)
     checks: list[tuple[str, list[str]]] = field(default_factory=list)
+    messages: list[tuple[str, str]] = field(default_factory=list)
+    stopped: list[str] = field(default_factory=list)
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
         raise AssertionError("the queue starts no session")
@@ -54,10 +56,10 @@ class FakeLauncher:
         return self.git(argv)
 
     def stop_session(self, session_id: str) -> None:
-        raise AssertionError("the queue stops no session")
+        self.stopped.append(session_id)
 
     def message_session(self, session_id: str, text: str) -> None:
-        raise AssertionError("the queue messages no session")
+        self.messages.append((session_id, text))
 
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         self.stacks.append((slot, verb))

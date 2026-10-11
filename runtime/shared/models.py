@@ -149,6 +149,7 @@ class Card:
     answered: str = ""
     asked_by: str = ""  # contract: R15, the session a question's answer goes back to
     comments_at: str = ""  # contract: R14, when the designer last counted the comments
+    limit: str = ""  # a decide card's spent limit, by its rounds.* name: what the owner's Extend raises
 
 
 @dataclass(slots=True)

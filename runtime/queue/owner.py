@@ -6,15 +6,20 @@ the orchestrator acts at once (R4). The warden writes the approval where no agen
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from runtime.queue import approvals, cards, documents, formats, intake, proposals, route, tasks
 from runtime.queue.book import Queue, request_rel, task_rel
 from runtime.queue.formats import dump_request, one_line
 from runtime.queue.statuses import OWNER
-from runtime.shared.models import Task
+from runtime.shared.models import RETIRED, STOPPED, Task
 from runtime.shared.protocol import Refused
+from runtime.warden import lifecycle, permits, registry
 from runtime.warden.context import Context
+from runtime.warden.launch import LaunchError
+
+log = logging.getLogger(__name__)
 
 
 def _proposed(queue: Queue, task_id: str) -> Task:
@@ -145,17 +150,20 @@ def go(ctx: Context, card_id: str) -> dict[str, Any]:
 
 
 def feedback(ctx: Context, card_id: str) -> dict[str, Any]:
-    """Check feedback wakes the designer to answer the owner's comments on the artifact."""
+    """Check feedback hands the designer the owner's comments on the artifact; the warden delivers it, so nothing
+    goes through the orchestrator."""
     _, card = cards.find(ctx.places, card_id, "spec")
-    cards.wake(ctx, card, f"The owner left comments on the spec of {card.task} ({card.brief}); read and answer them.")
-    ctx.post_event("feedback", {"task": card.task, "card": card_id, "session": card.asked_by})
+    if not cards.wake(ctx, card, f"The owner left comments on the spec of {card.task} ({card.brief}); read and "
+                                 "answer them."):  # fmt: skip
+        raise Refused("feedback", "the designer who asked is not running now; its comments wait on the artifact")
     return {"card": card_id}
 
 
 def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
-    """A stuck task: Extend its rounds, send it To a designer (rung 3), or Park it."""
+    """A stuck task: Extend the spent limit of its live session, send it To a designer (rung 3), or Park it. The
+    warden tells the session itself, or ends it when its task leaves the run, so nothing is relayed."""
     to, event, kind = {
-        "extend": ("building", "extend", "extend"),
+        "extend": ("building", "extend", "decided-extend"),
         "designer": ("proposed", "to-designer", "to-designer"),
         "park": ("parked", "park", "park"),
     }[choice]
@@ -163,11 +171,29 @@ def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
     with ctx.lock, queue.lock():
         found, card = cards.find(ctx.places, card_id, "decide")
         task = queue.task(card.task)
+        sessions = lifecycle.read(ctx)
+        live = next((s for s in sessions.values() if s.task == task.id and not s.parent and s.role in permits.CAP
+                     and s.state not in (RETIRED,)), None)  # fmt: skip
         fields: dict[str, Any] = {"run": 3} if choice == "designer" else {}
         tasks.transition(ctx, queue, task, to, event, OWNER, f"{kind} by you", **fields)
+        if choice == "extend" and live is not None:
+            extra = lifecycle.raise_limit(ctx, sessions, live, card.limit, by_orchestrator=False)
+            registry.write(ctx.places, sessions)
         cards.settle(ctx, found, card, kind)
+    if live is not None and choice == "extend":
+        _tell(ctx, live.id, f"The owner extended your {card.limit} to {extra} more than the setting: carry on.")
+    elif live is not None:
+        lifecycle.retire_session(ctx, live.id, STOPPED, lifecycle.OWNER)
     ctx.post_event(kind, {"task": card.task, "card": card_id})
     return {"card": card_id, "task": card.task, "status": to}
+
+
+def _tell(ctx: Context, sid: str, message: str) -> None:
+    try:
+        lifecycle.deliver(ctx, sid, message, OWNER)
+    # telemetry: surfaced — the session's limit is raised all the same; its next refused call names the new limit
+    except (LaunchError, Refused) as exc:
+        log.warning("warden: the owner's extension did not reach session %s (%s)", sid, type(exc).__name__)
 
 
 def answer(ctx: Context, card_id: str, text: str) -> dict[str, Any]:
@@ -176,6 +202,9 @@ def answer(ctx: Context, card_id: str, text: str) -> dict[str, Any]:
     with ctx.lock:
         found, card = cards.find(ctx.places, card_id, "question")
         cards.settle(ctx, found, card, text)
-    cards.wake(ctx, card, f"The owner answered your question on {card.task or 'your work'}: {one_line(text)}")
-    ctx.post_event("answered", {"card": card_id, "task": card.task, "session": card.asked_by, "answer": one_line(text)})
+    words = f"The owner answered your question on {card.task or 'your work'}: {one_line(text)}"
+    if not cards.wake(ctx, card, words):
+        # The orchestrator asked, or the asker no longer runs: the orchestrator hears it and acts on it.
+        ctx.post_event("answered", {"card": card_id, "task": card.task, "session": card.asked_by,
+                                    "answer": one_line(text)})  # fmt: skip
     return {"card": card_id}

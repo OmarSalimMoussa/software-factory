@@ -199,7 +199,7 @@ def _bring_back(ctx: Context, ids: list[str]) -> str:
             running = [c for c in registry.children(sessions, sid) if c.state in (WORKING, WAITING)]
             lifecycle.retire(ctx, running, s, WITH_PARENT, WARDEN, "ended when the factory switched Claude accounts")
             try:
-                lifecycle.wake(ctx, s, NOTE)
+                launch.resume(ctx, s, NOTE)
             except (LaunchError, Refused) as exc:
                 failed.append(f"{s.name} did not come back ({exc})")
             else:

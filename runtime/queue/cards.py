@@ -6,15 +6,19 @@ own cards.json, where no agent writes.
 from __future__ import annotations
 
 import dataclasses
+import logging
 
 from runtime.queue import formats, pictures, records, statuses, tasks
 from runtime.queue.book import Queue, spec_rel
 from runtime.shared import models, store
-from runtime.shared.models import WAITING, WORKING, Card
+from runtime.shared.models import WAITING, WORKING, Card, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden import lifecycle, registry
 from runtime.warden.context import Context
+from runtime.warden.launch import LaunchError
+
+log = logging.getLogger(__name__)
 
 
 def read(places: Places) -> list[Card]:
@@ -93,19 +97,45 @@ def _waiting(ctx: Context, card: Card) -> Card:
     return card
 
 
-def wake(ctx: Context, card: Card, message: str) -> None:
-    """Resume the session that asked, with the owner's word."""
+def wake(ctx: Context, card: Card, message: str) -> bool:
+    """Hand the session that asked the owner's word, and it works again; whether it reached it. The orchestrator
+    hears through its inbox instead, and a session no longer working or waiting has nothing to hear: the card keeps
+    the answer either way."""
     asker = registry.read(ctx.places).get(card.asked_by)
-    if asker is not None and asker.state == WAITING:
-        lifecycle.wake(ctx, asker, message)
+    if asker is None or asker.role == statuses.ORCH or asker.state not in (WORKING, WAITING):
+        return False
+    try:
+        lifecycle.deliver(ctx, asker.id, message, statuses.OWNER)
+    # telemetry: surfaced — the card shows the owner's answer, and the session reads it from its task when it resumes
+    except LaunchError as exc:
+        log.warning("warden: the owner's word on %s did not reach session %s (%s)", card.id, asker.id,
+                    type(exc).__name__)  # fmt: skip
+        return False
+    return True
 
 
-def to_decide(ctx: Context, task_id: str, why: str) -> Card:
+def to_decide(ctx: Context, task_id: str, why: str, limit: str) -> Card:
     """A running task whose rounds or check runs are spent goes to the owner: Extend, To a designer or Park."""
     queue = Queue.of(ctx)
     with ctx.lock, queue.lock():
         task = tasks.transition(ctx, queue, queue.task(task_id), "decide", "limits", statuses.WARDEN, why)
-        return _add(ctx, Card("", "decide", task_id, task.title, formats.one_line(why), ctx.clock.iso()), None)
+        card = Card("", "decide", task_id, task.title, formats.one_line(why), ctx.clock.iso(), limit=limit)
+        return _add(ctx, card, None)
+
+
+def spent(ctx: Context, s: Session, limit: str, why: str) -> bool:
+    """``s`` used up ``limit`` again after the orchestrator's one extension: its running task goes to the owner's
+    decide card, once. Whether the task now waits for the owner."""
+    if not s.task or s.parent or not lifecycle.extended_once(s, limit):
+        return False
+    with ctx.lock:
+        task = Queue.of(ctx).task(s.task)
+        if task.status == "decide":
+            return True
+        if task.status not in statuses.RUNNING:
+            return False
+        to_decide(ctx, s.task, why, limit)
+    return True
 
 
 def comments(ctx: Context, task_id: str, count: object) -> Card:
