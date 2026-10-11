@@ -1,0 +1,130 @@
+python_roots = ["runtime", "checks", "standard", "plugin"]
+first_party = ["runtime", "checks", "standard", "plugin"]
+excluded = {}
+test_support_dirs = ["tests"]
+scanned_testdata = []
+vendored = []
+vendored_prefix = "VENDORED:"
+typescript_from = "."
+quiet_calls = []
+floating_entries = []
+floating_components = []
+vite_configs = []
+sdk_owners = {}
+entry_owns_runtime = {}
+dist_to_src = {}
+
+[processes]
+"runtime/warden/wardend.py" = { process = "warden", boot = "logging.basicConfig()" }
+"runtime/dashboard/server.py" = { process = "dashboard", boot = "logging.basicConfig()" }
+"runtime/system/console.py" = { process = "install console", boot = "logging.basicConfig()" }
+
+[non_booting]
+"plugin/hooks/rulebook_loader.py" = "a Claude Code hook: its stderr and exit status reach the session that ran it"
+"plugin/hooks/statusline.py" = "Claude Code's status line command: its stderr and exit status reach the session"
+"runtime/cli/factory.py" = "the factory command: its stderr and exit status reach the session or the owner who ran it"
+"runtime/guard/commit_check.py" = "git's hook: its stderr and exit status reach the session that committed"
+"runtime/guard/hook.py" = "the guard, a Claude Code hook: its stderr and exit status reach the session"
+"runtime/system/drill_probe.py" = "the drills' probe: what it prints is the drill's evidence, and the drill reads its exit"
+"runtime/system/install.py" = "the installer, run by the owner with sudo: its stderr and exit status reach the owner"
+"runtime/system/uninstall.py" = "the uninstaller, run by the owner with sudo: its stderr and exit status reach the owner"
+"runtime/system/release.py" = "the release file's runner, run by the owner: its stderr and exit status reach the owner"
+"runtime/system/pause_checks.py" = "a systemd unit's step: its stderr and exit status go to the journal"
+"runtime/system/runners/agent_run.py" = "a systemd unit's command: its stderr and exit status go to the journal"
+"runtime/system/runners/check_run.py" = "a systemd unit's command: its stderr and exit status go to the journal"
+"runtime/system/runners/record_exit.py" = "a systemd unit's stop command: its stderr and exit status go to the journal"
+"runtime/system/runners/services_run.py" = "a systemd unit's command: its stderr and exit status go to the journal"
+"runtime/system/runners/stack_run.py" = "a systemd unit's command: its stderr and exit status go to the journal"
+"runtime/system/runners/start.py" = "a systemd unit's command: its stderr and exit status go to the journal"
+"runtime/system/runners/upgrade.py" = "root's upgrade unit: its stderr and exit status go to the journal and its log"
+"runtime/system/runners/with_token.py" = "a systemd unit's command: its stderr and exit status go to the journal"
+"standard/deploy_image.py" = "a CI step: its stderr and exit status reach the CI run"
+"standard/plan.py" = "a CI step: its stderr and exit status reach the CI run"
+"standard/release.py" = "a CI step: its stderr and exit status reach the CI run"
+"standard/smoke.py" = "a CI step: its stderr and exit status reach the CI run"
+"standard/server/ci_gate.py" = "the server's forced command for CI: its stderr and exit status reach the CI run"
+"standard/server/deploy.py" = "the server's deploy command, run by CI: its stderr and exit status reach the CI run"
+"standard/server/gc.py" = "the server's weekly cron job: it writes its log, and each deploy shows a failed one"
+"standard/server/heartbeat.py" = "the server's cron job: a missed ping is what Healthchecks.io reports"
+"standard/server/setup.py" = "the server set-up, run by the owner: its stderr and exit status reach the owner"
+
+[[components]]
+prefix = "runtime/"
+name = "warden and dashboard"
+sink = "sdk-logging"
+grounds = "runs in the warden or the dashboard: their logs reach the journal, and ERROR and above the factory's GlitchTip"
+reporters = []
+seams = []
+log_modules = []
+
+[[components]]
+prefix = "runtime/dashboard/ui/"
+name = "dashboard page"
+sink = "surface"
+grounds = "browser code: an error shows on the page, where the owner sees it"
+reporters = []
+seams = []
+log_modules = []
+
+[[components]]
+prefix = "runtime/system/install_console/console_ui/"
+name = "install page"
+sink = "surface"
+grounds = "browser code: an error shows on the page, where the owner sees it"
+reporters = []
+seams = []
+log_modules = []
+
+[[components]]
+prefix = "runtime/cli/"
+name = "factory command"
+sink = "exit"
+grounds = "a command: its stderr and exit status reach the session or the owner who ran it"
+reporters = []
+seams = []
+log_modules = []
+
+[[components]]
+prefix = "runtime/guard/"
+name = "guard"
+sink = "exit"
+grounds = "Claude Code's and git's hooks: their stderr and exit status reach the session"
+reporters = []
+seams = []
+log_modules = []
+
+[[components]]
+prefix = "runtime/system/"
+name = "install and runners"
+sink = "exit"
+grounds = "commands the owner or systemd runs: stderr and the exit status reach the owner or the journal"
+reporters = []
+seams = []
+log_modules = []
+
+[[components]]
+prefix = "standard/"
+name = "standard build and deploy"
+sink = "exit"
+grounds = "commands CI, the server or the owner runs: stderr and the exit status reach them"
+reporters = []
+seams = []
+log_modules = []
+
+[[components]]
+prefix = "checks/"
+name = "checks"
+sink = "exit"
+grounds = "the check runner: each problem it prints and its exit status are the result"
+reporters = []
+seams = []
+log_modules = []
+
+[[components]]
+prefix = "plugin/"
+name = "plugin hooks"
+sink = "exit"
+grounds = "Claude Code's hooks: their stderr and exit status reach the session"
+reporters = []
+seams = []
+log_modules = []

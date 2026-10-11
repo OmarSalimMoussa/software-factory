@@ -5,3 +5,4 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 testdata/state-*/
+node_modules/

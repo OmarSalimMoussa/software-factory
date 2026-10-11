@@ -31,6 +31,11 @@ jobs:
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen --extra dev
+      # The error-telemetry check reads the pages' scripts with the TypeScript that package.json pins.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
       # The standard checks' tools check runs ruff check, ruff format --check and mypy here, at the pinned versions
       # and with the factory's own settings, so no other job runs them again.
       - name: The factory meets its own standard checks
