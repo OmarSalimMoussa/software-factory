@@ -9,6 +9,7 @@ them out, and CI runs them as their own step, which the release waits for.
 from __future__ import annotations
 
 import io
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -25,21 +26,22 @@ NOT_APPLICABLE = {
     "tests": "runs a product's tests through its test map; the factory's CI runs its own pytest directly",
     "image-sources": "checks the images a product builds; the factory builds none",
 }
+# Each waits for its values, written by the slice of work that also clears what the check then finds.
 NOT_YET = {
-    "doc-refs": "slice 2",
-    "mirror-markers": "slice 2",
-    "mirrored-constants": "slice 2",
-    "tree-rules": "slice 3",
-    "config-readers": "slice 4",
-    "size-ceilings": "slice 5",
-    "error-telemetry": "slice 6",
-    "network-door": "slice 7",
-    "computation-owners": "slice 7",
-    "js-import-rules": "slice 7",
-    "vocabulary-homes": "slice 7",
-    "quiet-modules": "slice 7",
-    "pinned-config": "slice 7",
-    "generated-current": "slice 7",
+    "doc-refs": "slice 2: docs that name a product's paths are marked so, and ~/ paths read as outside the repo",
+    "mirror-markers": "slice 2: each mirrored constant folds into one source that every side reads",
+    "mirrored-constants": "slice 2: with no mirrors left, an empty group list",
+    "tree-rules": "slice 3: a README in every folder, and no environment read with a default",
+    "config-readers": "slice 4: one environment reader for each program family",
+    "size-ceilings": "slice 5: oversized files and folders split by concern, with no pins",
+    "error-telemetry": "slice 6: where each part's errors go, then every catch site and marker made true",
+    "network-door": "slice 7: each outside service reached through one owner",
+    "computation-owners": "slice 7: the dashboard's pages compute nothing the server can",
+    "js-import-rules": "slice 7: the import rules the dashboard's pages keep",
+    "vocabulary-homes": "slice 7: one home for the words for tasks, sessions and verdicts",
+    "quiet-modules": "slice 7: the modules that must never log above info",
+    "pinned-config": "slice 7: the config values that must not drift",
+    "generated-current": "slice 7: any generated file, checked against its generator",
 }
 GATED = [check_id for check_id in catalog.IDS if check_id not in NOT_APPLICABLE and check_id not in NOT_YET]
 
@@ -60,8 +62,10 @@ def test_each_listed_check_is_in_the_catalog_once_with_its_reason() -> None:
 
 
 def test_lint_format_and_types_stay_gated() -> None:
-    # CI runs ruff and mypy only through the tools check, so listing it anywhere but the gated set would stop them.
+    # CI runs ruff and mypy only through the tools check, so listing it anywhere but the gated set would stop them;
+    # and the tools check runs mypy only over the packages pyproject's [tool.mypy] names.
     assert "tools" in GATED
+    assert tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["mypy"]["packages"]
 
 
 @pytest.mark.parametrize("check_id", GATED)
@@ -75,4 +79,4 @@ def test_a_check_not_yet_gated_still_fails(check_id: str) -> None:
     status, output = factory_check(check_id)
     if status == 0:
         pytest.fail(f"{check_id} passes now: move it from NOT_YET to the gated set\n{output}")
-    assert status == 1, f"{check_id} could not run (exit {status}), which is no verdict\n{output}"
+    assert status == 1 and cli.COULD_NOT_RUN not in output, f"{check_id} reached no verdict (exit {status})\n{output}"

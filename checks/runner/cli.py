@@ -29,6 +29,7 @@ from runtime.shared.settings import Settings, SettingsError
 
 LAST = "tests"  # the heaviest check runs alone, after the others
 DEPS = "deps"  # the optional scripts/dev verb that installs what the product's checks and tests read
+COULD_NOT_RUN = "the check could not run"  # how a check that raised is reported: a failure, never a verdict
 
 
 class Refusal(Exception):
@@ -94,7 +95,7 @@ def run_one(check_id: str, repo: Repo) -> list[str]:
     except ValuesError as exc:
         return exc.problems
     except Exception as exc:  # one check's fault must not hide the others' verdicts; it fails, loudly
-        return [f"the check could not run: {type(exc).__name__}: {exc}"]
+        return [f"{COULD_NOT_RUN}: {type(exc).__name__}: {exc}"]
 
 
 def report(results: dict[str, list[str]], out: TextIO) -> list[str]:
