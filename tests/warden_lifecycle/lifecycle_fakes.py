@@ -13,9 +13,9 @@ from runtime.shared import store
 from runtime.shared.models import WORKING, Session, Task
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden import registry
-from runtime.warden.backstop import Proc
 from runtime.warden.context import Caller, Clock, Context, GitHub, StackResult
+from runtime.warden.sessions import registry
+from runtime.warden.sessions.backstop import Proc
 
 ROOT = Path(__file__).resolve().parents[2]
 REMOTE = "git@github.com:acme/product.git"

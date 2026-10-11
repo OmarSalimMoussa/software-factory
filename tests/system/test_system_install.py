@@ -24,7 +24,7 @@ from runtime.system import (
 from runtime.system.host import DryHost, RealHost
 from runtime.system.job import Install
 from runtime.system.journal import Journal
-from runtime.warden import registry
+from runtime.warden.sessions import registry
 
 
 def _answered(job: Install) -> None:

@@ -11,8 +11,8 @@ from runtime.queue import formats, owner, pictures, proposals, tasks
 from runtime.queue.book import task_rel
 from runtime.queue.propose import propose, propose_none
 from runtime.shared.protocol import Refused
-from runtime.warden import backstop, registry
-from runtime.warden.backstop import Proc
+from runtime.warden.sessions import backstop, registry
+from runtime.warden.sessions.backstop import Proc
 
 PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\x00" * 17
 

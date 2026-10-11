@@ -4,8 +4,9 @@ import pytest
 from loop_fakes import World, answers, healthy
 
 from runtime.shared.protocol import Refused
-from runtime.warden import deploys, outage, probes
-from runtime.warden.probes import Answer, NetworkFailure
+from runtime.warden.delivery import deploys, outage
+from runtime.warden.health import probes
+from runtime.warden.health.probes import Answer, NetworkFailure
 
 PROD_RED = "prod red"
 

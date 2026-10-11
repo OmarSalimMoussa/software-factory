@@ -12,8 +12,9 @@ from runtime.queue import route as ladders
 from runtime.queue.book import Queue
 from runtime.shared.models import REQUEST_SEVERITIES
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import inbox, registry
+from runtime.warden import inbox
 from runtime.warden.context import Context
+from runtime.warden.sessions import registry
 
 Args = dict[str, Any]
 CAUSE_TRY = "cause-try"

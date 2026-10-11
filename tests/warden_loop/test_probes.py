@@ -8,8 +8,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 from loop_fakes import World, healthy
 
-from runtime.warden import probes
-from runtime.warden.probes import Answer, NetworkFailure, http_get
+from runtime.warden.health import probes
+from runtime.warden.health.probes import Answer, NetworkFailure, http_get
 
 
 class _Health(BaseHTTPRequestHandler):

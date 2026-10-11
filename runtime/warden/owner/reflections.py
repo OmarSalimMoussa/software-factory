@@ -21,8 +21,8 @@ from typing import Any
 from runtime.shared import store
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import registry
 from runtime.warden.context import Context
+from runtime.warden.sessions import registry
 from runtime.warden.verbs import ORCH, OWNER
 
 log = logging.getLogger(__name__)

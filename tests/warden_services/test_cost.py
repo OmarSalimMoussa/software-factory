@@ -9,8 +9,9 @@ import pytest
 from runtime.shared import settings, store
 from runtime.shared.models import RETIRED, WORKING, Session
 from runtime.shared.paths import Places
-from runtime.warden import cost, registry
 from runtime.warden.context import Context
+from runtime.warden.sessions import registry
+from runtime.warden.spend import cost
 
 OPUS, HAIKU = "claude-opus-5-5", "claude-haiku-5-5"
 PRICE = {"input": 15.0, "output": 75.0, "cache_read": 1.5, "cache_write": 18.75}

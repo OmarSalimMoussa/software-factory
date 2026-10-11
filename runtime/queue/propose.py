@@ -17,8 +17,8 @@ from runtime.queue.formats import one_line
 from runtime.shared import store
 from runtime.shared.models import RETIRED, STOPPED, Session
 from runtime.shared.protocol import Refused
-from runtime.warden import lifecycle, registry
 from runtime.warden.context import Context
+from runtime.warden.sessions import lifecycle, registry
 
 
 def propose(

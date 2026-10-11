@@ -10,7 +10,8 @@ from lifecycle_fakes import World
 from runtime.shared import store
 from runtime.shared.models import DEPRIORITIZED, RETIRED, WAITING, WORKING
 from runtime.shared.protocol import Refused
-from runtime.warden import lifecycle, outage, reap
+from runtime.warden.delivery import outage
+from runtime.warden.sessions import lifecycle, reap
 
 START: dict[str, Any] = {"role": "implementer", "task": "t-0001"}
 

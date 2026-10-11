@@ -7,7 +7,7 @@ import json
 from dashboard_rig import Rig
 
 from runtime.shared import store
-from runtime.warden import ops
+from runtime.warden.owner import ops
 
 STALE = {"ok": False, "refused": "stale", "reason": "This changed; here it is now."}
 

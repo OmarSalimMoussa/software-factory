@@ -15,8 +15,8 @@ from pathlib import Path
 
 from runtime.shared import store
 from runtime.shared.paths import Places
-from runtime.warden import reflections
 from runtime.warden.context import Context
+from runtime.warden.owner import reflections
 
 log = logging.getLogger("factory.warden")
 

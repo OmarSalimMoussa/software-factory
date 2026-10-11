@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from warden_fakes import FakeClock
 
-from runtime.warden import codes, ops
 from runtime.warden.context import Context
+from runtime.warden.owner import codes, ops
 
 
 def test_an_operation_a_stopped_warden_left_running_reads_failed_at_its_step(ctx: Context) -> None:

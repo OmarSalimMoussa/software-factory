@@ -12,8 +12,9 @@ from runtime.queue.book import task_rel
 from runtime.queue.propose import propose
 from runtime.shared.models import RETIRED, STOPPED, WAITING, WORKING
 from runtime.shared.protocol import Refused
-from runtime.warden import backstop, lifecycle, reflections, registry
-from runtime.warden.backstop import Proc
+from runtime.warden.owner import reflections
+from runtime.warden.sessions import backstop, lifecycle, registry
+from runtime.warden.sessions.backstop import Proc
 
 
 def test_a_reorder_from_a_stale_page_is_refused(world: World) -> None:

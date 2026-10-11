@@ -5,8 +5,8 @@ from typing import Any
 from warden_fakes import FakeClock
 
 from runtime.shared import store
-from runtime.warden import reflections
 from runtime.warden.context import Context
+from runtime.warden.owner import reflections
 
 
 def reflect(ctx: Context, kind: str, text: str) -> dict[str, Any]:

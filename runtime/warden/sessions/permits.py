@@ -22,9 +22,11 @@ from runtime.shared.models import DEPRIORITIZED, RETIRED, WAITING, WORKING, Sess
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.slots import leases
-from runtime.warden import cost, ops, registry
-from runtime.warden import outage as outage_record
 from runtime.warden.context import Context
+from runtime.warden.delivery import outage as outage_record
+from runtime.warden.owner import ops
+from runtime.warden.sessions import registry
+from runtime.warden.spend import cost
 
 ORCH, IMPL, DESIGN = "orchestrator", "implementer", "designer"
 FAMILY = {ORCH: "orch", IMPL: "impl", DESIGN: "design"}
@@ -33,7 +35,7 @@ CAP = {IMPL: "caps.implementers", DESIGN: "caps.designers"}
 FACTORY_REPO = "software-factory"
 LEVELS = ("green", "amber", "red", "unknown")
 SEVERE = "severe"
-# Where a switch of Claude accounts stands: its daemon restarting, or back (runtime/warden/accounts.py).
+# Where a switch of Claude accounts stands: its daemon restarting, or back (runtime/warden/owner/accounts.py).
 RESTARTING, BACK = "restarting", "back"
 # owner/name at the end of any git remote or GitHub name: git@host:owner/name.git, https://host/owner/name, owner/name.
 _REMOTE = re.compile(r"[:/]([^/:]+/[^/]+?)(?:\.git)?/*$")

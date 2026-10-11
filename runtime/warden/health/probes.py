@@ -27,8 +27,8 @@ from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden import deploys
 from runtime.warden.context import Context
+from runtime.warden.delivery import deploys
 from standard import config
 
 STAGING, PROD = "staging", "prod"

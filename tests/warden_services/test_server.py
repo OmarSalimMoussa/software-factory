@@ -12,8 +12,9 @@ from runtime.shared import protocol
 from runtime.shared.models import DEPRIORITIZED, RETIRED, WORKING, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden import registry, server
+from runtime.warden import server
 from runtime.warden.dispatch import AGENT_SOCKET, OWNER_SOCKET, Dispatcher, Doors
+from runtime.warden.sessions import registry
 from runtime.warden.verbs import ANY, Verb
 
 AGENT, OWNER, DASHBOARD, STRANGER = 1001, 1000, 1002, 1003

@@ -10,8 +10,10 @@ from loop_fakes import World, healthy
 from runtime.queue import formats
 from runtime.shared import store
 from runtime.shared.models import INBOXES, Request
-from runtime.warden import deploys, errors_import, inbox, loop, probes, telemetry
-from runtime.warden.probes import Answer
+from runtime.warden import inbox, loop
+from runtime.warden.delivery import deploys
+from runtime.warden.health import errors_import, probes, telemetry
+from runtime.warden.health.probes import Answer
 
 ROOT = Path(__file__).resolve().parents[2]
 

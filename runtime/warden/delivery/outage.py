@@ -15,8 +15,12 @@ from runtime.shared import models, store
 from runtime.shared.models import Outage, Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import deploys, inbox, probes, reflections, registry
+from runtime.warden import inbox
 from runtime.warden.context import Context
+from runtime.warden.delivery import deploys
+from runtime.warden.health import probes
+from runtime.warden.owner import reflections
+from runtime.warden.sessions import registry
 
 DOWN, FIXING, ON_STAGING, STOPPED = "down", "fixing", "on-staging", "stopped"
 FIX_ON_STAGING = ("on-staging", "promoted")  # task statuses that mean staging's build includes the fix
@@ -93,7 +97,7 @@ def fix_status(ctx: Context, task_status: str) -> None:
 def owner_stop_fix(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """The owner's Stop on the outage band: the fix session retires and no bypass run follows."""
     # Imported here: lifecycle's permits import this module.
-    from runtime.warden.lifecycle import retire_session
+    from runtime.warden.sessions.lifecycle import retire_session
 
     with ctx.lock:
         outage = read(ctx.places)

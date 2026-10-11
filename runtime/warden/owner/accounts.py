@@ -22,11 +22,12 @@ from runtime.shared.claude_accounts import ACTIVE, SHOWN, UNIT_TOKEN, AccountErr
 from runtime.shared.models import PENDING, REVIVING, WAITING, WORKING
 from runtime.shared.protocol import Refused, ok
 from runtime.system import layout
-from runtime.warden import backstop, launch, lifecycle, ops, permits, registry
 from runtime.warden.context import Context
-from runtime.warden.launch import LaunchError
-from runtime.warden.lifecycle import WARDEN
-from runtime.warden.permits import BACK, ORCH, RESTARTING
+from runtime.warden.owner import ops
+from runtime.warden.sessions import backstop, launch, lifecycle, permits, registry
+from runtime.warden.sessions.launch import LaunchError
+from runtime.warden.sessions.lifecycle import WARDEN
+from runtime.warden.sessions.permits import BACK, ORCH, RESTARTING
 
 KIND = "account"
 NOTE = "The factory switched Claude accounts; carry on where you left off."

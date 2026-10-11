@@ -5,9 +5,9 @@ import pytest
 from runtime.shared.models import WORKING, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden import registry, subagents
 from runtime.warden.context import Caller
 from runtime.warden.dispatch import Doors
+from runtime.warden.sessions import registry, subagents
 from runtime.warden.verbs import IMPL
 
 

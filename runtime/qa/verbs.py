@@ -19,8 +19,8 @@ from runtime.shared import store
 from runtime.shared.models import RETIRED, Session, Task
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import health, leases
-from runtime.warden import doing, registry
 from runtime.warden.context import Context
+from runtime.warden.sessions import doing, registry
 
 SURFACES_FILE = "check-values/surfaces.toml"
 

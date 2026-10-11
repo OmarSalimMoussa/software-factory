@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from runtime.warden import plan
 from runtime.warden.context import Context
+from runtime.warden.spend import plan
 
 WINDOWS = {"five_hour": {"used_percentage": 12, "resets_at": 1791558000}, "seven_day": None}
 

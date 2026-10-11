@@ -18,10 +18,13 @@ from runtime.shared import models, store
 from runtime.shared.models import PENDING, RETIRED, WAITING, WORKING, RecordError, Session, Task
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import leases
-from runtime.warden import backstop, doing, inbox, launch, ops, outage, permits, registry
+from runtime.warden import inbox
 from runtime.warden.context import Context
-from runtime.warden.launch import LaunchError
-from runtime.warden.permits import CAP, DESIGN, FAMILY, IMPL, ORCH, SEVERE, actor
+from runtime.warden.delivery import outage
+from runtime.warden.owner import ops
+from runtime.warden.sessions import backstop, doing, launch, permits, registry
+from runtime.warden.sessions.launch import LaunchError
+from runtime.warden.sessions.permits import CAP, DESIGN, FAMILY, IMPL, ORCH, SEVERE, actor
 
 log = logging.getLogger(__name__)
 OWNER, WARDEN = "owner", "warden"
@@ -338,7 +341,7 @@ def owner_stop(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[s
             raise Refused("retired", f"{target.name} is already retired")
         tree = registry.subtree(sessions, target.id)
         if target.role == ORCH:
-            from runtime.warden.codes import check_code
+            from runtime.warden.owner.codes import check_code
 
             check_code(ctx, args.get("code"), lock_exempt=True)  # a code lock never blocks stopping the factory
             tree = [target, *(s for s in sessions.values() if s is not target)]

@@ -9,8 +9,8 @@ from lifecycle_fakes import World
 
 from runtime.shared import store
 from runtime.shared.protocol import Refused
-from runtime.warden import doing, launch, lifecycle, session_settings
-from runtime.warden.launch import LaunchError
+from runtime.warden.sessions import doing, launch, lifecycle, session_settings
+from runtime.warden.sessions.launch import LaunchError
 
 FIXTURE = Path(__file__).resolve().parents[2] / "testdata" / "fixture-product"
 

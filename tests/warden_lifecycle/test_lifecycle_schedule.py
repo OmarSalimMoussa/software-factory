@@ -8,7 +8,8 @@ from lifecycle_fakes import World
 from runtime.queue import proposals
 from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, STOPPED, WORKING
-from runtime.warden import crashwatch, lifecycle, schedule
+from runtime.warden import schedule
+from runtime.warden.sessions import crashwatch, lifecycle
 
 
 @pytest.fixture(autouse=True)

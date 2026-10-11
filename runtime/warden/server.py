@@ -24,9 +24,9 @@ from runtime.shared import protocol
 from runtime.shared.models import RETIRED
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden import registry
 from runtime.warden.context import Caller
 from runtime.warden.dispatch import AGENT_SOCKET, OWNER_SOCKET, Dispatcher
+from runtime.warden.sessions import registry
 from runtime.warden.verbs import DASH, OWNER
 
 log = logging.getLogger("factory.warden")

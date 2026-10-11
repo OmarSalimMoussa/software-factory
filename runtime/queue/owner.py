@@ -15,9 +15,10 @@ from runtime.queue.formats import dump_request, one_line
 from runtime.queue.statuses import OWNER
 from runtime.shared.models import RETIRED, STOPPED, Task
 from runtime.shared.protocol import Refused
-from runtime.warden import inbox, lifecycle, permits, registry
+from runtime.warden import inbox
 from runtime.warden.context import Context
-from runtime.warden.launch import LaunchError
+from runtime.warden.sessions import lifecycle, permits, registry
+from runtime.warden.sessions.launch import LaunchError
 
 log = logging.getLogger(__name__)
 

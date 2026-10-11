@@ -18,9 +18,9 @@ from runtime.shared import order, store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, Session, Task
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden import lifecycle, permits, registry
 from runtime.warden.context import Context
-from runtime.warden.permits import DESIGN, IMPL
+from runtime.warden.sessions import lifecycle, permits, registry
+from runtime.warden.sessions.permits import DESIGN, IMPL
 
 log = logging.getLogger(__name__)
 WARDEN = lifecycle.WARDEN

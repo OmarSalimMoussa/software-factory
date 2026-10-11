@@ -9,8 +9,8 @@ from warden_fakes import FakeLauncher
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
-from runtime.warden import reap, registry
 from runtime.warden.context import Context, StackResult
+from runtime.warden.sessions import reap, registry
 
 
 def session(sid: str, state: str, worktree: str, **fields: Any) -> Session:

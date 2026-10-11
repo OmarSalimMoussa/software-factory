@@ -14,9 +14,9 @@ from runtime.shared import models, store
 from runtime.shared.models import WAITING, WORKING, Card, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden import lifecycle, registry
 from runtime.warden.context import Context
-from runtime.warden.launch import LaunchError
+from runtime.warden.sessions import lifecycle, registry
+from runtime.warden.sessions.launch import LaunchError
 
 log = logging.getLogger(__name__)
 

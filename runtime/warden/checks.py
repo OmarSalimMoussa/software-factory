@@ -23,8 +23,8 @@ from runtime.shared import store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import registry
 from runtime.warden.context import Context
+from runtime.warden.sessions import registry
 
 IMPL = "implementer"
 TURN = "turn"

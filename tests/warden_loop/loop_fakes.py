@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.warden.context import Clock, Context, StackResult
-from runtime.warden.probes import Answer
+from runtime.warden.health.probes import Answer
 
 
 class FakeClock(Clock):

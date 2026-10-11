@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from dashboard_rig import Rig
 
-from runtime.warden.messages import PREFIX
+from runtime.warden.owner.messages import PREFIX
 
 THREAD = [
     {"who": "You", "at": "Oct 9, 11:30", "text": "Check Safari first: most of the reports come from it."},

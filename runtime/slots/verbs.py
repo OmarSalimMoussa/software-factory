@@ -18,8 +18,9 @@ from runtime.shared import store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import leases
-from runtime.warden import public, registry
+from runtime.warden import public
 from runtime.warden.context import Context, StackResult
+from runtime.warden.sessions import registry
 
 ORCH, IMPL = "orchestrator", "implementer"
 WORD = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@+-]{0,127}$")

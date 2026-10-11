@@ -42,28 +42,28 @@ def _o(handler: str, coded: bool = False) -> Verb:
 
 VERBS: dict[str, Verb] = {
     # sessions and their lifecycle (1B-1)
-    "start": _v("runtime.warden.lifecycle:start", ORCH, OWNER),
-    "stop": _v("runtime.warden.lifecycle:stop", ORCH, OWNER),
-    "resume": _v("runtime.warden.lifecycle:resume", ORCH, OWNER),
-    "extend": _v("runtime.warden.lifecycle:extend", ORCH, OWNER),
-    "doing": _v("runtime.warden.lifecycle:set_doing", *SESSIONS),
+    "start": _v("runtime.warden.sessions.lifecycle:start", ORCH, OWNER),
+    "stop": _v("runtime.warden.sessions.lifecycle:stop", ORCH, OWNER),
+    "resume": _v("runtime.warden.sessions.lifecycle:resume", ORCH, OWNER),
+    "extend": _v("runtime.warden.sessions.lifecycle:extend", ORCH, OWNER),
+    "doing": _v("runtime.warden.sessions.lifecycle:set_doing", *SESSIONS),
     # contract: added by the coordinator; the guard's SubagentStart and SubagentStop hooks report a subagent
-    "subagent.start": _v("runtime.warden.subagents:started", *SESSIONS),
-    "subagent.end": _v("runtime.warden.subagents:ended", *SESSIONS),
+    "subagent.start": _v("runtime.warden.sessions.subagents:started", *SESSIONS),
+    "subagent.end": _v("runtime.warden.sessions.subagents:ended", *SESSIONS),
     # the loop, probes, outage and pushes (1B-2)
     "tick": _v("runtime.warden.loop:tick", ORCH),
     "inbox": _v("runtime.warden.inbox:read", ORCH),
     "inbox.wait": _v("runtime.warden.inbox:wait", ORCH),
-    "push": _v("runtime.warden.github_push:push_checked", ORCH),
+    "push": _v("runtime.warden.delivery.github_push:push_checked", ORCH),
     "check": _v("runtime.warden.checks:check", ORCH, IMPL),
-    "promote": _v("runtime.warden.github_push:promote_cli", OWNER),
+    "promote": _v("runtime.warden.delivery.github_push:promote_cli", OWNER),
     # reflections, status, settings (1B-3)
-    "reflect": _v("runtime.warden.reflections:append", *ANY, kinds=frozenset({INTAKE, TRIAGE})),
+    "reflect": _v("runtime.warden.owner.reflections:append", *ANY, kinds=frozenset({INTAKE, TRIAGE})),
     "status": _v("runtime.warden.status:status", *ANY, kinds=READERS),
     "settings.show": _v("runtime.warden.status:settings_show", *ANY, kinds=READERS),
     # contract: added by FB6, read-only telemetry; the guard lets only intake, triage and testers among subagents ask
-    "errors": _v("runtime.warden.telemetry:errors", *SESSIONS, kinds=READERS),
-    "traces": _v("runtime.warden.telemetry:traces", *SESSIONS, kinds=READERS),
+    "errors": _v("runtime.warden.health.telemetry:errors", *SESSIONS, kinds=READERS),
+    "traces": _v("runtime.warden.health.telemetry:traces", *SESSIONS, kinds=READERS),
     # the queue (1C)
     "request.new": _v("runtime.queue.verbs:request_new", *ANY),
     "triage.apply": _v("runtime.queue.verbs:triage_apply", ORCH),
@@ -97,9 +97,11 @@ VERBS: dict[str, Verb] = {
     # contract: added by 2A. The dashboard cannot read the warden's state, so pictures and evidence come as bytes.
     "picture": _o("runtime.warden.snapshot:picture"),
     "evidence": _o("runtime.warden.snapshot:evidence"),
-    "op.get": _o("runtime.warden.ops:get"),
-    "device.admit": _o("runtime.warden.codes:admit_device", coded=True),
-    "device.verify": _o("runtime.warden.codes:verify_device"),  # contract: added by 1B-3, a device token ok/expired
+    "op.get": _o("runtime.warden.owner.ops:get"),
+    "device.admit": _o("runtime.warden.owner.codes:admit_device", coded=True),
+    "device.verify": _o(
+        "runtime.warden.owner.codes:verify_device"
+    ),  # contract: added by 1B-3, a device token ok/expired
     "proposal.approve": _o("runtime.queue.verbs:owner_approve"),
     "proposal.later": _o("runtime.queue.verbs:owner_later"),
     "proposal.drop": _o("runtime.queue.verbs:owner_drop"),
@@ -116,20 +118,22 @@ VERBS: dict[str, Verb] = {
     "needs.designer": _o("runtime.queue.verbs:owner_to_designer"),
     "needs.park": _o("runtime.queue.verbs:owner_park"),
     "needs.answer": _o("runtime.queue.verbs:owner_answer"),
-    "agent.message": _o("runtime.warden.messages:send"),  # contract: the owner's message to a running session
-    "agent.stop": _o("runtime.warden.lifecycle:owner_stop"),  # coded for the orchestrator: checked in the handler
-    "orchestrator.start": _o("runtime.warden.lifecycle:owner_start_orchestrator"),
-    "factory.pause": _o("runtime.warden.lifecycle:owner_pause", coded=True),
-    "factory.resume": _o("runtime.warden.lifecycle:owner_resume"),
-    "outage.stop": _o("runtime.warden.outage:owner_stop_fix"),
-    "settings.save": _o("runtime.warden.settings_save:save", coded=True),
-    "repo.change": _o("runtime.warden.settings_save:change_repo", coded=True),
-    "rule.switch": _o("runtime.warden.settings_save:switch_rule", coded=True),
-    "push.prod": _o("runtime.warden.github_push:push_prod", coded=True),
-    "push.back": _o("runtime.warden.github_push:push_back", coded=True),
+    "agent.message": _o("runtime.warden.owner.messages:send"),  # contract: the owner's message to a running session
+    "agent.stop": _o(
+        "runtime.warden.sessions.lifecycle:owner_stop"
+    ),  # coded for the orchestrator: checked in the handler
+    "orchestrator.start": _o("runtime.warden.sessions.lifecycle:owner_start_orchestrator"),
+    "factory.pause": _o("runtime.warden.sessions.lifecycle:owner_pause", coded=True),
+    "factory.resume": _o("runtime.warden.sessions.lifecycle:owner_resume"),
+    "outage.stop": _o("runtime.warden.delivery.outage:owner_stop_fix"),
+    "settings.save": _o("runtime.warden.owner.settings_save:save", coded=True),
+    "repo.change": _o("runtime.warden.owner.settings_save:change_repo", coded=True),
+    "rule.switch": _o("runtime.warden.owner.settings_save:switch_rule", coded=True),
+    "push.prod": _o("runtime.warden.delivery.github_push:push_prod", coded=True),
+    "push.back": _o("runtime.warden.delivery.github_push:push_back", coded=True),
     # contract: added by FB9, the agents' Claude accounts. No code: only the owner's own uid reaches owner.sock.
-    "account.list": _o("runtime.warden.accounts:list_accounts"),
-    "account.add": _o("runtime.warden.accounts:add"),
-    "account.remove": _o("runtime.warden.accounts:remove"),
-    "account.use": _o("runtime.warden.accounts:use"),
+    "account.list": _o("runtime.warden.owner.accounts:list_accounts"),
+    "account.add": _o("runtime.warden.owner.accounts:add"),
+    "account.remove": _o("runtime.warden.owner.accounts:remove"),
+    "account.use": _o("runtime.warden.owner.accounts:use"),
 }

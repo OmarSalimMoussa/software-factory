@@ -22,9 +22,10 @@ from runtime.queue.book import Queue
 from runtime.shared import store
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden import imports, telemetry
+from runtime.warden import imports
 from runtime.warden.context import Context
-from runtime.warden.telemetry import Issue
+from runtime.warden.health import telemetry
+from runtime.warden.health.telemetry import Issue
 
 log = logging.getLogger(__name__)
 

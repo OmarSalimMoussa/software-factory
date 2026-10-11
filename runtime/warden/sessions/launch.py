@@ -28,8 +28,8 @@ from runtime.shared.paths import AGENT_USER, Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.system.layout import DAEMON_UNIT
-from runtime.warden import reap, registry, session_settings
 from runtime.warden.context import Context, StackResult
+from runtime.warden.sessions import reap, registry, session_settings
 
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"

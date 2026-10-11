@@ -13,7 +13,7 @@ from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
 from runtime.shared import store
 from runtime.shared.models import REVIVING, Task
 from runtime.shared.protocol import Refused
-from runtime.warden import backstop, launch, lifecycle, permits, registry
+from runtime.warden.sessions import backstop, launch, lifecycle, permits, registry
 
 TASK = Task("t-0001", "T", ["r-2026-10-09-0001"], "G1", "major", ["ui"], "queued", "2026-10-09T12:00:00Z", "")
 

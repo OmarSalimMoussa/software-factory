@@ -177,7 +177,7 @@ def install_digest(ctx: Install) -> str:
     install = ctx.places.install
     code = (
         f"import sys; from pathlib import Path; sys.path.insert(0, {str(install)!r}); "
-        f"from runtime.warden.vitals import install_digest; print(install_digest(Path({str(install)!r})))"
+        f"from runtime.warden.health.vitals import install_digest; print(install_digest(Path({str(install)!r})))"
     )
     return ctx.host.run([layout.PYTHON, "-I", "-c", code]).strip() or "<digest>"
 

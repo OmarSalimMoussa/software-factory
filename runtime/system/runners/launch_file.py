@@ -21,7 +21,7 @@ from typing import Any
 from runtime.shared.settings import SCHEMA, Settings
 from runtime.slots import leases
 from runtime.system import layout
-from runtime.warden import launch, session_settings
+from runtime.warden.sessions import launch, session_settings
 
 SESSION, COMMAND, STACK, MESSAGE, CHECK = "session", "command", "stack", "message", "check"
 REFUSED = 2

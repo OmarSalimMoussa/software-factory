@@ -21,8 +21,8 @@ from runtime.shared.models import RETIRED, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
-from runtime.warden import registry
 from runtime.warden.context import Context
+from runtime.warden.sessions import registry
 from runtime.warden.verbs import ORCH
 
 log = logging.getLogger("factory.warden")

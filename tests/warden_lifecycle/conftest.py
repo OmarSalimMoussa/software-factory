@@ -9,8 +9,9 @@ from lifecycle_fakes import ROOT, FakeClock, FakeLauncher, Queue, World
 
 from runtime.shared import settings as settings_mod
 from runtime.shared.paths import Places
-from runtime.warden import backstop, launch, permits, settings_save
-from runtime.warden.backstop import Proc
+from runtime.warden.owner import settings_save
+from runtime.warden.sessions import backstop, launch, permits
+from runtime.warden.sessions.backstop import Proc
 
 
 @pytest.fixture

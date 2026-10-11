@@ -12,7 +12,7 @@ from runtime.shared.settings import SCHEMA, SettingsError, _flatten, build
 from runtime.system import layout
 from runtime.system.host import Account, Host
 from runtime.system.job import Install, github_name, github_origin, refuse
-from runtime.warden import registry
+from runtime.warden.sessions import registry
 
 # What the owner sets up before an install; the packages step installs the rest (nftables among them).
 _MACHINE_TOOLS = ("git", "tar", "systemctl", "systemd-run", "runuser", "loginctl", "useradd", "tailscale")

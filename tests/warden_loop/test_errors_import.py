@@ -14,8 +14,8 @@ from runtime.queue import formats
 from runtime.queue.book import Queue, request_rel, task_rel
 from runtime.shared import store
 from runtime.shared.models import Task
-from runtime.warden import errors_import, telemetry
-from runtime.warden.telemetry import Reply
+from runtime.warden.health import errors_import, telemetry
+from runtime.warden.health.telemetry import Reply
 
 GLITCHTIP = "https://box.test:8200"
 SERVER = {

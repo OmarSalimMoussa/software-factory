@@ -9,7 +9,9 @@ from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, STOPPED, WAITING, WORKING
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
-from runtime.warden import crashwatch, lifecycle, ops, schedule
+from runtime.warden import schedule
+from runtime.warden.owner import ops
+from runtime.warden.sessions import crashwatch, lifecycle
 
 
 def rule(call: Any, *args: Any) -> str:

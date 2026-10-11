@@ -9,7 +9,7 @@ from lifecycle_fakes import World
 
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, WORKING
 from runtime.shared.protocol import Refused
-from runtime.warden import messages
+from runtime.warden.owner import messages
 
 
 def test_a_running_session_gets_the_owners_message_as_its_own_turn(world: World) -> None:

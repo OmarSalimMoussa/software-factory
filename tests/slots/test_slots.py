@@ -9,8 +9,8 @@ from runtime.shared.models import RETIRED
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.slots.verbs import slot
-from runtime.warden import registry
 from runtime.warden.context import StackResult
+from runtime.warden.sessions import registry
 
 
 def _implementer(world: World, n: int) -> None:

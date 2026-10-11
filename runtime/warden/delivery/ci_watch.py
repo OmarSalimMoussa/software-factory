@@ -15,9 +15,11 @@ from runtime.queue.book import Queue
 from runtime.shared import store
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden import deploys, imports, probes
+from runtime.warden import imports
 from runtime.warden.context import Context
-from runtime.warden.github import GitHubError
+from runtime.warden.delivery import deploys
+from runtime.warden.delivery.github import GitHubError
+from runtime.warden.health import probes
 
 TIMED = imports.Timed("CI watch", "following CI's run of the last push", "watch.ci_poll_minutes",
                       expected=(GitHubError, Refused, OSError), told=(GitHubError,))  # fmt: skip

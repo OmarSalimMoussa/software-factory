@@ -29,9 +29,12 @@ from runtime.shared.models import Probe
 from runtime.shared.paths import PROMOTE_JOB, Places
 from runtime.shared.protocol import Refused, ok
 from runtime.shared.settings import Settings
-from runtime.warden import checks, deploys, inbox, ops, probes
+from runtime.warden import checks, inbox
 from runtime.warden.context import Context
-from runtime.warden.github import GitHubError
+from runtime.warden.delivery import deploys
+from runtime.warden.delivery.github import GitHubError
+from runtime.warden.health import probes
+from runtime.warden.owner import ops
 
 log = logging.getLogger(__name__)
 _FULL_SHA = re.compile(r"^[0-9a-f]{40}$")

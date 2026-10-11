@@ -15,7 +15,7 @@ from runtime.guard.commit_check import refusal
 from runtime.guard.facts import read_settings
 from runtime.guard.writes import is_protected, protected_paths
 from runtime.shared.protocol import Refused
-from runtime.warden import github_push
+from runtime.warden.delivery import github_push
 
 
 @pytest.mark.parametrize(

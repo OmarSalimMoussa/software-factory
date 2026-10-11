@@ -11,8 +11,9 @@ from runtime.shared import store
 from runtime.shared.models import DEPRIORITIZED, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden import ops, registry, settings_save
 from runtime.warden.context import Context
+from runtime.warden.owner import ops, settings_save
+from runtime.warden.sessions import registry
 
 HAIKU = "claude-haiku-5-5"
 

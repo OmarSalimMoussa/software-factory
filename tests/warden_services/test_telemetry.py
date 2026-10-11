@@ -9,9 +9,9 @@ from typing import Any
 import pytest
 
 from runtime.shared import store
-from runtime.warden import telemetry
 from runtime.warden.context import Context
-from runtime.warden.telemetry import Reply
+from runtime.warden.health import telemetry
+from runtime.warden.health.telemetry import Reply
 
 SERVER = {
     "glitchtip": {"url": "https://box.test:8200", "org": "notes", "token": "tok-server"},

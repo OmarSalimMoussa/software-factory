@@ -15,7 +15,7 @@ from runtime.dashboard.views import ops
 from runtime.dashboard.views.settings import LABELS
 from runtime.shared import models, store
 from runtime.shared.settings import SCHEMA
-from runtime.warden import deploys
+from runtime.warden.delivery import deploys
 
 BROKEN = {"broken", "id", "error"}
 

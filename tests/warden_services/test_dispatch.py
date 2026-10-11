@@ -9,9 +9,9 @@ from warden_fakes import FakeClock, code_now
 from runtime.shared import protocol, totp
 from runtime.shared.models import WORKING, Session
 from runtime.shared.protocol import Refused
-from runtime.warden import registry
 from runtime.warden.context import Caller, Context
 from runtime.warden.dispatch import AGENT_SOCKET, OWNER_SOCKET, Dispatcher, Doors
+from runtime.warden.sessions import registry
 from runtime.warden.verbs import ANY, DASH, IMPL, OWNER, Verb
 
 DASHBOARD = Caller(kind="dashboard", role=DASH)

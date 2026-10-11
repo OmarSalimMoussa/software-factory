@@ -23,8 +23,8 @@ from typing import Any
 
 from runtime.shared import models, store
 from runtime.shared.models import CostRecord, Session
-from runtime.warden import registry
 from runtime.warden.context import Context
+from runtime.warden.sessions import registry
 
 log = logging.getLogger("factory.warden")
 

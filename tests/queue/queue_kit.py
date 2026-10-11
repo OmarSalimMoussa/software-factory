@@ -16,8 +16,8 @@ from runtime.queue.book import Queue, request_rel
 from runtime.shared import settings as settings_mod
 from runtime.shared.models import Request, Session, Task
 from runtime.shared.paths import Places
-from runtime.warden import registry
 from runtime.warden.context import Caller, Clock, Context, StackResult
+from runtime.warden.sessions import registry
 
 ROOT = Path(__file__).resolve().parents[2]
 GOAL = (

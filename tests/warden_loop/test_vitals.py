@@ -9,7 +9,8 @@ from pathlib import Path
 import pytest
 from loop_fakes import World
 
-from runtime.warden import backstop, vitals
+from runtime.warden.health import vitals
+from runtime.warden.sessions import backstop
 
 
 @pytest.mark.parametrize(

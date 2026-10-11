@@ -20,8 +20,9 @@ from runtime.shared.models import RETIRED, Request, Task
 from runtime.shared.order import Ranking, ordered
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden import checks, inbox, registry
+from runtime.warden import checks, inbox
 from runtime.warden.context import Context
+from runtime.warden.sessions import registry
 
 LANDED = frozenset({"merged", "checked", "on-staging", "promoted", "closed"})
 SCORED = frozenset({"queued", "parked", "proposed"})
