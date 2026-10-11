@@ -7,7 +7,7 @@ import dataclasses
 import pytest
 from queue_kit import PICTURE, World
 
-from runtime.queue import cards, formats, owner, proposals
+from runtime.queue import cards, formats, owner, proposals, turn
 from runtime.queue.book import task_rel
 from runtime.queue.propose import propose
 from runtime.shared.models import RETIRED, STOPPED, WAITING, WORKING
@@ -127,6 +127,24 @@ def test_the_owners_extend_raises_the_live_sessions_limit_and_tells_it_and_park_
     owner.decide(world.owner(), again.id, "park")
     assert registry.read(world.places)["s-impl"].retired == STOPPED and world.launcher.stopped == ["s-impl"]
     assert world.queue().task(task_id).status == "parked"
+
+
+def test_the_owners_extend_of_a_task_stopped_in_its_merge_turn_sends_it_back_for_its_next_turn(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    task_id = _stuck(world, monkeypatch, status="turn")
+    cards.spent(world.ctx(), registry.read(world.places)["s-impl"], "qa", "spent again")
+    card = next(c for c in cards.read(world.places) if c.kind == "decide")
+    other = world.task(branch="impl-b")  # takes the turn while the owner decides
+    world.write_raw(task_rel(other.id), formats.dump_task(dataclasses.replace(other, status="qa-clean", run=1)))
+    world.launcher.git = lambda argv: (0, "c0ffee" * 6 + "abcd\n")
+    assert turn.next_turn(world.ctx(), {}, None)["task"] == other.id
+
+    owner.decide(world.owner(), card.id, "extend")
+
+    assert world.queue().task(task_id).status == "qa-clean"
+    assert turn.holder(world.places) == {"task": other.id, "branch": "impl-b", "base": "c0ffee" * 6 + "abcd"}
+    assert "Your merge turn ended while you waited" in world.launcher.messages[-1][1]
 
 
 def test_the_owners_extend_of_a_designers_spent_limit_sends_the_task_back_to_its_designer(

@@ -184,7 +184,8 @@ def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
             registry.write(ctx.places, sessions)
         cards.settle(ctx, found, card, kind)
     if live is not None and choice == "extend":
-        _tell(ctx, live.id, f"The owner extended your {card.limit} to {extra} more than the setting: carry on.")
+        again = " Your merge turn ended while you waited: it comes back with the next turn." if to == "qa-clean" else ""
+        _tell(ctx, live.id, f"The owner extended your {card.limit} to {extra} more than the setting: carry on.{again}")
     elif live is not None:
         lifecycle.retire_session(ctx, live.id, STOPPED, lifecycle.OWNER)
     ctx.post_event(kind, {"task": card.task, "card": card_id})
@@ -193,11 +194,12 @@ def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
 
 def _before_decide(queue: Queue, task_id: str) -> str:
     """The running status a spent limit took the task from: a designer's task goes back to designing, an
-    implementer's to where it was, so its own session carries on."""
+    implementer's to where it was, so its own session carries on. A merge turn is not held while the owner
+    decides: the task waits for its next one, qa-clean."""
     moves = [e for e in queue.read_log(task_id) if e.get("to") == "decide" and e.get("from")]
     if not moves:
         raise Refused("decide", f"{task_id}'s log says no status it came to the decide card from")
-    return moves[-1]["from"]
+    return "qa-clean" if moves[-1]["from"] == "turn" else str(moves[-1]["from"])
 
 
 def _tell(ctx: Context, sid: str, message: str) -> None:

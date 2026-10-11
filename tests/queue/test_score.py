@@ -8,6 +8,7 @@ import pytest
 from queue_kit import World
 
 from runtime.queue import goal, tasks
+from runtime.queue.book import Queue
 from runtime.queue.score import score
 from runtime.shared import order
 from runtime.shared.models import Request, Task
@@ -100,3 +101,21 @@ def test_a_task_scored_between_rescores_is_aged_as_of_the_last_one_like_the_task
     assert world.queue().task(second.id).score == world.queue().task(first.id).score
     tasks.rescore(world.ctx())
     assert world.queue().task(second.id).score == world.queue().task(first.id).score == 72.5  # both a week older
+
+
+def test_a_rescore_that_could_not_write_its_scores_is_tried_again(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    task = world.task()
+    world.clock.at += 7 * DAY  # its age part has grown
+
+    def full(self: object, changes: object, pictures: object = None) -> None:
+        raise OSError("No space left on device")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(Queue, "write", full)
+        with pytest.raises(OSError):
+            tasks.rescore(world.ctx())
+    assert tasks.rescored_at(world.places) is None  # so the next tick rescores again
+    assert tasks.rescore(world.ctx()) == 1 and tasks.rescored_at(world.places) == world.clock.at
+    assert world.queue().task(task.id).score == 72.5

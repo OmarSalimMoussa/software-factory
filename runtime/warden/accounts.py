@@ -19,7 +19,7 @@ from typing import Any
 
 from runtime.shared import claude_accounts, store
 from runtime.shared.claude_accounts import ACTIVE, SHOWN, UNIT_TOKEN, AccountError
-from runtime.shared.models import REVIVING, WAITING, WITH_PARENT, WORKING
+from runtime.shared.models import REVIVING, WAITING, WORKING
 from runtime.shared.protocol import Refused, ok
 from runtime.system import layout
 from runtime.warden import backstop, launch, lifecycle, ops, permits, registry
@@ -196,8 +196,7 @@ def _bring_back(ctx: Context, ids: list[str]) -> str:
             if sid in backstop.processes():
                 back.append(s.name)
                 continue
-            running = [c for c in registry.children(sessions, sid) if c.state in (WORKING, WAITING)]
-            lifecycle.retire(ctx, running, s, WITH_PARENT, WARDEN, "ended when the factory switched Claude accounts")
+            lifecycle.end_children(ctx, sessions, s, "ended when the factory switched Claude accounts")
             try:
                 launch.resume(ctx, s, NOTE)
             except (LaunchError, Refused) as exc:

@@ -123,6 +123,7 @@ SCHEMA: dict[str, Spec] = {
     "watch.push_wait_minutes": Spec("int", 5, 240),  # contract: added by 1B-2
     "watch.deploy_minutes": Spec("int", 5, 240),
     "watch.ci_poll_minutes": Spec("int", 1, 60),
+    "watch.branch_retry_minutes": Spec("int", 1, 60),
     "watch.resume_tries": Spec("int", 1, 5),
     "watch.crash_window_minutes": Spec("int", 5, 1440),
     "watch.resume_backoff_seconds": Spec("int", 5, 600),

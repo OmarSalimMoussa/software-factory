@@ -135,10 +135,10 @@ class Approval:
     model: str
     by: str
     at: str
+    # The rung `factory route` named from the task's facts when it was proposed (a change to them voids the
+    # proposal): a start whose facts now name a higher one is refused.
+    routed: int
     digest: str = ""  # contract: R20, the hash of the title, rung, model and picture the owner approved
-    # The rung `factory route` named from the task's facts when the owner approved: a start whose facts now name a
-    # higher one is refused. None in an approval an earlier factory made.
-    routed: int | None = None
 
 
 @dataclass(slots=True)

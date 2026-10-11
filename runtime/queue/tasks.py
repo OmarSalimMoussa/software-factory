@@ -11,7 +11,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import approvals, documents, formats, goal, intake, proposals, statuses
+from runtime.queue import approvals, documents, formats, goal, intake, proposals, route, statuses
 from runtime.queue.book import Queue, task_rel
 from runtime.queue.score import score
 from runtime.queue.statuses import OWNER, WARDEN
@@ -159,10 +159,13 @@ def goal_ranks(ctx: Context) -> dict[str, int]:
 def scored(ctx: Context, queue: Queue, task: Task, goals: Mapping[str, int]) -> Task:
     """The task scored as of the last rescore: a score's age part is fixed when it is written, so every waiting
     task's is measured from the same time, and the order reads them side by side."""
-    reqs = [queue.request(r) for r in task.requests]
     at = rescored_at(ctx.places)
-    return dataclasses.replace(task, score=score(task, reqs, goals, ctx.clock.now() if at is None else at,
-                                                 ctx.settings()))  # fmt: skip
+    return _scored_at(ctx, queue, task, goals, ctx.clock.now() if at is None else at)
+
+
+def _scored_at(ctx: Context, queue: Queue, task: Task, goals: Mapping[str, int], at: float) -> Task:
+    reqs = [queue.request(r) for r in task.requests]
+    return dataclasses.replace(task, score=score(task, reqs, goals, at, ctx.settings()))
 
 
 def _rescored_path(places: Places) -> Path:
@@ -269,6 +272,12 @@ def set_facts(ctx: Context, task_id: str, args: Mapping[str, Any]) -> Task:
         approval = approvals.current(ctx.places, task_id)
         if approval is not None and not approvals.matches(approval, changed):
             changed = transition(ctx, queue, changed, "proposed", "void", WARDEN, "what was approved changed")
+        # A proposal stands on the route its facts named, or on a reason to differ given against that route: facts
+        # that route elsewhere now send it back, to be proposed again on them.
+        routed = route.route(changed, ctx.settings())
+        if changed.status == "proposed" and routed != route.route(task, ctx.settings()):
+            changed = transition(ctx, queue, changed, "queued", "void", WARDEN,
+                                 f"its facts route it to rung {routed} now: propose it again")  # fmt: skip
     return changed
 
 
@@ -359,14 +368,16 @@ def rescore(ctx: Context) -> int:
     """Score every waiting task again, as of now, as after a change to GOAL.md; how many scores changed."""
     queue = Queue.of(ctx)
     goals = goal_ranks(ctx)
+    now = ctx.clock.now()
     with ctx.lock, queue.lock():
-        store.write_json(_rescored_path(ctx.places), {"at": ctx.clock.now()})
         changes = {}
         for task in queue.tasks()[0]:
             if task.status in SCORED:
-                new = scored(ctx, queue, task, goals)
+                new = _scored_at(ctx, queue, task, goals, now)
                 if new.score != task.score:
                     changes[task_rel(task.id)] = formats.dump_task(new)
         if changes:
             queue.write(changes)
+        # Only once the scores are written: a rescore that failed is tried again at the next tick.
+        store.write_json(_rescored_path(ctx.places), {"at": now})
     return len(changes)

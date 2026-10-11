@@ -51,7 +51,7 @@ def record(places: Places, task: Task, model: str, at: str, routed: int) -> Appr
     """The owner's approval of ``task`` at its run on ``model``, with the rung its facts routed to then."""
     if task.run is None:
         raise ValueError(f"{task.id} has no run to approve")
-    approval = Approval(task.id, task.run, model, "owner", at, digest(task, model), routed)
+    approval = Approval(task.id, task.run, model, "owner", at, routed, digest(task, model))
     store.write_json(_path(places, task.id), models.dump(approval), mode=0o600)
     return approval
 

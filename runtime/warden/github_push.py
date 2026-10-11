@@ -302,19 +302,39 @@ def _staging_build(ctx: Context) -> str:
         raise Refused("staging-unknown", "staging has not been probed yet: wait a minute, then push")
     if not staging.ok:
         raise Refused("staging-red", f"staging is red ({staging.error}): fix staging before pushing it to prod")
-    # Only a build known to be on GitHub's default branch goes: a commit GitHub's branch does not hold reads as
-    # unknown, as does one the mirror could not fetch.
-    if deploys.on_default(ctx.places, probes.STAGING) is not True:
-        raise Refused("staging-pinned", staging_off_default(ctx.settings().get_str("repo.default_branch")))
+    # Only a build known to be on GitHub's default branch goes.
+    on_default = deploys.on_default(ctx.places, probes.STAGING)
+    if on_default is not True:
+        raise Refused("staging-pinned", staging_off_default(ctx.settings(), on_default))
     prod = _latest(ctx, probes.PROD)
     if prod is not None and prod.ok and prod.commit == staging.commit:
         raise Refused("nothing-to-push", f"prod already runs {staging.commit[:12]}, the build staging runs")
     return staging.commit
 
 
-def staging_off_default(branch: str) -> str:
-    return (f"Staging's build is not known to be on {branch} as GitHub has it: only {branch}'s checked work goes to "
-            f"prod. Run CI on {branch} to put staging back on it.")  # fmt: skip
+def staging_off_default(settings: Settings, on_default: bool | None) -> str:
+    """Why staging's build may not go to prod, when it is not known to be on the default branch."""
+    branch = settings.get_str("repo.default_branch")
+    if on_default is False:
+        return (f"Staging runs a build that is not on {branch} as GitHub has it: only {branch}'s checked work goes "
+                f"to prod. Run CI on {branch} to put staging back on it.")  # fmt: skip
+    return (
+        f"The factory cannot tell yet whether staging's build is on {branch}: GitHub did not answer. It asks "
+        f"again every {settings.get_int('watch.branch_retry_minutes')} minutes; the push waits until then."
+    )
+
+
+def on_default(ctx: Context, commit: str) -> bool:
+    """Whether ``commit`` is on GitHub's default branch, from a fresh fetch into the warden's mirror: False for one
+    the branch does not hold. Raises Refused when GitHub or the mirror did not answer."""
+    settings = ctx.settings()
+    branch = settings.get_str("repo.default_branch")
+    git = _Git(ctx)
+    git.run("fetch", "--no-tags", "--quiet", f"git@github.com:{settings.get_str('repo.github')}.git",
+            f"+refs/heads/{branch}:refs/github/{branch}")  # fmt: skip
+    if git._exec(["cat-file", "-e", f"{commit}^{{commit}}"], cwd=git.mirror).returncode != 0:
+        return False
+    return git.is_ancestor(commit, f"refs/github/{branch}")
 
 
 def _pushes_path(places: Places) -> Path:

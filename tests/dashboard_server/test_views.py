@@ -166,10 +166,10 @@ def test_the_push_sheet_says_prod_runs_staging_only_when_prod_answers_on_staging
 def test_the_push_sheet_says_a_staging_build_off_the_default_branch_cannot_go_to_prod(
     rig: Rig, on_default: bool | None
 ) -> None:
-    deploys.note_branch(rig.places, "staging", STAGING, on_default)
+    deploys.note_branch(rig.places, "staging", STAGING, on_default, rig.clock.now())
     blocked = rig.parts("/api/push")["push"]["data"]["blocked"]
-    assert (blocked is None) is (on_default is True)
-    assert blocked is None or "only master's checked work goes to prod" in blocked
+    says = {True: None, False: "only master's checked work goes to prod", None: "GitHub did not answer"}[on_default]
+    assert blocked is None if says is None else says in blocked
 
 
 def test_home_draws_every_live_proposal_even_one_a_crash_left_without_its_place(rig: Rig) -> None:

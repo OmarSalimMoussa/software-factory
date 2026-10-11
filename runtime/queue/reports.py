@@ -1,6 +1,6 @@
 """The user-report pull (R24): new reports from the product's optional ``scripts/dev reports --since <cursor>``
-verb become requests in the users inbox. Without that verb the users inbox stays empty. The warden's tick pulls every
-reports.poll_minutes, on slot 0 from the main checkout; no session asks for it.
+verb become requests in the users inbox. Without that verb the users inbox stays empty. A pass of the warden's own
+pulls every reports.poll_minutes, in a thread off the tick, on slot 0 from the main checkout; no session asks for it.
 
 Each output line is one JSON report, ``{"id", "user", "at", "where", "text", "cursor"}``, or, before the reports, one
 erasure, ``{"erased": <report id>, "at"}``. A person's words are data from outside: they are kept, quoted with every
@@ -161,7 +161,8 @@ def note(ctx: Context) -> str | None:
 
 
 def poll(ctx: Context) -> None:
-    """The warden's tick: one pull every reports.poll_minutes, run as the warden on slot 0's main checkout."""
+    """The warden's reports pass: one pull every reports.poll_minutes, run as the warden on slot 0's main
+    checkout."""
     state = _timer(ctx)
 
     def run(argv: list[str]) -> tuple[int, str]:

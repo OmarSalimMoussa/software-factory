@@ -13,7 +13,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from runtime.queue import formats, turn
+from runtime.queue import approvals, formats, turn
 from runtime.queue.book import Queue
 from runtime.shared import store
 from runtime.slots import leases
@@ -30,7 +30,7 @@ def migrate(ctx: Context) -> list[str]:
     """Bring every old shape over; what each step did."""
     done: list[str] = []
     steps: list[Callable[[Context], str]] = [
-        _inbox_cursor, _leases, _errors_filed, _turn, _merges, _released, _typed_verdicts,
+        _inbox_cursor, _leases, _errors_filed, _turn, _merges, _released, _typed_verdicts, _approvals_routed,
     ]  # fmt: skip
     for step in steps:
         try:
@@ -149,6 +149,20 @@ def _typed_verdicts(ctx: Context) -> str:
         store.write_text(path, "".join(json.dumps({"agent": TYPED, **r}, sort_keys=True) + "\n" for r in rows),
                          mode=0o600)  # fmt: skip
     return f"{carried} typed findings" if carried else ""
+
+
+def _approvals_routed(ctx: Context) -> str:
+    """An approval names the rung its task's facts routed to; one made before took its approved rung for it, the
+    ceiling the old factory held a start to."""
+    carried = []
+    for path in sorted(ctx.places.approvals.glob("*.json")):
+        raw = store.read_json(path)
+        if path.name.endswith(".go.json") or not isinstance(raw, dict) or "routed" in raw or "rung" not in raw:
+            continue
+        store.write_json(path, {**raw, "routed": raw["rung"]}, mode=0o600)
+        approvals.current(ctx.places, path.stem)  # the new shape reads, or this raises
+        carried.append(path.stem)
+    return f"the routes of approvals {', '.join(carried)}" if carried else ""
 
 
 def _finding(ctx: Context, task_id: str, row: dict[str, Any], severity: str) -> None:

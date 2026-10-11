@@ -36,6 +36,18 @@ def test_an_approved_run_starts_on_the_next_pass_with_the_brief_it_was_proposed_
     assert world.launcher.started[0][1]["prompt"].endswith("Fix the loop; keep the old link.")
 
 
+def test_a_word_held_for_a_run_reaches_its_next_start_after_the_brief_and_only_once(world: World) -> None:
+    world.approve("t-0001")
+    _approved(world, "t-0001")
+    store.write_text(lifecycle.brief_path(world.ctx(), "t-0001"), "Fix the loop.\n")
+    store.write_text(lifecycle.held_path(world.ctx(), "t-0001"), "Your work was taken back off master.\n")
+
+    schedule.run_pass(world.ctx())
+
+    assert world.launcher.started[0][1]["prompt"].endswith("Fix the loop.\n\nYour work was taken back off master.")
+    assert not lifecycle.held_path(world.ctx(), "t-0001").exists()
+
+
 def test_a_full_cap_benches_the_lowest_ranked_run_the_new_one_outranks_then_starts_it(world: World) -> None:
     world.queue.add("t-0009", goal_item="G3", status="building")
     world.seat("5e550009", task="t-0009")

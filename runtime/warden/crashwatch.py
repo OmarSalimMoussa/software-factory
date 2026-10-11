@@ -28,7 +28,6 @@ from runtime.shared.models import (
     DEPRIORITIZED,
     FINISHED,
     WAITING,
-    WITH_PARENT,
     WORKING,
     Session,
 )
@@ -81,7 +80,9 @@ class SessionsWatch:
         procs = backstop.processes()
         backstop.sweep(ctx, procs)
         if self._benches is None or not self._benches.is_alive():
-            self._benches = self._start(lambda: finish_benches(ctx, procs))
+            # In its own thread: a failure is reported there, once while it lasts, as a pass's is.
+            self._benches = self._start(lambda: loop.run_once(ctx, "the benches' settling",
+                                                              lambda: finish_benches(ctx, procs)))  # fmt: skip
         watch(ctx)
         watch_orchestrator(ctx)
 
@@ -113,9 +114,7 @@ def _settle(ctx: Context, s: Session, procs: dict[str, Proc]) -> None:
             lifecycle.pause_progress(ctx, s.id, "already off the bench's list")
             return
         lifecycle.move(ctx, current, DEPRIORITIZED, WARDEN, current.note)
-        # Its subagents end with it; on revive the parent starts them again.
-        running = [c for c in registry.children(sessions, s.id) if c.state in (WORKING, WAITING)]
-        lifecycle.retire(ctx, running, current, WITH_PARENT, WARDEN, "ended with its benched parent")
+        lifecycle.end_children(ctx, sessions, current, "ended with its benched parent")  # its revive starts them
         registry.write(ctx.places, sessions)
     if s.task and permits.read_task(ctx, s.task).status in ("building", "designing"):
         permits.move_task(ctx, s.task, "deprioritized", "bench")
@@ -204,7 +203,7 @@ def watch(ctx: Context) -> None:
                     why = f"its process ended and {tries} resumes within {window // 60} min did not keep it running"
                     retired = lifecycle.retire(ctx, registry.subtree(sessions, sid), s, CRASHED, WARDEN, why)
             if relaunch is not None:
-                lifecycle.end_children(ctx, sessions, s)
+                lifecycle.end_children(ctx, sessions, s, "its parent's process ended")
             registry.write(ctx.places, sessions)
         if relaunch is not None:
             _resume(ctx, *relaunch)

@@ -90,7 +90,11 @@ def test_a_benched_session_settles_after_its_grace_and_revives_with_its_id(world
     assert benched.state == DEPRIORITIZED and leases.held_by(world.places, world.settings, benched_name) is None
     assert world.launcher.stopped == ["5e550001"] and world.launcher.stacks == [(2, ["empty"]), (2, [leases.SWEEP])]
     assert world.queue.tasks["t-0001"].status == "deprioritized"
+    store.write_text(lifecycle.held_path(world.ctx(), "t-0001"), "Your work was taken back off master.\n")
     lifecycle.revive_session(world.ctx(), "5e550001", "warden")
+    resumed = next(argv for argv in world.launcher.commands if argv[:2] == ["claude", "--resume"])
+    assert any("Your work was taken back off master." in word for word in resumed)  # a word held for its run
+    assert not lifecycle.held_path(world.ctx(), "t-0001").exists()
     back = world.session("5e550001")
     lease = leases.held_by(world.places, world.settings, benched_name)
     assert (back.state, lease and lease.slot, world.launcher.resumed) == (WORKING, 2, ["5e550001"])

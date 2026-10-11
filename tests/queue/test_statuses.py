@@ -10,7 +10,7 @@ from queue_kit import World
 from runtime.queue import documents, proposals, records, statuses, tasks, turn, verbs
 from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
 from runtime.shared import store
-from runtime.shared.models import RETIRED, Task
+from runtime.shared.models import Task
 from runtime.shared.protocol import Refused
 from runtime.warden import backstop, lifecycle, registry
 
@@ -28,6 +28,8 @@ TASK = Task("t-0001", "T", ["r-2026-10-09-0001"], "G1", "major", ["ui"], "queued
         ("closed", "queued", "unpark", OWNER),  # closed is final
         ("deprioritized", "closed", "done", IMPL),
         ("merged", "on-staging", "on-staging", WARDEN),  # staging only after the check of the default branch
+        ("turn", "merged", "merged", ORCH),  # the warden finds the merge itself
+        ("merged", "checked", "checked", ORCH),  # and a saved check of it that passed
     ],
 )
 def test_a_move_off_the_table_is_refused(source: str, target: str, event: str, actor: str) -> None:
@@ -104,31 +106,39 @@ def test_an_approved_spec_gives_its_task_the_slice_count_it_lists(world: World) 
     assert world.queue().task(task.id).slices == 4
 
 
-@pytest.mark.parametrize("live", [True, False], ids=["its-implementer-is-told", "a-new-implementer-starts-told"])
+@pytest.mark.parametrize(
+    ("implementer", "run", "status", "back"),
+    [("working", 1, "merged", "building"), ("deprioritized", 1, "merged", "building"),
+     ("retired", 1, "on-staging", "approved"), ("retired", 3, "on-staging", "building")],
+    ids=["its-implementer-is-told", "its-benched-implementer-is-told-at-its-revive",
+         "a-new-implementer-starts-told", "a-designed-builds-new-implementer-starts-told"],
+)  # fmt: skip
 def test_a_reverted_task_goes_back_to_its_implementer_or_once_that_ended_to_a_new_one(
-    world: World, monkeypatch: pytest.MonkeyPatch, live: bool
+    world: World, monkeypatch: pytest.MonkeyPatch, implementer: str, run: int, status: str, back: str
 ) -> None:
     task = world.task(branch="impl-t-0001")
-    world.queue().write_task(dataclasses.replace(task, status="merged" if live else "on-staging", run=1))
+    world.queue().write_task(dataclasses.replace(task, status=status, run=run))
     world.session("s-impl", "implementer", "impl-t-0001", task.id)
-    if live:
-        monkeypatch.setattr(backstop, "processes", lambda: {"s-impl": None})
-    else:  # its task passed its check, so its implementer finished
-        sessions = registry.read(world.places)
-        sessions["s-impl"].state = RETIRED
-        registry.write(world.places, sessions)
+    sessions = registry.read(world.places)
+    sessions["s-impl"].state = implementer  # retired: its task passed its check, so its implementer finished
+    registry.write(world.places, sessions)
+    monkeypatch.setattr(backstop, "processes", lambda: {"s-impl": None} if implementer == "working" else {})
 
     with pytest.raises(Refused, match="--note"):
         tasks.set_status(world.ctx(), task.id, "building", "", "")
-    back = tasks.set_status(world.ctx(), task.id, "building", "", "staging regressed; reverted as 0abc123")
+    moved = tasks.set_status(world.ctx(), task.id, "building", "", "staging regressed; reverted as 0abc123")
 
     told = "Your work was taken back off master: staging regressed; reverted as 0abc123"
-    assert back.status == ("building" if live else "approved")
-    if live:
+    held = lifecycle.held_path(world.ctx(), task.id)
+    assert moved.status == back
+    if implementer == "working":
         assert [(sid, told in text) for sid, text in world.launcher.messages] == [("s-impl", True)]
-    else:  # the scheduler starts the approved run with its brief, which now says why first
-        assert told in lifecycle.brief_path(world.ctx(), task.id).read_text()
-        assert proposals.read(world.places).approved == [task.id] and world.launcher.messages == []
+        assert not held.exists()
+    else:  # its next start or revive carries the word, once
+        assert told in held.read_text() and world.launcher.messages == []
+    if implementer == "retired":  # the scheduler starts it as it starts any approved run or designed build
+        waiting = proposals.designed_builds(world.places) if run >= 3 else proposals.read(world.places).approved
+        assert waiting == [task.id]
 
 
 def test_a_check_named_by_a_short_sha_checks_the_merge_it_ran_on(world: World) -> None:
@@ -140,7 +150,7 @@ def test_a_check_named_by_a_short_sha_checks_the_merge_it_ran_on(world: World) -
     report = (f"# Check\n\n## Scenarios\n\n{records.CHECK_TABLE}\n| --- | --- | --- | --- |\n"
               "| sign-in | pass | 3 | shot.png |\n").encode()  # fmt: skip
 
-    with pytest.raises(Refused, match="git rev-parse failed"):
+    with pytest.raises(Refused, match="the checkout has no commit fedcba9"):
         verbs.check_save(world.ctx(), {"commit": "fedcba9"}, report)
     answer = verbs.check_save(world.ctx(), {"commit": "abc1234"}, report)
     assert answer["checked"] == task.id and world.queue().task(task.id).status == "checked"

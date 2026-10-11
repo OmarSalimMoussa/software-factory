@@ -152,10 +152,12 @@ def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
     if dirty:
         raise Refused("check", "commit your changes first: a check reads what the branch has committed")
     on_default = branch == ctx.settings().get_str("repo.default_branch")
-    # A pass is a branch's check against the default branch it left, every ratchet included; --all on a branch skips
-    # the ratchets (they compare only what a branch changed), so it runs but records nothing the merge would trust.
-    whole = only is None and not (args.get("all") and not on_default)
-    if whole and passed(ctx.places, tree):
+    # A pass is a branch's check against the default branch it left, every ratchet included. --all on a branch skips
+    # the ratchets (they compare only what a branch changed): it is a run of the whole set, held to the merge turn
+    # and counted against it like any, but it records nothing the merge would trust.
+    whole = only is None
+    records = whole and not (args.get("all") and not on_default)
+    if records and passed(ctx.places, tree):
         return ok(exit=0, passed=True, tree=tree, output=f"factory check: tree {tree} already passed; nothing to run")
     left = _count_run(ctx, session) if whole and session.role == IMPL else None
     argv = ["--only", ",".join(only)] if only is not None else []
@@ -165,7 +167,7 @@ def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
         argv += _since(ctx, checkout)
     code, output = ctx.launcher.run_check(checkout, argv)
     recorded = False
-    if whole and code == 0:
+    if records and code == 0:
         after_commit, after_tree, _, after_dirty = _state(ctx, checkout)
         if (after_commit, after_tree, after_dirty) == (commit, tree, False):
             _record(ctx, tree, commit, branch, session.task)
@@ -173,7 +175,7 @@ def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
             output += f"factory check: recorded tree {tree} as passed\n"
         else:
             output += "factory check: the checkout moved while it was checked, so no pass is recorded\n"
-    elif not whole and code == 0:
+    elif not records and code == 0:
         why = "--only ran part of the set" if only is not None else "--all on a branch runs no ratchet"
         output += f"factory check: {why}, so no pass is recorded\n"
     if left is not None:

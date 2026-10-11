@@ -93,9 +93,10 @@ def test_a_file_written_before_its_defaults_were_kept_keeps_every_value(tmp_path
     target.parent.mkdir()
     target.write_text("MAIL_HOST=mail.example.com\nMODEL=model-a\n")
 
-    write(tmp_path, TEMPLATE + "MODEL=model-b\n")
+    notes = write(tmp_path, TEMPLATE + "MODEL=model-b\n")
 
     assert values(tmp_path)["MODEL"] == "model-a"
+    assert f"kept every value in {target}: no record of the template's defaults at its last write" in notes
     assert envfile.defaults_path(target).read_text().endswith("MODEL=model-b\n")
 
 

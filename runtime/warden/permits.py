@@ -148,7 +148,8 @@ def check_revive_order(ctx: Context, sessions: dict[str, Session], role: str, ta
         if other.id == skip or other.role != role or other.state != DEPRIORITIZED or other.parent:
             continue
         if order.outranks(read_task(ctx, other.task), task, approved):
-            raise Refused("revive-first", f"revive {other.name} first: it outranks {task.id}")
+            raise Refused("revive-first", f"{other.name} comes back first: it outranks {task.id}, and the warden "
+                                          "revives it when a place frees")  # fmt: skip
 
 
 def is_factory_repo(settings: Settings, remote: str) -> bool:
@@ -212,10 +213,10 @@ def check_start(ctx: Context, sessions: dict[str, Session], role: str, task: Tas
         raise Refused("approval", f"{task.id} changed since the owner approved it; propose it again")
     rung = approval.rung
     # The facts that made the approved rung allowed (slices, surfaces, owner class, cause) may have changed since:
-    # the ladder runs again, and a route higher than the one at approval refuses. A run proposed below its route,
-    # with the orchestrator's reason, still starts: its facts did not move.
+    # the ladder runs again, and a route higher than the one proposed and approved refuses. A run proposed below its
+    # route, with the orchestrator's reason, still starts: its facts did not move.
     needed = ladders.route(task, settings)
-    if approval.routed is not None and needed > approval.routed:
+    if needed > approval.routed:
         raise Refused("rung", f"{task.id}'s facts changed since the owner approved it: they route to rung {needed} "
                               f"now, not {approval.routed}; propose it again")  # fmt: skip
     designed = rung >= 3 and role == IMPL

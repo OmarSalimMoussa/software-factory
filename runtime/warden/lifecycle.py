@@ -85,12 +85,12 @@ def retire(ctx: Context, tree: list[Session], root: Session, kind: str, by: str,
     return tree
 
 
-def end_children(ctx: Context, sessions: dict[str, Session], s: Session) -> None:
+def end_children(ctx: Context, sessions: dict[str, Session], s: Session, why: str) -> None:
     """A session whose process ended took its subagents with it: their rows retire, so none holds a tester's place,
     and resumed, it starts them again. The caller holds ctx.lock and writes the registry."""
     running = [c for c in registry.children(sessions, s.id) if c.state in (WORKING, WAITING)]
     if running:
-        retire(ctx, running, s, models.WITH_PARENT, WARDEN, "its parent's process ended")
+        retire(ctx, running, s, models.WITH_PARENT, WARDEN, why)
 
 
 def after_retire(ctx: Context, retired: list[Session]) -> None:
@@ -153,7 +153,7 @@ def restart(ctx: Context, s: Session, message: str) -> None:
         if not claim_launch(ctx, s.id):
             raise LaunchError(f"{s.name} is being launched already")
         sessions = read(ctx)
-        end_children(ctx, sessions, sessions.get(s.id, s))
+        end_children(ctx, sessions, sessions.get(s.id, s), "its parent's process ended")
         registry.write(ctx.places, sessions)
     try:
         if s.id in backstop.processes():
@@ -177,7 +177,7 @@ def deliver(ctx: Context, sid: str, message: str, by: str) -> None:
             raise LaunchError(f"the warden is bringing {s.name} back right now: send it again in a minute")
         if not running:
             sessions = read(ctx)
-            end_children(ctx, sessions, sessions[sid])
+            end_children(ctx, sessions, sessions[sid], "its parent's process ended")
             registry.write(ctx.places, sessions)
     if running:
         ctx.launcher.message_session(s.id, message)
@@ -221,6 +221,18 @@ def brief_path(ctx: Context, task_id: str) -> Path:
     return ctx.places.state / "briefs" / f"{task_id}.md"
 
 
+def held_path(ctx: Context, task_id: str) -> Path:
+    """A word for the task's run that no session could take when it was said (a revert's, while the task's
+    implementer is benched or has ended): the run's next start or revive carries it, once."""
+    return ctx.places.state / "briefs" / f"{task_id}.held.md"
+
+
+def _with_held(ctx: Context, task_id: str, note: str) -> str:
+    path = held_path(ctx, task_id)
+    held = path.read_text(encoding="utf-8").strip() if task_id and path.is_file() else ""
+    return "\n\n".join(part for part in (note, held) if part)
+
+
 def start_run(ctx: Context, role: str, task: Task, note: str, outage_fix: bool) -> Session:
     """Start an implementer or designer on ``task`` under its permit, as the orchestrator asked or the warden's own
     scheduling pass decided; raises Refused naming the first rule it breaks. An implementer gets a slot when one is
@@ -228,6 +240,7 @@ def start_run(ctx: Context, role: str, task: Task, note: str, outage_fix: bool) 
     permits.check_not_factory(ctx)
     if not note and brief_path(ctx, task.id).is_file():
         note = brief_path(ctx, task.id).read_text(encoding="utf-8")
+    note = _with_held(ctx, task.id, note.strip())
     with ctx.lock:
         permits.check_daemon(ctx)
         sessions = read(ctx)
@@ -251,6 +264,7 @@ def start_run(ctx: Context, role: str, task: Task, note: str, outage_fix: bool) 
             raise
         if permit.bypass:
             outage.mark_bypass(ctx, task.id, s.id)
+    held_path(ctx, task.id).unlink(missing_ok=True)
     if task.status != "building":
         permits.move_task(ctx, task.id, "designing" if role == DESIGN else "building",
                           "outage" if permit.bypass else "start")  # fmt: skip
@@ -423,7 +437,8 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
         if s.role == IMPL:
             slot = permits.claim_slot(ctx, s)
         rebuild = f" Slot {slot} is yours again: rebuild it with factory slot up." if slot is not None else ""
-        launch.resume(ctx, s, REVIVED + rebuild + (f"\n\n{note}" if note else ""))
+        said = _with_held(ctx, s.task, note)
+        launch.resume(ctx, s, REVIVED + rebuild + (f"\n\n{said}" if said else ""))
     except (LaunchError, Refused) as exc:
         if slot is not None:
             permits.free_slot(ctx, slot)
@@ -438,6 +453,8 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
         s.resume_tries, s.benched_for = 0, ""
         move(ctx, s, WORKING, by, "revived")
         registry.write(ctx.places, sessions)
+    if s.task:
+        held_path(ctx, s.task).unlink(missing_ok=True)
     if s.task and permits.read_task(ctx, s.task).status == "deprioritized":
         permits.move_task(ctx, s.task, "designing" if s.role == DESIGN else "building", "revive")
     return ""

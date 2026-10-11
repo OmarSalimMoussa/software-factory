@@ -86,14 +86,24 @@ def _branch_path(places: Places) -> Path:
     return places.state / "deploys-on-default.json"
 
 
-def note_branch(places: Places, env: str, commit: str, on_default: bool | None) -> None:
-    """Whether ``env``'s build ``commit`` is on the default branch; None when git cannot tell."""
+def note_branch(places: Places, env: str, commit: str, on_default: bool | None, at: float) -> None:
+    """Whether ``env``'s build ``commit`` is on the default branch, asked at ``at``; None when GitHub did not say."""
     raw = store.read_json_or(_branch_path(places), {})
-    store.write_json(_branch_path(places), {**raw, env: {"commit": commit, "on_default": on_default}})
+    store.write_json(_branch_path(places), {**raw, env: {"commit": commit, "on_default": on_default, "at": at}})
+
+
+def branch_asked(places: Places, env: str, commit: str) -> tuple[bool | None, float] | None:
+    """The answer last noted for ``env``'s build ``commit`` and when it was asked; None when it never was."""
+    found = store.read_json_or(_branch_path(places), {}).get(env)
+    if not isinstance(found, dict) or found.get("commit") != commit or not isinstance(found.get("at"), int | float):
+        return None
+    value = found.get("on_default")
+    return (value if isinstance(value, bool) else None), float(found["at"])
 
 
 def on_default(places: Places, env: str) -> bool | None:
-    """Whether ``env`` runs a build on the default branch: False for a commit pinned by hand, None when unknown."""
+    """Whether ``env`` runs a build on the default branch: False for one GitHub's branch does not hold, None when
+    unknown."""
     found = store.read_json_or(_branch_path(places), {}).get(env)
     current = builds(places, env)["current"]
     if not isinstance(found, dict) or current is None or found.get("commit") != current["commit"]:

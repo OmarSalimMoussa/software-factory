@@ -7,7 +7,7 @@ import dataclasses
 import pytest
 from queue_kit import PICTURE, World
 
-from runtime.queue import formats, owner, pictures, proposals
+from runtime.queue import formats, owner, pictures, proposals, tasks
 from runtime.queue.book import task_rel
 from runtime.queue.propose import propose, propose_none
 from runtime.shared.protocol import Refused
@@ -76,6 +76,17 @@ def test_a_run_other_than_the_route_needs_a_reason(world: World) -> None:
     proposed = world.queue().task(task.id)
     assert (proposed.status, proposed.run) == ("proposed", 2)
     assert "the cause is shaky" in world.queue().read_log(task.id)[-1]["text"]
+
+
+def test_a_proposal_whose_facts_route_it_elsewhere_goes_back_to_be_proposed_on_them(world: World) -> None:
+    task = world.task()  # its facts route it to rung 1, so it is proposed with no reason
+    _propose(world, task.id)
+    tasks.set_facts(world.ctx(), task.id, {"cause": ""})  # an unconfirmed cause routes it higher
+    back = world.queue().task(task.id)
+    assert back.status == "queued" and task.id not in proposals.read(world.places).open
+    assert "propose it again" in world.queue().read_log(task.id)[-1]["text"]
+    with pytest.raises(Refused, match="needs --reason"):
+        _propose(world, task.id)  # rung 1 is now below its route
 
 
 def test_a_proposal_says_why_in_one_line(world: World) -> None:

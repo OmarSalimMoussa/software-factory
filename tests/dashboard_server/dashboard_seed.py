@@ -551,7 +551,7 @@ def seed(root: Path, now: float = T0) -> Places:
     for when, env, commit in (("Oct 5, 09:12", "prod", PREVIOUS), ("Oct 7, 10:05", "prod", PROD),
                               ("Oct 9, 11:18", "staging", STAGING)):  # fmt: skip
         deploys.record(places, env, commit, iso(_when(when, now)))
-    deploys.note_branch(places, "staging", STAGING, True)  # as the tick notes a build on the default branch
+    deploys.note_branch(places, "staging", STAGING, True, now)  # as the tick notes a build on the default branch
     store.write_json(
         places.plan,
         {

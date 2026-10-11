@@ -159,6 +159,7 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
     try:
         provision.drop(config, services, run, workspace=workspace, state=state)
         env_file.unlink(missing_ok=True)
+        envfile.defaults_path(env_file).unlink(missing_ok=True)
     except (provision.ProvisionError, OSError) as exc:
         print(f"stack-run: slot {slot} is empty, but its database or env file is still there: {exc}", flush=True)
         return 1

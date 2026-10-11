@@ -85,6 +85,11 @@ def run_passes(ctx: Context, passes: Sequence[tuple[str, Pass]]) -> None:
         loop.run_once(ctx, f"the {name} pass", partial(run, ctx))
 
 
+def _pull_reports(ctx: Context) -> None:
+    # In its own thread: a failure is reported there, once while it lasts, as a pass's is.
+    loop.run_once(ctx, "the reports pull", lambda: reports.poll(ctx))
+
+
 def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> list[tuple[str, Pass]]:
     watch = plan.PlanWatch(plan.source(agent_home, places))
     reaper, nightly = reap.Reaper(), gc.Nightly()
@@ -92,7 +97,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
         ("loop", loop.run_tick),
         ("sessions", crashwatch.SessionsWatch(imports.in_thread("benches")).run_pass),
         # It runs the product's scripts on a slot, for up to slots.verb_minutes: never inside the tick.
-        ("reports", imports.Background(reports.poll, imports.in_thread("reports")).run_pass),
+        ("reports", imports.Background(_pull_reports, imports.in_thread("reports")).run_pass),
         ("schedule", schedule.run_pass),
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),
         ("plan", watch.run_pass),

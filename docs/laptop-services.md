@@ -55,6 +55,10 @@ the share is made once and then kept.
 The env file and the database user's password live in the stack user's own folder, `/home/software-stack/slots/<n>/`,
 which no other user can open. When the share cannot be made, the command does not run, and its output says why.
 
+Every slot runs as the one stack user, with one Docker. So the code of any slot can read every slot's env file and
+the shared services' keys. These are throwaway development values: never put a prod key, a personal account or
+anything else you would not hand an agent into the env template's defaults, `[env.set]` or the shared services.
+
 Releasing a slot runs the product's `empty`. When `empty` succeeds, the factory also drops the slot's database, its
 database user and its network, and removes its env file. The slot's GlitchTip projects stay, with their history.
 

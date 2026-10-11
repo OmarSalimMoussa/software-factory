@@ -86,6 +86,8 @@ def write(
         raise EnvError(problems)
 
     notes = [f"created {target} from {template.name}"] if existing is None else []
+    if existing is not None and defaults is None:
+        notes.append(f"kept every value in {target}: no record of the template's defaults at its last write")
     held = existing or {}
     out: list[str] = []
     refusals: list[str] = []

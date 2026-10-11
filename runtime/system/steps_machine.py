@@ -332,6 +332,22 @@ def _subordinate_ids(ctx: Install) -> None:
         host.run(["usermod", *flags, stack])
 
 
+def _stack_wall(ctx: Install) -> None:
+    """The stack user's systemd is walled off the tailnet before it starts. One already running when its wall
+    changes restarts, so the kernel holds every container it runs from here on; the shared services start later."""
+    host, values = ctx.host, steps_wire.given(ctx)
+    wall = render.stack_wall(values["stack_uid"])
+    text = render.artifact(wall, ctx.templates(), values)
+    if host.exists(wall.dest) and host.read(wall.dest) == text:
+        return
+    host.mkdir(wall.dest.parent, mode=0o755)
+    host.write(wall.dest, text, mode=wall.mode)
+    host.run(["systemctl", "daemon-reload"])
+    unit = f"user@{values['stack_uid']}.service"
+    if host.query(["systemctl", "is-active", "--quiet", unit])[0] == 0:
+        host.run(["systemctl", "restart", unit])
+
+
 def rootless_docker(ctx: Install) -> None:
     """The stack user's own Docker daemon: a container's root is that user on the host, never root."""
     host, stack = ctx.host, layout.STACK_USER
@@ -340,6 +356,7 @@ def rootless_docker(ctx: Install) -> None:
     if host.query(["which", layout.ROOTLESS_SETUP])[0] != 0 and not host.dry:
         raise refuse("Docker's rootless extras are missing on this computer: install Docker from Docker's own "
                      "packages (docker-ce and docker-ce-rootless-extras), then install again")  # fmt: skip
+    _stack_wall(ctx)
     host.run(["systemctl", "start", f"user@{ctx.uid(stack)}.service"])
     if host.exists(layout.STACK_HOME / ".config" / "systemd" / "user" / "docker.service"):
         host.say("rootless Docker is already set up")

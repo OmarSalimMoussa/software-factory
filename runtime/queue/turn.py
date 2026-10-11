@@ -17,7 +17,7 @@ from typing import Any
 from runtime.queue import formats, proposals, statuses, tasks
 from runtime.queue.book import Queue
 from runtime.shared import order, store
-from runtime.shared.models import RETIRED, Session, Task
+from runtime.shared.models import RETIRED, WAITING, WORKING, Session, Task
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.warden import lifecycle, permits, registry
@@ -74,7 +74,12 @@ def full_commit(ctx: Context, commit: str) -> str:
     """The full sha of a commit the checkout knows: a check is matched to its merge by the whole sha."""
     if not formats.SHA.match(commit):
         raise Refused("check", "name the commit the check ran on")
-    return _git(ctx, "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}")
+    repo = ctx.settings().get_str("repo.path")
+    code, out = ctx.launcher.agent_command(["git", "-C", repo, "rev-parse", "--verify", "--quiet",
+                                            f"{commit}^{{commit}}"], repo)  # fmt: skip
+    if code != 0:
+        raise Refused("check", f"the checkout has no commit {commit}: name the merge the check ran on")
+    return out.strip()
 
 
 def held(ctx: Context, task: Task) -> None:
@@ -161,9 +166,9 @@ def check_saved(ctx: Context, commit: str, passed: bool) -> str:
 
 
 def send_back(ctx: Context, task_id: str, note: str) -> Task:
-    """A reverted task goes back to building, its implementer told why. Once that implementer has ended (its task
-    passed its check), the task goes back to the approved runs, or a designed build to the designed builds, and the
-    scheduler starts a new implementer, whose first message carries why."""
+    """A reverted task goes back to building, its implementer told why; a benched one is told when it is revived.
+    Once that implementer has ended (its task passed its check), the task goes back to the approved runs, or a
+    designed build to the designed builds, and the scheduler starts a new implementer, told why first."""
     if not note.strip():
         raise Refused("note", "a revert says why, and names the revert's commit, in --note")
     told = REVERTED.format(default=ctx.settings().get_str("repo.default_branch"), note=note.strip())
@@ -174,12 +179,11 @@ def send_back(ctx: Context, task_id: str, note: str) -> Task:
         designed = task.run is not None and task.run >= 3
         to = "building" if impl is not None or designed else "approved"
         moved = tasks.transition(ctx, queue, task, to, "reverted", tasks.actor(ctx), note.strip())
-        if impl is None:
-            if designed and task_id not in proposals.designed_builds(ctx.places):
-                proposals.set_designed_builds(ctx.places, [*proposals.designed_builds(ctx.places), task_id])
-            brief = lifecycle.brief_path(ctx, task_id)
-            before = brief.read_text(encoding="utf-8").strip() if brief.is_file() else ""
-            store.write_text(brief, f"{before}\n\n{told}".strip() + "\n", mode=0o600)
-    if impl is not None:
+        if impl is None and designed and task_id not in proposals.designed_builds(ctx.places):
+            proposals.set_designed_builds(ctx.places, [*proposals.designed_builds(ctx.places), task_id])
+        awake = impl is not None and impl.state in (WORKING, WAITING)
+        if not awake:  # the latest revert's word alone: an earlier one's revert is part of this one's history
+            store.write_text(lifecycle.held_path(ctx, task_id), told + "\n", mode=0o600)
+    if awake:
         _tell(ctx, moved, told)
     return moved

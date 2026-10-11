@@ -1,4 +1,5 @@
-"""The imports the warden's tick runs on a timer: prod's and staging's new errors, and the users' new reports.
+"""The imports the warden runs on a timer: prod's and staging's new errors in the tick, and the users' new reports in
+a pass of their own, off the tick (``Background``).
 
 Each keeps, in its own state file, when it last ran, whether its runs are failing, and the note `factory status`
 shows. A failing run is logged once per run of failures and tried again at the next period; it never stops the tick.

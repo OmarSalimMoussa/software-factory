@@ -26,17 +26,16 @@ def managed_settings(ctx: Install) -> None:
     host.write(MANAGED_SETTINGS, text, mode=render.MANAGED.mode)
 
 
-def _given(ctx: Install) -> dict[str, str]:
+def given(ctx: Install) -> dict[str, str]:
+    """The values every rendered artifact is filled from."""
     return render.values(ctx.places, ctx.need_settings(), agent_uid=ctx.uid(AGENT_USER),
                          stack_uid=ctx.uid(layout.STACK_USER))  # fmt: skip
 
 
 def units(ctx: Install) -> None:
-    given = _given(ctx)
-    wall = render.stack_wall(given["stack_uid"])
-    ctx.host.mkdir(wall.dest.parent, mode=0o755)
-    for item in (*render.UNIT_FILES, wall):
-        ctx.host.write(item.dest, render.artifact(item, ctx.templates(), given), mode=item.mode)
+    values = given(ctx)
+    for item in render.UNIT_FILES:
+        ctx.host.write(item.dest, render.artifact(item, ctx.templates(), values), mode=item.mode)
     # The warden's run-time budget changes live here; the slice just written already holds the settled values.
     control = layout.SLICE_CONTROL / f"{SLICE}.d"
     if ctx.host.exists(control):
@@ -45,14 +44,13 @@ def units(ctx: Install) -> None:
 
 
 def polkit(ctx: Install) -> None:
-    given = _given(ctx)
-    ctx.host.write(render.POLKIT.dest, render.artifact(render.POLKIT, ctx.templates(), given), mode=render.POLKIT.mode)
+    text = render.artifact(render.POLKIT, ctx.templates(), given(ctx))
+    ctx.host.write(render.POLKIT.dest, text, mode=render.POLKIT.mode)
 
 
 def firewall(ctx: Install) -> None:
-    given = _given(ctx)
     ctx.host.mkdir(layout.CONFIG, mode=0o755)
-    text = render.artifact(render.FIREWALL, ctx.templates(), given)
+    text = render.artifact(render.FIREWALL, ctx.templates(), given(ctx))
     ctx.host.write(render.FIREWALL.dest, text, mode=render.FIREWALL.mode)
     if ctx.host.dry:
         ctx.host.say("would check the rules with nft before they load")  # a dry run wrote no file to check

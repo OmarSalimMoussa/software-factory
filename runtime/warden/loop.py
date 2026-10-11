@@ -183,21 +183,39 @@ def file_red(ctx: Context, where: str, body: str) -> str:
         return intake.file_request(ctx, queue, "agents", "warden", "severe", where, body).id
 
 
+def _ask_branch(ctx: Context, probe: Probe) -> None:
+    """Whether staging's build is on the default branch, which a push to prod needs: asked once for a build, and
+    again every watch.branch_retry_minutes while GitHub has not said, so one failed fetch never holds a build back."""
+    if probe.env != probes.STAGING:
+        return
+    asked = deploys.branch_asked(ctx.places, probe.env, probe.commit)
+    retry = ctx.settings().get_int("watch.branch_retry_minutes") * 60
+    if asked is not None and (asked[0] is not None or ctx.clock.now() - asked[1] < retry):
+        return
+    on_default: bool | None
+    try:
+        on_default = github_push.on_default(ctx, probe.commit)
+    # telemetry: surfaced — unknown, which the push sheet draws; reported once a build, then asked again quietly
+    except Refused as exc:
+        on_default = None
+        if asked is None:
+            log.warning("warden: whether %s's build %s is on the default branch is unknown (%s)", probe.env,
+                        probe.commit[:12], exc.reason)  # fmt: skip
+    deploys.note_branch(ctx.places, probe.env, probe.commit, on_default, ctx.clock.now())
+
+
 def _deployed(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
     """A new build on staging or prod goes in the deploy log, and moves the tasks it includes along: checked to
     on-staging to promoted."""
-    if not probe.ok or memo["deployed"].get(probe.env) == probe.commit:
+    if not probe.ok:
+        return
+    if memo["deployed"].get(probe.env) == probe.commit:
+        _ask_branch(ctx, probe)
         return
     memo["deployed"][probe.env] = probe.commit
     deploys.record(ctx.places, probe.env, probe.commit, probe.at)
+    _ask_branch(ctx, probe)
     includes = github_push.includes(ctx)
-    branch = ctx.settings().get_str("repo.default_branch")
-    try:
-        on_default = includes(f"refs/github/{branch}", probe.commit)
-    # telemetry: surfaced — unknown, the build's branch draws as unknown; the push to prod reports the mirror's trouble
-    except Refused:
-        on_default = None
-    deploys.note_branch(ctx.places, probe.env, probe.commit, on_default)
     try:
         found = memo["deployed"]
         moved = tasks.advance_deployed(ctx, found.get(probes.STAGING), found.get(probes.PROD), includes)

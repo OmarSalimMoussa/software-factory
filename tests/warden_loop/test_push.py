@@ -73,6 +73,12 @@ def github_repo(world: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     return remote
 
 
+def test_the_warden_trusts_github_by_the_host_keys_it_pinned_and_no_other(world: World, github_repo: Path) -> None:
+    command = github_push._Git(world.ctx).env["GIT_SSH_COMMAND"]
+    assert "-o StrictHostKeyChecking=yes" in command
+    assert f"-o UserKnownHostsFile={world.ctx.places.github_known_hosts}" in command
+
+
 @pytest.mark.parametrize(
     "change",
     [
@@ -137,7 +143,7 @@ def probe(world: World, env: str, ok: bool, commit: str = "", on_default: bool |
     store.append_jsonl(world.ctx.places.probes, models.dump(record))
     if env == probes.STAGING and ok and commit:
         deploys.record(world.ctx.places, env, commit, world.clock.iso())
-        deploys.note_branch(world.ctx.places, env, commit, on_default)
+        deploys.note_branch(world.ctx.places, env, commit, on_default, world.clock.now())
 
 
 STAGING, PROD, OLD = "a" * 40, "b" * 40, "c" * 40
@@ -290,7 +296,7 @@ def test_push_back_goes_to_what_prod_ran_when_the_last_push_began_even_if_that_p
     assert github_push.push_back_target(world.ctx) == PROD  # not OLD, two builds back
 
 
-@pytest.mark.parametrize("on_default", [False, None], ids=["pinned-off-it", "not-on-githubs-branch-or-unknown"])
+@pytest.mark.parametrize("on_default", [False, None], ids=["off-it", "unknown"])
 def test_a_staging_build_not_known_on_the_default_branch_never_goes_to_prod(
     world: World, on_default: bool | None
 ) -> None:

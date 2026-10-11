@@ -8,7 +8,7 @@ import json
 from queue_kit import World
 
 from runtime.qa import findings
-from runtime.queue import formats, intake, turn
+from runtime.queue import approvals, formats, intake, turn
 from runtime.queue.book import Queue, task_rel
 from runtime.shared import store
 from runtime.slots import leases
@@ -44,11 +44,15 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
     world.session("s-impl", "implementer", "impl-t-0001", task=in_turn.id)
     typed = {"head": FULL, "tester": "qa-ux", "blockers": 1, "majors": 0, "minors": 0, "at": "x"}
     store.append_jsonl(places.state / "qa-results" / "s-impl.jsonl", typed)
+    # An approval that names no route, beside the owner's Go on another task.
+    store.write_json(places.approvals / f"{merged.id}.json", {"task": merged.id, "rung": 2, "model": "m",
+                                                             "by": "owner", "at": "x", "digest": "d"})  # fmt: skip
+    store.write_json(places.approvals / f"{in_turn.id}.go.json", {"task": in_turn.id, "by": "owner", "at": "x"})
 
     ctx = dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden"))
     done = upgrade.migrate(ctx)
 
-    assert len(done) == 7, done
+    assert len(done) == 8, done
     assert inbox.unacknowledged(places) == []
     assert leases.read(places, 1) is not None
     filed = json.loads(errors_import.path(places, "prod").read_text())["filed"]
@@ -57,4 +61,6 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
     assert turn.merges(places) == {FULL: merged.id}
     assert github_push.released(places) == "c" * 40
     assert findings.open_count(ctx, in_turn.id, FULL, "qa-ux") == 1
+    approval = approvals.current(places, merged.id)
+    assert approval is not None and approval.routed == 2
     assert upgrade.migrate(ctx) == []  # once brought over, nothing changes

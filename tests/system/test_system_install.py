@@ -13,6 +13,7 @@ from runtime.system import (
     ci_check,
     install,
     layout,
+    render,
     steps_machine,
     steps_prepare,
     steps_secrets,
@@ -385,3 +386,30 @@ def test_the_warden_trusts_github_only_by_the_host_keys_github_publishes_over_ht
     else:
         steps_machine.github_host_keys(job)
         assert written[job.places.github_known_hosts].startswith("github.com ssh-ed25519 AAAA")
+
+
+@pytest.mark.parametrize(
+    ("walled", "running", "restarts"),
+    [(False, False, False), (False, True, True), (True, True, False)],
+    ids=["first-start-is-walled", "running-without-it-restarts", "unchanged-leaves-it-running"],
+)
+def test_the_stack_users_systemd_is_walled_off_the_tailnet_before_its_containers_run(
+    tmp_path: Path, walled: bool, running: bool, restarts: bool
+) -> None:
+    job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    job.settings = settings()
+    values = steps_wire.given(job)
+    wall = render.stack_wall(values["stack_uid"])
+    unit = f"user@{values['stack_uid']}.service"
+    if walled:
+        job.host.files[wall.dest] = render.artifact(wall, job.templates(), values)
+    job.host.answers[f"systemctl is-active --quiet {unit}"] = (0 if running else 3, "")
+
+    steps_machine.rootless_docker(job)
+
+    acts = job.host.actions
+    wrote = next((n for n, a in enumerate(acts) if a.startswith(f"write: {wall.dest}")), None)
+    started = acts.index(f"run: systemctl start {unit}")
+    assert (wrote is not None) is (not walled) and (wrote is None or wrote < started)
+    assert (f"run: systemctl restart {unit}" in acts) is restarts

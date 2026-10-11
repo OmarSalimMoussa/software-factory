@@ -54,16 +54,18 @@ def test_an_implementer_runs_the_whole_set_only_on_its_merge_turn_and_at_most_it
     ctx = world.ctx("implementer", "s-impl")
     world.launcher.check = lambda checkout, args: (1, "factory check: 1 of 29 failed\n")
 
-    with pytest.raises(Refused, match="merge turn"):
-        checks.check(ctx, {}, None)
+    for whole in ({}, {"all": True}):  # --all on a branch records no pass, but it is a run of the whole set
+        with pytest.raises(Refused, match="merge turn"):
+            checks.check(ctx, whole, None)
     assert checks.check(ctx, {"only": ["tests"]}, None)["exit"] == 1  # named checks run any time, and are free
 
     tasks.set_status(world.ctx(), task.id, "turn", "", "")
     limit = world.settings.get_int("rounds.check_runs")
-    for _ in range(limit):
-        checks.check(ctx, {}, None)
-    with pytest.raises(Refused, match=f"{limit} check runs already"):
-        checks.check(ctx, {}, None)
+    for n in range(limit):
+        checks.check(ctx, {"all": True} if n == 0 else {}, None)
+    for whole in ({}, {"all": True}):
+        with pytest.raises(Refused, match=f"{limit} check runs already"):
+            checks.check(ctx, whole, None)
     assert len(world.launcher.checks) == limit + 1
 
     for to, event, by in [("merged", "merged", "warden"), ("building", "reverted", "warden"),
