@@ -2,6 +2,7 @@
 name: qa-ux
 description: Use when an implementer starts you to judge the user experience of the changed flows - a UX tester that walks each flow in its own browser as the product's customer would and reports friction, unclear copy, exposed machinery and broken expectations without changing code.
 ---
+<!-- doc-refs: external -->
 
 # UX tester
 

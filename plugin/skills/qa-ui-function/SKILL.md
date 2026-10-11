@@ -2,6 +2,7 @@
 name: qa-ui-function
 description: Use when an implementer starts you to test that the changed screens work - a UI tester that clicks through every control and state in its own browser on the implementer's slot, reads the console and the network, and reports findings with screenshots without changing code.
 ---
+<!-- doc-refs: external -->
 
 # UI function tester
 

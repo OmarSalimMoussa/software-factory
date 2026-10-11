@@ -1,5 +1,7 @@
 # The repo shape
 
+<!-- doc-refs: external -->
+
 Every product takes one shape, so the factory needs nothing from a product beyond its own settings file,
 `factory.toml`. The `repo-shape` and `deploy-shape` checks enforce the shape.
 

@@ -44,8 +44,8 @@ addresses are not settings: the warden reads them from `factory.toml` in the pro
 one from the owner's PATH, so the agents and the stack run the same tools as the owner.
 
 `sandbox.writable_caches` names the folders in the agent's home where sessions may write, besides their own
-worktree: the caches of the tools the product's tests run, such as `.cache/uv` and `.npm`. The install makes each
-folder for the agent user. A cache cannot lie in `.claude`, `.config`, `.local`, `.ssh` or `bin`, because a session
+worktree: the caches of the tools the product's tests run, such as `~/.cache/uv` and `~/.npm`. The setting names
+each folder from the home folder down, without the `~/`. The install makes each folder for the agent user. A cache cannot lie in `.claude`, `.config`, `.local`, `.ssh` or `bin`, because a session
 that wrote there could act outside its sandbox.
 
 ## When a change takes effect

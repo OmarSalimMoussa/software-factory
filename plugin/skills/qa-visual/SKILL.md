@@ -2,6 +2,7 @@
 name: qa-visual
 description: Use when an implementer starts you to judge how the changed screens look - a visual design tester that screenshots every state in both themes in its own browser and reports alignment, spacing, type, contrast, icon and AI-made-look problems without changing code.
 ---
+<!-- doc-refs: external -->
 
 # Visual design tester
 

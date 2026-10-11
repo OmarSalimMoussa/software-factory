@@ -57,8 +57,8 @@ def project_bases(tracked: Iterable[str]) -> set[str]:
 def path_like(token: str) -> str | None:
     """The token as a repo path, or None when it is some other thing (a URL, a package, a placeholder)."""
     token = _ANCHOR_RE.sub("", token.strip().rstrip(".,;:")).split("#", 1)[0]
-    if "/" not in token or token.startswith(("/", "@")) or ":/" in token:
-        return None  # a bare file name names a kind of file; absolute paths, URLs and npm scopes are not ours
+    if "/" not in token or token.startswith(("/", "~/", "@")) or ":/" in token:
+        return None  # a bare file name names a kind of file; absolute and home paths, URLs, npm scopes are not ours
     if "..." in token or "…" in token or _SKIP_CHARS & set(token):
         return None
     segments = token.rstrip("/").split("/")

@@ -2,6 +2,7 @@
 name: qa-backend
 description: Use when an implementer starts you to test the server side of its change on its slot - a backend tester that drives the API hard, checks behaviour, contracts, error paths, data and telemetry, times the touched endpoints, and reports findings without changing code.
 ---
+<!-- doc-refs: external -->
 
 # Backend tester
 

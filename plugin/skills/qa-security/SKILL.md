@@ -2,6 +2,7 @@
 name: qa-security
 description: Use when an implementer starts you to test the security of its change on its slot - a security tester that probes access control, injection, SSRF, secrets and the agents' prompt-injection and excessive-agency risks, and reports findings without changing code.
 ---
+<!-- doc-refs: external -->
 
 # Security tester
 
