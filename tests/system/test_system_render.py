@@ -82,6 +82,8 @@ def test_the_warden_reads_transcripts_but_writes_only_its_state_and_the_agents_q
     lines = _unit("software-warden.service").splitlines()
 
     assert "AmbientCapabilities=CAP_DAC_READ_SEARCH" in lines
+    # git's access(2) checks ignore that capability: the agent's group lets the warden push from its checkout
+    assert "SupplementaryGroups=software-slots software-agent" in lines
     assert "CapabilityBoundingSet=CAP_DAC_READ_SEARCH" in lines
     assert "ProtectSystem=strict" in lines
     assert "ProtectHome=read-only" in lines

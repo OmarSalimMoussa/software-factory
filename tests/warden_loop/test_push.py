@@ -415,3 +415,10 @@ def test_the_warden_pushes_a_pin_itself_and_only_tries_again_after_a_while(
     pins.push_pending(world.ctx)
 
     assert tries == [pin] and git(github_repo, "rev-parse", "master") == pin
+
+
+def test_a_git_failure_names_git_s_own_reason_not_its_closing_advice(
+    world: World, github_repo: Path, tmp_path: Path
+) -> None:
+    with pytest.raises(Refused, match="does not appear to be a git repository"):
+        github_push._Git(world.ctx).run("fetch", "--quiet", str(tmp_path / "nowhere"), "+refs/heads/x:refs/x")
