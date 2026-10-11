@@ -1,8 +1,11 @@
 """A workspace's or slot's env file, written from the product's template.
 
-The file is the template's text, comments kept. Each template key keeps the value the existing file holds, except the
-[env.set] keys and the factory's service keys, which every write sets. Generated secrets are filled once, then kept.
-A key the template no longer has is dropped. On a server, a key under a `# server: <why>` line must be set by hand.
+The file is the template's text, comments kept. The [env.set] keys and the factory's service keys are set at every
+write. Every other key keeps a value set by hand; one that still holds the default the template had at the last write
+takes the template's current value, so a changed default reaches every workspace and slot. The defaults of the last
+write are kept beside the file (``<file>.defaults``); a file written before that record existed keeps every value.
+Generated secrets are filled once, then kept. A key the template no longer has is dropped. On a server, a key under a
+`# server: <why>` line must be set by hand.
 """
 
 from __future__ import annotations
@@ -69,6 +72,7 @@ def write(
     problems: list[str] = []
     lines = _template(template, problems)
     existing = _existing(target, problems)
+    defaults = _existing(defaults_path(target), problems) if existing is not None else None
     keys = [line.key for line in lines if line.key]
     rendered = _rendered(config, placeholders, keys, template, problems)
     for key, value in {**rendered, **services}.items():
@@ -89,7 +93,7 @@ def write(
         if not line.key:
             out.append(line.text)
             continue
-        value, note = _value(line, rendered, services, held, existing is None)
+        value, note = _value(line, rendered, services, held, defaults, existing is None)
         if note:
             notes.append(note)
         if server and line.server_why and line.key not in rendered and line.key not in services:
@@ -108,6 +112,7 @@ def write(
         f"dropped {key}: the template no longer has it" for key in held if key not in keys and key not in services
     ]
     atomic_write(target, "\n".join(out) + "\n", 0o600)
+    atomic_write(defaults_path(target), "".join(f"{line.key}={line.value}\n" for line in lines if line.key), 0o600)
     if refusals:
         raise EnvError([*refusals, f"set each in {target}, then deploy again"])
     return notes
@@ -140,14 +145,27 @@ def parse_values(text: str, where: str) -> tuple[dict[str, str], list[str]]:
     return values, problems
 
 
+def defaults_path(target: Path) -> Path:
+    """Where the template's values at the last write of ``target`` are kept."""
+    return target.with_name(f"{target.name}.defaults")
+
+
 def _value(
-    line: _Line, rendered: dict[str, str], services: dict[str, str], held: dict[str, str], fresh: bool
+    line: _Line,
+    rendered: dict[str, str],
+    services: dict[str, str],
+    held: dict[str, str],
+    defaults: dict[str, str] | None,
+    fresh: bool,
 ) -> tuple[str, str]:
     if line.key in rendered:
         return rendered[line.key], ""
     if line.key in services:
         return services[line.key], ""
     current = held.get(line.key)
+    if current is not None and defaults is not None and current == defaults.get(line.key) != line.value:
+        made = generate(line.value)
+        return (line.value if made is None else made), f"updated {line.key}: the template's default changed"
     if current is not None and current not in ("", line.value):
         return current, ""
     made = generate(line.value)

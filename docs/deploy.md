@@ -55,7 +55,9 @@ kept. For each key:
 - `[env.set]` keys are filled in for the workspace: `{workspace}`, `{origin}`, `{port}`, `{commit}`, `{dir}`,
   `{env_dir}`, `{docker_socket}`.
 - The factory's service keys (below) are always written. Those the template lacks go in a block at the end.
-- Any other key keeps the value the file already holds, so a value set by hand stays.
+- Any other key keeps a value set by hand. A key that still holds the default the template had at the last write
+  takes the template's current default, so a changed default reaches staging, prod and every slot. The defaults
+  of the last write are kept beside the file, in `<file>.defaults`.
 - A key the template no longer has is removed, and the deploy log says so.
 - `generate-with-openssl-rand-hex-<N>` becomes N random bytes in hex, keeping any text before it (`pk-lf-`).
   `generate-with-python-fernet` becomes a Fernet key. Each is made once and kept.

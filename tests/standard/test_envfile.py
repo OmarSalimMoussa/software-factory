@@ -75,6 +75,30 @@ def test_set_and_service_keys_are_rewritten_hand_values_kept_and_a_gone_key_drop
     assert text.endswith(f"{envfile.SERVICE_BLOCK}\nSENTRY_DSN_APP=http://k@g/2\n")
 
 
+def test_a_changed_default_reaches_the_file_and_a_value_set_by_hand_stays(tmp_path: Path) -> None:
+    write(tmp_path, TEMPLATE + "MODEL=model-a\nREVIEW_MODEL=model-a\nTOKEN=generate-with-openssl-rand-hex-8\n")
+    target = tmp_path / "env" / "notes.env"
+    target.write_text(target.read_text().replace("REVIEW_MODEL=model-a", "REVIEW_MODEL=model-hand"))
+    token = values(tmp_path)["TOKEN"]
+
+    notes = write(tmp_path, TEMPLATE + "MODEL=model-b\nREVIEW_MODEL=model-b\nTOKEN=generate-with-openssl-rand-hex-8\n")
+
+    found = values(tmp_path)
+    assert (found["MODEL"], found["REVIEW_MODEL"], found["TOKEN"]) == ("model-b", "model-hand", token)
+    assert notes == ["updated MODEL: the template's default changed"]
+
+
+def test_a_file_written_before_its_defaults_were_kept_keeps_every_value(tmp_path: Path) -> None:
+    target = tmp_path / "env" / "notes.env"
+    target.parent.mkdir()
+    target.write_text("MAIL_HOST=mail.example.com\nMODEL=model-a\n")
+
+    write(tmp_path, TEMPLATE + "MODEL=model-b\n")
+
+    assert values(tmp_path)["MODEL"] == "model-a"
+    assert envfile.defaults_path(target).read_text().endswith("MODEL=model-b\n")
+
+
 def test_a_server_refuses_every_marked_key_left_at_the_template_value(tmp_path: Path) -> None:
     template = TEMPLATE + "# server: the laptop's key signs nothing real\nSIGNING_KEY=laptop-key\n"
 
@@ -94,7 +118,7 @@ def test_the_file_is_private_and_replaced_whole(tmp_path: Path) -> None:
 
     target = tmp_path / "env" / "notes.env"
     assert stat.S_IMODE(target.stat().st_mode) == 0o600
-    assert sorted(p.name for p in target.parent.iterdir()) == ["notes.env"]
+    assert sorted(p.name for p in target.parent.iterdir()) == ["notes.env", "notes.env.defaults"]
 
 
 @pytest.mark.parametrize(
