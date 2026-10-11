@@ -7,7 +7,7 @@ places and approvals that follow from the new status. Other parts of the warden 
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -287,34 +287,45 @@ def merge_commit(queue: Queue, task_id: str) -> str:
     return merges[-1]["commit"] if merges else ""
 
 
-def advance_deployed(ctx: Context, staging_commit: str | None, prod_commit: str | None) -> list[str]:
-    """Move checked tasks that staging's build includes to on-staging, and those prod's includes to promoted.
-
-    An unknown build (None) moves nothing; a task is included when its merge commit is an ancestor of the build.
-    """
-    repo = ctx.settings().get_str("repo.path")
+def advance_deployed(
+    ctx: Context, staging_commit: str | None, prod_commit: str | None, includes: Callable[[str, str], bool | None]
+) -> list[str]:
+    """Keep each merged task's status in step with the builds staging and prod run: checked, on-staging (staging's
+    build includes its merge) and promoted (prod's does), forward and back, as a push back or a pin takes a build
+    away. ``includes(build, merge)`` answers None for a build git does not know: that build moves nothing."""
     queue = Queue.of(ctx)
     moved: list[str] = []
 
-    def includes(build: str, merge: str) -> bool:
-        code, out = ctx.launcher.agent_command(["git", "-C", repo, "merge-base", "--is-ancestor", merge, build], repo)
-        if code not in (0, 1):
-            raise Refused("git", f"git merge-base exited {code}: {out.strip()[-200:]}")
-        return code == 0
+    def runs(build: str | None, merge: str) -> bool | None:
+        return None if build is None else includes(build, merge)
 
     with ctx.lock, queue.lock():
         for task in queue.tasks()[0]:
-            merge = merge_commit(queue, task.id) if task.status in ("checked", "on-staging") else ""
+            merge = merge_commit(queue, task.id) if task.status in ("checked", "on-staging", "promoted") else ""
             if not merge:
                 continue
-            if task.status == "checked" and staging_commit and includes(staging_commit, merge):
-                said = f"on staging at {staging_commit}"
-                task = transition(ctx, queue, task, "on-staging", "on-staging", WARDEN, said)
-                moved.append(f"{task.id} on-staging")
-            if task.status == "on-staging" and prod_commit and includes(prod_commit, merge):
-                transition(ctx, queue, task, "promoted", "promoted", WARDEN, f"on prod at {prod_commit}")
-                moved.append(f"{task.id} promoted")
+            on_staging, on_prod = runs(staging_commit, merge), runs(prod_commit, merge)
+            while (step := _deploy_step(task.status, on_staging, on_prod)) is not None:
+                to, event = step
+                build = prod_commit if event in ("promoted", "left-prod") else staging_commit
+                said = f"{'no longer ' if event.startswith('left') else ''}on {event.split('-')[-1]} at {build}"
+                task = transition(ctx, queue, task, to, event, WARDEN, said)
+                moved.append(f"{task.id} {to}")
     return moved
+
+
+def _deploy_step(status: str, on_staging: bool | None, on_prod: bool | None) -> tuple[str, str] | None:
+    """One move toward the status the builds say, or None once there; an unknown build (None) moves nothing. The
+    moves exclude each other in pairs, so walking them ends."""
+    if status == "promoted" and on_prod is False:
+        return "on-staging", "left-prod"
+    if status == "on-staging" and on_prod is True:
+        return "promoted", "promoted"
+    if status == "on-staging" and on_staging is False:
+        return "checked", "left-staging"
+    if status == "checked" and on_staging is True:
+        return "on-staging", "on-staging"
+    return None
 
 
 def rescore(ctx: Context) -> int:

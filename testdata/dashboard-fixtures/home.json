@@ -35,6 +35,7 @@
    "commit_url": "https://github.com/acme/acme-app/commit/9f8e7d1"
   },
   "to_push": 4,
+  "step_word": "in step",
   "laptop": {
    "state": "healthy",
    "label": "healthy",

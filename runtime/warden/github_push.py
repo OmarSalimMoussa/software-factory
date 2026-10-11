@@ -118,6 +118,30 @@ def push_checked(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
     return ok(sha=sha, commits=count, message=f"Pushed {count} commits; CI takes {sha[:12]} to staging")
 
 
+def includes(ctx: Context) -> Callable[[str, str], bool | None]:
+    """Whether a build includes a merge, asked of the warden's own mirror, which fetches GitHub's default branch once
+    when either commit is not in it yet: a build the agents' checkout never saw (a commit made on GitHub) is known
+    there. None for a commit GitHub's branch does not hold either; such a build moves no task."""
+    settings = ctx.settings()
+    branch = settings.get_str("repo.default_branch")
+    url = f"git@github.com:{settings.get_str('repo.github')}.git"
+    state: dict[str, Any] = {"git": None, "fetched": False}
+
+    def known(git: _Git, commit: str) -> bool:
+        return git._exec(["cat-file", "-e", f"{commit}^{{commit}}"], cwd=git.mirror).returncode == 0
+
+    def check(build: str, merge: str) -> bool | None:
+        git = state["git"] = state["git"] or _Git(ctx)
+        if not (known(git, build) and known(git, merge)) and not state["fetched"]:
+            state["fetched"] = True
+            git.run("fetch", "--no-tags", "--quiet", url, f"+refs/heads/{branch}:refs/github/{branch}")
+        if not (known(git, build) and known(git, merge)):
+            return None
+        return git.is_ancestor(merge, build)
+
+    return check
+
+
 def _unchecked_merges(ctx: Context, git: _Git, remote: str, head: str) -> list[str]:
     """The merges on the default branch between GitHub's branch and ``head`` that are not cleared to ship: one the
     warden never saw land for a task, or whose task's check has not passed. A merge reverted within the range ships
@@ -274,13 +298,36 @@ def _staging_build(ctx: Context) -> str:
         raise Refused("staging-unknown", "staging has not been probed yet: wait a minute, then push")
     if not staging.ok:
         raise Refused("staging-red", f"staging is red ({staging.error}): fix staging before pushing it to prod")
+    if deploys.on_default(ctx.places, probes.STAGING) is False:
+        branch = ctx.settings().get_str("repo.default_branch")
+        raise Refused("staging-pinned", f"staging runs {staging.commit[:12]}, pinned off {branch}: only {branch}'s "
+                                        f"checked work goes to prod; run CI on {branch} to unpin it")  # fmt: skip
     prod = _latest(ctx, probes.PROD)
     if prod is not None and prod.ok and prod.commit == staging.commit:
         raise Refused("nothing-to-push", f"prod already runs {staging.commit[:12]}, the build staging runs")
     return staging.commit
 
 
+def _pushes_path(places: Places) -> Path:
+    return places.state / "prod-pushes.jsonl"
+
+
+def push_back_target(ctx: Context) -> str | None:
+    """The build push back would put on prod, for the push sheet; None when there is none to go back to."""
+    try:
+        return _previous_prod(ctx)
+    # telemetry: expected — before prod ran two builds there is nothing to go back to
+    except Refused:
+        return None
+
+
 def _previous_prod(ctx: Context) -> str:
+    """The build prod ran before the last push to it, as the warden saw it answer when that push began: a push that
+    never answered (a crash-looping build) is never taken for one prod ran. Before the first push the warden made,
+    the deploy log's previous build."""
+    pushes = store.read_jsonl(_pushes_path(ctx.places))
+    if pushes and pushes[-1].get("from"):
+        return str(pushes[-1]["from"])
     previous = deploys.builds(ctx.places, probes.PROD)["previous"]
     if previous is None:
         raise Refused("no-previous", "the deploy log holds no earlier prod build to go back to")
@@ -296,6 +343,9 @@ def _start(ctx: Context, kind: str, sha: str) -> dict[str, Any]:
     wait_s = settings.get_int("watch.push_wait_minutes") * 60
     watch_s = settings.get_int("watch.loop_minutes") * 60
     deploys.expect(ctx.places, probes.PROD, sha, ctx.clock.now(), settings.get_int("watch.push_wait_minutes"))
+    running = deploys.builds(ctx.places, probes.PROD)["current"]
+    store.append_jsonl(_pushes_path(ctx.places), {"at": ctx.clock.iso(), "kind": kind, "to": sha,
+                                                   "from": running["commit"] if running else ""})  # fmt: skip
     with _watch_lock:  # the last step moves watch_until; it waits for this record to exist
         op_id = ops.launch(ctx, kind, _steps(ctx, kind, sha, wait_s, watch_s), {"sha": sha})
         until = ctx.clock.now() + wait_s + watch_s

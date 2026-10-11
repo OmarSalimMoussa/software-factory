@@ -246,3 +246,28 @@ def test_a_merge_reverted_in_the_range_ships_nothing_of_its_own(world: World, gi
     passed(world, git(world.checkout, "rev-parse", f"{head}^{{tree}}"))
 
     assert github_push.push_checked(world.ctx, {}, None)["sha"] == head
+
+
+def test_push_back_goes_to_what_prod_ran_when_the_last_push_began_even_if_that_push_never_answered(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for commit in (OLD, PROD):
+        deploys.record(world.ctx.places, probes.PROD, commit, world.clock.iso())
+    probe(world, probes.STAGING, True, STAGING)
+    probe(world, probes.PROD, True, PROD)
+    monkeypatch.setattr(github_push, "_steps", lambda *args: [])  # the push starts, and its build never answers
+
+    github_push.push_prod(world.ctx, {"expected_staging_sha": STAGING}, None)
+
+    assert github_push.push_back_target(world.ctx) == PROD  # not OLD, two builds back
+
+
+def test_a_staging_build_pinned_off_the_default_branch_never_goes_to_prod(world: World) -> None:
+    deploys.record(world.ctx.places, probes.STAGING, STAGING, world.clock.iso())
+    deploys.note_branch(world.ctx.places, probes.STAGING, STAGING, False)
+    probe(world, probes.STAGING, True, STAGING)
+    probe(world, probes.PROD, True, PROD)
+
+    with pytest.raises(Refused) as refused:
+        github_push.push_prod(world.ctx, {"expected_staging_sha": STAGING}, None)
+    assert refused.value.rule == "staging-pinned"

@@ -7,7 +7,7 @@ from typing import Any
 from runtime.dashboard.views import taskwords
 from runtime.dashboard.views.home import env_card
 from runtime.dashboard.views.kit import Parts, Query, Snap, epoch, span, when
-from runtime.dashboard.views.shell import health
+from runtime.dashboard.views.shell import health, prod_runs_staging
 from runtime.dashboard.views.task import built_from
 
 WANTS = ("settings", "probes", "queue", "deploys", "ci", "sessions", "cost", "cards", "qa", "specs", "rules", "outage")
@@ -32,11 +32,8 @@ def push(snap: Snap) -> dict[str, Any]:
     staging["healthy_for"] = span(snap.now - epoch(streak["since"])) if healthy and streak else None
     latest = snap.get("probes")["recent"]["staging"]
     expected = latest[-1]["commit"] if latest and latest[-1]["ok"] else None
-    # The warden's own rule for refusing a push: prod answers, on the build staging answers on. No task on staging is
-    # no proof: a prod never deployed, or a push of work made outside the factory's tasks, lists none.
-    prod_probe = snap.get("probes")["recent"]["prod"]
-    same = bool(expected and prod_probe and prod_probe[-1]["ok"] and prod_probe[-1]["commit"] == expected)
-    previous = snap.get("deploys")["prod"]["previous"]
+    same = prod_runs_staging(snap)
+    previous = snap.get("deploys")["push_back"]
     tasks = []
     specs = snap.get("specs")
     for task in sorted(taskwords.tasks(snap).values(), key=lambda t: t["created"]):
@@ -58,7 +55,7 @@ def push(snap: Snap) -> dict[str, Any]:
         "staging": staging,
         "tasks": tasks,
         "prod_runs_staging": same,
-        "previous_prod": previous["commit"][:7] if previous else None,
+        "previous_prod": previous[:7] if previous else None,
         "expected_staging_sha": expected,
         "blocked": blocked,
     }

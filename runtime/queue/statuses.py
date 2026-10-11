@@ -55,6 +55,9 @@ MOVES: tuple[Move, ...] = (
     _m({"merged"}, {"checked"}, "checked", ORCH, WARDEN),
     _m({"checked"}, {"on-staging"}, "on-staging", WARDEN),
     _m({"on-staging"}, {"promoted"}, "promoted", WARDEN),
+    # Prod pushed back, or staging taken to a build without the merge: the status follows what runs.
+    _m({"promoted"}, {"on-staging"}, "left-prod", WARDEN),
+    _m({"on-staging"}, {"checked"}, "left-staging", WARDEN),
     _m(RUNNING, {"decide"}, "limits", WARDEN),
     _m({"decide"}, {"building"}, "extend", OWNER),
     _m({"decide"}, {"parked"}, "park", OWNER),

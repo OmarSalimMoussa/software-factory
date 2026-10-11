@@ -8,7 +8,7 @@ from typing import Any
 
 from runtime.dashboard.views import agentwords, messaging, proposals, taskwords
 from runtime.dashboard.views.kit import Parts, Query, Snap, clock, epoch, iso, model_word, span, when
-from runtime.dashboard.views.shell import github_url, health
+from runtime.dashboard.views.shell import github_url, health, prod_runs_staging
 from runtime.shared.models import RETIRED, WAITING
 from runtime.shared.paths import PROMOTE_WORKFLOW
 
@@ -130,6 +130,8 @@ def envs(snap: Snap) -> dict[str, Any]:
         "staging": env_card(snap, "staging"),
         "prod": env_card(snap, "prod"),
         "to_push": ahead,
+        # Between the cards when no task waits on staging: staging can still differ from prod (a push back, a pin).
+        "step_word": "in step" if prod_runs_staging(snap) else "differs",
         "laptop": laptop(snap),
     }
 

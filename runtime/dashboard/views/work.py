@@ -19,10 +19,11 @@ from runtime.dashboard.views.kit import (
     plural,
     when,
 )
+from runtime.dashboard.views.shell import prod_runs_staging
 from runtime.queue.formats import outcome_task
 from runtime.shared import order
 
-WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "factory")
+WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "factory", "probes")
 TABS = (("tasks", "Tasks"), ("requests", "Requests"), ("parked", "Parked"), ("checks", "Checks"))
 INBOXES = (("all", "All inboxes"), ("agents", "Agents"), ("owner", "You"), ("users", "Users"))
 OUTCOMES = [["all", "Any outcome"], ["waiting", "Waiting"], ["task", "Task"], ["noise", "Noise"], ["parked", "Parked"]]
@@ -45,7 +46,7 @@ _GROUPS = {
         "the next proposal, ahead of its own picks.",
         "The queue is empty.",
     ),
-    "staging": ("On staging, waiting to push to prod", None, "Staging runs what prod runs."),
+    "staging": ("On staging, waiting to push to prod", None, ""),
 }
 
 
@@ -94,8 +95,16 @@ def groups(snap: Snap) -> list[dict[str, Any]]:
         "staging": [_row(snap, t, None, None, []) for t in ranked(("on-staging",))],
     }
     # The approved group shows only while something approved waits, as the prototype draws it.
+    # No task on staging is no proof staging runs prod's build: a push back or a pin leaves it different.
+    staging_empty = "Staging runs what prod runs." if prod_runs_staging(snap) else "No task waits on staging."
     return [
-        {"key": key, "title": title, "hint": hint, "empty": empty, "rows": rows[key]}
+        {
+            "key": key,
+            "title": title,
+            "hint": hint,
+            "empty": staging_empty if key == "staging" else empty,
+            "rows": rows[key],
+        }
         for key, (title, hint, empty) in _GROUPS.items()
         if key != "approved" or rows[key]
     ]

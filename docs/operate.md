@@ -81,8 +81,8 @@ When staging looks right, press Push to prod in the top bar and enter the code. 
 `deploy-prod.yml` with exactly the commit staging runs, follows its deploy job, then watches prod until it answers on
 it. The release steps run last (a browser extension's store upload, when it changed); a failed release shows as the
 push's last step, with prod already live. If prod misbehaves, push back the same way: the warden starts the same
-workflow with the commit prod ran before. It knows that commit from its deploy log, which records each new build
-staging and prod answer with.
+workflow with the commit prod ran when the last push began, so a push that never answered does not move the target.
+Push to prod refuses a staging build pinned off the default branch: lift the pin first.
 
 Your own checkout of the product runs the factory's git hooks too: a merge into the default branch there lands only
 with a tree that passed `factory check`.

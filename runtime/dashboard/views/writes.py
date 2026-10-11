@@ -113,7 +113,7 @@ def _push_back_args(body: Body, ref: str, snap: Snap | None) -> dict[str, Any]:
     in full, and refuses if prod's previous build has moved on since."""
     assert snap is not None
     sent = _text(body, "expected_sha")
-    previous = (snap.get("deploys")["prod"]["previous"] or {}).get("commit")
+    previous = snap.get("deploys")["push_back"]
     if not previous or not previous.startswith(sent):
         raise Stale(STALE)
     return {"expected_sha": previous, "code": body.get("code")}

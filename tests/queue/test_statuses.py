@@ -49,17 +49,26 @@ def test_the_orchestrator_names_the_event_only_when_the_table_holds_several(worl
     assert world.queue().read_log(task.id)[-1]["event"] == "noise"
 
 
-def test_deploys_move_checked_work_to_staging_then_prod(world: World) -> None:
+def test_task_statuses_follow_the_builds_forward_and_back(world: World) -> None:
     task = world.task(branch="impl-t-0001")
     world.queue().write_task(dataclasses.replace(task, status="turn", run=1))
     tasks.move(world.ctx(), task.id, "merged", "merged", "warden", "merged as abc1234", commit="abc1234")
     tasks.set_status(world.ctx(), task.id, "checked", "", "")
     included = {"5ta9e01", "9r0d001"}
-    world.launcher.git = lambda argv: (0 if argv[-2:] == ["abc1234", argv[-1]] and argv[-1] in included else 1, "")
-    assert tasks.advance_deployed(world.ctx(), "0ther00", None) == []
-    assert tasks.advance_deployed(world.ctx(), "5ta9e01", None) == [f"{task.id} on-staging"]
-    assert tasks.advance_deployed(world.ctx(), "5ta9e01", "9r0d001") == [f"{task.id} promoted"]
-    assert world.queue().task(task.id).status == "promoted"
+
+    def includes(build: str, merge: str) -> bool | None:
+        return None if build == "unkn0wn" else (merge == "abc1234" and build in included)
+
+    def advance(staging: str | None, prod: str | None) -> list[str]:
+        return tasks.advance_deployed(world.ctx(), staging, prod, includes)
+
+    assert advance("0ther00", None) == []
+    assert advance("unkn0wn", None) == []  # a build git does not know moves nothing, and stalls nothing
+    assert advance("5ta9e01", None) == [f"{task.id} on-staging"]
+    assert advance("5ta9e01", "9r0d001") == [f"{task.id} promoted"]
+    assert advance("5ta9e01", "01d0001") == [f"{task.id} on-staging"]  # prod pushed back
+    assert advance("01d0002", "01d0001") == [f"{task.id} checked"]  # and staging moved off it
+    assert world.queue().task(task.id).status == "checked"
 
 
 def test_one_task_holds_the_merge_turn_and_turn_next_picks_by_after_then_the_order(world: World) -> None:

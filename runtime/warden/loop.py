@@ -172,8 +172,17 @@ def _deployed(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
         return
     memo["deployed"][probe.env] = probe.commit
     deploys.record(ctx.places, probe.env, probe.commit, probe.at)
+    includes = github_push.includes(ctx)
+    branch = ctx.settings().get_str("repo.default_branch")
     try:
-        moved = tasks.advance_deployed(ctx, memo["deployed"].get(probes.STAGING), memo["deployed"].get(probes.PROD))
+        on_default = includes(f"refs/github/{branch}", probe.commit)
+    # telemetry: surfaced — unknown, the build's branch draws as unknown; the push to prod reports the mirror's trouble
+    except Refused:
+        on_default = None
+    deploys.note_branch(ctx.places, probe.env, probe.commit, on_default)
+    try:
+        found = memo["deployed"]
+        moved = tasks.advance_deployed(ctx, found.get(probes.STAGING), found.get(probes.PROD), includes)
     except Refused as exc:
         # Retried on the next probe: forgetting the build makes it new again.
         del memo["deployed"][probe.env]

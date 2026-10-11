@@ -176,24 +176,31 @@ class _Deploy:
         with _lock(self.paths.lock, self.log):
             for folder, mode in ((self.stack, 0o755), (self.env_dir, 0o700), (self.state, 0o755)):
                 folder.mkdir(parents=True, exist_ok=True, mode=mode)
-            if self.args.mode == "pin -":
-                pinned.unlink(missing_ok=True)
-                self.log("staging follows the default branch again")
-            elif self.args.mode is not None and self.args.mode.startswith("pin "):
-                atomic_write(pinned, self.args.mode[4:] + "\n", 0o644)
-                self.log(f"staging is pinned to {self.args.mode[4:]}")
             token = stdin.read().strip()
             if not token:
                 raise DeployError("no registry token arrived on standard input")
             host = self.config.product.registry.split("/", 1)[0]
             checked(self.tools.run, ["docker", "login", host, "-u", "github-actions", "--password-stdin"], token)
             try:
-                return self.deploy()
+                done = self.deploy()
+                if done == 0:
+                    self.pin(pinned)
+                return done
             finally:
                 if self.tools.run(["docker", "logout", host], None).returncode != 0:
                     self.log(
                         f"warning: docker logout {host} failed; the token stays in docker's config till it expires"
                     )
+
+    def pin(self, pinned: Path) -> None:
+        """A run by hand pins staging to its ref, or lifts the pin, only once its deploy succeeded: staging is never
+        pinned to a commit it does not run."""
+        if self.args.mode == "pin -":
+            pinned.unlink(missing_ok=True)
+            self.log("staging follows the default branch again")
+        elif self.args.mode is not None and self.args.mode.startswith("pin "):
+            atomic_write(pinned, self.args.mode[4:] + "\n", 0o644)
+            self.log(f"staging is pinned to {self.args.mode[4:]}")
 
     def deploy(self) -> int:
         short, run, log = self.args.short, self.tools.run, self.log

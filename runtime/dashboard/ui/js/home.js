@@ -18,7 +18,7 @@ PAGE.home = {
 const homePart = name => { const env = UI.data['/api/home'], p = env && env.parts[name]; return p && p.ok ? p.data : null; };
 
 function envsHTML(e) {
-  return `<div class="envs">${envCard(e.staging)}<div class="promote-col"><span class="arrow">${icon('chevron-right', 'lg')}</span><span class="ahead">${e.to_push ? `<b class="num" style="font-size:18px;color:var(--fg)">${e.to_push}</b><br>to push` : 'in step'}</span></div>${envCard(e.prod)}${laptopHTML(e.laptop)}</div>`;
+  return `<div class="envs">${envCard(e.staging)}<div class="promote-col"><span class="arrow">${icon('chevron-right', 'lg')}</span><span class="ahead">${e.to_push ? `<b class="num" style="font-size:18px;color:var(--fg)">${e.to_push}</b><br>to push` : esc(e.step_word)}</span></div>${envCard(e.prod)}${laptopHTML(e.laptop)}</div>`;
 }
 function envCard(env) {
   const dot = env.state === 'healthy' ? 'good' : env.state === 'down' ? 'bad' : '';

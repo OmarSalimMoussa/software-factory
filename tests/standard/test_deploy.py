@@ -249,3 +249,18 @@ def test_a_service_restarts_only_when_a_file_it_mounts_changed(server: Server) -
 
     assert server.deploy("prod", "abcdef12") == 0
     assert restarts() == []
+
+
+@pytest.mark.parametrize(("answers", "pinned"), [(False, False), (True, True)], ids=["never-answered", "answered"])
+def test_a_pin_holds_only_once_its_deploy_succeeded(server: Server, answers: bool, pinned: bool) -> None:
+    env = server.root / "srv/notes/staging/env/notes.env"
+    env.parent.mkdir(parents=True)
+    env.write_text("MAIL_HOST=mail.example.com\n")
+    server.health.answers["http://127.0.0.1:8301/healthz"] = [None]
+    live = (200, {"workspace": "staging", "build_commit": "abcdef12", "busy": 0})
+    server.health.answers["https://staging.notes.example.com/healthz"] = [live if answers else None]
+
+    code = server.deploy("staging", "abcdef12", "pin", "feature/x")
+
+    assert (code == 0) is answers
+    assert (server.root / "srv/notes/staging/state/pinned").exists() is pinned

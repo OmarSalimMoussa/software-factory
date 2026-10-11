@@ -34,6 +34,14 @@ def health(snap: Snap, env: str) -> dict[str, Any]:
     return {"state": state, "sha": good["commit"][:7] if good else None}
 
 
+def prod_runs_staging(snap: Snap) -> bool:
+    """The warden's own rule for a push to prod: prod answers on the build staging answers on. No task on staging is
+    no proof: a prod never deployed, a push back, or a push of work made outside the factory's tasks lists none."""
+    staging, prod = snap.get("probes")["recent"]["staging"], snap.get("probes")["recent"]["prod"]
+    expected = staging[-1]["commit"] if staging and staging[-1]["ok"] else None
+    return bool(expected and prod and prod[-1]["ok"] and prod[-1]["commit"] == expected)
+
+
 def factory_state(snap: Snap) -> str:
     if snap.get("factory")["paused"] is not None:
         return "paused"

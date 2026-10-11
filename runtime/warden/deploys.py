@@ -80,3 +80,23 @@ def last_push(places: Places, env: str) -> str | None:
     """The commit the warden last pushed toward ``env``, landed or not; None before its first push."""
     flight = _flights(places).get(env)
     return str(flight["commit"]) if flight is not None else None
+
+
+def _branch_path(places: Places) -> Path:
+    return places.state / "deploys-on-default.json"
+
+
+def note_branch(places: Places, env: str, commit: str, on_default: bool | None) -> None:
+    """Whether ``env``'s build ``commit`` is on the default branch; None when git cannot tell."""
+    raw = store.read_json_or(_branch_path(places), {})
+    store.write_json(_branch_path(places), {**raw, env: {"commit": commit, "on_default": on_default}})
+
+
+def on_default(places: Places, env: str) -> bool | None:
+    """Whether ``env`` runs a build on the default branch: False for a commit pinned by hand, None when unknown."""
+    found = store.read_json_or(_branch_path(places), {}).get(env)
+    current = builds(places, env)["current"]
+    if not isinstance(found, dict) or current is None or found.get("commit") != current["commit"]:
+        return None
+    value = found.get("on_default")
+    return value if isinstance(value, bool) else None
