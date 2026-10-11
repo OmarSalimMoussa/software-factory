@@ -10,7 +10,7 @@ from runtime.shared import claude_accounts, totp
 from runtime.shared.claude_accounts import AccountError
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER
 from runtime.shared.settings import overrides_toml
-from runtime.system import layout, render
+from runtime.system import github_keys, layout, render
 from runtime.system.job import Install, github_name, refuse
 
 # Claude Code carries its seccomp helper (which blocks Unix sockets in the sandbox) inside its own binary; a version
@@ -258,22 +258,39 @@ def secrets(ctx: Install) -> None:
         host.write(ctx.places.totp_secret, secret + "\n", mode=0o600, owner=WARDEN_USER)
         host.say("  Add this to your authenticator app. It is shown once, now:")
         host.say(f"    {totp.enrolment_uri(secret, ctx.owner.name)}" if not host.dry else "    <the secret>")
+    gh = github_keys.owner_gh(ctx)
+    if not gh:
+        host.say("  your `gh` is not signed in to github.com: the keys below are yours to add by hand")
     key = folder / "deploy.key"
     if not host.exists(key):
         host.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "software-factory deploy", "-f", str(key)],
                  user=WARDEN_USER)  # fmt: skip
-        host.say(f"  Add this as a deploy key with write access to {github}:")
-        host.say("    " + (host.read(_public_half(key)).strip() if not host.dry else "<the public key>"))
+        if not gh:
+            host.say(f"  Add this as a deploy key with write access to {github}:")
+            host.say("    " + (host.read(_public_half(key)).strip() if not host.dry else "<the public key>"))
+    # Kept in step on every install, so a key the owner never added, or one removed by hand, comes back.
+    if gh and not host.dry:
+        said = github_keys.put_deploy_key(ctx, gh, github, github_keys.WARDEN_TITLE, host.read(_public_half(key)),
+                                          write=True)  # fmt: skip
+        host.say(f"  the warden's deploy key on {github}: {said}")
     # Only the product's CI uses the private half, so the machine keeps just the public half, the mark it was made.
     read_key = folder / "factory-read.key"
     if not host.exists(_public_half(read_key)):
         host.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "software-factory read", "-f", str(read_key)],
                  user=WARDEN_USER)  # fmt: skip
         factory = github_name(ctx.factory_origin) or ctx.factory_origin
-        host.say(f"  Add this as a deploy key to {factory}, read-only, so {github}'s CI can check out the factory:")
-        host.say("    " + (host.read(_public_half(read_key)).strip() if not host.dry else "<the public key>"))
-        host.say(f"  Save the lines below, unchanged, as {github}'s secret FACTORY_READ_KEY. They are shown once, now:")
-        host.say(host.read(read_key).strip() if not host.dry else "<the private key>")
+        if gh and not host.dry:
+            title = github_keys.read_title(github)
+            said = github_keys.put_deploy_key(ctx, gh, factory, title, host.read(_public_half(read_key)), write=False)
+            github_keys.put_secret(ctx, gh, github, github_keys.READ_SECRET, read_key)
+            host.say(f"  the CI's read key on {factory}: {said}; its private half is {github}'s secret "
+                     f"{github_keys.READ_SECRET}")  # fmt: skip
+        else:
+            host.say(f"  Add this as a deploy key to {factory}, read-only, so {github}'s CI can check out the factory:")
+            host.say("    " + (host.read(_public_half(read_key)).strip() if not host.dry else "<the public key>"))
+            host.say(f"  Save the lines below, unchanged, as {github}'s secret {github_keys.READ_SECRET}. "
+                     "They are shown once, now:")  # fmt: skip
+            host.say(host.read(read_key).strip() if not host.dry else "<the private key>")
         host.remove(read_key)
     if not host.exists(folder / "github.token"):
         value = host.ask("Your GitHub token (Actions: write) for the warden: ", secret=True)
