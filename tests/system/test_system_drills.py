@@ -178,3 +178,56 @@ def test_the_install_refuses_to_finish_while_a_drill_fails(tmp_path: Path, monke
         {"name": "a", "ok": True, "evidence": "held"},
         {"name": "b", "ok": False, "evidence": "breached"},
     ]
+
+
+@dataclass
+class OneAnswer(FakeRig):
+    """A session whose one Bash call answers ``result``."""
+
+    result: str = ""
+    error: bool = True
+
+    def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None) -> Ran:
+        use = {
+            "type": "assistant",
+            "message": {
+                "content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": commands[-1]}}]
+            },
+        }
+        done = {
+            "type": "user",
+            "message": {
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "t1", "content": self.result, "is_error": self.error}
+                ]
+            },
+        }
+        return Ran(0, json.dumps(use) + "\n" + json.dumps(done) + "\n")  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("result", "error", "ok"),
+    [
+        (drills.SANDBOX_MARK, False, True),
+        ("Exit code 1\nbwrap: setting up uid map: Permission denied", True, False),
+    ],
+    ids=["runs", "sandbox-broken"],
+)
+def test_the_control_drill_needs_a_plain_command_to_run_in_the_sandbox(result: str, error: bool, ok: bool) -> None:
+    found = drills.sandbox_runs(OneAnswer(result=result, error=error))
+
+    assert found.ok is ok
+    assert ok or "bwrap: setting up uid map" in found.evidence  # the whole error, not its first line
+
+
+@pytest.mark.parametrize(
+    ("result", "ok"),
+    [
+        ("unix:/run/docker.sock -> EPERM\nunix:/run/software-factory/warden.sock -> EPERM", True),
+        ("Refused by the factory guard (factory-alone): run factory on its own", True),
+        ("Exit code 1", False),  # a sandbox that runs nothing proves nothing
+    ],
+    ids=["refused-each", "guard-refused", "bare-failure"],
+)
+def test_a_refusal_drill_passes_only_on_an_answer_that_names_the_refusal(result: str, ok: bool) -> None:
+    assert drills.sockets_refused(OneAnswer(result=result)).ok is ok

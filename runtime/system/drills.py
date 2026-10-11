@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from runtime.guard.wire import REFUSED as GUARD_REFUSAL
 from runtime.shared.paths import AGENT_USER, Places
 from runtime.shared.settings import Settings
 from runtime.system import layout
@@ -22,6 +23,7 @@ from runtime.system.steps_toolchain import python_request
 from standard.services import stack
 
 UNREACHABLE = "cannot be reached"  # how the factory command says it found no warden
+SANDBOX_MARK = "software-drill-sandbox-ok"
 _POLL_S = 1.0
 
 
@@ -126,6 +128,20 @@ def _first(text: str) -> str:
     return next((line.strip() for line in text.splitlines() if line.strip()), "(nothing)")[:200]
 
 
+def _brief(text: str) -> str:
+    """Every line of a result, joined: an error's first line ("Exit code 1") alone says nothing of its cause."""
+    return " / ".join(line.strip() for line in text.splitlines() if line.strip())[:400] or "(nothing)"
+
+
+def _did(ran: Ran) -> str:
+    """What a drill session did instead of what it was asked: the commands it ran, or its last words."""
+    runs = tool_runs(ran.out)
+    if runs:
+        return "it ran: " + "; ".join(f"{r.command[:120]} -> {_brief(r.result)[:160]}" for r in runs[:3])
+    said = [line for line in ran.out.splitlines() if line.strip()]
+    return "it ran nothing; its output ends: " + _brief("\n".join(said[-3:]))[:300]
+
+
 def _probe(rig: Rig, *targets: str) -> list[str]:
     seconds = str(rig.settings.get_int("watch.http_timeout_seconds"))
     return [layout.PYTHON, str(rig.places.install / "runtime" / "system" / "drill_probe.py"), "--seconds", seconds,
@@ -134,14 +150,29 @@ def _probe(rig: Rig, *targets: str) -> list[str]:
 
 def _sandboxed_probe(rig: Rig, name: str, *targets: str) -> Result:
     command = " ".join(_probe(rig, *targets))
-    run = exact_run(rig.sandboxed(command), command)
+    ran = rig.sandboxed(command)
+    run = exact_run(ran, command)
     if run is None:
-        return Result(name, False, "inconclusive: the drill session did not run the probe as asked")
+        return Result(name, False, f"inconclusive: the drill session did not run the probe as asked; {_did(ran)}")
     breached = _breached(run.result)
-    # A refused call (the guard's, or the sandbox stopping python itself) answers too; silence proves nothing.
-    answered = bool(outcomes(run.result)) or run.error
-    evidence = f"breached {', '.join(breached)}" if breached else _first(run.result)
+    # The probe must report each target, or the guard must refuse the call: a bare failure (a sandbox that runs
+    # nothing at all) proves nothing.
+    answered = bool(outcomes(run.result)) or GUARD_REFUSAL in run.result
+    evidence = f"breached {', '.join(breached)}" if breached else _brief(run.result)
     return Result(name, answered and not breached, evidence)
+
+
+def sandbox_runs(rig: Rig) -> Result:
+    """The control: a session's sandbox runs a plain command. Without it, every drill below that expects a refusal
+    could pass on a sandbox that runs nothing at all."""
+    name = "a session's sandbox runs a plain command"
+    command = f"echo {SANDBOX_MARK}"
+    ran = rig.sandboxed(command)
+    run = exact_run(ran, command)
+    if run is None:
+        return Result(name, False, f"inconclusive: the drill session did not run the echo as asked; {_did(ran)}")
+    ok = not run.error and SANDBOX_MARK in run.result
+    return Result(name, ok, _brief(run.result))
 
 
 def docker_denied(rig: Rig) -> Result:
@@ -269,9 +300,10 @@ def path_shadow(rig: Rig) -> Result:
         'export PATH="$PWD/drill-bin:$PATH"'
     )
     call = f"factory {' '.join(probe[2:])} unix:{rig.places.socket}"
-    run = exact_run(rig.sandboxed(setup, call), call)
+    ran = rig.sandboxed(setup, call)
+    run = exact_run(ran, call)
     if run is None:
-        return Result(name, False, "inconclusive: the drill session did not run the shadow as asked")
+        return Result(name, False, f"inconclusive: the drill session did not run the shadow as asked; {_did(ran)}")
     breached = _breached(run.result)
     return Result(name, not breached, "the shadow reached the warden" if breached else _first(run.result))
 
@@ -292,8 +324,8 @@ def toolchain_answers(rig: Rig) -> Result:
     runs = [(command, exact_run(ran, command)) for command in commands]
     done = [(command, run) for command, run in runs if run is not None]
     if len(done) < len(commands):
-        return Result(name, False, "inconclusive: the drill session did not run every command as asked")
-    failed = [f"{command}: {_first(run.result)}" for command, run in done if run.error]
+        return Result(name, False, f"inconclusive: the drill session did not run every command as asked; {_did(ran)}")
+    failed = [f"{command}: {_brief(run.result)}" for command, run in done if run.error]
     found = next((_first(run.result) for command, run in done if command == find and not run.error), "")
     if found and not (found.startswith(f"{layout.TOOLCHAIN_PYTHON}/") or str(Path(found).parent) in layout.SYSTEM_PATH):
         failed.append(f"{find} found {found}, not the toolchain's copy")
@@ -334,6 +366,7 @@ def dashboard_unreachable(rig: Rig) -> Result:
 
 
 DRILLS: tuple[Callable[[Rig], Result], ...] = (
+    sandbox_runs,
     docker_denied,
     shell_write_other_worktree,
     edit_other_worktree,

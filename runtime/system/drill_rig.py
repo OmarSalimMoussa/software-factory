@@ -76,6 +76,10 @@ class RealRig:
         self.session_a = str(uuid.uuid4())
         self.sessions: dict[str, Session] = {}
         self.timeout = self.settings.get_int("install.drill_seconds")
+        # Every drill session's whole output, for the owner to read when a drill fails: its evidence is one line.
+        stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        self.log_dir = ctx.owner.home / ".cache" / "software-factory" / "drills" / stamp
+        self.logged = 0
 
     # setting up and tearing down
 
@@ -117,6 +121,13 @@ class RealRig:
             host.query(["git", "-C", repo, "worktree", "remove", "--force", str(worktree)], user=AGENT_USER)
             host.query(["git", "-C", repo, "branch", "-D", branch], user=AGENT_USER)
         shutil.rmtree(layout.DRILLS, ignore_errors=True)
+        if self.log_dir.exists():
+            owner = self.ctx.owner
+            for folder in [self.log_dir.parents[2], self.log_dir.parents[1], self.log_dir.parent, self.log_dir]:
+                os.chown(folder, owner.uid, owner.gid)
+            for path in self.log_dir.iterdir():
+                os.chown(path, owner.uid, owner.gid)
+            self.ctx.host.say(f"  each drill session's whole output: {self.log_dir}")
 
     # what the drills call
 
@@ -175,7 +186,15 @@ class RealRig:
                 "--session-id", sid, "--settings", str(layout.public(self.places.state) / name),
                 "--model", model["model"], "--effort", model["effort"], "--output-format", "stream-json", "--verbose",
                 "--allowedTools", "Bash", "--permission-prompts", "none", "--no-session-persistence"]  # fmt: skip
-        return self._systemd_run(AGENT_USER, argv, view=True, token=True)
+        ran = self._systemd_run(AGENT_USER, argv, view=True, token=True)
+        self._log(prompt, ran)
+        return ran
+
+    def _log(self, prompt: str, ran: Ran) -> None:
+        self.logged += 1
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        path = self.log_dir / f"{self.logged:02d}-session.txt"
+        path.write_text(f"# asked\n{prompt}\n# exit {ran.code}\n{ran.out}", encoding="utf-8")
 
     def exists(self, path: Path) -> bool:
         return path.exists()
