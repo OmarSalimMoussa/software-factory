@@ -14,4 +14,7 @@ This file is for the owner and any session the owner opens on the factory itself
   stay unknown: never a zero or a dash for a missing value.
 - **The server computes, the dashboard renders.** The UI draws finished values from the warden's API.
 - **Tests protect behaviour a caller can see,** and every invariant of the guard and the agent lifecycle has one.
+- **Its own checks, too.** The factory meets every standard check that fits a dev tool, with no debt deferred.
+  `tests/self_check/` names the product-only checks with their grounds, and CI runs it before any release.
+- **No mirrored constants.** A value two parts share lives in one module or file that both read, never in a hand copy.
 - **Changes go:** branch, test, merge, push, reinstall. `SELF_REFLECT.md` on the machine says what to change next.
