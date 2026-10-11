@@ -69,6 +69,7 @@ def http_get(url: str, timeout: float) -> Answer:
     try:
         with opener.open(request, timeout=timeout) as response:
             return Answer(response.status, response.read(_MAX_BODY))
+    # telemetry: expected — an error status is an answer: the probe reads its status
     except urllib.error.HTTPError as exc:
         return Answer(exc.code, b"")
     except urllib.error.URLError as exc:
@@ -107,10 +108,13 @@ def take(ctx: Context, env: str, fetch: Fetch) -> Probe:
     started = time.monotonic()
     try:
         answer = fetch(address(ctx, env), timeout)
+    # telemetry: surfaced — the `probe` records no health address, not counted, for the dashboard to draw
     except NoAddress as exc:
         probe = Probe(at, env, False, "", None, f"no health address: {exc}; not counted")
+    # telemetry: surfaced — the `probe` records no answer in time, for the dashboard to draw
     except TimeoutError:
         probe = _failed(ctx, at, env, _ms(started), f"no answer within {timeout:g} s")
+    # telemetry: surfaced — the `probe` records the host unreachable from here, not counted
     except NetworkFailure as exc:
         probe = Probe(at, env, False, "", None, f"could not reach the host from here ({exc}); not counted")
     else:
@@ -140,6 +144,7 @@ def _ms(started: float) -> int:
 def _build_commit(body: bytes) -> str | None:
     try:
         parsed = json.loads(body)
+    # telemetry: expected — a body that is not JSON names no build: the probe records none
     except ValueError:
         return None
     commit = parsed.get("build_commit") if isinstance(parsed, dict) else None
@@ -151,6 +156,7 @@ def recent(places: Places, env: str, n: int) -> list[Probe]:
     found: list[Probe] = []
     try:
         fh = places.probes.open("rb")
+    # telemetry: expected — no probes yet: nothing has been probed on this machine
     except FileNotFoundError:
         return []
     with fh:

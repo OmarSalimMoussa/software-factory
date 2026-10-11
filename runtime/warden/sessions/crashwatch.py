@@ -120,7 +120,8 @@ def _finished(ctx: Context, s: Session) -> bool:
         return False
     try:
         return permits.read_task(ctx, s.task).status in DONE_AT[s.role]
-    except Refused:  # an unreadable task is never read as finished: the session is resumed instead
+    # telemetry: expected — an unreadable task is never read as finished: the session is resumed instead
+    except Refused:
         return False
 
 

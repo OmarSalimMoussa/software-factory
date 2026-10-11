@@ -86,6 +86,7 @@ def power(supplies: Path, settings: Settings) -> Reading:
                 on_battery = True
                 if (supply / "capacity").exists():
                     battery = int((supply / "capacity").read_text().strip())
+    # telemetry: surfaced — the power vital's `Reading` is unknown, naming why
     except (OSError, ValueError) as exc:
         return Reading("power", UNKNOWN, f"cannot read the power supplies: {type(exc).__name__}")
     if on_mains:
@@ -130,6 +131,7 @@ def install(places: Places) -> Reading:
     try:
         recorded = places.install_hash.read_text().strip()
         actual = _hash_when_changed(places.install)
+    # telemetry: surfaced — the install vital's `Reading` is unknown, naming why
     except OSError as exc:
         return Reading("install", UNKNOWN, f"cannot check the install: {type(exc).__name__}")
     if actual != recorded:
@@ -145,6 +147,7 @@ def hooks(places: Places, repo: Path, timeout: float) -> Reading:
             ["git", "config", "--includes", "--file", str(repo / ".git" / "config"), "--get", "core.hooksPath"],
             capture_output=True, text=True, timeout=timeout, check=False,
         )  # fmt: skip
+    # telemetry: surfaced — the hooks vital's `Reading` is unknown, naming why
     except (OSError, subprocess.TimeoutExpired) as exc:
         return Reading("hooks", UNKNOWN, f"cannot read the checkout's git config: {type(exc).__name__}")
     got = done.stdout.strip()
@@ -162,6 +165,7 @@ def daemon(proc: Path, agent_uid: int | None) -> Reading:
     found, outside = False, []
     try:
         entries = [e for e in proc.iterdir() if e.name.isdigit()]
+    # telemetry: surfaced — the daemon vital's `Reading` is unknown, naming why
     except OSError as exc:
         return Reading("daemon", UNKNOWN, f"cannot list processes: {type(exc).__name__}")
     for entry in entries:
@@ -172,7 +176,8 @@ def daemon(proc: Path, agent_uid: int | None) -> Reading:
             if len(argv) < 3 or not argv[0].endswith(b"claude") or argv[1:3] != [b"daemon", b"run"]:
                 continue
             cgroup = (entry / "cgroup").read_text()
-        except OSError:  # the process ended while it was read
+        # telemetry: expected — the process ended while it was read
+        except OSError:
             continue
         found = True
         if f"/{SLICE}/" not in cgroup:
@@ -189,8 +194,10 @@ def firewall(stamp: Path, now: float, settings: Settings) -> Reading:
     install.firewall_refresh_seconds, and each load touches ``stamp``: a stale stamp means it is not loading."""
     try:
         age = now - stamp.stat().st_mtime
+    # telemetry: surfaced — the firewall vital's `Reading` is red: it has never loaded
     except FileNotFoundError:
         return Reading("firewall", RED, "the firewall has never loaded")
+    # telemetry: surfaced — the firewall vital's `Reading` is unknown, naming why
     except OSError as exc:
         return Reading("firewall", UNKNOWN, f"cannot read when the firewall last loaded: {type(exc).__name__}")
     if age > settings.get_int("vitals.firewall_stale_seconds"):
@@ -205,6 +212,7 @@ def records(proc: Path, agent_uid: int | None, settled: float) -> Reading:
         return Reading(RECORDS, UNKNOWN, f"there is no {AGENT_USER} user")
     try:
         found = backstop.unseen(backstop.sessions_folder(), proc, agent_uid, settled)
+    # telemetry: surfaced — the records vital's `Reading` is unknown, naming why
     except (OSError, ValueError, IndexError) as exc:
         return Reading(RECORDS, UNKNOWN, f"cannot list the agent's sessions: {type(exc).__name__}")
     if found:
@@ -218,6 +226,7 @@ def blind(places: Places) -> bool:
     """Whether the last vitals found sessions the warden cannot see."""
     try:
         snapshot = store.read_json(places.vitals)
+    # telemetry: expected — no vitals yet: none has been read on this machine
     except FileNotFoundError:
         return False
     found = [r for r in snapshot.get("readings", []) if r.get("name") == RECORDS] if isinstance(snapshot, dict) else []
@@ -227,7 +236,8 @@ def blind(places: Places) -> bool:
 def _text(path: Path) -> str:
     try:
         return path.read_text()
-    except OSError:  # the reader reports unknown for empty text
+    # telemetry: surfaced — the vital `_text` feeds reads empty text as unknown
+    except OSError:
         return ""
 
 

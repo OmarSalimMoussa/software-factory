@@ -48,6 +48,7 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
         held = held_word(ctx, s.task)
         said = "\n\n".join(part for part in (note, held) if part)
         launch.resume(ctx, s, REVIVED + rebuild + (f"\n\n{said}" if said else ""))
+    # telemetry: surfaced — the session stays deprioritized; `move` records why, and the caller is told
     except (LaunchError, Refused) as exc:
         if slot is not None:
             permits.free_slot(ctx, slot)
@@ -76,7 +77,6 @@ def hand_held(ctx: Context, sid: str, task_id: str, word: str) -> None:
     next start or revive."""
     try:
         deliver(ctx, sid, word, WARDEN)
-    # telemetry: surfaced — the word stays held, and the run's next start or revive carries it
     except (LaunchError, Refused) as exc:
         log.warning("warden: a word held for %s did not reach session %s (%s)", task_id, sid, type(exc).__name__)
         return

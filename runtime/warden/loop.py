@@ -111,7 +111,6 @@ def run_once(ctx: Context, what: str, work: Callable[[], object]) -> None:
     key = (str(ctx.places.state), what)
     try:
         work()
-    # telemetry: last-resort — the failure is logged with its trace, once while it lasts, and the caller goes on
     except Exception as exc:
         said = f"{type(exc).__name__}: {exc}"[:300]
         if _FAILING.get(key) != said:

@@ -49,6 +49,7 @@ class Fold:
             if line.strip():
                 try:
                     self.step(json.loads(line))
+                # telemetry: surfaced — an unreadable line goes to `unreadable`: it fails the fold, or draws as a row
                 except (ValueError, KeyError, TypeError) as exc:
                     self.unreadable(path, exc)
         self.offset += len(whole)

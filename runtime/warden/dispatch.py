@@ -60,6 +60,7 @@ def resolve(verbs: Mapping[str, Verb]) -> dict[str, Handler]:
         module_name, _, attr = verb.handler.partition(":")
         try:
             found[name] = cast(Handler, getattr(importlib.import_module(module_name), attr))
+        # telemetry: surfaced — each missing handler is one of the `problems` the start-up raises
         except (ImportError, AttributeError) as exc:
             problems.append(f"{name} -> {verb.handler} ({type(exc).__name__})")
     if problems:
@@ -122,9 +123,10 @@ class Dispatcher:
             if agent_id:
                 caller = subagents.acting_as(self.doors.places, caller, agent_id)
             verb = self._allowed(caller, socket, name)
+        # telemetry: surfaced — the caller's answer is `refused`, with the rule and the reason
         except Refused as exc:
             return protocol.refused(exc.rule, exc.reason, exc.detail)
-        # telemetry: surfaced — the caller's answer says its upload was not base64
+        # telemetry: surfaced — the caller's answer is `refused`: its upload was not base64
         except ValueError:
             return protocol.refused("protocol", "the request's bytes_b64 is not base64")
         key = args.get("idempotency_key")
@@ -134,6 +136,7 @@ class Dispatcher:
             return protocol.refused("protocol", "idempotency_key must be 8 to 128 letters, digits, - or _")
         try:
             stored = self.idempotency.claim(key, name)
+        # telemetry: surfaced — the caller's answer is `refused`, with the rule and the reason
         except Refused as exc:
             return protocol.refused(exc.rule, exc.reason, exc.detail)
         if stored is not None:
@@ -168,6 +171,7 @@ class Dispatcher:
             if verb.coded:
                 codes.check_code(ctx, args.get("code"), lock_exempt=name in LOCK_EXEMPT)
             result = self.handlers[name](ctx, args, data)
+        # telemetry: surfaced — the caller's answer is `refused`, with the rule and the reason
         except Refused as exc:
             return protocol.refused(exc.rule, exc.reason, exc.detail), False
         except Exception as exc:

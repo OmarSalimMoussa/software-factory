@@ -69,6 +69,7 @@ def poll(ctx: Context) -> None:
         def work(env: str = env, state: dict[str, Any] = state) -> str:
             try:
                 service = telemetry.glitchtip(ctx.places, env)
+            # telemetry: surfaced — no GlitchTip until the server set-up runs: `work` returns that as its note
             except telemetry.NotSetUp:
                 return "the server set-up has not run"
             settings = ctx.settings()

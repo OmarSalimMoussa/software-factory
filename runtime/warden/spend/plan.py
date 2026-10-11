@@ -94,7 +94,6 @@ class PlanWatch:
         self._seen = identity
         try:
             reading = parse(_read_source(self.path))
-        # telemetry: surfaced — logged once per version of the file; the dashboard shows the reading ageing out
         except (PlanError, OSError) as exc:
             log.warning("warden: the plan limits file cannot be read (%s)", type(exc).__name__)
             return

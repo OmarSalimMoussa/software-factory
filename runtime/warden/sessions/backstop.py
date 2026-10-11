@@ -37,7 +37,8 @@ class Proc:
 def _started(proc: Path, pid: int) -> str:
     try:
         stat = (proc / str(pid) / "stat").read_text()
-    except OSError:  # the process ended, so its record names no live session
+    # telemetry: expected — the process ended, so its record names no live session
+    except OSError:
         return ""
     # Field 22 of stat is the start time; the fields after "pid (comm)" begin at field 3.
     fields = stat.rsplit(")", 1)[-1].split()
@@ -54,7 +55,8 @@ def read_processes(folder: Path, proc: Path) -> dict[str, Proc]:
     for path in folder.glob("*.json"):
         try:
             record = json.loads(path.read_text())
-        except (OSError, ValueError):  # a record is removed or rewritten as its process ends
+        # telemetry: expected — a record is removed or rewritten as its process ends
+        except (OSError, ValueError):
             continue
         if not isinstance(record, dict) or not isinstance(record.get("sessionId"), str):
             continue
@@ -85,7 +87,8 @@ def daemon_started() -> float | None:
             if entry.stat().st_uid != uid:
                 continue
             argv = (entry / "cmdline").read_bytes().split(b"\0")
-        except OSError:  # the process ended while it was read
+        # telemetry: expected — the process ended while it was read
+        except OSError:
             continue
         started = _started(PROC, int(entry.name))
         if argv[0].endswith(b"claude") and argv[1:3] == [b"daemon", b"run"] and started.isdigit():
@@ -112,7 +115,8 @@ def unseen(folder: Path, proc: Path, agent_uid: int, settled: float) -> list[int
             if entry.stat().st_uid != agent_uid:
                 continue
             argv = (entry / "cmdline").read_bytes().split(b"\0")
-        except OSError:  # the process ended while it was read
+        # telemetry: expected — the process ended while it was read
+        except OSError:
             continue
         if not argv[0].endswith(b"claude") or argv[1:3] == [b"daemon", b"run"] or {b"-p", b"--print"} & set(argv):
             continue

@@ -76,6 +76,7 @@ def ranking(ctx: Context) -> order.Ranking:
 def vitals_level(ctx: Context) -> str:
     try:
         raw = store.read_json(ctx.places.vitals)
+    # telemetry: expected — no vitals yet: none has been read, so the level is unknown
     except FileNotFoundError:
         return "unknown"
     except store.StoreError as exc:
@@ -110,6 +111,7 @@ def switching(ctx: Context) -> dict[str, Any] | None:
     the warden's own restart cut short (ops.recover marked it failed), and counts for nothing."""
     try:
         record = store.read_json(switch_path(ctx))
+    # telemetry: expected — no record: no switch of accounts is under way
     except FileNotFoundError:
         return None
     except store.StoreError as exc:

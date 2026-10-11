@@ -112,6 +112,7 @@ def run(ctx: Context, op_id: str, steps: Sequence[Step], result: dict[str, Any])
         step(ctx, op_id, index, RUNNING)
         try:
             detail = act()
+        # telemetry: surfaced — the refusal is the failed `step`'s reason, which the dashboard draws
         except Refused as exc:
             step(ctx, op_id, index, FAILED, exc.reason)
         except StepError as exc:

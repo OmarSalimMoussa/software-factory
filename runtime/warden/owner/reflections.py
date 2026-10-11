@@ -129,7 +129,6 @@ def _spent(ctx: Context, sid: str, limit: str) -> None:
         return
     try:
         cards.spent(ctx, session, limit, f"{session.name} used up its {limit} rounds again")
-    # telemetry: last-resort — the refusal is kept either way; the orchestrator's next extend asks the owner too
     except Exception:
         log.exception("warden: putting %s's task on the owner's card failed", sid)
 

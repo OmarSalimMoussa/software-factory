@@ -51,7 +51,8 @@ def agent_home() -> Path:
 def agent_uid() -> int | None:
     try:
         return pwd.getpwnam(AGENT_USER).pw_uid
-    except KeyError:  # an install not finished: there is no agent user to look for
+    # telemetry: expected — an install not finished: there is no agent user to look for
+    except KeyError:
         return None
 
 

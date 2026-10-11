@@ -66,7 +66,6 @@ def poll(ctx: Context) -> None:
             timeout = float(settings.get_int("watch.http_timeout_seconds"))
             rel = releases.Releases.of(releases.token_path(places), installed["repo"], timeout, releases.http_get)
             available = _ahead(rel, installed["commit"])
-    # telemetry: surfaced — the page shows the note; logged when it starts or changes, not at every pass
     except (releases.ReleaseError, store.StoreError) as exc:
         note = f"GitHub could not be asked for a newer factory: {exc}"
         if note != last["note"]:

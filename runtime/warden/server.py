@@ -183,6 +183,7 @@ def serve(places: Places, peers: Peers, dispatcher: Dispatcher, threads: int) ->
         def answer(pid: int, uid: int, line: bytes) -> dict[str, Any]:
             try:
                 caller = identify(places, peers, socket_kind, pid, uid)
+            # telemetry: surfaced — the caller's answer is `refused`, with the rule and the reason
             except Refused as exc:
                 return protocol.refused(exc.rule, exc.reason, exc.detail)
             return dispatcher.answer(caller, socket_kind, line)

@@ -42,7 +42,6 @@ def run(ctx: Context, timed: Timed, state: dict[str, Any], work: Callable[[], st
     state["polled"] = now
     try:
         found = work()
-    # telemetry: surfaced — logged once per run of failures here, and shown as the note in `factory status`
     except Exception as exc:
         why = str(exc) if isinstance(exc, timed.told) else type(exc).__name__
         if not state["failing"]:

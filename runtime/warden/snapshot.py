@@ -88,7 +88,7 @@ def _sessions(ctx: Context, args: dict[str, Any]) -> Any:
         try:
             row["facts"] = doing.facts(ctx.places, sid)
             row["sentence"] = doing.sentence(current, s, row["facts"], row["slot"]) if s.state != RETIRED else s.doing
-        # telemetry: surfaced — the agent's sentence draws as unknown; the rest of the tree still draws
+        # telemetry: surfaced — the agent's `row` draws its sentence as unknown; the rest of the tree still draws
         except store.StoreError:
             row["facts"], row["sentence"] = {}, None
         found[sid] = row
@@ -106,7 +106,7 @@ def _queue(ctx: Context, args: dict[str, Any]) -> Any:
         if name.endswith(".md"):
             try:
                 spec = records.parse_spec(queue.files.read(f"specs/{name}").decode(), f"specs/{name}")
-            # telemetry: surfaced — a broken spec is a row that says so; the queue-format sweep reports it
+            # telemetry: surfaced — a broken spec is a row in `broken` that says so; the queue-format sweep reports it
             except (ValueError, UnicodeDecodeError) as exc:
                 broken.append({"file": f"specs/{name}", "error": str(exc)})
                 continue
@@ -229,7 +229,7 @@ def _memory() -> int | None:
     """The laptop's memory in kB, so free memory can be drawn as a share of it."""
     try:
         found = re.search(r"^MemTotal:\s+(\d+) kB", Path("/proc/meminfo").read_text(), re.MULTILINE)
-    # telemetry: surfaced — the memory bar draws as unknown
+    # telemetry: surfaced — the memory bar draws as unknown from what `_memory` returns
     except OSError:
         return None
     return int(found.group(1)) if found else None
@@ -294,7 +294,7 @@ READERS: dict[str, Reader] = {
 def _read_one(ctx: Context, name: str, args: dict[str, Any]) -> tuple[Any, str | None]:
     try:
         return READERS[name](ctx, args), None
-    # telemetry: surfaced — the part that needs it draws the reason in its place
+    # telemetry: surfaced — the part that needs it draws the `reason` in its place
     except Refused as exc:
         return None, exc.reason
     except (store.StoreError, models.RecordError, ValueError, OSError) as exc:
@@ -341,7 +341,6 @@ def picture(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str,
         raise Refused("picture", f"{ref} has no picture")
     try:
         raw, media = pictures.picture_bytes(ctx.places, queue, kind, name)
-    # telemetry: surfaced — the page draws "The picture could not be shown."
     except FileNotFoundError as exc:
         raise Refused("picture", f"the picture of {ref} is gone") from exc
     return {"type": media, "bytes_b64": base64.b64encode(raw).decode()}
@@ -364,10 +363,8 @@ def evidence(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
             os.close(fd)
             fd = nxt
         leaf = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=fd)
-    # telemetry: surfaced — the page draws "The picture could not be shown."
     except FileNotFoundError as exc:
         raise Refused("evidence", f"{task} has no evidence {rel}; it may have aged out") from exc
-    # telemetry: surfaced — a link or a folder where an image should be is refused, never followed
     except OSError as exc:
         raise Refused("evidence", f"{rel} is not a plain file in {task}'s evidence") from exc
     finally:

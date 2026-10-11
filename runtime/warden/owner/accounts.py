@@ -82,7 +82,7 @@ def listing(ctx: Context) -> list[dict[str, Any]]:
             continue
         try:
             token, added = _token(path), path.stat().st_mtime
-        # telemetry: surfaced — the account draws as a row that cannot be read; the others still draw
+        # telemetry: surfaced — the account is one of the `rows`, drawn as one that cannot be read; the rest still draw
         except (OSError, ValueError) as exc:
             rows.append({"broken": True, "id": name, "error": f"Its token cannot be read ({type(exc).__name__})."})
             continue
@@ -200,6 +200,7 @@ def _bring_back(ctx: Context, ids: list[str]) -> str:
             lifecycle.end_children(ctx, sessions, s, "ended when the factory switched Claude accounts")
             try:
                 launch.resume(ctx, s, NOTE)
+            # telemetry: surfaced — a session that did not come back is one of the `failed` the owner reads
             except (LaunchError, Refused) as exc:
                 failed.append(f"{s.name} did not come back ({exc})")
             else:

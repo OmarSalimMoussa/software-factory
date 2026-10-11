@@ -92,6 +92,7 @@ def http_get(url: str, headers: dict[str, str], timeout: float) -> Reply:
     try:
         with opener.open(request, timeout=timeout) as response:
             return Reply(response.status, {k.lower(): v for k, v in response.headers.items()}, response.read())
+    # telemetry: expected — an error status is a reply: the caller reads its status
     except urllib.error.HTTPError as exc:
         return Reply(exc.code, {k.lower(): v for k, v in exc.headers.items()}, b"")
 

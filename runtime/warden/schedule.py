@@ -83,7 +83,7 @@ def _role(ctx: Context, role: str, waiting: dict[str, str]) -> None:
                 revive.revive_session(ctx, benched.id, WARDEN)
             else:
                 lifecycle.start_run(ctx, role, task, "", outage_fix=False)
-        # telemetry: surfaced — why it waits is kept for `factory status` and the dashboard
+        # telemetry: surfaced — why it is `waiting` is kept for `factory status` and the dashboard
         except Refused as refused:
             waiting[task.id] = refused.reason
             if refused.rule not in ("cap", "revive-first"):

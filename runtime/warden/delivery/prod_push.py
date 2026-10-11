@@ -140,7 +140,6 @@ def ask_branch(ctx: Context) -> None:
     answer: bool | None
     try:
         answer = on_default(ctx, commit)
-    # telemetry: surfaced — unknown, which the push sheet draws; reported once a build, then asked again quietly
     except Refused as exc:
         answer = None
         if asked is None:
@@ -212,7 +211,8 @@ def _running(ctx: Context, op_id: object) -> bool:
         return False
     try:
         return bool(ops.get(ctx, {"id": op_id}, None)["op"]["state"] == ops.RUNNING)
-    except Refused:  # its record was pruned, so it ended long ago
+    # telemetry: expected — its record was pruned, so the operation ended long ago
+    except Refused:
         return False
 
 
@@ -269,7 +269,8 @@ def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list
         while True:
             try:
                 state = ctx.github.run(run["id"])
-            except GitHubError as exc:  # the run goes on at GitHub; keep asking until the deadline
+            # telemetry: surfaced — the run goes on at GitHub; `trouble` names GitHub's last word if the wait ends
+            except GitHubError as exc:
                 trouble = f"; GitHub last said: {exc}"
             else:
                 found = done(state)

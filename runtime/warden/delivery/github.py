@@ -42,6 +42,7 @@ def urlopen_transport(request: urllib.request.Request, timeout: float) -> Reply:
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 -- a fixed https API
             return Reply(response.status, {k.lower(): v for k, v in response.headers.items()}, response.read())
+    # telemetry: expected — an error status is a reply: the caller reads its status and body
     except urllib.error.HTTPError as exc:
         return Reply(exc.code, {k.lower(): v for k, v in exc.headers.items()}, exc.read())
 
@@ -116,6 +117,7 @@ class RestGitHub:
         request = urllib.request.Request(f"{API}/rate_limit", headers=_HEADERS)
         try:
             reply = self._transport(request, self._timeout())
+        # telemetry: expected — GitHub not answering is the False that `reachable` asks about
         except (OSError, TimeoutError):
             return False
         return reply.status < 500
@@ -180,6 +182,7 @@ def _seg(value: str) -> str:
 def _message(body: bytes) -> str:
     try:
         parsed = json.loads(body)
+    # telemetry: expected — a body that is not JSON carries no message to quote
     except ValueError:
         return ""
     message = parsed.get("message") if isinstance(parsed, dict) else None

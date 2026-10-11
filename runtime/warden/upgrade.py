@@ -38,7 +38,6 @@ def migrate(ctx: Context) -> list[str]:
     for step in steps:
         try:
             said = step(ctx)
-        # telemetry: last-resort — logged with its trace; the reader of that state then refuses, naming the file
         except Exception as exc:
             log.exception("warden: bringing the state over failed at %s (%s)", step.__name__, type(exc).__name__)
             continue
