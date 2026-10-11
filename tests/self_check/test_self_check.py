@@ -30,7 +30,6 @@ NOT_APPLICABLE = {
 }
 # Each waits for its values, written by the slice of work that also clears what the check then finds.
 NOT_YET = {
-    "error-telemetry": "slice 6: where each part's errors go, then every catch site and marker made true",
     "network-door": "slice 7: each outside service reached through one owner",
     "computation-owners": "slice 7: the dashboard's pages compute nothing the server can",
     "js-import-rules": "slice 7: the import rules the dashboard's pages keep",
