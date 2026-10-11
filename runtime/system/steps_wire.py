@@ -7,6 +7,7 @@ import json
 import re
 from pathlib import Path
 
+from runtime.shared import upgrades
 from runtime.shared.paths import AGENT_USER, MANAGED_SETTINGS, SCRATCH, SLICE, WARDEN_USER
 from runtime.system import layout, render
 from runtime.system.host import CommandError, Host
@@ -190,6 +191,10 @@ def record(ctx: Install, drills: list[dict[str, object]]) -> None:
     body = {"commit": ctx.sha, "subject": ctx.subject, "drills": drills, "managed_settings": str(MANAGED_SETTINGS),
             "product": str(ctx.product)}  # fmt: skip
     host.write(layout.install_record(state), json.dumps(body, indent=1) + "\n", mode=0o600, owner=WARDEN_USER)
+    # Root's own record, which the dashboard's upgrade trusts where it would not trust the warden's folder.
+    host.mkdir(ctx.places.upgrade, mode=0o755)
+    mine = {"commit": ctx.sha, "owner": ctx.owner.name, "product": str(ctx.product)}
+    host.write(upgrades.installed_path(ctx.places), json.dumps(mine, indent=1) + "\n", mode=0o644)
     host.say(f"the factory at {ctx.sha[:12]} is installed")
 
 

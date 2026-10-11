@@ -28,6 +28,7 @@
 .cf-in:focus{border-color:var(--accent);outline:0;box-shadow:0 0 0 3px var(--accent-soft)}
 .cf-commit{overflow-wrap:anywhere}
 .cf-commit .mono{font-weight:650}
+.cf-kept{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:13.5px}
 .cf-ci{display:flex;flex-direction:column;gap:8px}
 .cf-ci-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;overflow-wrap:anywhere}
 .cf-ci .btn{white-space:normal;height:auto;min-height:28px;text-align:left;overflow-wrap:anywhere}

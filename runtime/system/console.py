@@ -1,4 +1,4 @@
-"""The install console: install, reinstall and uninstall the factory from a page in your browser, as root. The release
+"""The install console: install, upgrade and uninstall the factory from a page in your browser, as root. The release
 file starts it (``sudo python3 software-factory.pyz``); from the owner's clone of the factory it is
 
     sudo python3 runtime/system/console.py [--commit <sha>] [--repo <product checkout>]

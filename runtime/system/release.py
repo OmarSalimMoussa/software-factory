@@ -248,7 +248,7 @@ def seal(archive: Archive, root: Path) -> Path:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog=f"sudo python3 {NAME}", description="Install, reinstall or uninstall the "
+    parser = argparse.ArgumentParser(prog=f"sudo python3 {NAME}", description="Install, upgrade or uninstall the "
                                      "factory on this computer. With no option, it opens the install console in your "
                                      "browser.")  # fmt: skip
     what = parser.add_mutually_exclusive_group()
@@ -256,6 +256,8 @@ def _parser() -> argparse.ArgumentParser:
     what.add_argument("--uninstall", action="store_true", help="remove the factory from this computer")
     what.add_argument("--version", action="store_true", help="say which commit this release holds")
     what.add_argument("--check", action="store_true", help="check this file against its manifest")
+    what.add_argument("--upgrade", action="store_true",
+                      help="upgrade the installed factory as the dashboard's Upgrade does, asking nothing")  # fmt: skip
     parser.add_argument("--repo", type=Path, help="your checkout of the product the factory works on")
     parser.add_argument("--healthchecks", action="store_true", help="create the Healthchecks.io checks")
     keep = "leave a failed first install in place, to look at it, instead of removing it"
@@ -272,6 +274,8 @@ def _passed(args: argparse.Namespace, sha: str) -> tuple[str, list[str]]:
     common = [*repo, *(["--dry-run"] if args.dry_run else [])]
     if args.uninstall:
         return "runtime/system/uninstall.py", [*common, *(["--verbose"] if args.verbose else [])]
+    if args.upgrade:
+        return "runtime/system/install.py", ["--commit", sha, "--upgrade"]
     flags = [*(["--healthchecks"] if args.healthchecks else []), *(["--keep-on-failure"] if args.keep_on_failure
              else []), *(arg for item in args.set for arg in ("--set", item))]  # fmt: skip
     if args.terminal:
@@ -286,6 +290,8 @@ def launch(here: str, argv: list[str]) -> int:
         parser.error("--terminal needs --repo <your checkout of the product>")
     if args.uninstall and (args.healthchecks or args.keep_on_failure or args.set):
         parser.error("--uninstall takes only --repo, --dry-run and --verbose")
+    if args.upgrade and (args.repo or args.healthchecks or args.keep_on_failure or args.set or args.dry_run):
+        parser.error("--upgrade takes nothing else: it upgrades what is installed, as it is")
     try:
         archive = Archive.load(Path(here))
         problems = [] if args.version else archive.problems()
@@ -300,13 +306,14 @@ def launch(here: str, argv: list[str]) -> int:
         if args.check:
             print("Its files match its manifest.")
         return 0
-    if os.geteuid() != 0 or "SUDO_USER" not in os.environ:
+    # The upgrade service runs it as root itself; anyone else runs it with sudo, which names who they are.
+    if os.geteuid() != 0 or ("SUDO_USER" not in os.environ and not args.upgrade):
         print(f"Run it with sudo, as yourself: sudo python3 {Path(here).name}", file=sys.stderr)
         return 2
     stage = seal(archive, layout.STAGE_ROOT)
     script, passed = _passed(args, archive.sha)
     sealed.exec_staged(archive.sha, stage, script, passed, release=sealed.release_folder(stage),
-                       display=() if args.terminal or args.uninstall else sealed.DISPLAY)  # fmt: skip
+                       display=() if args.terminal or args.uninstall or args.upgrade else sealed.DISPLAY)  # fmt: skip
 
 
 def main(argv: list[str]) -> int:

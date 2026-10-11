@@ -6,7 +6,7 @@
 const {drive, consoleServer} = require('./lib.cjs');
 
 const SECRET = 'sk-ant-oat01-typed-in-the-console-5e5e';
-const ASKED = ['authenticator', 'deploy key to acme/shop', 'deploy key to acme/software-factory', 'GitHub token', 'claude setup-token', 'name for this Claude account'];
+const ASKED = ['authenticator', 'deploy key to acme/shop', 'deploy key to acme/software-factory', 'GitHub token for the warden', 'read-only GitHub token for the factory', 'claude setup-token', 'name for this Claude account'];
 const PHASES = 8;
 
 async function dryInstall(t, p, tag) {

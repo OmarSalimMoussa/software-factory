@@ -76,8 +76,10 @@ def stage_commit(host: Host, commit: str, owner: str, checkout: Path) -> tuple[s
 
 def declared_env(inherited: Mapping[str, str], sha: str, stage: Path, *, checkout: Path | None, release: Path | None,
                  display: tuple[str, ...]) -> dict[str, str]:  # fmt: skip
-    """Everything a sealed copy starts with; of ``inherited``, only the owner's name, TERM and ``display``."""
-    env = {**BASE_ENV, "SUDO_USER": inherited["SUDO_USER"], STAGE: str(stage), SHA: sha}
+    """Everything a sealed copy starts with; of ``inherited``, only the owner's name (none when the upgrade service
+    runs it, as root itself), TERM and ``display``."""
+    env = {**BASE_ENV, STAGE: str(stage), SHA: sha}
+    env.update({key: inherited[key] for key in ("SUDO_USER",) if key in inherited})
     env.update({key: str(path) for key, path in ((CHECKOUT, checkout), (RELEASE, release)) if path is not None})
     env.update({key: inherited[key] for key in ("TERM", *display) if key in inherited})
     return env

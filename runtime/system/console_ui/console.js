@@ -73,11 +73,13 @@ function renderForm(f) {
     const c = f.commit;
     el.innerHTML = `<div class="sec-h"><div class="label" id="f-heading"></div></div>
       <div class="card cform">
+        ${f.installed ? `<div class="cf-row"><div class="cf-l">${esc(f.installed.label)}</div><div class="cf-commit"><b class="mono">${esc(f.installed.short)}</b> ${esc(f.installed.subject)}</div></div>` : ''}
         <div class="cf-row"><div class="cf-l">${esc(c.label)}</div>
           ${c.value ? `<div class="cf-commit"><b class="mono">${esc(c.short)}</b> ${esc(c.subject)}<span class="help">${esc(c.note)}</span></div>` : ''}
           ${c.problem ? `<div class="cnote bad">${esc(c.problem)}</div>` : ''}<div class="cf-ci" id="f-ci" hidden></div></div>
         <div class="cf-row"><label class="cf-l" for="f-repo">${esc(f.repo.label)}</label><input class="cf-in mono" id="f-repo" autocomplete="off" spellcheck="false" value="${esc(f.repo.value)}"><span class="help">${esc(f.repo.hint)}</span></div>
-        <div class="cf-checks">${['healthchecks', 'keep'].map(k => `<label class="cf-check"><input type="checkbox" id="f-${k}"${f[k].checked ? ' checked' : ''}><span><b>${esc(f[k].label)}</b><span class="help">${esc(f[k].hint)}</span></span></label>`).join('')}</div>
+        ${f.kept ? `<div class="cf-row"><div class="cf-l">${esc(f.kept.label)}</div><ul class="cf-kept">${f.kept.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>` : ''}
+        <div class="cf-checks">${f.choices.map(k => `<label class="cf-check"><input type="checkbox" id="f-${esc(k.id)}"${k.checked ? ' checked' : ''}><span><b>${esc(k.label)}</b><span class="help">${esc(k.hint)}</span></span></label>`).join('')}</div>
         <div class="cf-foot"><label class="cf-switch"><input type="checkbox" role="switch" id="f-dry"${f.dry.checked ? ' checked' : ''}><span class="sw"></span><span><b>${esc(f.dry.label)}</b><span class="help">${esc(f.dry.hint)}</span></span></label>
           <button class="btn primary" data-action="install" id="f-go"></button></div>
       </div>`;
@@ -186,7 +188,7 @@ function renderEnding(e) {
 /* ---------- what the owner does ---------- */
 async function install() {
   const r = await send('/api/install', {commit: S.page.install.commit.value, repo: $('#f-repo').value.trim(),
-    healthchecks: $('#f-healthchecks').checked, keep: $('#f-keep').checked, dry: $('#f-dry').checked});
+    healthchecks: !!$('#f-healthchecks')?.checked, keep: !!$('#f-keep')?.checked, dry: $('#f-dry').checked});
   if (r.ok) watch();
 }
 async function look() { if ((await send('/api/uninstall', {confirm: false, repo: $('#f-repo').value.trim()})).ok) watch(); }

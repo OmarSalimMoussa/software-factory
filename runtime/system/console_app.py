@@ -197,7 +197,7 @@ class Console:
         return {
             "ok": True,
             "title": "Install console",
-            "sub": "Install, reinstall or remove the factory on this laptop. Nothing reaches the server.",
+            "sub": "Install, upgrade or remove the factory on this laptop. Nothing reaches the server.",
             "close": "Close",
             "status_label": "This laptop",
             "status": console_page.status(self.places, self.reader),
@@ -206,6 +206,7 @@ class Console:
                 self.repo,
                 record,
                 {"healthchecks": self.choices.healthchecks, "keep": self.choices.keep, "dry": self.choices.dry},
+                self.places,
             ),
             "uninstall": {
                 "heading": "Uninstall",
@@ -267,7 +268,7 @@ class Console:
             host = (self.hosts.dry if dry else self.hosts.real)(run)
             ctx = install.job(host, self.places, self.owner, Path(repo.strip()), commit.strip(),
                               dict(self.choices.changes), flags["healthchecks"] is True)  # fmt: skip
-            verb = "Installing" if ctx.first else "Reinstalling"
+            verb = "Installing" if ctx.first else "Upgrading"
             run.title = f"{'Dry run: ' if dry else ''}{verb} the factory at {commit.strip()[:12]}"
 
             def act() -> dict[str, Any]:

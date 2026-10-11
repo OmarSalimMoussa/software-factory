@@ -8,7 +8,7 @@ import tomllib
 from typing import Any
 
 from runtime.shared.models import DEPRIORITIZED, RETIRED
-from runtime.shared.settings import SCHEMA, SettingsError, _flatten, build
+from runtime.shared.settings import SCHEMA, SettingsError, build, flatten
 from runtime.system import layout
 from runtime.system.host import Account, Host
 from runtime.system.job import Install, github_name, github_origin, refuse
@@ -124,7 +124,7 @@ def _saved_overrides(ctx: Install) -> dict[str, Any]:
         ctx.host.say("(a dry run as you cannot read the saved settings; the install reads them as root)")
         return {}
     try:
-        return _flatten(tomllib.loads(text))
+        return flatten(tomllib.loads(text))
     except tomllib.TOMLDecodeError as exc:
         raise refuse(
             f"Your saved settings in {ctx.places.overrides} cannot be read ({exc}): fix the file by hand, "

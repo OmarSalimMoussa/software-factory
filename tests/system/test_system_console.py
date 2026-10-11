@@ -11,7 +11,7 @@ import pytest
 from system_fakes import PASSING, SHA, ci_answers, ci_link, dry_job
 
 from runtime.shared.paths import Places
-from runtime.system import console_page, install, layout, uninstall
+from runtime.system import console_page, healthchecks, install, layout, uninstall
 from runtime.system.console_app import Choices, Console, Hosts, Reply
 from runtime.system.console_run import ConsoleDryHost, Run
 from runtime.system.host import CommandError, DryHost, Host
@@ -261,3 +261,30 @@ def test_the_status_checks_an_older_install_by_the_few_settings_it_reads(
         assert [s["name"] for s in found["services"]] == ["The warden", "The dashboard", "GlitchTip", "Langfuse"]
     else:
         assert found["services"] == [] and "were not checked" in found["problem"]
+
+
+@pytest.mark.parametrize("watched", [False, True], ids=["no-healthchecks", "healthchecks-set-up"])
+def test_an_installed_factory_is_upgraded_and_the_form_says_from_what_and_what_it_keeps(
+    tmp_path: Path, watched: bool
+) -> None:
+    places = Places.under(tmp_path)
+    offered = {"value": "b" * 40, "short": "bbbbbbb", "subject": "The new one", "note": "", "problem": ""}
+    checked = {"healthchecks": False, "keep": False, "dry": False}
+    places.overrides.parent.mkdir(parents=True)
+    places.overrides.write_text("[caps]\nimplementers = 3\n\n[watch]\nloop_minutes = 20\n")
+    if watched:
+        healthchecks.keys_path(places.state).parent.mkdir(parents=True)
+        healthchecks.keys_path(places.state).write_text("{}")
+
+    first = console_page.install_form(offered, None, None, None, checked, places)
+    record = {"commit": "a" * 40, "subject": "The old one", "drills": [], "product": "/home/o/product"}
+    upgrade = console_page.install_form(offered, None, None, record, checked, places)
+
+    assert (first["heading"], first["installed"], first["kept"]) == ("Install", None, None)
+    assert [c["id"] for c in first["choices"]] == ["healthchecks", "keep"]
+    assert (upgrade["heading"], upgrade["button"], upgrade["installed"]["short"]) == ("Upgrade", "Upgrade", "aaaaaaa")
+    said = "Your settings: the 2 values you changed, the rest at the new release's defaults"
+    assert upgrade["kept"]["items"][0] == said
+    assert ("The Healthchecks.io checks" in upgrade["kept"]["items"]) is watched
+    [checks] = upgrade["choices"]  # a failed upgrade is never taken back, so it offers no keeping
+    assert checks["label"].endswith("again") is watched and checks["checked"] is False

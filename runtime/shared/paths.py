@@ -14,6 +14,8 @@ STATE = Path("/var/lib/software-factory")
 RUN = Path("/run/software-factory")
 # Root's alone: the firewall units' runtime folder, where each load of the table leaves its time.
 FIREWALL = Path("/run/software-firewall")
+# Root's alone, readable by all: what is installed, as root knows it, and the progress of an upgrade under way.
+UPGRADE = Path("/var/lib/software-factory-upgrade")
 MANAGED_SETTINGS = Path("/etc/claude-code/managed-settings.json")
 # On every user's PATH, so a session types the bare word: the sandbox exempts a call by its text, `factory …` alone.
 FACTORY_BIN = Path("/usr/local/bin/factory")
@@ -47,6 +49,7 @@ class Places:
     stack_slots: Path = STACK_SLOTS
     services: Path = SERVICES
     firewall: Path = FIREWALL
+    upgrade: Path = UPGRADE
 
     @classmethod
     def system(cls) -> Places:
@@ -56,7 +59,13 @@ class Places:
     def under(cls, root: Path) -> Places:
         """A self-contained tree for tests and the rehearsal."""
         return cls(
-            root / "install", root / "state", root / "run", root / "stack-slots", root / "services", root / "firewall"
+            root / "install",
+            root / "state",
+            root / "run",
+            root / "stack-slots",
+            root / "services",
+            root / "firewall",
+            root / "upgrade",
         )
 
     @classmethod

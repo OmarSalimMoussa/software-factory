@@ -126,6 +126,40 @@ def test_the_release_file_runs_nothing_without_sudo(
     assert "sudo" in capsys.readouterr().err and not (tmp_path / "stages").exists()
 
 
+@pytest.mark.parametrize(
+    ("argv", "starts"),
+    [(["--upgrade"], True), ([], False), (["--upgrade", "--repo", "/x"], None)],
+    ids=["upgrade-as-root", "install-needs-sudo", "upgrade-takes-nothing-else"],
+)
+def test_the_upgrade_service_runs_it_as_root_itself_and_it_upgrades_what_is_installed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str], starts: bool | None
+) -> None:
+    out, made = _built(tmp_path)
+    monkeypatch.setattr(release.os, "geteuid", lambda: 0)
+    monkeypatch.delenv("SUDO_USER", raising=False)  # a unit runs it, not a person with sudo
+    monkeypatch.setattr(release.layout, "STAGE_ROOT", tmp_path / "stages")
+    started: list[tuple[str, list[str], tuple[str, ...]]] = []
+
+    def exec_staged(sha: str, stage: Path, program: str, given: list[str], *, release: Path | None,
+                    display: tuple[str, ...]) -> NoReturn:  # fmt: skip
+        started.append((program, given, display))
+        raise SystemExit(0)
+
+    monkeypatch.setattr(sealed, "exec_staged", exec_staged)
+    if starts is None:
+        with pytest.raises(SystemExit) as stopped:
+            release.launch(str(out), argv)
+        assert stopped.value.code == 2 and started == []  # argparse refuses it
+    elif starts:
+        with pytest.raises(SystemExit):
+            release.launch(str(out), argv)
+        assert started == [("runtime/system/install.py", ["--commit", made["commit"], "--upgrade"], ())]
+    else:
+        assert release.launch(str(out), argv) == 2 and started == []
+    env = sealed.declared_env({}, made["commit"], tmp_path / "stage", checkout=None, release=None, display=())
+    assert "SUDO_USER" not in env  # the staged copy starts without an owner's name it was never given
+
+
 def test_a_stage_from_a_release_is_read_only_and_carries_its_manifest(tmp_path: Path) -> None:
     out, made = _built(tmp_path)
 

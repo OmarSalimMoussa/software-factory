@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from system_fakes import dry_job, settings
 
+from runtime.shared import releases
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
@@ -237,6 +238,7 @@ def test_the_secrets_step_keeps_the_agents_claude_accounts(
         folder / "deploy.key",
         folder / "factory-read.key.pub",
         folder / "github.token",
+        folder / "factory.token",
     }
     host.files.update({folder / name: text for name, text in present.items()})
 
@@ -248,6 +250,44 @@ def test_the_secrets_step_keeps_the_agents_claude_accounts(
     assert [a for a in host.actions if a.startswith("write: ")] == [
         f"write: {folder}/{w} {WARDEN_OWNED}" for w in written
     ]
+
+
+@pytest.mark.parametrize(
+    ("kept", "github", "refused"),
+    [(True, None, False), (False, None, False), (False, "HTTP 404", True)],
+    ids=["kept-from-before", "asked-and-checked", "one-github-refuses"],
+)
+def test_the_install_asks_once_for_a_factory_token_that_github_lets_read_the_releases(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kept: bool, github: str | None, refused: bool
+) -> None:
+    job = dry_job(tmp_path)
+    job.settings = settings(**{"factory.github": "acme/software-factory"})
+    host, folder = job.host, job.places.state / "secrets"
+    assert isinstance(host, DryHost)
+    host.dry = False  # decides like a real install; a dry host still changes nothing
+    host.paths |= {job.places.totp_secret, folder / "deploy.key", folder / "factory-read.key.pub",
+                   folder / "github.token", folder / "claude-accounts" / "active"}  # fmt: skip
+    if kept:
+        host.paths.add(folder / "factory.token")
+    checked: list[str] = []
+
+    def check(repo: str, token: str, timeout: float) -> None:
+        checked.append(repo)
+        if github:
+            raise releases.ReleaseError(f"GitHub refused GET /repos/acme/software-factory: {github}")
+
+    monkeypatch.setattr(steps_secrets, "check_factory_token", check)
+    if refused:
+        with pytest.raises(Refused, match="That token cannot read the factory's releases"):
+            steps_secrets.secrets(job)
+    else:
+        steps_secrets.secrets(job)
+
+    asked = [a for a in host.actions if a.startswith("ask the owner: A read-only GitHub token for the factory")]
+    wrote = [a for a in host.actions if a.startswith(f"write: {folder}/factory.token")]
+    assert (len(asked), checked, len(wrote)) == (
+        (0, [], 0) if kept else (1, ["acme/software-factory"], 0 if refused else 1)
+    )
 
 
 @pytest.mark.parametrize(

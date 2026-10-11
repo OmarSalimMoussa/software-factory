@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from runtime.shared import claude_accounts, totp
+from runtime.shared import claude_accounts, releases, totp
 from runtime.shared.claude_accounts import AccountError
 from runtime.shared.paths import WARDEN_USER
 from runtime.system import github_keys, layout
@@ -84,8 +84,41 @@ def secrets(ctx: Install) -> None:
         if not value:
             raise refuse("The warden needs your GitHub token: install again and paste it when asked")
         host.write(folder / "github.token", value + "\n", mode=0o600, owner=WARDEN_USER)
+    _factory_token(ctx)
     _claude_account(ctx, folder)
     _server_keys(ctx, folder)
+
+
+def _factory_token(ctx: Install) -> None:
+    """The owner's read-only token for the factory's own repo, asked for once: the warden finds new releases with it,
+    and the dashboard's Upgrade downloads them. Checked on GitHub before it is kept."""
+    host, path = ctx.host, releases.token_path(ctx.places)
+    if host.exists(path):
+        return
+    settings = ctx.need_settings()
+    factory = settings.get_str("factory.github")
+    value = host.ask(
+        "A read-only GitHub token for the factory's own repo: ", secret=True,
+        hint=f"A fine-grained token with Contents: Read and Actions: Read on {factory}. The dashboard finds and "
+             "installs new factory releases with it.",
+        link="https://github.com/settings/personal-access-tokens/new",
+    )  # fmt: skip
+    if not value:
+        raise refuse("The factory needs its read-only token to find new releases: install again and paste it")
+    if not host.dry:
+        try:
+            check_factory_token(factory, value, float(settings.get_int("watch.http_timeout_seconds")))
+        except releases.ReleaseError as exc:
+            raise refuse(f"That token cannot read the factory's releases ({exc}): make one as asked, then install "
+                         "again") from exc  # fmt: skip
+    host.write(path, value + "\n", mode=0o600, owner=WARDEN_USER)
+
+
+def check_factory_token(repo: str, token: str, timeout: float) -> None:
+    """Raises ReleaseError unless ``token`` reads the factory repo and its CI runs, as an upgrade does."""
+    found = releases.Releases(repo, token, timeout)
+    found.default_branch()
+    found.can_read_runs()
 
 
 def _read_key(ctx: Install, folder: Path, github: str, gh: str) -> None:

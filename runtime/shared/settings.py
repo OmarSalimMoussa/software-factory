@@ -369,14 +369,14 @@ class Settings:
         return build(self.defaults, merged)
 
 
-def _flatten(tree: Mapping[str, Any], prefix: str = "") -> dict[str, Any]:
+def flatten(tree: Mapping[str, Any], prefix: str = "") -> dict[str, Any]:
     flat: dict[str, Any] = {}
     for key, value in tree.items():
         path = f"{prefix}{key}"
         if path in SCHEMA:
             flat[path] = value
         elif isinstance(value, Mapping):
-            flat.update(_flatten(value, path + "."))
+            flat.update(flatten(value, path + "."))
         else:
             flat[path] = value
     return flat
@@ -389,7 +389,7 @@ def build(defaults: dict[str, Any], overrides: Mapping[str, Any]) -> Settings:
     for key, value in overrides.items():
         if key in SCHEMA:
             _set_leaf(tree, key, value)
-    flat = _flatten(tree)
+    flat = flatten(tree)
     problems += [f"{key} is not a setting" for key in flat if key not in SCHEMA]
     for key in SCHEMA:
         try:
@@ -423,7 +423,7 @@ def load(defaults_path: Path, overrides_path: Path | None) -> Settings:
     overrides: dict[str, Any] = {}
     if overrides_path is not None and overrides_path.exists():
         try:
-            overrides = _flatten(tomllib.loads(overrides_path.read_text()))
+            overrides = flatten(tomllib.loads(overrides_path.read_text()))
         except (OSError, tomllib.TOMLDecodeError) as exc:
             raise SettingsError([f"cannot read {overrides_path}: {exc}"]) from exc
     return build(defaults, overrides)
