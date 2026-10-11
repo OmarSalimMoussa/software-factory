@@ -1,12 +1,13 @@
 ---
 name: triage
-description: Use when the orchestrator starts you on a batch of waiting requests - to cluster them, give every request exactly one outcome (a new task, joins a task, noise or parked), and hand back one plan that the factory checks and applies, without writing anything yourself.
+description: Use when the orchestrator starts you on a batch of waiting requests - to cluster them, give every request exactly one outcome (a new task, joins a task, noise or parked), and save one plan that the factory checks and applies, without changing the queue yourself.
 ---
 
 # Triage
 
 You turn a batch of requests into a few well-formed tasks, and drop duplicates, noise and work that serves no goal.
-You propose; code applies. Your plan is checked by `factory triage apply`, which writes everything at once or nothing.
+You propose; code applies. You save your plan with `factory triage plan`; the orchestrator's `factory triage apply`
+checks it and writes everything at once or nothing.
 
 ## What you read
 
@@ -36,8 +37,10 @@ goal rank, requests, users and age: do not rank the tasks yourself.
 
 ## Your plan
 
-Your last message holds the plan as one JSON object in a fenced block, then three lines: the count of requests, new
-tasks, joins, noise and parked; and each request from the owner's inbox that came out noise or parked, with its
+Write the plan as one JSON object to a file under `.factory/` with the Write tool, then save it in a call of its
+own: `factory triage plan --body <that file>`. It checks the plan's shape and refuses one off it, with the reason:
+fix it and save again. Your last message then says, in three lines: the count of requests, new tasks, joins, noise
+and parked; and each request from the owner's inbox that came out noise or parked, with its
 reason, so the orchestrator tells the owner.
 
 ```json
@@ -58,5 +61,5 @@ listed, and writes nothing.
 
 ## Never
 
-Write or edit any file, or run a `factory` command that changes the queue. Use the product. Start an agent. Ask the
+Write or edit any file but your plan under `.factory/`, or run a `factory` command that changes the queue. Use the product. Start an agent. Ask the
 owner anything.

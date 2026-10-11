@@ -66,6 +66,7 @@ VERBS: dict[str, Verb] = {
     # the queue (1C)
     "request.new": _v("runtime.queue.verbs:request_new", *ANY),
     "triage.apply": _v("runtime.queue.verbs:triage_apply", ORCH),
+    "triage.plan": _v("runtime.queue.verbs:triage_plan", ORCH, kinds=frozenset({TRIAGE})),
     "task.new": _v("runtime.queue.verbs:task_new", ORCH, kinds=frozenset({INTAKE})),
     "task.facts": _v("runtime.queue.verbs:task_facts", ORCH, kinds=frozenset({INTAKE})),
     "task.status": _v("runtime.queue.verbs:task_status", ORCH),

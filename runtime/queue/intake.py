@@ -1,7 +1,7 @@
 """Requests arriving in the three inboxes, and the owner's boost of a waiting request (intake spec).
 
-A request is written once; only its outcome is added later. A severe one posts ``severe request`` at once; the
-request that makes ``intake.batch_size`` wait posts ``triage due``.
+A request is written once; only its outcome is added later. A severe one posts ``severe request`` at once; the warden's
+tick posts ``triage due`` when a batch is due (runtime/queue/triage.py names it).
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from runtime.shared.models import Request
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
 
-SEVERE_REQUEST, TRIAGE_DUE = "severe request", "triage due"
+SEVERE_REQUEST = "severe request"
 
 
 def body_text(data: bytes | None, what: str, limit_kib: int) -> str:
@@ -47,9 +47,6 @@ def file_request(
     queue.write({request_rel(req): formats.dump_request(req)})
     if severity == "severe":
         ctx.post_event(SEVERE_REQUEST, {"request": req.id, "inbox": inbox, "where": req.where})
-    waiting = sum(1 for r in queue.requests()[0] if not r.outcome)
-    if waiting == ctx.settings().get_int("intake.batch_size"):
-        ctx.post_event(TRIAGE_DUE, {"waiting": waiting})
     return req
 
 

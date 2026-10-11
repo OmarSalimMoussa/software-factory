@@ -44,6 +44,10 @@ def triage_apply(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]
     return ok(**triage.apply(ctx, data))
 
 
+def triage_plan(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
+    return ok(**triage.save_plan(ctx, data))
+
+
 def task_new(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
     body = intake.body_text(data, "task body", ctx.settings().get_int("queue.max_upload_kib"))
     task = tasks.new_task(ctx, args, body)

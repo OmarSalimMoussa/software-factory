@@ -80,9 +80,9 @@ def _parser() -> argparse.ArgumentParser:
     request.add_argument("--severity", required=True)
     request.add_argument("--where", required=True)
     request.add_argument("--body", required=True)
-    triage = sub.add_parser("triage", help="triage apply --body <plan.json>")
-    triage.add_argument("what", choices=["apply"])
-    triage.add_argument("--body", required=True)
+    triage = sub.add_parser("triage", help="triage plan --body <plan.json> (the triage subagent), or triage apply")
+    triage.add_argument("what", choices=["plan", "apply"])
+    triage.add_argument("--body")
     _queue(sub)
     sub.add_parser("route").add_argument("task")
     propose = sub.add_parser("propose")
@@ -251,7 +251,9 @@ def _call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
         args = {"severity": ns.severity, "where": ns.where, **({"from": ns.sender} if ns.sender else {})}
         return Call("request.new", args, read_file(ns.body))
     if cmd == "triage":
-        return Call("triage.apply", {}, read_file(ns.body))
+        if ns.what == "plan" and not ns.body:
+            raise CliError("factory triage plan --body <plan.json>")
+        return Call(f"triage.{ns.what}", {}, read_file(ns.body) if ns.body else None)
     if cmd == "queue":
         return _queue_call(ns, read_file)
     if cmd == "route":

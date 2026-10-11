@@ -77,4 +77,28 @@ def test_a_boosted_request_makes_a_boosted_task(world: World) -> None:
     owner.boost_request(world.owner(), a.id)
     summary = triage.apply(world.ctx(), plan(batch=[a.id], new_tasks=[_new(a.id)]))
     assert world.queue().task(summary["new"][0]).boosted_at == world.ctx().clock.iso()
-    assert ("boosted", {"request": a.id}) in world.events
+
+
+def test_the_next_batch_is_the_oldest_waiting_requests_without_the_severe_and_a_boosted_one_goes_alone(
+    world: World,
+) -> None:
+    size = world.settings.get_int("intake.batch_size")
+    filed = [world.request() for _ in range(size + 1)]
+    world.request(severity="severe")  # the fast lane's
+    found = triage.batch(world.ctx())
+    assert (found.ids, found.due, found.boosted) == ([r.id for r in filed[:size]], True, False)
+
+    owner.boost_request(world.owner(), filed[-1].id)
+    found = triage.batch(world.ctx())
+    assert (found.ids, found.due, found.boosted) == ([filed[-1].id], True, True)
+
+
+def test_triage_saves_its_plan_and_the_orchestrator_applies_the_saved_one(world: World) -> None:
+    a = world.request()
+    with pytest.raises(Refused, match="saved no plan"):
+        triage.apply(world.ctx(), None)
+    triage.save_plan(world.ctx("orchestrator", agent_id="atriage0000001"), plan(batch=[a.id], noise={a.id: "a test"}))
+
+    assert triage.apply(world.ctx(), None)["noise"] == 1
+    with pytest.raises(Refused, match="saved no plan"):
+        triage.apply(world.ctx(), None)  # applied once, then gone

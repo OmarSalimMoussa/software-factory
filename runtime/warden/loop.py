@@ -19,7 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import files, format_check, formats, goal, reports, tasks, turn
+from runtime.queue import files, format_check, formats, goal, reports, tasks, triage, turn
 from runtime.queue.book import Queue
 from runtime.shared import models, store
 from runtime.shared.models import Probe
@@ -191,31 +191,15 @@ def _loop_due(ctx: Context, memo: dict[str, Any], now: float) -> None:
 
 
 def _triage_due(ctx: Context, memo: dict[str, Any], now: float) -> None:
-    settings = ctx.settings()
-    waiting = _waiting(ctx)
-    if not waiting:
+    """`triage due` names its batch. A boosted request goes at once; otherwise a pass takes a while and the batch
+    waits while it runs, so one reminder per loop period is enough."""
+    found = triage.batch(ctx)
+    if not found.due or inbox.pending(ctx.places, inbox.TRIAGE_DUE):
         return
-    ages = [now - at for at in waiting if at is not None]
-    oldest = max(ages, default=None)
-    due = len(waiting) >= settings.get_int("intake.batch_size") or (
-        oldest is not None and oldest >= settings.get_int("intake.batch_max_wait_hours") * 3600
-    )
-    # A triage pass takes a while and the batch still waits while it runs: one reminder per loop period is enough.
-    recent = memo["triage_due"] is not None and now - memo["triage_due"] < settings.get_int("watch.loop_minutes") * 60
-    if not due or recent or inbox.pending(ctx.places, inbox.TRIAGE_DUE):
+    period = ctx.settings().get_int("watch.loop_minutes") * 60
+    recent = memo["triage_due"] is not None and now - memo["triage_due"] < period
+    if recent and not found.boosted:
         return
-    ctx.post_event(
-        inbox.TRIAGE_DUE, {"waiting": len(waiting), "oldest_hours": None if oldest is None else oldest / 3600}
-    )
+    ctx.post_event(inbox.TRIAGE_DUE, {"batch": found.ids, "boosted": found.boosted, "waiting": found.waiting})
     memo["triage_due"] = now
     store.write_json(_memo_path(ctx.places), memo)
-
-
-def _waiting(ctx: Context) -> list[float | None]:
-    """When each request that waits for triage arrived: no outcome yet, and not severe (those take the fast lane).
-
-    A request that cannot be read still waits, with no known age; the queue-format sweep reports it.
-    """
-    good, broken = Queue.of(ctx).requests()
-    ages: list[float | None] = [formats.epoch(r.at) for r in good if not r.outcome and r.severity != "severe"]
-    return ages + [None] * len(broken)

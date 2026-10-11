@@ -37,7 +37,7 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 | `loop due` | One loop pass (below). |
 | `severe request` | Start intake on it at once (one subagent place is always kept for intake). Route its task next. |
 | `prod red`, `staging red` | As "When something is red" says. |
-| `triage due` | Start one `triage` subagent on the batch; apply its plan; give each new task a light intake pass. |
+| `triage due` | Start one `triage` subagent on the batch the event names (its request ids). When it hands back, `factory triage apply`; give each new task a light intake pass. |
 | `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed. |
 | `approved` | The warden starts it when a place frees. Fill the free proposal slot. |
 | `not-now`, `dropped`, `boosted`, `proposal-slot-free` | Fill the free proposal slots. |
@@ -65,9 +65,9 @@ live and nothing merged for a while, a regression walk of the scenarios that wai
   exposure, or data at risk.
 - **The owner's words** are filed `--from owner`, quoted word for word. Something they say about the factory itself
   goes to `factory reflect --kind owner-feedback "<their words>"`, never into the queue.
-- **Triage proposes; code applies.** The triage subagent hands back a plan. Save it to a file in your worktree,
-  then `factory triage apply --body <that file>`. It refuses a plan that leaves a request without exactly one outcome.
-  An owner request that comes out noise or parked: tell the owner in chat, with the reason.
+- **Triage proposes; code applies.** The triage subagent saves its plan itself; `factory triage apply` applies it and
+  answers with what it did. It refuses a plan that leaves a request without exactly one outcome. An owner request
+  that comes out noise or parked: tell the owner in chat, with the reason.
 - **Intake.** Brief it with one request or task id. It writes the routing facts itself and hands back five lines.
 
 ## Proposing the next tasks

@@ -108,7 +108,8 @@ def boost(ctx: Context, task_id: str, on: bool) -> dict[str, Any]:
 
 
 def boost_request(ctx: Context, request_id: str) -> dict[str, Any]:
-    """A boosted request is triaged at once in a batch of its own, and its task arrives boosted."""
+    """A boosted request is triaged at once in a batch of its own, and its task arrives boosted: the warden's next
+    tick names it as the next triage batch."""
     queue = Queue.of(ctx)
     with ctx.lock, queue.lock():
         req = queue.request(request_id)
@@ -117,7 +118,6 @@ def boost_request(ctx: Context, request_id: str) -> dict[str, Any]:
         found = intake.boosts(ctx)
         found[request_id] = ctx.clock.iso()
         intake.set_boosts(ctx, found)
-    ctx.post_event("boosted", {"request": request_id})
     return {"request": request_id}
 
 

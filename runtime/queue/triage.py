@@ -1,8 +1,11 @@
-"""`factory triage apply`: triage proposes, code applies (intake spec, "The batch lane").
+"""The batch lane (intake spec): the warden names each batch, triage proposes, code applies.
 
-The plan arrives as JSON bytes. Every request in its batch gets exactly one outcome: a new task, joining an open
-task, noise or parked. Every problem is found before anything is written, and then every file is written at once,
-or nothing is.
+``batch`` names the next batch, the one rule both the warden's `triage due` and the dashboard read: the waiting
+requests (no outcome yet, and not severe: those take the fast lane), oldest first, at most intake.batch_size. A
+request the owner boosted goes at once, in a batch of its own. The triage subagent saves its plan with `factory
+triage plan`; `factory triage apply` applies the saved plan. Every request in the plan's batch gets exactly one
+outcome: a new task, joining an open task, noise or parked. Every problem is found before anything is written, and
+then every file is written at once, or nothing is.
 
     {"batch": ["r-…"],
      "new_tasks": [{"title", "body", "goal_item", "severity", "surfaces", "cause", "slices", "owner_class",
@@ -28,6 +31,48 @@ from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
 
 PLAN_KEYS = frozenset({"batch", "new_tasks", "joins", "noise", "parked"})
+PLAN_FILE = "triage-plan.json"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Batch:
+    ids: list[str]  # the requests the next triage pass takes, oldest first
+    due: bool  # whether that pass is due now
+    boosted: bool  # a request the owner boosted, alone
+    waiting: int  # every request waiting for triage
+    oldest_at: str | None  # when the oldest waiting request arrived; None when it cannot be read or none waits
+
+
+def batch(ctx: Context) -> Batch:
+    """The next triage batch, and whether it is due: a boosted request at once, else when intake.batch_size
+    requests wait or the oldest has waited intake.batch_max_wait_hours. A request that cannot be read still waits,
+    with no known age; the queue-format sweep reports it."""
+    settings = ctx.settings()
+    good, broken = Queue.of(ctx).requests()
+    waiting = sorted((r for r in good if not r.outcome and r.severity != "severe"), key=lambda r: (r.at, r.id))
+    boosted = sorted((at, rid) for rid, at in intake.boosts(ctx).items() if rid in {r.id for r in waiting})
+    count = len(waiting) + len(broken)
+    if boosted:
+        return Batch([boosted[0][1]], True, True, count, waiting[0].at if waiting else None)
+    size = settings.get_int("intake.batch_size")
+    oldest = waiting[0].at if waiting else None
+    aged = oldest is not None and ctx.clock.now() - formats.epoch(oldest) >= (
+        settings.get_int("intake.batch_max_wait_hours") * 3600
+    )
+    return Batch([r.id for r in waiting[:size]], bool(waiting) and (count >= size or aged), False, count, oldest)
+
+
+def _plan_path(ctx: Context) -> Any:
+    return ctx.places.state / PLAN_FILE
+
+
+def save_plan(ctx: Context, data: bytes | None) -> dict[str, Any]:
+    """The triage subagent's plan, kept for the orchestrator's `factory triage apply`; its shape is checked now."""
+    plan = _plan(data, ctx.settings().get_int("queue.max_upload_kib"))
+    store.write_json(_plan_path(ctx), plan, mode=0o600)
+    return {"batch": len(plan["batch"]) if isinstance(plan["batch"], list) else 0, "saved": True}
+
+
 NEW_TASK_KEYS = frozenset(
     {"title", "body", "goal_item", "severity", "surfaces", "cause", "slices", "owner_class", "requests", "after"}
 )
@@ -59,7 +104,13 @@ def _reasons(value: object, what: str, problems: list[str]) -> dict[str, str]:
 
 
 def apply(ctx: Context, data: bytes | None) -> dict[str, Any]:
+    """Apply the plan in ``data``, or the one triage saved when none is given."""
     settings = ctx.settings()
+    if data is None:
+        try:
+            data = _plan_path(ctx).read_bytes()
+        except FileNotFoundError as exc:
+            raise Refused("triage-plan", "triage saved no plan: it runs factory triage plan --body <file>") from exc
     plan = _plan(data, settings.get_int("queue.max_upload_kib"))
     goals = tasks.goal_count(ctx)
     queue = Queue.of(ctx)
@@ -101,6 +152,7 @@ def apply(ctx: Context, data: bytes | None) -> dict[str, Any]:
             "parked": len(parked),
         }
         store.write_json(ctx.places.state / "triage-last.json", summary, mode=0o600)
+        _plan_path(ctx).unlink(missing_ok=True)
     set_aside = [
         {"request": r, "outcome": requests[r].outcome} for r in (*noise, *parked) if requests[r].inbox == "owner"
     ]
