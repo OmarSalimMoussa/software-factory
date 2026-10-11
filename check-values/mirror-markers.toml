@@ -1,0 +1,12 @@
+# Files that talk about the mirror phrases without declaring a mirror: the check's own phrase list, the rulebook
+# sentence that defines the phrase, and the check's test fixtures. None of them is a hand-kept copy.
+skip = ["checks/standard/mirror_markers.py", "rules/engineering.md", "tests/checks/test_checks_patterns.py"]
+# No mirror is ever claimed: the factory keeps no mirrored constants, so any new "must mirror" note fails.
+claims = []
+
+[copies]
+# Server vocabularies copied, undeclared, into the browser code of the dashboard and the install console.
+server = ["runtime/"]
+web = ["runtime/dashboard/ui/", "runtime/system/console_ui/"]
+generated_markers = []
+rows = []

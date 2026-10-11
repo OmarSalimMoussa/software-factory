@@ -1,0 +1,3 @@
+# Groups of hand-kept copies that must hold the same value. The factory keeps none: a value two parts share lives in
+# one module or file that both read.
+groups = []

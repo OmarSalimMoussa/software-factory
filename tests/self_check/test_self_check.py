@@ -30,9 +30,6 @@ NOT_APPLICABLE = {
 }
 # Each waits for its values, written by the slice of work that also clears what the check then finds.
 NOT_YET = {
-    "doc-refs": "slice 2: docs that name a product's paths are marked so, and ~/ paths read as outside the repo",
-    "mirror-markers": "slice 2: each mirrored constant folds into one source that every side reads",
-    "mirrored-constants": "slice 2: with no mirrors left, an empty group list",
     "tree-rules": "slice 3: a README in every folder, and no environment read with a default",
     "config-readers": "slice 4: one environment reader for each program family",
     "size-ceilings": "slice 5: oversized files and folders split by concern, with no pins",
