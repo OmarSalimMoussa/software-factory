@@ -107,6 +107,7 @@ PHASES: tuple[Phase, ...] = (
     Phase("Setting up the factory", (
         ("Copying the factory into place", steps_machine.place),
         ("Giving the agents their copy of the product", steps_machine.agent_checkout),
+        ("Reading GitHub's host keys for the warden", steps_machine.github_host_keys),
         ("Installing Claude Code for the agents", steps_machine.claude_binary),
         ("Copying your tools for the agents", steps_toolchain.toolchain),
         ("Letting the agents' sandbox run", steps_machine.apparmor),

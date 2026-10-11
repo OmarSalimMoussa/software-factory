@@ -75,6 +75,7 @@ class Kit:
         parent: str = "",
         extensions: dict[str, int] | None = None,
         retired: str = "",
+        started: str = NOW.isoformat(),
     ) -> None:
         path = self.public / "sessions.json"
         rows = store.read_json_or(path, {})
@@ -82,7 +83,7 @@ class Kit:
             "name": f"{role}-a", "role": role, "family": "impl", "task": "t-0001", "parent": parent,
             "worktree": str(worktree if worktree is not None else self.worktree), "state": state,
             "agent_id": agent_id, "retired": retired or ("stopped" if state == "retired" else ""),
-            "extensions": extensions or {},
+            "extensions": extensions or {}, "started": started,
         }  # fmt: skip
         store.write_json(path, rows)
 

@@ -43,6 +43,7 @@ def _approved(world: World, *order: str) -> None:
 
 
 def test_a_bench_makes_room_only_for_a_task_that_outranks_the_one_it_replaces(world: World) -> None:
+    world.seat("0c0c0c0c", role="orchestrator", family="orch")  # runs start in a working factory
     world.queue.add("t-0001", goal_item="G1", status="building", severity="severe", created="2026-10-02T00:00:00Z")
     world.seat("5e550001", task="t-0001")
     world.approve("t-0002", goal_item="G2")
@@ -57,6 +58,7 @@ def test_a_bench_makes_room_only_for_a_task_that_outranks_the_one_it_replaces(wo
 
 @pytest.mark.parametrize("turn", [False, True], ids=["waiting-first", "never-a-merge-turn"])
 def test_a_bench_takes_a_waiting_session_first_and_never_a_merge_turn(world: World, turn: bool) -> None:
+    world.seat("0c0c0c0c", role="orchestrator", family="orch")  # runs start in a working factory
     world.cap(2)
     world.queue.add("t-0001", goal_item="G2", status="building")
     world.queue.add("t-0002", goal_item="G2", status="building")
@@ -70,6 +72,8 @@ def test_a_bench_takes_a_waiting_session_first_and_never_a_merge_turn(world: Wor
 
 
 def test_a_benched_session_settles_after_its_grace_and_revives_with_its_id(world: World) -> None:
+    world.seat("0c0c0c0c", role="orchestrator", family="orch")  # runs start in a working factory
+    world.run("0c0c0c0c")
     world.queue.add("t-0001", goal_item="G2", status="building")
     benched_name = world.seat("5e550001", task="t-0001").name
     leases.claim(world.ctx(), "someone-else", "/w/x")  # slot 1

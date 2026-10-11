@@ -5,9 +5,9 @@ watch.probe_seconds (prod every tick while a push to prod is in flight or just l
 answer with; moves the outage along; and
 posts to the orchestrator's inbox: loop due once watch.loop_minutes pass after its last pass, staging red the moment
 staging fails, and triage due when intake.batch_size requests wait or the oldest has waited
-intake.batch_max_wait_hours. Last, it files prod's new GlitchTip issues (errors_import) and the users' new reports
-(reports) as requests, each on its own timer. A step that fails never stops the steps after it. The orchestrator's
-`factory tick` acknowledges each pass.
+intake.batch_max_wait_hours. Last, it files prod's and staging's new GlitchTip issues (errors_import) as requests,
+on its own timer; the users' reports come in a pass of the warden's own (runtime/queue/reports.py), off the tick. A
+step that fails never stops the steps after it. The orchestrator's `factory tick` acknowledges each pass.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import files, format_check, formats, goal, intake, reports, tasks, triage, turn
+from runtime.queue import files, format_check, formats, goal, intake, tasks, triage, turn
 from runtime.queue.book import Queue
 from runtime.shared import models, store
 from runtime.shared.models import Probe
@@ -102,7 +102,6 @@ def run_tick(
         ("goal", lambda: _goal(ctx, _memo(ctx.places))),
         ("rescore", lambda: _rescore(ctx, now)),
         ("errors import", lambda: errors_import.poll(ctx)),
-        ("reports import", lambda: reports.poll(ctx)),
         ("CI watch", lambda: ci_watch.poll(ctx)),
         ("daily qa-prod", lambda: _qa_prod_due(ctx, now)),
     ]
@@ -289,6 +288,9 @@ def _triage_due(ctx: Context, memo: dict[str, Any], now: float) -> None:
     recent = memo["triage_due"] is not None and now - memo["triage_due"] < period
     if recent and not found.boosted:
         return
+    last = inbox.last(ctx.places, inbox.TRIAGE_DUE)
+    if found.boosted and recent and last is not None and last["data"]["batch"] == found.ids:
+        return  # the boosted request was posted at once, and its pass is under way
     ctx.post_event(inbox.TRIAGE_DUE, {"batch": found.ids, "boosted": found.boosted, "waiting": found.waiting})
     memo["triage_due"] = now
     store.write_json(_memo_path(ctx.places), memo)

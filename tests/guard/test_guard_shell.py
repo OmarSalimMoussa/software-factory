@@ -3,11 +3,13 @@ the ordinary commands an agent runs all day still pass."""
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 
 import pytest
 from guard_kit import Kit
 
+from runtime.guard import factory_calls
 from runtime.guard.shell import ShellError, invocations
 
 
@@ -305,3 +307,12 @@ def test_the_shell_reader_finds_programs_behind_wrappers_and_quotes(command: str
 def test_the_shell_reader_refuses_a_substitution_left_open() -> None:
     with pytest.raises(ShellError):
         invocations('echo "$(grep x file"')
+
+
+@pytest.mark.parametrize(
+    ("command", "verb"),
+    [("factory cause --tried 'the cache, but a cold start loops too'", "cause"),
+     ("factory queue task show t-0001", "task.show"), ("factory qa finding --head abc --severity major", "qa.finding")],
+)  # fmt: skip
+def test_each_new_verb_reads_as_the_warden_names_it(command: str, verb: str) -> None:
+    assert factory_calls.verb_of(shlex.split(command)) == verb

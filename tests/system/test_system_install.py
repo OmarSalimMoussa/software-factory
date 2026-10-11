@@ -353,3 +353,35 @@ def test_only_a_claude_code_the_drills_passed_with_is_installed_for_the_agents(
             steps_machine.claude_version(job)
     else:
         steps_machine.claude_version(job)
+
+
+@pytest.mark.parametrize(
+    ("meta", "refused"),
+    [({"ssh_keys": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"]}, False),
+     ({"ssh_keys": []}, True), (OSError("no network"), True)],
+    ids=["published", "none-named", "unreachable"],
+)  # fmt: skip
+def test_the_warden_trusts_github_only_by_the_host_keys_github_publishes_over_https(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, meta: object, refused: bool
+) -> None:
+    job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    job.settings = settings()
+    job.host.dry = False  # decides like a real install; a dry host still changes nothing
+
+    def get(url: str, timeout: float) -> bytes:
+        assert url == "https://api.github.com/meta"
+        if isinstance(meta, Exception):
+            raise meta
+        return json.dumps(meta).encode()
+
+    monkeypatch.setattr(steps_machine, "_get", get)
+    written: dict[Path, str] = {}
+    monkeypatch.setattr(job.host, "write", lambda path, text, **kw: written.__setitem__(path, text))
+    if refused:
+        with pytest.raises(Refused, match="GitHub"):
+            steps_machine.github_host_keys(job)
+        assert written == {}
+    else:
+        steps_machine.github_host_keys(job)
+        assert written[job.places.github_known_hosts].startswith("github.com ssh-ed25519 AAAA")

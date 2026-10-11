@@ -7,10 +7,10 @@ import dataclasses
 import pytest
 from queue_kit import PICTURE, World
 
-from runtime.queue import cards, formats, owner, proposals, tasks
+from runtime.queue import cards, formats, owner, proposals
 from runtime.queue.book import task_rel
 from runtime.queue.propose import propose
-from runtime.shared.models import STOPPED, WAITING, WORKING
+from runtime.shared.models import RETIRED, STOPPED, WAITING, WORKING
 from runtime.shared.protocol import Refused
 from runtime.warden import backstop, lifecycle, reflections, registry
 from runtime.warden.backstop import Proc
@@ -120,12 +120,28 @@ def test_the_owners_extend_raises_the_live_sessions_limit_and_tells_it_and_park_
 
     assert registry.read(world.places)["s-impl"].extensions["qa"] == 2 * by
     assert [sid for sid, _ in world.launcher.messages] == ["s-impl"]
-    assert world.events[-1][0] == "decided-extend" and world.queue().task(task_id).status == "building"
+    assert world.events[-1][0] == "decided-extend" and world.queue().task(task_id).status == "qa"  # where it stopped
 
-    for to, event, by_ in [("qa", "qa-ready", "implementer")]:
-        tasks.move(world.ctx(), task_id, to, event, by_)
     cards.spent(world.ctx(), registry.read(world.places)["s-impl"], "qa", "spent again")
     again = next(c for c in cards.read(world.places) if c.kind == "decide" and not c.answered)
     owner.decide(world.owner(), again.id, "park")
     assert registry.read(world.places)["s-impl"].retired == STOPPED and world.launcher.stopped == ["s-impl"]
     assert world.queue().task(task_id).status == "parked"
+
+
+def test_the_owners_extend_of_a_designers_spent_limit_sends_the_task_back_to_its_designer(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    task = world.task()
+    world.write_raw(task_rel(task.id), formats.dump_task(dataclasses.replace(task, status="designing", run=3)))
+    world.session("s-design", "designer", "design-t-0001", task.id)
+    procs = {"s-design": Proc(1, "s-design", "design-t-0001", "", "idle")}
+    monkeypatch.setattr(backstop, "processes", lambda: procs)
+    lifecycle.extend(world.ctx(), {"session": "s-design", "limit": "critic"}, None)
+    cards.spent(world.ctx(), registry.read(world.places)["s-design"], "critic", "spent again")
+    card = next(c for c in cards.read(world.places) if c.kind == "decide")
+
+    owner.decide(world.owner(), card.id, "extend")
+
+    assert world.queue().task(task.id).status == "designing"
+    assert registry.read(world.places)["s-design"].state != RETIRED and world.launcher.stopped == []

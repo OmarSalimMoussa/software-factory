@@ -18,6 +18,7 @@ from collections.abc import Callable, MutableMapping, Sequence
 from functools import partial
 from pathlib import Path
 
+from runtime.queue import reports
 from runtime.shared import error_reports, store
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, Places
@@ -27,6 +28,7 @@ from runtime.warden import (
     crashwatch,
     gc,
     github,
+    imports,
     inbox,
     launch,
     loop,
@@ -88,7 +90,9 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
     reaper, nightly = reap.Reaper(), gc.Nightly()
     return [
         ("loop", loop.run_tick),
-        ("sessions", crashwatch.SessionsWatch().run_pass),
+        ("sessions", crashwatch.SessionsWatch(imports.in_thread("benches")).run_pass),
+        # It runs the product's scripts on a slot, for up to slots.verb_minutes: never inside the tick.
+        ("reports", imports.Background(reports.poll, imports.in_thread("reports")).run_pass),
         ("schedule", schedule.run_pass),
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),
         ("plan", watch.run_pass),

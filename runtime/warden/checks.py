@@ -151,14 +151,17 @@ def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
     commit, tree, branch, dirty = _state(ctx, checkout)
     if dirty:
         raise Refused("check", "commit your changes first: a check reads what the branch has committed")
-    whole = only is None
+    on_default = branch == ctx.settings().get_str("repo.default_branch")
+    # A pass is a branch's check against the default branch it left, every ratchet included; --all on a branch skips
+    # the ratchets (they compare only what a branch changed), so it runs but records nothing the merge would trust.
+    whole = only is None and not (args.get("all") and not on_default)
     if whole and passed(ctx.places, tree):
         return ok(exit=0, passed=True, tree=tree, output=f"factory check: tree {tree} already passed; nothing to run")
     left = _count_run(ctx, session) if whole and session.role == IMPL else None
     argv = ["--only", ",".join(only)] if only is not None else []
     if args.get("all"):
         argv.append("--all")
-    elif branch == ctx.settings().get_str("repo.default_branch"):
+    elif on_default:
         argv += _since(ctx, checkout)
     code, output = ctx.launcher.run_check(checkout, argv)
     recorded = False
@@ -171,7 +174,8 @@ def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
         else:
             output += "factory check: the checkout moved while it was checked, so no pass is recorded\n"
     elif not whole and code == 0:
-        output += "factory check: --only ran part of the set, so no pass is recorded\n"
+        why = "--only ran part of the set" if only is not None else "--all on a branch runs no ratchet"
+        output += f"factory check: {why}, so no pass is recorded\n"
     if left is not None:
         output += f"factory check: {left} whole runs left on this merge turn\n"
     kib = ctx.settings().get_int("checks.output_kib")

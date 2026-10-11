@@ -110,6 +110,11 @@ class Places:
         return self.state / "public" / "firewall-loaded"
 
     @property
+    def github_known_hosts(self) -> Path:
+        """github.com's SSH host keys, as GitHub publishes them, which the warden's git trusts and nothing else."""
+        return self.state / ".ssh" / "known_hosts"
+
+    @property
     def public_turn(self) -> Path:
         """The branch holding the merge turn, for the merge hook, which runs as the agent and reads public/."""
         return self.state / "public" / "turn.json"

@@ -46,6 +46,14 @@ def test_a_start_is_refused_when_the_facts_now_need_a_higher_rung_than_was_appro
     assert refusal(world) == "rung"
 
 
+def test_a_run_proposed_below_its_route_with_a_reason_still_starts(world: World) -> None:
+    world.approve(cause="")  # its facts route to rung 3, and the orchestrator proposed rung 1 with its reason
+
+    answer = lifecycle.start(world.ctx(), START, None)
+
+    assert world.session(answer["session"]).state == WORKING
+
+
 @pytest.mark.parametrize(
     ("other", "refused"), [(WORKING, True), (WAITING, True), (DEPRIORITIZED, False), (RETIRED, False)]
 )

@@ -42,8 +42,8 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
     # Prod's build, released against; and a verdict a tester typed with one blocker.
     deploys.record(places, probes.PROD, "c" * 40, "2026-10-09T09:00:00Z")
     world.session("s-impl", "implementer", "impl-t-0001", task=in_turn.id)
-    store.append_jsonl(places.state / "qa-results" / "s-impl.jsonl",
-                       {"head": FULL, "tester": "qa-ux", "blockers": 1, "majors": 0, "minors": 0, "at": "x"})  # fmt: skip
+    typed = {"head": FULL, "tester": "qa-ux", "blockers": 1, "majors": 0, "minors": 0, "at": "x"}
+    store.append_jsonl(places.state / "qa-results" / "s-impl.jsonl", typed)
 
     ctx = dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden"))
     done = upgrade.migrate(ctx)

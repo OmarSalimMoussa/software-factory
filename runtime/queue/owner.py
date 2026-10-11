@@ -36,7 +36,8 @@ def approve(ctx: Context, task_id: str) -> dict[str, Any]:
         if task.run is None:
             raise Refused("run", f"{task_id} has no planned run")
         model = route.model_for(ctx.settings(), task.run)
-        approval = approvals.record(ctx.places, task, model, ctx.clock.iso())
+        routed = route.route(task, ctx.settings())
+        approval = approvals.record(ctx.places, task, model, ctx.clock.iso(), routed)
         try:
             tasks.transition(ctx, queue, task, "approved", "approve", OWNER, f"approved at rung {task.run} on {model}")
         except BaseException:
@@ -163,7 +164,7 @@ def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
     """A stuck task: Extend the spent limit of its live session, send it To a designer (rung 3), or Park it. The
     warden tells the session itself, or ends it when its task leaves the run, so nothing is relayed."""
     to, event, kind = {
-        "extend": ("building", "extend", inbox.DECIDED_EXTEND),
+        "extend": ("", "extend", inbox.DECIDED_EXTEND),
         "designer": ("proposed", "to-designer", inbox.TO_DESIGNER),
         "park": ("parked", "park", inbox.PARK),
     }[choice]
@@ -171,6 +172,8 @@ def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
     with ctx.lock, queue.lock():
         found, card = cards.find(ctx.places, card_id, "decide")
         task = queue.task(card.task)
+        if choice == "extend":
+            to = _before_decide(queue, task.id)
         sessions = lifecycle.read(ctx)
         live = next((s for s in sessions.values() if s.task == task.id and not s.parent and s.role in permits.CAP
                      and s.state not in (RETIRED,)), None)  # fmt: skip
@@ -186,6 +189,15 @@ def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
         lifecycle.retire_session(ctx, live.id, STOPPED, lifecycle.OWNER)
     ctx.post_event(kind, {"task": card.task, "card": card_id})
     return {"card": card_id, "task": card.task, "status": to}
+
+
+def _before_decide(queue: Queue, task_id: str) -> str:
+    """The running status a spent limit took the task from: a designer's task goes back to designing, an
+    implementer's to where it was, so its own session carries on."""
+    moves = [e for e in queue.read_log(task_id) if e.get("to") == "decide" and e.get("from")]
+    if not moves:
+        raise Refused("decide", f"{task_id}'s log says no status it came to the decide card from")
+    return moves[-1]["from"]
 
 
 def _tell(ctx: Context, sid: str, message: str) -> None:

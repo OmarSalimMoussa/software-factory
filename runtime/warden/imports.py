@@ -7,6 +7,7 @@ shows. A failing run is logged once per run of failures and tried again at the n
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -57,3 +58,30 @@ def run(ctx: Context, timed: Timed, state: dict[str, Any], work: Callable[[], st
 def note(state: dict[str, Any]) -> str | None:
     found = state["note"]
     return found if isinstance(found, str) else None
+
+
+Start = Callable[[Callable[[], None]], threading.Thread | None]
+
+
+def in_thread(name: str) -> Start:
+    """Run work in a daemon thread of its own, named ``name``: the start a pass uses for slow work the tick must not
+    wait on (a test passes one that runs it at once)."""
+
+    def start(work: Callable[[], None]) -> threading.Thread:
+        thread = threading.Thread(target=work, name=name, daemon=True)
+        thread.start()
+        return thread
+
+    return start
+
+
+class Background:
+    """A pass whose work runs in a thread of its own, one at a time: while the last one runs, a pass starts none."""
+
+    def __init__(self, work: Callable[[Context], None], start: Start) -> None:
+        self._work, self._start = work, start
+        self._thread: threading.Thread | None = None
+
+    def run_pass(self, ctx: Context) -> None:
+        if self._thread is None or not self._thread.is_alive():
+            self._thread = self._start(lambda: self._work(ctx))

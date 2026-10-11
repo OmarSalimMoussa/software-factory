@@ -67,6 +67,11 @@ def _lock(places: Places) -> Path:
     return places.state / ".inbox.lock"
 
 
+def last(places: Places, kind: str) -> dict[str, Any] | None:
+    """The newest event of ``kind`` posted; None before the first."""
+    return next((r for r in reversed(store.read_jsonl(places.inbox)) if r["kind"] == kind), None)
+
+
 def post_event(places: Places, clock: Clock, kind: str, data: dict[str, Any]) -> dict[str, Any]:
     """Append one event and wake every waiter; the stored record."""
     if kind not in KINDS:

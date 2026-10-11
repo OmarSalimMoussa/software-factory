@@ -59,7 +59,7 @@ MOVES: tuple[Move, ...] = (
     _m({"promoted"}, {"on-staging"}, "left-prod", WARDEN),
     _m({"on-staging"}, {"checked"}, "left-staging", WARDEN),
     _m(RUNNING, {"decide"}, "limits", WARDEN),
-    _m({"decide"}, {"building"}, "extend", OWNER),
+    _m({"decide"}, set(RUNNING), "extend", OWNER),  # back to the status the spent limit stopped it in
     _m({"decide"}, {"parked"}, "park", OWNER),
     _m({"decide"}, {"proposed"}, "to-designer", OWNER),
     _m(OPEN, {"proposed"}, "rung-up", ORCH),

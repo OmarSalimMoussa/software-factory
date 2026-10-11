@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -35,7 +34,18 @@ from runtime.shared.models import (
 )
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
-from runtime.warden import backstop, inbox, launch, lifecycle, loop, permits, reflections, registry, vitals
+from runtime.warden import (
+    backstop,
+    imports,
+    inbox,
+    launch,
+    lifecycle,
+    loop,
+    permits,
+    reflections,
+    registry,
+    vitals,
+)
 from runtime.warden.backstop import Proc
 from runtime.warden.context import Context
 from runtime.warden.launch import LaunchError
@@ -58,18 +68,12 @@ def _age(ctx: Context, since: str) -> float:
     return ctx.clock.now() - datetime.fromisoformat(since).timestamp()
 
 
-def _in_thread(work: Callable[[], None]) -> threading.Thread:
-    thread = threading.Thread(target=work, name="benches", daemon=True)
-    thread.start()
-    return thread
-
-
 class SessionsWatch:
     """The sessions pass, once a tick. Benches settle in a thread of their own, as reaps do: emptying a slot runs the
     product's scripts for up to slots.verb_minutes, and probes, outages and check-ins must not wait on it. ``start``
     runs the settling (a test passes one that runs it at once)."""
 
-    def __init__(self, start: Callable[[Callable[[], None]], threading.Thread | None] = _in_thread) -> None:
+    def __init__(self, start: imports.Start) -> None:
         self._start = start
         self._benches: threading.Thread | None = None
 
@@ -199,6 +203,8 @@ def watch(ctx: Context) -> None:
                 else:
                     why = f"its process ended and {tries} resumes within {window // 60} min did not keep it running"
                     retired = lifecycle.retire(ctx, registry.subtree(sessions, sid), s, CRASHED, WARDEN, why)
+            if relaunch is not None:
+                lifecycle.end_children(ctx, sessions, s)
             registry.write(ctx.places, sessions)
         if relaunch is not None:
             _resume(ctx, *relaunch)

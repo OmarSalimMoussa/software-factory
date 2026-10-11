@@ -278,7 +278,7 @@ def _call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
     if cmd == "turn":
         return Call("turn.next", {})
     if cmd == "cause":
-        return Call("cause.try", {"tried": ns.tried})
+        return Call("cause", {"tried": ns.tried})
     if cmd == "slot":
         return _slot_call(ns)
     if cmd == "qa":

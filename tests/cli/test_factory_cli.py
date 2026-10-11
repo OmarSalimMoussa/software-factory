@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import io
 import json
+import shlex
 
 import pytest
 
@@ -158,3 +159,21 @@ def test_the_owners_account_commands_send_the_token_as_bytes_and_follow_a_switch
     ]
     for argv in (["factory", "account", "use", "work"], ["factory", "account", "add", "work"]):
         assert VERBS[verb_of(argv)].owner_socket  # the guard refuses every owner verb to a session
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "cause --tried 'the cache, and a cold start loops too'", "queue task show t-0001", "queue next",
+        "queue task status t-0001 approved", "queue task facts t-0001 --slices 2", "turn next", "check",
+        "qa finding --head abc --severity major --where /notes --body f.md", "qa result --head abc", "qa plan",
+        "qa waive t-0001 f-1 --why 'not a bug'", "qa-ready abc", "qa-clean", "ready-check", "triage plan --body p.json",
+        "triage apply", "inbox", "inbox --wait", "tick", "status", "push", "reflect --kind miss 'it missed'",
+        "slot claim", "slot up", "propose t-0001 --picture p.svg --why now", "spec save t-0001 s.md --slices 2",
+        "needs-owner t-0001 --picture p.svg --question why", "errors", "traces", "doing 'reading'",
+    ],
+)  # fmt: skip
+def test_every_command_asks_for_the_verb_the_guard_reads_it_as(line: str) -> None:
+    argv = shlex.split(line)
+    call = build(argv, lambda path: b"text")
+    assert verb_of(["factory", *argv]) == call.verb and call.verb in VERBS

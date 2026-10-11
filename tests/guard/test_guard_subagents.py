@@ -207,15 +207,20 @@ def test_a_tester_holding_a_desktop_stops_at_its_desktop_time(
     assert (kit.rule(tool, {"file_path": "/x"}, **tester) == "tester-time") is refused
 
 
-@pytest.mark.parametrize(("running", "level", "refused"), [(3, "green", False), (4, "green", True), (0, "amber", True)])
+@pytest.mark.parametrize(
+    ("running", "age", "level", "refused"),
+    [(3, 60, "green", False), (4, 60, "green", True), (4, 86400, "green", False), (0, 60, "amber", True)],
+    ids=["under-the-cap", "at-the-cap", "rows-older-than-any-tester-runs", "amber"],
+)
 def test_browser_testers_are_capped_across_the_machine_and_start_only_on_green_vitals(
-    tmp_path: Path, running: int, level: str, refused: bool
+    tmp_path: Path, running: int, age: int, level: str, refused: bool
 ) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer")
     for n in range(running):  # other implementers' browser testers
         kit.session("implementer", sid=f"other-{n}")
-        kit.session("qa-ux", sid=f"tester-{n}", parent=f"other-{n}", agent_id=f"a{n}")
+        kit.session("qa-ux", sid=f"tester-{n}", parent=f"other-{n}", agent_id=f"a{n}",
+                    started=(NOW - timedelta(seconds=age)).isoformat())  # fmt: skip
     store.write_json(kit.public / "vitals.json", {"level": level})
     brief = "Scenarios and checks: 1\nWalk the sign-in."
     assert (kit.rule("Agent", {"subagent_type": "qa-ux", "prompt": brief}) == "subagents-at-once") is refused

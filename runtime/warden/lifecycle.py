@@ -85,6 +85,14 @@ def retire(ctx: Context, tree: list[Session], root: Session, kind: str, by: str,
     return tree
 
 
+def end_children(ctx: Context, sessions: dict[str, Session], s: Session) -> None:
+    """A session whose process ended took its subagents with it: their rows retire, so none holds a tester's place,
+    and resumed, it starts them again. The caller holds ctx.lock and writes the registry."""
+    running = [c for c in registry.children(sessions, s.id) if c.state in (WORKING, WAITING)]
+    if running:
+        retire(ctx, running, s, models.WITH_PARENT, WARDEN, "its parent's process ended")
+
+
 def after_retire(ctx: Context, retired: list[Session]) -> None:
     """Stop what still runs, and send an unfinished task back to Proposed next."""
     running = backstop.processes()
@@ -144,6 +152,9 @@ def restart(ctx: Context, s: Session, message: str) -> None:
     with ctx.lock:
         if not claim_launch(ctx, s.id):
             raise LaunchError(f"{s.name} is being launched already")
+        sessions = read(ctx)
+        end_children(ctx, sessions, sessions.get(s.id, s))
+        registry.write(ctx.places, sessions)
     try:
         if s.id in backstop.processes():
             ctx.launcher.stop_session(s.id)
@@ -164,6 +175,10 @@ def deliver(ctx: Context, sid: str, message: str, by: str) -> None:
         running = s.id in backstop.processes()
         if not running and not claim_launch(ctx, sid):
             raise LaunchError(f"the warden is bringing {s.name} back right now: send it again in a minute")
+        if not running:
+            sessions = read(ctx)
+            end_children(ctx, sessions, sessions[sid])
+            registry.write(ctx.places, sessions)
     if running:
         ctx.launcher.message_session(s.id, message)
     else:

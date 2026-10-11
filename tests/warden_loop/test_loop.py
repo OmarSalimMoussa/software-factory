@@ -128,7 +128,6 @@ def test_a_failing_tick_step_is_logged_and_the_steps_after_it_still_run(
         tick(ticking, tmp_path)  # it fails the same way again: reported once while it lasts
     assert inbox.LOOP_DUE in events
     assert [r.getMessage() for r in caplog.records] == ["warden: the tick's vitals step failed (OSError)"]
-    assert ticking.ctx.launcher.calls[0][:2] == (0, ["verbs"])  # type: ignore[attr-defined]  # the report pull ran
 
 
 def _staging_fails(world: World, tmp_path: Path, times: int) -> list[str]:
@@ -186,3 +185,15 @@ def test_every_waiting_task_is_scored_again_together_on_its_schedule(
     run(ticking, tmp_path)
 
     assert sorted(set(rescored)) == [start, start + every]
+
+
+def test_a_boosted_request_is_posted_for_triage_at_once_and_once(ticking: World, tmp_path: Path) -> None:
+    file_requests(ticking, 1, 0)
+    store.write_json(ticking.ctx.places.state / "request-boosts.json", {"r-2026-10-01-0001": ticking.clock.iso()})
+    posted = []
+    for _ in range(3):  # each pass the orchestrator reads its inbox and acknowledges with its tick
+        posted += [k for k in tick(ticking, tmp_path) if k == inbox.TRIAGE_DUE]
+        loop.tick(ticking.ctx, {}, None)
+        ticking.clock.t += ticking.ctx.settings().get_int("watch.tick_seconds")
+
+    assert posted == [inbox.TRIAGE_DUE]

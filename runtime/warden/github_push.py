@@ -190,7 +190,8 @@ class _Git:
             **os.environ,
             "GIT_TERMINAL_PROMPT": "0",
             "GIT_SSH_COMMAND": f"ssh -i {shlex.quote(str(key))} -o IdentitiesOnly=yes -o BatchMode=yes "
-                               "-o StrictHostKeyChecking=yes",
+                               "-o StrictHostKeyChecking=yes "
+                               f"-o UserKnownHostsFile={shlex.quote(str(ctx.places.github_known_hosts))}",
         }  # fmt: skip
         if not (self.mirror / "HEAD").is_file():
             self._exec(["init", "--bare", "--quiet", str(self.mirror)], cwd=self.mirror.parent)

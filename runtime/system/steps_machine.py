@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import urllib.request
 from pathlib import Path
 
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER, queue_dir
@@ -282,6 +283,34 @@ def agent_checkout(ctx: Install) -> None:
     if code == 0 and kind.strip() and kind.strip() != "directory":
         raise refuse(f"{queue} is a {kind.strip()}, not a folder: remove it, then install again")
     ctx.host.mkdir(queue, mode=0o755, owner=WARDEN_USER)
+
+
+_HOST_KEY = re.compile(r"^(ssh-ed25519|ecdsa-sha2-nistp(?:256|384|521)|ssh-rsa) [A-Za-z0-9+/=]+$")
+# GitHub's own list of its SSH host keys, read over HTTPS: the certificate vouches for them, so nothing is trusted on
+# first use.
+GITHUB_META = "https://api.github.com/meta"
+
+
+def _get(url: str, timeout: float) -> bytes:
+    with urllib.request.urlopen(url, timeout=timeout) as reply:  # noqa: S310 - a fixed https address
+        return bytes(reply.read())
+
+
+def github_host_keys(ctx: Install) -> None:
+    """github.com's SSH host keys for the warden's pushes and its mirror's fetches."""
+    host, path = ctx.host, ctx.places.github_known_hosts
+    if host.dry:
+        host.say(f"would write {path} from GitHub's published SSH host keys ({GITHUB_META})")
+        return
+    try:
+        keys = json.loads(_get(GITHUB_META, ctx.need_settings().get_int("watch.http_timeout_seconds")))["ssh_keys"]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise refuse(f"GitHub's SSH host keys could not be read from {GITHUB_META} ({type(exc).__name__}): check "
+                     "this computer's internet connection, then install again") from exc  # fmt: skip
+    if not isinstance(keys, list) or not keys or not all(isinstance(k, str) and _HOST_KEY.match(k) for k in keys):
+        raise refuse(f"GitHub named no SSH host keys this install can read at {GITHUB_META}: install again later")
+    host.mkdir(path.parent, mode=0o700, owner=WARDEN_USER)
+    host.write(path, "".join(f"github.com {key}\n" for key in keys), mode=0o644, owner=WARDEN_USER)
 
 
 def _subordinate_ids(ctx: Install) -> None:

@@ -203,12 +203,13 @@ def check_start(ctx: Context, sessions: dict[str, Session], role: str, task: Tas
     if not approvals.matches(approval, task):
         raise Refused("approval", f"{task.id} changed since the owner approved it; propose it again")
     rung = approval.rung
-    # The approval names a rung; the facts that made it allowed (slices, surfaces, owner class, cause) may have
-    # changed since, so the ladder runs again on the task as it is now.
+    # The facts that made the approved rung allowed (slices, surfaces, owner class, cause) may have changed since:
+    # the ladder runs again, and a route higher than the one at approval refuses. A run proposed below its route,
+    # with the orchestrator's reason, still starts: its facts did not move.
     needed = ladders.route(task, settings)
-    if needed > rung:
-        raise Refused("rung", f"{task.id}'s facts changed since the owner approved rung {rung}: it now needs rung "
-                              f"{needed}; propose it again at that rung")  # fmt: skip
+    if approval.routed is not None and needed > approval.routed:
+        raise Refused("rung", f"{task.id}'s facts changed since the owner approved it: they route to rung {needed} "
+                              f"now, not {approval.routed}; propose it again")  # fmt: skip
     designed = rung >= 3 and role == IMPL
     if role == DESIGN and rung < 3:
         raise Refused("rung", f"the owner approved rung {rung}, which needs no designer; start an implementer")

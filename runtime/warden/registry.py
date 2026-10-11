@@ -32,7 +32,7 @@ def write(places: Places, sessions: dict[str, Session]) -> None:
     # contract: extensions added, so the guard's round limits count what the owner or orchestrator extended.
     public = {
         sid: {k: getattr(s, k) for k in ("name", "role", "family", "task", "parent", "worktree", "state", "agent_id",
-                                        "retired", "extensions")}
+                                        "retired", "extensions", "started")}
         for sid, s in sessions.items()
     }  # fmt: skip
     store.write_json(places.state / "public" / "sessions.json", public)

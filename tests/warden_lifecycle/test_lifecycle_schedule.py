@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import pytest
 from lifecycle_fakes import World
 
 from runtime.queue import proposals
 from runtime.shared import store
-from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, WORKING
+from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, STOPPED, WORKING
 from runtime.warden import crashwatch, lifecycle, schedule
+
+
+@pytest.fixture(autouse=True)
+def orchestrator(world: World) -> None:
+    """Runs start only in a working factory: one with its orchestrator at work."""
+    world.seat("0c0c0c0c", role="orchestrator", family="orch")
 
 
 def _approved(world: World, *order: str) -> None:
@@ -68,3 +75,13 @@ def test_a_designed_build_starts_its_implementer_and_a_run_that_cannot_start_say
     world.vitals("green")
     schedule.run_pass(world.ctx())
     assert _live(world, "t-0001") == [WORKING] and schedule.waits(world.places) == {}
+
+
+def test_a_factory_the_owner_stopped_starts_no_run(world: World) -> None:
+    world.approve("t-0001")
+    _approved(world, "t-0001")
+    lifecycle.retire_session(world.ctx(), "0c0c0c0c", STOPPED, "owner")
+
+    schedule.run_pass(world.ctx())
+
+    assert _live(world, "t-0001") == [] and world.launcher.started == []

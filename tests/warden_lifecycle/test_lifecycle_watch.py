@@ -15,9 +15,10 @@ from runtime.shared.models import (
     REVIVING,
     STOPPED,
     WAITING,
+    WITH_PARENT,
     WORKING,
 )
-from runtime.warden import backstop, crashwatch, inbox, lifecycle, permits
+from runtime.warden import backstop, crashwatch, imports, inbox, lifecycle, permits
 from runtime.warden.backstop import Proc
 from runtime.warden.launch import LaunchError
 
@@ -191,7 +192,7 @@ def test_a_slow_bench_settles_beside_the_pass_and_no_second_one_starts_meanwhile
         done.wait(10)
 
     monkeypatch.setattr(crashwatch, "finish_benches", slow)
-    watcher = crashwatch.SessionsWatch()
+    watcher = crashwatch.SessionsWatch(imports.in_thread("benches"))
     watcher.run_pass(world.ctx())
     assert started.wait(10)
     watcher.run_pass(world.ctx())  # returns at once, though the first bench still runs
@@ -213,3 +214,14 @@ def test_a_session_the_warden_is_launching_is_never_launched_a_second_time(world
         lifecycle.release_launch(world.ctx(), "5e550001")
 
     assert world.launcher.resumed == []
+
+
+def test_a_resumed_session_takes_the_subagents_of_its_ended_process_out_of_the_running(world: World) -> None:
+    world.queue.add("t-0001", status="qa")
+    world.seat("5e550001", task="t-0001")
+    world.seat("a1b2c3", role="qa-ux", family="qa", task="t-0001", parent="5e550001", agent_id="a1b2c3")
+
+    crashwatch.watch(world.ctx())  # the implementer's process ended: the warden resumes it
+
+    tester = world.session("a1b2c3")
+    assert (tester.state, tester.retired) == (RETIRED, WITH_PARENT) and world.launcher.resumed == ["5e550001"]

@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
-from runtime.queue import approvals, statuses
+from runtime.queue import approvals, route, statuses
 from runtime.shared import settings as settings_mod
 from runtime.shared import store
 from runtime.shared.models import WORKING, Session, Task
@@ -160,7 +160,7 @@ class World:
     def approve(self, task_id: str = "t-0001", **fields: Any) -> Task:
         task = self.queue.add(task_id, **fields)
         model = self.settings.model("implementer_small" if task.run == 1 else "implementer_large")[0]
-        approvals.record(self.places, task, model, "2026-10-09T11:00:00Z")
+        approvals.record(self.places, task, model, "2026-10-09T11:00:00Z", route.route(task, self.settings))
         return task
 
     def cap(self, n: int) -> None:

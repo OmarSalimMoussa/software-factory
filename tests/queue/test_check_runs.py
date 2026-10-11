@@ -90,8 +90,8 @@ def test_a_whole_run_that_passed_on_an_unmoved_tree_is_recorded_for_the_push_and
 
 @pytest.mark.parametrize(
     ("args", "code", "moved"),
-    [({}, 1, False), ({"only": ["tests"]}, 0, False), ({}, 0, True)],
-    ids=["failed", "part-of-the-set", "checkout-moved"],
+    [({}, 1, False), ({"only": ["tests"]}, 0, False), ({}, 0, True), ({"all": True}, 0, False)],
+    ids=["failed", "part-of-the-set", "checkout-moved", "all-on-a-branch-runs-no-ratchet"],
 )
 def test_no_pass_is_recorded_for_a_failure_part_of_the_set_or_a_checkout_that_moved(
     world: World, git: dict[str, str], args: dict[str, object], code: int, moved: bool

@@ -188,6 +188,17 @@ def _tasks(repo: Path, now: float) -> tuple[list[Task], dict[str, list[dict[str,
                     "to": to,
                 }
             )
+        if status == "decide":  # a spent limit stopped its run while it was building
+            logs[task.id].append(
+                {
+                    "at": iso(now - 3600),
+                    "actor": "warden",
+                    "event": "limits",
+                    "text": "its rounds are used up",
+                    "from": "building",
+                    "to": "decide",
+                }
+            )
     return tasks, logs
 
 

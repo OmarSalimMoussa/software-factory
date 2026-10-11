@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ import pytest
 from queue_kit import World
 
 from runtime.queue import reports
+from runtime.warden import imports
 from runtime.warden.context import StackResult
 
 
@@ -119,3 +121,19 @@ def test_a_failed_pull_is_logged_once_and_tried_again_at_the_next_poll(
         "it runs again at the next poll"
     ]
     assert "failed (reports: scripts/dev reports exited 3)" in str(reports.note(ctx))
+
+
+def test_the_pull_runs_off_the_tick_and_one_at_a_time(world: World) -> None:
+    started, done, runs = threading.Event(), threading.Event(), []
+
+    def slow(ctx: object) -> None:  # a product's reports verb that takes long to answer
+        runs.append(1)
+        started.set()
+        done.wait(10)
+
+    puller = imports.Background(slow, imports.in_thread("reports"))
+    puller.run_pass(world.ctx())
+    assert started.wait(10)
+    puller.run_pass(world.ctx())  # returns at once, and starts no second pull while the first runs
+    assert runs == [1]
+    done.set()
