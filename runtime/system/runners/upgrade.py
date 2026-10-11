@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import traceback
 from pathlib import Path
 
@@ -66,6 +67,13 @@ def fetch(rel: releases.Releases, found: releases.Release, commit: str, folder: 
     return path
 
 
+def http_timeout(places: Places) -> float:
+    """The release's own default, read alone: the overrides are the warden's file, which root does not read here, and
+    the defaults leave the install's own values (repo.path) empty."""
+    tree = tomllib.loads(places.defaults.read_text(encoding="utf-8"))
+    return float(settings_module.read_some(tree, ("watch.http_timeout_seconds",))["watch.http_timeout_seconds"])
+
+
 def upgrade(places: Places, commit: str) -> int:
     installed = upgrades.read_installed(places)
     if installed is None:
@@ -77,9 +85,7 @@ def upgrade(places: Places, commit: str) -> int:
     folder = Path(tempfile.mkdtemp(prefix="download-", dir=places.upgrade))
     try:
         report(CHECKING)
-        # The release's defaults alone: the overrides are the warden's file, which root does not read here.
-        settings = settings_module.load(places.defaults, None)
-        timeout = float(settings.get_int("watch.http_timeout_seconds"))
+        timeout = http_timeout(places)
         rel = releases.Releases.of(upgrades.token_path(places), installed["repo"], timeout, releases.http_get)
         found = check(rel, installed["commit"], commit)
         report(DOWNLOADING)

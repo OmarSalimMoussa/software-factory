@@ -7,14 +7,14 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from system_fakes import dry_job
+from system_fakes import dry_job, settings
 
 from runtime.shared import store, upgrades
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import overrides_toml
 from runtime.system.host import DeployKey, DryHost
-from runtime.system.install_steps import steps_prepare
+from runtime.system.install_steps import steps_prepare, steps_secrets
 from runtime.system.journal import Journal
 from runtime.system.unattended import UnattendedHost
 
@@ -146,3 +146,18 @@ def test_the_product_s_checkout_must_be_a_folder_of_the_agents_home(tmp_path: Pa
     steps_prepare.check_machine(job)
     with pytest.raises(Refused, match="repo.path must be a folder inside"):
         steps_prepare.settle_settings(job)
+
+
+def test_an_upgrade_without_a_signed_in_github_cli_keeps_the_keys_and_asks_nothing(tmp_path: Path) -> None:
+    job = dry_job(tmp_path)
+    job.unattended, job.settings = True, settings()
+    host, folder = job.host, job.places.state / "secrets"
+    assert isinstance(host, DryHost)
+    host.dry = False
+    host.paths |= {job.places.totp_secret, upgrades.token_path(job.places)}
+    host.paths |= {folder / name for name in ("deploy.key", "factory-read.key.pub", "github.token", "factory.token")}
+    host.files[folder / "claude-accounts" / "active"] = "main\n"
+
+    steps_secrets.secrets(job)
+
+    assert [a for a in host.actions if a.startswith(("ask the owner: ", "write: "))] == []

@@ -42,11 +42,14 @@ def _keygen(ctx: Install, key: Path, title: str) -> None:
 
 
 def signed_in_gh(ctx: Install) -> str:
-    """The owner's GitHub CLI once it is signed in; "" when the owner chose to add the keys by hand."""
+    """The owner's GitHub CLI once it is signed in; "" when the owner chose to add the keys by hand. Unattended, ""
+    when it is not signed in: the keys an install made are kept, and a missing one stops the upgrade by name."""
     host = ctx.host
     if host.dry:
         return ""
     gh = github_keys.owner_gh(host, ctx.owner)
+    if ctx.unattended:
+        return gh
     while not gh and host.confirm("Sign in to GitHub", SIGN_IN, yes="I signed in", no="I will add the keys myself"):
         gh = github_keys.owner_gh(host, ctx.owner)
     return gh
