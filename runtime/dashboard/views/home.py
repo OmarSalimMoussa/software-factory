@@ -302,8 +302,10 @@ def _upgrade_asked(found: dict[str, Any]) -> dict[str, Any] | None:
                 "actions": [*(["upgrade"] if available else []), *resume]}  # fmt: skip
     if resume:
         return {**blank, "state": "done", "title": f"The factory is upgraded to {to}", "message": "Your agents are "
-                "paused with their work kept. Restart the factory when you are ready.", "changelog": asked["changelog"],
-                "actions": resume}  # fmt: skip
+                "paused with their work kept; restart the factory when you are ready. The warden pushes the product's "
+                f"move to this factory itself. Then run the server set-up from a factory checkout at {to} "
+                "(docs/server.md).",
+                "changelog": asked["changelog"], "actions": resume}  # fmt: skip
     return None
 
 

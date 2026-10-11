@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 
 import pytest
-from system_fakes import dry_job, settings
+from system_fakes import FACTORY_ORIGIN, dry_job, settings
 
-from runtime.shared import releases
+from runtime.shared import releases, upgrades
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
@@ -453,3 +453,38 @@ def test_the_stack_users_systemd_is_walled_off_the_tailnet_before_its_containers
     started = acts.index(f"run: systemctl start {unit}")
     assert (wrote is not None) is (not walled) and (wrote is None or wrote < started)
     assert (f"run: systemctl restart {unit}" in acts) is restarts
+
+
+@pytest.mark.parametrize(
+    ("first", "dirty", "moves"),
+    [(False, "", True), (True, "", False), (False, " M src/app.py", False)],
+    ids=["an-upgrade-moves-it", "a-first-install-leaves-it", "uncommitted-work-leaves-it"],
+)
+def test_an_upgrade_moves_the_agents_product_to_its_factory_in_one_commit_root_records(
+    tmp_path: Path, first: bool, dirty: str, moves: bool
+) -> None:
+    job = dry_job(tmp_path)
+    job.settings = settings()
+    job.first, job.sha, job.factory_origin = first, "e" * 40, FACTORY_ORIGIN
+    host, checkout = job.host, job.checkout()
+    assert isinstance(host, DryHost)
+    git = f"git -C {checkout}"
+    host.answers |= {
+        f"{git} symbolic-ref --short HEAD": (0, job.settings.get_str("repo.default_branch")),
+        f"{git} status --porcelain --untracked-files=no": (0, dirty),
+        f"cat {checkout}/.github/factory-ref": (0, f"acme/software-factory@{'a' * 40}\n"),
+        f"test -e {checkout}/.github/workflows/heartbeat.yml": (0, ""),
+    }
+
+    steps_wire.product_pin(job)
+
+    acts = host.actions
+    wrote = [a.split(" (")[0].removeprefix("write: ") for a in acts if a.startswith("write: ")]
+    if not moves:
+        assert wrote == []
+        return
+    assert f"{checkout}/.github/factory-ref" in wrote and f"{checkout}/.github/workflows/ci.yml" in wrote
+    assert str(upgrades.pins_path(job.places)) == wrote[-1]  # root's record that the commit is the owner's
+    assert f"run: {git} rm --quiet .github/workflows/heartbeat.yml (as software-agent)" in acts
+    [made] = [a for a in acts if " commit " in a]
+    assert "--no-verify" in made and "(as software-agent)" in made

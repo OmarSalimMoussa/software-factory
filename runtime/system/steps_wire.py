@@ -12,6 +12,7 @@ from runtime.shared.paths import AGENT_USER, MANAGED_SETTINGS, SCRATCH, SLICE, W
 from runtime.system import layout, render
 from runtime.system.host import CommandError, Host
 from runtime.system.job import Install, github_name, refuse
+from standard.config import FACTORY_REF
 
 _HTTPS = 443
 _TAILSCALE_LINK = re.compile(r"https://login\.tailscale\.com/\S+")
@@ -80,6 +81,57 @@ def git_hooks(ctx: Install) -> None:
     if f"/{SCRATCH}/" not in current.splitlines():
         ctx.host.write(exclude, current + ("" if current.endswith("\n") or not current else "\n") + f"/{SCRATCH}/\n",
                        mode=0o644, owner=AGENT_USER)  # fmt: skip
+
+
+def factory_repo(ctx: Install) -> str:
+    """The factory's repo as the release file or the owner's checkout names it, never as the warden's settings do."""
+    return str(ctx.release["repo"]) if ctx.release else github_name(ctx.factory_origin) or ""
+
+
+# Workflows the factory once copied into products, and copies no more.
+RETIRED_WORKFLOWS = ("heartbeat.yml",)
+PIN_AUTHOR = ["-c", "user.name=software factory", "-c", "user.email=factory@software.invalid"]
+
+
+def product_pin(ctx: Install) -> None:
+    """An upgrade moves the agents' copy of the product to the factory it installs, in one commit on the default
+    branch that only root may make: no agent may change .github. The warden pushes it as the owner's (runtime/warden/
+    pins.py)."""
+    host, checkout, repo = ctx.host, ctx.checkout(), factory_repo(ctx)
+    branch = ctx.need_settings().get_str("repo.default_branch")
+    git = ["git", "-C", str(checkout)]
+    on = host.query([*git, "symbolic-ref", "--short", "HEAD"], user=AGENT_USER)[1].strip()
+    dirty = host.query([*git, "status", "--porcelain", "--untracked-files=no"], user=AGENT_USER)[1].strip()
+    if ctx.first or not repo or on != branch or dirty:
+        host.say(f"the product's factory pin is left as it is (first {ctx.first}, repo {repo!r}, on {on!r}, "
+                 f"changes {bool(dirty)})")  # fmt: skip
+        return
+    want = {FACTORY_REF: f"{repo}@{ctx.sha}\n"} | {
+        f".github/workflows/{p.name}": p.read_text(encoding="utf-8")
+        for p in sorted((ctx.tree() / "templates" / "ci").glob("*.yml"))
+    }
+    held = {rel: host.query(["cat", str(checkout / rel)], user=AGENT_USER) for rel in want}
+    changed = [rel for rel, text in want.items() if held[rel] != (0, text)]
+    retired = [
+        f".github/workflows/{name}"
+        for name in RETIRED_WORKFLOWS
+        if host.query(["test", "-e", str(checkout / ".github" / "workflows" / name)], user=AGENT_USER)[0] == 0
+    ]
+    if not changed and not retired:
+        host.say(f"the product already uses the factory at {ctx.sha[:12]}")
+        return
+    host.run(["mkdir", "-p", str(checkout / ".github" / "workflows")], user=AGENT_USER)
+    for rel in changed:
+        host.write(checkout / rel, want[rel], mode=0o644, owner=AGENT_USER)
+    if retired:
+        host.run([*git, "rm", "--quiet", *retired], user=AGENT_USER)
+    host.run([*git, "add", *changed], user=AGENT_USER)
+    message = f"The product moves to the factory at {ctx.sha[:12]}, as the owner's upgrade asked"
+    host.run([*git, *PIN_AUTHOR, "commit", "--quiet", "--no-verify", "-m", message], user=AGENT_USER)
+    made = "c" * 40 if host.dry else host.run([*git, "rev-parse", "HEAD"], user=AGENT_USER).strip()
+    pins = [] if host.dry else upgrades.read_pins(ctx.places)
+    host.write(upgrades.pins_path(ctx.places), json.dumps([*pins, made]) + "\n", mode=0o644)
+    host.tell(f"The product moves to this factory in commit {made[:12]}; the warden pushes it when it starts.")
 
 
 def https_handlers(status: str) -> dict[str, str] | None:
@@ -193,9 +245,7 @@ def record(ctx: Install, drills: list[dict[str, object]]) -> None:
     host.write(layout.install_record(state), json.dumps(body, indent=1) + "\n", mode=0o600, owner=WARDEN_USER)
     # Root's own record, which the dashboard's upgrade trusts where it would not trust the warden's folder.
     host.mkdir(ctx.places.upgrade, mode=0o755)
-    # The factory's repo as the release file or the owner's checkout names it, never as the warden's settings do.
-    repo = str(ctx.release["repo"]) if ctx.release else github_name(ctx.factory_origin) or ""
-    mine = {"commit": ctx.sha, "owner": ctx.owner.name, "product": str(ctx.product), "repo": repo}
+    mine = {"commit": ctx.sha, "owner": ctx.owner.name, "product": str(ctx.product), "repo": factory_repo(ctx)}
     host.write(upgrades.installed_path(ctx.places), json.dumps(mine, indent=1) + "\n", mode=0o644)
     host.say(f"the factory at {ctx.sha[:12]} is installed")
 

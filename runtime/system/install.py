@@ -119,6 +119,7 @@ PHASES: tuple[Phase, ...] = (
         ("Writing the factory's firewall", steps_wire.firewall),
         ("Installing the factory command", steps_wire.factory_command),
         ("Adding the factory's checks to the product", steps_wire.git_hooks),
+        ("Moving the product to this factory", steps_wire.product_pin),
         ("Publishing the dashboard on your tailnet", steps_wire.tailnet),
     )),
     Phase("Starting up", (

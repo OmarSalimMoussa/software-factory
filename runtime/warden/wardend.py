@@ -35,6 +35,7 @@ from runtime.warden import (
     launch,
     loop,
     ops,
+    pins,
     plan,
     public,
     reap,
@@ -97,6 +98,11 @@ def _check_releases(ctx: Context) -> None:
     loop.run_once(ctx, "the release check", lambda: factory_upgrade.poll(ctx))
 
 
+def _push_pins(ctx: Context) -> None:
+    # In its own thread: a push fetches from GitHub and the agents' checkout.
+    loop.run_once(ctx, "the product pin's push", lambda: pins.push_pending(ctx))
+
+
 def _pull_reports(ctx: Context) -> None:
     # In its own thread: a failure is reported there, once while it lasts, as a pass's is.
     loop.run_once(ctx, "the reports pull", lambda: reports.poll(ctx))
@@ -112,6 +118,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
         ("reports", imports.Background(_pull_reports, imports.in_thread("reports")).run_pass),
         ("branch", imports.Background(_ask_branch, imports.in_thread("branch")).run_pass),
         ("releases", imports.Background(_check_releases, imports.in_thread("releases")).run_pass),
+        ("pins", imports.Background(_push_pins, imports.in_thread("pins")).run_pass),
         ("schedule", schedule.run_pass),
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),
         ("plan", watch.run_pass),

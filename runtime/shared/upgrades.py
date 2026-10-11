@@ -62,3 +62,15 @@ def write_progress(places: Places, frm: str, to: str, state: str, step: str, pro
     at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     record = {"from": frm, "to": to, "state": state, "step": step, "problem": problem, "log": log, "at": at}
     store.write_json(progress_path(places), record, mode=0o644)
+
+
+def pins_path(places: Places) -> Path:
+    return places.upgrade / "pins.json"
+
+
+def read_pins(places: Places) -> list[str]:
+    """The commits an upgrade made to move the product to its factory: the owner's, by asking for the upgrade."""
+    raw = store.read_json_or(pins_path(places), [])
+    if not isinstance(raw, list) or not all(isinstance(c, str) and FULL_SHA.match(c) for c in raw):
+        raise store.StoreError(f"{pins_path(places)}: needs a list of full commits")
+    return raw
