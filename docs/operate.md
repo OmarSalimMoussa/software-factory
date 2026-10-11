@@ -8,21 +8,22 @@ authenticator app set up at install.
 Use the install console, from your checkout of the factory:
 
 ```
-sudo python3 runtime/system/console.py --repo <your checkout of the product>
+sudo python3 runtime/system/console.py --repo <your checkout of the product> [--commit <sha>]
 ```
 
-It opens a page in your browser and prints the page's link too. The link works once, in the browser that opens it.
+It archives one commit, the newest on your checkout's default branch unless you name another with `--commit`, and
+runs from that copy, so every step is that commit's own code. It opens a page in your browser and prints the page's
+link too. The link works once, in the browser that opens it.
 
 - **This laptop** says whether the factory is installed, at which commit and since when, how the last drills did,
   whether the warden, the dashboard, GlitchTip and Langfuse answer, and where the dashboard is on your tailnet.
-- **Install** (or **Reinstall**) offers the newest commit on your checkout's default branch, or one you name. Turn on
-  **Dry run** to see every step on this machine without changing anything. Each step is a row; open it to read what it
-  did. A first install that fails takes back what it made, unless you chose to keep it.
-- **Questions** appear under the step that asks: the 6-digit code's secret, shown once with Copy; the warden's deploy
-  key; the factory's read key, whose private half becomes the product's secret `FACTORY_READ_KEY`; and your GitHub
-  token and the agents' Claude token, typed into password fields. Add it to GitHub does a key's part on GitHub with
-  your signed-in `gh`; without it, the page links to GitHub's own page. Skip the read key when the product already
-  holds `FACTORY_READ_KEY` from an earlier install: that key still works.
+- **Install** (or **Reinstall**) installs that commit. Turn on **Dry run** to see every step on this machine without
+  changing anything. Each step is a row; open it to read what it did. A first install that fails takes back what it
+  made, unless you chose to keep it. A finished install removes the copy the console runs from: start the console
+  again for another action.
+- **Questions** appear under the step that asks: the 6-digit code's secret, shown once with Copy, and your GitHub
+  token and the agents' Claude token, typed into password fields. With your `gh` signed in, the install puts the
+  GitHub keys in place itself; without it, the step's lines show each key to add by hand.
 - **When the drills fail**, Open the drill sessions' output opens the folder with each drill session's whole output.
 - **Uninstall** first shows what it would remove, changing nothing. Remove everything does it.
 

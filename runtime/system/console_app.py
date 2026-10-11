@@ -45,6 +45,10 @@ FILES = {
     "/icons.js": (DASHBOARD_UI / "icons.js", "text/javascript"),
 }
 BUSY = "An action is running. Wait for it to end."
+SPENT = (
+    "The install removed the copy of the commit this console runs from. Close the console, then start it again for "
+    "another action."
+)
 
 
 @dataclass
@@ -85,6 +89,8 @@ class Console:
         self._lock = threading.Lock()
         self._worker: threading.Thread | None = None
         self._looked: Path | None = None  # the product checkout the last look at an uninstall was for
+        # Read once: a finished install removes the archived commit this console runs from, these files with it.
+        self._files = {path: (file.read_bytes(), media) for path, (file, media) in FILES.items()}
 
     def link(self) -> str:
         if self._token is None:
@@ -152,9 +158,9 @@ class Console:
             with self._lock:
                 run = self.run
             return _json(200, {"ok": True, "run": run.view() if run else None, "busy": self._busy()})
-        if path in FILES:
-            file, media = FILES[path]
-            return Reply(200, file.read_bytes(), {"Content-Type": media})
+        if path in self._files:
+            body, media = self._files[path]
+            return Reply(200, body, {"Content-Type": media})
         return refused(404, "There is no such page.", api=path.startswith("/api/"))
 
     def _post(self, path: str, data: dict[str, Any]) -> Reply:
@@ -203,6 +209,13 @@ class Console:
         run = self.run
         return run is not None and not run.finished
 
+    def _refusal(self) -> str | None:
+        """Why no action may start now; None when one may."""
+        if self._busy():
+            return BUSY
+        stage = os.environ.get(install.STAGE)
+        return SPENT if stage is not None and not Path(stage).is_dir() else None
+
     # ---- actions -------------------------------------------------------------------------------------------------
 
     def start_install(self, data: dict[str, Any]) -> Reply:
@@ -223,8 +236,8 @@ class Console:
             return refused(400, " ".join(problems))
         dry, keep = flags["dry"] is True, flags["keep"] is True
         with self._lock:
-            if self._busy():
-                return refused(409, BUSY)
+            if why := self._refusal():
+                return refused(409, why)
             steps = tuple(title for title, _ in install.STEPS)
             run = Run("install", "", dry, steps, self.owner, "Taking back the failed install")
             host = (self.hosts.dry if dry else self.hosts.real)(run)
@@ -244,8 +257,8 @@ class Console:
         if not isinstance(confirm, bool) or not isinstance(repo, str) or (repo and not Path(repo).is_absolute()):
             return refused(400, "Say whether you confirm, and name your product checkout by its full path, or none.")
         with self._lock:
-            if self._busy():
-                return refused(409, BUSY)
+            if why := self._refusal():
+                return refused(409, why)
             last = self.run
             if confirm and not (last and last.kind == "look" and last.ending and last.ending["ok"]):
                 return refused(409, "Look at what Uninstall removes first.")

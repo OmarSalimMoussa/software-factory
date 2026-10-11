@@ -26,9 +26,10 @@
 .cf-l{font-size:12px;font-weight:600;color:var(--muted)}
 .cf-in{height:34px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--fg);padding:0 10px;min-width:0;width:100%}
 .cf-in:focus{border-color:var(--accent);outline:0;box-shadow:0 0 0 3px var(--accent-soft)}
-.cf-choice,.cf-check,.cf-switch{display:flex;align-items:flex-start;gap:10px;min-height:24px;cursor:pointer;position:relative}
-.cf-choice input,.cf-check input{width:18px;height:18px;margin:3px 0 0;accent-color:var(--accent);flex:none;cursor:pointer}
-.cf-choice b{font-weight:600;overflow-wrap:anywhere}
+.cf-commit{overflow-wrap:anywhere}
+.cf-commit .mono{font-weight:650}
+.cf-check,.cf-switch{display:flex;align-items:flex-start;gap:10px;min-height:24px;cursor:pointer;position:relative}
+.cf-check input{width:18px;height:18px;margin:3px 0 0;accent-color:var(--accent);flex:none;cursor:pointer}
 .cf-checks{display:flex;flex-direction:column;gap:12px;padding:12px 18px;border-top:1px solid var(--line)}
 .cf-check b,.cf-switch b{font-weight:600}
 .cf-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-top:1px solid var(--line)}

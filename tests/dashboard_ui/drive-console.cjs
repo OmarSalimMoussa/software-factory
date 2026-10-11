@@ -1,11 +1,12 @@
 'use strict';
 /* The install console: its one-time link admits this browser alone; a dry install draws every step as a row, asks each
-   question in place under its step (the 6-digit code's secret, both deploy keys, the GitHub and Claude tokens), keeps a
-   typed secret off the page, and finishes; at desktop and phone width, in both themes, with 24 px targets. */
+   question in place under its step (the 6-digit code's secret, the GitHub and Claude tokens), shows the keys to add by
+   hand as the installer's own lines, keeps a typed secret off the page, and finishes; at desktop and phone width, in
+   both themes, with 24 px targets. */
 const {drive, consoleServer} = require('./lib.cjs');
 
 const SECRET = 'sk-ant-oat01-typed-in-the-console-5e5e';
-const ASKED = ['authenticator', "warden's deploy key", "factory's read key", 'GitHub token', 'claude setup-token', 'name for this Claude account'];
+const ASKED = ['authenticator', 'GitHub token', 'claude setup-token', 'name for this Claude account'];
 
 async function dryInstall(t, p, tag) {
   if (!(await p.isChecked('#f-dry'))) await p.click('.cf-switch');
@@ -34,13 +35,15 @@ async function dryInstall(t, p, tag) {
   t.check(ASKED.every((want, i) => (asked[i] || '').includes(want)) && asked.length === ASKED.length, `${tag}: asked ${JSON.stringify(asked)}`);
   await p.waitForSelector('.cend', {timeout: 20000});
   t.check((await p.textContent('.cend')).includes('The dry run finished. Nothing changed.'), `${tag}: the run did not finish: ${await p.textContent('.cend')}`);
+  const secrets = await p.$$eval('.crow', els => els.map(e => e.textContent).find(t => t.includes('Keep the secrets')) || '');
+  t.check(secrets.includes('Add this as a deploy key to acme/shop') && secrets.includes('FACTORY_READ_KEY'), `${tag}: the keys to add by hand are not the step's own lines`);
   const states = await p.$$eval('.crow', els => els.map(e => e.dataset.state));
   t.check(states.length > 20 && states.every(s => s === 'done'), `${tag}: the steps are not all done: ${states.join(',')}`);
   t.check(!(await p.evaluate(() => document.body.innerText)).includes(SECRET), `${tag}: the typed secret is on the page`);
 }
 
 async function targets(t, p, tag) {
-  const small = await p.$$eval('button:not([hidden]), input.cf-in, summary, .cf-choice, .cf-check, .cf-switch, a.btn', els => els
+  const small = await p.$$eval('button:not([hidden]), input.cf-in, summary, .cf-check, .cf-switch, a.btn', els => els
     .filter(e => e.offsetParent !== null).filter(e => { const r = e.getBoundingClientRect(); return r.width < 24 || r.height < 24; })
     .map(e => e.outerHTML.slice(0, 60)));
   t.check(small.length === 0, `${tag}: targets under 24 px: ${small.join(' | ')}`);
@@ -57,7 +60,7 @@ drive('console', async t => {
   await p.waitForSelector('#f-go', {timeout: 8000});
   t.check(new URL(p.url()).search === '', 'the one-time token stayed in the address bar');
   t.check((await p.textContent('#status')).includes('Not installed'), 'the status does not say it is not installed');
-  t.check((await p.textContent('.cf-choice')).startsWith("0123456 The drive's newest commit"), 'the newest commit is not offered');
+  t.check((await p.textContent('.cf-commit')).startsWith("0123456 The drive's newest commit"), 'the commit it installs is not shown');
   t.check(await p.inputValue('#f-repo') !== '', 'the product checkout is not filled in');
   await targets(t, p, '1440');
   await dryInstall(t, p, '1440');

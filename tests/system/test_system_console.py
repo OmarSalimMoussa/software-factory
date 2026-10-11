@@ -184,3 +184,16 @@ def test_uninstall_removes_only_after_the_owner_saw_what_it_removes(tmp_path: Pa
     assert look["kind"] == "look" and [row["title"] for row in look["rows"]] == list(uninstall.STEPS)
     assert [a["id"] for a in look["ending"]["actions"]] == ["uninstall", "dismiss"]
     assert _post(console, cookie, "/api/uninstall", {"confirm": True, "repo": ""}).status == 200
+
+
+def test_once_an_install_removed_the_commit_the_console_runs_from_it_starts_nothing_more(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(install.STAGE, str(tmp_path / "stage-the-install-removed"))
+    console = _console(tmp_path)
+    cookie = _admit(console)
+    body = {"commit": "main", "repo": str(console.repo), "healthchecks": False, "keep": False, "dry": True}
+
+    for path, sent in (("/api/install", body), ("/api/uninstall", {"confirm": False, "repo": ""})):
+        reply = _post(console, cookie, path, sent)
+        assert reply.status == 409 and "start it again" in json.loads(reply.body)["reason"]

@@ -143,8 +143,7 @@ def install_form(host: Host, owner: Account, factory: Path, commit: str | None, 
     verb = "Reinstall" if record else "Install"
     return {
         "heading": verb,
-        "commit": {"label": "Factory commit", **commit_choice(host, owner, factory, commit)},
-        "other": {"label": "Another commit", "placeholder": "A sha, or a branch of your factory checkout"},
+        "commit": {"label": "Factory commit", **_offered(host, owner, factory, commit)},
         "repo": {"label": "Product checkout", "value": product,
                  "hint": "Your own checkout of the product the factory works on."},  # fmt: skip
         "healthchecks": {"label": "Create the Healthchecks.io checks",
@@ -155,6 +154,14 @@ def install_form(host: Host, owner: Account, factory: Path, commit: str | None, 
         "button": verb,
         "dry_button": "Dry run",
     }  # fmt: skip
+
+
+def _offered(host: Host, owner: Account, factory: Path, given: str | None) -> dict[str, Any]:
+    """The one commit this console installs: the one it runs from, archived when it started."""
+    choice = commit_choice(host, owner, factory, given)
+    if choice["problem"]:
+        return choice
+    return {**choice, "note": "To install another commit, start the console again with --commit <sha>."}
 
 
 def commit_choice(host: Host, owner: Account, factory: Path, given: str | None) -> dict[str, Any]:
