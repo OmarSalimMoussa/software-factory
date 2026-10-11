@@ -1,7 +1,8 @@
-# The factory's own CI: its tests, lint, format and types, and the dashboard's and the install console's browser
-# drives, on every push. An install takes only a commit on which every job here passed: nothing is tested on the
-# owner's machine. On a push to the default branch, once every check passed, the last job publishes the release file
-# the owner installs from, so a release exists only for a commit that passed.
+# The factory's own CI: its tests, the standard checks it holds every product to (lint, format and types among them),
+# and the dashboard's and the install console's browser drives, on every push. An install takes only a commit on
+# which every job here passed: nothing is tested on the owner's machine. On a push to the default branch, once every
+# check passed, the last job publishes the release file the owner installs from, so a release exists only for a
+# commit that passed.
 name: ci
 
 on:
@@ -20,12 +21,17 @@ jobs:
       - run: uv sync --frozen --extra dev
       - name: pytest
         run: uv run --frozen --extra dev pytest -q
-      - name: ruff
-        run: |
-          uv run --frozen --extra dev ruff check .
-          uv run --frozen --extra dev ruff format --check .
-      - name: mypy
-        run: uv run --frozen --extra dev mypy
+
+  self-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen --extra dev
+      # The standard checks' tools check runs ruff check, ruff format --check and mypy here, at the pinned versions
+      # and with the factory's own settings, so no other job runs them again.
+      - name: The factory meets its own standard checks
+        run: uv run --frozen --extra dev pytest -m self_check
 
   drives:
     runs-on: ubuntu-latest
@@ -49,7 +55,7 @@ jobs:
           node tests/dashboard_ui/run.cjs
 
   release:
-    needs: [test, drives]
+    needs: [test, self-check, drives]
     if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     permissions:

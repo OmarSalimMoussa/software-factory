@@ -59,6 +59,11 @@ def test_each_listed_check_is_in_the_catalog_once_with_its_reason() -> None:
     assert [check_id for check_id, why in {**NOT_APPLICABLE, **NOT_YET}.items() if not why.strip()] == []
 
 
+def test_lint_format_and_types_stay_gated() -> None:
+    # CI runs ruff and mypy only through the tools check, so listing it anywhere but the gated set would stop them.
+    assert "tools" in GATED
+
+
 @pytest.mark.parametrize("check_id", GATED)
 def test_the_factory_passes_each_gated_check(check_id: str) -> None:
     status, output = factory_check(check_id)

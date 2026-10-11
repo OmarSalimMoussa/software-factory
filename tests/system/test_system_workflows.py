@@ -10,7 +10,8 @@ FLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 def test_the_factorys_own_ci_runs_everything_an_install_trusts() -> None:
     text = (FLOWS / "ci.yml").read_text(encoding="utf-8")
 
-    for command in ("pytest", "ruff check", "ruff format --check", "mypy"):
+    # Lint, format and types run inside the self-check, as its tools check (tests/self_check/ keeps it gated).
+    for command in ("pytest -q", "pytest -m self_check"):
         assert f"--extra dev {command}" in text
     assert "node tests/dashboard_ui/run.cjs" in text  # the browser drives, which pytest skips without a browser
 
