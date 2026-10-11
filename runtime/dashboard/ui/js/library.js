@@ -92,8 +92,10 @@ function libKind(key, on) { const d = libData(); const set = new Set(d ? d.kinds
 
 /* ---------- pane sizes: a per-browser convenience, so they live in localStorage ---------- */
 const LIBCOLS = 'ef-lib-cols';
+// telemetry: expected — storage a private window refuses leaves the panes at their own sizes
 function libCols() { try { return JSON.parse(localStorage.getItem(LIBCOLS) || 'null'); } catch (e) { return null; } }
-function saveLibCols(c) { try { c ? localStorage.setItem(LIBCOLS, JSON.stringify(c)) : localStorage.removeItem(LIBCOLS); } catch (e) { /* without storage the sizes last until the page reloads */ } }
+// telemetry: expected — without storage the sizes last until the page reloads
+function saveLibCols(c) { try { c ? localStorage.setItem(LIBCOLS, JSON.stringify(c)) : localStorage.removeItem(LIBCOLS); } catch (e) { } }
 function setLibCols(lib, c) {
   if (!lib) return;
   if (c && c.f) lib.style.setProperty('--lib-f', c.f + 'px'); else lib.style.removeProperty('--lib-f');

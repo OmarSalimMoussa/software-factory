@@ -192,7 +192,8 @@ async function start() {
   if (UI.device || UI.halted) return;
   const want = (location.hash || '').slice(1);
   UI.page = PAGE[want] && (!UI.pages.length || UI.pages.some(p => p[0] === want)) ? want : (UI.pages[0] ? UI.pages[0][0] : 'home');
-  try { history.replaceState({page: UI.page, back: null}, '', '#' + UI.page); } catch (e) { /* history is optional */ }
+  // telemetry: expected — the history API is optional: without it the page works, only its back steps go
+  try { history.replaceState({page: UI.page, back: null}, '', '#' + UI.page); } catch (e) { }
   renderShell(); render();
   await loadPage();
   const ops = openOps();

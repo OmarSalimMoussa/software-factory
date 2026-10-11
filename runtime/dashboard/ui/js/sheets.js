@@ -131,8 +131,10 @@ function askDevice() {
 
 /* ---------- operations: long actions show their steps, and survive a reload ---------- */
 const OPS = 'ef-ops';
+// telemetry: expected — storage a private window refuses holds no operation to follow
 function openOps() { try { return JSON.parse(sessionStorage.getItem(OPS) || '[]'); } catch (e) { return []; } }
-function keepOps(list) { try { sessionStorage.setItem(OPS, JSON.stringify(list)); } catch (e) { /* without storage an operation is followed only until the page reloads */ } }
+// telemetry: expected — without storage an operation is followed only until the page reloads
+function keepOps(list) { try { sessionStorage.setItem(OPS, JSON.stringify(list)); } catch (e) { } }
 const holdOp = (id, title) => keepOps(openOps().filter(o => o.id !== id).concat([{id, title}]));
 const forgetOp = id => keepOps(openOps().filter(o => o.id !== id));
 function drawSteps(op) {

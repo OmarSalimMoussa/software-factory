@@ -25,7 +25,7 @@ def _at(stamp: str) -> str:
     """A transcript's time (ISO, with or without fractions of a second) as the page shows times."""
     try:
         return when(datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp())
-    # telemetry: surfaced — the line draws without its time
+    # telemetry: expected — a transcript time that is not ISO draws as no time; the line itself still draws
     except ValueError:
         return ""
 
@@ -34,7 +34,7 @@ def thread(snap: Snap, row: dict[str, Any]) -> list[dict[str, Any]]:
     """Who said what, in order: each of the owner's messages, then the agent's replies to it."""
     try:
         entries = snap.get("thread")
-    # telemetry: surfaced — the thread draws as one failed row; the rest of the panel still draws
+    # telemetry: surfaced — the thread draws as one `broken` row; the rest of the panel still draws
     except PartError as exc:
         return [broken("thread", str(exc))]
     # The panel's title already names the task; the agent speaks in its thread by its role.

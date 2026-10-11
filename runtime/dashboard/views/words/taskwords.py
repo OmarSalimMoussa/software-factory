@@ -128,7 +128,7 @@ def rung(task: dict[str, Any], settings: Settings) -> int | None:
         return int(task["run"])
     try:
         return route.route(as_task(task), settings)
-    # telemetry: surfaced — the row shows no rung until the orchestrator adds the task's facts
+    # telemetry: expected — a task without its facts has no rung yet; the orchestrator adds them
     except Refused:
         return None
 

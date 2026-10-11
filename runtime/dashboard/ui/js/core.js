@@ -67,6 +67,7 @@ async function request(method, url, body) {
   finally { clearTimeout(timer); }
   if (res.status === 401) throw new NeedsDevice('This device is not signed in.');
   let data = null;
+  // telemetry: surfaced — a body that is not JSON leaves `data` null, and the lines below say what the status means
   try { data = await res.json(); } catch (e) { data = null; }
   if ([502, 503, 504].includes(res.status)) throw new ApiDown(data && data.warden ? data.warden.since : null);
   if (data && data.ok === false && (data.refused || data.reason)) return data;
@@ -253,8 +254,10 @@ function flipFirst() { const f = {}; $$('#page [data-flip]').forEach(el => f[el.
 function flipPlay(first) { $$('#page [data-flip]').forEach(el => { const f = first[el.dataset.flip]; if (f == null) return; const d = f - el.getBoundingClientRect().top; if (!d) return; el.animate([{transform: `translateY(${d}px)`}, {transform: 'none'}], {duration: 380, easing: 'cubic-bezier(.2,.8,.2,1)'}); }); }
 
 /* ---------- theme ---------- */
+// telemetry: expected — storage a private window refuses leaves the theme at the system's
 function theme() { try { return localStorage.getItem('ef-theme') || 'system'; } catch (e) { return 'system'; } }
-function setTheme(t) { try { localStorage.setItem('ef-theme', t); } catch (e) { /* a private window keeps the theme for this page only */ } applyTheme(); renderShell(); }
+// telemetry: expected — a private window keeps the theme for this page only
+function setTheme(t) { try { localStorage.setItem('ef-theme', t); } catch (e) { } applyTheme(); renderShell(); }
 function applyTheme() { const t = theme(); if (t === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t); }
 applyTheme();
 
@@ -295,6 +298,7 @@ function go(page, opts = {}) {
   if (!PAGE[page]) return;
   closePops();
   const from = viewOf();
+  // telemetry: expected — without the history API the page keeps no back steps, and `UI.hist` says so
   try { history.replaceState(from, '', '#' + UI.page); history.pushState({page, back: opts.back ? from : null}, '', '#' + page); UI.hist = true; } catch (e) { UI.hist = false; }
   UI.back = opts.back ? from : null;
   UI.page = page; renderShell(); render(); $('#main').scrollTop = 0; $('#page').focus({preventScroll: true});

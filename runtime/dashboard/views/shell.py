@@ -56,7 +56,7 @@ def github_url(snap: Snap) -> str:
 def _count(snap: Snap, read: Any) -> int | None:
     try:
         return int(read())
-    # telemetry: surfaced — the count is left off the sidebar; the page itself draws the failure
+    # telemetry: surfaced — `_count` leaves the count off the sidebar; the page itself draws the failure
     except PartError:
         return None
 

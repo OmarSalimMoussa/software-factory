@@ -62,7 +62,7 @@ prefix = "runtime/dashboard/ui/"
 name = "dashboard page"
 sink = "surface"
 grounds = "browser code: an error shows on the page, where the owner sees it"
-reporters = []
+reporters = ["loadFailed", "alertToast", "toast", "say", "wardenDown", "askDevice"]
 seams = []
 log_modules = []
 

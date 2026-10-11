@@ -44,7 +44,7 @@ def fetch(warden: Warden, path: str) -> Image | None:
         return _missing("The warden sent something that is not an image.")
     try:
         body = base64.b64decode(str(answer.get("bytes_b64", "")), validate=True)
-    # telemetry: surfaced — the page draws "The picture could not be shown."
+    # telemetry: surfaced — the page draws what `_missing` says: the picture could not be read
     except binascii.Error:
         return _missing("The picture could not be read.")
     return Image(200, str(media), body)

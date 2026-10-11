@@ -80,7 +80,7 @@ def token_of(headers: Mapping[str, str]) -> str | None:
     jar: SimpleCookie = SimpleCookie()
     try:
         jar.load(headers.get("cookie", ""))
-    # telemetry: surfaced — a cookie the browser mangled is no device token: the page asks for the code again
+    # telemetry: expected — a cookie the browser mangled is no device token: the page asks for the code again
     except CookieError:
         return None
     morsel = jar.get(COOKIE)

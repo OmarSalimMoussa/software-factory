@@ -111,6 +111,7 @@ class App:
             if page is None:
                 return _json(404, {"ok": False, "error": "There is no such page."})
             return self._page(target, *page)
+        # telemetry: surfaced — the browser is answered with `_json` saying why access was refused
         except auth.Denied as exc:
             return _json(exc.status, {"ok": False, "refused": "access", "reason": str(exc)})
         except WardenDown:
@@ -161,13 +162,14 @@ class App:
         try:
             snap = self._snapshot(page.wants(query))
             builders = page.parts(snap, query)
+        # telemetry: surfaced — the browser is answered with `_json` saying what the page could not read
         except PartError as exc:
             return _json(400, {"ok": False, "error": str(exc)})
         built: dict[str, Any] = {}
         for name, build in builders.items():
             try:
                 built[name] = {"ok": True, "as_of": _iso(snap.now), "data": build()}
-            # telemetry: surfaced — the part draws its sentence in its own place; the rest of the page still draws
+            # telemetry: surfaced — the part is `built` with its sentence, drawn in its place; the rest still draws
             except PartError as exc:
                 built[name] = {"ok": False, "error": str(exc)}
             except Exception as exc:
@@ -217,6 +219,7 @@ class App:
             if found is None:
                 return _json(404, {"ok": False, "error": "There is no such action."})
             return self._write(*found, body, key)
+        # telemetry: surfaced — the browser is answered with `_json` saying why access was refused
         except auth.Denied as exc:
             return _json(exc.status, {"ok": False, "refused": "access", "reason": str(exc)})
         except WardenDown:
@@ -231,8 +234,10 @@ class App:
                     write.check(body, ref, snap)
             args = write.args(body, ref, snap)
             data = write.data(body) if write.data is not None else None
+        # telemetry: surfaced — the browser is answered with `_json`: the owner saw an older state
         except writes.Stale as exc:
             return _json(409, {"ok": False, "refused": "stale", "reason": str(exc)})
+        # telemetry: surfaced — the browser is answered with `_json` saying what is wrong with the input
         except PartError as exc:
             return _json(400, {"ok": False, "refused": "input", "reason": str(exc)})
         answer = self.warden.call(write.verb, {**args, "idempotency_key": key}, data)
