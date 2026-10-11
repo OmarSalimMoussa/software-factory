@@ -113,6 +113,11 @@ class Places:
         return self.state / "public" / "firewall-loaded"
 
     @property
+    def public_turn(self) -> Path:
+        """The branch holding the merge turn, for the merge hook, which runs as the agent and reads public/."""
+        return self.state / "public" / "turn.json"
+
+    @property
     def check_passes(self) -> Path:
         """Every tree a whole `factory check` passed, in the warden's state."""
         return self.state / "check-passes.json"

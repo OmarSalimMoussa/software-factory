@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.queue import cards, documents, intake, owner, tasks, triage
+from runtime.queue import cards, documents, intake, owner, tasks, triage, turn
 from runtime.queue import propose as proposing
 from runtime.queue import route as ladders
 from runtime.queue.book import Queue
@@ -113,15 +113,12 @@ def needs_owner(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
     return ok(card=card.id, kind=card.kind)
 
 
-def merge_recorded(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
-    task = tasks.merge_recorded(ctx, _text(args, "branch"), _text(args, "sha"))
-    return ok(task=task.id, status=task.status)
-
-
 def check_save(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
+    """A check of the default branch; the task its merge landed is checked when nothing failed."""
     record = documents.save_check(ctx, _text(args, "commit"), data)
     failed = [r.scenario for r in record.rows if r.result != "pass"]
-    return ok(check=record.id, scenarios=len(record.rows), not_passed=failed)
+    checked = turn.check_saved(ctx, record.commit, not failed)
+    return ok(check=record.id, scenarios=len(record.rows), not_passed=failed, checked=checked or None)
 
 
 # The owner's decisions, from the dashboard over owner.sock.

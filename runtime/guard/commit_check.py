@@ -82,6 +82,22 @@ def passed(places: Places, tree: str) -> bool:
     return isinstance(trees, list) and tree in trees
 
 
+def turn_refusal(places: Places, merging: str) -> str:
+    """Why a merge of ``merging`` into the default branch may not land: only the branch holding the merge turn, as
+    the warden published it, merges; "" when it holds it."""
+    path = places.public_turn
+    try:
+        branch = json.loads(path.read_text(encoding="utf-8"))["branch"]
+    except FileNotFoundError:
+        return "commit-check: no task holds the merge turn; give one with `factory turn next`, then merge it"
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise HookError(f"the merge turn cannot be read ({type(exc).__name__})") from exc
+    head = _optional_git("rev-parse", "--verify", "-q", f"refs/heads/{branch}")
+    if not head or head != merging:
+        return f"commit-check: only {branch}, which holds the merge turn, merges now; this is another branch's head"
+    return ""
+
+
 def _git(*args: str) -> str:
     done = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
     if done.returncode != 0:
@@ -129,6 +145,11 @@ def main(argv: list[str]) -> int:
             return 1
         if hook == "pre-push" or branch != default or not merging:
             return 0
+        if in_slice:
+            turn = turn_refusal(Places.system(), _git("rev-parse", "MERGE_HEAD").strip())
+            if turn:
+                print(turn, file=sys.stderr)
+                return 1
         tree = _git("write-tree").strip()
         if not passed(Places.system(), tree):
             print(

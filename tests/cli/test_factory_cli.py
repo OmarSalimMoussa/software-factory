@@ -77,7 +77,7 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["spec", "save", "t-0001", FILE],
         ["card", "comments", "t-0001", "3"],
         ["needs-owner", "t-0001", "--picture", FILE, "--question", "Why?"],
-        ["merge", "recorded", "impl-t-0001", "abc1234"],
+        ["turn", "next"],
         ["slot", "claim"],
         ["slot", "up", "web"],
         ["slot", "free", "2"],

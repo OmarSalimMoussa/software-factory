@@ -107,10 +107,7 @@ def _parser() -> argparse.ArgumentParser:
     needs.add_argument("--brief", default="")
     needs.add_argument("--ask", default="")
     needs.add_argument("--question", default="")
-    merge = sub.add_parser("merge")
-    merge.add_argument("what", choices=["recorded"])
-    merge.add_argument("branch")
-    merge.add_argument("sha")
+    sub.add_parser("turn", help="give the merge turn to the next qa-clean task").add_argument("what", choices=["next"])
     _slot(sub)
     qa = sub.add_parser("qa")
     qa.add_argument("what", choices=["plan", "result"])
@@ -268,8 +265,8 @@ def _call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
     if cmd == "needs-owner":
         args = {k: getattr(ns, k) for k in ("task", "brief", "ask", "question") if getattr(ns, k)}
         return Call("needs-owner", args, read_file(ns.picture))
-    if cmd == "merge":
-        return Call("merge.recorded", {"branch": ns.branch, "sha": ns.sha})
+    if cmd == "turn":
+        return Call("turn.next", {})
     if cmd == "slot":
         return _slot_call(ns)
     if cmd == "qa":

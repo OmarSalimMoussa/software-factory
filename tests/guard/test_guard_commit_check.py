@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from runtime.guard.commit_check import HookError, is_factory_repo, passed, refusal
+from runtime.guard.commit_check import HookError, is_factory_repo, passed, refusal, turn_refusal
 from runtime.guard.writes import ALWAYS_PROTECTED
 from runtime.shared import store
 from runtime.shared.paths import INSTALL, Places
@@ -88,3 +88,20 @@ def test_every_hook_runs_the_installed_check(hook: str) -> None:
     script = HOOKS / hook
     assert script.resolve() == HOOKS / "pre-commit" and script.stat().st_mode & 0o111
     assert subprocess.run(["bash", "-n", str(script)], check=False).returncode == 0
+
+
+def test_only_the_branch_holding_the_merge_turn_merges(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    subprocess.run(["git", "init", "-q", "-b", "master", str(tmp_path / "repo")], check=True)
+    monkeypatch.chdir(tmp_path / "repo")
+    for branch in ("impl-a", "impl-b"):
+        who = ["-c", "user.name=t", "-c", "user.email=t@t"]
+        subprocess.run(["git", *who, "commit", "-q", "--allow-empty", "-m", branch], check=True)
+        subprocess.run(["git", "branch", branch], check=True)
+    heads = {b: subprocess.run(["git", "rev-parse", b], capture_output=True, text=True, check=True).stdout.strip()
+             for b in ("impl-a", "impl-b")}  # fmt: skip
+    places = Places.under(tmp_path)
+
+    assert "no task holds the merge turn" in turn_refusal(places, heads["impl-a"])
+    store.write_json(places.public_turn, {"task": "t-0001", "branch": "impl-a"})
+    assert turn_refusal(places, heads["impl-a"]) == ""
+    assert "only impl-a" in turn_refusal(places, heads["impl-b"])

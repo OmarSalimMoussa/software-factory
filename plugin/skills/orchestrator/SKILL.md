@@ -104,12 +104,12 @@ live and nothing merged for a while, a regression walk of the scenarios that wai
 
 ## Merge turn, merge, check, ship
 
-1. **Turn.** One branch at a time. When a task is `qa-clean`, pick by `after`, then the one order:
-   `factory queue task status <task> turn`, and tell its implementer it has the turn. Hold the default branch still
-   until it merges.
+1. **Turn.** One branch at a time. When a task is `qa-clean` and no task holds the turn, `factory turn next` gives
+   it to the next one by `after`, then the one order, and the warden tells its implementer. Hold the default branch
+   still until it merges.
 2. **Merge.** When it asks, with its tree's pass: `git merge-base --is-ancestor <default branch> <branch>` must
-   hold, then `git merge --no-ff <branch> -m "Merge <branch>: <the outcome in one line>"`. The merge hook finds the
-   pass for that tree. Then record the merge in a call of its own: `factory merge recorded <branch> <merge sha>`.
+   hold, then `git merge --no-ff <branch> -m "Merge <branch>: <the outcome in one line>"`. The merge hook lets only
+   the branch holding the turn land, with the pass for its tree. The warden finds the merge and records it.
 3. **Check.** Rebuild slot 0 with what the merge touched (`factory slot up [service…]`). Pick the scenarios whose
    `protects` names a path the merge changed (`git diff --name-only <merge>^1 <merge>`), the one that waited
    longest, and the merged spec's own checks. Load the seeds they need (`factory slot seed load <name>`). Start the
@@ -117,10 +117,10 @@ live and nothing merged for a while, a regression walk of the scenarios that wai
    each tester's report to a file and run `factory queue check <merge sha> --body <that file>`.
 4. **A failure** reverts the merge only when that merge is the one change to the scenario's code since its last
    pass: `git revert -m 1 <merge> --no-edit`, the task back to `building`, its implementer told. Any other failure
-   becomes a request. Green: `factory queue task status <task> checked`, and tell the implementer.
-5. **Ship.** `factory push` has the warden push the checked commit; CI deploys staging. Staging regressing after
-   your push: revert, `factory check`, push again at once (`procedures/ops/revert.md`). Prod moves only when the
-   owner pushes it.
+   becomes a request. A saved check with no failure moves the task to `checked` by itself.
+5. **Ship.** `factory push` has the warden push the newest commit that is safe to ship: its tree passed, and every
+   merge it adds passed its check (or was reverted). CI deploys staging. Staging regressing after your push: revert,
+   `factory check`, push again at once (`procedures/ops/revert.md`). Prod moves only when the owner pushes it.
 
 ## When something is red
 

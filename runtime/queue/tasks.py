@@ -66,7 +66,11 @@ def transition(
     **fields: Any,
 ) -> Task:
     """Write the task with its new status and ``fields``; the caller holds ctx.lock and the queue lock."""
+    from runtime.queue import turn  # the turn moves tasks through this module
+
     moved = dataclasses.replace(statuses.move(task, to, event, by), **fields)
+    if to == "turn" and turn.holder(ctx.places) is not None:
+        raise Refused("one-turn", "another task holds the merge turn; the next one goes when it merges")
     queue.write({task_rel(moved.id): formats.dump_task(moved)}, pictures)
     extra = {"from": task.status, "to": to, **({"commit": commit} if commit else {})}
     queue.log(moved.id, ctx.clock.iso(), by, event, text, **extra)
@@ -77,10 +81,15 @@ def transition(
 def follow(ctx: Context, before: Task, after: Task) -> None:
     """Keep the proposal places, the approved order, the approval and the implementer's merge turn in step with a
     task's new status."""
+    from runtime.queue import turn  # the turn moves tasks through this module
+
     if (before.status == "turn") != (after.status == "turn"):
         _hold_turn(ctx, after.id, after.status == "turn")
     if after.status == "turn" and before.status != "turn":
         checks.new_turn(ctx, after.id)
+        turn.held(ctx, after)
+    if before.status == "turn" and after.status != "turn":
+        turn.released(ctx, after.id)
     found = proposals.read(ctx.places)
     if after.status != "proposed" and proposals.remove(found, after.id) and before.status == "proposed":
         ctx.post_event(SLOT_FREE, {"task": after.id})
@@ -270,17 +279,6 @@ def next_up(ctx: Context) -> dict[str, Any]:
         for t in ordered(ready, order)
     ]
     return {"next": rows, "skipped": skipped, "unreadable": [dataclasses.asdict(b) for b in broken]}
-
-
-def merge_recorded(ctx: Context, branch: str, sha: str) -> Task:
-    if not branch or not formats.SHA.match(sha):
-        raise Refused("merge", "merge recorded needs the branch and the merge commit")
-    queue = Queue.of(ctx)
-    with ctx.lock, queue.lock():
-        found = [t for t in queue.tasks()[0] if t.branch == branch and t.status == "turn"]
-        if len(found) != 1:
-            raise Refused("merge", f"no task in its merge turn has the branch {branch}")
-        return transition(ctx, queue, found[0], "merged", "merged", actor(ctx), f"merged as {sha}", commit=sha)
 
 
 def merge_commit(queue: Queue, task_id: str) -> str:

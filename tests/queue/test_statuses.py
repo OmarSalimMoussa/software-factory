@@ -7,7 +7,7 @@ import dataclasses
 import pytest
 from queue_kit import World
 
-from runtime.queue import statuses, tasks
+from runtime.queue import statuses, tasks, turn
 from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
 from runtime.shared.models import Task
 from runtime.shared.protocol import Refused
@@ -52,7 +52,7 @@ def test_the_orchestrator_names_the_event_only_when_the_table_holds_several(worl
 def test_deploys_move_checked_work_to_staging_then_prod(world: World) -> None:
     task = world.task(branch="impl-t-0001")
     world.queue().write_task(dataclasses.replace(task, status="turn", run=1))
-    tasks.merge_recorded(world.ctx(), "impl-t-0001", "abc1234")
+    tasks.move(world.ctx(), task.id, "merged", "merged", "warden", "merged as abc1234", commit="abc1234")
     tasks.set_status(world.ctx(), task.id, "checked", "", "")
     included = {"5ta9e01", "9r0d001"}
     world.launcher.git = lambda argv: (0 if argv[-2:] == ["abc1234", argv[-1]] and argv[-1] in included else 1, "")
@@ -60,3 +60,22 @@ def test_deploys_move_checked_work_to_staging_then_prod(world: World) -> None:
     assert tasks.advance_deployed(world.ctx(), "5ta9e01", None) == [f"{task.id} on-staging"]
     assert tasks.advance_deployed(world.ctx(), "5ta9e01", "9r0d001") == [f"{task.id} promoted"]
     assert world.queue().task(task.id).status == "promoted"
+
+
+def test_one_task_holds_the_merge_turn_and_turn_next_picks_by_after_then_the_order(world: World) -> None:
+    first, second, blocked = world.task(branch="impl-a"), world.task(branch="impl-b"), world.task(branch="impl-c")
+    unlanded = world.task()
+    for task, after in ((first, []), (second, []), (blocked, [unlanded.id])):
+        world.queue().write_task(dataclasses.replace(task, status="qa-clean", run=1, after=after))
+    world.launcher.git = lambda argv: (0, "c0ffee" * 6 + "abcd\n")
+
+    assert turn.next_turn(world.ctx(), {}, None)["task"] == first.id
+    assert turn.holder(world.places) == {"task": first.id, "branch": "impl-a", "base": "c0ffee" * 6 + "abcd"}
+    with pytest.raises(Refused, match="holds the merge turn"):
+        turn.next_turn(world.ctx(), {}, None)
+    with pytest.raises(Refused, match="another task holds the merge turn"):
+        tasks.set_status(world.ctx(), second.id, "turn", "", "")
+
+    tasks.move(world.ctx(), first.id, "merged", "merged", "warden", "merged")
+    assert turn.holder(world.places) is None
+    assert turn.next_turn(world.ctx(), {}, None)["task"] == second.id  # the blocked one waits for its after task

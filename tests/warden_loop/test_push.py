@@ -8,8 +8,9 @@ from pathlib import Path
 import pytest
 from loop_fakes import World
 
+from runtime.queue import formats, turn
 from runtime.shared import models, store
-from runtime.shared.models import Probe
+from runtime.shared.models import Probe, Task
 from runtime.shared.protocol import Refused
 from runtime.warden import deploys, github_push, inbox, ops, probes
 
@@ -197,3 +198,51 @@ def test_push_back_goes_only_to_the_build_before_prods_current_one_in_the_deploy
         github_push.push_back(world.ctx, {"expected_sha": STAGING}, None)
     assert refused.value.rule == "stale"
     assert world.github.dispatched == []
+
+
+def _merge(world: World, name: str) -> str:
+    """A branch with one change, merged into master with --no-ff; the merge commit."""
+    git(world.checkout, "checkout", "-q", "-b", name)
+    commit(world.checkout, write(f"src/{name}.py"))
+    git(world.checkout, "checkout", "-q", "master")
+    git(world.checkout, "merge", "-q", "--no-ff", name, "-m", f"Merge {name}")
+    return git(world.checkout, "rev-parse", "HEAD")
+
+
+def _task(world: World, task_id: str, status: str, merge: str) -> None:
+    queue = world.checkout / "queue" / "tasks"
+    for folder in (queue.parent, queue):
+        folder.mkdir(exist_ok=True)
+        folder.chmod(0o755)
+    task = Task(id=task_id, title="A change", requests=["r-2026-10-09-0001"], goal_item="G1", severity="major",
+                surfaces=["api"], status=status, created="2026-10-09T00:00:00Z", body="Change it.", run=1,
+                slices=1)  # fmt: skip
+    (queue / f"{task_id}.md").write_text(formats.dump_task(task))
+    known = turn.merges(world.ctx.places)
+    store.write_json(turn.merges_path(world.ctx.places), {**known, merge: task_id})
+
+
+@pytest.mark.parametrize(("status", "ships"), [("merged", False), ("checked", True)])
+def test_push_never_ships_a_merge_whose_check_of_the_default_branch_has_not_passed(
+    world: World, github_repo: Path, status: str, ships: bool
+) -> None:
+    merge = _merge(world, "impl-t-0001")
+    _task(world, "t-0001", status, merge)
+    passed(world, git(world.checkout, "rev-parse", f"{merge}^{{tree}}"))
+
+    if ships:
+        assert github_push.push_checked(world.ctx, {}, None)["sha"] == merge  # the newest shippable commit
+    else:
+        with pytest.raises(Refused, match="t-0001, merged") as refused:
+            github_push.push_checked(world.ctx, {}, None)
+        assert refused.value.rule == "unchecked"
+
+
+def test_a_merge_reverted_in_the_range_ships_nothing_of_its_own(world: World, github_repo: Path) -> None:
+    merge = _merge(world, "impl-t-0001")
+    _task(world, "t-0001", "building", merge)
+    git(world.checkout, "revert", "-m", "1", "--no-edit", merge)
+    head = git(world.checkout, "rev-parse", "HEAD")
+    passed(world, git(world.checkout, "rev-parse", f"{head}^{{tree}}"))
+
+    assert github_push.push_checked(world.ctx, {}, None)["sha"] == head

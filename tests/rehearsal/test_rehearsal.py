@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from rehearsal_kit import Rehearsal, build, git
 
+from runtime.queue import turn
 from runtime.queue.book import Queue
 from runtime.queue.format_check import check_queue
 from runtime.shared.models import FINISHED, RETIRED, WORKING
@@ -109,22 +110,24 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
         r.hook(impl, "subagent.end", {"agent_id": agent})
     r.session(impl, ["qa-clean"])
 
-    # The orchestrator gives the merge turn; the implementer rebases and its check passes for its tree.
-    r.session(orch, ["queue", "task", "status", TASK, "turn"])
+    # The orchestrator gives the merge turn, and the warden tells the implementer; it rebases and its check passes.
+    assert r.session(orch, ["turn", "next"])["task"] == TASK
     assert registry.read(r.places)[impl].merge_turn
+    assert [m["session"] for m in r.systemd.messages] == [impl]
     git(worktree, "rebase", "-q", "master")
     assert r.session(impl, ["check"])["passed"]
 
-    # The orchestrator merges, records the merge, saves the check of master, and ships it.
+    # The orchestrator merges; the warden finds the merge. The passing check of master marks the task checked, and
+    # the push ships the newest checked commit.
     git(r.repo, "merge", "-q", "--no-ff", branch, "-m", f"Merge {branch}: new notes show first")
     merge = git(r.repo, "rev-parse", "HEAD")
     assert checks.passed(r.places, git(r.repo, "rev-parse", "HEAD^{tree}"))
-    r.session(orch, ["merge", "recorded", branch, merge])
+    turn.find_merge(r.warden())
     assert not registry.read(r.places)[impl].merge_turn
     report = r.body(r.repo, "check.md", REPORT.encode())
-    assert r.session(orch, ["queue", "check", merge, "--body", report])["not_passed"] == []
-    r.session(orch, ["queue", "task", "status", TASK, "checked"])
-    assert r.session(orch, ["push", merge])["commits"] == 2
+    assert r.session(orch, ["queue", "check", merge, "--body", report])["checked"] == TASK
+    pushed = r.session(orch, ["push"])
+    assert (pushed["sha"], pushed["commits"]) == (merge, 2)
 
     # The warden's tick sees staging answer on the pushed commit, and logs it; prod still runs the first build.
     proc, power = kernel(tmp_path)

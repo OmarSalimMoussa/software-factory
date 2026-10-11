@@ -22,6 +22,8 @@ from pathlib import Path
 from typing import Any
 
 from runtime.guard.writes import UnknownProtectedPaths, is_protected, protected_paths
+from runtime.queue.book import Queue
+from runtime.queue.turn import merges
 from runtime.shared import store
 from runtime.shared.models import Probe
 from runtime.shared.paths import PROMOTE_JOB, Places
@@ -32,6 +34,10 @@ from runtime.warden.context import Context
 from runtime.warden.github import GitHubError
 
 _FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
+# What `git revert` writes into the message of the commit that takes a merge back.
+_REVERTS = re.compile(r"This reverts commit ([0-9a-f]{40})")
+# A task whose merge passed its check of the default branch.
+SHIPPABLE = frozenset({"checked", "on-staging", "promoted", "closed"})
 _SHA = re.compile(r"^[0-9a-f]{7,40}$")
 # One push at a time, of either kind: the check that none runs and the start happen together.
 _pushing = threading.Lock()
@@ -63,10 +69,12 @@ def protected_prefixes(settings: Settings) -> tuple[str, ...]:
 
 
 def push_checked(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Push the checked commit ``sha`` from the agent's checkout to the default branch on GitHub."""
+    """Push the default branch's newest shippable commit, or the one ``sha`` names, from the agent's checkout to
+    GitHub. Shippable: its tree passed factory check, and every merge it adds to GitHub's branch is one whose check
+    passed (its task checked or further), or was reverted within the range."""
     sha = args.get("sha")
-    if not isinstance(sha, str) or not _FULL_SHA.match(sha):
-        raise Refused("push", "name the checked commit by its full 40-character sha")
+    if sha is not None and (not isinstance(sha, str) or not _FULL_SHA.match(sha)):
+        raise Refused("push", "name the commit by its full 40-character sha, or name none to push the newest")
     settings = ctx.settings()
     checkout, branch = settings.get_str("repo.path"), settings.get_str("repo.default_branch")
     url = f"git@github.com:{settings.get_str('repo.github')}.git"
@@ -82,14 +90,20 @@ def push_checked(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
         trust = shlex.quote(f"safe.directory={Path(checkout) / '.git'}")
         upload_pack = f"git -c {trust} -c uploadpack.allowAnySHA1InWant=true upload-pack"
         git.run("fetch", "--no-tags", "--quiet", "--upload-pack", upload_pack, checkout,
-                f"+refs/heads/{branch}:refs/checkout/{branch}", sha)  # fmt: skip
+                f"+refs/heads/{branch}:refs/checkout/{branch}", *([sha] if sha else []))  # fmt: skip
+        remote = git.run("rev-parse", f"refs/github/{branch}").strip()
+        if sha is None:
+            sha = _newest_shippable(ctx, git, remote, f"refs/checkout/{branch}")
         if not git.is_ancestor(sha, f"refs/checkout/{branch}"):
             raise Refused("push", f"{sha[:12]} is not on {branch} in the checkout: merge it, check it, then push")
-        remote = git.run("rev-parse", f"refs/github/{branch}").strip()
         if remote == sha:
             return ok(sha=sha, commits=0, message=f"GitHub's {branch} already is {sha[:12]}")
         if not git.is_ancestor(remote, sha):
             raise Refused("push", f"{branch} on GitHub has commits {sha[:12]} lacks: merge them, check, then push")
+        unchecked = _unchecked_merges(ctx, git, remote, sha)
+        if unchecked:
+            raise Refused("unchecked", f"{sha[:12]} would ship {', '.join(unchecked)}, whose check of the default "
+                                       "branch has not passed: check it first, or revert it")  # fmt: skip
         bad = sorted({p for p in git.touched(remote, sha) if is_protected(p, prefixes)})
         if bad:
             raise Refused("protected-path", f"the range touches {', '.join(bad[:5])}, which only the owner changes: "
@@ -101,6 +115,41 @@ def push_checked(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
         count = int(git.run("rev-list", "--count", f"{remote}..{sha}"))
         git.run("push", "--quiet", url, f"{sha}:refs/heads/{branch}")
     return ok(sha=sha, commits=count, message=f"Pushed {count} commits; CI takes {sha[:12]} to staging")
+
+
+def _unchecked_merges(ctx: Context, git: _Git, remote: str, head: str) -> list[str]:
+    """The merges on the default branch between GitHub's branch and ``head`` that are not cleared to ship: one the
+    warden never saw land for a task, or whose task's check has not passed. A merge reverted within the range ships
+    nothing of its own."""
+    reverted = set(_REVERTS.findall(git.run("log", "--format=%B", f"{remote}..{head}")))
+    found = merges(ctx.places)
+    out = []
+    for merge in git.run("rev-list", "--first-parent", "--merges", f"{remote}..{head}").split():
+        if merge in reverted:
+            continue
+        task = found.get(merge)
+        status = Queue.of(ctx).task(task).status if task else ""
+        if status not in SHIPPABLE:
+            out.append(f"merge {merge[:12]}" + (f" ({task}, {status})" if task else " (no task's merge)"))
+    return out
+
+
+def _newest_shippable(ctx: Context, git: _Git, remote: str, tip: str) -> str:
+    """The newest first-parent commit after GitHub's branch whose tree passed and whose range ships only checked
+    merges; refused, with why the tip is not shippable, when there is none."""
+    candidates = git.run("rev-list", "--first-parent", f"{remote}..{tip}").split()
+    for commit in candidates:
+        if checks.passed(ctx.places, git.run("rev-parse", f"{commit}^{{tree}}").strip()) and not _unchecked_merges(
+            ctx, git, remote, commit
+        ):
+            return commit
+    if not candidates:
+        return remote
+    tree = git.run("rev-parse", f"{candidates[0]}^{{tree}}").strip()
+    why = ", ".join(_unchecked_merges(ctx, git, remote, candidates[0])) or (
+        "its tree never passed factory check" if not checks.passed(ctx.places, tree) else "nothing"
+    )
+    raise Refused("unchecked", f"nothing new is ready to ship: the default branch's tip waits on {why}")
 
 
 class _Git:

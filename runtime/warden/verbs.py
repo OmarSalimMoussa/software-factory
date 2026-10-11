@@ -76,7 +76,7 @@ VERBS: dict[str, Verb] = {
     "spec.save": _v("runtime.queue.verbs:spec_save", DESIGN),
     "card.comments": _v("runtime.queue.verbs:card_comments", DESIGN),
     "needs-owner": _v("runtime.queue.verbs:needs_owner", ORCH, DESIGN),
-    "merge.recorded": _v("runtime.queue.verbs:merge_recorded", ORCH),
+    "turn.next": _v("runtime.queue.turn:next_turn", ORCH),
     "queue.check": _v("runtime.queue.verbs:check_save", ORCH),  # contract: a saved check of the default branch
     # slots and QA (1C)
     "slot": _v("runtime.slots.verbs:slot", ORCH, IMPL, kinds=TESTERS),

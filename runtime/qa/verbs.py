@@ -78,7 +78,7 @@ def qa_plan(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str,
 
 def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """Every slice is built and the slot runs the head: testers may start on it. The task records the worktree's
-    branch here, which is how `factory merge recorded` later finds it."""
+    branch here: its merge turn names it, and the warden finds its merge by it."""
     session = _implementer(ctx)
     asked, slices = args.get("head"), args.get("slices")
     if not isinstance(asked, str) or not SHA.match(asked) or not isinstance(slices, list) or not slices:

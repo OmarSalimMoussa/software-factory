@@ -19,7 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import files, format_check, formats, goal, reports, tasks
+from runtime.queue import files, format_check, formats, goal, reports, tasks, turn
 from runtime.queue.book import Queue
 from runtime.shared import models, store
 from runtime.shared.models import Probe
@@ -85,6 +85,7 @@ def run_tick(
         ("probes", lambda: _probes(ctx, fetch, now)),
         ("loop due", lambda: _loop_due(ctx, _memo(ctx.places), now)),
         ("outage fix", lambda: _fix(ctx)),
+        ("merge turn", lambda: turn.find_merge(ctx)),
         ("triage due", lambda: _triage_due(ctx, _memo(ctx.places), now)),
         ("queue format", lambda: format_check.sweep(ctx)),
         ("goal", lambda: _goal(ctx, _memo(ctx.places))),
