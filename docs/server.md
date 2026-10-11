@@ -10,7 +10,8 @@ python3 -m standard.server.setup --product <product checkout>             # do i
 ```
 
 Options: `--fresh` also sets up the machine itself (a new server only). `--ci-key <file.pub>` uses your own key for
-CI instead of a pair the set-up makes. `--lockdown` only locks SSH down, as its own step.
+CI instead of a pair the set-up makes. `--healthchecks-ping <url>` gives prod's heartbeat its Healthchecks.io ping
+address. `--lockdown` only locks SSH down, as its own step.
 
 ## Before you start
 
@@ -68,6 +69,11 @@ If one fails, the set-up stops before it changes anything and says what to do.
 - **The shared services.** Their compose file, the edge's settings and their own `services.env`, in
   `/srv/factory/services/`. The set-up brings them up and waits until every one is healthy. Then it creates
   GlitchTip's organization, your GlitchTip user, a read-only token and a project for the factory's own errors.
+- **Prod's heartbeat.** Every five minutes, as the admin user, the server asks prod's public health address and
+  checks it answers as `prod`. Then it checks in with Healthchecks.io, or tells it at once that prod failed. When
+  the check-ins stop, Healthchecks.io tells you, even when the server is down. Give the check's ping address once,
+  with `--healthchecks-ping <url>`; it is kept in `/etc/software-factory/heartbeat-ping`. Running on the server, the
+  heartbeat uses none of GitHub's Actions minutes.
 - **The weekly clean-up.** Every Sunday at 04:17, as the admin user. It drops build cache older than a week and
   images no tag names, and logs one line to `/srv/factory/state/gc.log`. It never removes volumes or tagged images:
   volumes hold the databases and certificates, and tagged images are what a deploy or a rollback runs.

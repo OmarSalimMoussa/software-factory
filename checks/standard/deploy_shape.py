@@ -1,6 +1,6 @@
 """Deploy shape: the product can be built, smoke-tested and deployed the standard way.
 
-factory.toml loads and names a ghcr.io registry; the three workflows are the factory's templates, byte for byte (read
+factory.toml loads and names a ghcr.io registry; the two workflows are the factory's templates, byte for byte (read
 from the factory this check runs in, so a product is held to that commit's copy); ``.github/factory-ref`` pins the
 factory; every hook factory.toml names is tracked and executable; the build plan can be made (images, their order and
 build args); every built service runs the image CI builds for the commit; the smoke test reaches built services; the
@@ -28,7 +28,7 @@ VALUES_FILE = None
 VALUES = None
 
 TEMPLATES = Path(__file__).resolve().parents[2] / "templates" / "ci"
-WORKFLOWS = ("ci.yml", PROMOTE_WORKFLOW, "heartbeat.yml")
+WORKFLOWS = ("ci.yml", PROMOTE_WORKFLOW)
 FACTORY_REF = ".github/factory-ref"
 # CI signs in to this registry with the workflow's own GITHUB_TOKEN; it holds no other registry's password.
 REGISTRY = "ghcr.io/"

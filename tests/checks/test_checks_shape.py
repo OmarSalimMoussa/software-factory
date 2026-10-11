@@ -95,7 +95,7 @@ def test_the_fixture_has_the_standard_deploy_shape(standard_product: Path) -> No
         (_edit("factory.toml", '"ghcr.io/owner"', '"registry.example.com/owner"'),
          "[product].registry is registry.example.com/owner, but CI pushes only to ghcr.io/<owner>"),
         (_edit(".github/workflows/ci.yml", "\n", "\r\n"), ".github/workflows/ci.yml differs from the factory's"),
-        (_remove(".github/workflows/heartbeat.yml"), ".github/workflows/heartbeat.yml is missing"),
+        (_remove(".github/workflows/deploy-prod.yml"), ".github/workflows/deploy-prod.yml is missing"),
         (_add(".github/factory-ref", "owner/software-factory@main\n"), ".github/factory-ref must hold one line"),
         (_chmod("scripts/smoke-check"), "factory.toml names scripts/smoke-check as a hook, but it is not executable"),
         (_edit("factory.toml", 'expect = [{ service = "app"', 'expect = [{ service = "db"'),

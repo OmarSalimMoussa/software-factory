@@ -18,7 +18,7 @@ Every product takes one shape, so the factory needs nothing from a product beyon
 ├── compose.yml             the stack every workspace and laptop slot runs
 ├── <env template>          the settings the factory fills in for each workspace and slot
 ├── .github/
-│   ├── workflows/          the factory's three workflows, copied unchanged
+│   ├── workflows/          the factory's two workflows, copied unchanged
 │   └── factory-ref         the factory commit CI checks with
 └── .gitignore              lists queue/
 ```
@@ -64,10 +64,11 @@ deploy. Each hook is committed and executable.
 
 ## CI
 
-Every product runs the same three workflows, the factory's `templates/ci/`, copied into `.github/workflows/` byte
-for byte: `ci.yml` checks every push and takes the default branch to staging, `deploy-prod.yml` deploys prod when
-the owner pushes, and `heartbeat.yml` tells the uptime monitor prod is up. [ci.md](ci.md) says what each does and
-[deploy.md](deploy.md) what a deploy does on the server. The product brings:
+Every product runs the same two workflows, the factory's `templates/ci/`, copied into `.github/workflows/` byte
+for byte: `ci.yml` checks every push and takes the default branch to staging, and `deploy-prod.yml` deploys prod
+when the owner pushes. The server, not CI, tells the uptime monitor prod is up ([server.md](server.md)).
+[ci.md](ci.md) says what each workflow does and [deploy.md](deploy.md) what a deploy does on the server. The product
+brings:
 
 - **`.github/factory-ref`**: one line, `owner/name@<40-character sha>`, naming the factory repo and the commit CI
   checks and deploys with. The owner moves it to each factory commit they install.

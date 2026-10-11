@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 from test_stack import CONFIG, FACTORY_TOML
 
-from standard.server import setup
+from standard.server import heartbeat, setup
 from standard.server import setup_machine as machine
 from standard.server.setup_machine import Host, SetupError
 from standard.services import provision, stack
@@ -248,3 +248,48 @@ def test_a_rerun_joins_the_shared_containers_back_to_each_workspace_network(make
         "shop-prod-services": ["shop-prod-web", "factory-postgres", "factory-langfuse", "factory-glitchtip"],
         "shop-prod-telemetry": ["factory-langfuse", "factory-glitchtip"],
     }
+
+
+def test_the_heartbeat_runs_on_the_server_once_it_has_prod_s_ping_address(make_job: Any) -> None:
+    server = Server()
+    first = make_job(server)
+    setup.run(first)
+    assert setup.HEARTBEAT_CRON not in server.files
+    assert any("--healthchecks-ping" in item for item in first.todo)
+
+    second = make_job(server)
+    second.ping = "https://hc-ping.com/5f1c"
+    setup.run(second)
+    third = make_job(server)  # a later run without the address keeps the one the server holds
+    setup.run(third)
+
+    assert server.files[str(heartbeat.PING_FILE)] == ("root:deploy 640", "https://hc-ping.com/5f1c\n")
+    assert server.files[setup.HEARTBEAT_CRON][1].endswith("*/5 * * * * deploy /usr/local/bin/factory-heartbeat\n")
+    assert third.host.changes == [] and third.todo == []
+
+
+@pytest.mark.parametrize(
+    ("answer", "pinged", "code"),
+    [
+        (b'{"workspace": "prod", "build_commit": "abcd1234"}', ["https://hc-ping.com/5f1c"], 0),
+        (b'{"workspace": "staging"}', ["https://hc-ping.com/5f1c/fail"], 1),
+        (OSError("refused"), ["https://hc-ping.com/5f1c/fail"], 1),
+    ],
+    ids=["prod-answers", "wrong-workspace", "no-answer"],
+)
+def test_the_heartbeat_checks_in_only_when_prod_answers_as_prod(
+    answer: bytes | OSError, pinged: list[str], code: int
+) -> None:
+    calls: list[str] = []
+
+    def get(url: str, body: bytes | None) -> bytes:
+        if url.startswith("https://hc-ping.com/"):
+            calls.append(url)
+            return b"OK"
+        assert url == "https://prod.acme.dev/healthz"
+        if isinstance(answer, OSError):
+            raise answer
+        return answer
+
+    assert heartbeat.beat(CONFIG, "https://hc-ping.com/5f1c", get) == code
+    assert calls == pinged

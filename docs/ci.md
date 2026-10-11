@@ -1,6 +1,6 @@
 # CI
 
-Every product runs the same three GitHub workflows. They live in the factory's `templates/ci/`, and the product copies
+Every product runs the same two GitHub workflows. They live in the factory's `templates/ci/`, and the product copies
 them into `.github/workflows/` and never edits them: the `deploy-shape` check refuses a copy that differs by one byte.
 Everything that belongs to one product comes from its `factory.toml`.
 
@@ -8,7 +8,6 @@ Everything that belongs to one product comes from its `factory.toml`.
 | --- | --- | --- |
 | `ci.yml` | every push, and by hand | checks every push; builds, smoke-tests and deploys staging from the default branch |
 | `deploy-prod.yml` | when the warden starts it | deploys prod, then publishes the releases that changed |
-| `heartbeat.yml` | every 5 minutes | tells Healthchecks.io that prod answers |
 
 ## ci.yml
 
@@ -90,13 +89,6 @@ After the deploy, the **releases** job publishes each `[[release]]` that is read
 Each release prints one line: published, skipped and why, or failed and why. A failed release fails the run, so the
 warden reports the push as failed even though prod is live; the run's page says which job failed.
 
-## heartbeat.yml
-
-Every 5 minutes it asks prod's health address, `https://<[workspaces.prod].domain><[deploy].health>`, and checks that
-the answer names the workspace `prod`. Only then does it ping Healthchecks.io. When the pings stop, Healthchecks.io
-tells the owner, even when the owner's laptop and the server are both down. GitHub may start a scheduled run a few
-minutes late.
-
 ## What the product must answer
 
 `[deploy].health` on every workspace answers status 200 with a JSON object:
@@ -118,7 +110,6 @@ images; so `[product].registry` must be a `ghcr.io` path the repo may write to.
 | --- | --- | --- |
 | `FACTORY_READ_KEY` | The private half of a read-only deploy key on the factory's repo | all jobs that run the factory's code |
 | `SERVER_DEPLOY_KEY` | The private key of the server's `ci` user, from the server set-up | the staging and prod deploys |
-| `HEALTHCHECKS_PROD_PING` | The Healthchecks.io ping address for prod | the heartbeat |
 | `EXTENSION_STORE_EXTENSION_ID` | The extension's id in the Chrome Web Store | the releases |
 | `EXTENSION_STORE_PUBLISHER_ID` | The store publisher's id | the releases |
 | `EXTENSION_STORE_CLIENT_ID` | The Google API client's id | the releases |
@@ -126,4 +117,4 @@ images; so `[product].registry` must be a `ghcr.io` path the repo may write to.
 | `EXTENSION_STORE_REFRESH_TOKEN` | A refresh token for that client | the releases |
 
 The five store secrets are needed only once a release is live; then a missing one fails the releases job, naming it,
-before anything is packaged. A missing `SERVER_DEPLOY_KEY` or `HEALTHCHECKS_PROD_PING` fails its job the same way.
+before anything is packaged. A missing `SERVER_DEPLOY_KEY` fails its job the same way.

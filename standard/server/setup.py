@@ -1,6 +1,7 @@
 """The server set-up kit, run on the owner's laptop from a factory checkout, against the product's one server.
 
     python3 -m standard.server.setup --product <checkout> [--fresh] [--dry-run] [--ci-key <file.pub>]
+                                     [--healthchecks-ping <url>]
     python3 -m standard.server.setup --product <checkout> --lockdown
 
 It signs in as [server] admin over SSH, trusting only [server] host_key, and uses `sudo -n`. Each step prints what
@@ -25,6 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from standard.config import FILE, Config, ConfigError, load
+from standard.server import heartbeat as heartbeat_mod
 from standard.server import setup_machine as machine
 from standard.server.setup_machine import Host, SetupError, ensure_dirs, ensure_file, remote_text
 from standard.services import provision, stack
@@ -35,6 +37,7 @@ CODE = "/usr/local/lib/software-factory"
 PRODUCT_TOML = "/etc/software-factory/product.toml"
 SUDOERS = "/etc/sudoers.d/factory-ci"
 CRON = "/etc/cron.d/factory-gc"
+HEARTBEAT_CRON = "/etc/cron.d/factory-heartbeat"
 SERVICES = Path("/srv/factory/services")
 CI_USER = "ci"
 GATE = 'command="/usr/local/bin/factory-ci-gate",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding'
@@ -42,6 +45,7 @@ COMMANDS = {
     "factory-deploy": "standard.server.deploy",
     "factory-ci-gate": "standard.server.ci_gate",
     "factory-gc": "standard.server.gc",
+    "factory-heartbeat": "standard.server.heartbeat",
 }
 SERVE_HTTPS = tuple(stack.PORTS[name] for name in ("glitchtip", "langfuse", "minio", "pgweb"))
 SERVE_TCP = (stack.PORTS["postgres"],)
@@ -59,6 +63,7 @@ _INSTALL_CODE = (
     'set -e; rm -rf "$1.new" "$1.old"; mkdir -m 755 "$1.new"; base64 -d | tar -x --no-same-owner -C "$1.new"; '
     'if [ -e "$1" ]; then mv "$1" "$1.old"; fi; mv "$1.new" "$1"; rm -rf "$1.old"'
 )
+_PING = re.compile(r"^https://[A-Za-z0-9.-]+/[A-Za-z0-9/_-]+$")
 _KEY = re.compile(r"^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(?:256|384|521)) [A-Za-z0-9+/=]+( [^\n]*)?$")
 
 
@@ -77,6 +82,7 @@ class Job:
     services: dict[str, str] = field(default_factory=dict)
     token: str = ""
     todo: list[str] = field(default_factory=list)
+    ping: str = ""  # prod's Healthchecks.io ping address; "" keeps the one the server holds
 
     @property
     def admin(self) -> str:
@@ -250,6 +256,19 @@ def clean_up(job: Job) -> None:
     ensure_file(job.host, CRON, text + line, owner="root:root", mode="644")
 
 
+def heartbeat(job: Job) -> None:
+    host, ping_file = job.host, str(heartbeat_mod.PING_FILE)
+    ensure_file(host, "/usr/local/bin/factory-heartbeat", _wrapper("factory-heartbeat"), owner="root:root", mode="755")
+    if job.ping:
+        ensure_file(host, ping_file, job.ping + "\n", owner=f"root:{job.admin_group}", mode="640")
+    elif remote_text(host, ping_file) is None:
+        job.todo.append("give prod's Healthchecks.io ping address: run the set-up again with --healthchecks-ping <url>")
+        return
+    line = f"*/5 * * * * {job.config.server.admin} /usr/local/bin/factory-heartbeat\n"
+    text = "# Prod's heartbeat: prod answers as prod, then Healthchecks.io hears from the server.\n"
+    ensure_file(host, HEARTBEAT_CRON, text + line, owner="root:root", mode="644")
+
+
 def tailnet(job: Job) -> None:
     host, name = job.host, job.config.server.tailnet
     done = host.read(["sudo", "-n", "tailscale", "serve", "status", "--json"])
@@ -314,6 +333,7 @@ STEPS: tuple[tuple[str, Callable[[Job], None]], ...] = (
     ("Folders", folders),
     ("The shared services", shared_services),
     ("The weekly clean-up", clean_up),
+    ("Prod's heartbeat", heartbeat),
     ("The tailnet", tailnet),
     ("The warden's copy on this laptop", laptop),
 )
@@ -359,7 +379,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="read everything, change nothing")
     parser.add_argument("--ci-key", type=Path, help="the public key CI deploys with (default: a pair kept here)")
     parser.add_argument("--lockdown", action="store_true", help="only: sshd takes keys only, and no root")
+    parser.add_argument("--healthchecks-ping", default="", help="prod's Healthchecks.io ping address, once")
     args = parser.parse_args(argv)
+    if args.healthchecks_ping and not _PING.fullmatch(args.healthchecks_ping):
+        print("--healthchecks-ping takes the check's https ping address, such as https://hc-ping.com/<uuid>",
+              file=sys.stderr)  # fmt: skip
+        return 2
     try:
         config = load(args.product)
         with tempfile.TemporaryDirectory() as folder:
@@ -371,7 +396,9 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             home = Path.home() / ".config" / "software-factory"
             product_toml = (args.product / FILE).read_text()
-            run(Job(config, product_toml, host, provision.real_run, args.fresh, args.ci_key, home, FACTORY))
+            job = Job(config, product_toml, host, provision.real_run, args.fresh, args.ci_key, home, FACTORY)
+            job.ping = args.healthchecks_ping
+            run(job)
     except ConfigError as exc:
         print("factory.toml has problems:\n" + "\n".join(f"  - {p}" for p in exc.problems), file=sys.stderr)
         return 2

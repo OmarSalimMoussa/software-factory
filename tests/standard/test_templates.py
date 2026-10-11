@@ -15,7 +15,7 @@ from standard import yaml_subset
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATES = ROOT / "templates" / "ci"
 PRODUCT = ROOT / "testdata" / "fixture-product"
-NAMES = ("ci.yml", "deploy-prod.yml", "heartbeat.yml")
+NAMES = ("ci.yml", "deploy-prod.yml")
 SHA = "0123456789abcdef0123456789abcdef01234567"
 # Stands in for ssh: keeps what the workflow sent and answers with $FAKE_LAST as the deploy's last line.
 FAKE_SSH = """#!/bin/sh
