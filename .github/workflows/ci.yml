@@ -25,7 +25,10 @@ jobs:
   self-check:
     runs-on: ubuntu-latest
     steps:
+      # The whole history: the ratchet checks compare this push with the commit it started from.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen --extra dev
       # The standard checks' tools check runs ruff check, ruff format --check and mypy here, at the pinned versions

@@ -9,12 +9,15 @@ them out, and CI runs them as their own step, which the release waits for.
 from __future__ import annotations
 
 import io
+import json
+import os
 import tomllib
 from pathlib import Path
 
 import pytest
 
 from checks.runner import catalog, cli
+from runtime.shared import settings as settings_mod
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -44,6 +47,8 @@ NOT_YET = {
     "generated-current": "slice 7: any generated file, checked against its generator",
 }
 GATED = [check_id for check_id in catalog.IDS if check_id not in NOT_APPLICABLE and check_id not in NOT_YET]
+# These compare a change with the commit it started from, so over the whole tree (--all) they have nothing to compare.
+RATCHETS = ("comment-budgets", "history-narrative", "complexity-ratchet", "count-claims")
 
 pytestmark = pytest.mark.self_check
 
@@ -54,11 +59,20 @@ def factory_check(check_id: str) -> tuple[int, str]:
     return cli.run(["--all", "--only", check_id], ROOT, None, out), out.getvalue()
 
 
+def base_of_this_push() -> str:
+    """What this push is measured against: the default branch's previous tip on a push to it, else where the branch
+    left the default branch. GitHub's own event file says which; CI checks out the whole history for it."""
+    event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+    default = event["repository"]["default_branch"]
+    return str(event["before"]) if os.environ["GITHUB_REF_NAME"] == default else f"origin/{default}"
+
+
 def test_each_listed_check_is_in_the_catalog_once_with_its_reason() -> None:
     listed = [*NOT_APPLICABLE, *NOT_YET]
     assert sorted(set(listed) - set(catalog.IDS)) == []
     assert sorted(set(NOT_APPLICABLE) & set(NOT_YET)) == []
     assert [check_id for check_id, why in {**NOT_APPLICABLE, **NOT_YET}.items() if not why.strip()] == []
+    assert sorted(set(RATCHETS) - set(GATED)) == []
 
 
 def test_lint_format_and_types_stay_gated() -> None:
@@ -72,6 +86,14 @@ def test_lint_format_and_types_stay_gated() -> None:
 def test_the_factory_passes_each_gated_check(check_id: str) -> None:
     status, output = factory_check(check_id)
     assert status == 0, output
+
+
+@pytest.mark.parametrize("check_id", RATCHETS)
+def test_this_push_holds_each_ratchet(check_id: str) -> None:
+    out = io.StringIO()
+    settings = settings_mod.load(ROOT / "settings.toml", None)
+    status = cli.run(["--since", base_of_this_push(), "--only", check_id], ROOT, settings, out)
+    assert status == 0, out.getvalue()
 
 
 @pytest.mark.parametrize("check_id", sorted(NOT_YET))
