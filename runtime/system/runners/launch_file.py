@@ -262,6 +262,20 @@ def _plain(raw: bytes) -> str:
     return re.sub(r"\x1b\[[0-9;?]*[ -/]*[@-~]", "", raw.decode(errors="replace")).strip()
 
 
+def run_captured(argv: list[str], cwd: Path, env: dict[str, str], timeout: int) -> tuple[int, str]:
+    """Run, holding what it prints (standard error with standard output) for the caller to redact before it reaches
+    the unit's output; its exit status and that text."""
+    try:
+        done = subprocess.run(argv, cwd=cwd, env=env, timeout=timeout, check=False, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, text=True, errors="replace")  # fmt: skip
+    except subprocess.TimeoutExpired as exc:
+        said = exc.output.decode(errors="replace") if isinstance(exc.output, bytes) else (exc.output or "")
+        return TIMED_OUT, said + f"\nrunner: {Path(argv[0]).name} ran past {timeout} s and was stopped\n"
+    except OSError as exc:
+        return REFUSED, f"runner: {Path(argv[0]).name} could not start ({type(exc).__name__})\n"
+    return done.returncode, done.stdout
+
+
 def run(argv: list[str], cwd: Path, env: dict[str, str], timeout: int, fds: tuple[int, ...] = ()) -> int:
     """Run with the unit's own output (the warden's runs/<id>.log); the exit status is the unit's."""
     try:

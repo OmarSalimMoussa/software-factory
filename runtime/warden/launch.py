@@ -30,7 +30,6 @@ from runtime.shared.settings import Settings
 from runtime.system.layout import DAEMON_UNIT
 from runtime.warden import reap, registry, session_settings
 from runtime.warden.context import Context, StackResult
-from standard import config as product_config
 
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
@@ -38,18 +37,8 @@ CHECK_UNIT = "software-check-run@{}.service"
 # A started session's registry id until the backstop sees it running under its name and takes the id Claude Code
 # gave it (`claude --bg` ignores --session-id). The guard finds an unbound session the same way, by name.
 PENDING = "pending-"
-REDACTED = "[redacted]"
-# What `claude --bg` prints for the session it started. A resume that prints another short id started a copy.
 # What `claude --bg` prints for the session it started; the install drills it on the Claude Code it installs.
 BACKGROUNDED = re.compile(r"^backgrounded · ([0-9a-f]{8})\b", re.MULTILINE)
-# A value made only of digits or a boolean word carries no secret; redacting it would erase every port and flag.
-_NOT_SECRET = re.compile(r"^(\d+|true|false|yes|no|on|off)$", re.IGNORECASE)
-# The keys the factory writes into a slot's env file that name no secret: a network, an address, an environment and a
-# release (standard/services/provision.py writes them).
-_PUBLIC_SERVICE_KEYS = frozenset(
-    {"FACTORY_SERVICES_NETWORK", "LANGFUSE_HOST", "LANGFUSE_TRACING_ENVIRONMENT", "SENTRY_ENVIRONMENT",
-     "SENTRY_RELEASE", "SENTRY_INGEST_URL"}
-)  # fmt: skip
 
 Run = Callable[[list[str]], subprocess.CompletedProcess[str]]
 
@@ -163,49 +152,13 @@ class Units:
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         request_id = f"stack-{uuid.uuid4().hex}"
         self._request(request_id, {"kind": "stack", "slot": slot, "verb": verb, "session": session})
+        # The stack runner hid every secret it knows before printing (runtime/system/runners/stack_run.py).
         code, output = self._wait(STACK_UNIT.format(request_id), request_id)
-        clean = redact(output, slot_secrets(self.places, slot, self.settings()))
         log = self.places.evidence / "stack" / f"{request_id}.log"
-        store.write_text(log, clean, mode=0o600)
+        store.write_text(log, output, mode=0o600)
         lines = self.settings().get_int("slots.log_tail_lines")
-        tail = "\n".join(clean.splitlines()[-lines:]) if lines else ""
+        tail = "\n".join(output.splitlines()[-lines:]) if lines else ""
         return StackResult(exit=code, tail=tail, log=str(log))
-
-
-def slot_secrets(places: Places, slot: int, settings: Settings) -> list[str]:
-    """Every value in the slot's env file that could be a secret. The file has the name the product's factory.toml
-    gives it; what the product's scripts write beside it is never read.
-
-    Its keys from factory.toml's [env.set] hold no secret: their values are made from the slot's public facts (its name,
-    port, address and folders), as are the factory's own names and addresses. Redacting them would blank the slot's
-    own address out of everything it prints."""
-    try:
-        product = product_config.load(Path(settings.get_str("repo.path")))
-    except product_config.ConfigError as exc:
-        raise LaunchError(f"a slot's output cannot be redacted: {exc}") from exc
-    public = frozenset(key for key, _ in product.env.set) | _PUBLIC_SERVICE_KEYS
-    path = places.slot_env_dir(slot) / product.env.file
-    try:
-        lines = path.read_text().splitlines()
-    # telemetry: expected — a slot that was never provisioned, or that `empty` cleared, has no env file
-    except FileNotFoundError:
-        return []
-    except OSError as exc:
-        raise LaunchError(f"{path} cannot be read to redact it: {type(exc).__name__}") from exc
-    values = []
-    for line in lines:
-        key, sep, value = line.partition("=")
-        key, value = key.strip(), value.strip().strip("'\"")
-        if sep and not key.startswith("#") and key not in public and value and not _NOT_SECRET.match(value):
-            values.append(value)
-    return values
-
-
-def redact(text: str, secrets: list[str]) -> str:
-    # Longest first, so a secret that contains another is replaced whole.
-    for secret in sorted(set(secrets), key=len, reverse=True):
-        text = text.replace(secret, REDACTED)
-    return text
 
 
 def _options(ctx: Context, settings_id: str, role: str, model: str, effort: str, place: Path) -> dict[str, str]:
