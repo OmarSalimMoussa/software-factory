@@ -1,0 +1,10 @@
+# Loads the factory's nftables table again, on software-firewall-refresh.timer: anything that flushes the machine's
+# ruleset (enabling nftables.service, whose default rules start with `flush ruleset`) has it back within the period.
+# Each load leaves its time where the warden's firewall vital reads it.
+[Unit]
+Description=software factory: load the agent and stack users' firewall again
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/nft -f @nft_file@
+ExecStartPost=/usr/bin/touch @firewall_stamp@

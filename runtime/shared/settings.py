@@ -100,6 +100,7 @@ SCHEMA: dict[str, Spec] = {
     "vitals.memory_red_gib": Spec("float", 0.25, 256),
     "vitals.cpu_pressure_amber": Spec("float", 1, 100),
     "vitals.battery_red": Spec("int", 0, 100),
+    "vitals.firewall_stale_seconds": Spec("int", 30, 3600),
     "watch.tick_seconds": Spec("int", 5, 120),
     "watch.probe_seconds": Spec("int", 15, 600),
     "watch.outage_after": Spec("int", 2, 5),
@@ -166,6 +167,7 @@ SCHEMA: dict[str, Spec] = {
     "install.drills_at_once": Spec("int", 1, 8, when="Next install"),
     "install.tailnet_seconds": Spec("int", 10, 600, when="Next install"),
     "install.hook_timeout_seconds": Spec("int", 2, 60, when="Next install"),
+    "install.firewall_refresh_seconds": Spec("int", 10, 600, when="Next install"),
     "install.healthchecks_grace_minutes": Spec("int", 1, 120, when="Next install"),
     # contract: added by FB7. The programs the product's scripts need, copied from the owner's PATH for the agents and
     # the stack.

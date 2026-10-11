@@ -9,3 +9,8 @@ Before=slices.target
 MemoryHigh=@memory_high@
 MemoryMax=@memory_max@
 CPUWeight=@cpu_weight@
+# The kernel's own wall under the firewall table, which something could flush: nothing in the slice reaches the
+# tailnet, where the dashboard is published and prod's pgweb and Postgres answer. Tailscale's own address stays open:
+# on a machine whose resolver is MagicDNS, every name is looked up there.
+IPAddressDeny=100.64.0.0/10 fd7a:115c:a1e0::/48
+IPAddressAllow=100.100.100.100 fd7a:115c:a1e0::53

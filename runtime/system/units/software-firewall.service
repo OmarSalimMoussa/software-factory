@@ -1,13 +1,18 @@
-# Loads the factory's own nftables table, which keeps the agent user away from the owner's dashboard.
+# Loads the factory's own nftables table, which keeps the agent and stack users away from the owner's dashboard and
+# the tailnet. After nftables.service, whose rules flush the ruleset, and restarted with it; the refresh timer loads
+# it again should anything else flush it.
 [Unit]
-Description=software factory: the agent user's firewall
+Description=software factory: the agent and stack users' firewall
 Wants=network-pre.target
 Before=network-pre.target @daemon_unit@
+After=nftables.service
+PartOf=nftables.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/sbin/nft -f @nft_file@
+ExecStartPost=/usr/bin/touch @firewall_stamp@
 ExecStop=/usr/sbin/nft delete table inet @nft_table@
 
 [Install]

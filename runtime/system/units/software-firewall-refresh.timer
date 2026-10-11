@@ -1,0 +1,11 @@
+# Starts software-firewall-refresh.service every install.firewall_refresh_seconds.
+[Unit]
+Description=software factory: keep the agent and stack users' firewall loaded
+
+[Timer]
+OnActiveSec=@firewall_refresh@
+OnUnitActiveSec=@firewall_refresh@
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

@@ -108,6 +108,11 @@ class Places:
         return self.state / "pictures"
 
     @property
+    def firewall_stamp(self) -> Path:
+        """Touched by root each time the firewall table loads; the firewall vital reads its time."""
+        return self.state / "public" / "firewall-loaded"
+
+    @property
     def check_passes(self) -> Path:
         """Every tree a whole `factory check` passed, in the warden's state."""
         return self.state / "check-passes.json"

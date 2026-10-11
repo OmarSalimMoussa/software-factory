@@ -103,8 +103,8 @@ def tailnet(ctx: Install) -> None:
 def start(ctx: Install) -> None:
     host = ctx.host
     host.run(["systemctl", "daemon-reload"])
-    host.run(["systemctl", "enable", layout.FIREWALL_UNIT, *layout.SERVICES])
-    host.run(["systemctl", "restart", layout.FIREWALL_UNIT])
+    host.run(["systemctl", "enable", layout.FIREWALL_UNIT, layout.FIREWALL_TIMER, *layout.SERVICES])
+    host.run(["systemctl", "restart", layout.FIREWALL_UNIT, layout.FIREWALL_TIMER])
     host.run(["systemctl", "restart", *layout.SERVICES])
 
 

@@ -37,6 +37,8 @@ class Artifact:
 UNIT_FILES = (
     Artifact("units/software-factory.slice", layout.UNITS_DIR / SLICE, 0o644),
     Artifact(f"units/{layout.FIREWALL_UNIT}", layout.UNITS_DIR / layout.FIREWALL_UNIT, 0o644),
+    Artifact(f"units/{layout.FIREWALL_REFRESH}", layout.UNITS_DIR / layout.FIREWALL_REFRESH, 0o644),
+    Artifact(f"units/{layout.FIREWALL_TIMER}", layout.UNITS_DIR / layout.FIREWALL_TIMER, 0o644),
     Artifact(f"units/{layout.WARDEN_UNIT}", layout.UNITS_DIR / layout.WARDEN_UNIT, 0o644),
     Artifact(f"units/{layout.DASHBOARD_UNIT}", layout.UNITS_DIR / layout.DASHBOARD_UNIT, 0o644),
     Artifact(f"units/{layout.DAEMON_UNIT}", layout.UNITS_DIR / layout.DAEMON_UNIT, 0o644),
@@ -93,6 +95,8 @@ def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str
         "firewall_unit": layout.FIREWALL_UNIT,
         "nft_file": str(layout.NFT_FILE),
         "nft_table": layout.NFT_TABLE,
+        "firewall_stamp": str(places.firewall_stamp),
+        "firewall_refresh": f"{settings.get_int('install.firewall_refresh_seconds')}s",
         "memory_high": settings.get_str("budget.slice_memory_high"),
         "memory_max": settings.get_str("budget.slice_memory_max"),
         "cpu_weight": str(settings.get_int("budget.slice_cpu_weight")),

@@ -35,7 +35,15 @@ from runtime.system.journal import Journal  # noqa: E402
 
 PROGRAM = "uninstall.py"
 
-UNITS = (layout.WARDEN_UNIT, layout.DASHBOARD_UNIT, layout.DAEMON_UNIT, layout.FIREWALL_UNIT, layout.SERVICES_UNIT)
+UNITS = (
+    layout.WARDEN_UNIT,
+    layout.DASHBOARD_UNIT,
+    layout.DAEMON_UNIT,
+    layout.FIREWALL_TIMER,
+    layout.FIREWALL_REFRESH,
+    layout.FIREWALL_UNIT,
+    layout.SERVICES_UNIT,
+)
 TEMPLATES = (layout.AGENT_RUN, layout.STACK_RUN, layout.CHECK_RUN)
 GUARD = "/opt/software-factory/runtime/guard/hook.py"  # the installed guard, named in the factory's managed settings
 HOOKS = str(paths.INSTALL / "checks" / "git-hooks")

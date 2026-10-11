@@ -1,5 +1,5 @@
-"""The laptop's vitals, read every tick: memory, CPU pressure, power, the install, the git hooks and the agent's
-Claude daemon. Each reading is green, amber, red or unknown; unknown is treated as amber, never as fine.
+"""The laptop's vitals, read every tick: memory, CPU pressure, power, the install, the git hooks, the agent's Claude
+daemon and the firewall. Each reading is green, amber, red or unknown; unknown is treated as amber, never as fine.
 
 The permits read vitals.json: red blocks every start; amber blocks all but severe work. Readers take the kernel's
 folders as arguments, so tests feed samples.
@@ -149,6 +149,20 @@ def daemon(proc: Path, agent_uid: int | None) -> Reading:
     return Reading("daemon", GREEN, "inside the factory's slice")
 
 
+def firewall(stamp: Path, now: float, settings: Settings) -> Reading:
+    """The firewall table that walls the agent and stack users off the dashboard and the tailnet loads again every
+    install.firewall_refresh_seconds, and each load touches ``stamp``: a stale stamp means it is not loading."""
+    try:
+        age = now - stamp.stat().st_mtime
+    except FileNotFoundError:
+        return Reading("firewall", RED, "the firewall has never loaded")
+    except OSError as exc:
+        return Reading("firewall", UNKNOWN, f"cannot read when the firewall last loaded: {type(exc).__name__}")
+    if age > settings.get_int("vitals.firewall_stale_seconds"):
+        return Reading("firewall", RED, f"the firewall last loaded {age:.0f} s ago")
+    return Reading("firewall", GREEN, "loaded")
+
+
 def _agent_uid() -> int | None:
     try:
         return pwd.getpwnam(AGENT_USER).pw_uid
@@ -173,6 +187,7 @@ def refresh(ctx: Context, proc: Path = PROC, supplies: Path = POWER) -> dict[str
         install(ctx.places),
         hooks(ctx.places, Path(settings.get_str("repo.path")), settings.get_int("watch.tick_seconds")),
         daemon(proc, _agent_uid()),
+        firewall(ctx.places.firewall_stamp, ctx.clock.now(), settings),
     ]
     snapshot = {"at": ctx.clock.iso(), "level": worst(readings), "readings": [asdict(r) for r in readings]}
     store.write_json(ctx.places.vitals, snapshot)

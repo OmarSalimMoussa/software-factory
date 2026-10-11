@@ -136,3 +136,16 @@ def test_neither_user_that_runs_agent_code_reaches_the_dashboard_or_the_tailnet(
         assert f'meta skuid "{user}" tcp dport 8400 reject with tcp reset' in text
         assert f'meta skuid "{user}" ip daddr 100.64.0.0/10 meta l4proto tcp reject with tcp reset' in text
         assert f'meta skuid "{user}" ip6 daddr fd7a:115c:a1e0::/48 meta l4proto tcp reject with tcp reset' in text
+
+
+def test_the_firewall_loads_after_nftables_again_on_its_timer_and_the_kernel_walls_the_slice_off_the_tailnet() -> None:
+    firewall = _unit("software-firewall.service").splitlines()
+    refresh = _unit("software-firewall-refresh.service").splitlines()
+    timer = _unit("software-firewall-refresh.timer", **{"install.firewall_refresh_seconds": 45}).splitlines()
+    stamp = "ExecStartPost=/usr/bin/touch /var/lib/software-factory/public/firewall-loaded"
+
+    assert {"After=nftables.service", "PartOf=nftables.service", stamp} <= set(firewall)
+    assert {"ExecStart=/usr/sbin/nft -f /etc/software-factory/firewall.nft", stamp} <= set(refresh)
+    assert {"OnActiveSec=45s", "OnUnitActiveSec=45s", "WantedBy=timers.target"} <= set(timer)
+    slice_ = _unit("software-factory.slice").splitlines()
+    assert "IPAddressDeny=100.64.0.0/10 fd7a:115c:a1e0::/48" in slice_
