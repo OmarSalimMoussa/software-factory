@@ -174,7 +174,8 @@ def test_every_waiting_task_is_scored_again_together_on_its_schedule(
 ) -> None:
     file_requests(ticking, 0, 0)
     rescored: list[float] = []
-    monkeypatch.setattr(loop.tasks, "rescore", lambda ctx: rescored.append(ctx.clock.now()) or 0)
+    real = loop.tasks.rescore
+    monkeypatch.setattr(loop.tasks, "rescore", lambda ctx: rescored.append(ctx.clock.now()) or real(ctx))
     every = ticking.ctx.settings().get_int("intake.rescore_hours") * 3600
 
     start = ticking.clock.t

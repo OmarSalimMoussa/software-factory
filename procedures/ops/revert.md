@@ -12,6 +12,8 @@ after a push.
 4. Check the revert like a merge: rebuild slot 0 with what it touched, and walk the scenario that failed, so it has
    a fresh pass before the work comes back.
 5. Push it with `factory push`.
-6. Send the task back to `building` with the reason, and tell its implementer. The fix starts from the reverted
-   work: `git merge --ff-only <default branch>`, `git revert <the revert's sha>`, then the fix. A rebase alone would
-   leave the work reverted.
+6. Send the task back: `factory queue task status <task> building --note "<why>; reverted as <the revert's sha>"`.
+   The warden hands the note to its implementer. After a push, that implementer has ended: the warden puts the task
+   back in the approved runs instead (a designed build back in the designed builds), and the new implementer's
+   first message carries the note. Either one brings the work back first: `git merge --ff-only <default branch>`,
+   `git revert <the revert's sha>`, then the fix.

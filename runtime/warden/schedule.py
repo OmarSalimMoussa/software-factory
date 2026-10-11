@@ -15,12 +15,12 @@ from pathlib import Path
 
 from runtime.queue import proposals
 from runtime.shared import order, store
-from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session, Task
+from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, Session, Task
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden import lifecycle, permits, registry
 from runtime.warden.context import Context
-from runtime.warden.permits import DESIGN, IMPL, ORCH
+from runtime.warden.permits import DESIGN, IMPL
 
 log = logging.getLogger(__name__)
 WARDEN = lifecycle.WARDEN
@@ -43,8 +43,7 @@ def run_pass(ctx: Context) -> None:
     # stopped it (the orchestrator retired, and the installer may be waiting for every session to end).
     if lifecycle.paused_path(ctx).exists() or permits.switching(ctx) is not None:
         return
-    live = registry.read(ctx.places).values()
-    if not any(s.role == ORCH and s.state in (WORKING, WAITING) for s in live):
+    if not permits.at_work(registry.read(ctx.places).values()):
         return
     waiting: dict[str, str] = {}
     for role in (IMPL, DESIGN):

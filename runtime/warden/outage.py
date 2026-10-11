@@ -109,6 +109,6 @@ def owner_stop_fix(ctx: Context, args: dict[str, Any], data: bytes | None) -> di
         outage.stage, outage.bypass_used = STOPPED, True
         _write(ctx.places, outage)
     ctx.post_event(
-        "stopped", {"session": outage.session, "task": outage.task, "why": "the owner stopped the outage fix"}
+        inbox.STOPPED, {"session": outage.session, "task": outage.task, "why": "the owner stopped the outage fix"}
     )
     return ok(message="The fix is stopped. Prod stays down until you push a build or push prod back.")

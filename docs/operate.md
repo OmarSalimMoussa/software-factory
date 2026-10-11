@@ -144,7 +144,7 @@ accounts keeps its one token as the account `main`.
 ## Tune
 
 Change any setting on the Settings page and save with the code. Each value is checked before it is saved, the save
-is committed to the factory's repo, and only what reads that value reloads. See [settings.md](settings.md).
+is written to the warden's state on this machine, and only what reads that value reloads. See [settings.md](settings.md).
 
 ## Improve the factory
 

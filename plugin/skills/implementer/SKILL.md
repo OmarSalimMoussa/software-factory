@@ -82,8 +82,9 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 
 ## 5. Until the default branch is checked
 
-Stay until the orchestrator says the check passed, and fix what the check sends back. Work the check reverted comes
-back first: `git merge --ff-only <default branch>`, `git revert <the revert's sha>`, then the fix. Once your task is
+Stay until the orchestrator says the check passed, and fix what the check sends back. Work that was reverted (the
+warden's message, or your first one, says so) comes back first: `git merge --ff-only <default branch>`,
+`git revert <the revert's sha>`, then the fix. Once your task is
 checked, the warden ends your session and empties your slot itself.
 
 ## Paused and revived

@@ -51,8 +51,9 @@ MOVES: tuple[Move, ...] = (
     _m({"building"}, {"qa"}, "qa-ready", IMPL),
     _m({"qa"}, {"qa-clean"}, "qa-clean", IMPL),
     _m({"qa-clean"}, {"turn"}, "turn", ORCH),
-    _m({"turn"}, {"merged"}, "merged", ORCH, WARDEN),
-    _m({"merged"}, {"checked"}, "checked", ORCH, WARDEN),
+    # The warden's alone: it finds the merge on the default branch, and a saved check of it that passed.
+    _m({"turn"}, {"merged"}, "merged", WARDEN),
+    _m({"merged"}, {"checked"}, "checked", WARDEN),
     _m({"checked"}, {"on-staging"}, "on-staging", WARDEN),
     _m({"on-staging"}, {"promoted"}, "promoted", WARDEN),
     # Prod pushed back, or staging taken to a build without the merge: the status follows what runs.
@@ -74,7 +75,8 @@ MOVES: tuple[Move, ...] = (
     _m(NOT_CLOSED, {"closed"}, "rung-0", ORCH),
     _m(NOT_CLOSED, {"closed"}, "noise", ORCH),
     _m(NOT_CLOSED, {"closed"}, "done", ORCH, WARDEN),
-    _m({"merged", "checked", "on-staging"}, {"building"}, "reverted", ORCH, WARDEN),
+    # A reverted task goes back to its implementer, or, once that has ended, to a new one (runtime/queue/turn.py).
+    _m({"merged", "checked", "on-staging"}, {"building", "approved"}, "reverted", ORCH, WARDEN),
     _m({"queued"}, {"parked"}, "park", ORCH),
     _m({"parked"}, {"queued"}, "unpark", OWNER),
 )

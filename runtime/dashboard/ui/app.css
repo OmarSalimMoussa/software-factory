@@ -320,6 +320,7 @@ svg.ring .fg{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoff
 .chart svg{width:100%;height:auto;display:block}
 .chart text{fill:var(--muted);font:11px var(--font)}
 .chart .gridl{stroke:var(--line)}
+.chart .unk{fill:var(--warn);font-weight:600}
 .chart>.sec-h{flex-direction:column;align-items:flex-start;gap:8px}
 .chart>.sec-h .label{white-space:nowrap}
 .bars{display:flex;flex-direction:column;gap:2px;padding:6px 0}

@@ -48,6 +48,12 @@ class Permit:
     bypass: bool  # started under the outage bypass, with no approval
 
 
+def at_work(sessions: Iterable[Session]) -> bool:
+    """Whether the orchestrator is at work, working or waiting: a pause benches it and the owner's stop retires it,
+    and only an orchestrator at work chooses proposals or has runs started."""
+    return any(s.role == ORCH and s.state in (WORKING, WAITING) and not s.parent for s in sessions)
+
+
 def actor(ctx: Context) -> str:
     return "owner" if ctx.caller.kind in ("owner", "dashboard") else ctx.caller.role
 
@@ -127,7 +133,8 @@ def check_cap(settings: Settings, sessions: Iterable[Session], role: str) -> Non
     cap = settings.get_int(CAP[role])
     if len(held) >= cap:
         names = ", ".join(s.name for s in held)
-        raise Refused("cap", f"{len(held)} of {cap} {role}s hold a place ({names}); bench one for higher work, or wait")
+        raise Refused("cap", f"{len(held)} of {cap} {role}s hold a place ({names}); the warden benches one only "
+                            "for higher-ranked work, so this run waits for a place")  # fmt: skip
 
 
 def cap_full(settings: Settings, sessions: Iterable[Session], role: str) -> bool:
@@ -187,7 +194,8 @@ def check_start(ctx: Context, sessions: dict[str, Session], role: str, task: Tas
         raise Refused("role", "a start is for an implementer or a designer")
     live = [s for s in sessions.values() if s.task == task.id and s.role == role and s.state != RETIRED]
     if live:
-        raise Refused("one-run", f"{task.id} already has {live[0].name} ({live[0].state}); revive or stop it")
+        raise Refused("one-run", f"{task.id} already has {live[0].name} ({live[0].state}); the warden "
+                                  "brings a benched one back itself, or stop it first")  # fmt: skip
     if task.severity != SEVERE and not task.goal_item:
         raise Refused("goal", f"{task.id} names no goal item, and only severe work starts without one")
     if outage:
@@ -264,7 +272,8 @@ def read_task(ctx: Context, task_id: str) -> Task:
     except FileNotFoundError as exc:
         raise Refused("task", f"no task {task_id}") from exc
     except (FormatError, UnicodeDecodeError) as exc:
-        raise Refused("task", f"{task_id} cannot be read ({exc}); queue-format files it for a fix") from exc
+        raise Refused("task", f"{task_id} cannot be read ({exc}); the queue-format sweep reports it as the "
+                              "warden's fault") from exc  # fmt: skip
 
 
 def move_task(ctx: Context, task_id: str, to: str, event: str, by: str = statuses.WARDEN) -> None:

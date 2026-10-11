@@ -95,13 +95,21 @@ def hero(snap: Snap, query: Query) -> dict[str, Any]:
         "budget_pct": round(today / budget * 100) if known else None,
         "today": f"today {'≥ ' if today_unknown else ''}${today:,.0f} of ${budget:,.0f}, at API prices"
         if known
-        else f"today unknown of ${budget:,.0f}: no price is set for its models",
+        else f"today unknown of ${budget:,.0f}: no price is set for its models, so the budget stops nothing",
         "kv": [
             {"label": "Average cost of a merge", "value": _merge_cost(snap)},
-            {"label": "Per day, average", "value": f"${total / len(days):,.0f}"},
+            {"label": "Per day, average", "value": _average(total, unknown, len(days))},
         ],
         "unknown": f"{plural(unknown, 'call')} with unknown price" if unknown else None,
     }
+
+
+def _average(total: float, unknown: int, days: int) -> str:
+    """Calls of unknown price add an unknown amount: the average is then the least it cost, or unknown with no
+    price known at all."""
+    if unknown and not total:
+        return "unknown"
+    return f"{'≥ ' if unknown else ''}${total / days:,.0f}"
 
 
 def _scale(top: float) -> tuple[float, list[float]]:
@@ -126,7 +134,9 @@ def chart(snap: Snap, query: Query) -> dict[str, Any]:
             if (len(days) - 1 - n) % (2 if len(days) > 7 else 1) == 0
             else None
         )
-        rows.append({"label": label, "values": values, "total": round(sum(values), 2)})
+        unknown = int(sum(cell[1] for cell in cells.values()))
+        rows.append({"label": label, "values": values, "total": round(sum(values), 2),
+                     "unknown": f"{plural(unknown, 'call')} of unknown price" if unknown else None})  # fmt: skip
     top, ticks = _scale(max([r["total"] for r in rows] + [budget]))
     return {
         "families": [{"key": k, "label": label, "color": color} for k, (label, color) in FAMILIES.items()],

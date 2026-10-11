@@ -50,6 +50,8 @@ def push(snap: Snap) -> dict[str, Any]:
         "down": "Staging is red: the push waits until it is healthy.",
         "unknown": "Staging's health is unknown: the push waits for its next probe.",
     }.get(pill["state"])
+    if blocked is None:
+        blocked = snap.get("deploys")["staging_pinned"]
     return {
         "prod": _build(snap, "prod"),
         "staging": staging,

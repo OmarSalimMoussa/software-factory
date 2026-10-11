@@ -36,8 +36,9 @@ from runtime.warden.github import GitHubError
 _FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 # What `git revert` writes into the message of the commit that takes a merge back.
 _REVERTS = re.compile(r"This reverts commit ([0-9a-f]{40})")
-# A task whose merge passed its check of the default branch.
-SHIPPABLE = frozenset({"checked", "on-staging", "promoted", "closed"})
+# A task whose merge passed its check of the default branch. A closed task's merge ships only on a saved check of
+# that merge that passed: a task may be closed before its check.
+SHIPPABLE = frozenset({"checked", "on-staging", "promoted"})
 _SHA = re.compile(r"^[0-9a-f]{7,40}$")
 # One push at a time, of either kind: the check that none runs and the start happen together.
 _pushing = threading.Lock()
@@ -148,13 +149,15 @@ def _unchecked_merges(ctx: Context, git: _Git, remote: str, head: str) -> list[s
     nothing of its own."""
     reverted = set(_REVERTS.findall(git.run("log", "--format=%B", f"{remote}..{head}")))
     found = merges(ctx.places)
+    queue = Queue.of(ctx)
+    passed = {c.commit for c in queue.checks()[0] if all(r.result == "pass" for r in c.rows)}
     out = []
     for merge in git.run("rev-list", "--first-parent", "--merges", f"{remote}..{head}").split():
         if merge in reverted:
             continue
         task = found.get(merge)
-        status = Queue.of(ctx).task(task).status if task else ""
-        if status not in SHIPPABLE:
+        status = queue.task(task).status if task else ""
+        if status not in SHIPPABLE and not (status == "closed" and merge in passed):
             out.append(f"merge {merge[:12]}" + (f" ({task}, {status})" if task else " (no task's merge)"))
     return out
 
@@ -299,14 +302,19 @@ def _staging_build(ctx: Context) -> str:
         raise Refused("staging-unknown", "staging has not been probed yet: wait a minute, then push")
     if not staging.ok:
         raise Refused("staging-red", f"staging is red ({staging.error}): fix staging before pushing it to prod")
-    if deploys.on_default(ctx.places, probes.STAGING) is False:
-        branch = ctx.settings().get_str("repo.default_branch")
-        raise Refused("staging-pinned", f"staging runs {staging.commit[:12]}, pinned off {branch}: only {branch}'s "
-                                        f"checked work goes to prod; run CI on {branch} to unpin it")  # fmt: skip
+    # Only a build known to be on GitHub's default branch goes: a commit GitHub's branch does not hold reads as
+    # unknown, as does one the mirror could not fetch.
+    if deploys.on_default(ctx.places, probes.STAGING) is not True:
+        raise Refused("staging-pinned", staging_off_default(ctx.settings().get_str("repo.default_branch")))
     prod = _latest(ctx, probes.PROD)
     if prod is not None and prod.ok and prod.commit == staging.commit:
         raise Refused("nothing-to-push", f"prod already runs {staging.commit[:12]}, the build staging runs")
     return staging.commit
+
+
+def staging_off_default(branch: str) -> str:
+    return (f"Staging's build is not known to be on {branch} as GitHub has it: only {branch}'s checked work goes to "
+            f"prod. Run CI on {branch} to put staging back on it.")  # fmt: skip
 
 
 def _pushes_path(places: Places) -> Path:

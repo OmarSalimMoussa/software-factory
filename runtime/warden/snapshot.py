@@ -39,6 +39,7 @@ from runtime.warden import (
     lifecycle,
     messages,
     outage,
+    permits,
     plan,
     probes,
     public,
@@ -241,7 +242,7 @@ def _queue(ctx: Context, args: dict[str, Any]) -> Any:
         if name.endswith(".md"):
             try:
                 spec = records.parse_spec(queue.files.read(f"specs/{name}").decode(), f"specs/{name}")
-            # telemetry: surfaced — a broken spec is a row that says so; the queue-format sweep files it
+            # telemetry: surfaced — a broken spec is a row that says so; the queue-format sweep reports it
             except (ValueError, UnicodeDecodeError) as exc:
                 broken.append({"file": f"specs/{name}", "error": str(exc)})
                 continue
@@ -377,10 +378,17 @@ def _factory(ctx: Context, args: dict[str, Any]) -> Any:
     return {"paused": paused, "locked_until": until, "triage": triage}
 
 
+def _proposals(ctx: Context, args: dict[str, Any]) -> dict[str, Any]:
+    found = proposals.read(ctx.places)
+    # An empty place is the orchestrator choosing only while it is at work.
+    return {"open": found.open, "approved": found.approved,
+            "choosing": permits.at_work(registry.read(ctx.places).values())}  # fmt: skip
+
+
 READERS: dict[str, Reader] = {
     "settings": _settings,
     "sessions": _sessions,
-    "proposals": lambda ctx, args: (lambda f: {"open": f.open, "approved": f.approved})(proposals.read(ctx.places)),
+    "proposals": _proposals,
     "cards": lambda ctx, args: [models.dump(c) for c in cards.read(ctx.places)],
     "outage": lambda ctx, args: (lambda o: None if o is None else models.dump(o))(outage.read(ctx.places)),
     "factory": _factory,
@@ -388,7 +396,10 @@ READERS: dict[str, Reader] = {
     "deploys": lambda ctx, args: {
         **{env: deploys.builds(ctx.places, env) for env in probes.ENVS},
         "push_back": github_push.push_back_target(ctx),
-        "staging_on_default": deploys.on_default(ctx.places, probes.STAGING),
+        # Why staging's build may not go to prod, as the push would refuse it; None when it may.
+        "staging_pinned": None
+        if deploys.on_default(ctx.places, probes.STAGING) is True
+        else github_push.staging_off_default(ctx.settings().get_str("repo.default_branch")),
     },
     "ci": lambda ctx, args: ci_watch.read(ctx.places),
     "plan": lambda ctx, args: plan.reading(ctx),

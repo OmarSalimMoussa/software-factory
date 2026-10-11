@@ -12,6 +12,8 @@ from pathlib import Path
 INSTALL = Path("/opt/software-factory")
 STATE = Path("/var/lib/software-factory")
 RUN = Path("/run/software-factory")
+# Root's alone: the firewall units' runtime folder, where each load of the table leaves its time.
+FIREWALL = Path("/run/software-firewall")
 MANAGED_SETTINGS = Path("/etc/claude-code/managed-settings.json")
 # On every user's PATH, so a session types the bare word: the sandbox exempts a call by its text, `factory …` alone.
 FACTORY_BIN = Path("/usr/local/bin/factory")
@@ -44,6 +46,7 @@ class Places:
     run: Path
     stack_slots: Path = STACK_SLOTS
     services: Path = SERVICES
+    firewall: Path = FIREWALL
 
     @classmethod
     def system(cls) -> Places:
@@ -52,7 +55,9 @@ class Places:
     @classmethod
     def under(cls, root: Path) -> Places:
         """A self-contained tree for tests and the rehearsal."""
-        return cls(root / "install", root / "state", root / "run", root / "stack-slots", root / "services")
+        return cls(
+            root / "install", root / "state", root / "run", root / "stack-slots", root / "services", root / "firewall"
+        )
 
     @classmethod
     def for_runner(cls, install: Path, state: Path) -> Places:
@@ -106,8 +111,9 @@ class Places:
 
     @property
     def firewall_stamp(self) -> Path:
-        """Touched by root each time the firewall table loads; the firewall vital reads its time."""
-        return self.state / "public" / "firewall-loaded"
+        """Touched by root each time the firewall table loads; the firewall vital reads its time. In root's own
+        folder: root's touch follows a link, which another user could plant in a folder it writes."""
+        return self.firewall / "loaded"
 
     @property
     def github_known_hosts(self) -> Path:

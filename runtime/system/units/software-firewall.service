@@ -12,6 +12,9 @@ PartOf=nftables.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/sbin/nft -f @nft_file@
+# The stamp's folder outlives each run, so the refresh unit's loads and this one's share it.
+RuntimeDirectory=@firewall_run_name@
+RuntimeDirectoryPreserve=yes
 ExecStartPost=/usr/bin/touch @firewall_stamp@
 ExecStop=/usr/sbin/nft delete table inet @nft_table@
 

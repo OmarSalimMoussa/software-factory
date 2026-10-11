@@ -12,7 +12,6 @@ from typing import Any
 
 from runtime.dashboard.views import agentwords, taskwords
 from runtime.dashboard.views.kit import Snap, ago, broken, epoch, plural, spelled, version
-from runtime.shared.models import WAITING, WORKING
 
 _settled: dict[int, dict[str, Any]] = {}
 _done: dict[str, tuple[float, str]] = {}
@@ -108,11 +107,7 @@ def slots(snap: Snap) -> dict[str, Any]:
     found = snap.get("proposals")
     tasks = taskwords.tasks(snap)
     ids = [e for e in found["open"] if e and e != "none" and e in tasks]
-    # Only an orchestrator at work chooses: one benched by the owner's pause, or not running, chooses nothing.
-    working = any(
-        s["role"] == "orchestrator" and s["state"] in (WORKING, WAITING) for s in snap.get("sessions").values()
-    )
-    choosing = working and snap.get("factory")["paused"] is None
+    choosing = found["choosing"]  # only an orchestrator at work chooses, as the warden says
     with _lock:
         for index in [i for i, s in _settled.items() if s["until"] <= snap.now]:
             del _settled[index]

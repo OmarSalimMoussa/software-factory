@@ -123,7 +123,8 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
     (
         "cost",
         "Cost",
-        "Applies as soon as you save. Nothing stops at the budget.",
+        "Applies as soon as you save. Once today's spend reaches the budget, only severe work starts until the UTC "
+        "day ends. A call to a model with no price counts for nothing toward it.",
         [
             ("cost.daily_budget_usd", "Daily budget at API prices, $"),
             ("cost.plan_stale_minutes", "Minutes before a plan reading counts as unknown"),
@@ -360,7 +361,7 @@ def shown(key: str, value: Any) -> Any:
         return [str(v) for v in value]
     if kind == "prices":
         if not value:
-            return "No prices set: every call's cost is unknown"
+            return "No prices set: every call's cost is unknown, so the daily budget stops nothing"
         return " · ".join(f"{model_label(m)} ${p['input']:g} in, ${p['output']:g} out" for m, p in value.items())
     if kind == "weights":
         return " · ".join(f"{name} {weight:g}" for name, weight in value.items())

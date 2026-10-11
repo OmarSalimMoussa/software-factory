@@ -14,6 +14,7 @@ from dashboard_seed import FIXTURES, STAGING, iso
 from runtime.dashboard.views.settings import LABELS
 from runtime.shared import models, store
 from runtime.shared.settings import SCHEMA
+from runtime.warden import deploys
 
 BROKEN = {"broken", "id", "error"}
 
@@ -161,9 +162,32 @@ def test_the_push_sheet_says_prod_runs_staging_only_when_prod_answers_on_staging
     assert rig.parts("/api/push")["push"]["data"]["prod_runs_staging"] is runs
 
 
+@pytest.mark.parametrize("on_default", [True, False, None], ids=["on-it", "pinned-off-it", "unknown"])
+def test_the_push_sheet_says_a_staging_build_off_the_default_branch_cannot_go_to_prod(
+    rig: Rig, on_default: bool | None
+) -> None:
+    deploys.note_branch(rig.places, "staging", STAGING, on_default)
+    blocked = rig.parts("/api/push")["push"]["data"]["blocked"]
+    assert (blocked is None) is (on_default is True)
+    assert blocked is None or "only master's checked work goes to prod" in blocked
+
+
 def test_home_draws_every_live_proposal_even_one_a_crash_left_without_its_place(rig: Rig) -> None:
     store.write_json(rig.places.proposals, {"open": ["t-0027", "t-0024", None], "approved": []})
 
     slots = rig.parts("/api/home")["proposals"]["data"]["slots"]
 
     assert [s["task"] for s in slots if s.get("task")] == ["t-0027", "t-0024", "t-0025"]
+
+
+def test_spend_of_unknown_price_is_unknown_and_the_budget_says_it_stops_nothing(rig: Rig) -> None:
+    rows = store.read_jsonl(rig.places.cost)
+    store.write_text(rig.places.cost, "".join(json.dumps({**r, "usd": None}) + "\n" for r in rows))
+
+    spend = rig.parts("/api/spend?range=7&slice=family")
+    hero, days = spend["hero"]["data"], spend["chart"]["data"]["days"]
+    assert hero["total"] is None and hero["budget_pct"] is None and "stops nothing" in hero["today"]
+    assert {"label": "Per day, average", "value": "unknown"} in hero["kv"]  # never $0
+    assert days[-1]["total"] == 0 and days[-1]["unknown"].endswith("of unknown price")
+    tile = rig.parts("/api/home")["tiles"]["data"]["spend"]
+    assert tile["today"] is None and tile["pct"] is None and "stops nothing" in tile["foot"]

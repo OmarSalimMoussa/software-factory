@@ -251,13 +251,10 @@ def _qa_prod_due(ctx: Context, now: float) -> None:
 def _rescore(ctx: Context, now: float) -> None:
     """Every waiting task scored again at once, every intake.rescore_hours: a score's age part is fixed when it is
     written, and the order reads the scores side by side."""
-    path = ctx.places.state / "rescored.json"
-    last = store.read_json_or(path, {"at": None})
-    at = last.get("at") if isinstance(last, dict) else None
-    if isinstance(at, int | float) and now - at < ctx.settings().get_int("intake.rescore_hours") * 3600:
+    at = tasks.rescored_at(ctx.places)
+    if at is not None and now - at < ctx.settings().get_int("intake.rescore_hours") * 3600:
         return
     tasks.rescore(ctx)
-    store.write_json(path, {"at": now})
 
 
 def _fix(ctx: Context) -> None:

@@ -53,9 +53,8 @@ def save_spec(ctx: Context, task_id: str, data: bytes | None, slices: object) ->
 
 
 def save_check(ctx: Context, commit: str, data: bytes | None) -> CheckRecord:
-    """A check of the default branch: the report's # title, its ## Scenarios table and any notes."""
-    if not formats.SHA.match(commit):
-        raise Refused("check", "name the commit the check ran on")
+    """A check of the default branch, on ``commit`` (a full sha): the report's # title, its ## Scenarios table and
+    any notes."""
     text = intake.body_text(data, "check", ctx.settings().get_int("queue.max_upload_kib"))
     now = ctx.clock.iso()
     record_id = f"c-{now.replace('-', '').replace(':', '')}-{commit[:7]}"

@@ -33,7 +33,9 @@ def _given(ctx: Install) -> dict[str, str]:
 
 def units(ctx: Install) -> None:
     given = _given(ctx)
-    for item in render.UNIT_FILES:
+    wall = render.stack_wall(given["stack_uid"])
+    ctx.host.mkdir(wall.dest.parent, mode=0o755)
+    for item in (*render.UNIT_FILES, wall):
         ctx.host.write(item.dest, render.artifact(item, ctx.templates(), given), mode=item.mode)
     # The warden's run-time budget changes live here; the slice just written already holds the settled values.
     control = layout.SLICE_CONTROL / f"{SLICE}.d"

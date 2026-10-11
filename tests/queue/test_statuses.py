@@ -7,10 +7,12 @@ import dataclasses
 import pytest
 from queue_kit import World
 
-from runtime.queue import documents, statuses, tasks, turn
+from runtime.queue import documents, proposals, records, statuses, tasks, turn, verbs
 from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
-from runtime.shared.models import Task
+from runtime.shared import store
+from runtime.shared.models import RETIRED, Task
 from runtime.shared.protocol import Refused
+from runtime.warden import backstop, lifecycle, registry
 
 TASK = Task("t-0001", "T", ["r-2026-10-09-0001"], "G1", "major", ["ui"], "queued", "2026-10-09T12:00:00Z", "")
 
@@ -53,7 +55,7 @@ def test_task_statuses_follow_the_builds_forward_and_back(world: World) -> None:
     task = world.task(branch="impl-t-0001")
     world.queue().write_task(dataclasses.replace(task, status="turn", run=1))
     tasks.move(world.ctx(), task.id, "merged", "merged", "warden", "merged as abc1234", commit="abc1234")
-    tasks.set_status(world.ctx(), task.id, "checked", "", "")
+    tasks.move(world.ctx(), task.id, "checked", "checked", "warden", "the check passed")
     included = {"5ta9e01", "9r0d001"}
 
     def includes(build: str, merge: str) -> bool | None:
@@ -100,3 +102,46 @@ def test_an_approved_spec_gives_its_task_the_slice_count_it_lists(world: World) 
 
     tasks.set_status(world.ctx(), task.id, "building", "spec-approved", "")
     assert world.queue().task(task.id).slices == 4
+
+
+@pytest.mark.parametrize("live", [True, False], ids=["its-implementer-is-told", "a-new-implementer-starts-told"])
+def test_a_reverted_task_goes_back_to_its_implementer_or_once_that_ended_to_a_new_one(
+    world: World, monkeypatch: pytest.MonkeyPatch, live: bool
+) -> None:
+    task = world.task(branch="impl-t-0001")
+    world.queue().write_task(dataclasses.replace(task, status="merged" if live else "on-staging", run=1))
+    world.session("s-impl", "implementer", "impl-t-0001", task.id)
+    if live:
+        monkeypatch.setattr(backstop, "processes", lambda: {"s-impl": None})
+    else:  # its task passed its check, so its implementer finished
+        sessions = registry.read(world.places)
+        sessions["s-impl"].state = RETIRED
+        registry.write(world.places, sessions)
+
+    with pytest.raises(Refused, match="--note"):
+        tasks.set_status(world.ctx(), task.id, "building", "", "")
+    back = tasks.set_status(world.ctx(), task.id, "building", "", "staging regressed; reverted as 0abc123")
+
+    told = "Your work was taken back off master: staging regressed; reverted as 0abc123"
+    assert back.status == ("building" if live else "approved")
+    if live:
+        assert [(sid, told in text) for sid, text in world.launcher.messages] == [("s-impl", True)]
+    else:  # the scheduler starts the approved run with its brief, which now says why first
+        assert told in lifecycle.brief_path(world.ctx(), task.id).read_text()
+        assert proposals.read(world.places).approved == [task.id] and world.launcher.messages == []
+
+
+def test_a_check_named_by_a_short_sha_checks_the_merge_it_ran_on(world: World) -> None:
+    task = world.task(branch="impl-t-0001")
+    world.queue().write_task(dataclasses.replace(task, status="merged", run=1))
+    merge = "abc1234" + "0" * 33
+    store.write_json(turn.merges_path(world.places), {merge: task.id})
+    world.launcher.git = lambda argv: (0, f"{merge}\n") if argv[-1] == "abc1234^{commit}" else (1, "")
+    report = (f"# Check\n\n## Scenarios\n\n{records.CHECK_TABLE}\n| --- | --- | --- | --- |\n"
+              "| sign-in | pass | 3 | shot.png |\n").encode()  # fmt: skip
+
+    with pytest.raises(Refused, match="git rev-parse failed"):
+        verbs.check_save(world.ctx(), {"commit": "fedcba9"}, report)
+    answer = verbs.check_save(world.ctx(), {"commit": "abc1234"}, report)
+    assert answer["checked"] == task.id and world.queue().task(task.id).status == "checked"
+    assert [c.commit for c in world.queue().checks()[0]] == [merge]

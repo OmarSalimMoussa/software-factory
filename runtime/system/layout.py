@@ -125,3 +125,9 @@ def tailnet_record(state: Path) -> Path:
     """What the install changed on Tailscale, for the uninstall to put back: the operator it cleared and what it
     serves."""
     return state / "tailnet.json"
+
+
+def stack_wall(stack_uid: str) -> Path:
+    """The drop-in that walls the stack user's systemd off the tailnet, in a folder that is all the factory's, as
+    the user is."""
+    return UNITS_DIR / f"user@{stack_uid}.service.d" / "software-tailnet.conf"

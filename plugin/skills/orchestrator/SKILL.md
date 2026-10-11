@@ -41,7 +41,7 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 | `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed, giving it the event's `since`. |
 | `approved` | The warden starts it when a place frees. Fill the free proposal slot. |
 | `not-now`, `dropped`, `boosted`, `proposal-slot-free` | Fill the free proposal slots. |
-| `go` | Start the build. The warden ends the spec's designer itself. |
+| `go` | The owner said Go to a spec: the warden starts its build when a place frees and ends its designer. Nothing to do. |
 | `decided-extend`, `park`, `to-designer` | The owner decided a stuck task; the warden told its session or ended it. `to-designer`: propose it at rung 3. |
 | `limit-extended` | The owner gave a session more of a limit; the warden told it. Nothing to do. |
 | `answered` | The owner answered a question you asked: act on it. A session's own answer reaches it from the warden. |
@@ -119,8 +119,9 @@ merged for a while, a regression walk of the scenarios that waited longest.
    `qa-regression` testers at once, the scenarios split between them, each signed in as its own test address. Save
    each tester's report to a file and run `factory queue check <merge sha> --body <that file>`.
 4. **A failure** reverts the merge only when that merge is the one change to the scenario's code since its last
-   pass: `git revert -m 1 <merge> --no-edit`, the task back to `building`, its implementer told. Any other failure
-   becomes a request. A saved check with no failure moves the task to `checked` by itself.
+   pass: `git revert -m 1 <merge> --no-edit`, then `factory queue task status <task> building --note "<why>; reverted
+   as <the revert's sha>"`. The warden tells its implementer, or starts a new one once it has ended. Any other
+   failure becomes a request. A saved check with no failure moves the task to `checked` by itself.
 5. **Ship.** `factory push` has the warden push the newest commit that is safe to ship: its tree passed, and every
    merge it adds passed its check (or was reverted). CI deploys staging. Staging regressing after your push: revert,
    `factory check`, push again at once (`procedures/ops/revert.md`). Prod moves only when the owner pushes it.

@@ -7,7 +7,7 @@ import dataclasses
 import pytest
 from queue_kit import World
 
-from runtime.queue import goal
+from runtime.queue import goal, tasks
 from runtime.queue.score import score
 from runtime.shared import order
 from runtime.shared.models import Request, Task
@@ -90,3 +90,13 @@ def test_goal_items_keep_their_names_and_rank_by_their_place_among_the_open_ones
 def test_a_goal_list_that_cannot_be_read_is_refused_with_why(change: tuple[str, str], says: str) -> None:
     with pytest.raises(goal.GoalError, match=says):
         goal.parse(GOAL_MD.replace(*change))
+
+
+def test_a_task_scored_between_rescores_is_aged_as_of_the_last_one_like_the_tasks_beside_it(world: World) -> None:
+    first, waiting = world.task(), world.request()  # both requests filed now
+    tasks.rescore(world.ctx())
+    world.clock.at += 7 * DAY
+    second = world.task(requests=[waiting.id])  # its request has waited as long as the first's
+    assert world.queue().task(second.id).score == world.queue().task(first.id).score
+    tasks.rescore(world.ctx())
+    assert world.queue().task(second.id).score == world.queue().task(first.id).score == 72.5  # both a week older

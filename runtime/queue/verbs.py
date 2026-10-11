@@ -161,7 +161,7 @@ def needs_owner(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
 
 def check_save(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
     """A check of the default branch; the task its merge landed is checked when nothing failed."""
-    record = documents.save_check(ctx, _text(args, "commit"), data)
+    record = documents.save_check(ctx, turn.full_commit(ctx, _text(args, "commit")), data)
     failed = [r.scenario for r in record.rows if r.result != "pass"]
     checked = turn.check_saved(ctx, record.commit, not failed)
     return ok(check=record.id, scenarios=len(record.rows), not_passed=failed, checked=checked or None)

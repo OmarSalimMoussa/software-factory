@@ -49,6 +49,13 @@ UNIT_FILES = (
     Artifact("units/system-sleep.sh", layout.SLEEP_HOOK, 0o755),
 )
 POLKIT = Artifact("polkit/50-software-factory.rules", layout.POLKIT_RULE, 0o644)
+
+
+def stack_wall(stack_uid: str) -> Artifact:
+    """The drop-in that walls the stack user's own systemd off the tailnet; its place names the user's id."""
+    return Artifact("units/stack-user-tailnet.conf", layout.stack_wall(stack_uid), 0o644)
+
+
 FIREWALL = Artifact("nftables/software-factory.nft", layout.NFT_FILE, 0o644)
 APPARMOR = Artifact("apparmor/software-bwrap", layout.APPARMOR_PROFILE, 0o644)
 MANAGED = Artifact("managed-settings.json", MANAGED_SETTINGS, 0o644)
@@ -95,6 +102,7 @@ def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str
         "firewall_unit": layout.FIREWALL_UNIT,
         "nft_file": str(layout.NFT_FILE),
         "nft_table": layout.NFT_TABLE,
+        "firewall_run_name": places.firewall.name,
         "firewall_stamp": str(places.firewall_stamp),
         "firewall_refresh": f"{settings.get_int('install.firewall_refresh_seconds')}s",
         "memory_high": settings.get_str("budget.slice_memory_high"),

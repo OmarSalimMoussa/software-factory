@@ -7,4 +7,6 @@ Description=software factory: load the agent and stack users' firewall again
 [Service]
 Type=oneshot
 ExecStart=/usr/sbin/nft -f @nft_file@
+RuntimeDirectory=@firewall_run_name@
+RuntimeDirectoryPreserve=yes
 ExecStartPost=/usr/bin/touch @firewall_stamp@

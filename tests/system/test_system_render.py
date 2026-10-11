@@ -41,7 +41,7 @@ def test_the_slice_takes_its_budget_from_the_settings(changes: dict[str, object]
 
 def test_every_unit_renders_whole() -> None:
     given = _values()
-    for item in (*render.UNIT_FILES, render.POLKIT, render.FIREWALL):
+    for item in (*render.UNIT_FILES, render.stack_wall(STACK_UID), render.POLKIT, render.FIREWALL):
         assert render.TOKEN.search(render.artifact(item, HERE, given)) is None, item.source
 
 
@@ -142,10 +142,26 @@ def test_the_firewall_loads_after_nftables_again_on_its_timer_and_the_kernel_wal
     firewall = _unit("software-firewall.service").splitlines()
     refresh = _unit("software-firewall-refresh.service").splitlines()
     timer = _unit("software-firewall-refresh.timer", **{"install.firewall_refresh_seconds": 45}).splitlines()
-    stamp = "ExecStartPost=/usr/bin/touch /var/lib/software-factory/public/firewall-loaded"
+    # Root touches the stamp in a folder of root's own, where no other user can plant a link for it to follow.
+    stamp = {"RuntimeDirectory=software-firewall", "RuntimeDirectoryPreserve=yes",
+             "ExecStartPost=/usr/bin/touch /run/software-firewall/loaded"}  # fmt: skip
 
-    assert {"After=nftables.service", "PartOf=nftables.service", stamp} <= set(firewall)
-    assert {"ExecStart=/usr/sbin/nft -f /etc/software-factory/firewall.nft", stamp} <= set(refresh)
+    assert {"After=nftables.service", "PartOf=nftables.service", *stamp} <= set(firewall)
+    assert {"ExecStart=/usr/sbin/nft -f /etc/software-factory/firewall.nft", *stamp} <= set(refresh)
     assert {"OnActiveSec=45s", "OnUnitActiveSec=45s", "WantedBy=timers.target"} <= set(timer)
     slice_ = _unit("software-factory.slice").splitlines()
     assert "IPAddressDeny=100.64.0.0/10 fd7a:115c:a1e0::/48" in slice_
+    # The stack user's own systemd runs every container outside the slice: the same wall, for that user alone.
+    wall = render.stack_wall(STACK_UID)
+    assert wall.dest == Path(f"/etc/systemd/system/user@{STACK_UID}.service.d/software-tailnet.conf")
+    walled = render.artifact(wall, HERE, _values()).splitlines()
+    assert [line for line in walled if line.startswith("IPAddress")] == [
+        line for line in slice_ if line.startswith("IPAddress")
+    ]
+
+
+def test_the_agents_daemon_starts_only_with_the_firewall_loaded_and_never_restarts_with_it() -> None:
+    daemon = _unit("software-agent-daemon.service").splitlines()
+    # Requires= would pass on the firewall unit's restarts with nftables.service, and each ends every session.
+    assert not any(line.startswith(("Requires=", "BindsTo=", "Requisite=")) for line in daemon)
+    assert "ExecStartPre=+/usr/sbin/nft list table inet software_factory" in daemon

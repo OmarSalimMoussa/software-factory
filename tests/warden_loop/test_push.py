@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from loop_fakes import World
 
-from runtime.queue import formats, turn
+from runtime.queue import formats, records, turn
 from runtime.shared import models, store
 from runtime.shared.models import Probe, Task
 from runtime.shared.protocol import Refused
@@ -129,10 +129,15 @@ def test_push_reads_the_agents_checkout_though_another_user_owns_it(
     assert answer["commits"] == 1
 
 
-def probe(world: World, env: str, ok: bool, commit: str = "") -> None:
+def probe(world: World, env: str, ok: bool, commit: str = "", on_default: bool | None = True) -> None:
+    """A probe of ``env``; a healthy staging build is noted as deployed, and whether it is on the default branch, as
+    the tick notes it."""
     error = "" if ok else "HTTP 502"
     record = Probe(world.clock.iso(), env, ok, commit, 40, error, counts=not ok)
     store.append_jsonl(world.ctx.places.probes, models.dump(record))
+    if env == probes.STAGING and ok and commit:
+        deploys.record(world.ctx.places, env, commit, world.clock.iso())
+        deploys.note_branch(world.ctx.places, env, commit, on_default)
 
 
 STAGING, PROD, OLD = "a" * 40, "b" * 40, "c" * 40
@@ -235,18 +240,28 @@ def _task(world: World, task_id: str, status: str, merge: str) -> None:
     store.write_json(turn.merges_path(world.ctx.places), {**known, merge: task_id})
 
 
-@pytest.mark.parametrize(("status", "ships"), [("merged", False), ("checked", True)])
+@pytest.mark.parametrize(
+    ("status", "check", "ships"),
+    [("merged", "", False), ("checked", "", True), ("closed", "", False), ("closed", "fail", False),
+     ("closed", "pass", True)],
+    ids=["merged", "checked", "closed-before-its-check", "closed-after-a-failed-check", "closed-after-its-check"],
+)  # fmt: skip
 def test_push_never_ships_a_merge_whose_check_of_the_default_branch_has_not_passed(
-    world: World, github_repo: Path, status: str, ships: bool
+    world: World, github_repo: Path, status: str, check: str, ships: bool
 ) -> None:
     merge = _merge(world, "impl-t-0001")
     _task(world, "t-0001", status, merge)
     passed(world, git(world.checkout, "rev-parse", f"{merge}^{{tree}}"))
+    if check:
+        row = records.ScenarioRow("sign-in", check, 3, "shot.png")
+        saved = records.CheckRecord(f"c-20261009T000000Z-{merge[:7]}", merge, "2026-10-09T00:00:00Z", "Check", [row])
+        (world.checkout / "queue" / "checks").mkdir(mode=0o755)
+        (world.checkout / "queue" / "checks" / f"{saved.id}.md").write_text(records.dump_check(saved))
 
     if ships:
         assert github_push.push_checked(world.ctx, {}, None)["sha"] == merge  # the newest shippable commit
     else:
-        with pytest.raises(Refused, match="t-0001, merged") as refused:
+        with pytest.raises(Refused, match=f"t-0001, {status}") as refused:
             github_push.push_checked(world.ctx, {}, None)
         assert refused.value.rule == "unchecked"
 
@@ -275,10 +290,11 @@ def test_push_back_goes_to_what_prod_ran_when_the_last_push_began_even_if_that_p
     assert github_push.push_back_target(world.ctx) == PROD  # not OLD, two builds back
 
 
-def test_a_staging_build_pinned_off_the_default_branch_never_goes_to_prod(world: World) -> None:
-    deploys.record(world.ctx.places, probes.STAGING, STAGING, world.clock.iso())
-    deploys.note_branch(world.ctx.places, probes.STAGING, STAGING, False)
-    probe(world, probes.STAGING, True, STAGING)
+@pytest.mark.parametrize("on_default", [False, None], ids=["pinned-off-it", "not-on-githubs-branch-or-unknown"])
+def test_a_staging_build_not_known_on_the_default_branch_never_goes_to_prod(
+    world: World, on_default: bool | None
+) -> None:
+    probe(world, probes.STAGING, True, STAGING, on_default)
     probe(world, probes.PROD, True, PROD)
 
     with pytest.raises(Refused) as refused:

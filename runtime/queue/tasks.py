@@ -15,14 +15,17 @@ from runtime.queue import approvals, documents, formats, goal, intake, proposals
 from runtime.queue.book import Queue, task_rel
 from runtime.queue.score import score
 from runtime.queue.statuses import OWNER, WARDEN
+from runtime.shared import store
 from runtime.shared.models import RETIRED, Request, Task
 from runtime.shared.order import Ranking, ordered
+from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden import checks, inbox, registry
 from runtime.warden.context import Context
 
 LANDED = frozenset({"merged", "checked", "on-staging", "promoted", "closed"})
 SCORED = frozenset({"queued", "parked", "proposed"})
+REVERTED = "reverted"  # the event that takes a landed task back to its builder
 _FACTS: dict[str, type] = {
     "title": str,
     "goal_item": str,
@@ -120,7 +123,10 @@ def _hold_turn(ctx: Context, task_id: str, held: bool) -> None:
 
 
 def set_status(ctx: Context, task_id: str, to: str, event: str, note: str) -> Task:
-    """The orchestrator's move of a task (a merge turn, a spec it approved, a close); refused off the table."""
+    """The orchestrator's move of a task (a merge turn, a spec it approved, a close); refused off the table. A revert
+    goes where the warden finds its implementer (runtime/queue/turn.py)."""
+    from runtime.queue import turn  # the turn moves tasks through this module
+
     queue = Queue.of(ctx)
     with ctx.lock, queue.lock():
         task = queue.task(task_id)
@@ -130,10 +136,14 @@ def set_status(ctx: Context, task_id: str, to: str, event: str, note: str) -> Ta
             if len(found) != 1:
                 raise Refused("task-status", f"{task_id} {task.status} → {to} needs --event: one of {found or 'none'}")
             event = found[0]
-        moved = transition(ctx, queue, task, to, event, actor(ctx), note or f"{event}: now {to}")
-        if event == "spec-approved":
-            documents.approve_spec(ctx, queue, task_id)
-    return moved
+        if event != REVERTED:
+            moved = transition(ctx, queue, task, to, event, actor(ctx), note or f"{event}: now {to}")
+            if event == "spec-approved":
+                documents.approve_spec(ctx, queue, task_id)
+            return moved
+    if to != "building":
+        raise Refused("task-status", f"a revert sends {task_id} back to building; the warden finds who builds it")
+    return turn.send_back(ctx, task_id, note)
 
 
 def goal_ranks(ctx: Context) -> dict[str, int]:
@@ -147,8 +157,25 @@ def goal_ranks(ctx: Context) -> dict[str, int]:
 
 
 def scored(ctx: Context, queue: Queue, task: Task, goals: Mapping[str, int]) -> Task:
+    """The task scored as of the last rescore: a score's age part is fixed when it is written, so every waiting
+    task's is measured from the same time, and the order reads them side by side."""
     reqs = [queue.request(r) for r in task.requests]
-    return dataclasses.replace(task, score=score(task, reqs, goals, ctx.clock.now(), ctx.settings()))
+    at = rescored_at(ctx.places)
+    return dataclasses.replace(task, score=score(task, reqs, goals, ctx.clock.now() if at is None else at,
+                                                 ctx.settings()))  # fmt: skip
+
+
+def _rescored_path(places: Places) -> Path:
+    return places.state / "rescored.json"
+
+
+def rescored_at(places: Places) -> float | None:
+    """When every waiting task was last scored at once; None before the first time."""
+    raw = store.read_json_or(_rescored_path(places), {"at": None})
+    at = raw.get("at") if isinstance(raw, dict) else "missing"
+    if at is not None and not isinstance(at, int | float):
+        raise store.StoreError(f"{_rescored_path(places)}: not a time")
+    return at
 
 
 def facts_from(args: Mapping[str, Any], allowed: frozenset[str] | None = None) -> dict[str, Any]:
@@ -329,10 +356,11 @@ def _deploy_step(status: str, on_staging: bool | None, on_prod: bool | None) -> 
 
 
 def rescore(ctx: Context) -> int:
-    """Score every waiting task again, as after a change to GOAL.md; how many scores changed."""
+    """Score every waiting task again, as of now, as after a change to GOAL.md; how many scores changed."""
     queue = Queue.of(ctx)
     goals = goal_ranks(ctx)
     with ctx.lock, queue.lock():
+        store.write_json(_rescored_path(ctx.places), {"at": ctx.clock.now()})
         changes = {}
         for task in queue.tasks()[0]:
             if task.status in SCORED:

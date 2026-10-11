@@ -2,13 +2,14 @@
 # session outlives the short unit that asked for it.
 [Unit]
 Description=software factory: the agents' Claude daemon
-Wants=network-online.target
+Wants=network-online.target @firewall_unit@
 After=network-online.target @warden_unit@ @firewall_unit@
-# No agent runs while the firewall that keeps it off the dashboard is down.
-Requires=@firewall_unit@
 
 [Service]
 Type=simple
+# No agent starts while the firewall that keeps it off the dashboard is not loaded. Not Requires= on the firewall
+# unit: that restarts with nftables.service, and a restart here ends every session the daemon hosts.
+ExecStartPre=+/usr/sbin/nft list table inet @nft_table@
 User=@agent_user@
 Group=@agent_user@
 Slice=@slice@

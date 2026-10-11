@@ -40,7 +40,8 @@ function stackChart(c) {
     const x = pl + i * bw + bw * .18, w = bw * .64, top = y(d.total), base = y(0), rr = Math.min(r, (base - top) / 2);
     let acc = 0;
     const segs = d.values.map((v, j) => { const y0 = y(acc), y1 = y(acc + v); acc += v; return `<rect x="${x}" y="${y1}" width="${w}" height="${Math.max(0, y0 - y1)}" fill="${cv(c.families[j].color)}"><title>${esc(c.families[j].label)}: $${v.toFixed(2)}</title></rect>`; }).join('');
-    return `<clipPath id="sbar-${i}"><path d="M${x} ${base}V${top + rr}Q${x} ${top} ${x + rr} ${top}H${x + w - rr}Q${x + w} ${top} ${x + w} ${top + rr}V${base}Z"/></clipPath><g clip-path="url(#sbar-${i})">${segs}</g>`;
+    const unk = d.unknown ? `<text class="unk" x="${x + w / 2}" y="${top - 4}" text-anchor="middle">?<title>${esc(d.unknown)}</title></text>` : '';
+    return `<clipPath id="sbar-${i}"><path d="M${x} ${base}V${top + rr}Q${x} ${top} ${x + rr} ${top}H${x + w - rr}Q${x + w} ${top} ${x + w} ${top + rr}V${base}Z"/></clipPath><g clip-path="url(#sbar-${i})">${segs}</g>${unk}`;
   }).join('');
   const labels = days.map((d, i) => d.label ? `<text x="${pl + i * bw + bw / 2}" y="${H - 6}" text-anchor="middle">${esc(d.label)}</text>` : '').join('');
   const budget = c.budget == null ? '' : `<line x1="${pl}" x2="${W}" y1="${y(c.budget)}" y2="${y(c.budget)}" stroke="var(--warn)" stroke-dasharray="4 4"/><text x="${pl - 8}" y="${y(c.budget) + 4}" text-anchor="end" style="fill:var(--warn);font-weight:600">$${c.budget}</text>`;

@@ -181,7 +181,8 @@ def tiles(snap: Snap) -> dict[str, Any]:
     # known at all the day's spend is unknown, never $0.
     today = None if unknown and not spark[-1] else spark[-1]
     pct = None if today is None else round(today / budget * 100)
-    foot = f"{pct}% of the daily budget" if pct is not None else "unknown: no price is set for its models"
+    foot = (f"{pct}% of the daily budget" if pct is not None
+            else "unknown: no price is set for its models, so the budget stops nothing")  # fmt: skip
     if unknown and today is not None:
         foot += f", and {plural(unknown, 'call')} of unknown price"
     return {

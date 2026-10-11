@@ -47,7 +47,7 @@ reason, so the orchestrator tells the owner.
 {"batch": ["r-2026-10-09-0042", "r-2026-10-09-0051", "r-2026-10-09-0052"],
  "new_tasks": [{"title": "Signing in sends people back to the sign-in page",
                 "body": "What is wrong, and how to know it is fixed.",
-                "goal_item": "G1", "severity": "major", "surfaces": ["ui", "access"],
+                "goal_item": "G-build-sop", "severity": "major", "surfaces": ["ui", "access"],
                 "cause": "", "slices": null, "owner_class": "none",
                 "requests": ["r-2026-10-09-0042"], "after": []}],
  "joins": {"r-2026-10-09-0051": "t-0017"},

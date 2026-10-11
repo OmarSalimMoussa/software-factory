@@ -4,7 +4,8 @@
 tells its implementer; while a task holds it no other task may. The holder and its branch are published for the
 merge hook, which refuses any other branch. The warden finds the merge itself, each tick: the first-parent merge on
 the default branch, since the turn was given, whose second parent is on the holder's branch. A saved check of that
-merge with no failure moves the task to checked. The orchestrator keeps the merge itself and the call to revert.
+merge with no failure moves the task to checked. The orchestrator keeps the merge itself and the call to revert;
+the warden sends a reverted task back to its implementer, or, once that has ended, to a new one.
 """
 
 from __future__ import annotations
@@ -13,10 +14,10 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import statuses, tasks
+from runtime.queue import formats, proposals, statuses, tasks
 from runtime.queue.book import Queue
 from runtime.shared import order, store
-from runtime.shared.models import RETIRED, Task
+from runtime.shared.models import RETIRED, Session, Task
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.warden import lifecycle, permits, registry
@@ -28,6 +29,10 @@ TURN, MERGED, CHECKED = "turn", "merged", "checked"
 GIVEN = (
     "You have the merge turn. Rebase on {default}, rerun the tests you picked, then factory check; once it passes, "
     "ask the orchestrator to merge, with the tree it names."
+)
+REVERTED = (
+    "Your work was taken back off {default}: {note}\n\nBring it back first: `git merge --ff-only {default}`, "
+    "`git revert <the revert's sha>`, then the fix. A rebase alone would leave the work reverted."
 )
 
 
@@ -65,6 +70,13 @@ def _git(ctx: Context, *args: str) -> str:
     return out.strip()
 
 
+def full_commit(ctx: Context, commit: str) -> str:
+    """The full sha of a commit the checkout knows: a check is matched to its merge by the whole sha."""
+    if not formats.SHA.match(commit):
+        raise Refused("check", "name the commit the check ran on")
+    return _git(ctx, "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}")
+
+
 def held(ctx: Context, task: Task) -> None:
     """``task`` got the turn: record it with the default branch's commit now. The caller holds ctx.lock."""
     if holder(ctx.places) is not None:
@@ -100,17 +112,21 @@ def next_turn(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
     return ok(task=moved.id, branch=moved.branch, message=f"{moved.id} has the merge turn; its implementer was told")
 
 
-def _tell(ctx: Context, task: Task, message: str) -> None:
+def _implementer(ctx: Context, task_id: str) -> Session | None:
     sessions = registry.read(ctx.places).values()
-    mine = [s for s in sessions if s.task == task.id and s.role == statuses.IMPL and not s.parent]
-    impl = next((s for s in mine if s.state != RETIRED), None)
+    mine = [s for s in sessions if s.task == task_id and s.role == statuses.IMPL and not s.parent]
+    return next((s for s in mine if s.state != RETIRED), None)
+
+
+def _tell(ctx: Context, task: Task, message: str) -> None:
+    impl = _implementer(ctx, task.id)
     if impl is None:
         return
     try:
         lifecycle.deliver(ctx, impl.id, message, lifecycle.WARDEN)
-    # telemetry: surfaced — the turn stands; the implementer reads it from its task's status when it next looks
+    # telemetry: surfaced — the move stands; the implementer reads it from its task's status when it next looks
     except (LaunchError, Refused) as exc:
-        log.warning("warden: %s's implementer %s was not told of its turn (%s)", task.id, impl.id, type(exc).__name__)
+        log.warning("warden: %s's implementer %s was not told of its move (%s)", task.id, impl.id, type(exc).__name__)
 
 
 def find_merge(ctx: Context) -> None:
@@ -142,3 +158,28 @@ def check_saved(ctx: Context, commit: str, passed: bool) -> str:
         return ""
     tasks.move(ctx, task_id, CHECKED, "checked", statuses.WARDEN, f"the check of {commit[:12]} passed")
     return task_id
+
+
+def send_back(ctx: Context, task_id: str, note: str) -> Task:
+    """A reverted task goes back to building, its implementer told why. Once that implementer has ended (its task
+    passed its check), the task goes back to the approved runs, or a designed build to the designed builds, and the
+    scheduler starts a new implementer, whose first message carries why."""
+    if not note.strip():
+        raise Refused("note", "a revert says why, and names the revert's commit, in --note")
+    told = REVERTED.format(default=ctx.settings().get_str("repo.default_branch"), note=note.strip())
+    queue = Queue.of(ctx)
+    with ctx.lock, queue.lock():
+        task = queue.task(task_id)
+        impl = _implementer(ctx, task_id)
+        designed = task.run is not None and task.run >= 3
+        to = "building" if impl is not None or designed else "approved"
+        moved = tasks.transition(ctx, queue, task, to, "reverted", tasks.actor(ctx), note.strip())
+        if impl is None:
+            if designed and task_id not in proposals.designed_builds(ctx.places):
+                proposals.set_designed_builds(ctx.places, [*proposals.designed_builds(ctx.places), task_id])
+            brief = lifecycle.brief_path(ctx, task_id)
+            before = brief.read_text(encoding="utf-8").strip() if brief.is_file() else ""
+            store.write_text(brief, f"{before}\n\n{told}".strip() + "\n", mode=0o600)
+    if impl is not None:
+        _tell(ctx, moved, told)
+    return moved

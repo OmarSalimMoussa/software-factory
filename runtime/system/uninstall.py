@@ -101,6 +101,9 @@ def system_files(host: Host) -> None:
     for name in (*UNITS, *TEMPLATES, f"{SLICE}"):
         _remove(host, layout.UNITS_DIR / name)
     _remove(host, layout.SLICE_CONTROL / f"{SLICE}.d")
+    stack = host.account(layout.STACK_USER)
+    if stack is not None:
+        _remove(host, layout.stack_wall(str(stack.uid)).parent)
     _remove(host, layout.SLEEP_HOOK)
     _try(host, ["systemctl", "daemon-reload"])
     _try(host, ["systemctl", "reset-failed"])
@@ -125,7 +128,7 @@ def _with_leftovers(path: Path) -> tuple[Path, ...]:
 
 def programs(host: Host, places: Places, dashboard_port: str | None) -> None:
     for path in (paths.FACTORY_BIN, layout.CLAUDE_BIN.parent, *_with_leftovers(paths.INSTALL), layout.TOOLS,
-                 *_with_leftovers(layout.TOOLCHAIN), paths.RUN, layout.DRILLS):  # fmt: skip
+                 *_with_leftovers(layout.TOOLCHAIN), paths.RUN, paths.FIREWALL, layout.DRILLS):  # fmt: skip
         _remove(host, path)
     sealed_copies(host)
     tailnet(host, places, dashboard_port)

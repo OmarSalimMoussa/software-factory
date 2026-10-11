@@ -333,7 +333,8 @@ def resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
         if s.state == RETIRED:
             raise Refused("retired", f"{s.name} is retired, and a retired session can never be resumed")
         if s.state not in (WORKING, WAITING):
-            raise Refused("state", f"{s.name} is {s.state}; a deprioritized session comes back with factory revive")
+            raise Refused("state", f"{s.name} is {s.state}; the warden brings a benched session back itself when a "
+                                   "place frees")  # fmt: skip
     try:
         deliver(ctx, s.id, message, actor(ctx))
     except LaunchError as exc:

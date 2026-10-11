@@ -82,7 +82,7 @@ def parse_spec(text: str, rel: str = "") -> Spec:
     if spec.brief and not spec.brief.startswith(ARTIFACT):
         problems.append(f"brief must be a {ARTIFACT} artifact link")
     if spec.goal_item and not GOAL_ITEM.match(spec.goal_item):
-        problems.append(f"goal_item {spec.goal_item!r} is not G<n>")
+        problems.append(f"goal_item {spec.goal_item!r} is not a goal item's name, such as G-build-sop")
     if not ISO.match(spec.updated):
         problems.append(f"updated {spec.updated!r} is not a UTC time")
     if not body:
