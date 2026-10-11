@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import socket
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -81,3 +82,27 @@ def test_a_subagent_report_never_blocks_when_the_warden_is_away(kit: Kit, event:
     payload: dict[str, object] = {"hook_event_name": event, "session_id": SID, "agent_id": TESTER_ID}
     code, out, err = _handle(kit, payload)
     assert (code, out) == (0, "") and err.startswith("factory guard: subagent.") and "not sent" in err
+
+
+def test_a_guard_that_runs_out_of_its_time_refuses_the_call_instead_of_letting_it_through(
+    kit: Kit, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from runtime.guard import deadline, decide
+
+    def slow(call: object) -> None:
+        time.sleep(5)
+
+    monkeypatch.setattr(decide, "decide_tool", slow)
+
+    def handled(payload: dict[str, object]) -> tuple[int, str, str]:
+        deadline.arm(0.4)
+        try:
+            return _handle(kit, payload)
+        finally:
+            deadline.disarm()
+
+    started = time.monotonic()
+    code, _, err = handled(kit.payload("Bash", {"command": "ls"}))
+    assert time.monotonic() - started < 2
+    assert code == 2 and "ran out of time" in err
+    assert handled(kit.payload("Read", {"file_path": "/x"}))[0] == 0

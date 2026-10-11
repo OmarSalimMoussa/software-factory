@@ -8,11 +8,12 @@ import json
 import socket
 from pathlib import Path
 
+from runtime.guard import deadline
+
 # The text before every refusal, which Claude Code hands back as the call's result: transcripts are read for it.
 REFUSED = "Refused by the factory guard"
 READ_TOOLS = frozenset({"Read", "Grep", "Glob", "LS", "ToolSearch", "TaskOutput", "TodoWrite", "SubagentHandback"})
 PARENTS = frozenset({"main", "orchestrator"})
-_SEND_TIMEOUT_S = 0.5
 
 
 def one_line(rule: str, reason: str) -> str:
@@ -42,7 +43,7 @@ def send_refusal(path: Path, record: dict[str, str]) -> None:
     # The warden listens on a stream socket instead.
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-            sock.settimeout(_SEND_TIMEOUT_S)
+            sock.settimeout(deadline.spare())
             sock.connect(str(path))
             sock.sendall(line)
     except OSError:

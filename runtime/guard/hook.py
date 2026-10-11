@@ -4,7 +4,8 @@ Run as ``/usr/bin/python3 -I <install>/runtime/guard/hook.py``. Before loading a
 alone whether this is a factory session: its process sits in the factory's slice. A session outside the slice is the
 owner's and is never guarded. Inside it, any failure refuses the call with exit 2, because Claude Code lets a call
 through on a timeout or any other exit code; reading and reporting are never refused for a failure. Each refusal is
-one line naming the rule and the remedy, and goes to the warden's refusal socket. A subagent's start and end are
+one line naming the rule and the remedy, and goes to the warden's refusal socket. The guard decides within half the
+hook's time (runtime/guard/deadline.py), so a slow rule refuses instead of timing out. A subagent's start and end are
 reported to the warden, which registers it under its parent; those hooks never block. Stdlib only.
 """
 
@@ -19,7 +20,7 @@ from pathlib import Path
 # `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.guard import wire  # noqa: E402 - the path line above must run first
+from runtime.guard import deadline, wire  # noqa: E402 - the path line above must run first
 from runtime.shared.paths import SLICE, Places  # noqa: E402
 
 _INPUT_LIMIT = 4_000_000
@@ -78,16 +79,13 @@ def report_subagent(payload: dict[str, object], event: str, places: Places) -> s
     """Tell the warden a subagent started or ended; what went wrong, as one line for standard error, or nothing."""
     verb = _SUBAGENT_VERBS[event]
     try:
-        from runtime.guard.facts import read_settings
         from runtime.shared.protocol import request
 
         args = {"agent_id": str(payload.get("agent_id", ""))}
         if verb == "subagent.start":
             args["kind"] = str(payload.get("agent_type", ""))
-        # Half the hook's own time, so the line about a silent warden is written before Claude Code gives up.
-        wait = read_settings(places).get_int("install.hook_timeout_seconds") / 2
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-            sock.settimeout(wait)
+            sock.settimeout(deadline.left())
             sock.connect(str(places.socket))
             sock.sendall(request(verb, args))
             answer = json.loads(sock.makefile("rb").readline())
@@ -122,6 +120,32 @@ def _run(payload: dict[str, object], event: object, places: Places, home: Path, 
     return 0, "", ""
 
 
+def out_of_time(raw: str) -> Outcome:
+    try:
+        payload = json.loads(raw)
+    # telemetry: surfaced — an unreadable input refuses like any other the guard cannot decide
+    except ValueError:
+        payload = {}
+    if not isinstance(payload, dict) or payload.get("hook_event_name") not in (None, "PreToolUse"):
+        return 0, "", ""
+    if wire.simple_way_out(payload):
+        return 0, "", ""
+    return 2, "", wire.one_line("guard", "the guard ran out of time to decide, so this call is refused; try again")
+
+
+def _arm(places: Places) -> None:
+    """Give the guard half the hook's time. Settings that cannot be read arm nothing: the guard's first step reads
+    them again and refuses the call."""
+    try:
+        from runtime.guard.facts import read_settings
+
+        seconds = read_settings(places).get_int("install.hook_timeout_seconds")
+    # telemetry: surfaced — the rules read the settings again and refuse the call, naming why
+    except Exception:  # noqa: BLE001
+        return
+    deadline.arm(seconds)
+
+
 def main() -> int:
     raw = sys.stdin.read(_INPUT_LIMIT)
     try:
@@ -130,7 +154,16 @@ def main() -> int:
     except OSError as exc:
         print(f"factory guard: /proc/self/cgroup is unreadable ({type(exc).__name__})", file=sys.stderr)
         cgroup = ""
-    code, out, err = handle(raw, cgroup, Places.system(), Path.home(), datetime.now(UTC))
+    places = Places.system()
+    if in_factory_slice(cgroup):
+        _arm(places)
+    try:
+        code, out, err = handle(raw, cgroup, places, Path.home(), datetime.now(UTC))
+    # The time ran out while a refusal was being written: the call is refused all the same, unless it only reads.
+    except deadline.OutOfTime:
+        code, out, err = out_of_time(raw)
+    finally:
+        deadline.disarm()
     if out:
         print(out)
     if err:

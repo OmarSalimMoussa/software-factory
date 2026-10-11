@@ -185,7 +185,7 @@ drill = { model = "claude-haiku-5-5", effort = "low" }  # the model the drills d
 drill_seconds = 180     # the longest one drill may run
 drills_at_once = 4      # drill sessions run side by side, each in its own unit; the guard and host drills run alone
 tailnet_seconds = 60    # how long publishing the dashboard on the tailnet may wait before the owner is shown why
-hook_timeout_seconds = 10  # how long Claude Code waits for the guard; a timeout lets the call through
+hook_timeout_seconds = 10  # how long Claude Code waits for the guard, which decides within half of it or refuses
 firewall_refresh_seconds = 60  # how often the firewall table is loaded again, should anything have flushed it
 healthchecks_grace_minutes = 10  # how late a Healthchecks.io check-in may be before the owner is told
 toolchain = ["uv", "node"]  # programs the product's scripts need, copied from the owner's PATH for the agents and stack

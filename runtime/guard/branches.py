@@ -11,7 +11,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from runtime.guard import shell
+from runtime.guard import deadline, shell
 from runtime.guard.facts import ORCHESTRATOR, Call, Decision, Refusal, resolve
 from runtime.guard.git_rules import GIT_VALUED, git_args, subcommand
 
@@ -32,13 +32,14 @@ _VALUED = {
 _BRANCH_READS = frozenset({"-l", "--list", "-a", "--all", "-r", "--remotes", "--show-current", "-v", "-vv"})
 _TAG_READS = frozenset({"-l", "--list", "-v", "--verify", "-n"})
 _CREATES = {"checkout": ("-b", "-B", "--orphan"), "switch": ("-c", "-C", "--orphan")}
-_TIMEOUT_S = 10
 
 
 def _git(directory: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", "-C", str(directory), *args], capture_output=True, text=True, timeout=_TIMEOUT_S, check=False
-    )
+    try:
+        return subprocess.run(["git", "-C", str(directory), *args], capture_output=True, text=True,
+                              timeout=deadline.left(), check=False)  # fmt: skip
+    except subprocess.TimeoutExpired as exc:
+        raise deadline.OutOfTime(f"git {args[0]} did not answer in the guard's time") from exc
 
 
 def current_branch(directory: Path) -> str | None:
