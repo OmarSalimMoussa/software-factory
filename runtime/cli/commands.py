@@ -9,6 +9,17 @@ from typing import Any
 def parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="factory", description="Ask the factory's warden.")
     sub = parser.add_subparsers(dest="cmd", required=True)
+    _sessions(sub)
+    _telemetry(sub)
+    _requests(sub)
+    _queue(sub)
+    _tasks(sub)
+    _slot(sub)
+    _qa(sub)
+    return parser
+
+
+def _sessions(sub: Any) -> None:
     start = sub.add_parser("start", help="start an implementer or designer (orchestrator), or the orchestrator")
     start.add_argument("role", choices=["implementer", "designer", "orchestrator"])
     start.add_argument("target", nargs="?", default="")
@@ -34,7 +45,9 @@ def parser() -> argparse.ArgumentParser:
     sub.add_parser("status")
     sub.add_parser("settings").add_argument("what", choices=["show"])
     sub.add_parser("account", help="the agents' Claude accounts, the owner's own: list, add, use or remove")
-    _telemetry(sub)
+
+
+def _requests(sub: Any) -> None:
     request = sub.add_parser("request", help="request new --from … --severity … --where … --body <file>")
     request.add_argument("what", choices=["new"])
     request.add_argument("--from", dest="sender", default="")
@@ -44,7 +57,9 @@ def parser() -> argparse.ArgumentParser:
     triage = sub.add_parser("triage", help="triage plan --body <plan.json> (the triage subagent), or triage apply")
     triage.add_argument("what", choices=["plan", "apply"])
     triage.add_argument("--body")
-    _queue(sub)
+
+
+def _tasks(sub: Any) -> None:
     sub.add_parser("route").add_argument("task")
     propose = sub.add_parser("propose")
     propose.add_argument("task", nargs="?", default="")
@@ -72,7 +87,9 @@ def parser() -> argparse.ArgumentParser:
     sub.add_parser("turn", help="give the merge turn to the next qa-clean task").add_argument("what", choices=["next"])
     cause = sub.add_parser("cause", help="cause --tried '<the idea, and what ruled it out>': one try that did not hold")
     cause.add_argument("--tried", required=True)
-    _slot(sub)
+
+
+def _qa(sub: Any) -> None:
     qa = sub.add_parser("qa", help="qa plan | finding --head … --severity … --where … --body <file> | result --head … "
                                    "| waive <task> <finding> --why …")  # fmt: skip
     qa.add_argument("what", choices=["plan", "finding", "result", "waive"])
@@ -92,7 +109,6 @@ def parser() -> argparse.ArgumentParser:
     scope.add_argument("--all", action="store_true", help="check everything, not only what the branch adds")
     scope.add_argument("--list", action="store_true", help="name every check and its rule")
     check.add_argument("--only", metavar="IDS", help="run only these checks (comma-separated); records no pass")
-    return parser
 
 
 def _facts(parser: argparse.ArgumentParser) -> None:
