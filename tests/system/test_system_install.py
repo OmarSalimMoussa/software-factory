@@ -147,6 +147,20 @@ def test_the_factory_is_never_installed_onto_its_own_repo(tmp_path: Path) -> Non
         install.run(job)
 
 
+def test_root_never_opens_a_repository_the_owner_owns(tmp_path: Path) -> None:
+    """Git refuses root a repository another user owns: each clone of one comes from a bundle the owner writes."""
+    job = dry_job(tmp_path)
+
+    install.run(job)
+
+    assert isinstance(job.host, DryHost) and job.factory is not None
+    theirs = (f" {job.product}", f" {job.factory}")
+    reads = [action.split(" | ")[0] for action in job.host.actions if action.startswith("run: git")]
+    reads = [read for read in reads if any(f"{path} " in f"{read} " for path in theirs)]
+    assert sum("bundle create" in read for read in reads) == 2
+    assert all(read.endswith(f"(as {job.owner.name})") for read in reads)
+
+
 def test_the_install_makes_each_tool_cache_a_session_may_write_for_the_agent(tmp_path: Path) -> None:
     job = dry_job(tmp_path)
 

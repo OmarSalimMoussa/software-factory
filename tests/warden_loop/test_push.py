@@ -107,6 +107,23 @@ def test_push_sends_only_a_commit_whose_tree_passed_the_checks(world: World, git
     assert git(github_repo, "rev-parse", "master") == checked
 
 
+def test_push_reads_the_agents_checkout_though_another_user_owns_it(
+    world: World, github_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checked = commit(world.checkout, write("src/app.py"))
+    passes.record(world.checkout, git(world.checkout, "rev-parse", f"{checked}^{{tree}}"), "master", "now")
+    # Git's own test switch makes every repository another user's; the global config trusts the warden's mirror and
+    # GitHub's stand-in, never the agent's checkout.
+    config = github_repo.parent / "gitconfig"
+    mirror = github_push.mirror_path(world.ctx.places)
+    config.write_text(config.read_text() + f"[safe]\n\tdirectory = {mirror}\n\tdirectory = {github_repo}\n")
+    monkeypatch.setenv("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+
+    answer = github_push.push_checked(world.ctx, {"sha": checked}, None)
+
+    assert answer["commits"] == 1
+
+
 def probe(world: World, env: str, ok: bool, commit: str = "") -> None:
     error = "" if ok else "HTTP 502"
     record = Probe(world.clock.iso(), env, ok, commit, 40, error, counts=not ok)

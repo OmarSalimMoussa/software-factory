@@ -77,9 +77,13 @@ def push_checked(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
         git.run("fetch", "--no-tags", "--quiet", url, f"+refs/heads/{branch}:refs/github/{branch}")
         # The checkout belongs to the agent, so git must be told it may read it; a fetch reads it only through
         # upload-pack, the side of git built to serve untrusted repositories. A checked commit need not be a branch
-        # tip, so the checkout must hand over any commit it has.
-        git.run("-c", f"safe.directory={checkout}", "-c", "uploadpack.allowAnySHA1InWant=true", "fetch", "--no-tags",
-                "--quiet", checkout, f"+refs/heads/{branch}:refs/checkout/{branch}", sha)  # fmt: skip
+        # tip, so the checkout must hand over any commit it has. Both settings go on upload-pack's own command line
+        # (run through a shell): git drops a fetch's -c options when it starts a local upload-pack, which checks the
+        # owner of the git folder, not of the checkout.
+        trust = shlex.quote(f"safe.directory={Path(checkout) / '.git'}")
+        upload_pack = f"git -c {trust} -c uploadpack.allowAnySHA1InWant=true upload-pack"
+        git.run("fetch", "--no-tags", "--quiet", "--upload-pack", upload_pack, checkout,
+                f"+refs/heads/{branch}:refs/checkout/{branch}", sha)  # fmt: skip
         if not git.is_ancestor(sha, f"refs/checkout/{branch}"):
             raise Refused("push", f"{sha[:12]} is not on {branch} in the checkout: merge it, check it, then push")
         remote = git.run("rev-parse", f"refs/github/{branch}").strip()

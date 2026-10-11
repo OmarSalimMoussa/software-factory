@@ -111,7 +111,7 @@ def system_files(host: Host) -> None:
 
 def _with_leftovers(path: Path) -> tuple[Path, ...]:
     """``path`` and what a stopped install may have left half made beside it."""
-    return (path, *(path.with_name(f"{path.name}.{end}") for end in ("new", "old", "partial")))
+    return (path, *(path.with_name(f"{path.name}.{end}") for end in ("new", "old", "partial", "bundle")))
 
 
 def programs(host: Host, dashboard_port: str) -> None:

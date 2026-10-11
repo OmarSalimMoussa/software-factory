@@ -205,9 +205,9 @@ def apparmor(ctx: Install) -> None:
     host.run(["apparmor_parser", "-r", str(layout.APPARMOR_PROFILE)])
 
 
-def _clone(ctx: Install, source: Path, dest: Path, origin: str, owner: str, branch: str = "") -> None:
-    """A clone of ``source`` (a checkout, or a bundle of history) at ``dest``, on ``branch`` when one is named, owned
-    by ``owner``. It is made beside ``dest`` and moved there whole, so a stopped run never leaves half a clone."""
+def _clone(ctx: Install, source: Path, dest: Path, origin: str, owner: str, branch: str) -> None:
+    """A clone of the bundle of history ``source`` at ``dest``, on ``branch``, owned by ``owner``. It is made beside
+    ``dest`` and moved there whole, so a stopped run never leaves half a clone."""
     host = ctx.host
     if host.exists(dest):
         host.say(f"{dest} is already there; kept as it is")
@@ -215,18 +215,34 @@ def _clone(ctx: Install, source: Path, dest: Path, origin: str, owner: str, bran
     partial = dest.with_name(dest.name + ".partial")
     if host.exists(partial):
         host.remove(partial)
-    host.run(["git", "-c", f"safe.directory={source}", "clone", "--quiet", "--no-hardlinks", str(source),
-              str(partial)])  # fmt: skip
-    if branch:
-        host.run(["git", "-C", str(partial), "checkout", "-q", "-B", branch, "--track", f"origin/{branch}"])
+    host.run(["git", "clone", "--quiet", str(source), str(partial)])
+    host.run(["git", "-C", str(partial), "checkout", "-q", "-B", branch, "--track", f"origin/{branch}"])
     host.run(["git", "-C", str(partial), "remote", "set-url", "origin", origin])
     host.run(["chown", "-R", f"{owner}:{owner}", str(partial)])
     host.run(["mv", str(partial), str(dest)])
 
 
+def _clone_checkout(ctx: Install, checkout: Path, dest: Path, origin: str, owner: str, branch: str) -> None:
+    """``_clone`` of the owner's ``checkout``. Git refuses root a repository another user owns, and a -c
+    safe.directory never reaches the upload-pack a local clone starts, so the owner writes the checkout's history
+    as a bundle and root clones that: root never opens the owner's repository."""
+    host = ctx.host
+    if host.exists(dest):
+        host.say(f"{dest} is already there; kept as it is")
+        return
+    bundle = dest.with_name(dest.name + ".bundle")
+    try:
+        host.pipe(["git", "-C", str(checkout), "bundle", "create", "-", "--all"], ctx.owner.name,
+                  ["dd", f"of={bundle}", "status=none"])  # fmt: skip
+        _clone(ctx, bundle, dest, origin, owner, branch)
+    finally:
+        host.remove(bundle)
+
+
 def agent_checkout(ctx: Install) -> None:
-    """The agent user's own checkout of the product; the owner keeps theirs."""
-    _clone(ctx, ctx.product, ctx.checkout(), ctx.product_origin, AGENT_USER)
+    """The agent user's own checkout of the product, on its default branch; the owner keeps theirs."""
+    branch = ctx.need_settings().get_str("repo.default_branch")
+    _clone_checkout(ctx, ctx.product, ctx.checkout(), ctx.product_origin, AGENT_USER, branch)
 
 
 def warden_clone(ctx: Install) -> None:
@@ -236,16 +252,15 @@ def warden_clone(ctx: Install) -> None:
     host, owner = ctx.host, ctx.owner.name
     clone = Path(ctx.need_settings().get_str("factory.clone"))
     if ctx.release is not None and ctx.bundle is not None:
-        source, branch = ctx.bundle, str(ctx.release["branch"])
+        _clone(ctx, ctx.bundle, clone, ctx.factory_origin, WARDEN_USER, str(ctx.release["branch"]))
     elif ctx.factory is not None:
-        source, branch = ctx.factory, github_keys.default_branch(host, owner, ctx.factory)
+        branch = github_keys.default_branch(host, owner, ctx.factory)
         if not branch and not host.dry:
             raise refuse("The factory's default branch cannot be found: sign in to the GitHub CLI (gh auth login), "
                          "then install again")  # fmt: skip
-        branch = branch or "<default branch>"
+        _clone_checkout(ctx, ctx.factory, clone, ctx.factory_origin, WARDEN_USER, branch or "<default branch>")
     else:
         raise refuse("this install names neither a release nor a checkout of the factory to clone")
-    _clone(ctx, source, clone, ctx.factory_origin, WARDEN_USER, branch)
     yours = ctx.factory or ctx.product
     for key, what in (("user.name", "Your name"), ("user.email", "Your email address")):
         value = host.query(["git", "-C", str(yours), "config", key], user=owner)[1].strip()
