@@ -17,7 +17,8 @@ from runtime.queue import statuses
 from runtime.shared import models, store
 from runtime.shared.models import RETIRED, WAITING, WORKING, RecordError, Session, Task
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import backstop, doing, launch, ops, outage, permits, registry
+from runtime.slots import leases
+from runtime.warden import backstop, doing, launch, ops, outage, permits, registry, session_settings
 from runtime.warden.context import Context
 from runtime.warden.launch import LaunchError
 from runtime.warden.permits import CAP, DESIGN, FAMILY, IMPL, ORCH, SEVERE, actor
@@ -155,15 +156,29 @@ def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
         return owner_start_orchestrator(ctx, args, data)
     if ctx.caller.role != ORCH:
         raise Refused("role", "only the orchestrator starts implementers and designers; start your own claude yourself")
-    task = permits.read_task(ctx, _text(args, "task"))
     note = str(args.get("note", ""))
     if len(note.encode()) > ctx.settings().get_int("queue.max_upload_kib") * 1024:
         raise Refused("args", "the note is too long; put the detail in the task")
+    s = start_run(ctx, role, permits.read_task(ctx, _text(args, "task")), note, args.get("outage") is True)
+    return ok(session=s.id, name=s.name, model=s.model, rung=s.rung)
+
+
+def brief_path(ctx: Context, task_id: str) -> Path:
+    """The brief the orchestrator wrote when it proposed the task, which its run starts with."""
+    return ctx.places.state / "briefs" / f"{task_id}.md"
+
+
+def start_run(ctx: Context, role: str, task: Task, note: str, outage_fix: bool) -> Session:
+    """Start an implementer or designer on ``task`` under its permit, as the orchestrator asked or the warden's own
+    scheduling pass decided; raises Refused naming the first rule it breaks. An implementer gets a slot when one is
+    free, as a revived one does; its first message says which."""
     permits.check_not_factory(ctx)
+    if not note and brief_path(ctx, task.id).is_file():
+        note = brief_path(ctx, task.id).read_text(encoding="utf-8")
     with ctx.lock:
         permits.check_daemon(ctx)
         sessions = read(ctx)
-        permit = permits.check_start(ctx, sessions, role, task, args.get("outage") is True)
+        permit = permits.check_start(ctx, sessions, role, task, outage_fix)
         permits.check_vitals(ctx, task.severity == SEVERE)
         if permit.bypass and permits.cap_full(ctx.settings(), sessions.values(), role):
             victim = make_room(ctx, sessions, task)
@@ -173,13 +188,31 @@ def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
         name = ("impl-" if role == IMPL else "design-") + _NAME.sub("-", task.id.lower()).strip("-")
         fields = {"name": name, "role": role, "model": permit.model, "effort": permit.effort, "task": task.id,
                   "rung": permit.rung, **_by(ctx, role)}  # fmt: skip
-        s = launch.start_session(ctx, sessions, fields, f"Task: {task.id}\n\n{note}".strip(), worktree=name)
+        slot = _claim_at_start(ctx, name, role, task.id)
+        held = f"\n\nSlot {slot} is yours: bring it up with factory slot up." if slot is not None else ""
+        try:
+            s = launch.start_session(ctx, sessions, fields, f"Task: {task.id}{held}\n\n{note}".strip(), worktree=name)
+        except Refused:
+            if slot is not None:
+                permits.free_slot(ctx, slot)
+            raise
         if permit.bypass:
             outage.mark_bypass(ctx, task.id, s.id)
     if task.status != "building":
         permits.move_task(ctx, task.id, "designing" if role == DESIGN else "building",
                           "outage" if permit.bypass else "start")  # fmt: skip
-    return ok(session=s.id, name=s.name, model=s.model, rung=s.rung)
+    return s
+
+
+def _claim_at_start(ctx: Context, name: str, role: str, task_id: str) -> int | None:
+    if role != IMPL:
+        return None
+    worktree = session_settings.worktrees(Path(ctx.settings().get_str("repo.path"))) / name
+    try:
+        return leases.claim(ctx, name, str(worktree), f"started for {task_id}")
+    # telemetry: expected — every slot is held; the implementer claims one when it frees
+    except Refused:
+        return None
 
 
 def owner_start_orchestrator(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
@@ -324,28 +357,6 @@ def make_room(ctx: Context, sessions: dict[str, Session], task: Task) -> Session
     return choices[0]
 
 
-def bench(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    for_task = _text(args, "for")
-    with ctx.lock:
-        sessions = read(ctx)
-        s = find(ctx, sessions, _text(args, "session"))
-        if s.role not in CAP or s.parent or s.state not in (WORKING, WAITING):
-            raise Refused("bench", f"{s.name} is a {s.role}, {s.state}; only a working or waiting run is benched")
-        if s.merge_turn:
-            raise Refused("merge-turn", f"{s.name} holds its merge turn; bench another or wait for its merge")
-        full = permits.cap_full(ctx.settings(), sessions.values(), s.role)
-        if permits.needed_role(ctx, for_task) != s.role or not full:
-            raise Refused("bench", f"{for_task} does not need {s.name}'s place: start it, or bench the right role")
-        choices = permits.benchable(ctx, sessions, s.role, for_task)
-        if s not in choices:
-            raise Refused("outranks", f"{for_task} does not outrank {s.task}, so {s.name} keeps its place")
-        if s.state == WORKING and choices[0].state == WAITING:
-            raise Refused("waiting-first", f"bench {choices[0].name} first: a waiting one goes before a working one")
-        begin_bench(ctx, s, actor(ctx), f"benched for {for_task}")
-        registry.write(ctx.places, sessions)
-    return ok(name=s.name, grace_seconds=ctx.settings().get_int("watch.bench_grace_seconds"))
-
-
 def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
     """Resume a session already marked reviving, claiming a slot for an implementer; why it failed, or nothing.
 
@@ -377,10 +388,12 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
     return ""
 
 
-def revive(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
+def revive_session(ctx: Context, sid: str, by: str) -> str:
+    """Bring a deprioritized session back, as the orchestrator asked or the warden's scheduling pass decided; its
+    name. Raises Refused naming the rule it breaks."""
     with ctx.lock:
         sessions = read(ctx)
-        s = find(ctx, sessions, _text(args, "session"))
+        s = sessions[sid]
         if s.state == RETIRED:
             raise Refused("retired", f"{s.name} is retired, and a retired session can never be revived")
         if s.state != models.DEPRIORITIZED:
@@ -391,12 +404,12 @@ def revive(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
         if s.role in CAP and task is not None:
             permits.check_cap(ctx.settings(), sessions.values(), s.role)
             permits.check_revive_order(ctx, sessions, s.role, task, skip=s.id)
-        move(ctx, s, models.REVIVING, actor(ctx), "reviving")
+        move(ctx, s, models.REVIVING, by, "reviving")
         registry.write(ctx.places, sessions)
-    failed = bring_back(ctx, s.id, actor(ctx))
+    failed = bring_back(ctx, s.id, by)
     if failed:
         raise Refused("revive", f"{s.name} stays deprioritized: {failed}")
-    return ok(name=s.name)
+    return s.name
 
 
 # ---- the owner's pause and resume ----------------------------------------------------------------------------------

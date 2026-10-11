@@ -8,7 +8,7 @@ from typing import Any
 from runtime.queue import proposals, reports
 from runtime.shared import models
 from runtime.slots import leases
-from runtime.warden import codes, errors_import, plan, probes, registry, settings_save
+from runtime.warden import codes, errors_import, plan, probes, registry, schedule, settings_save
 from runtime.warden.context import Context
 
 
@@ -33,6 +33,8 @@ def status(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
         # runs in the owner's order, which start from the top.
         "proposals": found.open,
         "approved": found.approved,
+        # Why each approved run, designed build or benched session has not started yet (the scheduling pass).
+        "waiting": schedule.waits(ctx.places),
         **health,
         "plan": plan.reading(ctx),
         "errors_import": errors_import.note(ctx.places),

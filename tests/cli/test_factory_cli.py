@@ -51,8 +51,6 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["stop", "impl-t-0001"],
         ["resume", "impl-t-0001", "go on"],
         ["extend", "impl-t-0001", "qa"],
-        ["bench", "impl-t-0001", "--for", "t-0002"],
-        ["revive", "impl-t-0001"],
         ["doing", "fixing the cookie"],
         ["tick"],
         ["inbox"],

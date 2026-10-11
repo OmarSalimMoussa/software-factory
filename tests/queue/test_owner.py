@@ -19,7 +19,7 @@ from runtime.warden.backstop import Proc
 def test_a_reorder_from_a_stale_page_is_refused(world: World) -> None:
     first, second = world.task(), world.task()
     for task in (first, second):
-        propose(world.ctx(), task.id, 1, "why", "", PICTURE)
+        propose(world.ctx(), task.id, 1, "why", "", PICTURE, "")
     with pytest.raises(Refused) as refused:
         owner.move(world.owner(), second.id, "up", [second.id, first.id], approved=False)
     assert refused.value.rule == "stale"
@@ -37,7 +37,7 @@ def test_a_reorder_from_a_stale_page_is_refused(world: World) -> None:
 )
 def test_each_proposal_decision_posts_its_event(world: World, decide, event: str) -> None:  # type: ignore[no-untyped-def]
     task = world.task()
-    propose(world.ctx(), task.id, 1, "why", "", PICTURE)
+    propose(world.ctx(), task.id, 1, "why", "", PICTURE, "")
     decide(world, task.id)
     assert [kind for kind, _ in world.events][-2:] == ["proposal-slot-free", event]
 

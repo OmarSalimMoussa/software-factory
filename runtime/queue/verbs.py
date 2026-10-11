@@ -88,6 +88,7 @@ def propose(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
             _text(args, "why", required=False),
             _text(args, "reason", required=False),
             data,
+            _text(args, "brief", required=False),
         )
     )
 

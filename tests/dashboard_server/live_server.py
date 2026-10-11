@@ -169,7 +169,7 @@ class Live:
         ctx = self.warden.doors.context(ORCHESTRATOR)
         if self.reserve:
             task, why = self.reserve.pop(0)
-            propose.propose(ctx, task, 1, why, "", (FIXTURES / "pictures" / f"task-{task}.svg").read_bytes())
+            propose.propose(ctx, task, 1, why, "", (FIXTURES / "pictures" / f"task-{task}.svg").read_bytes(), "")
         else:
             propose.propose_none(ctx)
 

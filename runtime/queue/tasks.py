@@ -93,6 +93,11 @@ def follow(ctx: Context, before: Task, after: Task) -> None:
     if after.status in ("proposed", "queued", "parked", "closed"):
         approvals.void(ctx.places, after.id)
     proposals.write(ctx.places, found)
+    builds = proposals.designed_builds(ctx.places)
+    designed = before.status in ("designing", "review") and after.status == "building"
+    if designed != (after.id in builds):
+        proposals.set_designed_builds(ctx.places, [*builds, after.id] if designed else
+                                      [t for t in builds if t != after.id])  # fmt: skip
 
 
 def _hold_turn(ctx: Context, task_id: str, held: bool) -> None:

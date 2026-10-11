@@ -35,6 +35,7 @@ from runtime.warden import (
     reap,
     reflections,
     registry,
+    schedule,
     server,
     settings_save,
 )
@@ -89,6 +90,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
     return [
         ("loop", loop.run_tick),
         ("sessions", crashwatch.watch_sessions),
+        ("schedule", schedule.run_pass),
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),
         ("plan", watch.run_pass),
         ("reap", reaper.run_pass),

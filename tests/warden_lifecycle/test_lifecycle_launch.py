@@ -58,7 +58,10 @@ def test_a_session_gets_its_role_agents_with_their_browser_servers(world: World)
     assert set(agents) == {"implementer", "qa-backend", "qa-security", "qa-ui-function", "qa-ux", "qa-visual"}
     assert (agents["implementer"]["model"], agents["implementer"]["effort"]) == (request["model"], request["effort"])
     assert agents["qa-ui-function"]["mcpServers"][0]["qa-browser"]["args"] == ["qa-browser", "qa-ui-function"]
-    assert launch.session_argv(request)[-2:] == ["--", "Task: t-0001"]
+    assert launch.session_argv(request)[-2:] == [
+        "--",
+        "Task: t-0001\n\nSlot 1 is yours: bring it up with factory slot up.",
+    ]
 
 
 def test_a_stack_run_hands_back_a_redacted_tail(world: World) -> None:

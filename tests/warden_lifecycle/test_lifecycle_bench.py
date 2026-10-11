@@ -5,10 +5,11 @@ from typing import Any
 import pytest
 from lifecycle_fakes import World
 
+from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, STOPPED, WAITING, WORKING
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
-from runtime.warden import crashwatch, lifecycle, ops
+from runtime.warden import crashwatch, lifecycle, ops, schedule
 
 
 def rule(call: Any, *args: Any) -> str:
@@ -29,36 +30,43 @@ def test_only_the_owner_retires_a_session_that_is_out_of_its_place(world: World,
     assert world.queue.tasks["t-0001"].status == "proposed"
 
 
-@pytest.mark.parametrize("verb", [lifecycle.revive, lifecycle.resume])
 @pytest.mark.parametrize("ref", ["5e550001", "implementer-5e550001"])
-def test_a_retired_session_is_never_revived_or_resumed(world: World, verb: Any, ref: str) -> None:
+def test_a_retired_session_is_never_revived_or_resumed(world: World, ref: str) -> None:
     world.seat("5e550001", task="t-0001", state=RETIRED, retired=STOPPED)
-    assert rule(verb, world.ctx(), {"session": ref, "message": "carry on"}, None) == "retired"
+    assert rule(lifecycle.resume, world.ctx(), {"session": ref, "message": "carry on"}, None) == "retired"
+    assert rule(lifecycle.revive_session, world.ctx(), "5e550001", "warden") == "retired"
     assert world.launcher.resumed == []
 
 
+def _approved(world: World, *order: str) -> None:
+    store.write_json(world.places.proposals, {"open": [], "approved": list(order)})
+
+
 def test_a_bench_makes_room_only_for_a_task_that_outranks_the_one_it_replaces(world: World) -> None:
-    world.queue.add("t-0001", goal_item="G1", status="building")
+    world.queue.add("t-0001", goal_item="G1", status="building", severity="severe", created="2026-10-02T00:00:00Z")
     world.seat("5e550001", task="t-0001")
     world.approve("t-0002", goal_item="G2")
-    assert rule(lifecycle.bench, world.ctx(), {"session": "5e550001", "for": "t-0002"}, None) == "outranks"
-    world.approve("t-0003", severity="severe")
-    lifecycle.bench(world.ctx(), {"session": "5e550001", "for": "t-0003"}, None)
+    _approved(world, "t-0002")
+    schedule.run_pass(world.ctx())
+    assert world.session("5e550001").state == WORKING  # a severe run outranks any approved one
+    world.approve("t-0003", severity="severe", created="2026-09-01T00:00:00Z")  # an older severe one outranks it
+    _approved(world, "t-0002", "t-0003")
+    schedule.run_pass(world.ctx())
     assert world.session("5e550001").state == BENCH_PENDING
 
 
-def test_a_bench_takes_a_waiting_session_first_and_never_a_merge_turn(world: World) -> None:
+@pytest.mark.parametrize("turn", [False, True], ids=["waiting-first", "never-a-merge-turn"])
+def test_a_bench_takes_a_waiting_session_first_and_never_a_merge_turn(world: World, turn: bool) -> None:
     world.cap(2)
     world.queue.add("t-0001", goal_item="G2", status="building")
     world.queue.add("t-0002", goal_item="G2", status="building")
     world.seat("3c3c3c3c", task="t-0001")
-    world.seat("4d4d4d4d", task="t-0002", state=WAITING)
+    world.seat("4d4d4d4d", task="t-0002", state=WAITING, merge_turn=turn)
     world.approve("t-0003", severity="severe")
-    bench = {"session": "3c3c3c3c", "for": "t-0003"}
-    assert rule(lifecycle.bench, world.ctx(), bench, None) == "waiting-first"
-    world.seat("4d4d4d4d", task="t-0002", state=WAITING, merge_turn=True)
-    assert rule(lifecycle.bench, world.ctx(), {"session": "4d4d4d4d", "for": "t-0003"}, None) == "merge-turn"
-    lifecycle.bench(world.ctx(), bench, None)
+    _approved(world, "t-0003")
+    schedule.run_pass(world.ctx())
+    benched = "3c3c3c3c" if turn else "4d4d4d4d"
+    assert [s.id for s in lifecycle.read(world.ctx()).values() if s.state == BENCH_PENDING] == [benched]
 
 
 def test_a_benched_session_settles_after_its_grace_and_revives_with_its_id(world: World) -> None:
@@ -68,7 +76,8 @@ def test_a_benched_session_settles_after_its_grace_and_revives_with_its_id(world
     assert leases.claim(world.ctx(), benched_name, "/w/b") == 2
     world.run("5e550001")
     world.approve("t-0002", severity="severe")
-    lifecycle.bench(world.ctx(), {"session": "5e550001", "for": "t-0002"}, None)
+    _approved(world, "t-0002")
+    schedule.run_pass(world.ctx())
     crashwatch.watch_sessions(world.ctx())
     assert world.session("5e550001").state == BENCH_PENDING and world.launcher.stopped == []
     world.later(world.settings.get_int("watch.bench_grace_seconds"))
@@ -77,7 +86,7 @@ def test_a_benched_session_settles_after_its_grace_and_revives_with_its_id(world
     assert benched.state == DEPRIORITIZED and leases.held_by(world.places, world.settings, benched_name) is None
     assert world.launcher.stopped == ["5e550001"] and world.launcher.stacks == [(2, ["empty"]), (2, [leases.SWEEP])]
     assert world.queue.tasks["t-0001"].status == "deprioritized"
-    lifecycle.revive(world.ctx(), {"session": "5e550001"}, None)
+    lifecycle.revive_session(world.ctx(), "5e550001", "warden")
     back = world.session("5e550001")
     lease = leases.held_by(world.places, world.settings, benched_name)
     assert (back.state, lease and lease.slot, world.launcher.resumed) == (WORKING, 2, ["5e550001"])

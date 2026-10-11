@@ -45,8 +45,6 @@ VERBS: dict[str, Verb] = {
     "stop": _v("runtime.warden.lifecycle:stop", ORCH, OWNER),
     "resume": _v("runtime.warden.lifecycle:resume", ORCH, OWNER),
     "extend": _v("runtime.warden.lifecycle:extend", ORCH, OWNER),
-    "bench": _v("runtime.warden.lifecycle:bench", ORCH),
-    "revive": _v("runtime.warden.lifecycle:revive", ORCH),
     "doing": _v("runtime.warden.lifecycle:set_doing", *SESSIONS),
     # contract: added by the coordinator; the guard's SubagentStart and SubagentStop hooks report a subagent
     "subagent.start": _v("runtime.warden.subagents:started", *SESSIONS),

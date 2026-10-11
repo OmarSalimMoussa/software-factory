@@ -1,6 +1,7 @@
 """`factory propose`: the orchestrator puts a task on Home for the owner (routing spec, R4).
 
-At most ``routing.max_proposals`` places hold proposals. A proposal carries a picture and a one-line why; it runs at
+At most ``routing.max_proposals`` places hold proposals. A proposal carries a picture and a one-line why, and the
+brief its run starts with once approved (the warden starts it; the orchestrator writes nothing more). It runs at
 the rung ``factory route`` names unless it names another, which needs a reason that goes to the task's log. A
 running task comes back one rung up the same way, with its approval gone. ``propose --none`` fills a place with
 "nothing else".
@@ -13,12 +14,18 @@ from typing import Any
 from runtime.queue import pictures, proposals, route, statuses, tasks
 from runtime.queue.book import Queue
 from runtime.queue.formats import one_line
+from runtime.shared import store
 from runtime.shared.protocol import Refused
+from runtime.warden import lifecycle
 from runtime.warden.context import Context
 
 
-def propose(ctx: Context, task_id: str, run: object, why: str, reason: str, picture: bytes | None) -> dict[str, Any]:
+def propose(
+    ctx: Context, task_id: str, run: object, why: str, reason: str, picture: bytes | None, brief: str
+) -> dict[str, Any]:
     settings = ctx.settings()
+    if len(brief.encode()) > settings.get_int("queue.max_upload_kib") * 1024:
+        raise Refused("brief", "the brief is too long; put the detail in the task")
     if run is not None and (isinstance(run, bool) or not isinstance(run, int) or run not in range(1, 5)):
         raise Refused("run", "a proposal runs at rung 1 to 4; a rung-0 task closes with a reason instead")
     if not why.strip() or "\n" in why.strip():
@@ -65,6 +72,11 @@ def propose(ctx: Context, task_id: str, run: object, why: str, reason: str, pict
             proposals.write(ctx.places, before)
             raise
         place = proposals.read(ctx.places).open.index(task_id)
+        brief_file = lifecycle.brief_path(ctx, task_id)
+        if brief.strip():
+            store.write_text(brief_file, brief.strip() + "\n", mode=0o600)
+        else:
+            brief_file.unlink(missing_ok=True)
     return {"task": moved.id, "place": place, "run": run, "route": planned}
 
 

@@ -39,14 +39,14 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 | `prod red`, `staging red` | As "When something is red" says. |
 | `triage due` | Start one `triage` subagent on the batch; apply its plan; give each new task a light intake pass. |
 | `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed. |
-| `approved` | Start the run when a cap has room (below). The free proposal slot is filled next. |
+| `approved` | The warden starts it when a place frees. Fill the free proposal slot. |
 | `not-now`, `dropped`, `boosted`, `proposal-slot-free` | Fill the free proposal slots. |
 | `go` | Start the build. The warden ends the spec's designer itself. |
 | `decided-extend`, `park`, `to-designer` | The owner decided a stuck task; the warden told its session or ended it. `to-designer`: propose it at rung 3. |
 | `limit-extended` | The owner gave a session more of a limit; the warden told it. Nothing to do. |
 | `answered` | The owner answered a question you asked: act on it. A session's own answer reaches it from the warden. |
 | `stopped` | The owner stopped a run. Its task is back in Proposed with its branch kept: nothing to undo. |
-| `benched` | A session you benched has stopped and keeps its context. Start the run it made room for. |
+| `benched` | A session was benched for higher work and keeps its context; the warden starts what it made room for. |
 | `crashed` | A session kept dying and was retired. Its task is back in Proposed with its branch kept: propose it again. |
 | `paused`, `resumed` | Pause: start nothing, end your turn. Resume: run the start steps again. |
 | `goal-changed` | Reread `GOAL.md` and fill the proposal slots again. |
@@ -78,21 +78,23 @@ live and nothing merged for a while, a regression walk of the scenarios that wai
    its reason. A different rung needs a reason.
 3. Draw a small picture of the change from the task's facts: a rough before and after of the screen for a UI task,
    a small flow for a backend task, where it breaks for a bug. An SVG, few words, written to your temp folder.
-4. `factory propose <task> --picture <file> --why "<why now, one line>"`, adding `--run <N> --reason "<why>"` for a
-   rung other than the route's. When nothing else is worth proposing, `factory propose --none`.
+4. Write the brief the run starts with to a file under `.factory/`: what to build or fix, what to watch for, and
+   anything the owner said. `factory propose <task> --picture <file> --why "<why now, one line>" --brief <file>`,
+   adding `--run <N> --reason "<why>"` for a rung other than the route's. When nothing else is worth proposing,
+   `factory propose --none`.
 
 ## Starting and steering runs
 
-- **Only approved runs start,** in the owner's order: `factory start implementer|designer <task>`. The warden picks
-  the model from the approved rung and checks the approval, the cap and the vitals.
-- **Making room.** Deprioritized sessions come back first: `factory revive <session>` when a slot frees. An approved
-  task that outranks a running one when its cap is full: `factory bench <session> --for <task>`, the lowest-ranked,
-  a waiting session before a working one, never one in its merge turn. It comes back with its full context.
+- **The warden starts approved runs itself,** in the owner's order, with the brief you proposed them with: it
+  picks the model from the approved rung, checks the approval, the cap and the vitals, brings deprioritized sessions
+  back before runs they outrank, and benches the lowest-ranked run (a waiting one before a working one, never one in
+  its merge turn) when a higher one needs its place. `factory status` says why each one still waits. A designed
+  build's implementer starts the same way once you approve its spec or the owner says Go.
 - **Questions.** Answer from `GOAL.md`, the task's log and the owner's past rulings. When none answers:
   `factory needs-owner <task> --picture <file> --question "<the question>"`. Only that task waits.
 - **Specs.** A rung 3 designer hands back its spec and brief: approve it if it serves the task's goal item and stays
-  within rung 3 (`factory queue task status <task> building`), then start the implementer. A spec that turned out
-  large and visible goes back to the owner one rung up.
+  within rung 3 (`factory queue task status <task> building`); the warden starts its implementer. A spec that turned
+  out large and visible goes back to the owner one rung up.
 - **Moving up a rung.** A session that reports `needs rung <N>`: stop it (`factory stop <session>`; its branch
   stays), propose the task again at that rung with the reason and a new picture, and write
   `factory reflect --kind misroute "<the facts that misled the plan>"`.
@@ -130,6 +132,6 @@ live and nothing merged for a while, a regression walk of the scenarios that wai
 ## Never
 
 Read or write product code. Edit `GOAL.md`, the factory, or another session's worktree. Start, resume or stop a
-session other than with `factory`. Start any run the owner did not approve, except the outage fix. Push other than
+session other than with `factory`. Start any run yourself, except the outage fix. Push other than
 with `factory push`, or reach prod in any way. Merge without `--no-ff` or without a pass. Let the default branch
 move during a merge turn. Keep a schedule of your own: the warden drives the loop.

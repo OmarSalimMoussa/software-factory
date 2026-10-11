@@ -61,11 +61,15 @@ def release_held(places: Places, task: str) -> None:
         store.write_json(_held_path(places), held, mode=0o600)
 
 
-def _empty_slot(ctx: Context, session: Session) -> dict[str, str]:
-    """The slot whose lease names the session, emptied; nothing when it holds none (released, or never claimed)."""
+def _empty_slot(ctx: Context, session: Session, live: list[Session]) -> dict[str, str]:
+    """The slot whose lease names the session, emptied; nothing when it holds none (released, or never claimed).
+    A lease names a session by its name, which the next run of the same task takes: while that one lives, the slot
+    is its own."""
     lease = leases.held_by(ctx.places, ctx.settings(), session.name)
     if lease is None:
         return {}
+    if any(other.name == session.name for other in live):
+        return {"slot": "left alone: the task's next session holds it"}
     failed = leases.empty(ctx, lease.slot, session.id)
     if failed:
         log.warning("warden: reaping session %s, slot %d: %s", session.id, lease.slot, failed)
@@ -110,7 +114,7 @@ def reap(ctx: Context, session_id: str) -> dict[str, str]:
     outcome: dict[str, str] = {}
     # A subagent shares its parent's worktree and slot; the orchestrator's worktree is the main checkout.
     if not session.parent:
-        outcome.update(_empty_slot(ctx, session))
+        outcome.update(_empty_slot(ctx, session, live))
         if session.worktree and session.role != ORCH:
             outcome.update(_remove_worktree(ctx, session, live))
     done = reaped(ctx.places)

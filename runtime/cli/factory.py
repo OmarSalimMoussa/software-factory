@@ -62,10 +62,6 @@ def _parser() -> argparse.ArgumentParser:
     extend = sub.add_parser("extend")
     extend.add_argument("session")
     extend.add_argument("limit")
-    bench = sub.add_parser("bench")
-    bench.add_argument("session")
-    bench.add_argument("--for", dest="for_task", required=True)
-    sub.add_parser("revive").add_argument("session")
     sub.add_parser("doing").add_argument("text")
     sub.add_parser("tick")
     sub.add_parser("inbox").add_argument("--wait", action="store_true")
@@ -96,6 +92,7 @@ def _parser() -> argparse.ArgumentParser:
     propose.add_argument("--why", default="")
     propose.add_argument("--run", type=int)
     propose.add_argument("--reason", default="")
+    propose.add_argument("--brief", help="a file holding the brief the run starts with once approved")
     spec = sub.add_parser("spec")
     spec.add_argument("what", choices=["save"])
     spec.add_argument("task")
@@ -233,14 +230,12 @@ def _call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
         if ns.role == "orchestrator":
             return Call("start", {"role": ns.role})
         return Call("start", {"role": ns.role, "task": ns.target, "note": ns.note, "outage": ns.outage})
-    if cmd in ("stop", "revive"):
-        return Call(cmd, {"session": ns.session, **({"why": ns.why} if cmd == "stop" and ns.why else {})})
+    if cmd == "stop":
+        return Call(cmd, {"session": ns.session, **({"why": ns.why} if ns.why else {})})
     if cmd == "resume":
         return Call("resume", {"session": ns.session, "message": ns.message})
     if cmd == "extend":
         return Call("extend", {"session": ns.session, "limit": ns.limit})
-    if cmd == "bench":
-        return Call("bench", {"session": ns.session, "for": ns.for_task})
     if cmd == "doing":
         return Call("doing", {"text": ns.text})
     if cmd == "inbox":
@@ -307,8 +302,10 @@ def _propose_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> 
             raise CliError("propose --none names no task and no picture")
         return Call("propose.none", {})
     if not ns.task or not ns.picture:
-        raise CliError("factory propose <task> --picture <file> --why '…' [--run N --reason '…']")
+        raise CliError("factory propose <task> --picture <file> --why '…' [--brief <file>] [--run N --reason '…']")
     args = {"task": ns.task, "why": ns.why, **({"run": ns.run} if ns.run is not None else {})}
+    if ns.brief:
+        args["brief"] = read_file(ns.brief).decode("utf-8", errors="replace")
     return Call("propose", {**args, **({"reason": ns.reason} if ns.reason else {})}, read_file(ns.picture))
 
 

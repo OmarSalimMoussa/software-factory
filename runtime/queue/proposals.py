@@ -8,6 +8,7 @@ found nothing else worth proposing. A card that leaves turns its place into None
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TypeVar
 
 from runtime.shared import store
@@ -80,3 +81,19 @@ def reorder(order: list[T], task_id: str, direction: str, seen: object) -> None:
     if not 0 <= j < len(order):
         raise Refused("move", f"{task_id} is already at the {'top' if direction == 'up' else 'bottom'}")
     order[i], order[j] = order[j], order[i]
+
+
+def _builds_path(places: Places) -> Path:
+    return places.state / "designed-builds.json"
+
+
+def designed_builds(places: Places) -> list[str]:
+    """Tasks whose spec the orchestrator approved or the owner said Go to, each waiting for its implementer."""
+    raw = store.read_json_or(_builds_path(places), [])
+    if not isinstance(raw, list) or not all(isinstance(t, str) for t in raw):
+        raise store.StoreError(f"{_builds_path(places)}: not a list of task ids")
+    return raw
+
+
+def set_designed_builds(places: Places, found: list[str]) -> None:
+    store.write_json(_builds_path(places), found, mode=0o600)

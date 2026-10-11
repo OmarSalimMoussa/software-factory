@@ -13,7 +13,7 @@ from runtime.queue.propose import propose
 
 def _approved(world: World) -> str:
     task = world.task()
-    propose(world.ctx(), task.id, 1, "first visit", "", PICTURE)
+    propose(world.ctx(), task.id, 1, "first visit", "", PICTURE, "")
     owner.approve(world.owner(), task.id)
     return task.id
 

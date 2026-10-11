@@ -13,7 +13,7 @@ PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\x00" * 17
 
 
 def _propose(world: World, task_id: str, run: int = 1, reason: str = "", picture: bytes | None = PICTURE) -> None:
-    propose(world.ctx(), task_id, run, "every new user meets it", reason, picture)
+    propose(world.ctx(), task_id, run, "every new user meets it", reason, picture, "")
 
 
 def test_no_more_proposals_than_places(world: World) -> None:
@@ -76,7 +76,7 @@ def test_a_run_other_than_the_route_needs_a_reason(world: World) -> None:
 def test_a_proposal_says_why_in_one_line(world: World) -> None:
     task = world.task()
     with pytest.raises(Refused, match="why"):
-        propose(world.ctx(), task.id, 1, "", "", PICTURE)
+        propose(world.ctx(), task.id, 1, "", "", PICTURE, "")
 
 
 def test_nothing_else_fills_every_free_place_until_a_proposal_takes_one(world: World) -> None:
