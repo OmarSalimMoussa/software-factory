@@ -10,14 +10,14 @@ from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, PAUSED, RETIRED,
 _ROLE_WORDS = {"orchestrator": "orchestrator", "designer": "designer", "intake": "intake", "triage": "triage"}
 # Marker and state word for each live state; a retired agent shows how it ended.
 _LIVE = {
-    WORKING: ("working", "working"),
-    WAITING: ("waiting", "waiting for you"),
+    WORKING: ("accent", "working"),
+    WAITING: ("warn", "waiting for you"),
     BENCH_PENDING: ("depri", "moving to the bench"),
     DEPRIORITIZED: ("depri", "deprioritized"),
-    REVIVING: ("working", "coming back"),
+    REVIVING: ("accent", "coming back"),
 }
 _ENDED = {
-    "finished": ("done", "done"),
+    "finished": ("good", "done"),
     "stopped": ("stop", "stopped"),
     "with-parent": ("stop", "stopped"),
     "crashed": ("stop", "crashed"),
@@ -80,8 +80,8 @@ def doing(snap: Snap, row: dict[str, Any]) -> str:
     return "Waiting for you" if state == WAITING else "Working"
 
 
-def marker(row: dict[str, Any]) -> tuple[str, str]:
-    """The tree's marker and the state word."""
+def dot(row: dict[str, Any]) -> tuple[str, str]:
+    """The tone of the agent's dot in the tree, and its state word."""
     if row["state"] == RETIRED:
         return _ENDED[row["retired"]]
     return _LIVE[row["state"]]

@@ -31,21 +31,21 @@
     "id": "t-0009",
     "title": "Export to a spreadsheet app",
     "why": "No goal item asks for it",
-    "requests": 7,
+    "requests": "7 requests",
     "date": "Oct 5"
    },
    {
     "id": "t-0010",
     "title": "Team workspaces with roles",
     "why": "Not for this goal",
-    "requests": 3,
+    "requests": "3 requests",
     "date": "Oct 6"
    },
    {
     "id": "t-0011",
     "title": "Keyboard shortcuts for invoices",
     "why": "Too small to matter now",
-    "requests": 2,
+    "requests": "2 requests",
     "date": "Oct 7"
    }
   ]

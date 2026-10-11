@@ -23,7 +23,6 @@ function bannerHTML(b) {
   const btn = {start: '<button class="btn primary" data-action="start-orch" data-write>Start the orchestrator</button>', resume: `<button class="btn primary" data-action="resume" data-write>${icon('play-circle', 'sm')}Resume the factory</button>`}[b.action] || '';
   return `<div class="ro-banner"><span class="ico">${icon(b.kind === 'paused' ? 'pause-circle' : 'stop-circle')}</span><div style="flex:1;min-width:0"><b>${esc(b.text)}</b> <span class="muted">${esc(b.sub)}</span></div>${btn}</div>`;
 }
-const MARK = {working: 'accent', done: 'good', waiting: 'warn', depri: 'depri', stop: 'stop'};
 function node(a) {
   if (a.broken) return `<div class="node"><div class="node-card broken" role="status">${icon('exclamation-triangle', 'sm')}<div style="min-width:0"><div class="nname">This agent could not be read.</div><div class="nsub">${esc(a.id)} · ${esc(a.error)}</div></div></div></div>`;
   const kids = a.kids || [], id = esc(a.id);
@@ -31,7 +30,7 @@ function node(a) {
     ${kids.length ? `<button class="toggle" data-toggle="${id}" aria-label="Show or hide ${esc(a.name)}'s agents">${icon('chevron-down', 'sm')}</button>` : '<span></span>'}
     ${ava(a.family, a.initials)}
     <div style="min-width:0"><div class="nname">${esc(a.name)} <span class="faint" style="font-weight:500;font-size:12px">${esc(a.role)}${esc(a.kids_label)}</span></div><div class="nsub">${esc(a.doing)}</div></div>
-    <span class="chip hide-sm">${esc(a.model)}</span><span class="state hide-sm"><i class="dot ${MARK[a.marker] || ''}"></i>${esc(a.state_word)}</span><span class="cost">${esc(a.cost)}</span>${a.can_stop ? `<button class="iconbtn kill" data-stop="${id}" aria-label="Stop ${esc(a.name)} and every agent under it" data-write>${icon('stop-circle', 'sm')}</button>` : '<span></span>'}</div>
+    <span class="chip hide-sm">${esc(a.model)}</span><span class="state hide-sm"><i class="dot ${esc(a.dot)}"></i>${esc(a.state_word)}</span><span class="cost">${esc(a.cost)}</span>${a.can_stop ? `<button class="iconbtn kill" data-stop="${id}" aria-label="Stop ${esc(a.name)} and every agent under it" data-write>${icon('stop-circle', 'sm')}</button>` : '<span></span>'}</div>
     ${kids.length ? `<div class="kids-wrap"><div class="kids">${kids.map(node).join('')}</div></div>` : ''}</div>`;
 }
 const treeIds = (n, out = []) => { if (n && !n.broken && n.kids && n.kids.length) { out.push(n.id); n.kids.forEach(k => treeIds(k, out)); } return out; };

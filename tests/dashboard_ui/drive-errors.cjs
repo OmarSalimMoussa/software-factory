@@ -15,7 +15,7 @@ drive('errors', async t => {
   await d.keyboard.press('Escape'); await settle(d);
   t.check(await d.$eval('#sheet', e => e.classList.contains('open')), 'Escape closed the sign-in panel');
   await t.code(d, '111111'); await settle(d);
-  t.check((await d.textContent('#code-note')).includes('That code is wrong. 4 tries left.'), 'wrong device code: ' + await d.textContent('#code-note'));
+  t.check((await d.textContent('#code-note')).includes('Wrong code, 4 tries left.'), 'wrong device code: ' + await d.textContent('#code-note'));
   await t.code(d); await d.waitForSelector('#props', {timeout: 8000}).catch(() => {}); await ready(d);
   t.check(await d.$('#props') && (await d.context().cookies()).some(c => c.name === 'owner'), 'the device was not signed in');
   await d.close();
@@ -92,7 +92,7 @@ drive('errors', async t => {
   for (const left of [4, 3, 2, 1]) {
     await t.code(p, '000000'); await settle(p);
     const note = await p.textContent('#code-note');
-    t.check(note.includes(`That code is wrong. ${left} ${left === 1 ? 'try' : 'tries'} left.`), `tries left ${left}: ${note}`);
+    t.check(note.includes(`Wrong code, ${left} ${left === 1 ? 'try' : 'tries'} left.`), `tries left ${left}: ${note}`);
   }
   await t.code(p, '000000'); await settle(p);
   t.check(/Locked after too many wrong codes\. Try again at \d\d:\d\d\./.test(await p.textContent('#code-note')) && await p.$eval('#code-0', e => e.disabled), 'no lock after five wrong codes');

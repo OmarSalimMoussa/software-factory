@@ -58,6 +58,15 @@ _WORDS = {
     "decide": "Needs your decision",
     "closed": "Closed",
 }
+NEED_ACTIONS: dict[str, dict[str, Any]] = {
+    "artifact": {"label": "Open artifact", "icon": "arrow-top-right-on-square", "primary": False},
+    "feedback": {"label": "Check feedback", "icon": "chat-bubble-left-right", "primary": False},
+    "go": {"label": "Go", "icon": "check", "primary": True},
+    "extend": {"label": "Extend", "icon": None, "primary": False},
+    "designer": {"label": "To a designer", "icon": None, "primary": False},
+    "park": {"label": "Park", "icon": None, "primary": False},
+    "answer": {"label": "Send answer", "icon": "check", "primary": True},
+}
 _TASK_FIELDS = frozenset(f.name for f in dataclasses.fields(Task))
 LANDED = ("merged", "checked", "on-staging", "promoted")
 IN_PROGRESS = (

@@ -8,7 +8,18 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from runtime.dashboard.views import docs
-from runtime.dashboard.views.kit import KIND_LOOK, PartError, Parts, Query, Snap, day_label, iso, page, when
+from runtime.dashboard.views.kit import (
+    KIND_LOOK,
+    PartError,
+    Parts,
+    Query,
+    Snap,
+    day_label,
+    iso,
+    page,
+    plural,
+    when,
+)
 
 WANTS = docs.WANTS
 RANGES = [["all", "Any time"], ["today", "Today"], ["d7", "7 days"], ["d30", "30 days"], ["custom", "Between"]]
@@ -92,7 +103,7 @@ def library(snap: Snap, query: Query) -> dict[str, Any]:
         "inboxes": INBOXES,
         "inbox": inbox,
         "query": q or None,
-        "total": len(shown),
+        "total": plural(len(shown), "file"),
         "results": [
             {
                 "id": d.id,

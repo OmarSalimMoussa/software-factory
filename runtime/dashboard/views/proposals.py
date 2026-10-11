@@ -17,8 +17,8 @@ _settled: dict[int, dict[str, Any]] = {}
 _done: dict[str, tuple[float, str]] = {}
 _lock = threading.Lock()
 SETTLED_WORDS = {
-    "approve": ("approved", "Approved. It starts when a slot is free."),
-    "later": ("later", "Back in the queue until something changes."),
+    "approve": ("approved", "done", "check", "Approved. It starts when a slot is free."),
+    "later": ("later", "later", "clock", "Back in the queue until something changes."),
 }
 DONE_WORDS = {
     "go": "Approved. The build starts next.",
@@ -57,7 +57,7 @@ def settle(snap: Snap, ref: str, action: str) -> None:
     task_id = ref
     if task_id not in found or task is None:
         return
-    state, message = SETTLED_WORDS[action]
+    state, look, mark, message = SETTLED_WORDS[action]
     with _lock:
         _settled[found.index(task_id)] = {
             "kind": "settled",
@@ -65,6 +65,8 @@ def settle(snap: Snap, ref: str, action: str) -> None:
             "line": task["title"],
             "picture": _picture(task),
             "state": state,
+            "look": look,
+            "icon": mark,
             "message": message,
             "until": until,
         }
@@ -138,7 +140,7 @@ def slots(snap: Snap) -> dict[str, Any]:
     return {"max": limit, "open": len(ids), "approved_waiting": len(found["approved"]), "slots": places}
 
 
-def needs(snap: Snap) -> list[dict[str, Any]]:
+def needs(snap: Snap) -> dict[str, Any]:
     tasks = taskwords.tasks(snap)
     sessions = snap.get("sessions")
     with _lock:
@@ -186,5 +188,6 @@ def needs(snap: Snap) -> list[dict[str, Any]]:
             row.update(
                 chips=[{"text": "Question", "tone": "info"}], picture_label="See the picture", actions=["answer"]
             )
+        row["actions"] = [{"key": key, **taskwords.NEED_ACTIONS[key]} for key in row["actions"]]
         out.append(row)
-    return out
+    return {"count": len(out), "cards": out}

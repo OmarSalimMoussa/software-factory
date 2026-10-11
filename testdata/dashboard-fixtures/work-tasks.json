@@ -32,6 +32,8 @@
     "title": "In progress",
     "hint": null,
     "empty": "Nothing is being built.",
+    "count": 7,
+    "flip": "row",
     "rows": [
      {
       "id": "t-0021",
@@ -224,6 +226,8 @@
     "title": "Proposed to you",
     "hint": "Nothing starts until you approve it. The full cards, with their sketches, are on Home.",
     "empty": "No proposals waiting.",
+    "count": 3,
+    "flip": "prop",
     "rows": [
      {
       "id": "t-0027",
@@ -311,6 +315,8 @@
     "title": "Queue, in computed order",
     "hint": "The orchestrator proposes from the top of this order. Boost makes a task the next proposal, ahead of its own picks.",
     "empty": "The queue is empty.",
+    "count": 4,
+    "flip": "row",
     "rows": [
      {
       "id": "t-0018",
@@ -423,6 +429,8 @@
     "title": "On staging, waiting to push to prod",
     "hint": null,
     "empty": "Staging runs what prod runs.",
+    "count": 4,
+    "flip": "row",
     "rows": [
      {
       "id": "t-0016",

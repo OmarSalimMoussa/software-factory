@@ -16,7 +16,7 @@ PAGE.home = {
      look again soon, so the slot moves on without waiting a whole poll. */
   soon: env => {
     const p = env.parts.proposals, kinds = p && p.ok ? p.data.slots.map(s => s.kind) : [], u = env.parts.upgrade;
-    if (u && u.ok && u.data && ['preparing', 'running'].includes(u.data.state)) return 3000;  // an upgrade moves step by step
+    if (u && u.ok && u.data && u.data.busy) return 3000;  // an upgrade moves step by step
     return kinds.includes('settled') ? 1600 : kinds.includes('choosing') ? 4000 : 0;
   }
 };
@@ -26,14 +26,13 @@ function envsHTML(e) {
   return `<div class="envs">${envCard(e.staging)}<div class="promote-col"><span class="arrow">${icon('chevron-right', 'lg')}</span><span class="ahead">${e.to_push ? `<b class="num" style="font-size:18px;color:var(--fg)">${e.to_push}</b><br>to push` : esc(e.step_word)}</span></div>${envCard(e.prod)}${laptopHTML(e.laptop)}</div>`;
 }
 function envCard(env) {
-  const dot = env.state === 'healthy' ? 'good' : env.state === 'down' ? 'bad' : '';
-  return `<div class="card env"><div class="env-top"><i class="dot ${dot}"></i><span class="env-name">${esc(env.name)}</span><span class="chip mono" style="margin-left:auto">${esc(env.sha || 'unknown')}</span></div><div class="env-state" style="color:${env.state === 'down' ? 'var(--bad)' : env.state === 'healthy' ? 'var(--fg)' : 'var(--muted)'}">${esc(env.state_word)}</div>
+  const dot = esc(env.tone);
+  return `<div class="card env"><div class="env-top"><i class="dot ${dot}"></i><span class="env-name">${esc(env.name)}</span><span class="chip mono" style="margin-left:auto">${esc(env.sha || 'unknown')}</span></div><div class="env-state" style="color:${cv(env.state_color)}">${esc(env.state_word)}</div>
     <div class="env-meta"><span class="dep">${icon('clock', 'sm')}deployed <b>${esc(env.deployed || 'unknown')}</b></span>${env.chips.map(chip).join('')}</div>
     <div class="env-links">${env.deployment_url ? `<a href="${esc(env.deployment_url)}" target="_blank" rel="noopener">${icon('rocket-launch', 'sm')}Deployment</a>` : ''}${env.commit_url ? `<a href="${esc(env.commit_url)}" target="_blank" rel="noopener">${icon('code-bracket', 'sm')}Commit on GitHub</a>` : ''}</div></div>`;
 }
-const LAPTOP_TONE = {healthy: 'good', amber: 'warn', red: 'bad'};
 function laptopHTML(l) {
-  return `<div class="card vitals-mini"><div class="env-top"><span class="env-name">Laptop</span><span class="chip ${LAPTOP_TONE[l.state] || ''}" style="margin-left:auto">${esc(l.label)}</span></div>${l.rows.map(r => `<div class="vrow"><span>${esc(r.label)}</span>${r.pct == null ? '<div class="meter unknown"></div>' : `<div class="meter"><i style="width:${r.pct}%"></i></div>`}<span class="num">${esc(r.value)}</span></div>`).join('')}</div>`;
+  return `<div class="card vitals-mini"><div class="env-top"><span class="env-name">Laptop</span><span class="chip ${esc(l.tone)}" style="margin-left:auto">${esc(l.label)}</span></div>${l.rows.map(r => `<div class="vrow"><span>${esc(r.label)}</span>${r.pct == null ? '<div class="meter unknown"></div>' : `<div class="meter"><i style="width:${r.pct}%"></i></div>`}<span class="num">${esc(r.value)}</span></div>`).join('')}</div>`;
 }
 
 /* ---------- the upgrade band: a newer factory, the upgrade under way, or how it ended ---------- */
@@ -42,8 +41,8 @@ function upgradeBand(u) {
     upgrade: () => `<button class="btn sm primary" data-action="upgrade-factory" data-commit="${esc(u.commit)}">${icon('arrow-up-circle', 'sm')}Upgrade</button>`,
     resume: () => `<button class="btn sm" data-action="resume">${icon('play-circle', 'sm')}Restart the factory</button>`,
   };
-  const busy = ['preparing', 'running'].includes(u.state);
-  const changes = u.changelog.length ? `<details class="u-log"><summary>What changed (${u.changelog.length})</summary><ul>${u.changelog.map(c => `<li>${esc(c)}</li>`).join('')}</ul></details>` : '';
+  const busy = u.busy;
+  const changes = u.changes_title ? `<details class="u-log"><summary>${esc(u.changes_title)}</summary><ul>${u.changelog.map(c => `<li>${esc(c)}</li>`).join('')}</ul></details>` : '';
   const log = u.log ? `<div class="o-s muted">The log: <span class="mono">${esc(u.log)}</span></div>` : '';
   return `<div class="card upgrade" data-state="${esc(u.state)}" role="status"><span class="ico">${icon(busy ? 'arrow-path' : 'arrow-up-circle')}</span><div style="min-width:0"><div class="o-t">${esc(u.title)}</div><div class="o-s">${esc(u.message)}</div>${log}${changes}</div><div class="o-a">${u.actions.map(a => acts[a] ? acts[a]() : '').join('')}</div></div>`;
 }
@@ -75,7 +74,7 @@ const homePartOf = (env, name) => { const p = env.parts[name]; return p && p.ok 
 function slotHTML(s, i) {
   if (s.broken) return `<div class="card prop slot" data-flip="slot-${i}" role="status">${icon('exclamation-triangle')}This proposal could not be read: ${esc(s.error)}</div>`;
   if (s.kind === 'card') return propCard(s);
-  if (s.kind === 'settled') return `<div class="card prop ${s.state === 'approved' ? 'done' : 'later'}" data-flip="${esc(s.task)}"><button class="sk" data-task="${esc(s.task)}" aria-label="Open the proposal">${picture(s.picture, 'Sketch: now and after')}</button><div class="prop-main"><div class="prop-t">${esc(s.line)}</div><div class="result">${icon(s.state === 'approved' ? 'check' : 'clock', 'sm')}${esc(s.message)}</div></div><span></span></div>`;
+  if (s.kind === 'settled') return `<div class="card prop ${esc(s.look)}" data-flip="${esc(s.task)}"><button class="sk" data-task="${esc(s.task)}" aria-label="Open the proposal">${picture(s.picture, 'Sketch: now and after')}</button><div class="prop-main"><div class="prop-t">${esc(s.line)}</div><div class="result">${icon(s.icon, 'sm')}${esc(s.message)}</div></div><span></span></div>`;
   if (s.kind === 'choosing') return `<div class="card prop slot" data-flip="slot-${i}"><span class="spin"></span>The orchestrator is choosing the next proposal…</div>`;
   return `<div class="card prop slot" data-flip="slot-${i}">${s.message ? icon('check') + esc(s.message) : ''}</div>`;
 }
@@ -103,18 +102,14 @@ DDPICK['prop-run'] = (id, v) => act(`/api/proposals/${encodeURIComponent(id)}/ru
 /* ---------- Also needs you: every other decision, each with a picture of what it asks ---------- */
 function needsSection(env) {
   const l = homePartOf(env, 'needs');
-  return `<section class="section"><div class="sec-h"><div class="label">Also needs you ${l ? `<span class="n">${l.length}</span>` : ''}</div></div>${part(env, 'needs', list => `<div class="needs" id="needs">${list.length ? list.map(needCard).join('') : `<div class="card need slot">${icon('check')} Nothing else needs you.</div>`}</div>`)}</section>`;
+  return `<section class="section"><div class="sec-h"><div class="label">Also needs you ${l ? `<span class="n">${l.count}</span>` : ''}</div></div>${part(env, 'needs', d => `<div class="needs" id="needs">${d.cards.length ? d.cards.map(needCard).join('') : `<div class="card need slot">${icon('check')} Nothing else needs you.</div>`}</div>`)}</section>`;
 }
-const NEED_BTN = {
-  artifact: (n, c) => n.art_url ? `<a class="btn" href="${esc(n.art_url)}" target="_blank" rel="noopener">${icon('arrow-top-right-on-square', 'sm')}Open artifact</a>` : `<button class="btn" disabled>${icon('arrow-top-right-on-square', 'sm')}Open artifact</button>`,
-  feedback: (n, c) => `<button class="btn" data-need-act="feedback" data-id="${esc(n.id)}" data-write ${c}>${icon('chat-bubble-left-right', 'sm')}Check feedback</button>`,
-  go: (n, c) => `<button class="btn primary" data-need-act="go" data-id="${esc(n.id)}" data-write ${c}>${icon('check', 'sm')}Go</button>`,
-  extend: (n, c) => `<button class="btn" data-need-act="extend" data-id="${esc(n.id)}" data-write ${c}>Extend</button>`,
-  designer: (n, c) => `<button class="btn" data-need-act="designer" data-id="${esc(n.id)}" data-write ${c}>To a designer</button>`,
-  park: (n, c) => `<button class="btn" data-need-act="park" data-id="${esc(n.id)}" data-write ${c}>Park</button>`,
-  answer: (n, c) => `<button class="btn primary" data-need-act="answer" data-id="${esc(n.id)}" data-write ${c}>${icon('check', 'sm')}Send answer</button>`
+const needButton = (n, a, c) => {
+  const look = `${a.icon ? icon(a.icon, 'sm') : ''}${esc(a.label)}`;
+  if (a.key === 'artifact') return n.art_url ? `<a class="btn" href="${esc(n.art_url)}" target="_blank" rel="noopener">${look}</a>` : `<button class="btn" disabled>${look}</button>`;
+  return `<button class="btn${a.primary ? ' primary' : ''}" data-need-act="${esc(a.key)}" data-id="${esc(n.id)}" data-write ${c}>${look}</button>`;
 };
-const needButtons = (n, close) => n.actions.map(a => NEED_BTN[a] ? NEED_BTN[a](n, close ? 'data-close="1"' : '') : '').join('');
+const needButtons = (n, close) => n.actions.map(a => needButton(n, a, close ? 'data-close="1"' : '')).join('');
 const goalChip = n => n.goal_item ? `<span class="chip accent">${esc(n.goal_item)}</span>` : '';
 UI.answers = {};
 function needCard(n) {
@@ -128,7 +123,7 @@ function needCard(n) {
   return `<div class="card need pic decide" data-need="${id}">${pic}<div class="prop-main"><div class="prop-t" style="cursor:default">${esc(n.title)}</div><div class="prop-why" style="white-space:normal">${esc(n.sub)}</div><div class="need-s" style="margin:0">${n.task ? pill(n.task, 'accent', 'mono') : ''}${goalChip(n)}${n.chips.map(chip).join('')}</div></div>
     <div class="need-a prop-a">${needButtons(n)}</div></div>`;
 }
-const needOf = id => (homePart('needs') || []).find(n => n.id === id);
+const needOf = id => (homePart('needs') || {cards: []}).cards.find(n => n.id === id);
 function needAct(id, what, btn, close) {
   const n = needOf(id); if (!n) return;
   const body = {version: n.version};

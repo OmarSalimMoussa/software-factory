@@ -56,6 +56,7 @@ def push(snap: Snap) -> dict[str, Any]:
         "prod": _build(snap, "prod"),
         "staging": staging,
         "tasks": tasks,
+        "gains": len(tasks),
         "prod_runs_staging": same,
         "previous_prod": previous[:7] if previous else None,
         "expected_staging_sha": expected,

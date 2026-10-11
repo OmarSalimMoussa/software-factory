@@ -24,7 +24,7 @@ def _has(query: str, *texts: str) -> bool:
 def search(snap: Snap, query: str) -> dict[str, Any]:
     q = query.strip()
     if not q:
-        return {"groups": [], "files": 0, "shown_files": 0}
+        return {"groups": [], "more": None}
     found = docs.searched(docs.index(snap), q)
 
     def doc_items(kind: str) -> list[dict[str, Any]]:
@@ -89,9 +89,11 @@ def search(snap: Snap, query: str) -> dict[str, Any]:
     groups = [("Pages", pages)] + [(label, doc_items(kind)) for label, kind in _DOC_GROUPS]
     groups += [("Agents", (agents[:PER_GROUP] + gone[: PER_GROUP - 1])), ("Settings", rows[:PER_GROUP])]
     groups += [(label, doc_items(kind)) for label, kind in _LATE_GROUPS]
-    kept = [{"label": label, "items": items} for label, items in groups if items]
-    shown_files = sum(1 for g in kept for i in g["items"] if i["kind"] == "doc")
-    return {"groups": kept, "files": len(found), "shown_files": shown_files}
+    kept = [{"label": label, "items": [{**i, "go": i["kind"] in ("page", "setting")} for i in items]}
+            for label, items in groups if items]  # fmt: skip
+    shown = sum(1 for g in kept for i in g["items"] if i["kind"] == "doc")
+    more = f"See all {len(found)} matching files in Library" if len(found) > shown else None
+    return {"groups": kept, "more": more}
 
 
 def _plain(value: Any) -> str:

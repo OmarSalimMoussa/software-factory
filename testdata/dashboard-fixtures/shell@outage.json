@@ -5,10 +5,12 @@
   "pills": {
    "staging": {
     "state": "healthy",
+    "tone": "good",
     "sha": "a1b2c3d"
    },
    "prod": {
     "state": "down",
+    "tone": "bad",
     "sha": "9f8e7d1"
    }
   },

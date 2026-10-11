@@ -1,0 +1,64 @@
+# The server computes and the pages draw: the dashboard's and the install console's scripts derive nothing the
+# server can send. They are read as written, since their markup lives in template strings.
+
+[[computations]]
+name = "words and tones for a state"
+scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
+suffixes = [".js"]
+when = [["\\.(state|level|status|tone|marker) === '[a-z_-]+' \\?"]]
+code_only = false
+remedy = "the server sends the word, the tone or the icon with the state; the page draws it"
+owners = {}
+
+[[computations]]
+name = "lists of states"
+scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
+suffixes = [".js"]
+when = [["\\[('[a-z_-]+', )+'[a-z_-]+'\\]\\.includes\\("]]
+code_only = false
+remedy = "the server sends what the list decides, such as busy or go, as a field of its own"
+
+[computations.owners]
+"runtime/dashboard/ui/js/core.js" = "which inputs take typing is the browser's own: the input types, not a server state"
+
+[[computations]]
+name = "plurals"
+scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
+suffixes = [".js"]
+when = [["=== 1 \\?"]]
+code_only = false
+remedy = "the server sends the counted words, such as 3 files, with the count"
+
+[computations.owners]
+"runtime/dashboard/ui/js/settings.js" = "the owner's unsaved edits live only in the page, so their count and its words are the page's own"
+
+[[computations]]
+name = "counts shown"
+scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
+suffixes = [".js"]
+when = [["\\.length\\s*\\}"]]
+code_only = false
+remedy = "the server sends the count beside the list it counts"
+
+[computations.owners]
+"runtime/dashboard/ui/js/settings.js" = "the owner's unsaved edits live only in the page, so their count is the page's own"
+
+[[computations]]
+name = "the clock"
+scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
+suffixes = [".js"]
+when = [["new Date\\("], ["Date\\.now\\("], ["Date\\.parse\\("], ["\\.toLocale(Date|Time)String\\("]]
+code_only = false
+remedy = "the server sends times as the page shows them; only core.js reads the page's own clock"
+
+[computations.owners]
+"runtime/dashboard/ui/js/core.js" = "the page's own clock: how long since it last heard the warden, when it lost it, and the live countdown toward a time the server sends"
+
+[[computations]]
+name = "links"
+scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
+suffixes = [".js"]
+when = [["https?://"]]
+code_only = false
+remedy = "the server sends every link, built from the settings it holds"
+owners = {}

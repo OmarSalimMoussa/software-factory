@@ -7,7 +7,7 @@ from typing import Any
 
 from runtime.dashboard.views import messaging, proposals
 from runtime.dashboard.views.kit import Parts, Query, Snap, clock, epoch, iso, model_word, plural, span, when
-from runtime.dashboard.views.shell import github_url, health, prod_runs_staging
+from runtime.dashboard.views.shell import STATE_COLOR, github_url, health, prod_runs_staging
 from runtime.dashboard.views.words import agentwords, taskwords
 from runtime.shared.models import RETIRED, WAITING
 from runtime.shared.paths import PROMOTE_WORKFLOW
@@ -32,10 +32,10 @@ WANTS = (
 )
 SPARK_DAYS = 14
 _LAPTOP = {
-    "green": ("healthy", "healthy"),
-    "amber": ("amber", "strained"),
-    "unknown": ("amber", "unknown"),
-    "red": ("red", "critical"),
+    "green": ("healthy", "healthy", "good"),
+    "amber": ("amber", "strained", "warn"),
+    "unknown": ("amber", "unknown", "warn"),
+    "red": ("red", "critical", "bad"),
 }
 _STAGES = (
     ("designing", "designing", "--f-design", ("designing",)),
@@ -67,7 +67,9 @@ def env_card(snap: Snap, env: str) -> dict[str, Any]:
     return {
         "name": env.title(),
         "state": pill["state"],
+        "tone": pill["tone"],
         "state_word": pill["state"].title(),
+        "state_color": STATE_COLOR[pill["state"]],
         "sha": pill["sha"],
         "deployed": when(epoch(current["at"])) if current else None,
         "chips": chips,
@@ -81,9 +83,9 @@ def laptop(snap: Snap) -> dict[str, Any]:
     vitals = snap.get("vitals")["reading"]
     if vitals is None:
         rows = [{"label": label, "pct": None, "value": "unknown"} for label in ("Memory", "CPU", "Power")]
-        return {"state": "amber", "label": "unknown", "rows": rows}
+        return {"state": "amber", "tone": "warn", "label": "unknown", "rows": rows}
     readings = {r["name"]: r for r in vitals["readings"]}
-    state, label = _LAPTOP[vitals["level"]]
+    state, label, tone = _LAPTOP[vitals["level"]]
     cpu, power = readings["cpu"], readings["power"]
     cpu_pct, power_pct = cpu["figure"], power["figure"]
     mains = power["level"] == "green"
@@ -91,6 +93,7 @@ def laptop(snap: Snap) -> dict[str, Any]:
     cpu_words = f"{cpu_pct:.0f}%" if cpu_pct is not None else "not reported" if cpu["level"] == "missing" else "unknown"
     return {
         "state": state,
+        "tone": tone,
         "label": label,
         "rows": [
             {"label": "Memory", "pct": used, "value": "unknown" if used is None else f"{used}%"},
@@ -268,6 +271,15 @@ _COMES_BACK = "The dashboard restarts during the upgrade. This page comes back o
 
 def upgrade(snap: Snap) -> dict[str, Any] | None:
     """A newer factory on offer, the upgrade under way, how it ended, or nothing; the words are all here."""
+    band = _upgrade_band(snap)
+    if band is None:
+        return None
+    changes = len(band["changelog"])
+    title = f"What changed ({changes})" if changes else None
+    return {**band, "busy": band["state"] in ("preparing", "running"), "changes_title": title}
+
+
+def _upgrade_band(snap: Snap) -> dict[str, Any] | None:
     found = snap.get("upgrade")
     band = _upgrade_asked(found) if found["asked"] is not None else None
     available = found["offer"]["available"]

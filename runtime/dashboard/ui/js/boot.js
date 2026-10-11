@@ -29,13 +29,13 @@ function drawGs() {
   if (!q.trim()) { pop.hidden = true; $('#gq').setAttribute('aria-expanded', 'false'); return; }
   if (!UI.gs.data && !UI.gs.error) return;
   if (UI.gs.error) { pop.innerHTML = `<div class="gs-empty">${esc(UI.gs.error)}</div>`; pop.hidden = false; return; }
-  const {groups, files, shown_files: shown} = UI.gs.data;
+  const {groups, more} = UI.gs.data;
   UI.gs.list = groups.flatMap(g => g.items);
-  if (files > shown) UI.gs.list.push({kind: 'all', title: `See all ${files} matching files in Library`});
+  if (more) UI.gs.list.push({kind: 'all', title: more, go: true});
   UI.gs.at = Math.min(UI.gs.at, Math.max(0, UI.gs.list.length - 1));
   let i = 0;
-  const row = x => { const k = i++; return `<button class="gs-item ${x.kind === 'all' ? 'gs-all' : ''}" role="option" id="gs-${k}" data-gs="${k}" aria-selected="${k === UI.gs.at}">${x.kind === 'all' ? `<span class="ico">${icon('book-open', 'sm')}</span>` : gsIcon(x.icon)}<span style="min-width:0"><div class="t">${x.kind === 'all' ? esc(x.title) : gsMark(x.title, q)}</div>${x.sub ? `<div class="s">${gsMark(x.sub, q)}</div>` : ''}</span><span class="faint">${['page', 'setting', 'all'].includes(x.kind) ? icon('chevron-right', 'sm') : ''}</span></button>`; };
-  pop.innerHTML = groups.length ? groups.map(g => `<div class="gs-group">${esc(g.label)}</div>${g.items.map(row).join('')}`).join('') + (files > shown ? row(UI.gs.list.at(-1)) : '') : `<div class="gs-empty">Nothing matches “${esc(q.trim())}”.</div>`;
+  const row = x => { const k = i++; return `<button class="gs-item ${x.kind === 'all' ? 'gs-all' : ''}" role="option" id="gs-${k}" data-gs="${k}" aria-selected="${k === UI.gs.at}">${x.kind === 'all' ? `<span class="ico">${icon('book-open', 'sm')}</span>` : gsIcon(x.icon)}<span style="min-width:0"><div class="t">${x.kind === 'all' ? esc(x.title) : gsMark(x.title, q)}</div>${x.sub ? `<div class="s">${gsMark(x.sub, q)}</div>` : ''}</span><span class="faint">${x.go ? icon('chevron-right', 'sm') : ''}</span></button>`; };
+  pop.innerHTML = groups.length ? groups.map(g => `<div class="gs-group">${esc(g.label)}</div>${g.items.map(row).join('')}`).join('') + (more ? row(UI.gs.list.at(-1)) : '') : `<div class="gs-empty">Nothing matches “${esc(q.trim())}”.</div>`;
   pop.hidden = false; $('#gq').setAttribute('aria-expanded', 'true'); $('#gq').setAttribute('aria-activedescendant', 'gs-' + UI.gs.at);
 }
 function gsKey(e) {

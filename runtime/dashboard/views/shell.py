@@ -20,6 +20,10 @@ PAGES = [
 ]
 
 
+_TONE = {"healthy": "good", "down": "bad", "unknown": ""}
+STATE_COLOR = {"healthy": "--fg", "down": "--bad", "unknown": "--muted"}
+
+
 def health(snap: Snap, env: str) -> dict[str, Any]:
     """An environment's state from its last probe, and the build it last answered on."""
     recent = snap.get("probes")["recent"][env]
@@ -31,7 +35,7 @@ def health(snap: Snap, env: str) -> dict[str, Any]:
         state = "healthy"
     else:
         state = "down" if last["counts"] else "unknown"
-    return {"state": state, "sha": good["commit"][:7] if good else None}
+    return {"state": state, "tone": _TONE[state], "sha": good["commit"][:7] if good else None}
 
 
 def prod_runs_staging(snap: Snap) -> bool:

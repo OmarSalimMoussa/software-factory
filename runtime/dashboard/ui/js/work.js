@@ -20,13 +20,12 @@ const WORK_TAB = {
   requests: d => `<div class="toolbar"><div class="pillset">${d.inboxes.map(k => `<button class="pill" data-inbox="${esc(k.key)}" aria-pressed="${UI.reqInbox === k.key}">${esc(k.label)} <span class="c">${k.count}</span></button>`).join('')}</div>
       <div class="seg" role="group" aria-label="Outcome">${d.outcomes.map(([k, l]) => `<button data-out="${esc(k)}" aria-pressed="${UI.reqOut === k}">${esc(l)}</button>`).join('')}</div></div>
       <div class="card rows">${d.rows.length ? d.rows.map(r => r.broken ? brokenRow(r) : reqRow(r)).join('') : '<div class="empty">No requests match.</div>'}${showMore('requests', d.more)}</div>`,
-  parked: d => `<div class="card rows">${d.rows.length ? d.rows.map(p => p.broken ? brokenRow(p) : `<div class="row req-row" data-open-doc="${esc(p.id)}"><span class="faint">${icon('clock', 'sm')}</span><div style="min-width:0"><div class="tt">${esc(p.title)}</div><div class="ts">${esc(p.why)} · ${p.requests} request${p.requests === 1 ? '' : 's'}</div></div><span class="c-hide faint">${esc(p.date)}</span><span class="c-hide"></span><button class="btn sm" data-unpark="${esc(p.id)}" data-write>Unpark</button></div>`).join('') : '<div class="empty">Nothing parked.</div>'}</div>`,
+  parked: d => `<div class="card rows">${d.rows.length ? d.rows.map(p => p.broken ? brokenRow(p) : `<div class="row req-row" data-open-doc="${esc(p.id)}"><span class="faint">${icon('clock', 'sm')}</span><div style="min-width:0"><div class="tt">${esc(p.title)}</div><div class="ts">${esc(p.why)} · ${esc(p.requests)}</div></div><span class="c-hide faint">${esc(p.date)}</span><span class="c-hide"></span><button class="btn sm" data-unpark="${esc(p.id)}" data-write>Unpark</button></div>`).join('') : '<div class="empty">Nothing parked.</div>'}</div>`,
   checks: d => `<div class="legend">${d.legend.map(l => `<span><i style="background:${toneColor(l.tone)}"></i>${esc(l.label)}</span>`).join('')}</div>
       <div class="card rows">${d.rows.length ? d.rows.map(c => c.broken ? brokenRow(c) : `<div class="row check-row" data-open-doc="${esc(c.id)}"><div><div class="tt">${esc(c.merge)}</div><div class="ts"><span class="chip mono">${esc(c.sha)}</span>${esc(c.age)}</div></div><div class="scen">${c.results.map(x => `<i class="${x.cls}" title="${esc(x.scenario)}"></i>`).join('')}</div><div class="status" style="justify-content:flex-end"><i class="dot ${c.tone}"></i>${esc(c.summary)}</div></div>`).join('') : '<div class="empty">No check of the default branch has run yet.</div>'}</div>`
 };
-const FLIP_OF = {approved: 'appr', proposed: 'prop'};
 function groupHTML(g) {
-  return `<section class="card rows group" data-group="${esc(g.key)}"><div class="group-h"><span class="gtitle">${esc(g.title)}<span class="n">${g.rows.length}</span></span>${g.hint ? hint(g.hint, true) : ''}</div>${g.rows.length ? g.rows.map(r => r.broken ? brokenRow(r) : taskRow(r, FLIP_OF[g.key] || 'row')).join('') : `<div class="empty">${esc(g.empty)}</div>`}</section>`;
+  return `<section class="card rows group" data-group="${esc(g.key)}"><div class="group-h"><span class="gtitle">${esc(g.title)}<span class="n">${g.count}</span></span>${g.hint ? hint(g.hint, true) : ''}</div>${g.rows.length ? g.rows.map(r => r.broken ? brokenRow(r) : taskRow(r, g.flip)).join('') : `<div class="empty">${esc(g.empty)}</div>`}</section>`;
 }
 function taskRow(t, flip) {
   const id = esc(t.id);
@@ -48,7 +47,7 @@ function reqRow(r) {
   const o = r.outcome;
   return `<div class="row req-row" data-open-doc="${esc(r.id)}">${ava(r.family, r.initial, 26)}
     <div style="min-width:0"><div class="tt">${r.severe ? '<span class="chip bad">severe</span> ' : ''}${esc(r.text)}</div><div class="ts"><span class="mono">${esc(r.id)}</span>${esc(r.age)}</div></div>
-    <span class="c-hide">${pill(o.text, o.tone, o.tone === 'accent' ? 'mono' : '')}</span><span class="c-hide faint">${esc(r.from)}</span>
+    <span class="c-hide">${pill(o.text, o.tone, o.mono ? 'mono' : '')}</span><span class="c-hide faint">${esc(r.from)}</span>
     ${r.can_boost ? `<button class="btn sm" data-boostreq="${esc(r.id)}" data-write>${icon('arrow-up-circle', 'sm')}Boost</button>` : '<span></span>'}</div>`;
 }
 const workGroup = key => { const env = UI.data[PAGE.work.url()], p = env && env.parts.tasks; return p && p.ok ? p.data.groups.find(g => g.key === key) : null; };

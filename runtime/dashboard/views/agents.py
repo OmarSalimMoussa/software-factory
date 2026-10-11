@@ -36,7 +36,7 @@ def in_tree(snap: Snap, row: dict[str, Any]) -> bool:
 
 def node(snap: Snap, rows: dict[str, dict[str, Any]], row: dict[str, Any]) -> dict[str, Any]:
     kids = [k for k in words.kids(rows, row) if in_tree(snap, k)]
-    marker, state_word = words.marker(row)
+    dot, state_word = words.dot(row)
     return {
         "id": row["id"],
         "name": words.name(snap, row),
@@ -46,7 +46,7 @@ def node(snap: Snap, rows: dict[str, dict[str, Any]], row: dict[str, Any]) -> di
         "kids_label": f" · {len(kids)}" if kids else "",
         "doing": words.doing(snap, row),
         "model": words.model(row),
-        "marker": marker,
+        "dot": dot,
         "state_word": state_word,
         "cost": words.cost(snap, row),
         "can_stop": row["state"] != RETIRED,

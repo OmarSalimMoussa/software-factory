@@ -1,4 +1,6 @@
 {
- "goal": {"$error": "GOAL.md is missing, so the goal cannot be drawn."},
+ "goal": {
+  "$error": "GOAL.md is missing, so the goal cannot be drawn."
+ },
  "working": []
 }

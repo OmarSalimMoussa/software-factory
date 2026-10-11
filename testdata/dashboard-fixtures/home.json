@@ -3,7 +3,9 @@
   "staging": {
    "name": "Staging",
    "state": "healthy",
+   "tone": "good",
    "state_word": "Healthy",
+   "state_color": "--fg",
    "sha": "a1b2c3d",
    "deployed": "Oct 9, 11:18",
    "chips": [
@@ -22,7 +24,9 @@
   "prod": {
    "name": "Prod",
    "state": "healthy",
+   "tone": "good",
    "state_word": "Healthy",
+   "state_color": "--fg",
    "sha": "9f8e7d1",
    "deployed": "Oct 7, 10:05",
    "chips": [
@@ -38,6 +42,7 @@
   "step_word": "in step",
   "laptop": {
    "state": "healthy",
+   "tone": "good",
    "label": "healthy",
    "rows": [
     {
@@ -177,80 +182,118 @@
    }
   ]
  },
- "needs": [
-  {
-   "id": "n1",
-   "kind": "spec",
-   "task": "t-0023",
-   "goal_item": "G2",
-   "title": "A partner sign-in during an import asks for it in place",
-   "sub": "Second sign-off",
-   "chips": [
-    {
-     "text": "Second sign-off",
-     "tone": "warn"
-    },
-    {
-     "text": "designer's mock-ups",
-     "tone": "violet"
-    }
-   ],
-   "picture": "/api/picture/card/n1",
-   "picture_label": "See the designer's mock-ups",
-   "art_url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000023",
-   "comments": "3 comments, 2 h ago",
-   "actions": [
-    "artifact",
-    "feedback",
-    "go"
-   ],
-   "done": null,
-   "version": "v1"
-  },
-  {
-   "id": "n2",
-   "kind": "decide",
-   "task": "t-0019",
-   "goal_item": "G1",
-   "title": "Slow export moved up a rung twice",
-   "sub": "Its rounds are used up at rung 3. Extend them, send it to a designer, or park it.",
-   "chips": [],
-   "picture": "/api/picture/card/n2",
-   "picture_label": "See how the task moved",
-   "art_url": null,
-   "comments": null,
-   "actions": [
-    "extend",
-    "designer",
-    "park"
-   ],
-   "done": null,
-   "version": "v1"
-  },
-  {
-   "id": "n3",
-   "kind": "question",
-   "task": "t-0022",
-   "goal_item": "G2",
-   "title": "Retry an upload asks you a question",
-   "sub": "Should a dropped upload resume from the last full part, or start again?",
-   "chips": [
-    {
-     "text": "Question",
-     "tone": "info"
-    }
-   ],
-   "picture": null,
-   "picture_label": null,
-   "art_url": null,
-   "comments": null,
-   "actions": [
-    "answer"
-   ],
-   "done": null,
-   "version": "v1"
-  }
- ],
+ "needs": {
+  "count": 3,
+  "cards": [
+   {
+    "id": "n1",
+    "kind": "spec",
+    "task": "t-0023",
+    "goal_item": "G2",
+    "title": "A partner sign-in during an import asks for it in place",
+    "sub": "Second sign-off",
+    "chips": [
+     {
+      "text": "Second sign-off",
+      "tone": "warn"
+     },
+     {
+      "text": "designer's mock-ups",
+      "tone": "violet"
+     }
+    ],
+    "picture": "/api/picture/card/n1",
+    "picture_label": "See the designer's mock-ups",
+    "art_url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000023",
+    "comments": "3 comments, 2 h ago",
+    "actions": [
+     {
+      "key": "artifact",
+      "label": "Open artifact",
+      "icon": "arrow-top-right-on-square",
+      "primary": false
+     },
+     {
+      "key": "feedback",
+      "label": "Check feedback",
+      "icon": "chat-bubble-left-right",
+      "primary": false
+     },
+     {
+      "key": "go",
+      "label": "Go",
+      "icon": "check",
+      "primary": true
+     }
+    ],
+    "done": null,
+    "version": "v1"
+   },
+   {
+    "id": "n2",
+    "kind": "decide",
+    "task": "t-0019",
+    "goal_item": "G1",
+    "title": "Slow export moved up a rung twice",
+    "sub": "Its rounds are used up at rung 3. Extend them, send it to a designer, or park it.",
+    "chips": [],
+    "picture": "/api/picture/card/n2",
+    "picture_label": "See how the task moved",
+    "art_url": null,
+    "comments": null,
+    "actions": [
+     {
+      "key": "extend",
+      "label": "Extend",
+      "icon": null,
+      "primary": false
+     },
+     {
+      "key": "designer",
+      "label": "To a designer",
+      "icon": null,
+      "primary": false
+     },
+     {
+      "key": "park",
+      "label": "Park",
+      "icon": null,
+      "primary": false
+     }
+    ],
+    "done": null,
+    "version": "v1"
+   },
+   {
+    "id": "n3",
+    "kind": "question",
+    "task": "t-0022",
+    "goal_item": "G2",
+    "title": "Retry an upload asks you a question",
+    "sub": "Should a dropped upload resume from the last full part, or start again?",
+    "chips": [
+     {
+      "text": "Question",
+      "tone": "info"
+     }
+    ],
+    "picture": null,
+    "picture_label": null,
+    "art_url": null,
+    "comments": null,
+    "actions": [
+     {
+      "key": "answer",
+      "label": "Send answer",
+      "icon": "check",
+      "primary": true
+     }
+    ],
+    "done": null,
+    "version": "v1"
+   }
+  ]
+ },
  "tiles": {
   "work": {
    "count": 6,

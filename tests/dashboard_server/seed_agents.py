@@ -58,9 +58,7 @@ def seed_sessions(now: float) -> list[Session]:
         role = roles.get(node["role"], node["role"])
         if role in ("tester", "critic"):
             role = node["name"]
-        state = {"working": "working", "waiting": "waiting", "depri": "deprioritized", "done": "retired"}[
-            node["marker"]
-        ]
+        state = {"accent": "working", "warn": "waiting", "depri": "deprioritized", "good": "retired"}[node["dot"]]
         rung = {"implementer, small": 1, "implementer, large": 2}.get(node["role"])
         out.append(
             Session(

@@ -270,7 +270,7 @@ async function loadShell() {
     UI.shell = p.data; UI.pages = p.data.pages; renderShell();
   } catch (e) { loadFailed(e, 'The top bar', loadShell); }
 }
-const pillHTML = (name, p) => `<i class="dot ${p.state === 'healthy' ? 'good' : p.state === 'down' ? 'bad' : ''}"></i><b>${name}</b><span class="sha">${esc(p.sha || 'unknown')}</span>`;
+const pillHTML = (name, p) => `<i class="dot ${esc(p.tone)}"></i><b>${name}</b><span class="sha">${esc(p.sha || 'unknown')}</span>`;
 function renderShell() {
   $('#brand-mark').innerHTML = icon('bolt', 'sm');
   $('#gs-open').innerHTML = icon('magnifying-glass'); $('.gs-ico').innerHTML = icon('magnifying-glass', 'sm'); $('.gs-close').innerHTML = icon('x-mark', 'sm');

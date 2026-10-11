@@ -26,7 +26,9 @@
   "staging": {
    "name": "Staging",
    "state": "healthy",
+   "tone": "good",
    "state_word": "Healthy",
+   "state_color": "--fg",
    "sha": "a1b2c3d",
    "deployed": "Oct 9, 11:18",
    "chips": [
@@ -45,7 +47,9 @@
   "prod": {
    "name": "Prod",
    "state": "down",
+   "tone": "bad",
    "state_word": "Down",
+   "state_color": "--bad",
    "sha": "9f8e7d1",
    "deployed": "Oct 7, 10:05",
    "chips": [
@@ -65,6 +69,7 @@
   "step_word": "in step",
   "laptop": {
    "state": "healthy",
+   "tone": "good",
    "label": "healthy",
    "rows": [
     {

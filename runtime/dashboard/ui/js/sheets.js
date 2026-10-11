@@ -105,7 +105,7 @@ function codeSheet(title, intro, okWord, send, opts = {}) {
       const c = ans.code || {};
       sent = ''; boxes.forEach(b => { b.value = ''; b.disabled = false; }); ok.disabled = false;
       if (c.locked_until) { UI.shell && (UI.shell.code.locked_until = c.locked_until); boxes.forEach(b => b.disabled = true); ok.disabled = true; say(`Locked after too many wrong codes. Try again at ${c.locked_until}.`, true); return; }
-      if (c.tries_left != null) { const box = $('#code'); box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake'); boxes[0].focus(); say(`That code is wrong. ${c.tries_left} ${c.tries_left === 1 ? 'try' : 'tries'} left.`, true); return; }
+      if (c.tries_left != null) { const box = $('#code'); box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake'); boxes[0].focus(); say(ans.reason, true); return; }
       boxes[0].focus(); say(ans.reason || 'The factory refused that.', true); return;
     }
     UI.device = false; closeSheet();
@@ -191,7 +191,7 @@ async function openPromote() {
   UI.origins = Object.fromEntries(d.tasks.map(t => [t.id, t.built_from]));
   if (d.prod_runs_staging) { openSheet('Push to prod', `<div class="card empty" style="min-height:120px">${icon('check')} Prod already runs what staging runs.</div>${d.previous_prod ? `<button class="btn" data-action="promote-back" data-write data-sha="${esc(d.previous_prod)}">Push prod back to ${esc(d.previous_prod)}</button>` : ''}`, ''); return; }
   codeSheet('Push to prod', `<div class="diff">${envBox('Prod now', d.prod)}<span style="color:var(--faint);display:grid;place-items:center">${icon('chevron-right')}</span>${envBox('Staging', d.staging, true)}</div>
-    ${d.tasks.length ? `<div class="section"><div class="label">What prod gains <span class="n">${d.tasks.length}</span> ${hint('Open a change to see what it was built from. Prod is redeployed at exactly the commit staging runs.')}</div><div class="card rows" style="overflow:hidden">${d.tasks.map(t => `<button class="origin-row" data-origin="${esc(t.id)}" aria-expanded="false" aria-controls="origin-${esc(t.id)}"><span class="tt" style="font-weight:500">${esc(t.title)}</span>${chip(t.chip)}<span class="chev faint">${icon('chevron-right', 'sm')}</span></button><div class="origin" id="origin-${esc(t.id)}" hidden></div>`).join('')}</div></div>` : ''}`,
+    ${d.tasks.length ? `<div class="section"><div class="label">What prod gains <span class="n">${d.gains}</span> ${hint('Open a change to see what it was built from. Prod is redeployed at exactly the commit staging runs.')}</div><div class="card rows" style="overflow:hidden">${d.tasks.map(t => `<button class="origin-row" data-origin="${esc(t.id)}" aria-expanded="false" aria-controls="origin-${esc(t.id)}"><span class="tt" style="font-weight:500">${esc(t.title)}</span>${chip(t.chip)}<span class="chev faint">${icon('chevron-right', 'sm')}</span></button><div class="origin" id="origin-${esc(t.id)}" hidden></div>`).join('')}</div></div>` : ''}`,
   'Push to prod', (code, key) => post('/api/push', {expected_staging_sha: d.expected_staging_sha, code}, key), {opTitle: 'Pushing to prod', icon: 'rocket-launch', blocked: d.blocked});
 }
 function openPushBack(sha) {

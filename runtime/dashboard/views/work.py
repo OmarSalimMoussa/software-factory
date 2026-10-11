@@ -23,6 +23,9 @@ from runtime.dashboard.views.words import taskwords
 from runtime.queue.formats import outcome
 from runtime.shared import order
 
+# A row keeps its key as it moves between these groups and Home's proposals, so it slides instead of jumping.
+_FLIP = {"approved": "appr", "proposed": "prop"}
+
 WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "factory", "probes", "goal")
 TABS = (("tasks", "Tasks"), ("requests", "Requests"), ("parked", "Parked"), ("checks", "Checks"))
 INBOXES = (("all", "All inboxes"), ("agents", "Agents"), ("owner", "You"), ("users", "Users"))
@@ -105,6 +108,8 @@ def groups(snap: Snap) -> list[dict[str, Any]]:
             "title": title,
             "hint": hint,
             "empty": staging_empty if key == "staging" else empty,
+            "count": len(rows[key]),
+            "flip": _FLIP.get(key, "row"),
             "rows": rows[key],
         }
         for key, (title, hint, empty) in _GROUPS.items()
@@ -118,12 +123,12 @@ def _boost(task: dict[str, Any], snap: Snap) -> str | None:
     return "unboost" if task["boosted_at"] else "boost"
 
 
-def _outcome(request: dict[str, Any]) -> tuple[str, dict[str, str]]:
+def _outcome(request: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     """The outcome filter's key, and the pill the row shows."""
     found = outcome(request["outcome"])
     if found.task:
-        return "task", {"text": found.task, "tone": "accent"}
-    return found.kind, {"text": found.kind, "tone": ""}
+        return "task", {"text": found.task, "tone": "accent", "mono": True}
+    return found.kind, {"text": found.kind, "tone": "", "mono": False}
 
 
 def requests(snap: Snap, query: Query) -> dict[str, Any]:
@@ -175,7 +180,7 @@ def parked(snap: Snap) -> dict[str, Any]:
                         "id": t["id"],
                         "title": t["title"],
                         "why": move["text"] or "Parked",
-                        "requests": len(t["requests"]),
+                        "requests": plural(len(t["requests"]), "request"),
                         "date": when(epoch(move["at"] or t["created"]))[:-7],
                     },
                 )
@@ -189,7 +194,7 @@ def parked(snap: Snap) -> dict[str, Any]:
                         "id": r["id"],
                         "title": first_line(r["body"]),
                         "why": outcome(r["outcome"]).reason,
-                        "requests": 1,
+                        "requests": plural(1, "request"),
                         "date": when(epoch(r["at"]))[:-7],
                     },
                 )
