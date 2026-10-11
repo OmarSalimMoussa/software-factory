@@ -23,6 +23,8 @@ def test_the_dry_run_lists_every_step_in_order_and_changes_nothing(
     printed = [line for line in capsys.readouterr().out.splitlines() if line[:3].strip().rstrip(".").isdigit()]
     assert printed == [f"{n:>2}. {title}" for n, (title, _) in enumerate(install.STEPS, 1)]
     assert any(action.startswith("write: /etc/systemd/system/software-factory.slice") for action in job.host.actions)
+    # The owner's own git hooks read the settings published under it; no factory user may list or enter it.
+    assert f"make: {tmp_path / 'root' / 'state'}/ (710, software-warden:owner)" in job.host.actions
     assert not (tmp_path / "root").exists()
 
 

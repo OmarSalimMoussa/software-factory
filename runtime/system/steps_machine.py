@@ -59,7 +59,7 @@ def users(ctx: Install) -> None:
             if name in homes:
                 host.run(["passwd", "--lock", name])
             continue
-        privileged = sorted(layout.PRIVILEGED_GROUPS & set(account.groups))
+        privileged = sorted((layout.PRIVILEGED_GROUPS | {owner_group(ctx)}) & set(account.groups))
         if privileged:
             raise refuse(f"{name} is in {', '.join(privileged)}: remove it (gpasswd -d {name} <group>), then reinstall")
         if name in homes and account.home != homes[name]:
@@ -83,9 +83,18 @@ def users(ctx: Install) -> None:
         host.run(["loginctl", "enable-linger", name])
 
 
+def owner_group(ctx: Install) -> str:
+    """The owner's primary group: an account lists it first."""
+    if not ctx.owner.groups:
+        raise refuse(f"{ctx.owner.name}'s primary group cannot be read: the state folder cannot be given to it")
+    return ctx.owner.groups[0]
+
+
 def state_tree(ctx: Install) -> None:
     host, state = ctx.host, ctx.places.state
-    host.mkdir(state, mode=0o700, owner=WARDEN_USER)
+    # The owner may pass through (never list) to public/: the factory's git hooks in the owner's own checkout read the
+    # settings the warden publishes there. No factory user is in the owner's group, so to them the folder stays shut.
+    host.mkdir(state, mode=0o710, owner=WARDEN_USER, group=owner_group(ctx))
     public = layout.public(state)
     for folder in (public, public / "launch", ctx.places.rendered_plugin):
         host.mkdir(folder, mode=0o755, owner=WARDEN_USER)
