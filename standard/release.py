@@ -9,7 +9,6 @@ Run by deploy-prod.yml's releases job:
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import subprocess
 import sys
@@ -18,6 +17,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from standard import config as settings
+from standard import environment
 from standard.config import Config, Release
 
 # The chrome-web-store upload's own variable, then the repo secret the workflow hands it in.
@@ -42,16 +42,16 @@ class ReleaseError(Exception):
     pass
 
 
-def missing_secrets(config: Config, environ: Mapping[str, str]) -> list[str]:
+def missing_secrets(config: Config, credentials: Mapping[str, str]) -> list[str]:
     if not any(release.live for release in config.releases):
         return []
-    return [secret for _, secret in STORE_SECRETS if not environ.get(secret)]
+    return [secret for _, secret in STORE_SECRETS if secret not in credentials]
 
 
-def changed(release: Release, repo: Path, *, sha: str, released: str, run: Run, environ: Mapping[str, str]) -> bool:
+def changed(release: Release, repo: Path, *, sha: str, released: str, run: Run, env: Mapping[str, str]) -> bool:
     if released == "-":
         return True
-    code = run(["git", "diff", "--quiet", released, sha, "--", *release.when_changed], repo, environ)
+    code = run(["git", "diff", "--quiet", released, sha, "--", *release.when_changed], repo, env)
     if code not in (0, 1):
         raise ReleaseError(f"git could not compare {released} with {sha} (exit code {code})")
     return code == 1
@@ -65,11 +65,13 @@ def release_all(
     released: str,
     run_number: int,
     run: Run,
-    environ: Mapping[str, str],
+    credentials: Mapping[str, str],
+    inherited: Mapping[str, str],
     say: Callable[[str], None],
 ) -> bool:
-    """Prints one line per release; False when any release failed."""
-    missing = missing_secrets(config, environ)
+    """Prints one line per release; False when any release failed. ``credentials`` holds the store's repo secrets the
+    job sets; ``inherited`` is the job's environment, handed on to the product's hook and the upload."""
+    missing = missing_secrets(config, credentials)
     if missing:
         raise ReleaseError(f"the repo secrets {', '.join(missing)} are not set; a live release needs every one")
     if not config.releases:
@@ -77,7 +79,7 @@ def release_all(
     version = f"1.0.{run_number}"
     origin = config.workspace("prod").origin
     # The product's packaging hook never sees the store's credentials.
-    hook_env = {key: value for key, value in environ.items() if key not in dict(STORE_SECRETS).values()}
+    hook_env = {key: value for key, value in inherited.items() if key not in dict(STORE_SECRETS).values()}
     ok = True
     with tempfile.TemporaryDirectory(prefix="factory-release-") as tmp:
         for number, release in enumerate(config.releases, 1):
@@ -85,7 +87,7 @@ def release_all(
             if not release.live:
                 say(f"{label}: skipped, not live yet (live = false in factory.toml)")
                 continue
-            if not changed(release, repo, sha=sha, released=released, run=run, environ=environ):
+            if not changed(release, repo, sha=sha, released=released, run=run, env=hook_env):
                 say(f"{label}: skipped, nothing in {', '.join(release.when_changed)} changed since {released}")
                 continue
             package = Path(tmp) / str(number) / "release.zip"
@@ -96,7 +98,7 @@ def release_all(
                 say(f"{label}: FAILED, the package hook {said}")
                 ok = False
                 continue
-            store_env = {**hook_env, **{name: environ[secret] for name, secret in STORE_SECRETS}}
+            store_env = {**hook_env, **{name: credentials[secret] for name, secret in STORE_SECRETS}}
             code = run([*UPLOAD, "--source", str(package)], repo, store_env)
             if code != 0:
                 say(f"{label}: FAILED, the Chrome Web Store upload exited with code {code}")
@@ -128,7 +130,8 @@ def main(argv: list[str] | None = None) -> int:
             released=args.released,
             run_number=args.run,
             run=real_run,
-            environ=os.environ,
+            credentials=environment.secrets([secret for _, secret in STORE_SECRETS]),
+            inherited=environment.handed_on(),
             say=lambda line: print(line, flush=True),
         )
     except settings.ConfigError as exc:

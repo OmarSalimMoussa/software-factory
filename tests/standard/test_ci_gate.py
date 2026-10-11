@@ -24,7 +24,7 @@ def test_a_login_with_no_command_is_refused(tmp_path: Path) -> None:
     product = tmp_path / "product.toml"
     product.write_text(FACTORY_TOML)
     notes: list[str] = []
-    assert ci_gate.main({}, product, execv, notes.append) == 2
+    assert ci_gate.main(None, product, execv, notes.append) == 2
     assert notes == ["refused: a login with no command"]
 
 
@@ -59,11 +59,11 @@ def test_only_the_three_deploy_shapes_pass_the_gate(tmp_path: Path, command: str
     notes: list[str] = []
 
     if args is None:
-        assert ci_gate.main({"SSH_ORIGINAL_COMMAND": command}, product, execv, notes.append) == 2
+        assert ci_gate.main(command, product, execv, notes.append) == 2
         assert notes == [f"refused: {command[:300]!r}"]
         return
     with pytest.raises(Execed) as started:
-        ci_gate.main({"SSH_ORIGINAL_COMMAND": command}, product, execv, notes.append)
+        ci_gate.main(command, product, execv, notes.append)
     assert started.value.path == "/usr/bin/sudo"
     assert started.value.argv == ["sudo", "-n", "-u", "deploy", "/usr/local/bin/factory-deploy", *args]
     assert notes == []

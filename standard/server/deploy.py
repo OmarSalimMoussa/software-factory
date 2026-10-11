@@ -27,7 +27,7 @@ from typing import TextIO
 
 from standard import compose as compose_mod
 from standard import config as config_mod
-from standard import envfile
+from standard import envfile, environment
 from standard import plan as plan_mod
 from standard.compose import ComposeError
 from standard.config import Config, ConfigError
@@ -367,7 +367,7 @@ class _Deploy:
 
     def hooks(self) -> str:
         """Run the workspace's after-deploy hooks in order; the first failure, or "" when all passed."""
-        env = dict(os.environ)
+        env = environment.handed_on()
         env.update(
             FACTORY_WORKSPACE=self.ws.name,
             FACTORY_COMMIT=self.args.short,

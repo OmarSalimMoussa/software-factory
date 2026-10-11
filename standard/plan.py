@@ -26,6 +26,7 @@ from typing import Any
 
 from standard import compose as compose_mod
 from standard import config as config_mod
+from standard import environment
 from standard.compose import Compose, ComposeError
 from standard.config import Config, ConfigError
 
@@ -298,7 +299,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--github-output", action="store_true", help="append the outputs to $GITHUB_OUTPUT")
     args = parser.parse_args(argv)
-    output = os.environ.get("GITHUB_OUTPUT") if args.github_output else None
+    output = environment.github_output() if args.github_output else None
     if args.github_output and not output:
         print("plan: --github-output needs GITHUB_OUTPUT, the file GitHub Actions reads outputs from", file=sys.stderr)
         return 2

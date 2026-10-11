@@ -12,11 +12,12 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from pathlib import Path
 from typing import NoReturn
 
 from standard import config as config_mod
+from standard import environment
 from standard.config import ConfigError
 
 PRODUCT_TOML = Path("/etc/software-factory/product.toml")
@@ -50,12 +51,12 @@ def system_log(message: str) -> None:
 
 
 def main(
-    environ: Mapping[str, str],
+    command: str | None,
     product_toml: Path = PRODUCT_TOML,
     execv: Exec = os.execv,
     note: Note = system_log,
 ) -> int:
-    command = environ.get("SSH_ORIGINAL_COMMAND")  # what the client asked to run; a plain login asks nothing
+    """``command`` is what the SSH client asked the forced command to run; None for a login that asked nothing."""
     args = None if command is None else deploy_args(command)
     if args is None:
         # repr() keeps a newline or a control byte from forging a second log line.
@@ -72,4 +73,4 @@ def main(
 
 
 if __name__ == "__main__":
-    sys.exit(main(os.environ))
+    sys.exit(main(environment.ssh_original_command()))

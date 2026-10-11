@@ -46,7 +46,15 @@ class Runner:
 def release(config: settings.Config, runner: Runner, released: str, environ: Mapping[str, str]) -> list[str]:
     said: list[str] = []
     ok = release_all(
-        config, Path("/repo"), sha=SHA, released=released, run_number=7, run=runner, environ=environ, say=said.append
+        config,
+        Path("/repo"),
+        sha=SHA,
+        released=released,
+        run_number=7,
+        run=runner,
+        credentials={key: value for key, value in environ.items() if key in SECRETS},
+        inherited=environ,
+        say=said.append,
     )
     assert ok
     return said

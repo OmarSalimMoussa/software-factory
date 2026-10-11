@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from standard import config as settings
-from standard import envfile, probe, yaml_subset
+from standard import envfile, environment, probe, yaml_subset
 from standard.config import Config, Expect
 from standard.probe import Result, Run, State
 from standard.services import provision, stack
@@ -312,7 +312,7 @@ class Smoke:
         if not check:
             return
         self.say(f"smoke: running the product's check {check}")
-        env = dict(os.environ)
+        env = environment.handed_on()
         env.update(
             FACTORY_PROJECT=self.project,
             FACTORY_WORKSPACE=WORKSPACE,
