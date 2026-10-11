@@ -18,7 +18,9 @@ dev = [
 testpaths = ["tests", "runtime", "checks", "standard"]
 pythonpath = ["."]  # contract: tests import runtime and checks from the repo root
 python_files = ["test_*.py", "*_test.py"]
-addopts = "-q"
+# The self-check runs only in CI, as its own step: a plain run leaves it out, and `-m self_check` selects it.
+addopts = "-q -m 'not self_check'"
+markers = ["self_check: the factory held to the standard checks it holds every product to; CI only"]
 
 [tool.ruff]
 line-length = 120
