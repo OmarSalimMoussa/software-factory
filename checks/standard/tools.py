@@ -74,6 +74,7 @@ def binary(repo: Repo, name: str) -> str:
 def run(repo: Repo, values: dict[str, Any]) -> list[str]:
     try:
         table = config(repo)
+    # telemetry: surfaced — a tools table that cannot be read is what `run` reports
     except ValueError as exc:
         return [str(exc)]
     failed = sync(repo)

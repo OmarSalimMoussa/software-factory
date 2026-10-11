@@ -113,6 +113,7 @@ def scan(repo: Repo, rule: Rule) -> list[str]:
             continue
         try:
             lines = lines_of(rel, repo.read(rel), rule.code_only)
+        # telemetry: surfaced — a file that does not tokenize is one of the rule's `problems`
         except SyntaxError as exc:
             problems.append(f"{rel}: does not tokenize, so {rule.label} cannot read it: {exc}")
             continue

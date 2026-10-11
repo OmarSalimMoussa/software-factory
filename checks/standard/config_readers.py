@@ -85,6 +85,7 @@ def read_problems(repo: Repo, values: Mapping[str, Any]) -> list[str]:
             continue
         try:
             hits = _env_lines(repo.read(rel), kind)
+        # telemetry: surfaced — a file that does not tokenize is one of the check's `problems`
         except SyntaxError as exc:
             problems.append(f"{ID}: {rel} does not tokenize as Python: {exc}")
             continue
@@ -175,6 +176,7 @@ def service_problems(repo: Repo, values: Mapping[str, Any]) -> list[str]:
                 continue
             supply = supply_of(repo, values, row["compose"], entry)
             demands = config_reads(repo, row["config"], values)
+        # telemetry: surfaced — a compose or config file it cannot read is one of the check's `problems`
         except (configs.ConfigError, SyntaxError) as exc:
             problems.append(f"{ID}: {label}: {exc}")
             continue

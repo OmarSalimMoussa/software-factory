@@ -27,6 +27,7 @@ def _run(repo: Repo, name: str, command: list[str]) -> tuple[subprocess.Complete
         return None, f"{ID}: {name}: its command is empty"
     try:
         done = subprocess.run(command, cwd=repo.root, capture_output=True, text=True, check=False)
+    # telemetry: surfaced — a command that cannot start comes back from `_run` as the check's problem
     except OSError as exc:
         return None, f"{ID}: {name}: `{' '.join(command)}` cannot start: {exc.strerror or exc}"
     return done, ""

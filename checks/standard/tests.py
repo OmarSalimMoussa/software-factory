@@ -79,6 +79,7 @@ def _run(repo: Repo, command: list[str]) -> tuple[int, str]:
     try:
         done = subprocess.run(command, cwd=repo.root, env=env, capture_output=True, text=True, timeout=whole,
                               check=False)  # fmt: skip
+    # telemetry: surfaced — the stopped run comes back from `_run` as a failure with what it printed
     except subprocess.TimeoutExpired as exc:
         said = "".join(p if isinstance(p, str) else p.decode(errors="replace") for p in (exc.stdout, exc.stderr) if p)
         return 1, f"{said.strip()}\nThe test run passed {whole} s, so it was stopped: find the test that hangs"

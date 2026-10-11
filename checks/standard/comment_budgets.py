@@ -68,6 +68,7 @@ def measure(repo: Repo, trees: list[str]) -> tuple[dict[str, dict[str, int]], li
             continue
         try:
             docblock[rel], docstrings[rel], discretionary, nonblank = file_counts(rel, repo.read(rel))
+        # telemetry: surfaced — a file that does not parse is a problem in `outside`, which the check reports
         except SyntaxError as exc:
             outside.append(f"{ID}: {rel} does not parse: {exc.msg}")
             continue
@@ -92,7 +93,8 @@ def measure_before(
         try:
             if old is not None:
                 found["docstring-length"][rel] = file_counts(rel, old)[1]
-        except SyntaxError:  # it did not parse there: it starts at zero
+        # telemetry: expected — a file that did not parse on the default branch starts at zero
+        except SyntaxError:
             continue
     comment, total = Counter[str](), Counter[str]()
     for rel in repo.tracked_before():
@@ -102,6 +104,7 @@ def measure_before(
             continue
         try:
             _, _, discretionary, nonblank = file_counts(rel, old)
+        # telemetry: expected — a file that did not parse on the default branch adds nothing to its tree
         except SyntaxError:
             continue
         comment[tree] += discretionary

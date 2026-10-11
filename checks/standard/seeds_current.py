@@ -28,6 +28,7 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
     try:
         done = subprocess.run([str(script), "seed", "check"], cwd=repo.root, capture_output=True, text=True,
                               check=False)  # fmt: skip
+    # telemetry: surfaced — a seed check that cannot start is what `run` reports
     except OSError as exc:
         return [f"{ID}: {SCRIPT} seed check cannot start: {exc.strerror or exc}"]
     if done.returncode == 0:

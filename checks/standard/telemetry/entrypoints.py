@@ -38,6 +38,7 @@ def _docker_targets(dockerfile: str, text: str, resolver: Resolver, registry: Re
             continue
         try:
             argv = _argv(match.group(2))
+        # telemetry: surfaced — an exec form that is not a JSON list is one of the `problems`
         except ValueError:
             problems.append(f"{dockerfile}:{number} — its exec form is not a JSON list")
             continue

@@ -38,6 +38,7 @@ def goal_problems(repo: Repo) -> list[str]:
         return out
     try:
         items = goal.parse(text)
+    # telemetry: surfaced — GOAL.md's problems go into `out`, which the check reports
     except goal.GoalError as exc:
         return [*out, *exc.problems]
     return out + [f"GOAL.md: {i.id}'s outcome does not read '<outcome>. Done when <check>.'" for i in items
@@ -54,6 +55,7 @@ def queue_problems(repo: Repo) -> list[str]:
         return [*out, ".gitignore is missing: it lists queue/"]
     try:
         repo.git("check-ignore", "-q", "--no-index", "queue/request.md")
+    # telemetry: surfaced — check-ignore fails when queue/ is not ignored, which `out` reports
     except GitError:
         out.append(".gitignore does not ignore queue/: add the line queue/")
     return out

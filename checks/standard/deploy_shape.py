@@ -86,6 +86,7 @@ def image_problems(repo: Repo, config: Config, compose: Compose) -> list[str]:
     out: list[str] = []
     try:
         plan_mod.images(repo.root, config, compose, "0" * plan_mod.SHORT)
+    # telemetry: surfaced — the build plan's problems go into `out`, which the check reports
     except plan_mod.PlanError as exc:
         out += [f"the build plan cannot be made: {p}" for p in exc.problems]
     # The env file names the commit's tag; on the server it is the tag of the images CI pushed.
@@ -111,7 +112,8 @@ def _named_images(repo: Repo, config: Config, built: set[str]) -> list[str]:
     for rel in repo.tracked:
         try:
             text = (repo.root / rel).read_text(encoding="utf-8")
-        except UnicodeDecodeError:  # a binary file names no image to run
+        # telemetry: expected — a binary file is not text, so it names no image to run
+        except UnicodeDecodeError:
             continue
         for name in dict.fromkeys(pattern.findall(text)):
             # A name ending in - is a prefix the code appends a key to; some built image must carry it.
@@ -157,6 +159,7 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
     out = workflow_problems(repo) + ref_problems(repo)
     try:
         config = config_mod.load(repo.root)
+    # telemetry: surfaced — factory.toml's problems go into `out`, which the check reports
     except ConfigError as exc:
         return out + [f"{config_mod.FILE}: {p}" for p in exc.problems]
     if not config.product.registry.startswith(REGISTRY):
@@ -167,6 +170,7 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
         return [*out, f"{compose_mod.FILE} is missing (or not committed): the stack every deploy runs"]
     try:
         compose = compose_mod.read(repo.root / compose_mod.FILE)
+    # telemetry: surfaced — the compose file's problems go into `out`, which the check reports
     except ComposeError as exc:
         return out + [f"{compose_mod.FILE}: {p}" for p in exc.problems]
     built = {s.name for s in compose.built()} | {e.name for e in config.build.extra_images} | {plan_mod.DEPLOY_IMAGE}

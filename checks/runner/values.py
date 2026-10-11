@@ -50,6 +50,7 @@ def problems(schema: Schema, value: Any, where: str) -> list[str]:
             return [f"{where} must be {_kind(schema)}"]
         try:
             re.compile(value)
+        # telemetry: surfaced — a pattern that does not compile is one of the values file's `problems`
         except re.error as exc:
             return [f"{where} does not compile as a regular expression: {exc}"]
         return []

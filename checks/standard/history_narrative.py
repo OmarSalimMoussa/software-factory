@@ -40,6 +40,7 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
             continue
         try:
             found[rel] = hits(rel, repo.read(rel))
+        # telemetry: surfaced — a file that does not parse is one of the check's `problems`
         except SyntaxError as exc:
             problems.append(f"{ID}: {rel} does not parse: {exc.msg}")
             continue
@@ -60,5 +61,6 @@ def _count_before(repo: Repo, rel: str) -> int:
     old = repo.before(rel)
     try:
         return len(hits(rel, old)) if old is not None else 0
-    except SyntaxError:  # it did not parse on the default branch: every hit is the branch's own
+    # telemetry: expected — a file that did not parse on the default branch: every hit is the branch's own
+    except SyntaxError:
         return 0

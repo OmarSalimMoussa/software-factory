@@ -90,9 +90,11 @@ def run_one(check_id: str, repo: Repo) -> list[str]:
         check: Check = catalog.load(check_id)
         values = repo.values(check.values_file, check.values) if check.values_file else {}
         return check.run(repo, values)
+    # telemetry: surfaced — unreadable values are the check's `problems`, which the run prints and fails on
     except ValuesError as exc:
         return exc.problems
-    except Exception as exc:  # one check's fault must not hide the others' verdicts; it fails, loudly
+    # telemetry: surfaced — a check that breaks fails with `COULD_NOT_RUN` and why, never hiding the others
+    except Exception as exc:
         return [f"{COULD_NOT_RUN}: {type(exc).__name__}: {exc}"]
 
 
@@ -118,6 +120,7 @@ def run(argv: list[str], cwd: Path, settings: Settings | None, out: TextIO) -> i
         ids = chosen(args.only)
         root = Path(git(cwd, "rev-parse", "--show-toplevel").strip())
         branch = None if args.all else changed_paths(root, settings, args.since)
+    # telemetry: surfaced — the refusal is written to `out` and the run exits 2
     except (Refusal, GitError) as exc:
         out.write(f"factory check: {exc}\n")
         return 2

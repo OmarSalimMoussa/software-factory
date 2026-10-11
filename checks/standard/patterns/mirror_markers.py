@@ -74,6 +74,7 @@ def _claims(hit: tuple[str, int, str, str], claim: dict[str, str]) -> bool:
 def _groups(repo: Repo) -> tuple[list[str], list[dict[str, Any]], list[str]]:
     try:
         groups = repo.values(mirrored_constants.VALUES_FILE, mirrored_constants.VALUES)["groups"]
+    # telemetry: surfaced — unreadable groups come back from `_groups` as the check's problems
     except ValuesError as exc:
         return [], [], [f"{ID}: claims are checked against the groups, which cannot be read: {p}" for p in exc.problems]
     return [g["name"] for g in groups], groups, []
@@ -82,6 +83,7 @@ def _groups(repo: Repo) -> tuple[list[str], list[dict[str, Any]], list[str]]:
 def _copy_problems(repo: Repo, settings: dict[str, Any], groups: list[dict[str, Any]]) -> list[str]:
     try:
         found = copies.find(repo, settings["server"], settings["web"], settings["generated_markers"])
+    # telemetry: surfaced — server code that does not parse comes back from `_copy_problems` as a problem
     except SyntaxError as exc:
         return [f"{ID}: server Python does not parse, so its vocabularies cannot be read: {exc}"]
     rows = {(row["path"], row["name"]) for row in settings["rows"]}

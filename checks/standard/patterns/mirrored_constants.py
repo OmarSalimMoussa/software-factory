@@ -98,6 +98,7 @@ def check_group(repo: Repo, group: dict[str, Any]) -> list[str]:
     for side in group["sides"]:
         try:
             readings.append((side["path"], read_value(repo, side, group["kind"])))
+        # telemetry: surfaced — a side whose value cannot be read is one of the group's `problems`
         except (ValueError, SyntaxError) as exc:
             problems.append(f"{ID} ({group['name']}): {exc}")
     if problems:

@@ -130,6 +130,7 @@ class Repo:
             return {}
         try:
             stanza = json.loads(done.stdout).get(name, {})
+        # telemetry: expected — a committed baseline that does not parse has no old pin reason to compare
         except (ValueError, AttributeError):
             return {}
         return stanza if isinstance(stanza, dict) else {}

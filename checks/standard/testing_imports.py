@@ -60,6 +60,7 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
             continue
         try:
             found = list(scaffolding_imports(repo.read(rel)))
+        # telemetry: surfaced — a file that does not parse is one of the check's `problems`
         except SyntaxError as exc:
             problems.append(f"{rel}:{exc.lineno}: does not parse as Python: {exc.msg}")
             continue

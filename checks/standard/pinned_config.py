@@ -44,6 +44,7 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
         if key not in docs:
             try:
                 docs[key] = configs.read(repo, pin["file"], pin["format"])
+            # telemetry: surfaced — a config file it cannot read is kept and reported in `problems` just below
             except configs.ConfigError as exc:
                 docs[key] = exc
             if isinstance(docs[key], configs.ConfigError):

@@ -73,6 +73,7 @@ def collect(repo: Repo, registry: Registry) -> tuple[list[FileFacts], list[tuple
         if language == "python":
             try:
                 files.append(python_scan.scan(rel, text, resolver))
+            # telemetry: surfaced — a file that does not parse is one of the check's `problems`
             except SyntaxError as exc:
                 problems.append(f"{rel} does not parse as Python: {exc.msg}")
         elif language == "shell":
@@ -81,6 +82,7 @@ def collect(repo: Repo, registry: Registry) -> tuple[list[FileFacts], list[tuple
             files.append(shell_scan.scan_dockerfile(rel, text))
     try:
         files += ts_bridge.scan(repo.root, ts_paths, repo.tracked, registry.typescript_from)
+    # telemetry: surfaced — a scan that cannot run is one of the check's `problems`, so the check fails
     except ts_bridge.ScanError as exc:
         problems.append(str(exc))
     return files, scanned, problems
