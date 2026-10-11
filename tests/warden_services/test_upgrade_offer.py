@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from warden_fakes import OWNER_CALLER, FakeLauncher
 
-from runtime.shared import releases, upgrades
+from runtime.shared import network, releases, upgrades
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.system.runners import upgrade as upgrade_runner
@@ -36,7 +36,7 @@ def _installed(places: Places) -> None:
 def _github(calls: list[str], down: bool = False) -> releases.Get:
     """GitHub with one release, NEW, two commits ahead of OLD."""
 
-    def get(url: str, headers: dict[str, str], timeout: float) -> releases.Answer:
+    def get(url: str, headers: dict[str, str], timeout: float) -> network.Answer:
         calls.append(url)
         if down:
             raise TimeoutError("timed out")
@@ -55,7 +55,7 @@ def _github(calls: list[str], down: bool = False) -> releases.Get:
             }
         else:
             raise AssertionError(url)
-        return releases.Answer(200, {}, json.dumps(body).encode())
+        return network.Answer(200, {}, json.dumps(body).encode())
 
     return get
 

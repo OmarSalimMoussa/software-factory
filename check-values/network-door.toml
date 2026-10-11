@@ -1,0 +1,69 @@
+# Every outbound link goes through a door that sets its deadline and its redirect and proxy policy.
+
+[[doors]]
+name = "factory HTTP"
+scans = ["runtime/"]
+suffixes = [".py"]
+calls = [
+  '\burllib\.request\.urlopen\b',
+  '\bbuild_opener\(',
+  '^\s*from\s+urllib\.request\s+import\b',
+  '\bhttp\.client\.HTTPS?Connection\(',
+  '\bsocket\.create_connection\(',
+  '^\s*(import|from)\s+(requests|httpx|aiohttp|urllib3)\b',
+]
+unless = []
+owners = ["runtime/shared/network.py"]
+code_only = true
+remedy = "send it through runtime/shared/network.py's call, which sets the deadline and the redirect and proxy policy"
+
+[doors.allow]
+"runtime/system/drill_probe.py" = "the drills' probe opens raw links on purpose: whether a wall lets one through is the evidence it reports"
+"runtime/system/install_drills/drill_rig.py" = "a drill's raw connection is its evidence: whether the wall refuses it"
+
+[[doors]]
+name = "standard HTTP"
+scans = ["standard/"]
+suffixes = [".py"]
+calls = [
+  '\burllib\.request\.urlopen\b',
+  '\bbuild_opener\(',
+  '^\s*from\s+urllib\.request\s+import\b',
+  '\bhttp\.client\.HTTPS?Connection\(',
+  '\bsocket\.create_connection\(',
+  '^\s*(import|from)\s+(requests|httpx|aiohttp|urllib3)\b',
+]
+unless = []
+owners = ["standard/network.py"]
+allow = {}
+code_only = true
+remedy = "send it through standard/network.py's call, which sets the deadline"
+
+[[doors]]
+name = "no links from the checks or the hooks"
+scans = ["checks/", "plugin/"]
+suffixes = [".py"]
+calls = [
+  '\burllib\.request\.urlopen\b',
+  '\bbuild_opener\(',
+  '^\s*from\s+urllib\.request\s+import\b',
+  '\bhttp\.client\.HTTPS?Connection\(',
+  '\bsocket\.create_connection\(',
+  '^\s*(import|from)\s+(requests|httpx|aiohttp|urllib3)\b',
+]
+unless = []
+owners = []
+allow = {}
+code_only = true
+remedy = "the checks and the hooks reach nothing over the network: read what the repo or the warden already holds"
+
+[[doors]]
+name = "page links"
+scans = ["runtime/dashboard/ui/", "runtime/system/install_console/console_ui/"]
+suffixes = [".js"]
+calls = ['\bfetch\(', '\bnew\s+WebSocket\(', '\bnew\s+EventSource\(', '\bXMLHttpRequest\b', '\bsendBeacon\(']
+unless = []
+owners = ["runtime/dashboard/ui/js/core.js", "runtime/system/install_console/console_ui/console.js"]
+allow = {}
+code_only = true
+remedy = "ask the page's server through core.js's api and post (console.js's api on the install page)"

@@ -10,7 +10,6 @@ that cannot be read: the probe then has no address, says why, and never guesses 
 
 from __future__ import annotations
 
-import http.client
 import json
 import os
 import re
@@ -20,10 +19,9 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from runtime.queue import files
-from runtime.shared import models, store
+from runtime.shared import models, network, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
@@ -56,30 +54,17 @@ class Answer:
 Fetch = Callable[[str, float], Answer]
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """A health address answers itself; a redirect (a captive portal, a moved host) is an answer, not a hop."""
-
-    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
-        return None
-
-
 def http_get(url: str, timeout: float) -> Answer:
-    opener = urllib.request.build_opener(_NoRedirect)
+    """A health address answers itself: a redirect (a captive portal, a moved host) is an answer, not a hop."""
     request = urllib.request.Request(url, headers={"Accept": "application/json", "Cache-Control": "no-cache"})
     try:
-        with opener.open(request, timeout=timeout) as response:
-            return Answer(response.status, response.read(_MAX_BODY))
-    # telemetry: expected — an error status is an answer: the probe reads its status
-    except urllib.error.HTTPError as exc:
-        return Answer(exc.code, b"")
-    except urllib.error.URLError as exc:
-        if isinstance(exc.reason, TimeoutError):
-            raise TimeoutError(url) from exc
-        raise NetworkFailure(type(exc.reason).__name__) from exc
+        found = network.call(request, timeout, limit=_MAX_BODY)
     except TimeoutError:
         raise
-    except (OSError, http.client.HTTPException) as exc:
-        raise NetworkFailure(type(exc).__name__) from exc
+    except OSError as exc:
+        reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
+        raise NetworkFailure(type(reason).__name__) from exc
+    return Answer(found.status, found.body)
 
 
 def address(ctx: Context, env: str) -> str:

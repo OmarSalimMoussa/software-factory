@@ -12,11 +12,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from runtime.shared import network
+from runtime.shared.network import Answer
 from runtime.shared.paths import CI_WORKFLOW, PROMOTE_WORKFLOW, Places
 from runtime.shared.settings import Settings
 
@@ -27,24 +28,12 @@ class GitHubError(Exception):
     """A GitHub call failed; the message says which and why, never the token."""
 
 
-@dataclass(frozen=True, slots=True)
-class Reply:
-    status: int
-    headers: dict[str, str]
-    body: bytes
+# Raises OSError when GitHub cannot be reached; any HTTP answer is an Answer.
+Transport = Callable[[urllib.request.Request, float], Answer]
 
 
-# Raises OSError (URLError included) or TimeoutError when GitHub cannot be reached; any HTTP answer is a Reply.
-Transport = Callable[[urllib.request.Request, float], Reply]
-
-
-def urlopen_transport(request: urllib.request.Request, timeout: float) -> Reply:
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 -- a fixed https API
-            return Reply(response.status, {k.lower(): v for k, v in response.headers.items()}, response.read())
-    # telemetry: expected — an error status is a reply: the caller reads its status and body
-    except urllib.error.HTTPError as exc:
-        return Reply(exc.code, {k.lower(): v for k, v in exc.headers.items()}, exc.read())
+def transport(request: urllib.request.Request, timeout: float) -> Answer:
+    return network.call(request, timeout, follow=True)
 
 
 def token_path(places: Places) -> Path:

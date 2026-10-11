@@ -9,9 +9,9 @@ from typing import Any
 import pytest
 
 from runtime.shared import store
+from runtime.shared.network import Answer
 from runtime.warden.context import Context
 from runtime.warden.health import telemetry
-from runtime.warden.health.telemetry import Reply
 
 SERVER = {
     "glitchtip": {"url": "https://box.test:8200", "org": "notes", "token": "tok-server"},
@@ -30,9 +30,9 @@ def answering(monkeypatch: pytest.MonkeyPatch, body: Any) -> list[tuple[str, str
     """GlitchTip answers ``body`` on one page; the URLs and credentials it was asked with."""
     asked: list[tuple[str, str]] = []
 
-    def http_get(url: str, headers: dict[str, str], timeout: float) -> Reply:
+    def http_get(url: str, headers: dict[str, str], timeout: float) -> Answer:
         asked.append((url, headers["Authorization"]))
-        return Reply(200, {}, json.dumps(body).encode())
+        return Answer(200, {}, json.dumps(body).encode())
 
     monkeypatch.setattr(telemetry, "http_get", http_get)
     return asked

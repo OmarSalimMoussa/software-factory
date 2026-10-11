@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import json
 import re
-import urllib.request
 from pathlib import Path
 
+from runtime.shared import network
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER, queue_dir
 from runtime.shared.settings import overrides_toml
 from runtime.system import layout, render
@@ -297,8 +297,7 @@ GITHUB_META = "https://api.github.com/meta"
 
 
 def _get(url: str, timeout: float) -> bytes:
-    with urllib.request.urlopen(url, timeout=timeout) as reply:  # noqa: S310 - a fixed https address
-        return bytes(reply.read())
+    return network.call(url, timeout, follow=True).checked("GitHub").body
 
 
 def github_host_keys(ctx: Install) -> None:

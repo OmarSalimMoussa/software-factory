@@ -5,24 +5,19 @@ from __future__ import annotations
 
 import json
 import tomllib
-import urllib.error
-import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from runtime.dashboard.client import Warden, WardenDown
+from runtime.shared import network, store
 from runtime.shared import settings as settings_module
-from runtime.shared import store
 from runtime.shared.paths import Places
 from runtime.system import ci_check, github_keys, healthchecks, install, layout, uninstall
 from runtime.system.host import Account, Host
 from runtime.system.install_console.console_run import FAILED, Run
 from runtime.system.install_steps import steps_wire
 from runtime.system.job import Install
-
-# Loopback only: a proxy from the environment must never carry these probes off the machine.
-_DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 def _action(ident: str, label: str, tone: str) -> dict[str, str]:
@@ -115,14 +110,11 @@ def _services(places: Places) -> tuple[list[dict[str, Any]], str]:
 
 def _answers(url: str, timeout: float, *, any_status: bool) -> bool:
     try:
-        with _DIRECT.open(url, timeout=timeout) as reply:
-            return any_status or reply.status == 200
-    # telemetry: surfaced — an error status is an answer; the status draws what `_answers` says
-    except urllib.error.HTTPError:
-        return any_status
+        status = network.call(url, timeout, follow=True).status
     # telemetry: surfaced — a service that does not answer is drawn so, from what `_answers` returns
     except (OSError, ValueError):
         return False
+    return any_status or status == 200
 
 
 def address(host: Host) -> dict[str, str] | None:

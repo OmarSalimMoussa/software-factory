@@ -6,25 +6,17 @@ The address comes from product code, so the warden asks only a loopback address 
 from __future__ import annotations
 
 import json
-import urllib.error
-import urllib.request
 from urllib.parse import urlsplit
 
+from runtime.shared import network
 from runtime.slots import leases
 from runtime.warden.context import Context
 
 LOOPBACK = frozenset({"127.0.0.1", "localhost"})
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args: object, **kwargs: object) -> None:
-        return None
-
-
 def http_get(url: str, timeout: int, limit: int) -> bytes:
-    opener = urllib.request.build_opener(_NoRedirect())
-    with opener.open(urllib.request.Request(url), timeout=timeout) as answer:
-        body: bytes = answer.read(limit + 1)
+    body = network.call(url, timeout, limit=limit + 1).checked("the slot's stack").body
     if len(body) > limit:
         raise ValueError(f"the answer is larger than {limit} bytes")
     return body

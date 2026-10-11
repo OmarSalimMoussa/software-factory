@@ -21,7 +21,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from runtime.shared import store
+from runtime.shared import network, store
+from runtime.shared.network import Answer
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import leases
@@ -70,31 +71,10 @@ class Issue:
     permalink: str | None
 
 
-@dataclass(frozen=True, slots=True)
-class Reply:
-    status: int
-    headers: dict[str, str]  # names in lower case
-    body: bytes
-
-
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """A redirect would carry the key to wherever it points: it is an answer, not a hop."""
-
-    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
-        return None
-
-
-def http_get(url: str, headers: dict[str, str], timeout: float) -> Reply:
-    """Raises OSError (URLError included) or TimeoutError when the service cannot be reached; any HTTP answer is a
-    Reply."""
-    opener = urllib.request.build_opener(_NoRedirect)
-    request = urllib.request.Request(url, headers={"Accept": "application/json", **headers})
-    try:
-        with opener.open(request, timeout=timeout) as response:
-            return Reply(response.status, {k.lower(): v for k, v in response.headers.items()}, response.read())
-    # telemetry: expected — an error status is a reply: the caller reads its status
-    except urllib.error.HTTPError as exc:
-        return Reply(exc.code, {k.lower(): v for k, v in exc.headers.items()}, b"")
+def http_get(url: str, headers: dict[str, str], timeout: float) -> Answer:
+    """Raises OSError when the service cannot be reached. A redirect is an answer, never followed: it would carry the
+    key to wherever it points."""
+    return network.call(urllib.request.Request(url, headers={"Accept": "application/json", **headers}), timeout)
 
 
 def get_json(service: str, url: str, headers: dict[str, str], timeout: float) -> tuple[Any, dict[str, str]]:

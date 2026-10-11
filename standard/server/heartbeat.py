@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import json
 import sys
-import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 
+from standard import network
 from standard.config import ConfigError, parse
 from standard.config_records import Config
 
@@ -24,8 +24,10 @@ Get = Callable[[str, bytes | None], bytes]
 
 
 def _get(url: str, body: bytes | None) -> bytes:
-    with urllib.request.urlopen(url, data=body, timeout=TIMEOUT) as reply:  # noqa: S310 - fixed https addresses
-        return bytes(reply.read())
+    status, answer = network.call(url, TIMEOUT, data=body)
+    if not 200 <= status < 300:
+        raise OSError(f"{url} answered HTTP {status}")
+    return answer
 
 
 def prod_problem(config: Config, get: Get) -> str:

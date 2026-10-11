@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from runtime.shared import network
 from runtime.shared.paths import Places
 
 ENVIRONMENT = "factory"
@@ -130,16 +131,14 @@ def envelope(body: dict[str, Any], sent_at: datetime) -> bytes:
     return b"\n".join([json.dumps(header).encode(), json.dumps(item).encode(), payload]) + b"\n"
 
 
-def urlopen_send(request: urllib.request.Request, timeout: float) -> None:
-    # A refused event (an HTTP error) raises too: urllib's HTTPError is an OSError.
-    with urllib.request.urlopen(request, timeout=timeout) as answer:  # noqa: S310 -- the installed DSN's own address
-        answer.read()
+def send_event(request: urllib.request.Request, timeout: float) -> None:
+    network.call(request, timeout, follow=True).checked("GlitchTip")
 
 
 class Reporter(logging.Handler):
     """Sends each record at ERROR or above as one event, in the thread that logged it."""
 
-    def __init__(self, dsn: Dsn, *, release: str, root: Path, timeout: float, send: Send = urlopen_send) -> None:
+    def __init__(self, dsn: Dsn, *, release: str, root: Path, timeout: float, send: Send = send_event) -> None:
         super().__init__(logging.ERROR)
         # Not self.release: that is the handler lock's own method.
         self.dsn, self.commit, self.root, self.timeout, self._send = dsn, release, root, timeout, send
@@ -168,7 +167,7 @@ class Reporter(logging.Handler):
         self.failing = False
 
 
-def install(places: Places, *, timeout: float, send: Send = urlopen_send) -> Reporter | None:
+def install(places: Places, *, timeout: float, send: Send = send_event) -> Reporter | None:
     """Report every error the service logs, when the install has saved the factory's DSN; else say so once."""
     path = dsn_path(places)
     try:

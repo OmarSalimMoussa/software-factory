@@ -8,7 +8,7 @@ import pytest
 from loop_fakes import World, healthy
 
 from runtime.queue import formats
-from runtime.shared import store
+from runtime.shared import network, store
 from runtime.shared.models import INBOXES, Request
 from runtime.warden import inbox, loop
 from runtime.warden.delivery import deploys
@@ -96,7 +96,7 @@ def test_a_failed_errors_read_never_stops_the_loop_and_is_logged_once_a_run(
     })  # fmt: skip
     reads: list[str] = []
 
-    def down(url: str, headers: dict[str, str], timeout: float) -> telemetry.Reply:
+    def down(url: str, headers: dict[str, str], timeout: float) -> network.Answer:
         reads.append(url)
         raise TimeoutError(url)
 

@@ -14,8 +14,8 @@ from runtime.queue import formats
 from runtime.queue.book import Queue, request_rel, task_rel
 from runtime.shared import store
 from runtime.shared.models import Task
+from runtime.shared.network import Answer
 from runtime.warden.health import errors_import, telemetry
-from runtime.warden.health.telemetry import Reply
 
 GLITCHTIP = "https://box.test:8200"
 SERVER = {
@@ -46,11 +46,11 @@ def asked(world: World, monkeypatch: pytest.MonkeyPatch) -> list[str]:
     }
     found: list[str] = []
 
-    def http_get(url: str, headers: dict[str, str], timeout: float) -> Reply:
+    def http_get(url: str, headers: dict[str, str], timeout: float) -> Answer:
         assert headers["Authorization"] == "Bearer tok-read"
         found.append(url)
         body, header = pages[parse_qs(urlsplit(url).query).get("cursor", [""])[0]]
-        return Reply(200, {"link": header}, json.dumps(body).encode())
+        return Answer(200, {"link": header}, json.dumps(body).encode())
 
     monkeypatch.setattr(telemetry, "http_get", http_get)
     return found

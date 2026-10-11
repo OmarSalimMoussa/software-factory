@@ -16,6 +16,8 @@ import urllib.request
 from collections.abc import Callable
 from typing import IO, Any
 
+from runtime.shared import network
+
 PROTOCOL = "2025-06-18"
 METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD")
 PATH = re.compile(r"^/[\x21-\x7e]*$")
@@ -35,11 +37,6 @@ TOOL = {
         "required": ["method", "path"],
     },
 }
-
-
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args: object, **kwargs: object) -> None:
-        return None
 
 
 class SlotApiError(ValueError):
@@ -68,17 +65,9 @@ def build(port: int, arguments: dict[str, Any]) -> urllib.request.Request:
 
 
 def send(request: urllib.request.Request, timeout: int, limit: int) -> str:
-    opener = urllib.request.build_opener(_NoRedirect())
-    try:
-        answer = opener.open(request, timeout=timeout)
-    # telemetry: expected — an error status is an answer: the call reads its status and body
-    except urllib.error.HTTPError as exc:
-        answer = exc
-    with answer:
-        status = answer.status
-        kind = answer.headers.get("Content-Type", "")
-        location = answer.headers.get("Location", "")
-        raw = answer.read(limit + 1)
+    answer = network.call(request, timeout, limit=limit + 1)
+    status, raw = answer.status, answer.body
+    kind, location = answer.headers.get("content-type", ""), answer.headers.get("location", "")
     text = raw[:limit].decode(errors="replace") + ("\n[cut: the answer is longer]" if len(raw) > limit else "")
     head = (
         f"HTTP {status}" + (f"\nContent-Type: {kind}" if kind else "") + (f"\nLocation: {location}" if location else "")

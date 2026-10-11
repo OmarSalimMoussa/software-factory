@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from runtime.shared import releases, upgrades
+from runtime.shared import network, releases, upgrades
 from runtime.shared.paths import Places
 from runtime.system import release
 from runtime.system.runners import upgrade
@@ -50,17 +50,17 @@ def _github(data: bytes, commit: str, seen: list[tuple[str, dict[str, str]]], **
         f"{API}/compare/{commit}...main": {"status": wrong.get("on", "identical"), "commits": []},
     }  # fmt: skip
 
-    def get(url: str, headers: dict[str, str], timeout: float) -> releases.Answer:
+    def get(url: str, headers: dict[str, str], timeout: float) -> network.Answer:
         seen.append((url, headers))
         if url.startswith(f"{API}/actions/runs?"):
-            return releases.Answer(200, {}, json.dumps({"total_count": wrong.get("runs", 1)}).encode())
+            return network.Answer(200, {}, json.dumps({"total_count": wrong.get("runs", 1)}).encode())
         if url.endswith("/releases/assets/1") or url.endswith("/releases/assets/2"):
-            return releases.Answer(302, {"location": f"{STORAGE}/{url[-1]}"}, b"")
+            return network.Answer(302, {"location": f"{STORAGE}/{url[-1]}"}, b"")
         if url == f"{STORAGE}/1":
-            return releases.Answer(200, {}, data)
+            return network.Answer(200, {}, data)
         if url == f"{STORAGE}/2":
-            return releases.Answer(200, {}, f"{digest}  {releases.ASSET}\n".encode())
-        return releases.Answer(200, {}, json.dumps(answers[url]).encode())
+            return network.Answer(200, {}, f"{digest}  {releases.ASSET}\n".encode())
+        return network.Answer(200, {}, json.dumps(answers[url]).encode())
 
     return get
 

@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from runtime.shared import network
+from runtime.shared.network import Answer
 from runtime.shared.paths import Places
 
 API = "https://api.github.com"
@@ -34,33 +36,12 @@ class ReleaseError(Exception):
     """A release could not be read or trusted; the message says which and why, never the token."""
 
 
-@dataclass(frozen=True, slots=True)
-class Answer:
-    status: int
-    headers: dict[str, str]
-    body: bytes
-
-
 # Any HTTP answer is an Answer, a redirect included (never followed); raises OSError when nothing answers.
 Get = Callable[[str, dict[str, str], float], Answer]
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
-        return None
-
-
-_OPENER = urllib.request.build_opener(_NoRedirect)
-
-
 def http_get(url: str, headers: dict[str, str], timeout: float) -> Answer:
-    request = urllib.request.Request(url, headers=headers)
-    try:
-        with _OPENER.open(request, timeout=timeout) as reply:
-            return Answer(reply.status, {k.lower(): v for k, v in reply.headers.items()}, reply.read())
-    # telemetry: expected — an error status is an answer: the caller reads its status and body
-    except urllib.error.HTTPError as exc:
-        return Answer(exc.code, {k.lower(): v for k, v in exc.headers.items()}, exc.read())
+    return network.call(urllib.request.Request(url, headers=headers), timeout)
 
 
 def token_path(places: Places) -> Path:

@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-import http.client
 import json
 import os
 import re
 import shutil
 import stat
-import urllib.error
-import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from standard import network
 from standard.config_records import Config
 from standard.services.provision import Run, checked
 
@@ -38,13 +36,9 @@ class DeployError(Exception):
 def http_get(url: str) -> tuple[int, bytes] | None:
     """The status and body of an answer, or None when nothing answers."""
     try:
-        with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT_SECONDS) as response:
-            return int(response.status), response.read(65536)
-    # telemetry: expected — an error status is an answer: the caller reads its status and body
-    except urllib.error.HTTPError as exc:
-        return exc.code, exc.read(65536)
+        return network.call(url, HTTP_TIMEOUT_SECONDS, limit=65536)
     # telemetry: expected — nothing answers yet: the caller polls until its wait ends, then fails
-    except (OSError, http.client.HTTPException):
+    except OSError:
         return None
 
 

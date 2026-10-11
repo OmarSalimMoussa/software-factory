@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
-import urllib.request
 
+from runtime.shared import network
 from runtime.warden.context import Context
 
 log = logging.getLogger(__name__)
@@ -27,7 +27,6 @@ def ping(ctx: Context, check: str) -> None:
     if not url:
         return
     try:
-        with urllib.request.urlopen(url, timeout=ctx.settings().get_int("watch.http_timeout_seconds")):
-            pass
+        network.call(url, ctx.settings().get_int("watch.http_timeout_seconds"), follow=True).checked("Healthchecks.io")
     except OSError as exc:
         log.warning("warden: the %s healthcheck ping failed (%s)", check, type(exc).__name__)

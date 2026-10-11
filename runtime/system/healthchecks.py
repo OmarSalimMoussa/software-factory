@@ -13,6 +13,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from runtime.shared import network
 from runtime.shared.paths import WARDEN_USER
 from runtime.shared.settings import Settings
 from runtime.system import layout
@@ -39,8 +40,7 @@ def _call(url: str, key: str, body: dict[str, Any] | None, timeout: int) -> dict
     request = urllib.request.Request(
         url, data=data, method="POST", headers={"X-Api-Key": key, "Content-Type": "application/json"}
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 - the fixed Healthchecks.io API
-        answer = json.loads(response.read() or b"{}")
+    answer = json.loads(network.call(request, timeout, follow=True).checked("Healthchecks.io").body or b"{}")
     if not isinstance(answer, dict):
         raise ValueError("Healthchecks.io answered with something other than an object")
     return answer

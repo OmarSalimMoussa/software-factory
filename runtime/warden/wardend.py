@@ -135,7 +135,7 @@ def main() -> int:
     clock = Clock()
     owner, agent_home = _owner(places), launch.agent_home()
     doors = Doors(places, settings, clock, launch.Units(places, settings),
-                  github.RestGitHub(places, settings, github.urlopen_transport), inbox.poster(places, clock),
+                  github.RestGitHub(places, settings, github.transport), inbox.poster(places, clock),
                   threading.RLock())  # fmt: skip
     dispatcher = Dispatcher(doors, resolve(VERBS))
     ops.recover(places, clock)
