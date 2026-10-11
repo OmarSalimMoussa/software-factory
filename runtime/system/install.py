@@ -2,11 +2,12 @@
 
     sudo python3 runtime/system/install.py --commit <sha> --repo <product checkout> [--healthchecks] [--set k=v]...
 
-Add ``--dry-run`` (no sudo needed) to print every step and what it would do, changing nothing. The install archives
-the commit, tests that copy, and places it read-only; sets up the users, the units, polkit, the firewall, Claude Code's
-managed settings and the sandbox's needs; starts the shared services every slot uses, then the factory; and runs the
-drills. It refuses to begin while any session is working or waiting, and refuses to finish while any drill fails.
-Rerun it after every change to the factory.
+Add ``--dry-run`` (no sudo needed) to print every step and what it would do, changing nothing. The install runs from a
+sealed, read-only copy of the commit and takes only a commit the factory's CI passed: nothing is tested on this
+machine. It places that copy; sets up the users, the units, polkit, the firewall, Claude Code's managed settings and
+the sandbox's needs; starts the shared services every slot uses, then the factory; and runs the drills. It refuses to
+begin while any session is working or waiting, and refuses to finish while any drill fails. Rerun it after every
+change to the factory.
 """
 
 from __future__ import annotations
@@ -18,16 +19,18 @@ import sys
 import tomllib
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from runtime.shared.paths import Places  # noqa: E402 - the path line above must run first
 from runtime.shared.protocol import Refused  # noqa: E402
 from runtime.system import (  # noqa: E402
+    ci_check,
     drills,
     healthchecks,
     layout,
+    sealed,
     steps_machine,
     steps_prepare,
     steps_services,
@@ -65,8 +68,8 @@ def record(ctx: Install) -> None:
 STEPS: tuple[tuple[str, Callable[[Install], None]], ...] = (
     ("Check the machine", steps_prepare.check_machine),
     ("Refuse while a session is working or waiting", steps_prepare.refuse_live_sessions),
-    ("Archive the commit", steps_prepare.archive),
-    ("Test the archived copy", steps_prepare.test_copy),
+    ("Run from a sealed copy of the commit", steps_prepare.sealed_copy),
+    ("Check that the factory's CI passed on the commit", ci_check.passed),
     ("Settle the settings", steps_prepare.settle_settings),
     ("Install the packages", steps_machine.packages),
     ("Create the users", steps_machine.users),
@@ -98,9 +101,7 @@ STEPS: tuple[tuple[str, Callable[[Install], None]], ...] = (
 
 
 # The steps before this one change nothing on the machine, so a failure there leaves nothing to take back.
-FIRST_CHANGE = 3
-# Set when this process runs from the archived commit: the stage, the commit and the owner's checkout it came from.
-STAGE, SHA, CHECKOUT = "SOFTWARE_INSTALL_STAGE", "SOFTWARE_INSTALL_SHA", "SOFTWARE_INSTALL_CHECKOUT"
+FIRST_CHANGE = next(number for number, (_, step) in enumerate(STEPS, 1) if step is steps_machine.packages)
 
 
 def run(ctx: Install) -> None:
@@ -112,11 +113,11 @@ def run(ctx: Install) -> None:
 
 def job(host: Host, places: Places, owner: Account, repo: Path, commit: str, changes: dict[str, Any],
         healthchecks: bool) -> Install:  # fmt: skip
-    # Run from the archived commit (from_commit), the owner's checkout is named by the process that archived it.
-    checkout = Path(os.environ.get(CHECKOUT, str(REPO_ROOT)))
+    # Run from the sealed copy (from_commit), the owner's checkout is named by the process that sealed it.
+    checkout = Path(os.environ.get(sealed.CHECKOUT, str(REPO_ROOT)))
     ctx = Install(host, places, checkout, repo.resolve(), commit, owner, changes, healthchecks)
-    if STAGE in os.environ:
-        ctx.stage, ctx.sha = Path(os.environ[STAGE]), os.environ[SHA]
+    if sealed.STAGE in os.environ:
+        ctx.stage, ctx.sha = Path(os.environ[sealed.STAGE]), os.environ[sealed.SHA]
     # Known before any step runs: only a first install is ever taken back.
     ctx.first = not host.exists(layout.install_record(places.state))
     return ctx
@@ -170,39 +171,16 @@ def parse_changes(items: list[str]) -> dict[str, Any]:
     return changes
 
 
-def stage_commit(commit: str, owner: str) -> tuple[str, Path]:
-    """``commit`` archived and unpacked in a new stage folder, as the owner: the full sha and the stage."""
-    host = RealHost()
-    code, out = host.query(["git", "-C", str(REPO_ROOT), "rev-parse", "--verify", f"{commit}^{{commit}}"], user=owner)
-    if code != 0:
-        raise refuse(f"{commit} is not a commit in {REPO_ROOT}")
-    sha = out.strip()
-    stage = host.scratch(owner)
-    host.run(["git", "-C", str(REPO_ROOT), "archive", "--format=tar", "-o", str(stage / "factory.tar"), sha],
-             user=owner)  # fmt: skip
-    host.run(["mkdir", str(stage / "tree")], user=owner)
-    host.run(["tar", "-x", "-f", str(stage / "factory.tar"), "-C", str(stage / "tree")], user=owner)
-    return sha, stage
-
-
-def exec_staged(sha: str, stage: Path, script: str, argv: list[str]) -> NoReturn:
-    """Run ``script`` (a path inside the factory) again from the stage, with the stage, the sha and this checkout in
-    its environment: from then on every line of factory code is the commit's own."""
-    env = {**os.environ, STAGE: str(stage), SHA: sha, CHECKOUT: str(REPO_ROOT)}
-    staged = stage / "tree" / script
-    os.execve(sys.executable, [sys.executable, str(staged), *argv], env)
-
-
 def from_commit(commit: str, owner: str, argv: list[str]) -> int:
-    """Archive ``commit`` and run the install again from that copy, so every step is the commit's own code: nothing
-    in the checkout's working files (an edit in progress, a file not committed) can change what an install does."""
+    """Seal ``commit`` and run the install again from that copy, so every step is the commit's own code: nothing in
+    the checkout's working files (an edit in progress, a file not committed) can change what an install does."""
     try:
-        sha, stage = stage_commit(commit, owner)
+        sha, stage = sealed.stage_commit(RealHost(), commit, owner, REPO_ROOT)
     except (Refused, CommandError) as exc:
         print(f"{PROGRAM}: {exc.reason if isinstance(exc, Refused) else exc}", file=sys.stderr)
         return 1
-    print(f"Installing {sha[:12]}: every step runs from that commit, archived in {stage}", flush=True)
-    exec_staged(sha, stage, "runtime/system/install.py", argv)
+    print(f"Installing {sha[:12]}: every step runs from that commit, sealed read-only in {stage}", flush=True)
+    sealed.exec_staged(sha, stage, "runtime/system/install.py", argv, checkout=REPO_ROOT)
 
 
 def main(argv: list[str]) -> int:
@@ -223,10 +201,15 @@ def main(argv: list[str]) -> int:
     if owner is None:
         print("install.py: the owner's account cannot be read", file=sys.stderr)
         return 2
-    if not args.dry_run and STAGE not in os.environ:
+    if not args.dry_run and sealed.STAGE not in os.environ:
         return from_commit(args.commit, owner.name, argv)
     ctx = job(host, Places.system(), owner, args.repo, args.commit, parse_changes(args.set), args.healthchecks)
-    return 0 if perform(ctx, keep=args.keep_on_failure) is None else 1
+    problem: str | None = "interrupted"
+    try:
+        problem = perform(ctx, keep=args.keep_on_failure)
+    finally:
+        sealed.finish(host, ctx.stage, kept=problem is not None and args.keep_on_failure)
+    return 0 if problem is None else 1
 
 
 if __name__ == "__main__":

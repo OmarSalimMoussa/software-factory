@@ -43,7 +43,11 @@ UNIT_PATH = ":".join((str(TOOLCHAIN_BIN), *SYSTEM_PATH))
 # Copy, never hard-link, from the cache every session shares: a session editing a file in its own venv must not edit
 # the cache another session installs from.
 UV_ENV = {"UV_PYTHON_INSTALL_DIR": str(TOOLCHAIN_PYTHON), "UV_PYTHON_DOWNLOADS": "never", "UV_LINK_MODE": "copy"}
-STAGE_PREFIX = "software-factory-stage-"
+# Where each install and console runs from: a sealed, root-owned and read-only copy of one commit, in a folder of its
+# own named <sha>-<random>, removed when it ends.
+STAGE_ROOT = Path("/var/lib/software-factory-stage")
+# The one PATH the installer and the console run with, and every command they run as root.
+ROOT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 UNITS_DIR = Path("/etc/systemd/system")
 SLICE_CONTROL = Path("/etc/systemd/system.control")  # where `systemctl set-property` keeps its drop-ins

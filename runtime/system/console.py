@@ -2,10 +2,11 @@
 
     sudo python3 runtime/system/console.py [--commit <sha>] [--repo <product checkout>]
 
-It serves one page on 127.0.0.1 at a free port, opens it in your browser and prints its link. The link works once:
-its token becomes a cookie that only that browser holds. The page runs the installer's and the uninstaller's own
-steps, one action at a time, and asks in place what the command line asks in the terminal. Ctrl-C or the page's Close
-stops it.
+It runs from a sealed, read-only copy of the commit it offers, removed when it stops. It serves one page on 127.0.0.1
+at a free port, opens it in your browser and prints its link. The link works once: its token becomes a cookie that
+only that browser holds. The page shows whether the factory's CI passed on the commit, runs the installer's and the
+uninstaller's own steps, one action at a time, and asks in place what the command line asks in the terminal. Ctrl-C
+or the page's Close stops it.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from runtime.shared.paths import Places  # noqa: E402 - the path line above must run first
 from runtime.shared.protocol import Refused  # noqa: E402
-from runtime.system import console_page, install  # noqa: E402
+from runtime.system import console_page, sealed  # noqa: E402
 from runtime.system.console_app import Console, Hosts, Reply, refused  # noqa: E402
 from runtime.system.console_run import ConsoleHost, ConsoleLookingHost  # noqa: E402
 from runtime.system.host import (  # noqa: E402
@@ -156,22 +157,32 @@ def main(argv: list[str]) -> int:
     if owner is None:
         print(f"{PROGRAM}: the owner's account cannot be read", file=sys.stderr)
         return 2
-    if install.STAGE not in os.environ:
+    if sealed.STAGE not in os.environ:
         # The whole console runs from the commit it offers, so the steps it runs are that commit's own.
         offered = console_page.commit_choice(reader, owner, REPO_ROOT, args.commit)
         if offered["problem"]:
             print(f"{PROGRAM}: {offered['problem']}", file=sys.stderr)
             return 1
         try:
-            sha, stage = install.stage_commit(offered["value"], owner.name)
+            sha, stage = sealed.stage_commit(reader, offered["value"], owner.name, REPO_ROOT)
         except (Refused, CommandError) as exc:
             print(f"{PROGRAM}: {exc.reason if isinstance(exc, Refused) else exc}", file=sys.stderr)
             return 1
-        print(f"The console runs {sha[:12]} ({offered['subject']}), archived in {stage}", flush=True)
-        install.exec_staged(sha, stage, "runtime/system/console.py", ["--commit", sha, *_without_commit(argv)])
-    console = Console(Places.system(), owner, reader, Hosts(ConsoleHost, ConsoleLookingHost),
-                      opener(owner, display(reader, owner, os.environ)), commit=args.commit,
-                      repo=args.repo.resolve() if args.repo else None)  # fmt: skip
+        print(f"The console runs {sha[:12]} ({offered['subject']}), sealed read-only in {stage}", flush=True)
+        sealed.exec_staged(sha, stage, "runtime/system/console.py", ["--commit", sha, *_without_commit(argv)],
+                           checkout=REPO_ROOT, display=_DISPLAY)  # fmt: skip
+    console: Console | None = None
+    try:
+        console = Console(Places.system(), owner, reader, Hosts(ConsoleHost, ConsoleLookingHost),
+                          opener(owner, display(reader, owner, os.environ)), commit=args.commit,
+                          repo=args.repo.resolve() if args.repo else None)  # fmt: skip
+        return until_stopped(console)
+    finally:
+        sealed.finish(reader, Path(os.environ[sealed.STAGE]), kept=console is not None and console.kept)
+
+
+def until_stopped(console: Console) -> int:
+    """Serve the page until Close, or Ctrl-C, stops the console; its exit code."""
     defaults = tomllib.loads((REPO_ROOT / "settings.toml").read_text(encoding="utf-8"))
     server = serve(console, defaults["watch"]["socket_read_seconds"])
     link = console.link()

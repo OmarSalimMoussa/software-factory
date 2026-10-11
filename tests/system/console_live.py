@@ -19,7 +19,7 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE.parents[1]), str(HERE)]
 
-from system_fakes import FACTORY_ORIGIN, FIXTURE, PRODUCT_ORIGIN  # noqa: E402
+from system_fakes import FACTORY_ORIGIN, FIXTURE, PASSING, PRODUCT_ORIGIN, ci_answers  # noqa: E402
 
 from runtime.shared.paths import Places  # noqa: E402
 from runtime.system.console import serve  # noqa: E402
@@ -48,6 +48,7 @@ def main() -> int:
     reader = DryHost(answers={
         f"{git} symbolic-ref --short refs/remotes/origin/HEAD": (0, "origin/main\n"),
         f"{git} log -1 --format=%H%n%h%n%s main --": (0, f"{NEWEST}\n0123456\nThe drive's newest commit\n"),
+        **ci_answers(REPO_ROOT, NEWEST, PASSING),
     })  # fmt: skip
     owner = Account(getpass.getuser(), os.getuid(), os.getgid(), root / "home", ("owner",))
     opened: list[str] = []

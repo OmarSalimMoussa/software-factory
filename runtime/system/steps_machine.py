@@ -115,7 +115,7 @@ def state_tree(ctx: Install) -> None:
 
 
 def place(ctx: Install) -> None:
-    """The archived tree, root-owned and read-only, swapped in whole; then the pinned check tools beside it."""
+    """The sealed tree, root-owned and read-only, swapped in whole; then the pinned check tools beside it."""
     host, install = ctx.host, ctx.places.install
     fresh, old = install.with_name(install.name + ".new"), install.with_name(install.name + ".old")
     for leftover in (fresh, old):
@@ -267,7 +267,7 @@ def secrets(ctx: Install) -> None:
             host.show_code(secret, totp.enrolment_uri(secret, ctx.owner.name))
     # With the owner's signed-in gh the install puts every GitHub key in place itself; without it, each is shown to add
     # by hand.
-    gh = "" if host.dry else github_keys.owner_gh(ctx)
+    gh = "" if host.dry else github_keys.owner_gh(host, ctx.owner.name)
     if not gh and not host.dry:
         host.say("  your `gh` is not signed in to github.com: the keys below are yours to add by hand")
     key = folder / "deploy.key"

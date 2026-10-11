@@ -14,7 +14,7 @@ from runtime.dashboard.client import Warden, WardenDown
 from runtime.shared import settings as settings_module
 from runtime.shared import store
 from runtime.shared.paths import Places
-from runtime.system import install, layout, uninstall
+from runtime.system import ci_check, install, layout, uninstall
 from runtime.system.console_run import FAILED, Run
 from runtime.system.host import Account, Host
 from runtime.system.job import Install
@@ -141,9 +141,14 @@ def install_form(host: Host, owner: Account, factory: Path, commit: str | None, 
     named = record.get("product") if record else None
     product = str(repo) if repo else named if isinstance(named, str) else ""
     verb = "Reinstall" if record else "Install"
+    offered = _offered(host, owner, factory, commit)
+    ci = None  # no commit, no CI to show
+    if not offered["problem"]:
+        origin = ci_check.origin(host, owner.name, factory)
+        ci = ci_view(ci_check.verdict(host, owner.name, origin, offered["value"]))
     return {
         "heading": verb,
-        "commit": {"label": "Factory commit", **_offered(host, owner, factory, commit)},
+        "commit": {"label": "Factory commit", **offered, "ci": ci},
         "repo": {"label": "Product checkout", "value": product,
                  "hint": "Your own checkout of the product the factory works on."},  # fmt: skip
         "healthchecks": {"label": "Create the Healthchecks.io checks",
@@ -156,8 +161,27 @@ def install_form(host: Host, owner: Account, factory: Path, commit: str | None, 
     }  # fmt: skip
 
 
+_CI = {
+    ci_check.PASSED: ("good", "CI passed", "The factory's CI passed on this commit."),
+    ci_check.RUNNING: ("warn", "CI running", "The factory's CI is still running on this commit. Install it once CI "
+                       "passes."),
+    ci_check.FAILED: ("bad", "CI failed", "The factory's CI failed on this commit. Fix it and push the fix, then start "
+                      "the console with that commit."),
+}  # fmt: skip
+
+
+def ci_view(found: ci_check.Verdict) -> dict[str, Any]:
+    """The offered commit's CI, as its row draws it: a chip, a sentence, and a link to each check not passed."""
+    if found.state == ci_check.UNKNOWN:
+        tone, label, text = "warn", "CI not checked", sentence(found.reason).rstrip(".") + "."
+    else:
+        tone, label, text = _CI[found.state]
+    links = [{"label": f"{check.name}: {check.what}", "url": check.url} for check in found.open]
+    return {"state": found.state, "tone": tone, "label": label, "text": text, "links": links}
+
+
 def _offered(host: Host, owner: Account, factory: Path, given: str | None) -> dict[str, Any]:
-    """The one commit this console installs: the one it runs from, archived when it started."""
+    """The one commit this console installs: the one it runs from, sealed when it started."""
     choice = commit_choice(host, owner, factory, given)
     if choice["problem"]:
         return choice
@@ -192,7 +216,7 @@ def _stopped(run: Run, what: str) -> str:
     return f"{what} at “{step}”." if step else f"{what} before its first step."
 
 
-def _detail(problem: str) -> str:
+def sentence(problem: str) -> str:
     return problem[:1].upper() + problem[1:]
 
 
@@ -222,7 +246,7 @@ def install_ending(ctx: Install, problem: str | None, keep: bool, run: Run, host
         then = "Fix what it said, then install again."
     logs = [_action("logs", "Open the drill sessions' output", "")] if run.folder else []
     return _ending(False, _stopped(run, "The install stopped"), then, [*logs, DONE],
-                   detail=_detail(problem), folder=run.folder)  # fmt: skip
+                   detail=sentence(problem), folder=run.folder)  # fmt: skip
 
 
 def uninstall_ending(run: Run, problem: str | None) -> dict[str, Any]:
@@ -234,7 +258,7 @@ def uninstall_ending(run: Run, problem: str | None) -> dict[str, Any]:
         return _ending(True, "The factory is removed from this machine.", uninstall.LEFT_FOR_YOU, [DONE])
     where = "Uninstall would stop" if run.kind == "look" else "The uninstall stopped"
     return _ending(False, _stopped(run, where), "Fix what it said, then uninstall again.", [DONE],
-                   detail=_detail(problem))  # fmt: skip
+                   detail=sentence(problem))  # fmt: skip
 
 
 def broken(kind: str, exc: Exception) -> dict[str, Any]:

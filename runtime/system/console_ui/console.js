@@ -74,7 +74,7 @@ function renderForm(f) {
       <div class="card cform">
         <div class="cf-row"><div class="cf-l">${esc(c.label)}</div>
           ${c.value ? `<div class="cf-commit"><b class="mono">${esc(c.short)}</b> ${esc(c.subject)}<span class="help">${esc(c.note)}</span></div>` : ''}
-          ${c.problem ? `<div class="cnote bad">${esc(c.problem)}</div>` : ''}</div>
+          ${c.problem ? `<div class="cnote bad">${esc(c.problem)}</div>` : ''}<div class="cf-ci" id="f-ci" hidden></div></div>
         <div class="cf-row"><label class="cf-l" for="f-repo">${esc(f.repo.label)}</label><input class="cf-in mono" id="f-repo" autocomplete="off" spellcheck="false" value="${esc(f.repo.value)}"><span class="help">${esc(f.repo.hint)}</span></div>
         <div class="cf-checks">${['healthchecks', 'keep'].map(k => `<label class="cf-check"><input type="checkbox" id="f-${k}"><span><b>${esc(f[k].label)}</b><span class="help">${esc(f[k].hint)}</span></span></label>`).join('')}</div>
         <div class="cf-foot"><label class="cf-switch"><input type="checkbox" role="switch" id="f-dry"><span class="sw"></span><span><b>${esc(f.dry.label)}</b><span class="help">${esc(f.dry.hint)}</span></span></label>
@@ -83,7 +83,17 @@ function renderForm(f) {
     $('#f-dry').addEventListener('change', () => labelGo());
   }
   $('#f-heading').textContent = f.heading;
+  renderCi(f.commit.ci);
   labelGo();
+}
+/* The commit's CI changes while the console runs, so it is drawn again with every answer. */
+function renderCi(ci) {
+  const el = $('#f-ci');
+  el.hidden = !ci;
+  if (!ci) { el.innerHTML = ''; return; }
+  const links = ci.links.filter(l => safeUrl(l.url)).map(l => `<a class="btn sm quiet" href="${esc(l.url)}" target="_blank" rel="noopener">${icon('arrow-top-right-on-square', 'sm')}${esc(l.label)}</a>`).join('');
+  const html = `<div class="cf-ci-h"><span class="chip ${esc(ci.tone)}">${esc(ci.label)}</span><span>${esc(ci.text)}</span></div>${links ? `<div class="cq-links">${links}</div>` : ''}`;
+  if (el.innerHTML !== html) el.innerHTML = html;
 }
 function labelGo() { const f = S.page.install; $('#f-go').textContent = $('#f-dry').checked ? f.dry_button : f.button; }
 

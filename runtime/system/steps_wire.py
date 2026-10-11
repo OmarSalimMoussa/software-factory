@@ -4,7 +4,6 @@ hooks, the tailnet, starting it, and the record a finished install leaves."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from runtime.shared.paths import AGENT_USER, MANAGED_SETTINGS, SCRATCH, SLICE, WARDEN_USER
 from runtime.system import layout, render
@@ -105,6 +104,4 @@ def record(ctx: Install, drills: list[dict[str, object]]) -> None:
     # The owner's own checkout of the product too: the install console offers it for the next install.
     body = {"commit": ctx.sha, "drills": drills, "managed_settings": str(MANAGED_SETTINGS), "product": str(ctx.product)}
     host.write(layout.install_record(state), json.dumps(body, indent=1) + "\n", mode=0o600, owner=WARDEN_USER)
-    if ctx.stage is not None and not host.dry:
-        host.remove(Path(ctx.stage))
     host.say(f"The factory at {ctx.sha[:12]} is installed.")

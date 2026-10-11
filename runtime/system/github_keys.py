@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 from runtime.system import steps_prepare
+from runtime.system.host import Host
 from runtime.system.job import Install
 
 WARDEN_TITLE = "software-factory warden"
@@ -20,12 +21,12 @@ def read_title(product: str) -> str:
     return f"{product} CI (read-only)"
 
 
-def owner_gh(ctx: Install) -> str:
+def owner_gh(host: Host, owner: str) -> str:
     """The owner's `gh`, when it is installed and signed in to github.com; "" otherwise."""
-    code, found = steps_prepare.owner_tool(ctx, "gh")
+    code, found = steps_prepare.login_tool(host, owner, "gh")
     if code != 0 or not found:
         return ""
-    status, _ = ctx.host.query([found, "auth", "status", "--hostname", "github.com"], user=ctx.owner.name)
+    status, _ = host.query([found, "auth", "status", "--hostname", "github.com"], user=owner)
     return found if status == 0 else ""
 
 

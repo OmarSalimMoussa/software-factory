@@ -1,5 +1,5 @@
-"""The steps before anything on the machine changes: check it, refuse while work is live, archive and test the
-commit, settle the settings, then stop the running factory."""
+"""The steps before anything on the machine changes: check it, refuse while work is live, run from the commit's
+sealed copy, settle the settings, then stop the running factory."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from typing import Any
 from runtime.shared.models import DEPRIORITIZED, RETIRED
 from runtime.shared.settings import SettingsError, _flatten, build
 from runtime.system import layout
-from runtime.system.host import CommandError
+from runtime.system.host import Host
 from runtime.system.job import Install, github_name, refuse
 from runtime.warden import registry
 
@@ -20,12 +20,17 @@ _OWNER_TOOLS = ("uv", "claude")
 _RESTING = (DEPRIORITIZED, RETIRED)
 
 
-def owner_tool(ctx: Install, name: str) -> tuple[int, str]:
-    """The file the owner's login shell runs for ``name``, every link followed, kept for ``ctx.tool``; the shell's exit
-    code beside it."""
-    code, out = ctx.host.query(["sh", "-lc", f'readlink -f "$(command -v {name})"'], user=ctx.owner.name)
-    ctx.tools[name] = out.strip()
+def login_tool(host: Host, user: str, name: str) -> tuple[int, str]:
+    """The file ``user``'s login shell runs for ``name``, every link followed; the shell's exit code beside it."""
+    code, out = host.query(["sh", "-lc", f'readlink -f "$(command -v {name})"'], user=user)
     return code, out.strip()
+
+
+def owner_tool(ctx: Install, name: str) -> tuple[int, str]:
+    """The owner's ``name`` (``login_tool``), kept for ``ctx.tool``."""
+    code, found = login_tool(ctx.host, ctx.owner.name, name)
+    ctx.tools[name] = found
+    return code, found
 
 
 def check_machine(ctx: Install) -> None:
@@ -62,33 +67,19 @@ def refuse_live_sessions(ctx: Install) -> None:
         raise refuse(f"{len(live)} session(s) still working or waiting ({', '.join(live)}): pause the factory first")
 
 
-def archive(ctx: Install) -> None:
-    host, owner = ctx.host, ctx.owner.name
+def sealed_copy(ctx: Install) -> None:
+    """The commit is sealed before the first step (runtime/system/sealed.py); a dry run says what would be."""
+    host = ctx.host
     if ctx.stage is not None:
-        host.say(f"  {ctx.sha[:12]} is archived in {ctx.stage}, and this install runs from it")
+        host.say(f"  {ctx.sha[:12]} is sealed, root-owned and read-only, in {ctx.stage}; every step runs from it")
         return
+    if not host.dry:
+        raise refuse("this install does not run from a sealed copy of its commit: start it with install.py")
     wanted = f"{ctx.commit}^{{commit}}"
-    code, out = host.query(["git", "-C", str(ctx.factory), "rev-parse", "--verify", wanted], user=owner)
-    if code != 0 and not host.dry:
-        raise refuse(f"{ctx.commit} is not a commit in {ctx.factory}")
+    out = host.query(["git", "-C", str(ctx.factory), "rev-parse", "--verify", wanted], user=ctx.owner.name)[1]
     ctx.sha = out.strip() or f"<sha of {ctx.commit}>"
-    stage = host.scratch(owner)
-    ctx.stage = stage
-    host.run(["git", "-C", str(ctx.factory), "archive", "--format=tar", "-o", str(stage / "factory.tar"), ctx.sha],
-             user=owner)  # fmt: skip
-    host.run(["mkdir", str(stage / "tree")], user=owner)
-    host.run(["tar", "-x", "-f", str(stage / "factory.tar"), "-C", str(stage / "tree")], user=owner)
-
-
-def test_copy(ctx: Install) -> None:
-    try:
-        ctx.host.run(
-            [ctx.tool("uv"), "run", "--frozen", "--extra", "dev", "pytest", "-q", "-p", "no:cacheprovider"],
-            user=ctx.owner.name, cwd=ctx.tree(),
-        )  # fmt: skip
-    except CommandError as exc:
-        tail = exc.output[-400:]
-        raise refuse(f"the factory's tests failed on {ctx.sha[:12]}, so nothing was installed: {tail}") from exc
+    host.say(f"  would archive {ctx.sha[:12]} as {ctx.owner.name}, unpack it as root into a new folder in "
+             f"{layout.STAGE_ROOT}, make it read-only, and run every step from that copy")  # fmt: skip
 
 
 def _saved_overrides(ctx: Install) -> dict[str, Any]:

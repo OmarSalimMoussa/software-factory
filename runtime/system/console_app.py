@@ -20,7 +20,7 @@ from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 from runtime.shared.paths import Places
-from runtime.system import console_page, install, uninstall
+from runtime.system import ci_check, console_page, install, sealed, uninstall
 from runtime.system.console_run import Run
 from runtime.system.host import Account, Host
 from runtime.system.job import REPO_ROOT
@@ -33,8 +33,8 @@ DASHBOARD_UI = REPO_ROOT / "runtime" / "dashboard" / "ui"
 
 
 def factory_checkout() -> Path:
-    """The owner's factory checkout: the one this console was archived from, when it runs from an archived commit."""
-    return Path(os.environ.get(install.CHECKOUT, str(REPO_ROOT)))
+    """The owner's factory checkout: the one this console's sealed copy came from, when it runs from one."""
+    return Path(os.environ.get(sealed.CHECKOUT, str(REPO_ROOT)))
 
 
 FILES = {
@@ -45,10 +45,6 @@ FILES = {
     "/icons.js": (DASHBOARD_UI / "icons.js", "text/javascript"),
 }
 BUSY = "An action is running. Wait for it to end."
-SPENT = (
-    "The install removed the copy of the commit this console runs from. Close the console, then start it again for "
-    "another action."
-)
 
 
 @dataclass
@@ -89,7 +85,7 @@ class Console:
         self._lock = threading.Lock()
         self._worker: threading.Thread | None = None
         self._looked: Path | None = None  # the product checkout the last look at an uninstall was for
-        # Read once: a finished install removes the archived commit this console runs from, these files with it.
+        self.kept = False  # a failed install the owner keeps: the console's sealed copy stays beside it
         self._files = {path: (file.read_bytes(), media) for path, (file, media) in FILES.items()}
 
     def link(self) -> str:
@@ -211,10 +207,7 @@ class Console:
 
     def _refusal(self) -> str | None:
         """Why no action may start now; None when one may."""
-        if self._busy():
-            return BUSY
-        stage = os.environ.get(install.STAGE)
-        return SPENT if stage is not None and not Path(stage).is_dir() else None
+        return BUSY if self._busy() else None
 
     # ---- actions -------------------------------------------------------------------------------------------------
 
@@ -228,13 +221,18 @@ class Console:
             problems.append("Name your product checkout by its full path.")
         if not all(isinstance(flag, bool) for flag in flags.values()):
             problems.append("Each choice is on or off.")
-        staged = os.environ.get(install.SHA, "")
+        staged = os.environ.get(sealed.SHA, "")
         if isinstance(commit, str) and staged and not staged.startswith(commit.strip()) and commit.strip() != "":
             problems.append(f"This console runs {staged[:12]} and installs only that commit: to install another, "
                             "start the console with --commit <that commit>.")  # fmt: skip
         if problems or not isinstance(commit, str) or not isinstance(repo, str):
             return refused(400, " ".join(problems))
         dry, keep = flags["dry"] is True, flags["keep"] is True
+        if not dry:
+            origin = ci_check.origin(self.reader, self.owner.name, factory_checkout())
+            found = ci_check.verdict(self.reader, self.owner.name, origin, commit.strip())
+            if found.state != ci_check.PASSED:
+                return refused(409, console_page.sentence(found.refusal()))
         with self._lock:
             if why := self._refusal():
                 return refused(409, why)
@@ -246,7 +244,9 @@ class Console:
             run.title = f"{'Dry run: ' if dry else ''}{'Installing' if ctx.first else 'Reinstalling'} {commit.strip()}"
 
             def act() -> dict[str, Any]:
-                return console_page.install_ending(ctx, install.perform(ctx, keep=keep), keep, run, self.reader)
+                problem = install.perform(ctx, keep=keep)
+                self.kept = self.kept or (problem is not None and keep and not dry)
+                return console_page.install_ending(ctx, problem, keep, run, self.reader)
 
             self._start(run, act)
         return _json(200, {"ok": True})

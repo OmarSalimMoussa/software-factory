@@ -28,7 +28,7 @@ def _config(ctx: Install) -> product_config.Config:
 
 
 def place(ctx: Install) -> None:
-    """The stack's files from the archived commit, copied onto what is there so a bound file keeps its inode; then
+    """The stack's files from the sealed commit, copied onto what is there so a bound file keeps its inode; then
     services.env, its secrets kept and the rest made again from the product's factory.toml."""
     host, folder, group = ctx.host, ctx.places.services, layout.STACK_USER
     config = _config(ctx)

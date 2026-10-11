@@ -5,22 +5,32 @@ authenticator app set up at install.
 
 ## Install, reinstall and uninstall
 
+An install takes only a commit the factory's own CI passed: GitHub holds at least one check run for it, and every one
+succeeded (or was skipped because it did not apply). So push the commit and wait for its CI first. The installer and
+the console check it with your `gh`, which must be signed in to github.com. Nothing is tested on this machine at
+install time.
+
 Use the install console, from your checkout of the factory:
 
 ```
 sudo python3 runtime/system/console.py --repo <your checkout of the product> [--commit <sha>]
 ```
 
-It archives one commit, the newest on your checkout's default branch unless you name another with `--commit`, and
-runs from that copy, so every step is that commit's own code. It opens a page in your browser and prints the page's
-link too. The link works once, in the browser that opens it.
+It takes one commit, the newest on your checkout's default branch unless you name another with `--commit`, and seals
+it: root unpacks the commit into a new folder under `/var/lib/software-factory-stage/`, owned by root and read-only.
+The console and every step it runs read the factory only from that copy, with an environment the console writes out
+in full. So nothing in your checkout's working files or in your shell can change what an install does. The copy is
+removed when the console stops. The console opens a page in your browser and prints the page's link too. The link
+works once, in the browser that opens it.
 
 - **This laptop** says whether the factory is installed, at which commit and since when, how the last drills did,
   whether the warden, the dashboard, GlitchTip and Langfuse answer, and where the dashboard is on your tailnet.
-- **Install** (or **Reinstall**) installs that commit. Turn on **Dry run** to see every step on this machine without
-  changing anything. Each step is a row; open it to read what it did. A first install that fails takes back what it
-  made, unless you chose to keep it. A finished install removes the copy the console runs from: start the console
-  again for another action.
+- **Install** (or **Reinstall**) installs that commit. Beside it, the page shows the commit's CI: passed, still
+  running or failed, with a link to each check that has not passed. The console refuses to install a commit whose CI
+  has not passed, and names each check to wait for or fix. Turn on **Dry run** to see every step on this machine
+  without changing anything; a dry run says what it would check of CI. Each step is a row; open it to read what it
+  did. A first install that fails takes back what it made, unless you chose to keep it: then the sealed copy it ran
+  from stays beside it after the console stops, for you to look at, and the uninstaller removes it.
 - **Questions** appear under the step that asks: the 6-digit code's secret, shown once with Copy, and your GitHub
   token and the agents' Claude token, typed into password fields. With your `gh` signed in, the install puts the
   GitHub keys in place itself; without it, the step's lines show each key to add by hand.
@@ -31,8 +41,9 @@ One action runs at a time. Close on the page stops the console once no action ru
 at any time: it first lets a running action end, refusing any question the action still asks, and a second Ctrl-C
 stops at once.
 
-The command lines run the same steps: `sudo python3 runtime/system/install.py --commit <sha> --repo <path>`, with
-`--dry-run`, `--healthchecks`, `--keep-on-failure` or `--set key=value`; and
+The command lines run the same steps, from a sealed copy in the same way:
+`sudo python3 runtime/system/install.py --commit <sha> --repo <path>`, with `--dry-run`, `--healthchecks`,
+`--keep-on-failure` (which keeps the sealed copy too) or `--set key=value`; and
 `sudo python3 runtime/system/uninstall.py [--repo <path>] [--dry-run]`.
 
 ## Start
@@ -126,9 +137,9 @@ The factory never changes itself. Read the Self-reflect page: misses, friction, 
 To act on one:
 
 1. Pause the factory, then stop every agent.
-2. Change the factory's repo by hand: branch, test, merge, push.
-3. Reinstall from the reviewed commit with the install console (or `install.py --commit <sha> --repo <path>`). The
-   installer refuses while any factory session is live.
+2. Change the factory's repo by hand: branch, test, merge, push. Wait for the factory's CI to pass on the commit.
+3. Reinstall from that commit with the install console (or `install.py --commit <sha> --repo <path>`). The installer
+   refuses while any factory session is live, and refuses a commit whose CI has not passed.
 4. Run the server set-up again from that commit (`python3 -m standard.server.setup --product <path>`): a deploy
    refuses a build planned by another factory commit than the server runs.
 5. In the product, move `.github/factory-ref` to that commit, and copy in `templates/ci/` again if it changed.

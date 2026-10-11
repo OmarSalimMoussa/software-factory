@@ -1,6 +1,6 @@
 """One install: what the owner asked for, and what the steps learn as they run.
 
-The steps fill it in order (the commit's sha, the archived tree, the settled settings), and each later step asks
+The steps fill it in order (the commit's sha, its sealed copy, the settled settings), and each later step asks
 for what it needs through a method that fails loudly when an earlier step did not run.
 """
 
@@ -35,14 +35,14 @@ def github_name(url: str) -> str | None:
 class Install:
     host: Host
     places: Places
-    factory: Path  # the owner's clone of the factory; the commit is archived from it
+    factory: Path  # the owner's clone of the factory; the commit is sealed from it
     product: Path  # the owner's checkout of the product (--repo)
     commit: str
     owner: Account
     changes: dict[str, Any]  # --set key=value, applied over the saved overrides
     healthchecks: bool
     sha: str = ""
-    stage: Path | None = None
+    stage: Path | None = None  # the commit's sealed copy, which this install runs from
     settings: Settings | None = None
     overrides: dict[str, Any] = field(default_factory=dict)
     first: bool = True  # no earlier install recorded
@@ -57,8 +57,8 @@ class Install:
         if self.host.dry:
             return REPO_ROOT
         if self.stage is None:
-            raise refuse("the commit was not archived before this step")
-        return self.stage / "tree"
+            raise refuse("the commit was not sealed before this step")
+        return self.stage
 
     def templates(self) -> Path:
         return self.tree() / "runtime" / "system"

@@ -3,10 +3,11 @@
     sudo python3 runtime/system/uninstall.py [--dry-run]
 
 It refuses while any session is working or waiting. It stops and removes the factory's units, rules, firewall table,
-AppArmor profile, managed settings, commands and programs; the warden's state (its secrets and the 6-digit code's
-secret included) and the laptop's shared services with their data; the four factory users with their homes (the
-agents' clone and the stack user's Docker data); and the factory's git hooks setting in the owner's checkout. It never
-removes packages, the owner's own files, or anything on the server or on GitHub: it prints what to remove there.
+AppArmor profile, managed settings, commands and programs, and the sealed copies installs ran from; the warden's state
+(its secrets and the 6-digit code's secret included) and the laptop's shared services with their data; the four
+factory users with their homes (the agents' clone and the stack user's Docker data); and the factory's git hooks
+setting in the owner's checkout. It never removes packages, the owner's own files, or anything on the server or on
+GitHub: it prints what to remove there.
 """
 
 from __future__ import annotations
@@ -109,9 +110,19 @@ def programs(host: Host, dashboard_port: str) -> None:
     for path in (paths.FACTORY_BIN, layout.CLAUDE_BIN.parent, paths.INSTALL, layout.TOOLS, layout.TOOLCHAIN,
                  paths.RUN, layout.DRILLS):  # fmt: skip
         _remove(host, path)
+    sealed_copies(host)
     code, served = host.query(["tailscale", "serve", "status"])
     if code == 0 and f"127.0.0.1:{dashboard_port}" in served:
         _try(host, ["tailscale", "serve", "--https=443", "off"])
+
+
+def sealed_copies(host: Host) -> None:
+    """Every sealed copy, unless this runs from one (the console, or a first install taking itself back): that copy
+    goes when its program ends."""
+    if REPO_ROOT.is_relative_to(layout.STAGE_ROOT):
+        host.say(f"  kept {layout.STAGE_ROOT}: this runs from a sealed copy in it, which goes when it ends")
+        return
+    _remove(host, layout.STAGE_ROOT)
 
 
 def state(host: Host, places: Places) -> None:

@@ -28,7 +28,7 @@ class RenderError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class Artifact:
-    source: str  # relative to this folder, so the installer reads it from the archived commit
+    source: str  # relative to this folder, so the installer reads it from the sealed commit
     dest: Path
     mode: int
 
@@ -101,7 +101,7 @@ def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str
 
 
 def artifact(item: Artifact, source: Path, given: Mapping[str, str]) -> str:
-    """One template from the folder ``source`` (this folder in the archived commit), rendered."""
+    """One template from the folder ``source`` (this folder in the sealed commit), rendered."""
     return render((source / item.source).read_text(encoding="utf-8"), given)
 
 

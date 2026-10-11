@@ -8,7 +8,7 @@ from system_fakes import dry_job, settings
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
-from runtime.system import install, steps_machine
+from runtime.system import ci_check, install, steps_machine
 from runtime.system.host import DryHost
 from runtime.warden import registry
 
@@ -161,8 +161,10 @@ def test_the_secrets_step_keeps_the_agents_claude_accounts(
         (False, install.FIRST_CHANGE + 5, False, False),  # a reinstall: removing it would delete real work
         (True, install.FIRST_CHANGE - 1, False, False),  # nothing was changed yet
         (True, install.FIRST_CHANGE + 5, True, False),  # the owner keeps it to look at
+        # A commit whose CI has not passed is refused before anything changes.
+        (True, [step for _, step in install.STEPS].index(ci_check.passed) + 1, False, False),
     ],
-    ids=["first-install", "reinstall", "before-any-change", "kept"],
+    ids=["first-install", "reinstall", "before-any-change", "kept", "ci-not-passed"],
 )
 def test_only_a_failed_first_install_is_taken_back(
     tmp_path: Path, first: bool, reached: int, keep: bool, rolled: bool

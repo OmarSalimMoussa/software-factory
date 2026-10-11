@@ -1,8 +1,8 @@
 'use strict';
-/* The install console: its one-time link admits this browser alone; a dry install draws every step as a row, asks each
-   question in place under its step (the 6-digit code's secret, the GitHub and Claude tokens), shows the keys to add by
-   hand as the installer's own lines, keeps a typed secret off the page, and finishes; at desktop and phone width, in
-   both themes, with 24 px targets. */
+/* The install console: its one-time link admits this browser alone; it shows the offered commit's CI; a dry install
+   draws every step as a row, asks each question in place under its step (the 6-digit code's secret, the GitHub and
+   Claude tokens), shows the keys to add by hand as the installer's own lines, keeps a typed secret off the page, and
+   finishes; at desktop and phone width, in both themes, with 24 px targets. */
 const {drive, consoleServer} = require('./lib.cjs');
 
 const SECRET = 'sk-ant-oat01-typed-in-the-console-5e5e';
@@ -61,6 +61,7 @@ drive('console', async t => {
   t.check(new URL(p.url()).search === '', 'the one-time token stayed in the address bar');
   t.check((await p.textContent('#status')).includes('Not installed'), 'the status does not say it is not installed');
   t.check((await p.textContent('.cf-commit')).startsWith("0123456 The drive's newest commit"), 'the commit it installs is not shown');
+  t.check((await p.textContent('#f-ci')).startsWith("CI passedThe factory's CI passed on this commit."), `the commit's CI is not shown: ${await p.textContent('#f-ci')}`);
   t.check(await p.inputValue('#f-repo') !== '', 'the product checkout is not filled in');
   await targets(t, p, '1440');
   await dryInstall(t, p, '1440');

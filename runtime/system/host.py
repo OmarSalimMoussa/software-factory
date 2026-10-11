@@ -1,8 +1,9 @@
 """The installer's only hands on the machine. Every step acts through a Host, so a dry run prints what each step
 would do and changes nothing: the same step functions run against a DryHost.
 
-A real Host runs as root. Commands as another user go through ``runuser`` with that user's home and runtime folder,
-so a user's own tools (git, uv, systemctl --user) see their own configuration.
+A real Host runs as root. Its commands as root run with the one fixed PATH; commands as another user go through
+``runuser`` with nothing but that user's home, runtime folder and session bus, so a user's own tools (git, uv,
+systemctl --user) see their own configuration and nothing of the installer's.
 """
 
 from __future__ import annotations
@@ -111,6 +112,10 @@ class Host(ABC):
         """Commands as ``user`` for code that reads each exit code itself; each is printed as it runs."""
 
     @abstractmethod
+    def pipe(self, source: list[str], user: str, sink: list[str]) -> None:
+        """``source``, run as ``user``, writes its bytes into ``sink``, run as root; CommandError when either fails."""
+
+    @abstractmethod
     def write(self, path: Path, text: str, *, mode: int, owner: str = "root", group: str = "") -> None: ...
 
     @abstractmethod
@@ -135,15 +140,12 @@ class Host(ABC):
     def ask(self, prompt: str, *, secret: bool, hint: str, link: str) -> str:
         """The owner's answer; ``hint`` says in one line what to give, ``link`` is where it is made ("" for none)."""
 
-    @abstractmethod
-    def scratch(self, owner: str) -> Path:
-        """A new empty folder, owned by ``owner``."""
-
 
 def as_user(account: Account, argv: list[str], env: Mapping[str, str] | None) -> list[str]:
     """``argv`` run by root as ``account``, with that user's home, runtime folder and session bus."""
     merged = {**user_env(account), **(env or {})}
-    return ["runuser", "-u", account.name, "--", "env", *(f"{k}={v}" for k, v in merged.items()), *argv]
+    # -i: nothing of root's environment reaches the user's command, the install's own variables included.
+    return ["runuser", "-u", account.name, "--", "env", "-i", *(f"{k}={v}" for k, v in merged.items()), *argv]
 
 
 def user_env(account: Account) -> dict[str, str]:
@@ -162,28 +164,31 @@ def user_env(account: Account) -> dict[str, str]:
 class RealHost(Host):
     dry = False
 
-    def _argv(self, argv: list[str], user: str, env: Mapping[str, str] | None) -> list[str]:
+    def _spawn(self, argv: list[str], user: str, env: Mapping[str, str] | None) -> tuple[list[str], dict[str, str]]:
+        """The command line and the environment it starts with: as root, this process's own with the fixed PATH; as
+        another user, ``runuser`` starts it with only what ``as_user`` declares."""
+        root = {**os.environ, "PATH": layout.ROOT_PATH}
         if not user:
-            return argv if not env else ["env", *(f"{k}={v}" for k, v in env.items()), *argv]
+            return argv, {**root, **(env or {})}
         account = self.account(user)
         if account is None:
             raise CommandError(argv, -1, f"there is no user {user}")
-        return as_user(account, argv, env)
+        return as_user(account, argv, env), root
 
     def run(
         self, argv: list[str], *, user: str = "", cwd: Path | None = None, stdin: str | None = None,
         env: Mapping[str, str] | None = None,
     ) -> str:  # fmt: skip
         self.say(f"  run: {' '.join(argv)[:160]}" + (f" (as {user})" if user else ""))
-        done = subprocess.run(
-            self._argv(argv, user, env), cwd=cwd, input=stdin, text=True, capture_output=True, check=False
-        )
+        command, environ = self._spawn(argv, user, env)
+        done = subprocess.run(command, cwd=cwd, input=stdin, text=True, capture_output=True, check=False, env=environ)
         if done.returncode != 0:
             raise CommandError(argv, done.returncode, done.stdout + done.stderr)
         return done.stdout
 
     def query(self, argv: list[str], *, user: str = "", cwd: Path | None = None) -> tuple[int, str]:
-        done = subprocess.run(self._argv(argv, user, None), cwd=cwd, text=True, capture_output=True, check=False)
+        command, environ = self._spawn(argv, user, None)
+        done = subprocess.run(command, cwd=cwd, text=True, capture_output=True, check=False, env=environ)
         return done.returncode, done.stdout + done.stderr
 
     def runner(self, user: str, env: Mapping[str, str]) -> Runner:
@@ -191,10 +196,32 @@ class RealHost(Host):
             self.say(f"  run: {' '.join(argv)[:160]} (as {user})")
             # Without input of its own, a command reads nothing: never the owner's terminal.
             feed: dict[str, Any] = {"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}
-            done = subprocess.run(self._argv(argv, user, env), text=True, capture_output=True, check=False, **feed)
+            command, environ = self._spawn(argv, user, env)
+            done = subprocess.run(command, text=True, capture_output=True, check=False, env=environ, **feed)
             return subprocess.CompletedProcess(argv, done.returncode, done.stdout, done.stderr)
 
         return run
+
+    def pipe(self, source: list[str], user: str, sink: list[str]) -> None:
+        self.say(f"  run: {' '.join(source)[:120]} (as {user}) | {' '.join(sink)[:120]}")
+        made, made_env = self._spawn(source, user, None)
+        taken, taken_env = self._spawn(sink, "", None)
+        # The source's errors go to a file, not a pipe: a full pipe would stall it while the sink waits for its end.
+        with tempfile.TemporaryFile() as errors:
+            producer = subprocess.Popen(made, env=made_env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                        stderr=errors)  # fmt: skip
+            try:
+                done = subprocess.run(taken, env=taken_env, stdin=producer.stdout, capture_output=True, check=False)
+            finally:
+                if producer.stdout is not None:
+                    producer.stdout.close()
+                code = producer.wait()
+            errors.seek(0)
+            said = (errors.read() + done.stdout + done.stderr).decode(errors="replace")
+        if done.returncode != 0:
+            raise CommandError(sink, done.returncode, said)
+        if code != 0:
+            raise CommandError(source, code, said)
 
     def write(self, path: Path, text: str, *, mode: int, owner: str = "root", group: str = "") -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -247,11 +274,6 @@ class RealHost(Host):
         answer = getpass.getpass(prompt) if secret else input(prompt)
         return answer.strip()
 
-    def scratch(self, owner: str) -> Path:
-        folder = Path(tempfile.mkdtemp(prefix=layout.STAGE_PREFIX))
-        shutil.chown(folder, owner, owner)
-        return folder
-
 
 @dataclass
 class DryHost(Host):
@@ -287,6 +309,9 @@ class DryHost(Host):
 
         return run
 
+    def pipe(self, source: list[str], user: str, sink: list[str]) -> None:
+        self._do(f"run: {' '.join(source)} (as {user}) | {' '.join(sink)}")
+
     def write(self, path: Path, text: str, *, mode: int, owner: str = "root", group: str = "") -> None:
         self._do(f"write: {path} ({mode:o}, {owner}:{group or owner})")
 
@@ -313,6 +338,3 @@ class DryHost(Host):
     def ask(self, prompt: str, *, secret: bool, hint: str, link: str) -> str:
         self._do(f"ask the owner: {prompt.strip()}")
         return "<answer>"
-
-    def scratch(self, owner: str) -> Path:
-        return Path(tempfile.gettempdir()) / f"{layout.STAGE_PREFIX}dry-run"

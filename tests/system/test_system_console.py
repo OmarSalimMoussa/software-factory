@@ -8,12 +8,13 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from system_fakes import dry_job
+from system_fakes import PASSING, SHA, ci_answers, ci_link, dry_job
 
 from runtime.system import console_page, install, layout, uninstall
 from runtime.system.console_app import Console, Hosts, Reply
 from runtime.system.console_run import ConsoleDryHost, Run
 from runtime.system.host import CommandError, DryHost, Host
+from runtime.system.job import REPO_ROOT
 
 PORT = 4321
 HOST = f"127.0.0.1:{PORT}"
@@ -21,13 +22,19 @@ ORIGIN = f"http://{HOST}"
 SECRET = "sk-ant-oat01-typed-into-the-page-7f7f"
 
 
-def _console(tmp_path: Path, real: Callable[[Run], Host] | None = None) -> Console:
+def _console(tmp_path: Path, real: Callable[[Run], Host] | None = None,
+             runs: list[tuple[str, str, str]] = PASSING) -> Console:  # fmt: skip
+    """The console offers SHA, whose CI ran ``runs``."""
     job = dry_job(tmp_path)
 
     def dry(run: Run) -> Host:
         return ConsoleDryHost(run, dict(job.host.answers) if isinstance(job.host, DryHost) else {})
 
-    console = Console(job.places, job.owner, DryHost(), Hosts(real or dry, dry), lambda target: True, commit="main",
+    reader = DryHost(answers={
+        **ci_answers(REPO_ROOT, SHA, runs),
+        f"git -C {REPO_ROOT} log -1 --format=%H%n%h%n%s {SHA} --": (0, f"{SHA}\n{SHA[:7]}\nThe offered commit\n"),
+    })  # fmt: skip
+    console = Console(job.places, job.owner, reader, Hosts(real or dry, dry), lambda target: True, commit=SHA,
                       repo=job.product)  # fmt: skip
     console.port = PORT
     return console
@@ -145,6 +152,7 @@ def test_an_install_in_the_console_shows_each_step_in_order_and_a_failures_roll_
     ending: str,
 ) -> None:  # fmt: skip
     monkeypatch.setattr(install, "STEPS", tuple(_step(n, n == fails_at) for n in range(1, 6)))
+    monkeypatch.setattr(install, "FIRST_CHANGE", 3)  # these steps change the machine from the third on
     monkeypatch.setattr(console_page, "address", lambda host: None)
 
     def real(run: Run) -> Host:
@@ -156,7 +164,7 @@ def test_an_install_in_the_console_shows_each_step_in_order_and_a_failures_roll_
 
     console = _console(tmp_path, real)
     cookie = _admit(console)
-    body = {"commit": "main", "repo": str(console.repo), "healthchecks": False, "keep": False, "dry": False}
+    body = {"commit": SHA, "repo": str(console.repo), "healthchecks": False, "keep": False, "dry": False}
 
     assert _post(console, cookie, "/api/install", body).status == 200
     _until(lambda: _run(console, cookie)["ending"] is not None)
@@ -186,14 +194,16 @@ def test_uninstall_removes_only_after_the_owner_saw_what_it_removes(tmp_path: Pa
     assert _post(console, cookie, "/api/uninstall", {"confirm": True, "repo": ""}).status == 200
 
 
-def test_once_an_install_removed_the_commit_the_console_runs_from_it_starts_nothing_more(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv(install.STAGE, str(tmp_path / "stage-the-install-removed"))
-    console = _console(tmp_path)
+def test_the_console_shows_the_commits_ci_and_installs_it_only_once_ci_passed(tmp_path: Path) -> None:
+    console = _console(tmp_path, runs=[("test", "completed", "failure"), ("drives", "completed", "success")])
     cookie = _admit(console)
-    body = {"commit": "main", "repo": str(console.repo), "healthchecks": False, "keep": False, "dry": True}
+    body = {"commit": SHA, "repo": str(console.repo), "healthchecks": False, "keep": False, "dry": False}
 
-    for path, sent in (("/api/install", body), ("/api/uninstall", {"confirm": False, "repo": ""})):
-        reply = _post(console, cookie, path, sent)
-        assert reply.status == 409 and "start it again" in json.loads(reply.body)["reason"]
+    shown = console.page()["install"]["commit"]["ci"]
+    refused = _post(console, cookie, "/api/install", body)
+
+    assert (shown["state"], shown["links"]) == ("failed", [{"label": "test: failed (failure)", "url": ci_link(0)}])
+    assert refused.status == 409 and f"  test: failed (failure): {ci_link(0)}" in json.loads(refused.body)["reason"]
+    assert console.run is None
+    assert _post(console, cookie, "/api/install", {**body, "dry": True}).status == 200  # a dry run changes nothing
+    console.stop()
