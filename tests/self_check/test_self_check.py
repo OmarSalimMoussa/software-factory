@@ -30,7 +30,6 @@ NOT_APPLICABLE = {
 }
 # Each waits for its values, written by the slice of work that also clears what the check then finds.
 NOT_YET = {
-    "tree-rules": "slice 3: a README in every folder, and no environment read with a default",
     "config-readers": "slice 4: one environment reader for each program family",
     "size-ceilings": "slice 5: oversized files and folders split by concern, with no pins",
     "error-telemetry": "slice 6: where each part's errors go, then every catch site and marker made true",

@@ -1,0 +1,34 @@
+# The factory's own Python: its runtime, its checks, its standard build and deploy, and its plugin's hooks.
+product_python = ["runtime", "checks", "standard", "plugin"]
+# The factory serves its pages with the standard library and imports no HTTP framework.
+service_frameworks = []
+# No JavaScript barrel or index module stands in for the module that owns a symbol.
+entrypoints = {}
+# Every environment read is required, or optional by design without a default.
+env_allow = {}
+
+[readme_exempt]
+"plugin/skills/critic-architecture" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/critic-product" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/critic-reliability" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/critic-security" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/critic-ux" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/debugging" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/designer" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/implementer" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/intake" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/orchestrator" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/qa-backend" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/qa-prod" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/qa-regression" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/qa-security" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/qa-ui-function" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/qa-ux" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/qa-visual" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/taking-review" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/triage" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/skills/verifying-claims" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+"plugin/.claude-plugin" = "Claude Code's plugin manifest folder, read by Claude Code, not by people"
+"testdata/dashboard-fixtures" = "fixtures of the dashboard's payloads; a README would be read as a fixture"
+"testdata/fixture-product/.github" = "a copy of a product's shape: a README would change the fixture"
+"testdata/fixture-product/check-values" = "a copy of a product's values: the folder holds only values files"
