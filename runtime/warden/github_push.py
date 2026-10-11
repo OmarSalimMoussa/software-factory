@@ -11,6 +11,7 @@ tick.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shlex
@@ -33,6 +34,7 @@ from runtime.warden import checks, deploys, inbox, ops, probes
 from runtime.warden.context import Context
 from runtime.warden.github import GitHubError
 
+log = logging.getLogger(__name__)
 _FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 # What `git revert` writes into the message of the commit that takes a merge back.
 _REVERTS = re.compile(r"This reverts commit ([0-9a-f]{40})")
@@ -322,6 +324,30 @@ def staging_off_default(settings: Settings, on_default: bool | None) -> str:
         f"The factory cannot tell yet whether staging's build is on {branch}: GitHub did not answer. It asks "
         f"again every {settings.get_int('watch.branch_retry_minutes')} minutes; the push waits until then."
     )
+
+
+def ask_branch(ctx: Context) -> None:
+    """The warden's branch pass, in a thread of its own, since a fetch can take minutes: whether staging's build is
+    on the default branch, which a push to prod needs. Asked once for a build, and again every
+    watch.branch_retry_minutes while GitHub has not said, so one failed fetch never holds a build back."""
+    current = deploys.builds(ctx.places, probes.STAGING)["current"]
+    if current is None:
+        return
+    commit = str(current["commit"])
+    asked = deploys.branch_asked(ctx.places, probes.STAGING, commit)
+    retry = ctx.settings().get_int("watch.branch_retry_minutes") * 60
+    if asked is not None and (asked[0] is not None or ctx.clock.now() - asked[1] < retry):
+        return
+    answer: bool | None
+    try:
+        answer = on_default(ctx, commit)
+    # telemetry: surfaced — unknown, which the push sheet draws; reported once a build, then asked again quietly
+    except Refused as exc:
+        answer = None
+        if asked is None:
+            log.warning("warden: whether staging's build %s is on the default branch is unknown (%s)", commit[:12],
+                        exc.reason)  # fmt: skip
+    deploys.note_branch(ctx.places, probes.STAGING, commit, answer, ctx.clock.now())
 
 
 def on_default(ctx: Context, commit: str) -> bool:

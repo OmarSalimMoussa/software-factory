@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 
 import pytest
@@ -199,6 +200,22 @@ def test_a_slow_bench_settles_beside_the_pass_and_no_second_one_starts_meanwhile
 
     assert runs == [1]
     done.set()
+
+
+def test_a_bench_settling_that_fails_in_its_thread_is_reported_there_once_while_it_lasts(
+    world: World, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    def broken(ctx: object, procs: object) -> None:
+        raise store.StoreError("registry.json: not an object")
+
+    monkeypatch.setattr(crashwatch, "finish_benches", broken)
+    watcher = crashwatch.SessionsWatch(at_once)
+    with caplog.at_level(logging.ERROR):
+        for _ in range(2):
+            watcher.run_pass(world.ctx())
+    assert [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR] == [
+        "warden: the benches' settling failed (StoreError)"
+    ]
 
 
 def test_a_session_the_warden_is_launching_is_never_launched_a_second_time(world: World) -> None:

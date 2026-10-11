@@ -266,18 +266,22 @@ def set_facts(ctx: Context, task_id: str, args: Mapping[str, Any]) -> Task:
             changed.not_now = False
         if changed.status in SCORED:
             changed = scored(ctx, queue, changed, goals)
+        # A proposal stands on the route its facts named, or on a reason to differ given against that route: facts
+        # that route elsewhere send it back, to be proposed again on them. Only a proposal is routed here: a queued
+        # task may still lack the facts a route needs.
+        rerouted = None
+        if task.status == "proposed":
+            routed = route.route(changed, ctx.settings())
+            rerouted = routed if routed != route.route(task, ctx.settings()) else None
         queue.write({task_rel(task_id): formats.dump_task(changed)})
         said = ", ".join(f"{k} {v}" for k, v in facts.items())
         queue.log(task_id, ctx.clock.iso(), actor(ctx), "facts", said)
         approval = approvals.current(ctx.places, task_id)
         if approval is not None and not approvals.matches(approval, changed):
             changed = transition(ctx, queue, changed, "proposed", "void", WARDEN, "what was approved changed")
-        # A proposal stands on the route its facts named, or on a reason to differ given against that route: facts
-        # that route elsewhere now send it back, to be proposed again on them.
-        routed = route.route(changed, ctx.settings())
-        if changed.status == "proposed" and routed != route.route(task, ctx.settings()):
+        if rerouted is not None:
             changed = transition(ctx, queue, changed, "queued", "void", WARDEN,
-                                 f"its facts route it to rung {routed} now: propose it again")  # fmt: skip
+                                 f"its facts route it to rung {rerouted} now: propose it again")  # fmt: skip
     return changed
 
 

@@ -222,15 +222,25 @@ def brief_path(ctx: Context, task_id: str) -> Path:
 
 
 def held_path(ctx: Context, task_id: str) -> Path:
-    """A word for the task's run that no session could take when it was said (a revert's, while the task's
-    implementer is benched or has ended): the run's next start or revive carries it, once."""
+    """A word for the task's run (a revert's), kept until a session of it takes it: handed to a working one, or
+    carried by the run's next start or revive when none is working, or it did not arrive. Only its latest is kept."""
     return ctx.places.state / "briefs" / f"{task_id}.held.md"
 
 
-def _with_held(ctx: Context, task_id: str, note: str) -> str:
+def _held(ctx: Context, task_id: str) -> str:
     path = held_path(ctx, task_id)
-    held = path.read_text(encoding="utf-8").strip() if task_id and path.is_file() else ""
-    return "\n\n".join(part for part in (note, held) if part)
+    return path.read_text(encoding="utf-8").strip() if task_id and path.is_file() else ""
+
+
+def _took_held(ctx: Context, task_id: str, sent: str) -> str:
+    """The held word went out as ``sent``: it is gone, unless a newer one was held meanwhile, which is returned to be
+    handed over. The caller holds ctx.lock, as the writer of a held word does."""
+    late = _held(ctx, task_id)
+    if late != sent:
+        return late
+    if task_id:
+        held_path(ctx, task_id).unlink(missing_ok=True)
+    return ""
 
 
 def start_run(ctx: Context, role: str, task: Task, note: str, outage_fix: bool) -> Session:
@@ -240,7 +250,6 @@ def start_run(ctx: Context, role: str, task: Task, note: str, outage_fix: bool) 
     permits.check_not_factory(ctx)
     if not note and brief_path(ctx, task.id).is_file():
         note = brief_path(ctx, task.id).read_text(encoding="utf-8")
-    note = _with_held(ctx, task.id, note.strip())
     with ctx.lock:
         permits.check_daemon(ctx)
         sessions = read(ctx)
@@ -255,16 +264,18 @@ def start_run(ctx: Context, role: str, task: Task, note: str, outage_fix: bool) 
         fields = {"name": name, "role": role, "model": permit.model, "effort": permit.effort, "task": task.id,
                   "rung": permit.rung, **_by(ctx, role)}  # fmt: skip
         slot = _claim_at_start(ctx, name, role, task.id)
-        held = f"\n\nSlot {slot} is yours: bring it up with factory slot up." if slot is not None else ""
+        took = f"\n\nSlot {slot} is yours: bring it up with factory slot up." if slot is not None else ""
+        held = _held(ctx, task.id)  # read and dropped under the lock its writer holds
+        said = "\n\n".join(part for part in (note.strip(), held) if part)
         try:
-            s = launch.start_session(ctx, sessions, fields, first_prompt(task, held, note), worktree=name)
+            s = launch.start_session(ctx, sessions, fields, first_prompt(task, took, said), worktree=name)
         except Refused:
             if slot is not None:
                 permits.free_slot(ctx, slot)
             raise
         if permit.bypass:
             outage.mark_bypass(ctx, task.id, s.id)
-    held_path(ctx, task.id).unlink(missing_ok=True)
+        _took_held(ctx, task.id, held)
     if task.status != "building":
         permits.move_task(ctx, task.id, "designing" if role == DESIGN else "building",
                           "outage" if permit.bypass else "start")  # fmt: skip
@@ -437,7 +448,8 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
         if s.role == IMPL:
             slot = permits.claim_slot(ctx, s)
         rebuild = f" Slot {slot} is yours again: rebuild it with factory slot up." if slot is not None else ""
-        said = _with_held(ctx, s.task, note)
+        held = _held(ctx, s.task)
+        said = "\n\n".join(part for part in (note, held) if part)
         launch.resume(ctx, s, REVIVED + rebuild + (f"\n\n{said}" if said else ""))
     except (LaunchError, Refused) as exc:
         if slot is not None:
@@ -453,11 +465,26 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
         s.resume_tries, s.benched_for = 0, ""
         move(ctx, s, WORKING, by, "revived")
         registry.write(ctx.places, sessions)
-    if s.task:
-        held_path(ctx, s.task).unlink(missing_ok=True)
+        # A word held while it came back (a revert said as it revived) was not in its message: it follows now.
+        late = _took_held(ctx, s.task, held)
+    if late:
+        hand_held(ctx, s.id, s.task, late)
     if s.task and permits.read_task(ctx, s.task).status == "deprioritized":
         permits.move_task(ctx, s.task, "designing" if s.role == DESIGN else "building", "revive")
     return ""
+
+
+def hand_held(ctx: Context, sid: str, task_id: str, word: str) -> None:
+    """Hand a working session a word held for its task's run; one that does not arrive stays held for the run's
+    next start or revive."""
+    try:
+        deliver(ctx, sid, word, WARDEN)
+    # telemetry: surfaced — the word stays held, and the run's next start or revive carries it
+    except (LaunchError, Refused) as exc:
+        log.warning("warden: a word held for %s did not reach session %s (%s)", task_id, sid, type(exc).__name__)
+        return
+    with ctx.lock:
+        _took_held(ctx, task_id, word)
 
 
 def revive_session(ctx: Context, sid: str, by: str) -> str:

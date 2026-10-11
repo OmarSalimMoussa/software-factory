@@ -10,7 +10,6 @@ from loop_fakes import World, healthy
 from runtime.queue import formats
 from runtime.shared import store
 from runtime.shared.models import INBOXES, Request
-from runtime.shared.protocol import Refused
 from runtime.warden import deploys, errors_import, inbox, loop, probes, telemetry
 from runtime.warden.probes import Answer
 
@@ -51,9 +50,8 @@ def tick(world: World, tmp_path: Path) -> list[str]:
 
 
 @pytest.fixture
-def ticking(world: World, monkeypatch: pytest.MonkeyPatch) -> World:
+def ticking(world: World) -> World:
     world.ctx.post_event = inbox.poster(world.ctx.places, world.clock)
-    monkeypatch.setattr(loop.github_push, "on_default", lambda ctx, commit: True)  # GitHub's branch holds it
     world.checkout.mkdir(parents=True, exist_ok=True)
     (world.checkout / "GOAL.md").write_bytes((ROOT / "testdata" / "fixture-product" / "GOAL.md").read_bytes())
     small = world.ctx.settings().with_changes({"intake.batch_size": 10, "intake.batch_max_wait_hours": 6})
@@ -200,30 +198,3 @@ def test_a_boosted_request_is_posted_for_triage_at_once_and_once(ticking: World,
         ticking.clock.t += ticking.ctx.settings().get_int("watch.tick_seconds")
 
     assert posted == [inbox.TRIAGE_DUE]
-
-
-def test_a_build_github_did_not_place_on_the_branch_is_asked_again_and_reported_once(
-    ticking: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    file_requests(ticking, 0, 0)
-    answers: list[bool | None] = [None, None, True]  # None: the fetch failed
-
-    def on_default(ctx: object, commit: str) -> bool:
-        answer = answers.pop(0)
-        if answer is None:
-            raise Refused("push-failed", "git fetch failed: Connection timed out")
-        return answer
-
-    monkeypatch.setattr(loop.github_push, "on_default", on_default)
-    retry = ticking.ctx.settings().get_int("watch.branch_retry_minutes") * 60
-    with caplog.at_level(logging.WARNING, logger=loop.__name__):
-        for wait in (0, retry - 1, 1, retry):  # the same build all along
-            ticking.clock.t += max(wait, ticking.ctx.settings().get_int("watch.probe_seconds"))
-            run(ticking, tmp_path)
-            if wait == retry - 1:
-                assert len(answers) == 2  # not asked again before the retry is due
-    assert answers == [] and deploys.on_default(ticking.ctx.places, probes.STAGING) is True
-    assert [r.getMessage() for r in caplog.records if "default branch" in r.getMessage()] == [
-        f"warden: whether staging's build {'a' * 12} is on the default branch is unknown "
-        "(git fetch failed: Connection timed out)"
-    ]

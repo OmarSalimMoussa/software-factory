@@ -89,6 +89,12 @@ def test_a_proposal_whose_facts_route_it_elsewhere_goes_back_to_be_proposed_on_t
         _propose(world, task.id)  # rung 1 is now below its route
 
 
+def test_facts_on_a_queued_task_that_cannot_be_routed_yet_are_kept(world: World) -> None:
+    task = world.task(slices=None)  # no slice estimate yet, so no route
+    tasks.set_facts(world.ctx(), task.id, {"cause": "web/auth.py:52"})
+    assert world.queue().task(task.id).cause == "web/auth.py:52"
+
+
 def test_a_proposal_says_why_in_one_line(world: World) -> None:
     task = world.task()
     with pytest.raises(Refused, match="why"):

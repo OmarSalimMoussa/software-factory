@@ -12,6 +12,7 @@ from system_fakes import FIXTURE, settings
 
 from runtime.shared.paths import Places
 from runtime.system.runners import stack_run
+from standard import envfile
 from standard.services import provision
 
 SLOT = 2
@@ -98,6 +99,7 @@ def test_a_verb_runs_on_a_provisioned_slot_and_a_successful_empty_drops_it(
                                              "commit": "dev-slot2", "state": places.slot_state_dir(SLOT)})  # fmt: skip
     assert [name for name, _ in shared.calls[1:]] == (["drop"] if dropped else [])
     assert env_file.exists() is not dropped
+    assert envfile.defaults_path(env_file).exists() is not dropped  # nothing of the slot's file stays behind
     # The factory removes only what it wrote; the product's own files beside it are its scripts' to clear.
     assert (env_file.parent / "seeds" / "users.json").exists()
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -306,3 +307,41 @@ def test_a_staging_build_not_known_on_the_default_branch_never_goes_to_prod(
     with pytest.raises(Refused) as refused:
         github_push.push_prod(world.ctx, {"expected_staging_sha": STAGING}, None)
     assert refused.value.rule == "staging-pinned"
+
+
+def test_a_build_github_did_not_place_on_the_branch_is_asked_again_and_reported_once(
+    world: World, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    deploys.record(world.ctx.places, probes.STAGING, STAGING, world.clock.iso())
+    answers: list[bool | None] = [None, None, True]  # None: GitHub did not answer
+
+    def on_default(ctx: object, commit: str) -> bool:
+        answer = answers.pop(0)
+        if answer is None:
+            raise Refused("push-failed", "git fetch failed: Connection timed out")
+        return answer
+
+    monkeypatch.setattr(github_push, "on_default", on_default)
+    retry = world.ctx.settings().get_int("watch.branch_retry_minutes") * 60
+    with caplog.at_level(logging.WARNING, logger=github_push.__name__):
+        for wait, left in ((0, 2), (retry - 1, 2), (1, 1), (retry, 0), (retry, 0)):  # the same build all along
+            world.clock.t += wait
+            github_push.ask_branch(world.ctx)
+            assert len(answers) == left  # asked again only once the retry is due, and never once known
+    assert deploys.on_default(world.ctx.places, probes.STAGING) is True
+    assert [r.getMessage() for r in caplog.records] == [
+        f"warden: whether staging's build {STAGING[:12]} is on the default branch is unknown "
+        "(git fetch failed: Connection timed out)"
+    ]
+
+
+def test_whether_a_commit_is_on_the_default_branch_is_asked_of_github_itself(world: World, github_repo: Path) -> None:
+    pushed = git(world.checkout, "rev-parse", "HEAD")
+    commit(world.checkout, write("src/local.py"))
+    local = git(world.checkout, "rev-parse", "HEAD")
+
+    assert github_push.on_default(world.ctx, pushed) is True
+    assert github_push.on_default(world.ctx, local) is False  # GitHub's branch does not hold it
+    shutil.rmtree(github_repo)  # GitHub does not answer
+    with pytest.raises(Refused, match="git fetch failed"):
+        github_push.on_default(world.ctx, pushed)

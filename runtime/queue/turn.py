@@ -77,8 +77,11 @@ def full_commit(ctx: Context, commit: str) -> str:
     repo = ctx.settings().get_str("repo.path")
     code, out = ctx.launcher.agent_command(["git", "-C", repo, "rev-parse", "--verify", "--quiet",
                                             f"{commit}^{{commit}}"], repo)  # fmt: skip
-    if code != 0:
+    if code == 1 and not out.strip():  # --verify --quiet: git found no such commit, and says nothing
         raise Refused("check", f"the checkout has no commit {commit}: name the merge the check ran on")
+    if code != 0:
+        log.warning("warden: git rev-parse in the agents' checkout failed (exit %d)", code)
+        raise Refused("git", f"git rev-parse failed in the agents' checkout: {out.strip()[-200:]}")
     return out.strip()
 
 
@@ -166,7 +169,8 @@ def check_saved(ctx: Context, commit: str, passed: bool) -> str:
 
 
 def send_back(ctx: Context, task_id: str, note: str) -> Task:
-    """A reverted task goes back to building, its implementer told why; a benched one is told when it is revived.
+    """A reverted task goes back to building, its implementer told why; a benched or reviving one is told when it
+    is back, and a word that did not arrive is held for the run's next start or revive.
     Once that implementer has ended (its task passed its check), the task goes back to the approved runs, or a
     designed build to the designed builds, and the scheduler starts a new implementer, told why first."""
     if not note.strip():
@@ -181,9 +185,9 @@ def send_back(ctx: Context, task_id: str, note: str) -> Task:
         moved = tasks.transition(ctx, queue, task, to, "reverted", tasks.actor(ctx), note.strip())
         if impl is None and designed and task_id not in proposals.designed_builds(ctx.places):
             proposals.set_designed_builds(ctx.places, [*proposals.designed_builds(ctx.places), task_id])
+        # The latest revert's word alone is held: an earlier one's revert is part of this one's history.
+        store.write_text(lifecycle.held_path(ctx, task_id), told + "\n", mode=0o600)
         awake = impl is not None and impl.state in (WORKING, WAITING)
-        if not awake:  # the latest revert's word alone: an earlier one's revert is part of this one's history
-            store.write_text(lifecycle.held_path(ctx, task_id), told + "\n", mode=0o600)
-    if awake:
-        _tell(ctx, moved, told)
+    if awake and impl is not None:
+        lifecycle.hand_held(ctx, impl.id, task_id, told)
     return moved

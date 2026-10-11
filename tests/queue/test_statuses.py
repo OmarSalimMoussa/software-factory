@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 
 import pytest
 from queue_kit import World
@@ -10,9 +11,9 @@ from queue_kit import World
 from runtime.queue import documents, proposals, records, statuses, tasks, turn, verbs
 from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
 from runtime.shared import store
-from runtime.shared.models import Task
+from runtime.shared.models import REVIVING, Task
 from runtime.shared.protocol import Refused
-from runtime.warden import backstop, lifecycle, registry
+from runtime.warden import backstop, launch, lifecycle, permits, registry
 
 TASK = Task("t-0001", "T", ["r-2026-10-09-0001"], "G1", "major", ["ui"], "queued", "2026-10-09T12:00:00Z", "")
 
@@ -141,15 +142,49 @@ def test_a_reverted_task_goes_back_to_its_implementer_or_once_that_ended_to_a_ne
         assert waiting == [task.id]
 
 
-def test_a_check_named_by_a_short_sha_checks_the_merge_it_ran_on(world: World) -> None:
+def test_a_revert_said_while_its_implementer_comes_back_follows_it_once_it_is_back(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    task = world.task(branch="impl-t-0001")
+    world.queue().write_task(dataclasses.replace(task, status="merged", run=1))
+    world.session("s-impl", "implementer", "impl-t-0001", task.id)
+    sessions = registry.read(world.places)
+    sessions["s-impl"].state = REVIVING  # its revive is under way, outside the lock
+    registry.write(world.places, sessions)
+    monkeypatch.setattr(backstop, "processes", lambda: {})
+    monkeypatch.setattr(permits, "claim_slot", lambda ctx, s: None)
+    resumed: list[str] = []
+
+    def resume(ctx: object, s: object, message: str) -> None:
+        resumed.append(message)
+        if len(resumed) == 1:  # the orchestrator's revert lands while the revive runs
+            tasks.set_status(world.ctx(), task.id, "building", "", "staging regressed; reverted as 0abc123")
+
+    monkeypatch.setattr(launch, "resume", resume)
+
+    assert lifecycle.bring_back(world.ctx(), "s-impl", "warden") == ""
+
+    assert len(resumed) == 2 and "Your work was taken back off master" in resumed[1]
+    assert not lifecycle.held_path(world.ctx(), task.id).exists()
+
+
+def test_a_check_named_by_a_short_sha_checks_the_merge_it_ran_on(
+    world: World, caplog: pytest.LogCaptureFixture
+) -> None:
     task = world.task(branch="impl-t-0001")
     world.queue().write_task(dataclasses.replace(task, status="merged", run=1))
     merge = "abc1234" + "0" * 33
     store.write_json(turn.merges_path(world.places), {merge: task.id})
-    world.launcher.git = lambda argv: (0, f"{merge}\n") if argv[-1] == "abc1234^{commit}" else (1, "")
     report = (f"# Check\n\n## Scenarios\n\n{records.CHECK_TABLE}\n| --- | --- | --- | --- |\n"
               "| sign-in | pass | 3 | shot.png |\n").encode()  # fmt: skip
 
+    world.launcher.git = lambda argv: (128, "fatal: cannot change to '/repo': No such file or directory")
+    with caplog.at_level(logging.WARNING), pytest.raises(Refused, match="git rev-parse failed"):
+        verbs.check_save(world.ctx(), {"commit": "abc1234"}, report)  # git itself failed: not a wrong sha
+    assert [r.getMessage() for r in caplog.records] == [
+        "warden: git rev-parse in the agents' checkout failed (exit 128)"
+    ]
+    world.launcher.git = lambda argv: (0, f"{merge}\n") if argv[-1] == "abc1234^{commit}" else (1, "")
     with pytest.raises(Refused, match="the checkout has no commit fedcba9"):
         verbs.check_save(world.ctx(), {"commit": "fedcba9"}, report)
     answer = verbs.check_save(world.ctx(), {"commit": "abc1234"}, report)
