@@ -180,6 +180,8 @@ SCHEMA: dict[str, Spec] = {
     # contract: added by FB7. The programs the product's scripts need, copied from the owner's PATH for the agents and
     # the stack.
     "install.toolchain": Spec("list", when="Next install"),
+    "install.claude_lowest": Spec("str", when="Next install"),
+    "install.claude_untested": Spec("str", when="Next install"),
 }
 
 _PRICE_KEYS = ("input", "output", "cache_read", "cache_write")

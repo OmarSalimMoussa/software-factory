@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
 import pytest
 from loop_fakes import World
 
-from runtime.warden import vitals
+from runtime.warden import backstop, vitals
 
 
 @pytest.mark.parametrize(
@@ -59,3 +60,28 @@ def test_a_reading_the_kernel_does_not_have_is_missing_and_blocks_nothing(world:
     assert missing.level == vitals.MISSING
     assert vitals.worst([green, missing]) == vitals.GREEN
     assert vitals.worst([green, vitals.cpu("", world.ctx.settings())]) == vitals.UNKNOWN  # unreadable is not missing
+
+
+def _process(proc: Path, pid: int, argv: list[str], started_ticks: int) -> None:
+    (proc / str(pid)).mkdir(parents=True)
+    (proc / str(pid) / "cmdline").write_bytes(b"\0".join(a.encode() for a in argv) + b"\0")
+    fields = ["S", *["0"] * 18, str(started_ticks), "0", "0"]
+    (proc / str(pid) / "stat").write_text(f"{pid} (claude) {' '.join(fields)}\n")
+
+
+def test_a_claude_session_with_no_record_the_warden_reads_is_red(tmp_path: Path) -> None:
+    proc, folder, ticks = tmp_path / "proc", tmp_path / "sessions", os.sysconf("SC_CLK_TCK")
+    folder.mkdir()
+    proc.mkdir()
+    (proc / "uptime").write_text("1000.00 0.00\n")
+    old = 100 * ticks  # started 900 s ago
+    _process(proc, 101, ["claude", "--bg"], old)  # has its record
+    _process(proc, 102, ["claude", "daemon", "run"], old)
+    _process(proc, 103, ["claude", "-p", "drill"], old)
+    _process(proc, 104, ["claude", "--resume"], 999 * ticks)  # a second old: not settled yet
+    (folder / "101.json").write_text(json.dumps({"sessionId": "s-101", "pid": 101, "procStart": str(old)}))
+    assert backstop.unseen(folder, proc, os.getuid(), 60) == []
+
+    _process(proc, 105, ["/usr/local/libexec/software-factory/claude", "--bg"], old)
+
+    assert backstop.unseen(folder, proc, os.getuid(), 60) == [105]

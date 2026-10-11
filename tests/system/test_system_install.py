@@ -333,3 +333,26 @@ def test_the_install_keeps_the_operator_it_clears_and_the_uninstall_puts_it_back
     uninstall.tailnet(job.host, job.places, str(settings().get_int("dashboard.port")))
 
     assert asked[1:] == ["tailscale serve --https=443 off", "tailscale set --operator=owner"]
+
+
+@pytest.mark.parametrize(
+    ("said", "refused"),
+    [("2.1.296 (Claude Code)", ""), ("2.1.900 (Claude Code)", ""), ("2.1.10 (Claude Code)", "Your Claude Code is"),
+     ("2.2.0 (Claude Code)", "drilled with 2.1.296 up to below 2.2.0"), ("command not found", "did not say")],
+)  # fmt: skip
+def test_only_a_claude_code_the_drills_passed_with_is_installed_for_the_agents(
+    tmp_path: Path, said: str, refused: str
+) -> None:
+    job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    steps_prepare.check_machine(job)
+    steps_prepare.settle_settings(job)
+    job.tools["claude"] = claude = "/home/owner/.local/bin/claude"
+    job.host.dry = False  # decides like a real install; a dry host still changes nothing
+    job.host.answers[f"{claude} --version"] = (0, said + "\n")
+
+    if refused:
+        with pytest.raises(Refused, match=refused):
+            steps_machine.claude_version(job)
+    else:
+        steps_machine.claude_version(job)

@@ -30,7 +30,7 @@ from runtime.shared.paths import AGENT_USER, SLICE, Places
 from runtime.system import layout
 from runtime.system.drills import Ran
 from runtime.system.job import Install, refuse
-from runtime.warden import registry, session_settings
+from runtime.warden import backstop, registry, session_settings
 from runtime.warden.launch import LaunchError, Units
 
 # What the drill is, said first: a command that probes the sandbox's walls looks like an attack without it.
@@ -305,6 +305,39 @@ class RealRig:
         finally:
             shutil.rmtree(checkout, ignore_errors=True)
         return checkout, Ran(code, out)
+
+    def real_session(self, name: str, prompt: str) -> Ran:
+        request_id = f"{_DRILL_NAME}-{uuid.uuid4().hex[:12]}"
+        model, role, checkout = self.settings["install.drill"], "implementer", self.ctx.checkout()
+        written = session_settings.write(self.settings, self.places, request_id, role, checkout, layout.AGENT_HOME)
+        agents = session_settings.agents(self.settings, self.places, role, model["model"], model["effort"])
+        request = {
+            "name": name,
+            "cwd": str(checkout),
+            "worktree": "",
+            "prompt": prompt,
+            "model": model["model"],
+            "effort": model["effort"],
+            "agent": role,
+            "settings": str(written),
+            "agents": json.dumps(agents),
+        }
+        try:
+            code, out = Units(self.places, lambda: self.settings).start_waiting(request_id, request)
+        except LaunchError as exc:
+            return Ran(-1, str(exc))
+        return Ran(code, out)
+
+    def session_records(self) -> dict[str, str]:
+        found = backstop.read_processes(layout.AGENT_HOME / ".claude" / "sessions", backstop.PROC)
+        return {sid: proc.name for sid, proc in found.items()}
+
+    def stop_session(self, short_id: str) -> Ran:
+        try:
+            Units(self.places, lambda: self.settings).stop_session(short_id)
+        except LaunchError as exc:
+            return Ran(1, str(exc))
+        return Ran(0, "")
 
     def warden_command(self, argv: list[str]) -> Ran:
         """``argv`` as the agent, the way the warden runs it: its launcher, through the agent-run template unit."""

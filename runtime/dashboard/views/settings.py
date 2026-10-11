@@ -316,6 +316,8 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("install.firewall_refresh_seconds", "Load the firewall again every, seconds"),
             ("install.healthchecks_grace_minutes", "Minutes a check-in may be late"),
             ("install.toolchain", "Programs the product's scripts need"),
+            ("install.claude_lowest", "Lowest Claude Code version the drills passed with"),
+            ("install.claude_untested", "First Claude Code version not yet drilled"),
         ],
     ),
 ]

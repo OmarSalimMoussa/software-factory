@@ -8,6 +8,7 @@ left half made is made again.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER, queue_dir
@@ -24,6 +25,7 @@ _NPM_RUNTIME = (
     Path("/usr/local/lib/node_modules/@anthropic-ai/sandbox-runtime"),
 )
 _CHUNK = 1 << 20
+_VERSION = re.compile(r"^(\d+(?:\.\d+){1,3})\b")
 _APT_ENV = {"DEBIAN_FRONTEND": "noninteractive"}
 _SUBORDINATE_START, _SUBORDINATE_COUNT = 100_000, 65_536  # where useradd starts subordinate ids, and how many
 
@@ -177,8 +179,37 @@ def embeds_seccomp(binary: Path) -> bool:
     return False
 
 
+def _version(text: str) -> tuple[int, ...] | None:
+    found = _VERSION.match(text.strip())
+    return tuple(int(part) for part in found.group(1).split(".")) if found else None
+
+
+def claude_version(ctx: Install) -> None:
+    """The factory reads Claude Code's own files and output (its session records, its launch line, its transcripts),
+    which no version promises to keep: only a version the drills passed with is installed for the agents."""
+    host, settings = ctx.host, ctx.need_settings()
+    lowest, untested = settings.get_str("install.claude_lowest"), settings.get_str("install.claude_untested")
+    code, said = host.query([ctx.tool("claude"), "--version"], user=ctx.owner.name)
+    if host.dry:
+        host.say(f"Claude Code: yours must be at least {lowest} and below {untested} (a dry run does not ask)")
+        return
+    have, low, high = _version(said), _version(lowest), _version(untested)
+    if low is None or high is None:
+        raise refuse("The settings install.claude_lowest and install.claude_untested must each be a version such as "
+                     "2.1.296: fix them with --set, then install again")  # fmt: skip
+    if code != 0 or have is None:
+        raise refuse(f"Your Claude Code did not say its version ({said.strip()[:80]!r}): update it, then install again")
+    if not low <= have < high:
+        raise refuse(f"Your Claude Code is {'.'.join(map(str, have))}, and the factory is drilled with {lowest} up "
+                     f"to below {untested}: install one of those (claude install {lowest}), or, to try this one, "
+                     "install again with --set install.claude_untested=<a higher version>, and check every drill "
+                     "passes")  # fmt: skip
+    host.say(f"Claude Code {'.'.join(map(str, have))}: within the versions the drills passed with")
+
+
 def claude_binary(ctx: Install) -> None:
     host = ctx.host
+    claude_version(ctx)
     host.mkdir(layout.CLAUDE_BIN.parent, mode=0o755)
     host.run(["install", "-m", "0755", "-o", "root", "-g", "root", ctx.tool("claude"), str(layout.CLAUDE_BIN)])
     host.say(f"{host.query([str(layout.CLAUDE_BIN), '--version'])[1].strip() or 'Claude Code'} for the agents")

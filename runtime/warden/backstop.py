@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -68,7 +69,36 @@ def read_processes(folder: Path, proc: Path) -> dict[str, Proc]:
 
 
 def processes() -> dict[str, Proc]:
-    return read_processes(launch.agent_home() / ".claude" / "sessions", PROC)
+    return read_processes(sessions_folder(), PROC)
+
+
+def sessions_folder() -> Path:
+    return launch.agent_home() / ".claude" / "sessions"
+
+
+def unseen(folder: Path, proc: Path, agent_uid: int, settled: float) -> list[int]:
+    """The agent's claude processes running for at least ``settled`` seconds that no session record names: sessions
+    the warden cannot see, as when a Claude Code update moved or reshaped its records. Neither its daemon nor a
+    one-shot `claude -p` (the install's drills) writes a record, so neither counts. OSError or ValueError when /proc
+    cannot be read."""
+    named = {p.pid for p in read_processes(folder, proc).values()}
+    uptime = float((proc / "uptime").read_text().split()[0])
+    entries = [e for e in proc.iterdir() if e.name.isdigit()]
+    ticks = os.sysconf("SC_CLK_TCK")
+    found = []
+    for entry in entries:
+        try:
+            if entry.stat().st_uid != agent_uid:
+                continue
+            argv = (entry / "cmdline").read_bytes().split(b"\0")
+        except OSError:  # the process ended while it was read
+            continue
+        if not argv[0].endswith(b"claude") or argv[1:3] == [b"daemon", b"run"] or {b"-p", b"--print"} & set(argv):
+            continue
+        started = _started(proc, int(entry.name))
+        if int(entry.name) not in named and started.isdigit() and uptime - int(started) / ticks >= settled:
+            found.append(int(entry.name))
+    return sorted(found)
 
 
 def bind(sessions: dict[str, Session], procs: dict[str, Proc]) -> tuple[bool, dict[str, str]]:

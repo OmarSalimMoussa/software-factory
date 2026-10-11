@@ -46,6 +46,24 @@ class FakeRig:
     # How the warden's launcher answers a command that succeeds, then one that fails.
     warden: tuple[Ran, Ran] = (Ran(0, "true\n"), Ran(1, ""))
     check: dict[str, str] = field(default_factory=lambda: {"env": "unset", "write": "EROFS"})  # outcome by kind
+    # A real session: what `claude --bg` prints, the name its record gives it ("" for none), whether stop ends it.
+    launched: str = "backgrounded · 5e55abcd\n"
+    recorded: str | None = "tag"  # "tag": the name the drill gave it
+    stops: bool = True
+    _session: dict[str, str] = field(default_factory=dict)
+
+    def real_session(self, name: str, prompt: str) -> Ran:
+        if self.recorded is not None:
+            self._session["5e55abcd-0000-4000-8000-000000000000"] = name if self.recorded == "tag" else self.recorded
+        return Ran(0, self.launched)
+
+    def session_records(self) -> dict[str, str]:
+        return dict(self._session)
+
+    def stop_session(self, short_id: str) -> Ran:
+        if self.stops:
+            self._session.clear()
+        return Ran(0 if self.stops else 1, "" if self.stops else "claude stop: no such session")
 
     def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran:
         return Ran(1, "")
@@ -362,3 +380,22 @@ def test_the_stack_drill_needs_both_the_user_and_a_container_walled_off(plain: s
             return Ran(0, "".join(f"{t} -> {plain}\n" for t in argv[4:]))
 
     assert drills.stack_off_tailnet(Stack()).ok is ok
+
+
+@pytest.mark.parametrize(
+    ("rig", "ok", "says"),
+    [
+        ({}, True, "started 5e55abcd, recorded as drill-session-"),
+        ({"launched": "Started a session\n"}, False, "printed no 'backgrounded · <id>' line"),
+        ({"recorded": None}, False, "no record in the agent's ~/.claude/sessions names session 5e55abcd"),
+        ({"recorded": "another-name"}, False, "its record names it 'another-name'"),
+        ({"stops": False}, False, "claude stop 5e55abcd left it running"),
+    ],
+    ids=["whole", "launch-line-changed", "no-record", "name-not-recorded", "stop-fails"],
+)
+def test_the_session_drill_needs_the_launch_line_the_record_and_the_stop_the_warden_reads(
+    rig: dict[str, Any], ok: bool, says: str
+) -> None:
+    result = drills.background_session(FakeRig(**rig))
+
+    assert result.ok is ok and says in result.evidence

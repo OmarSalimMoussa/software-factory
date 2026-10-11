@@ -40,7 +40,8 @@ CHECK_UNIT = "software-check-run@{}.service"
 PENDING = "pending-"
 REDACTED = "[redacted]"
 # What `claude --bg` prints for the session it started. A resume that prints another short id started a copy.
-_BACKGROUNDED = re.compile(r"^backgrounded · ([0-9a-f]{8})\b", re.MULTILINE)
+# What `claude --bg` prints for the session it started; the install drills it on the Claude Code it installs.
+BACKGROUNDED = re.compile(r"^backgrounded · ([0-9a-f]{8})\b", re.MULTILINE)
 # A value made only of digits or a boolean word carries no secret; redacting it would erase every port and flag.
 _NOT_SECRET = re.compile(r"^(\d+|true|false|yes|no|on|off)$", re.IGNORECASE)
 # The keys the factory writes into a slot's env file that name no secret: a network, an address, an environment and a
@@ -115,6 +116,11 @@ class Units:
         done = self.run(["start", AGENT_UNIT.format(request_id)])
         if done.returncode != 0:
             raise LaunchError(f"the session did not start: {done.stderr.strip()[-300:]}")
+
+    def start_waiting(self, request_id: str, launch: dict[str, Any]) -> tuple[int, str]:
+        """A session's start, waited on: how it exited and what `claude --bg` printed (the install's drill reads it)."""
+        self._request(request_id, {"kind": "session", **launch})
+        return self._wait(AGENT_UNIT.format(request_id), request_id)
 
     def agent_command(self, argv: list[str], cwd: str) -> tuple[int, str]:
         request_id = f"cmd-{uuid.uuid4().hex}"
@@ -219,7 +225,7 @@ def resume(ctx: Context, s: Session, message: str) -> None:
     code, output = ctx.launcher.agent_command(argv, cwd)
     if code != 0:
         raise LaunchError(f"claude --resume failed: {output.strip()[-300:]}")
-    started = _BACKGROUNDED.search(output)
+    started = BACKGROUNDED.search(output)
     if started is None:
         raise LaunchError("claude --resume named no session it started")
     if not s.id.startswith(started.group(1)):

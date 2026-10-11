@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import shlex
+import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -23,11 +24,13 @@ from runtime.shared.settings import Settings
 from runtime.system import layout
 from runtime.system.drill_probe import BREACHES
 from runtime.system.steps_toolchain import python_request
+from runtime.warden.launch import BACKGROUNDED
 from standard.services import stack
 
 UNREACHABLE = "cannot be reached"  # how the factory command says it found no warden
 SANDBOX_MARK = "software-drill-sandbox-ok"
 _POLL_S = 1.0
+SESSION_PROMPT = "This is a drill. Reply with the one word ready, and do nothing else."
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +76,15 @@ class Rig(Protocol):
     def wait(self, seconds: float) -> None: ...
     def now(self) -> float: ...
     def warden_command(self, argv: list[str]) -> Ran: ...
+    def real_session(self, name: str, prompt: str) -> Ran:
+        """A session started as the warden starts one, through the agent-run unit; what `claude --bg` printed."""
+        ...
+
+    def session_records(self) -> dict[str, str]:
+        """Each live session the agent's ~/.claude/sessions records, as the backstop reads it: its id to its name."""
+        ...
+
+    def stop_session(self, short_id: str) -> Ran: ...
     def warden_check(self, probe: list[str]) -> tuple[Path, Ran]:
         """A check the warden runs, through the check-run unit, on a scratch checkout in the agent's home whose
         ``scripts/dev deps`` runs ``probe`` and fails with what it printed; that checkout and the check's report."""
@@ -242,6 +254,37 @@ def hosts_refused(rig: Rig) -> Result:
     port = rig.settings.get_int("dashboard.port")
     return _sandboxed_probe(rig, "a host off the list and the host's localhost are refused",
                             "tcp:example.com:443", f"tcp:127.0.0.1:{port}")  # fmt: skip
+
+
+def background_session(rig: Rig) -> Result:
+    """A real background session, started as the warden starts one: `claude --bg` names it, its record in the
+    agent's ~/.claude/sessions names it, and `claude stop` ends it. Each is Claude Code's own, which the warden reads
+    and no version promises to keep."""
+    name = "a background session starts, is recorded by its name, and stops, as the warden reads them"
+    tag = f"drill-session-{uuid.uuid4().hex[:8]}"
+    ran = rig.real_session(tag, SESSION_PROMPT)
+    started = BACKGROUNDED.search(ran.out)
+    if ran.code != 0 or started is None:
+        return Result(name, False, f"claude --bg printed no 'backgrounded · <id>' line (exit {ran.code}): "
+                                   f"{_first(ran.out)}")  # fmt: skip
+    short, limit = started.group(1), rig.settings.get_int("install.drill_seconds")
+    begun = rig.now()
+    found = {sid: named for sid, named in rig.session_records().items() if sid.startswith(short)}
+    while not found and rig.now() - begun <= limit:
+        rig.wait(_POLL_S)
+        found = {sid: named for sid, named in rig.session_records().items() if sid.startswith(short)}
+    if not found:
+        rig.stop_session(short)
+        return Result(name, False, f"no record in the agent's ~/.claude/sessions names session {short}")
+    [(sid, named)] = found.items()
+    stopped = rig.stop_session(short)
+    while sid in rig.session_records() and rig.now() - begun <= limit:
+        rig.wait(_POLL_S)
+    if sid in rig.session_records():
+        return Result(name, False, f"claude stop {short} left it running: {_first(stopped.out)}")
+    if named != tag:
+        return Result(name, False, f"its record names it {named!r}, not {tag}: the warden binds a start by its name")
+    return Result(name, True, f"started {short}, recorded as {tag}, stopped")
 
 
 def backstop_stops_claude(rig: Rig) -> Result:
@@ -440,6 +483,7 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
     sockets_refused,
     hosts_refused,
     backstop_stops_claude,
+    background_session,
     bubblewrap_missing,
     factory_alone,
     finished_subagent,
@@ -458,7 +502,8 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
 
 # Each starts at least one sandboxed session, which waits on a model: they run side by side.
 SESSIONS = frozenset({sandbox_runs, shell_write_other_worktree, secrets_unreadable, sockets_refused, hosts_refused,
-                      bubblewrap_missing, factory_in_sandbox, path_shadow, toolchain_answers})  # fmt: skip
+                      bubblewrap_missing, factory_in_sandbox, path_shadow, toolchain_answers,
+                      background_session})  # fmt: skip
 
 
 def _one(drill: Callable[[Rig], Result], rig: Rig) -> Result:

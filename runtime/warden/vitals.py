@@ -20,9 +20,11 @@ from typing import Any
 from runtime.shared import store
 from runtime.shared.paths import AGENT_USER, SLICE, Places
 from runtime.shared.settings import Settings
+from runtime.warden import backstop
 from runtime.warden.context import Context
 
 GREEN, AMBER, UNKNOWN, RED, MISSING = "green", "amber", "unknown", "red", "missing"
+RECORDS = "sessions"
 LEVELS = (GREEN, MISSING, AMBER, UNKNOWN, RED)  # worst last
 PROC = Path("/proc")
 POWER = Path("/sys/class/power_supply")
@@ -174,6 +176,32 @@ def firewall(stamp: Path, now: float, settings: Settings) -> Reading:
     return Reading("firewall", GREEN, "loaded")
 
 
+def records(proc: Path, agent_uid: int | None, settled: float) -> Reading:
+    """Whether every Claude session the agent runs has the record the warden sees it by. One without blinds the
+    backstop, the crash watch and the callers' roles at once, so it is red, and the crash watch waits."""
+    if agent_uid is None:
+        return Reading(RECORDS, UNKNOWN, f"there is no {AGENT_USER} user")
+    try:
+        found = backstop.unseen(backstop.sessions_folder(), proc, agent_uid, settled)
+    except (OSError, ValueError, IndexError) as exc:
+        return Reading(RECORDS, UNKNOWN, f"cannot list the agent's sessions: {type(exc).__name__}")
+    if found:
+        return Reading(RECORDS, RED, f"{len(found)} Claude sessions run with no session record (pid "
+                                     f"{', '.join(map(str, found))}): the factory cannot see them, so it resumes and "
+                                     "retires none; check the Claude Code version")  # fmt: skip
+    return Reading(RECORDS, GREEN, "every running session has its record")
+
+
+def blind(places: Places) -> bool:
+    """Whether the last vitals found sessions the warden cannot see."""
+    try:
+        snapshot = store.read_json(places.vitals)
+    except FileNotFoundError:
+        return False
+    found = [r for r in snapshot.get("readings", []) if r.get("name") == RECORDS] if isinstance(snapshot, dict) else []
+    return any(r.get("level") == RED for r in found)
+
+
 def _agent_uid() -> int | None:
     try:
         return pwd.getpwnam(AGENT_USER).pw_uid
@@ -203,6 +231,7 @@ def refresh(ctx: Context, proc: Path = PROC, supplies: Path = POWER) -> dict[str
         install(ctx.places),
         hooks(ctx.places, Path(settings.get_str("repo.path")), settings.get_int("watch.tick_seconds")),
         daemon(proc, _agent_uid()),
+        records(proc, _agent_uid(), settings.get_int("watch.start_grace_seconds")),
         firewall(ctx.places.firewall_stamp, ctx.clock.now(), settings),
     ]
     snapshot = {"at": ctx.clock.iso(), "level": worst(readings), "readings": [asdict(r) for r in readings]}

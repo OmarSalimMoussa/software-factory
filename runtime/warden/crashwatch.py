@@ -8,6 +8,7 @@ watched: a deprioritized one has no process by design, and a bench-pending or re
 hands. A crashed session is resumed up to watch.resume_tries
 times, then retired as crashed; the orchestrator is always resumed (the same session) and never retired by the watch.
 While the owner's switch of Claude accounts runs, its daemon restart is no crash: the switch brings its sessions back.
+While the vitals find Claude sessions with no record the warden reads, no session counts as crashed.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from runtime.shared.models import (
 )
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
-from runtime.warden import backstop, inbox, launch, lifecycle, loop, permits, reflections, registry
+from runtime.warden import backstop, inbox, launch, lifecycle, loop, permits, reflections, registry, vitals
 from runtime.warden.backstop import Proc
 from runtime.warden.context import Context
 from runtime.warden.launch import LaunchError
@@ -107,7 +108,8 @@ def _finished(ctx: Context, s: Session) -> bool:
 
 
 def watch(ctx: Context) -> None:
-    if permits.switching(ctx) is not None:
+    # Sessions the warden cannot see would all look crashed: it resumes and retires none until it sees them again.
+    if permits.switching(ctx) is not None or vitals.blind(ctx.places):
         return
     settings = ctx.settings()
     tries, grace = settings.get_int("watch.resume_tries"), settings.get_int("watch.start_grace_seconds")

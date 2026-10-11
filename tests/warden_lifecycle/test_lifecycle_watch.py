@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from lifecycle_fakes import World
 
+from runtime.shared import store
 from runtime.shared.models import (
     BENCH_PENDING,
     CRASHED,
@@ -106,3 +107,15 @@ def test_a_restarted_orchestrator_is_told_the_events_it_has_not_acted_on(world: 
     crashwatch.watch(world.ctx())
     resumed = next(argv for argv in world.launcher.commands if argv[:2] == ["claude", "--resume"])
     assert "Events you have not acted on yet: triage due." in resumed[-1]
+
+
+def test_while_sessions_run_unseen_the_crash_watch_resumes_and_retires_none(world: World) -> None:
+    world.queue.add("t-0001", status="building")
+    world.seat("5e550001", task="t-0001")
+    blind = {"at": NOW, "level": "red", "readings": [{"name": "sessions", "level": "red", "value": "1 unseen"}]}
+    store.write_json(world.ctx().places.vitals, blind)
+
+    for _ in range(world.settings.get_int("watch.resume_tries") + 2):
+        crashwatch.watch(world.ctx())
+
+    assert world.session("5e550001").state == WORKING and world.launcher.resumed == []

@@ -105,6 +105,13 @@ installed, the install stops and names it: run `uv python install <version>`, th
 write their tools' caches in the agent's home (`sandbox.writable_caches`), so the product's tests run inside their
 sandbox. At every install, a drill runs each tool and finds the product's Python from inside a session.
 
+The factory reads parts of Claude Code that no version promises to keep: its session records, the line `claude --bg`
+prints, its transcripts. So the install copies only a Claude Code the drills passed with (`install.claude_lowest` up
+to below `install.claude_untested`), the agents' copy never updates itself, and a drill starts, finds and stops a real
+background session as the warden does. To move to a newer Claude Code, install again with
+`--set install.claude_untested=<a higher version>` and check every drill passes. Should sessions ever run with no
+record the warden reads, the vitals turn red and the crash watch resumes and retires nothing until they are seen.
+
 ## Pause, stop, resume
 
 - **Pause the factory** (code): every session, the orchestrator included, commits its work and pauses. Nothing is
