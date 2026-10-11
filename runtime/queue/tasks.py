@@ -16,7 +16,7 @@ from runtime.queue.book import Queue, task_rel
 from runtime.queue.score import score
 from runtime.queue.statuses import OWNER, WARDEN
 from runtime.shared.models import RETIRED, Request, Task
-from runtime.shared.order import ordered
+from runtime.shared.order import Ranking, ordered
 from runtime.shared.protocol import Refused
 from runtime.warden import checks, registry
 from runtime.warden.context import Context
@@ -137,16 +137,17 @@ def set_status(ctx: Context, task_id: str, to: str, event: str, note: str) -> Ta
     return moved
 
 
-def goal_count(ctx: Context) -> int:
+def goal_ranks(ctx: Context) -> dict[str, int]:
+    """Each open goal item's rank in GOAL.md, by its name."""
     settings = ctx.settings()
     try:
         items = goal.read(Path(settings.get_str("repo.path")), settings.get_int("queue.max_upload_kib") * 1024)
     except goal.GoalError as exc:
         raise Refused("goal", f"{exc}; only a person edits GOAL.md") from exc
-    return len(items)
+    return goal.ranks(items)
 
 
-def scored(ctx: Context, queue: Queue, task: Task, goals: int) -> Task:
+def scored(ctx: Context, queue: Queue, task: Task, goals: Mapping[str, int]) -> Task:
     reqs = [queue.request(r) for r in task.requests]
     return dataclasses.replace(task, score=score(task, reqs, goals, ctx.clock.now(), ctx.settings()))
 
@@ -180,7 +181,7 @@ def new_task(ctx: Context, args: Mapping[str, Any], body: str) -> Task:
     request_ids = args.get("requests")
     if not isinstance(request_ids, list) or not request_ids or not all(isinstance(r, str) for r in request_ids):
         raise Refused("facts", "a task links at least one request: --requests r-…")
-    goals = goal_count(ctx)
+    goals = goal_ranks(ctx)
     with ctx.lock, queue.lock():
         reqs = [_waiting(queue, rid) for rid in request_ids]
         now = ctx.clock.iso()
@@ -226,7 +227,7 @@ def set_facts(ctx: Context, task_id: str, args: Mapping[str, Any]) -> Task:
     facts = facts_from(args)
     if not facts:
         raise Refused("facts", "name at least one fact to set")
-    goals = goal_count(ctx)
+    goals = goal_ranks(ctx)
     with ctx.lock, queue.lock():
         task = queue.task(task_id)
         if task.status == "closed":
@@ -264,7 +265,7 @@ def next_up(ctx: Context) -> dict[str, Any]:
             skipped.append({"task": task.id, "why": f"waits for {', '.join(waits)}"})
         else:
             ready.append(task)
-    order = proposals.read(ctx.places).approved
+    ranking = Ranking(proposals.read(ctx.places).approved, goal_ranks(ctx))
     rows = [
         {
             "task": t.id,
@@ -276,7 +277,7 @@ def next_up(ctx: Context) -> dict[str, Any]:
             "surfaces": t.surfaces,
             "slices": t.slices,
         }
-        for t in ordered(ready, order)
+        for t in ordered(ready, ranking)
     ]
     return {"next": rows, "skipped": skipped, "unreadable": [dataclasses.asdict(b) for b in broken]}
 
@@ -331,7 +332,7 @@ def _deploy_step(status: str, on_staging: bool | None, on_prod: bool | None) -> 
 def rescore(ctx: Context) -> int:
     """Score every waiting task again, as after a change to GOAL.md; how many scores changed."""
     queue = Queue.of(ctx)
-    goals = goal_count(ctx)
+    goals = goal_ranks(ctx)
     with ctx.lock, queue.lock():
         changes = {}
         for task in queue.tasks()[0]:

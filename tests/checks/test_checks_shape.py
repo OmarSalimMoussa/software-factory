@@ -42,8 +42,9 @@ def test_the_fixture_has_the_standard_shape(fixture_product: Path) -> None:
     ("damage", "said"),
     [
         (_edit("GOAL.md", "## How it speaks", "## Voice"), "GOAL.md has no '## How it speaks' heading"),
-        (_edit("GOAL.md", "- G2 People", "- G3 People"), "item 2 of the goal is numbered G3"),
-        (_edit("GOAL.md", "Done when searching", "Once searching"), "does not read '- G<n> <outcome>. Done when"),
+        (_edit("GOAL.md", "- G2 People", "- G3 People"), "GOAL.md names G3 twice"),
+        (_edit("GOAL.md", "Done when searching", "Once searching"), "G2's outcome does not read '<outcome>. Done when"),
+        (_edit("GOAL.md", "- G2 People", "- 2. People"), "does not read '- <name> <outcome>'"),
         (_edit(".gitignore", "queue/\n", ""), ".gitignore does not ignore queue/"),
         (_edit("scripts/dev", '"reports")', '"reports", "logs")'), "lists logs, which is not a standard verb"),
         (_edit("scripts/dev", '"verbs", "test",', '"verbs",'), "scripts/dev verbs does not list test"),

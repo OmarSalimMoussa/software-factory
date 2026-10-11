@@ -58,6 +58,11 @@ def approved_order(ctx: Context) -> list[str]:
     return [str(t) for t in approved]
 
 
+def ranking(ctx: Context) -> order.Ranking:
+    """What the one order reads: the owner's order among approved runs and the goal items' ranks."""
+    return order.Ranking(approved_order(ctx), tasks.goal_ranks(ctx))
+
+
 def vitals_level(ctx: Context) -> str:
     try:
         raw = store.read_json(ctx.places.vitals)
@@ -129,7 +134,7 @@ def cap_full(settings: Settings, sessions: Iterable[Session], role: str) -> bool
 
 def check_revive_order(ctx: Context, sessions: dict[str, Session], role: str, task: Task, skip: str = "") -> None:
     """Deprioritized sessions come back before new runs they outrank, and among themselves in the one order."""
-    approved = approved_order(ctx)
+    approved = ranking(ctx)
     for other in sessions.values():
         if other.id == skip or other.role != role or other.state != DEPRIORITIZED or other.parent:
             continue
@@ -216,7 +221,7 @@ def needed_role(ctx: Context, task_id: str) -> str:
 def benchable(ctx: Context, sessions: dict[str, Session], role: str, for_task: str) -> list[Session]:
     """The sessions a bench for ``for_task`` may push out, in the order to push them: waiting before working, then
     lowest-ranked first. Never one in its merge turn, and only one the new task outranks."""
-    new, approved = read_task(ctx, for_task), approved_order(ctx)
+    new, approved = read_task(ctx, for_task), ranking(ctx)
     found = [(s, read_task(ctx, s.task)) for s in registry.seated(sessions.values(), role)
              if s.state in (WORKING, WAITING) and not s.merge_turn and s.task != for_task]  # fmt: skip
     found = [(s, t) for s, t in found if order.outranks(new, t, approved)]
@@ -227,7 +232,7 @@ def benchable(ctx: Context, sessions: dict[str, Session], role: str, for_task: s
 
 def in_order(ctx: Context, sessions: list[Session]) -> list[Session]:
     """The orchestrator first, then the rest in their tasks' one order."""
-    approved = approved_order(ctx)
+    approved = ranking(ctx)
     ranked = sorted((s for s in sessions if s.task), key=lambda s: order.rank(read_task(ctx, s.task), approved))
     return [s for s in sessions if not s.task] + ranked
 

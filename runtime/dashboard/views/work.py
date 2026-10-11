@@ -23,7 +23,7 @@ from runtime.dashboard.views.shell import prod_runs_staging
 from runtime.queue.formats import outcome_task
 from runtime.shared import order
 
-WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "factory", "probes")
+WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "factory", "probes", "goal")
 TABS = (("tasks", "Tasks"), ("requests", "Requests"), ("parked", "Parked"), ("checks", "Checks"))
 INBOXES = (("all", "All inboxes"), ("agents", "Agents"), ("owner", "You"), ("users", "Users"))
 OUTCOMES = [["all", "Any outcome"], ["waiting", "Waiting"], ["task", "Task"], ["noise", "Noise"], ["parked", "Parked"]]
@@ -81,10 +81,12 @@ def groups(snap: Snap) -> list[dict[str, Any]]:
     approved = [t for t in found["approved"] if t in tasks and tasks[t]["status"] == "approved"]
     proposed = [t for t in found["open"] if t and t in tasks and tasks[t]["status"] == "proposed"]
     model_tasks = {t.id: t for t in (taskwords.as_task(raw) for raw in tasks.values())}
+    goals = {i["id"]: i["rank"] for i in snap.get("goal")["items"] if i["rank"] is not None}
+    ranking = order.Ranking(found["approved"], goals)
 
     def ranked(states: tuple[str, ...]) -> list[dict[str, Any]]:
         chosen = [model_tasks[i] for i, t in tasks.items() if t["status"] in states]
-        return [tasks[t.id] for t in order.ordered(chosen, found["approved"])]
+        return [tasks[t.id] for t in order.ordered(chosen, ranking)]
 
     rows: dict[str, list[dict[str, Any]]] = {
         "progress": [_row(snap, t, None, None, []) for t in ranked(taskwords.IN_PROGRESS)],

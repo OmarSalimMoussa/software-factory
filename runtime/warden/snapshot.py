@@ -353,7 +353,7 @@ def _goal(ctx: Context, args: dict[str, Any]) -> Any:
     except (goal.GoalError, OSError, UnicodeDecodeError) as exc:
         raise Refused("goal", f"{goal.GOAL_FILE} cannot be read: {exc}") from exc
     return {
-        "items": [{"id": i.id, "text": i.text} for i in items],
+        "items": [{"id": i.id, "text": i.text, "done": i.done, "rank": i.rank} for i in items],
         "text": raw.decode(),
         "changed": (repo / goal.GOAL_FILE).stat().st_mtime,
     }

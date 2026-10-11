@@ -26,7 +26,6 @@ from runtime.queue.formats import FormatError
 from runtime.queue.score import score
 from runtime.shared import store
 from runtime.shared.models import Request, Task
-from runtime.shared.order import goal_rank
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
 
@@ -112,7 +111,7 @@ def apply(ctx: Context, data: bytes | None) -> dict[str, Any]:
         except FileNotFoundError as exc:
             raise Refused("triage-plan", "triage saved no plan: it runs factory triage plan --body <file>") from exc
     plan = _plan(data, settings.get_int("queue.max_upload_kib"))
-    goals = tasks.goal_count(ctx)
+    goals = tasks.goal_ranks(ctx)
     queue = Queue.of(ctx)
     with ctx.lock, queue.lock():
         problems: list[str] = []
@@ -200,7 +199,13 @@ def _outcomes(
 
 
 def _new_task(
-    queue: Queue, n: int, spec: object, goals: int, existing: Mapping[str, Task], now: str, problems: list[str]
+    queue: Queue,
+    n: int,
+    spec: object,
+    goals: Mapping[str, int],
+    existing: Mapping[str, Task],
+    now: str,
+    problems: list[str],
 ) -> Task | None:
     where = f"new task {n + 1}"
     if not isinstance(spec, dict) or set(spec) != NEW_TASK_KEYS:
@@ -226,8 +231,8 @@ def _new_task(
         body=spec["body"].strip(),
     )
     task = dataclasses.replace(task, **facts)
-    if task.goal_item and goal_rank(task.goal_item) > goals:
-        problems.append(f"{where} names {task.goal_item}, which GOAL.md does not list")
+    if task.goal_item and task.goal_item not in goals:
+        problems.append(f"{where} names {task.goal_item}, which is no open item of GOAL.md")
     problems += [f"{where} waits for {a}, which does not exist" for a in task.after if a not in existing]
     try:
         formats.parse_task(formats.dump_task(dataclasses.replace(task, id="t-0000", status="queued")))
@@ -247,7 +252,7 @@ def _changes(
     parked: Mapping[str, str],
     existing: Mapping[str, Task],
     boosted: Mapping[str, str],
-    goals: int,
+    goals: Mapping[str, int],
     now: str,
 ) -> tuple[dict[str, str], list[Task]]:
     changes: dict[str, str] = {}

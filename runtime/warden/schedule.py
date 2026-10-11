@@ -61,7 +61,8 @@ def _candidates(ctx: Context, sessions: dict[str, Session], role: str) -> list[t
         task = permits.read_task(ctx, task_id)
         if task.status in ("approved", "building") and permits.needed_role(ctx, task_id) == role:
             found.append((task, None))
-    return sorted(found, key=lambda pair: order.rank(pair[0], approved))
+    ranking = permits.ranking(ctx)
+    return sorted(found, key=lambda pair: order.rank(pair[0], ranking))
 
 
 def _role(ctx: Context, role: str, waiting: dict[str, str]) -> None:

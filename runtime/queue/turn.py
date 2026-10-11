@@ -94,7 +94,7 @@ def next_turn(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
              and all(a in by_id and by_id[a].status in tasks.LANDED for a in t.after)]  # fmt: skip
     if not ready:
         return ok(task=None, message="no qa-clean task is ready for its merge turn")
-    task = order.ordered(ready, permits.approved_order(ctx))[0]
+    task = order.ordered(ready, permits.ranking(ctx))[0]
     moved = tasks.move(ctx, task.id, TURN, "turn", statuses.ORCH, "the next merge turn")
     _tell(ctx, moved, GIVEN.format(default=ctx.settings().get_str("repo.default_branch")))
     return ok(task=moved.id, branch=moved.branch, message=f"{moved.id} has the merge turn; its implementer was told")

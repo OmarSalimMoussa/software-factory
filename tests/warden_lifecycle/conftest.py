@@ -18,6 +18,12 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> World:
     places = Places.under(tmp_path)
     repo = tmp_path / "repo"
     repo.mkdir()
+    goal = [
+        "- G1 Sign in works. Done when it does.",
+        "- G2 Pages load. Done when they do.",
+        "- G3 Export. Done when it is.",
+    ]
+    (repo / "GOAL.md").write_text("# Goal\n\n## The goal\n\n" + "\n".join(goal) + "\n")
     defaults = tomllib.loads((ROOT / "settings.toml").read_text())
     overrides = {"repo.path": str(repo), "repo.github": "acme/product", "caps.implementers": 1, "caps.designers": 1}
     procs: dict[str, Proc] = {}

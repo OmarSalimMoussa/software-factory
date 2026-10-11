@@ -1,8 +1,8 @@
 """Repo shape: the one shape every product takes, so the factory needs no per-product configuration.
 
-GOAL.md with its four headings and a ranked G1..Gn checklist; ``queue/`` ignored by git and never tracked;
-``qa/scenarios/``; ``check-values/`` holding only files named for what they feed; and an executable ``scripts/dev``
-with the fixed verbs, which ``scripts/dev verbs`` lists.
+GOAL.md with its four headings and its goal items, each a stable name and an outcome, read by the warden's own
+parser; ``queue/`` ignored by git and never tracked; ``qa/scenarios/``; ``check-values/`` holding only files named for
+what they feed; and an executable ``scripts/dev`` with the fixed verbs, which ``scripts/dev verbs`` lists.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from typing import Any
 
 from checks.runner import catalog
 from checks.runner.repo import GitError, Repo
+from runtime.queue import goal
 
 ID = "repo-shape"
 RULE = "The repo has the standard shape: files, headings, verbs, queue/ ignored"
@@ -23,7 +24,7 @@ VALUES = None
 HEADINGS = ("Who it is for", "The goal", "How it looks and feels", "How it speaks")
 VERBS = ("up", "down", "empty", "health", "sign-in", "seed", "desktop", "verbs", "test")
 OPTIONAL_VERBS = ("reports", "deps")
-_ITEM_RE = re.compile(r"^- G(\d+) \S.*\. Done when \S.*\.$")
+_DONE_WHEN = re.compile(r"^\S.*\. Done when \S.*\.$")
 
 
 def goal_problems(repo: Repo) -> list[str]:
@@ -35,17 +36,12 @@ def goal_problems(repo: Repo) -> list[str]:
     out += [f"GOAL.md has '## {h}' {found.count(h)} times" for h in HEADINGS if found.count(h) > 1]
     if "The goal" not in found:
         return out
-    section = re.split(r"^## .*$", text.split("## The goal", 1)[1], maxsplit=1, flags=re.M)[0]
-    items = [line.rstrip() for line in section.splitlines() if line.startswith("- ")]
-    if not items:
-        out.append("GOAL.md: '## The goal' has no checklist: each item reads '- G<n> <outcome>. Done when <check>.'")
-    for n, line in enumerate(items, 1):
-        match = _ITEM_RE.match(line)
-        if match is None:
-            out.append(f"GOAL.md: {line!r} does not read '- G<n> <outcome>. Done when <check>.'")
-        elif int(match.group(1)) != n:
-            out.append(f"GOAL.md: item {n} of the goal is numbered G{match.group(1)}: number them G1, G2, ... in rank")
-    return out
+    try:
+        items = goal.parse(text)
+    except goal.GoalError as exc:
+        return [*out, *exc.problems]
+    return out + [f"GOAL.md: {i.id}'s outcome does not read '<outcome>. Done when <check>.'" for i in items
+                  if not _DONE_WHEN.match(i.text)]  # fmt: skip
 
 
 def queue_problems(repo: Repo) -> list[str]:

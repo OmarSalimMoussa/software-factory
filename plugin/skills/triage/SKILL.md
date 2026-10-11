@@ -29,7 +29,7 @@ Group the batch into clusters: requests about the same thing. Then give every re
 | **Noise** | A misunderstanding, a test, spam, nothing to act on; with a one-line reason |
 | **Parked** | Real, but it serves no goal item now, or is too small to matter; with a one-line reason |
 
-Each new task has a short title in your words, the goal item it serves (`G<n>`), a severity (`severe`, `major` or
+Each new task has a short title in your words, the goal item it serves (its name in `GOAL.md`, such as `G-build-sop`; never one checked done), a severity (`severe`, `major` or
 `minor`), the surfaces you expect it to touch (`ui`, `api`, `access`, `desktop`, `none`), the requests it gathers,
 and a body: what is wrong or wanted, and how to know it is done. The cause, slices and owner class come later, from
 an intake pass on each new task, unless a request already makes them plain. The order is computed from severity,

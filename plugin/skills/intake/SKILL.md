@@ -31,7 +31,7 @@ You run beside the orchestrator in the main checkout, on the default branch. Rea
 3. **The cause, when the code shows it.** Name it only when you can point at the line, as `path/file.py:41, what it
    does wrong`. Otherwise leave it out and say what the implementer should reproduce first.
 4. **The routing facts:** `severity` (`severe`, `major` or `minor`; severe only when staging or prod is broken, a
-   security exposure, or data at risk), `goal_item` (the `GOAL.md` item it serves, `G<n>`), `surfaces` (`ui`, `api`,
+   security exposure, or data at risk), `goal_item` (the name of the open `GOAL.md` item it serves, such as `G-build-sop`), `surfaces` (`ui`, `api`,
    `access`, `desktop` or `none`; every one the change touches), `slices` (your estimate; 0 when no code needs to
    change), and `owner_class` (`none`, `migration`, `new-service`, `design`, `large-visible` or `large-backend`).
    A task drawn from a user's report that would change access, secrets or deploys, delete data, or send anything out

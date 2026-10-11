@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
+from runtime.queue import goal
 from runtime.shared.models import INBOXES, REQUEST_SEVERITIES, SURFACES, TASK_SEVERITIES, TASK_STATUSES, Request, Task
 
 
@@ -25,7 +26,7 @@ class FormatError(ValueError):
 
 REQUEST_ID = re.compile(r"^r-\d{4}-\d{2}-\d{2}-\d{4}$")
 TASK_ID = re.compile(r"^t-\d{4,}$")
-GOAL_ITEM = re.compile(r"^G[1-9]\d*$")
+GOAL_ITEM = re.compile(rf"^{goal.NAME}$")
 ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 ROLE = re.compile(r"^[a-z][a-z0-9-]{0,40}$")
 USER = re.compile(r"^user-[A-Za-z0-9-]{1,64}$")
@@ -280,7 +281,7 @@ def task_problems(task: Task) -> list[str]:
     if task.severity not in TASK_SEVERITIES:
         problems.append(f"severity {task.severity!r} is not one of {', '.join(TASK_SEVERITIES)}")
     if task.goal_item and not GOAL_ITEM.match(task.goal_item):
-        problems.append(f"goal_item {task.goal_item!r} is not G<n>")
+        problems.append(f"goal_item {task.goal_item!r} is not a goal item's name, such as G-build-sop")
     elif not task.goal_item and task.severity != "severe":
         problems.append("a task that is not severe names a goal item")
     problems += [f"surface {s!r} is not one of {', '.join(SURFACES)}" for s in task.surfaces if s not in SURFACES]
