@@ -94,19 +94,38 @@ def power(supplies: Path, settings: Settings) -> Reading:
     return Reading("power", level, f"on battery, {battery}%")
 
 
+def _files(root: Path) -> list[Path]:
+    return sorted(p for p in root.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
+
+
 def install_digest(root: Path) -> str:
     """The hash the installer records and the warden checks: every file's path and bytes, in order."""
     digest = hashlib.sha256()
-    for path in sorted(p for p in root.rglob("*") if p.is_file() and "__pycache__" not in p.parts):
+    for path in _files(root):
         digest.update(str(path.relative_to(root)).encode() + b"\0")
         digest.update(path.read_bytes())
     return digest.hexdigest()
 
 
+# The install's file stamps and the hash they were read at, by install folder: the hash is read again only when a
+# file's inode, size or change time moved, not every tick.
+_HASHED: dict[str, tuple[str, str]] = {}
+
+
+def _hash_when_changed(root: Path) -> str:
+    stamps = [(str(p), st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns) for p in _files(root)
+              for st in (p.stat(),)]  # fmt: skip
+    stamp = hashlib.sha256(repr(stamps).encode()).hexdigest()
+    seen = _HASHED.get(str(root))
+    if seen is None or seen[0] != stamp:
+        seen = _HASHED[str(root)] = (stamp, install_digest(root))
+    return seen[1]
+
+
 def install(places: Places) -> Reading:
     try:
         recorded = places.install_hash.read_text().strip()
-        actual = install_digest(places.install)
+        actual = _hash_when_changed(places.install)
     except OSError as exc:
         return Reading("install", UNKNOWN, f"cannot check the install: {type(exc).__name__}")
     if actual != recorded:

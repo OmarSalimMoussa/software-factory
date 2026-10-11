@@ -21,6 +21,11 @@ ROOT = Path(__file__).resolve().parents[2]
 REMOTE = "git@github.com:acme/product.git"
 
 
+def at_once(work: Callable[[], None]) -> None:
+    """Settles the sessions pass's benches at once, so a test reads the result as the pass returns."""
+    work()
+
+
 class FakeClock(Clock):
     def __init__(self) -> None:
         self.at = datetime(2026, 10, 9, 12, 0, tzinfo=UTC).timestamp()

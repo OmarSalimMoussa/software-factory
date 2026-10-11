@@ -10,6 +10,7 @@ from queue_kit import World
 
 from runtime.queue import format_check, formats, records
 from runtime.queue.book import request_rel, task_rel
+from runtime.queue.files import QueueFiles
 from runtime.queue.formats import FormatError
 from runtime.shared.models import Request, Task
 
@@ -105,3 +106,20 @@ def test_the_sweep_files_one_request_per_failing_file_and_content(world: World) 
     assert len(format_check.sweep(world.ctx())) == 1
     filed = world.queue().request(first[0])
     assert (filed.inbox, filed.from_role, filed.where) == ("agents", "warden", "queue/tasks/t-0042.md")
+
+
+def test_the_sweep_reads_nothing_while_the_queue_is_unchanged_and_a_rewrite_is_read_again(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world.write_raw("tasks/t-0042.md", "not a task")
+    format_check.sweep(world.ctx())
+    world.queue().blobs()  # the request the sweep filed is read once, like any write
+    reads: list[str] = []
+    real = QueueFiles.read
+    monkeypatch.setattr(QueueFiles, "read", lambda self, rel: reads.append(rel) or real(self, rel))
+
+    assert format_check.sweep(world.ctx()) == [] and reads == []
+
+    world.queue().files.write("tasks/t-0042.md", b"still not a task")
+    assert world.queue().blobs()["tasks/t-0042.md"] == b"still not a task"
+    assert reads == ["tasks/t-0042.md"]

@@ -15,6 +15,7 @@ import socket
 import threading
 import time
 from collections.abc import Callable, MutableMapping, Sequence
+from functools import partial
 from pathlib import Path
 
 from runtime.shared import error_reports, store
@@ -78,10 +79,7 @@ class FreshSettings:
 
 def run_passes(ctx: Context, passes: Sequence[tuple[str, Pass]]) -> None:
     for name, run in passes:
-        try:
-            run(ctx)
-        except Exception as exc:
-            log.exception("warden: the %s pass failed (%s)", name, type(exc).__name__)
+        loop.run_once(ctx, f"the {name} pass", partial(run, ctx))
 
 
 def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> list[tuple[str, Pass]]:
@@ -89,7 +87,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
     reaper, nightly = reap.Reaper(), gc.Nightly()
     return [
         ("loop", loop.run_tick),
-        ("sessions", crashwatch.watch_sessions),
+        ("sessions", crashwatch.SessionsWatch().run_pass),
         ("schedule", schedule.run_pass),
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),
         ("plan", watch.run_pass),

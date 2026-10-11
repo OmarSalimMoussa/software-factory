@@ -9,7 +9,7 @@ import stat
 from typing import Any, cast
 
 import pytest
-from lifecycle_fakes import World
+from lifecycle_fakes import World, at_once
 
 from runtime.shared import claude_accounts, protocol
 from runtime.shared.models import DEPRIORITIZED, RETIRED, WAITING, WITH_PARENT, WORKING
@@ -136,7 +136,7 @@ def test_a_switch_restarts_the_daemon_and_brings_each_working_session_back_witho
 
     def meanwhile() -> None:
         """A tick of the session watch, a start and a second switch, while the daemon restarts."""
-        crashwatch.watch_sessions(world.ctx())
+        crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
         for name, act in (("start", lambda: lifecycle.start(world.ctx(), {"role": "implementer", "task": "t-0004"},
                                                             None)),
                           ("switch", lambda: accounts.use(world.owner(), {"name": "main"}, None))):  # fmt: skip

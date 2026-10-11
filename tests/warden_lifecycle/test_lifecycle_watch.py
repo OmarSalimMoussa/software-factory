@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import threading
+
 import pytest
-from lifecycle_fakes import World
+from lifecycle_fakes import World, at_once
 
 from runtime.shared import store
 from runtime.shared.models import (
@@ -17,6 +19,7 @@ from runtime.shared.models import (
 )
 from runtime.warden import backstop, crashwatch, inbox, lifecycle, permits
 from runtime.warden.backstop import Proc
+from runtime.warden.launch import LaunchError
 
 NOW = "2026-10-09T12:00:00Z"
 
@@ -26,7 +29,7 @@ def test_the_crash_watch_never_reads_a_session_out_of_its_place_as_crashed(world
     world.queue.add("t-0001", status="deprioritized")
     world.seat("5e550001", task="t-0001", state=state, since=NOW)
     for _ in range(3):
-        crashwatch.watch_sessions(world.ctx())
+        crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
     assert world.session("5e550001").state == state
     assert world.launcher.resumed == [] and world.launcher.stopped == []
 
@@ -92,12 +95,12 @@ def test_a_silent_orchestrator_is_restarted_as_the_same_session(world: World) ->
     world.run("0c0c0c0c")
     quiet = world.settings.get_int("watch.orchestrator_busy_silent_minutes") * 60
     world.later(quiet - 1)
-    crashwatch.watch_sessions(world.ctx())
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
     assert world.launcher.resumed == []
     world.later(1)
-    crashwatch.watch_sessions(world.ctx())
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
     world.later(world.settings.get_int("watch.tick_seconds"))
-    crashwatch.watch_sessions(world.ctx())
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
     assert world.launcher.stopped == ["0c0c0c0c"] and world.launcher.resumed == ["0c0c0c0c"]
     assert world.session("0c0c0c0c").state == WORKING
 
@@ -171,3 +174,38 @@ def test_a_crash_waits_longer_each_time_and_one_long_after_the_last_counts_afres
     crash()  # two crashes are the limit, but this one comes long after them
     s = world.session("5e550001")
     assert (s.state, s.resume_tries, world.launcher.resumed.count("5e550001")) == (WORKING, 1, 3)
+
+
+def test_a_slow_bench_settles_beside_the_pass_and_no_second_one_starts_meanwhile(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    started, done, runs = threading.Event(), threading.Event(), []
+
+    def slow(ctx: object, procs: object) -> None:  # a slot's scripts/dev down that takes long
+        runs.append(1)
+        started.set()
+        done.wait(10)
+
+    monkeypatch.setattr(crashwatch, "finish_benches", slow)
+    watcher = crashwatch.SessionsWatch()
+    watcher.run_pass(world.ctx())
+    assert started.wait(10)
+    watcher.run_pass(world.ctx())  # returns at once, though the first bench still runs
+
+    assert runs == [1]
+    done.set()
+
+
+def test_a_session_the_warden_is_launching_is_never_launched_a_second_time(world: World) -> None:
+    world.queue.add("t-0001", status="building")
+    world.seat("5e550001", task="t-0001")
+    with world.ctx().lock:
+        assert lifecycle.claim_launch(world.ctx(), "5e550001")
+    try:
+        crashwatch.watch(world.ctx())
+        with pytest.raises(LaunchError, match="bringing implementer-5e550001 back right now"):
+            lifecycle.deliver(world.owner(), "5e550001", "Carry on.", "owner")
+    finally:
+        lifecycle.release_launch(world.ctx(), "5e550001")
+
+    assert world.launcher.resumed == []

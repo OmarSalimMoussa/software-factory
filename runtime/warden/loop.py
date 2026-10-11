@@ -105,11 +105,28 @@ def run_tick(
         ("CI watch", lambda: ci_watch.poll(ctx)),
     ]
     for name, step in steps:
-        try:
-            step()
-        # telemetry: last-resort — the step's failure is logged with its trace, and the tick goes on
-        except Exception as exc:
-            log.exception("warden: the tick's %s step failed (%s)", name, type(exc).__name__)
+        run_once(ctx, f"the tick's {name} step", step)
+
+
+# Each step's or pass's current failure, by the warden's state folder and its name.
+_FAILING: dict[tuple[str, str], str] = {}
+
+
+def run_once(ctx: Context, what: str, work: Callable[[], object]) -> None:
+    """Run ``work``; a failure is logged with its trace when it begins or changes, not again each time it repeats
+    (a missing GOAL.md fails every tick), and its end is logged too. The caller goes on either way."""
+    key = (str(ctx.places.state), what)
+    try:
+        work()
+    # telemetry: last-resort — the failure is logged with its trace, once while it lasts, and the caller goes on
+    except Exception as exc:
+        said = f"{type(exc).__name__}: {exc}"[:300]
+        if _FAILING.get(key) != said:
+            log.exception("warden: %s failed (%s)", what, type(exc).__name__)
+        _FAILING[key] = said
+    else:
+        if _FAILING.pop(key, None) is not None:
+            log.info("warden: %s works again", what)
 
 
 def _probes(ctx: Context, fetch: probes.Fetch, now: float) -> None:

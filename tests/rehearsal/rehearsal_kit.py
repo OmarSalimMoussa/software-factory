@@ -19,6 +19,7 @@ import subprocess
 import sys
 import threading
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -116,6 +117,11 @@ class FakeGitHub:
 
     def reachable(self) -> bool:
         return True
+
+
+def at_once(work: Callable[[], None]) -> None:
+    """Settles the sessions pass's benches at once, so a test reads the result as the pass returns."""
+    work()
 
 
 @dataclass
@@ -276,7 +282,7 @@ class Rehearsal:
             git(self.repo, "worktree", "add", "-q", "-b", f"worktree-{raw['worktree']}", str(where), "master")
         session_id = str(uuid.uuid4())  # `claude --bg` picks the id itself
         self.pids[session_id] = self.kernel.run_session(session_id, name)
-        crashwatch.watch_sessions(self.warden())
+        crashwatch.SessionsWatch(start=at_once).run_pass(self.warden())
         return session_id
 
     def health(self, staging: str, prod: str) -> Any:

@@ -26,6 +26,8 @@ LOCK = ".lock"
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 _READ_FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK
+# Each queue file's bytes as last read, by checkout and path, with the stamp they were read at (QueueFiles.stamps).
+_READ: dict[tuple[str, str], tuple[tuple[int, int, int], bytes]] = {}
 
 
 def _unsafe(reason: str) -> Refused:
@@ -163,6 +165,33 @@ class QueueFiles:
             finally:
                 os.close(fd)
 
+    def stamps(self, sub: str) -> dict[str, tuple[int, int, int]]:
+        """Each item in a queue folder with its inode, size and change time, sorted: what says a file changed without
+        reading it (a write renames a new file in; an append grows it)."""
+        with self._root() as root:
+            try:
+                fd = self._walk(root, _parts(sub), create=False)
+            except FileNotFoundError:
+                return {}
+            try:
+                found = {}
+                for name in sorted(n for n in os.listdir(fd) if NAME.match(n)):
+                    with suppress(FileNotFoundError):  # gone between the listing and its stat
+                        st = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                        found[name] = (st.st_ino, st.st_size, st.st_mtime_ns)
+                return found
+            finally:
+                os.close(fd)
+
+    def read_stamped(self, rel: str, stamp: tuple[int, int, int]) -> bytes:
+        """``rel``'s bytes, read again only when ``stamp`` (from ``stamps``) differs from the one they were last read
+        at. Every write here forgets what it replaced, so a quick rewrite is never served from memory."""
+        key = (str(self.repo), rel)
+        seen = _READ.get(key)
+        if seen is None or seen[0] != stamp:
+            seen = _READ[key] = (stamp, self.read(rel))
+        return seen[1]
+
     def write(self, rel: str, data: bytes) -> None:
         self.write_many({rel: data})
 
@@ -195,6 +224,8 @@ class QueueFiles:
                 for dir_fd, tmp, name in staged:
                     os.rename(tmp, name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
                 staged.clear()
+                for rel in files:
+                    _READ.pop((str(self.repo), rel), None)
                 for dir_fd in dirs.values():
                     os.fsync(dir_fd)
             finally:
@@ -235,6 +266,7 @@ class QueueFiles:
                         raise _unsafe(f"queue/{rel} is not a regular file")
                     os.write(fd, line if line.endswith(b"\n") else line + b"\n")
                     os.fsync(fd)
+                    _READ.pop((str(self.repo), rel), None)
                 finally:
                     os.close(fd)
             finally:

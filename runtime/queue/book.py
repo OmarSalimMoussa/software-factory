@@ -61,15 +61,16 @@ class Queue:
         with self.files.lock():
             yield
 
-    def blobs(self) -> dict[str, bytes]:
-        """Every request, task, task log, spec and check, by its path under queue/."""
-        found: dict[str, bytes] = {}
+    def stamps(self) -> dict[str, tuple[int, int, int]]:
+        """Every request, task, task log, spec and check, by its path under queue/, with what says it changed."""
         folders = [f"requests/{inbox}" for inbox in INBOXES] + ["tasks", "specs", "checks"]
-        for folder in folders:
-            for name in self.files.names(folder):
-                if name.endswith((".md", LOG_SUFFIX)):
-                    found[f"{folder}/{name}"] = self.files.read(f"{folder}/{name}")
-        return found
+        return {f"{folder}/{name}": stamp for folder in folders for name, stamp in self.files.stamps(folder).items()
+                if name.endswith((".md", LOG_SUFFIX))}  # fmt: skip
+
+    def blobs(self) -> dict[str, bytes]:
+        """Every request, task, task log, spec and check, by its path under queue/. Only a file that changed since the
+        warden last read it is read again: the queue only grows, and every write checks all of it."""
+        return {rel: self.files.read_stamped(rel, stamp) for rel, stamp in self.stamps().items()}
 
     def requests(self) -> tuple[list[Request], list[Broken]]:
         good: list[Request] = []

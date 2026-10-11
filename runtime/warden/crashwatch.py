@@ -1,6 +1,6 @@
-"""The watch over sessions, once a tick: bind and backstop, finish the benches whose grace has passed, retire each
-session whose task moved past its part, resume or retire each working or waiting session whose process is gone, and
-restart an orchestrator whose loop went silent.
+"""The watch over sessions, once a tick: bind and backstop, finish the benches whose grace has passed (in a thread of
+their own), retire each session whose task moved past its part, resume or retire each working or waiting session
+whose process is gone, and restart an orchestrator whose loop went silent.
 
 A finished implementer or designer is retired at once, its process stopped and its slot reaped, though a background
 session stays alive when idle: its place and slot are free for the next run. Only working and waiting sessions are
@@ -16,6 +16,8 @@ While the vitals find Claude sessions with no record the warden reads, no sessio
 from __future__ import annotations
 
 import logging
+import threading
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -56,13 +58,28 @@ def _age(ctx: Context, since: str) -> float:
     return ctx.clock.now() - datetime.fromisoformat(since).timestamp()
 
 
-def watch_sessions(ctx: Context) -> None:
-    """The loop calls this once a tick."""
-    procs = backstop.processes()
-    backstop.sweep(ctx, procs)
-    finish_benches(ctx, procs)
-    watch(ctx)
-    watch_orchestrator(ctx)
+def _in_thread(work: Callable[[], None]) -> threading.Thread:
+    thread = threading.Thread(target=work, name="benches", daemon=True)
+    thread.start()
+    return thread
+
+
+class SessionsWatch:
+    """The sessions pass, once a tick. Benches settle in a thread of their own, as reaps do: emptying a slot runs the
+    product's scripts for up to slots.verb_minutes, and probes, outages and check-ins must not wait on it. ``start``
+    runs the settling (a test passes one that runs it at once)."""
+
+    def __init__(self, start: Callable[[Callable[[], None]], threading.Thread | None] = _in_thread) -> None:
+        self._start = start
+        self._benches: threading.Thread | None = None
+
+    def run_pass(self, ctx: Context) -> None:
+        procs = backstop.processes()
+        backstop.sweep(ctx, procs)
+        if self._benches is None or not self._benches.is_alive():
+            self._benches = self._start(lambda: finish_benches(ctx, procs))
+        watch(ctx)
+        watch_orchestrator(ctx)
 
 
 def finish_benches(ctx: Context, procs: dict[str, Proc]) -> None:
@@ -142,11 +159,12 @@ def watch(ctx: Context) -> None:
     watched = [s.id for s in lifecycle.read(ctx).values() if s.state in (WORKING, WAITING) and not s.parent]
     for sid in watched:
         retired: list[Session] = []
+        relaunch: tuple[Session, bool] | None = None
         with ctx.lock:
             sessions = lifecycle.read(ctx)
             s = sessions.get(sid)
             # Read again under the lock: a wake or a revive may have changed it since the list above.
-            if s is None or s.state not in (WORKING, WAITING):
+            if s is None or s.state not in (WORKING, WAITING) or lifecycle.launching(sid):
                 continue
             if s.role != ORCH and _finished(ctx, s):
                 why = "finished: its task moved past its part"
@@ -159,8 +177,7 @@ def watch(ctx: Context) -> None:
                 why = f"its session never appeared within {grace} s of its start"
                 retired = lifecycle.retire(ctx, registry.subtree(sessions, sid), s, CRASHED, WARDEN, why)
             elif restarted:
-                _resume(ctx, s, counted=False)
-                continue
+                relaunch = (s, False) if lifecycle.claim_launch(ctx, sid) else None
             else:
                 last = formats.epoch(s.crashed_at) if s.crashed_at else None
                 if last is not None and now - last > window:
@@ -174,16 +191,20 @@ def watch(ctx: Context) -> None:
                 if s.role == ORCH or s.resume_tries < tries:
                     s.resume_tries += 1  # a resume never resets it: one that keeps dying is retired
                     s.crashed_at = ctx.clock.iso()
-                    registry.write(ctx.places, sessions)
-                    _resume(ctx, s, counted=True)
+                    relaunch = (s, True) if lifecycle.claim_launch(ctx, sid) else None
                     if s.role == ORCH and s.resume_tries == tries:
                         reflections.incident(ctx, f"The orchestrator's process ended {tries} times within "
                                                   f"{window // 60} min; the warden keeps resuming it, waiting longer "
                                                   "each time. Check its Claude account's sign-in.")  # fmt: skip
-                    continue
-                why = f"its process ended and {tries} resumes within {window // 60} min did not keep it running"
-                retired = lifecycle.retire(ctx, registry.subtree(sessions, sid), s, CRASHED, WARDEN, why)
+                else:
+                    why = f"its process ended and {tries} resumes within {window // 60} min did not keep it running"
+                    retired = lifecycle.retire(ctx, registry.subtree(sessions, sid), s, CRASHED, WARDEN, why)
             registry.write(ctx.places, sessions)
+        if relaunch is not None:
+            _resume(ctx, *relaunch)
+            continue
+        if not retired:
+            continue
         lifecycle.after_retire(ctx, retired)
         if retired[0].retired == CRASHED:
             ctx.post_event(inbox.CRASHED, {"session": sid, "name": retired[0].name, "task": retired[0].task})
@@ -191,11 +212,14 @@ def watch(ctx: Context) -> None:
         store.write_json(_daemon_path(ctx), {"started": daemon})
 
 
-def _resume(ctx: Context, s: Session, *, counted: bool) -> None:
+def _resume(ctx: Context, s: Session, counted: bool) -> None:
+    """Resume ``s``, claimed for it under ctx.lock, outside the lock."""
     try:
         launch.resume(ctx, s, RESTARTED + (_owed(ctx) if s.role == ORCH else ""))
     except LaunchError as exc:
         log.warning("resume of session %s after its process ended failed (%s)", s.id, type(exc).__name__)
+    finally:
+        lifecycle.release_launch(ctx, s.id)
     if s.role == ORCH and counted:
         reflections.incident(ctx, "The orchestrator's process ended; the warden resumed it.")
 
@@ -221,13 +245,18 @@ def watch_orchestrator(ctx: Context) -> None:
         silent = ctx.clock.now() - heard
         if silent < limit:
             return
-        try:
-            lifecycle.restart(ctx, orchestrator, SILENT.format(minutes=int(silent // 60)) + _owed(ctx))
-            reflections.incident(ctx, f"The orchestrator's loop was silent for {int(silent // 60)} min; the warden "
-                                      "restarted it.")  # fmt: skip
-        except LaunchError as exc:
-            log.warning("restart of silent orchestrator %s failed (%s)", orchestrator.id, type(exc).__name__)
+    try:
+        lifecycle.restart(ctx, orchestrator, SILENT.format(minutes=int(silent // 60)) + _owed(ctx))
+    except LaunchError as exc:
+        log.warning("restart of silent orchestrator %s failed (%s)", orchestrator.id, type(exc).__name__)
+        return
+    reflections.incident(ctx, f"The orchestrator's loop was silent for {int(silent // 60)} min; the warden "
+                              "restarted it.")  # fmt: skip
+    with ctx.lock:
+        sessions = lifecycle.read(ctx)
+        current = sessions.get(orchestrator.id)
+        if current is None or current.state not in (WORKING, WAITING):
             return
         # Its silence counts again from now, so the next tick does not restart it once more.
-        lifecycle.move(ctx, orchestrator, orchestrator.state, WARDEN, f"restarted after {int(silent // 60)} min silent")
+        lifecycle.move(ctx, current, current.state, WARDEN, f"restarted after {int(silent // 60)} min silent")
         registry.write(ctx.places, sessions)

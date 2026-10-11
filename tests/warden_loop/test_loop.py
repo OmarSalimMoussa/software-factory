@@ -125,6 +125,7 @@ def test_a_failing_tick_step_is_logged_and_the_steps_after_it_still_run(
     monkeypatch.setattr(loop.vitals, "refresh", broken)
     with caplog.at_level(logging.ERROR, logger=loop.__name__):
         events = tick(ticking, tmp_path)
+        tick(ticking, tmp_path)  # it fails the same way again: reported once while it lasts
     assert inbox.LOOP_DUE in events
     assert [r.getMessage() for r in caplog.records] == ["warden: the tick's vitals step failed (OSError)"]
     assert ticking.ctx.launcher.calls[0][:2] == (0, ["verbs"])  # type: ignore[attr-defined]  # the report pull ran

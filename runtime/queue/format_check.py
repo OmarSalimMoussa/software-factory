@@ -19,6 +19,7 @@ from runtime.shared import store
 from runtime.shared.models import INBOXES, Request, Task
 
 if TYPE_CHECKING:
+    from runtime.queue.book import Queue
     from runtime.warden.context import Context
 
 
@@ -105,6 +106,14 @@ def check_queue(repo: Path) -> list[str]:
     return [f"queue/{rel}: {problem}" for rel, found in sorted(check(blobs).items()) for problem in found]
 
 
+# The queue's stamps at the last sweep, by the warden's state folder.
+_SWEPT: dict[str, str] = {}
+
+
+def _stamp(queue: Queue) -> str:
+    return hashlib.sha256(repr(sorted(queue.stamps().items())).encode()).hexdigest()
+
+
 def sweep(ctx: Context) -> list[str]:
     """Check the whole queue and file one request for each failing file not filed at this content; the new ids."""
     from runtime.queue import intake
@@ -113,6 +122,9 @@ def sweep(ctx: Context) -> list[str]:
     queue = Queue.of(ctx)
     filed_path = ctx.places.state / "queue-format-filed.json"
     with ctx.lock, queue.lock():
+        stamp = _stamp(queue)
+        if _SWEPT.get(str(ctx.places.state)) == stamp:
+            return []  # nothing in the queue changed since the last sweep
         blobs = queue.blobs()
         failing = {rel: found for rel, found in check(blobs).items() if found}
         filed = store.read_json_or(filed_path, {})
@@ -129,4 +141,6 @@ def sweep(ctx: Context) -> list[str]:
             new.append(req.id)
         if new:
             store.write_json(filed_path, filed, mode=0o600)
+            stamp = _stamp(queue)  # with what it filed
+        _SWEPT[str(ctx.places.state)] = stamp
     return new

@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 import pytest
-from rehearsal_kit import Rehearsal, build, git
+from rehearsal_kit import Rehearsal, at_once, build, git
 
 from runtime.queue import turn
 from runtime.queue.book import Queue
@@ -155,7 +155,7 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
     assert git(r.github, "rev-parse", "master") == merge
 
     # Its task is past its part: the next session watch retires the implementer, though its process is alive.
-    crashwatch.watch_sessions(r.warden())
+    crashwatch.SessionsWatch(start=at_once).run_pass(r.warden())
     sessions = registry.read(r.places)
     assert (sessions[impl].state, sessions[impl].retired, sessions[impl].task) == (RETIRED, FINISHED, TASK)
     assert r.systemd.stops == [impl[:8]]

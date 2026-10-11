@@ -115,31 +115,62 @@ def retire_session(ctx: Context, ref: str, kind: str, by: str) -> list[Session]:
     return retired
 
 
-def restart(ctx: Context, s: Session, message: str) -> None:
-    """Stop the session's process and resume it with ``message``: for one that went silent.
+# The sessions a launch (a resume, a restart) is under way for. A launch runs outside ctx.lock, which every request
+# waits on, and may take factory.command_seconds; it is claimed under the lock, so the crash watch never reads the
+# moment between a stop and a resume as a crash, and no second launch of the same session starts.
+_launching: set[str] = set()
 
-    Held under ctx.lock, so the crash watch never reads the moment between the stop and the resume as a crash.
-    """
+
+def claim_launch(ctx: Context, sid: str) -> bool:
+    """Claim ``sid`` for one launch; False when another holds it. The caller holds ctx.lock."""
+    if sid in _launching:
+        return False
+    _launching.add(sid)
+    return True
+
+
+def launching(sid: str) -> bool:
+    return sid in _launching
+
+
+def release_launch(ctx: Context, sid: str) -> None:
     with ctx.lock:
+        _launching.discard(sid)
+
+
+def restart(ctx: Context, s: Session, message: str) -> None:
+    """Stop the session's process and resume it with ``message``: for one that went silent. Raises LaunchError when
+    another launch of it is under way."""
+    with ctx.lock:
+        if not claim_launch(ctx, s.id):
+            raise LaunchError(f"{s.name} is being launched already")
+    try:
         if s.id in backstop.processes():
             ctx.launcher.stop_session(s.id)
         launch.resume(ctx, s, message)
+    finally:
+        release_launch(ctx, s.id)
 
 
 def deliver(ctx: Context, sid: str, message: str, by: str) -> None:
     """Hand a working or waiting session ``message`` as its next turn, and a waiting one works again. A running
     process reads it as soon as its turn ends, busy or idle, so no turn is cut short; one whose process is gone is
-    resumed with it (under ctx.lock, so the crash watch never resumes it too). Raises LaunchError when it did not
-    arrive, Refused when the session is not working or waiting."""
+    resumed with it (claimed, so the crash watch never resumes it too). Raises LaunchError when it did not arrive or
+    the warden is launching it already, Refused when the session is not working or waiting."""
     with ctx.lock:
         s = read(ctx).get(sid)
         if s is None or s.state not in (WORKING, WAITING):
             raise Refused("state", f"{s.name if s else sid} is {s.state if s else 'unknown'}; nothing to hand over")
         running = s.id in backstop.processes()
-        if not running:
-            launch.resume(ctx, s, message)
+        if not running and not claim_launch(ctx, sid):
+            raise LaunchError(f"the warden is bringing {s.name} back right now: send it again in a minute")
     if running:
         ctx.launcher.message_session(s.id, message)
+    else:
+        try:
+            launch.resume(ctx, s, message)
+        finally:
+            release_launch(ctx, sid)
     with ctx.lock:
         sessions = read(ctx)
         current = sessions[sid]

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from lifecycle_fakes import World
+from lifecycle_fakes import World, at_once
 
 from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, STOPPED, WAITING, WORKING
@@ -78,10 +78,10 @@ def test_a_benched_session_settles_after_its_grace_and_revives_with_its_id(world
     world.approve("t-0002", severity="severe")
     _approved(world, "t-0002")
     schedule.run_pass(world.ctx())
-    crashwatch.watch_sessions(world.ctx())
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
     assert world.session("5e550001").state == BENCH_PENDING and world.launcher.stopped == []
     world.later(world.settings.get_int("watch.bench_grace_seconds"))
-    crashwatch.watch_sessions(world.ctx())
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
     benched = world.session("5e550001")
     assert benched.state == DEPRIORITIZED and leases.held_by(world.places, world.settings, benched_name) is None
     assert world.launcher.stopped == ["5e550001"] and world.launcher.stacks == [(2, ["empty"]), (2, [leases.SWEEP])]
@@ -107,7 +107,7 @@ def test_pause_benches_every_session_and_resume_brings_them_back_in_order(world:
     assert ops.get(world.owner(), {"id": op_id}, None)["op"]["state"] == ops.RUNNING
     assert rule(lifecycle.owner_resume, world.owner(), {}, None) == "settling"
     world.later(world.settings.get_int("watch.bench_grace_seconds"))
-    crashwatch.watch_sessions(world.ctx())
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
     assert {world.session(s).state for s in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {DEPRIORITIZED}
     assert ops.get(world.owner(), {"id": op_id}, None)["op"]["state"] == ops.DONE
     lifecycle.owner_resume(world.owner(), {}, None)
