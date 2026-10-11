@@ -1,13 +1,8 @@
 {
-  "complexity": {"units": {}},
-  "count-claims": {"units": {}},
   "dir-files": {"pins": {}},
   "doc-size": {"pins": {}},
-  "docstring-length": {"units": {}},
-  "history-narrative": {"units": {}},
   "module-docblock": {"pins": {}},
   "readme-size": {"pins": {}},
   "source-size": {"pins": {}},
-  "test-size": {"pins": {}},
-  "tree-density": {"units": {"app": 93, "tests": 0, "web": 0}}
+  "test-size": {"pins": {}}
 }

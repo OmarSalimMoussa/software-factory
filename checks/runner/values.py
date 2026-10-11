@@ -91,8 +91,7 @@ def load(root: Path, name: str, schema: Schema) -> dict[str, Any]:
     return data
 
 
-# The ceiling and ratchet budgets several checks share. A ceiling stanza pins units over the standard ceiling with a
-# limit and the grounds for it; a ratchet stanza holds each unit's baseline measure.
+# The ceiling budgets several checks share: a stanza pins units over the standard ceiling with a
+# limit and the grounds for it.
 PIN = {"limit": int, "reason": str}
 CEILING_STANZA = {"pins": {str: PIN}}
-RATCHET_STANZA = {"units": {str: int}}

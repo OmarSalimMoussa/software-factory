@@ -140,23 +140,19 @@ def test_the_staging_deploy_follows_on_a_push_and_pins_a_run_by_hand(
 
 
 @pytest.mark.parametrize(
-    ("last", "previous"),
+    ("last", "deployed"),
     [
-        (f"deployed prod {SHA[:8]} previous 89abcdef", "89abcdef"),
-        (f"deployed prod {SHA[:8]} previous -", "-"),
-        ("deployed prod 99999999 previous 89abcdef", None),
-        (f"deployed staging {SHA[:8]} previous 89abcdef", None),
+        (f"deployed prod {SHA[:8]} previous 89abcdef", True),
+        (f"deployed prod {SHA[:8]} previous -", True),
+        ("deployed prod 99999999 previous 89abcdef", False),
+        (f"deployed staging {SHA[:8]} previous 89abcdef", False),
     ],
 )
-def test_the_prod_deploy_hands_the_releases_the_commit_prod_ran_before(
-    tmp_path: Path, last: str, previous: str | None
+def test_the_prod_deploy_passes_only_when_the_server_says_it_deployed_this_commit(
+    tmp_path: Path, last: str, deployed: bool
 ) -> None:
     done = run_step("deploy-prod.yml", "deploy", "Deploy prod", tmp_path, {"SHA": SHA, "FAKE_LAST": last})
 
     args = (tmp_path / "home" / "ssh-args").read_text().splitlines()
     assert args[-1] == f"deploy prod {SHA[:8]}"
-    if previous is None:
-        assert done.returncode != 0 and not (tmp_path / "outputs").exists()
-    else:
-        assert done.returncode == 0, done.stderr
-        assert (tmp_path / "outputs").read_text() == f"previous={previous}\n"
+    assert (done.returncode == 0) is deployed, done.stderr

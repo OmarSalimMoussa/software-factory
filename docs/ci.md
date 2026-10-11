@@ -75,14 +75,15 @@ does not move. To lift the pin, start `ci.yml` by hand with the default branch.
 ## deploy-prod.yml
 
 The warden starts it when the owner presses Push to prod: with the full commit staging runs, or, for a push back, the
-commit prod ran before. It refuses anything but a full 40-character commit. It then deploys prod over SSH, and the
-server answers with the commit prod ran before.
+commit prod ran before, and with `released`, the commit the last releases that finished ran at (`-` before any
+did). It refuses anything but a full 40-character commit. It then deploys prod over SSH.
 
 After the deploy, the **releases** job publishes each `[[release]]` that is ready:
 
 - A release with `live = false` is skipped. Set it to `true` once the store has approved the first version by hand.
-- A live release is published only when something in its `when_changed` paths changed since the commit prod ran
-  before, or when prod ran nothing before.
+- A live release is published only when something in its `when_changed` paths changed since `released`, or when
+  no releases finished before. The warden moves `released` only when the releases job succeeds, so a release that
+  failed is tried again at the next push.
 - The product's packaging hook runs as `<package> <version> <origin> <zip>`: the version is `1.0.<run number>` of
   `deploy-prod.yml`, the origin is `https://<prod domain>`, and the hook writes the zip. The hook never sees the
   store's credentials.

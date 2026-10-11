@@ -43,17 +43,17 @@ class Runner:
         return [Path(argv[0]).name for argv, _ in self.calls]
 
 
-def release(config: settings.Config, runner: Runner, previous: str, environ: Mapping[str, str]) -> list[str]:
+def release(config: settings.Config, runner: Runner, released: str, environ: Mapping[str, str]) -> list[str]:
     said: list[str] = []
     ok = release_all(
-        config, Path("/repo"), sha=SHA, previous=previous, run_number=7, run=runner, environ=environ, say=said.append
+        config, Path("/repo"), sha=SHA, released=released, run_number=7, run=runner, environ=environ, say=said.append
     )
     assert ok
     return said
 
 
 @pytest.mark.parametrize(
-    ("live", "previous", "diff", "programs", "line"),
+    ("live", "released", "diff", "programs", "line"),
     [
         (False, "abc1234", 1, [], "skipped, not live yet"),
         (True, "abc1234", 0, ["git"], "skipped, nothing in web/ changed since abc1234"),
@@ -61,13 +61,13 @@ def release(config: settings.Config, runner: Runner, previous: str, environ: Map
         (True, "-", 0, ["package-extension", "npx"], "published version 1.0.7"),
     ],
 )
-def test_a_live_release_publishes_only_what_changed_since_prod_ran_before(
-    live: bool, previous: str, diff: int, programs: list[str], line: str
+def test_a_live_release_publishes_only_what_changed_since_the_last_releases_finished(
+    live: bool, released: str, diff: int, programs: list[str], line: str
 ) -> None:
     runner = Runner(diff)
     environ = {"PATH": "/usr/bin", **SECRETS} if live else {"PATH": "/usr/bin"}
 
-    said = release(with_release(live), runner, previous, environ)
+    said = release(with_release(live), runner, released, environ)
 
     assert runner.programs() == programs
     assert len(said) == 1 and line in said[0]

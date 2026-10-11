@@ -103,7 +103,7 @@ class FakeClock(Clock):
 class FakeGitHub:
     """GitHub's API answers only the control probe; the walk never promotes."""
 
-    def dispatch_promote(self, sha: str) -> str:
+    def dispatch_promote(self, sha: str, released: str) -> str:
         raise AssertionError("the walk never promotes")
 
     def ci_run(self, sha: str) -> str | None:

@@ -58,10 +58,11 @@ class RestGitHub:
         self._settings = settings
         self._transport = transport
 
-    def dispatch_promote(self, sha: str) -> str:
-        """Start the product's prod workflow for ``sha`` on the default branch; the id of the run it started."""
+    def dispatch_promote(self, sha: str, released: str) -> str:
+        """Start the product's prod workflow for ``sha`` on the default branch, its releases comparing with
+        ``released`` (the commit the last releases that finished ran at, or -); the id of the run it started."""
         branch = self._settings().get_str("repo.default_branch")
-        body = {"ref": branch, "inputs": {"sha": sha}, "return_run_details": True}
+        body = {"ref": branch, "inputs": {"sha": sha, "released": released}, "return_run_details": True}
         reply = self._json("POST", f"/repos/{self._repo()}/actions/workflows/{PROMOTE_WORKFLOW}/dispatches", body)
         run_id = reply.get("workflow_run_id")
         if not isinstance(run_id, int):

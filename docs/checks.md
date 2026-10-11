@@ -43,7 +43,7 @@ check that reads no values needs no file.
 | `network-door`, `config-readers`, `js-import-rules` | `network-door.toml`, `config-readers.toml`, `js-import-rules.toml` |
 | `vocabulary-homes`, `computation-owners`, `quiet-modules` | the file of the same name, `.toml` |
 | `image-sources`, `env-template-sync`, `pinned-config`, `generated-current` | the file of the same name, `.toml` |
-| `size-ceilings`, `complexity-ratchet`, `count-claims`, `history-narrative` | `baseline.json` |
+| `size-ceilings`, `comment-budgets` (their pins) | `baseline.json` |
 
 `repo-shape`, `deploy-shape`, `testing-imports`, `qa-scenarios`, `seeds-current` and `queue-format` read no
 values. `deploy-shape` reads the product's `factory.toml` instead: it holds the product to the standard build and
@@ -52,9 +52,11 @@ deploy, from the workflows and the hooks to the images, the deploy files and the
 
 ## Ratchets and pins
 
-`baseline.json` records where a file stands today on the ratchets: its size, its complexity, its comment density.
-Only getting worse fails, so an improvement never needs a re-run. Growing past a ceiling needs a pin in
-`baseline.json` with its grounds in one line; a pin without grounds fails.
+A ratchet (`complexity-ratchet`, `count-claims`, `history-narrative`, and the docstring and density budgets of
+`comment-budgets`) compares each file or tree a branch changed with how it stands on the default branch, measured
+the same way: only getting worse fails, and no number is kept by hand, so an improvement tightens the baseline as
+soon as it merges and parallel branches never conflict over one. Checking everything (`--all`) runs no ratchet.
+Growing past a ceiling needs a pin in `baseline.json` with its grounds in one line; a pin without grounds fails.
 
 ## When a check fails
 

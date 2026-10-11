@@ -7,9 +7,11 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from conftest import MakeRepo, commit_all
 
 from checks.runner import cli
 from checks.runner.repo import Repo
+from checks.standard import count_claims
 from checks.standard import tests as tests_check
 from runtime.shared.settings import Settings, build
 
@@ -101,3 +103,26 @@ def test_changed_paths_pick_tests_by_their_longest_prefix(
         "readers": {"app/": ["tests"], "app/sub/": ["sub-tests", "tests"], "web/": []},
     }
     assert tests_check.select(changed, values) == (picked, unplaced)
+
+
+def _branch_from(root: Path, files: dict[str, str]) -> Repo:
+    """The default branch as committed, then a branch that writes ``files``: the repo as a branch check opens it."""
+    base = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, text=True).stdout
+    subprocess.run(["git", "checkout", "-q", "-b", "work"], cwd=root, check=True)
+    for rel, text in files.items():
+        (root / rel).write_text(text)
+    commit_all(root, "work")
+    return Repo.open(root, tuple(files), base.strip())
+
+
+@pytest.mark.parametrize(("now", "fails"), [("all three of them, the last two", True), ("every one", False)])
+def test_a_ratchet_compares_what_a_branch_changed_with_the_default_branch(
+    make_repo: MakeRepo, now: str, fails: bool
+) -> None:
+    root = make_repo({"docs/a.md": "We keep all three of them.\n", "docs/b.md": "All five agree.\n"})
+
+    repo = _branch_from(root, {"docs/a.md": f"We keep {now}.\n"})
+
+    problems = count_claims.run(repo, {})
+    assert bool(problems) is fails  # docs/b.md, unchanged, is never measured
+    assert not fails or problems[0].startswith("count-claims: docs/a.md has 2, over the 1 it has on the default branch")

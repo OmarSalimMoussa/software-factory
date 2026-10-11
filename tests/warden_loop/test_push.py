@@ -179,6 +179,19 @@ def test_a_failed_release_after_a_good_deploy_fails_only_the_last_step(world: Wo
     steps = ops.get(world.ctx, {"id": started["op"]}, None)["op"]["steps"]
     assert [step["state"] for step in steps[:-1]] == [ops.DONE] * 4 and steps[-1]["state"] != ops.DONE
     assert "prod is live" in str(steps[-1])
+    assert github_push.released(world.ctx.places) is None  # the next push tries the release again
+
+
+def test_the_next_push_releases_what_changed_since_the_last_releases_that_finished(world: World) -> None:
+    later = "d" * 40
+    probe(world, probes.PROD, True, PROD)
+    for build in (STAGING, later):
+        probe(world, probes.STAGING, True, build)
+        world.github.on_run = lambda build=build: probe(world, probes.PROD, True, build)
+        started = github_push.push_prod(world.ctx, {"expected_staging_sha": build}, None)
+        ops.join(started["op"], timeout=30)
+
+    assert world.github.released == ["-", STAGING]
 
 
 def test_push_back_goes_only_to_the_build_before_prods_current_one_in_the_deploy_log(world: World) -> None:

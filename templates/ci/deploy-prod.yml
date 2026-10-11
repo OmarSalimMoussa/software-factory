@@ -9,6 +9,10 @@ on:
         description: The full commit to put on prod
         required: true
         type: string
+      released:
+        description: The commit the last releases that finished ran at, or - when none did
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -26,8 +30,6 @@ jobs:
     concurrency:
       group: deploy-prod
       cancel-in-progress: false
-    outputs:
-      previous: ${{ steps.deploy.outputs.previous }}
     steps:
       - name: Refuse anything but a full commit
         env:
@@ -64,14 +66,13 @@ jobs:
           printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes \
             -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ServerAliveInterval=30 \
             "ci@$host" "deploy prod $short" | tee "$RUNNER_TEMP/deploy.out"
-          # The deploy's last line names the commit prod ran before, which the releases compare against.
+          # The deploy's last line says it deployed this commit; anything else is a failed deploy.
           last="$(tail -n 1 "$RUNNER_TEMP/deploy.out")"
           pattern="^deployed prod $short previous ([0-9a-f]{7,40}|-)$"
           if [[ ! "$last" =~ $pattern ]]; then
             echo "::error::the deploy did not end with 'deployed prod $short previous <commit or ->'"
             exit 1
           fi
-          echo "previous=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
 
   releases:
     needs: deploy
@@ -108,7 +109,7 @@ jobs:
       - name: Release what changed
         env:
           SHA: ${{ inputs.sha }}
-          PREVIOUS: ${{ needs.deploy.outputs.previous }}
+          RELEASED: ${{ inputs.released }}
           RUN: ${{ github.run_number }}
           PYTHONPATH: ${{ github.workspace }}/factory
           EXTENSION_STORE_EXTENSION_ID: ${{ secrets.EXTENSION_STORE_EXTENSION_ID }}
@@ -116,4 +117,4 @@ jobs:
           EXTENSION_STORE_CLIENT_ID: ${{ secrets.EXTENSION_STORE_CLIENT_ID }}
           EXTENSION_STORE_CLIENT_SECRET: ${{ secrets.EXTENSION_STORE_CLIENT_SECRET }}
           EXTENSION_STORE_REFRESH_TOKEN: ${{ secrets.EXTENSION_STORE_REFRESH_TOKEN }}
-        run: python3 -P -m standard.release --repo . --sha "$SHA" --previous "$PREVIOUS" --run "$RUN"
+        run: python3 -P -m standard.release --repo . --sha "$SHA" --released "$RELEASED" --run "$RUN"

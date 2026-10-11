@@ -41,6 +41,8 @@ class Repo:
     root: Path
     tracked: tuple[str, ...]
     changed: tuple[str, ...] | None  # None when checking everything
+    # The commit the branch left the default branch at: what a ratchet compares with. None when checking everything.
+    base: str | None = None
     # (ceiling MiB, reserve MiB) a test run must fit in, from the budget.test_* settings; None where nothing else
     # shares the machine (CI), so no guard is needed.
     test_memory: tuple[int, int] | None = None
@@ -53,8 +55,21 @@ class Repo:
     _excluded_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @classmethod
-    def open(cls, root: Path, changed: Sequence[str] | None = None) -> Repo:
-        return cls(root, tracked_files(root), None if changed is None else tuple(changed))
+    def open(cls, root: Path, changed: Sequence[str] | None = None, base: str | None = None) -> Repo:
+        return cls(root, tracked_files(root), None if changed is None else tuple(changed), base)
+
+    def before(self, rel: str) -> str | None:
+        """``rel`` as it stood where the branch left the default branch; None when it was not there."""
+        if self.base is None:
+            return None
+        done = subprocess.run(["git", "show", f"{self.base}:{rel}"], cwd=self.root, capture_output=True, check=False)
+        return done.stdout.decode("utf-8", errors="replace") if done.returncode == 0 else None
+
+    def tracked_before(self) -> tuple[str, ...]:
+        """Every file the default branch held where the branch left it."""
+        if self.base is None:
+            return ()
+        return tuple(p for p in self.git("ls-tree", "-r", "-z", "--name-only", self.base).split("\0") if p)
 
     def read(self, rel: str) -> str:
         return (self.root / rel).read_text(encoding="utf-8", errors="replace")

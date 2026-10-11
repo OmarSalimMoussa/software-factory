@@ -3,7 +3,8 @@
 Per file, the summed excess over ruff's C901 (cyclomatic complexity), PLR0911 (returns), PLR0912 (branches) and
 PLR0915 (statements) limits: how far past each limit, not how many functions pass one, so splitting a function never
 reads as a regression. Measured by the factory's pinned ruff, which skips what the product's ruff configuration
-excludes; a file that does not parse is one problem naming it. A per-file ratchet in check-values/baseline.json.
+excludes; a file that does not parse is one problem naming it. A per-file ratchet against the default branch: each
+file the branch changed, measured again as it stood there.
 """
 
 from __future__ import annotations
@@ -11,13 +12,13 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import tempfile
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 from checks.runner import budgets, excludes, scope, tools
 from checks.runner.repo import Repo
-from checks.runner.values import RATCHET_STANZA
 
 ID = "complexity-ratchet"
 RULE = "No file's complexity grows"
@@ -42,27 +43,21 @@ def excess(message: str) -> int:
     return int(match.group(1)) - int(match.group(2))
 
 
-def measure(repo: Repo) -> tuple[dict[str, int], dict[str, str]]:
-    """Each measured file's excess, and why each file that does not parse cannot be measured."""
-    paths = sorted(
-        rel
-        for rel in repo.tracked
-        if rel.endswith(".py") and scope.classify(rel) in ("source", "tests") and not repo.excluded(rel)
-    )
+def _ruff(root: Path, paths: list[str], exclusions: list[str]) -> tuple[dict[str, int], dict[str, str]]:
+    """Each file's excess under ``root``, and why each file that does not parse cannot be measured."""
     counts: Counter[str] = Counter({rel: 0 for rel in paths})
     unparsable: dict[str, str] = {}
     if not paths:
         return dict(counts), unparsable
     # --isolated: the standard limits, whatever the product's own ruff settings say, but its exclusions.
-    argv = [str(tools.binary("ruff")), "check", "--isolated", *excludes.ruff_args(repo.root), "--select", SELECT,
-            "--output-format", "json", *paths]  # fmt: skip
-    done = subprocess.run(argv, cwd=repo.root, capture_output=True, text=True, check=False)
+    argv = [str(tools.binary("ruff")), "check", "--isolated", *exclusions, "--select", SELECT, "--output-format",
+            "json", *paths]  # fmt: skip
+    done = subprocess.run(argv, cwd=root, capture_output=True, text=True, check=False)
     if done.returncode not in (0, 1):
         raise MeasureError(f"ruff exited {done.returncode}: {done.stderr.strip()}")
-    violations = json.loads(done.stdout)
-    root = repo.root.resolve()
-    for entry in violations:
-        rel = Path(entry["filename"]).resolve().relative_to(root).as_posix()
+    resolved = root.resolve()
+    for entry in json.loads(done.stdout):
+        rel = Path(entry["filename"]).resolve().relative_to(resolved).as_posix()
         # Every selected rule has a code; an entry without one is ruff's report that the file does not parse.
         if entry["code"] is None:
             unparsable.setdefault(rel, str(entry["message"]))
@@ -71,9 +66,36 @@ def measure(repo: Repo) -> tuple[dict[str, int], dict[str, str]]:
     return {rel: n for rel, n in counts.items() if rel not in unparsable}, unparsable
 
 
+def measure(repo: Repo) -> tuple[dict[str, int], dict[str, str]]:
+    """Each measured file's excess, and why each file that does not parse cannot be measured."""
+    paths = sorted(
+        rel
+        for rel in repo.tracked
+        if rel.endswith(".py") and scope.classify(rel) in ("source", "tests") and not repo.excluded(rel)
+    )
+    return _ruff(repo.root, paths, excludes.ruff_args(repo.root))
+
+
+def measure_before(repo: Repo, paths: list[str]) -> dict[str, int]:
+    """Each of ``paths`` measured as it stood on the default branch; a file it lacked, or that did not parse there,
+    is left out."""
+    with tempfile.TemporaryDirectory() as scratch:
+        root, there = Path(scratch), []
+        for rel in paths:
+            old = repo.before(rel)
+            if old is not None:
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (root / rel).write_text(old, encoding="utf-8")
+                there.append(rel)
+        return _ruff(root, there, [])[0]
+
+
 def run(repo: Repo, values: dict[str, Any]) -> list[str]:
     counts, unparsable = measure(repo)
-    problems = budgets.check_ratchet(STANZA, counts, repo.stanza(STANZA, RATCHET_STANZA))
-    return [f"{p}; {REMEDY}" for p in problems] + [
-        f"{ID}: {rel} does not parse, so its complexity cannot be measured: {why}" for rel, why in unparsable.items()
-    ]
+    broken = [f"{ID}: {rel} does not parse, so its complexity cannot be measured: {why}" for rel, why in
+              unparsable.items()]  # fmt: skip
+    if repo.changed is None:
+        return broken  # a ratchet compares a branch's change with the default branch
+    changed = {rel: n for rel, n in counts.items() if rel in repo.changed}
+    problems = budgets.check_ratchet(STANZA, changed, measure_before(repo, sorted(changed)))
+    return [f"{p}; {REMEDY}" for p in problems] + broken

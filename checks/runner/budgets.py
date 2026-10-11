@@ -1,13 +1,14 @@
-"""The two budget modes several checks share, both kept in check-values/baseline.json.
+"""The two budget modes several checks share.
 
-A **ceiling** fails a unit over the standard limit unless a pin records a higher limit and its grounds. A **ratchet**
-fails a unit measuring over its baseline. Only getting worse fails: a unit that shrinks or vanishes passes and leaves
-its pin or baseline as it was, so an improvement never costs a second run.
+A **ceiling** fails a unit over the standard limit unless a pin in check-values/baseline.json records a higher limit
+and its grounds. A **ratchet** fails a unit a branch makes worse than it is on the default branch, measured both
+ways by the same check; only a branch's change is compared, so checking everything runs no ratchet.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from typing import Any
 
 GROUNDS = ("behavior", "behaviour", "readab")
@@ -89,17 +90,16 @@ def check_ceiling(
 
 
 def check_ratchet(
-    gate: str, measured: dict[str, int], stanza: dict[str, Any], *, new_unit_manual: bool = False
+    gate: str, measured: Mapping[str, int], before: Mapping[str, int], *, new_units: bool = False
 ) -> list[str]:
-    """Problems for every unit measuring over its baseline; a unit with no entry starts at zero, or, when
-    ``new_unit_manual``, must be given its entry by hand so the starting point is a reviewed edit."""
-    units: dict[str, int] = stanza["units"]
+    """Problems for every unit measuring over what it measured where the branch left the default branch. The default
+    branch is the baseline: no number is kept by hand, and an improvement tightens it as soon as it merges. A unit the
+    default branch lacks starts at zero, or, with ``new_units``, wherever the branch puts it."""
     out: list[str] = []
     for unit, value in sorted(measured.items()):
-        if unit not in units and new_unit_manual:
-            out.append(f"{gate}: new unit {unit} measures {value}: add its entry to check-values/baseline.json by hand")
+        if unit not in before and new_units:
             continue
-        baseline = units.get(unit, 0)
-        if value > baseline:
-            out.append(f"{gate}: {unit} measures {value}, over its baseline of {baseline}")
+        if value > before.get(unit, 0):
+            out.append(f"{gate}: {unit} measures {value}, over the {before.get(unit, 0)} it measures on the default "
+                       "branch")  # fmt: skip
     return out

@@ -58,7 +58,7 @@ class Launcher:
 
 
 class GitHub:
-    def dispatch_promote(self, sha: str) -> str:
+    def dispatch_promote(self, sha: str, released: str) -> str:
         return "1"
 
     def ci_run(self, sha: str) -> str | None:

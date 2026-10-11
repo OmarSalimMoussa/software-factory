@@ -24,11 +24,13 @@ class FakeGitHub:
     up: bool = True
     on_run: Callable[[], None] | None = None
     dispatched: list[str] = field(default_factory=list)
+    released: list[str] = field(default_factory=list)  # what each dispatch said the last releases ran at
     releases: str = "success"  # how the prod workflow's jobs after its deploy job end
     ci: dict[str, Any] | None = None  # CI's run of a pushed commit, once GitHub started one
 
-    def dispatch_promote(self, sha: str) -> str:
+    def dispatch_promote(self, sha: str, released: str) -> str:
         self.dispatched.append(sha)
+        self.released.append(released)
         return "42"
 
     def full_sha(self, sha: str) -> str:

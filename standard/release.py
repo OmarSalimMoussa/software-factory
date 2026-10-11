@@ -1,8 +1,9 @@
-"""The releases after a prod deploy: each live ``[[release]]`` of factory.toml whose files changed since the commit
-prod ran before is packaged by the product's hook and published.
+"""The releases after a prod deploy: each live ``[[release]]`` of factory.toml whose files changed since the last
+releases that finished is packaged by the product's hook and published. The warden keeps that commit and passes it
+in, so a release that failed is tried again at the next push.
 
 Run by deploy-prod.yml's releases job:
-``python3 -m standard.release --repo . --sha <40-hex> --previous <commit or -> --run <run number>``.
+``python3 -m standard.release --repo . --sha <40-hex> --released <commit or -> --run <run number>``.
 """
 
 from __future__ import annotations
@@ -47,12 +48,12 @@ def missing_secrets(config: Config, environ: Mapping[str, str]) -> list[str]:
     return [secret for _, secret in STORE_SECRETS if not environ.get(secret)]
 
 
-def changed(release: Release, repo: Path, *, sha: str, previous: str, run: Run, environ: Mapping[str, str]) -> bool:
-    if previous == "-":
+def changed(release: Release, repo: Path, *, sha: str, released: str, run: Run, environ: Mapping[str, str]) -> bool:
+    if released == "-":
         return True
-    code = run(["git", "diff", "--quiet", previous, sha, "--", *release.when_changed], repo, environ)
+    code = run(["git", "diff", "--quiet", released, sha, "--", *release.when_changed], repo, environ)
     if code not in (0, 1):
-        raise ReleaseError(f"git could not compare {previous} with {sha} (exit code {code})")
+        raise ReleaseError(f"git could not compare {released} with {sha} (exit code {code})")
     return code == 1
 
 
@@ -61,7 +62,7 @@ def release_all(
     repo: Path,
     *,
     sha: str,
-    previous: str,
+    released: str,
     run_number: int,
     run: Run,
     environ: Mapping[str, str],
@@ -84,8 +85,8 @@ def release_all(
             if not release.live:
                 say(f"{label}: skipped, not live yet (live = false in factory.toml)")
                 continue
-            if not changed(release, repo, sha=sha, previous=previous, run=run, environ=environ):
-                say(f"{label}: skipped, nothing in {', '.join(release.when_changed)} changed since {previous}")
+            if not changed(release, repo, sha=sha, released=released, run=run, environ=environ):
+                say(f"{label}: skipped, nothing in {', '.join(release.when_changed)} changed since {released}")
                 continue
             package = Path(tmp) / str(number) / "release.zip"
             package.parent.mkdir()
@@ -109,13 +110,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python3 -m standard.release", description=__doc__)
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--sha", required=True, help="the full commit prod now runs")
-    parser.add_argument("--previous", required=True, help="the commit prod ran before, or - when none did")
+    parser.add_argument("--released", required=True, help="the commit the last releases that finished ran at, or -")
     parser.add_argument("--run", type=int, required=True, help="the workflow's run number: the version's last part")
     args = parser.parse_args(argv)
     if not re.fullmatch(r"[0-9a-f]{40}", args.sha):
         parser.error("--sha must be a full commit: 40 lowercase hex characters")
-    if args.previous != "-" and not re.fullmatch(r"[0-9a-f]{7,40}", args.previous):
-        parser.error("--previous must be a commit or -")
+    if args.released != "-" and not re.fullmatch(r"[0-9a-f]{7,40}", args.released):
+        parser.error("--released must be a commit or -")
     if args.run < 1:
         parser.error("--run must be a whole number above 0")
     repo = args.repo.resolve()
@@ -124,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
             settings.load(repo),
             repo,
             sha=args.sha,
-            previous=args.previous,
+            released=args.released,
             run_number=args.run,
             run=real_run,
             environ=os.environ,

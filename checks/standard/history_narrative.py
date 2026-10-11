@@ -2,7 +2,7 @@
 
 Six phrases, case-insensitive, on a word boundary. Deliberately not a bare "used to": a purpose clause ("a flag used
 to fetch the token") cannot be told from a history claim by a pattern, so only "used to be" counts. Tests may narrate
-the bug they pin. A per-file ratchet that starts at zero, kept in check-values/baseline.json.
+the bug they pin. A per-file ratchet against the default branch, where a new file starts at zero.
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ from typing import Any
 
 from checks.runner import budgets, comments, scope
 from checks.runner.repo import Repo
-from checks.runner.values import RATCHET_STANZA
 
 ID = "history-narrative"
 RULE = "Comments never narrate history"
@@ -45,9 +44,21 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
             problems.append(f"{ID}: {rel} does not parse: {exc.msg}")
             continue
         counts[rel] = len(found[rel])
-    units = repo.stanza(ID, RATCHET_STANZA)["units"]
+    if repo.changed is None:
+        return problems  # a ratchet compares a branch's change with the default branch
     for rel, count in sorted(counts.items()):
-        if count > units.get(rel, 0):
+        if rel not in repo.changed:
+            continue
+        was = _count_before(repo, rel)
+        if count > was:
             shown = "\n".join(f"    {rel}:{n}: {phrase!r} in {text}" for n, phrase, text in found[rel])
-            problems.append(f"{ID}: {rel} has {count}, over its baseline of {units.get(rel, 0)}; {REMEDY}\n{shown}")
+            problems.append(f"{ID}: {rel} has {count}, over the {was} it has on the default branch; {REMEDY}\n{shown}")
     return problems
+
+
+def _count_before(repo: Repo, rel: str) -> int:
+    old = repo.before(rel)
+    try:
+        return len(hits(rel, old)) if old is not None else 0
+    except SyntaxError:  # it did not parse on the default branch: every hit is the branch's own
+        return 0

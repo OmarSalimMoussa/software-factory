@@ -362,6 +362,20 @@ def _running(ctx: Context, op_id: object) -> bool:
         return False
 
 
+def _released_path(places: Places) -> Path:
+    return places.state / "released.json"
+
+
+def released(places: Places) -> str | None:
+    """The commit the last releases that finished ran at; None before any did."""
+    found = store.read_json_or(_released_path(places), None)
+    if found is None:
+        return None
+    if not isinstance(found, dict) or not isinstance(found.get("commit"), str):
+        raise store.StoreError(f"{_released_path(places)}: want a commit")
+    return str(found["commit"])
+
+
 def qa_prod_path(places: Places) -> Path:
     return places.state / "qa-prod-due.json"
 
@@ -385,9 +399,12 @@ def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list
     deadline = time.monotonic() + wait_s
     run: dict[str, str] = {}
 
+    full = {"sha": sha}
+
     def dispatch() -> str:
         try:
-            run["id"] = ctx.github.dispatch_promote(sha if _FULL_SHA.match(sha) else ctx.github.full_sha(sha))
+            full["sha"] = sha if _FULL_SHA.match(sha) else ctx.github.full_sha(sha)
+            run["id"] = ctx.github.dispatch_promote(full["sha"], released(ctx.places) or "-")
         except GitHubError as exc:
             raise ops.StepError(str(exc)) from exc
         return f"workflow run {run['id']}"
@@ -426,6 +443,8 @@ def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list
     def releases() -> str:
         state = finished("releases", lambda state: state if state["status"] == "completed" else None)
         if state["conclusion"] == "success":
+            # The next push's releases compare with this commit; one that failed is tried again then.
+            store.write_json(_released_path(ctx.places), {"commit": full["sha"], "at": ctx.clock.iso()})
             return f"the releases finished: {state['url']}"
         raise ops.StepError(f"prod is live at {sha[:12]}, but the releases ended {state['conclusion']}: {state['url']}")
 

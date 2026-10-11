@@ -68,8 +68,9 @@ def chosen(only: str | None) -> list[str]:
     return [check_id for check_id in catalog.IDS if check_id in wanted]
 
 
-def changed_paths(root: Path, settings: Settings | None, since: str | None) -> tuple[str, ...] | None:
-    """What HEAD changed since ``since``, or since the branch left the default branch; None when it adds nothing."""
+def changed_paths(root: Path, settings: Settings | None, since: str | None) -> tuple[str, tuple[str, ...]] | None:
+    """Where the branch left the default branch (or ``since``), and what HEAD changed since; None when it adds
+    nothing."""
     if settings is None:
         raise Refusal("on CI, run factory check --all")
     if git(root, "status", "--porcelain", "--untracked-files=no").strip():
@@ -81,7 +82,7 @@ def changed_paths(root: Path, settings: Settings | None, since: str | None) -> t
         raise Refusal(f"cannot find where this branch left {since or branch}: {exc}") from exc
     if base == git(root, "rev-parse", "HEAD").strip():
         return None
-    return tuple(p for p in git(root, "diff", "--name-only", "-z", base, "HEAD").split("\0") if p)
+    return base, tuple(p for p in git(root, "diff", "--name-only", "-z", base, "HEAD").split("\0") if p)
 
 
 def run_one(check_id: str, repo: Repo) -> list[str]:
@@ -117,11 +118,11 @@ def run(argv: list[str], cwd: Path, settings: Settings | None, out: TextIO) -> i
     try:
         ids = chosen(args.only)
         root = Path(git(cwd, "rev-parse", "--show-toplevel").strip())
-        changed = None if args.all else changed_paths(root, settings, args.since)
+        branch = None if args.all else changed_paths(root, settings, args.since)
     except (Refusal, GitError) as exc:
         out.write(f"factory check: {exc}\n")
         return 2
-    if not args.all and changed is None:
+    if not args.all and branch is None:
         out.write(
             "factory check: HEAD adds nothing to the default branch, so there is nothing to check "
             "(--all checks everything)\n"
@@ -131,7 +132,8 @@ def run(argv: list[str], cwd: Path, settings: Settings | None, out: TextIO) -> i
     if unprepared:
         out.write(f"factory check: {unprepared}\n")
         return 1
-    repo = Repo.open(root, changed)
+    base, changed = branch if branch is not None else (None, None)
+    repo = Repo.open(root, changed, base)
     if settings is not None and not on_ci():
         ceiling = settings.get_int("budget.test_memory_ceiling_mib")
         repo.test_memory = (ceiling, settings.get_int("budget.test_reserve_mib"))
