@@ -1,0 +1,95 @@
+/* The install console, in the dashboard's look: app.css first, then these few parts of its own, in the same tokens.
+   One column with no sidebar; a run's steps as rows with their output folded under them. */
+.app.solo{grid-template-columns:minmax(0,1fr)}
+.solo .top .brand{padding:0}
+.solo .page{max-width:980px;margin:0 auto}
+.help{display:block;font-size:11.5px;color:var(--faint);font-weight:400;margin-top:1px}
+.cnote{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.cnote.bad{color:var(--bad)}
+
+/* this laptop */
+.cstatus{padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+.cs-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:15px;min-height:28px}
+.cs-top .btn{margin-left:auto}
+.cfacts{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cfacts .v{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.cfacts .s{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.csvc{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 24px}
+.csvc li{display:flex;align-items:center;gap:8px;min-height:24px}
+.csvc li .muted{margin-left:auto}
+.cdrills{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+
+/* the install form */
+.cform{padding:4px 0}
+.cf-row{display:flex;flex-direction:column;gap:8px;padding:12px 18px;border-top:1px solid var(--line)}
+.cf-row:first-child{border-top:0}
+.cf-l{font-size:12px;font-weight:600;color:var(--muted)}
+.cf-in{height:34px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--fg);padding:0 10px;min-width:0;width:100%}
+.cf-in:focus{border-color:var(--accent);outline:0;box-shadow:0 0 0 3px var(--accent-soft)}
+.cf-choice,.cf-check,.cf-switch{display:flex;align-items:flex-start;gap:10px;min-height:24px;cursor:pointer;position:relative}
+.cf-choice input,.cf-check input{width:18px;height:18px;margin:3px 0 0;accent-color:var(--accent);flex:none;cursor:pointer}
+.cf-choice b{font-weight:600;overflow-wrap:anywhere}
+.cf-checks{display:flex;flex-direction:column;gap:12px;padding:12px 18px;border-top:1px solid var(--line)}
+.cf-check b,.cf-switch b{font-weight:600}
+.cf-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-top:1px solid var(--line)}
+.cf-switch input{position:absolute;opacity:0;width:36px;height:22px;margin:0;cursor:pointer}
+.cf-switch .sw{width:36px;height:22px;border-radius:11px;background:var(--line-strong);position:relative;flex:none;margin-top:1px;transition:background .15s}
+.cf-switch .sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .15s}
+.cf-switch input:checked+.sw{background:var(--accent)}
+.cf-switch input:checked+.sw::after{transform:translateX(14px)}
+.cf-switch input:focus-visible+.sw{outline:2px solid var(--accent);outline-offset:2px}
+
+/* a run */
+.crun{overflow:hidden}
+.cr-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line)}
+.cr-h b{font-size:14px;overflow-wrap:anywhere;min-width:0}
+.crows{list-style:none;margin:0;padding:0}
+.crow{border-bottom:1px solid var(--line)}
+.crow:last-child{border-bottom:0}
+.crow summary{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:40px;padding:6px 18px;cursor:pointer;list-style:none;color:var(--faint)}
+.crow summary::-webkit-details-marker{display:none}
+.crow summary:hover{background:color-mix(in srgb,var(--sunken) 55%,var(--surface))}
+.crow[data-state="running"] summary{color:var(--fg);font-weight:600}
+.crow[data-state="done"] summary{color:var(--fg)}
+.crow[data-state="done"] .cmark{color:var(--good)}
+.crow[data-state="failed"] summary{color:var(--bad);font-weight:600}
+.cmark{display:grid;place-items:center;width:20px;height:20px}
+.ct{overflow-wrap:anywhere}
+.cs{font-size:12px;color:var(--muted);font-weight:500}
+.cout{margin:0 18px 12px 48px;padding:10px 12px;background:var(--sunken);border-radius:8px;font:12px/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto}
+.cout:empty{display:none}
+.cgroup{padding:10px 18px;background:var(--sunken);font-size:11.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+.cq-slot{padding:0 18px 14px 48px}
+#q-top{padding:14px 18px 0}
+.cq-slot:empty,#q-top:empty{display:none}
+.cq{padding:14px 16px;display:flex;flex-direction:column;gap:10px;border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:0 0 0 3px var(--accent-soft)}
+.cq-t{display:flex;align-items:center;gap:8px;color:var(--accent)}
+.cq-t b{color:var(--fg);overflow-wrap:anywhere}
+.cq-x{margin:0;color:var(--muted)}
+.cbox{display:flex;flex-direction:column;gap:4px}
+.cbox-l{font-size:12px;font-weight:600;color:var(--muted)}
+.cbox-v{display:flex;align-items:flex-start;gap:8px}
+.cbox-v code{flex:1;min-width:0;padding:7px 10px;background:var(--sunken);border-radius:7px;font-size:12px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;max-height:160px;overflow:auto}
+.cq-a,.cq-links{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.cnotes{padding:10px 18px;font:12px/1.5 var(--mono);color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;border-top:1px solid var(--line)}
+.cnotes:empty{display:none}
+.cend{padding:14px 18px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.cend p{margin:0}
+.ce-h{display:flex;align-items:center;gap:8px;font-size:14px}
+.cend.good .ce-h .icon{color:var(--good)}
+.cend.bad .ce-h .icon{color:var(--bad)}
+.ce-d{color:var(--bad);overflow-wrap:anywhere}
+.ce-n{color:var(--muted)}
+
+/* uninstall */
+.cun{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.cun p{margin:0;color:var(--muted);flex:1 1 320px}
+
+@media (max-width:760px){
+  .solo .page{padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+  .cfacts,.csvc{grid-template-columns:minmax(0,1fr)}
+  .cout{margin-left:18px}
+  .cq-slot{padding-left:18px}
+  .cf-foot .btn,.cun .btn{flex:1 1 100%}
+  .cun p{flex-basis:100%}
+}

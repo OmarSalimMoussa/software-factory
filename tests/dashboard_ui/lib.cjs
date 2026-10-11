@@ -26,12 +26,24 @@ async function liveServer() {
   return {url, stop: () => proc.kill(), set: body => postJSON('/__switch', body), reset: () => postJSON('/__reset', {}), calls: () => fetch(url + '/__calls').then(r => r.json())};
 }
 
-async function drive(name, fn) {
+/* The install console on a temporary machine, every action dry; see tests/system/console_live.py. Its url is the
+   console's one-time link. */
+async function consoleServer() {
+  const proc = spawn('python3', [path.join(__dirname, '..', 'system', 'console_live.py')], {stdio: ['ignore', 'pipe', 'inherit']});
+  const url = await new Promise((resolve, reject) => {
+    let buf = '';
+    proc.stdout.on('data', d => { buf += d; const m = buf.match(/listening on (\S+)/); if (m) resolve(m[1]); });
+    proc.on('exit', c => reject(new Error('the console exited with ' + c)));
+  });
+  return {url, stop: () => proc.kill()};
+}
+
+async function drive(name, fn, start = liveServer) {
   const errors = [], shots = process.env.SHOTS;
-  const pw = playwright(), srv = await liveServer();
+  const pw = playwright(), srv = await start();
   const browser = await pw.chromium.launch({executablePath: CHROME, args: ['--headless=new']});
   const t = {
-    srv, errors,
+    srv, errors, browser,
     check: (cond, msg) => { if (!cond) errors.push(msg); },
     /* A page on its own context; admitted (with the owner cookie) unless told otherwise. */
     open: async (width, height, hash = 'home', {admit = true} = {}) => {
@@ -64,4 +76,4 @@ async function ready(p) {
 const heights = (p, sel) => p.$$eval(sel, els => els.map(e => Math.round(e.getBoundingClientRect().height)));
 const texts = (p, sel) => p.$$eval(sel, els => els.map(e => e.textContent.trim()));
 
-module.exports = {drive, ready, heights, texts};
+module.exports = {drive, ready, heights, texts, consoleServer};

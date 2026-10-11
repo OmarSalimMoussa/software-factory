@@ -11,6 +11,7 @@ from runtime.shared.claude_accounts import AccountError
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER
 from runtime.shared.settings import overrides_toml
 from runtime.system import layout, render
+from runtime.system.host import DeployKey
 from runtime.system.job import Install, github_name, refuse
 
 # Claude Code carries its seccomp helper (which blocks Unix sockets in the sandbox) inside its own binary; a version
@@ -21,6 +22,10 @@ _NPM_RUNTIME = (
     Path("/usr/local/lib/node_modules/@anthropic-ai/sandbox-runtime"),
 )
 _CHUNK = 1 << 20
+# Each key's comment, which GitHub shows as its title; the uninstaller names the first when it says what is left.
+DEPLOY_TITLE = "software-factory deploy"
+READ_TITLE = "software-factory read"
+READ_SECRET = "FACTORY_READ_KEY"  # the secret the CI templates check the factory out with
 
 
 def packages(ctx: Install) -> None:
@@ -256,27 +261,33 @@ def secrets(ctx: Install) -> None:
     if not host.exists(ctx.places.totp_secret):
         secret = totp.new_secret()
         host.write(ctx.places.totp_secret, secret + "\n", mode=0o600, owner=WARDEN_USER)
-        host.say("  Add this to your authenticator app. It is shown once, now:")
-        host.say(f"    {totp.enrolment_uri(secret, ctx.owner.name)}" if not host.dry else "    <the secret>")
+        if host.dry:
+            host.show_code("<the secret>", "<the authenticator link>")
+        else:
+            host.show_code(secret, totp.enrolment_uri(secret, ctx.owner.name))
     key = folder / "deploy.key"
     if not host.exists(key):
-        host.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "software-factory deploy", "-f", str(key)],
-                 user=WARDEN_USER)  # fmt: skip
-        host.say(f"  Add this as a deploy key with write access to {github}:")
-        host.say("    " + (host.read(_public_half(key)).strip() if not host.dry else "<the public key>"))
+        host.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", DEPLOY_TITLE, "-f", str(key)], user=WARDEN_USER)
+        public = host.read(_public_half(key)).strip() if not host.dry else "<the public key>"
+        why = "The warden pushes the agents' work with it."
+        host.show_key(DeployKey(github, DEPLOY_TITLE, public, True, why, "", "", ""))
     # Only the product's CI uses the private half, so the machine keeps just the public half, the mark it was made.
     read_key = folder / "factory-read.key"
     if not host.exists(_public_half(read_key)):
-        host.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "software-factory read", "-f", str(read_key)],
+        host.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", READ_TITLE, "-f", str(read_key)],
                  user=WARDEN_USER)  # fmt: skip
         factory = github_name(ctx.factory_origin) or ctx.factory_origin
-        host.say(f"  Add this as a deploy key to {factory}, read-only, so {github}'s CI can check out the factory:")
-        host.say("    " + (host.read(_public_half(read_key)).strip() if not host.dry else "<the public key>"))
-        host.say(f"  Save the lines below, unchanged, as {github}'s secret FACTORY_READ_KEY. They are shown once, now:")
-        host.say(host.read(read_key).strip() if not host.dry else "<the private key>")
+        public = host.read(_public_half(read_key)).strip() if not host.dry else "<the public key>"
+        private = host.read(read_key).strip() if not host.dry else "<the private key>"
+        why = f"{github}'s CI checks out the factory with it."
+        host.show_key(DeployKey(factory, READ_TITLE, public, False, why, private, READ_SECRET, github))
         host.remove(read_key)
     if not host.exists(folder / "github.token"):
-        value = host.ask("Your GitHub token (Actions: write) for the warden: ", secret=True)
+        value = host.ask(
+            "Your GitHub token (Actions: write) for the warden: ", secret=True,
+            hint=f"A fine-grained token with Actions: Read and write on {github}; the warden starts its workflows.",
+            link="https://github.com/settings/personal-access-tokens/new",
+        )  # fmt: skip
         if not value:
             raise refuse("github.token is needed: run the install again and paste it")
         host.write(folder / "github.token", value + "\n", mode=0o600, owner=WARDEN_USER)
@@ -296,11 +307,17 @@ def _claude_account(ctx: Install, folder: Path) -> None:
         name, token = claude_accounts.DEFAULT, host.read(lone) if not host.dry else "<the token>"
         host.say(f"  the agents' token becomes the Claude account {name}")
     else:
-        token = host.ask("The token `claude setup-token` printed, for the agents' sessions: ", secret=True)
+        token = host.ask(
+            "The token `claude setup-token` printed, for the agents' sessions: ", secret=True,
+            hint="Run `claude setup-token` in a terminal, sign in with the account the agents should use, and paste "
+                 "the token it prints.",
+            link="https://code.claude.com/docs/en/authentication#generate-a-long-lived-token",
+        )  # fmt: skip
         if not token:
             raise refuse("the agents' Claude token is needed: run the install again and paste it")
         asked = f"A name for this Claude account (Enter for {claude_accounts.DEFAULT}): "
-        name = host.ask(asked, secret=False) or claude_accounts.DEFAULT
+        hint = f"Small letters, digits and dashes, to tell your accounts apart; empty for {claude_accounts.DEFAULT}."
+        name = host.ask(asked, secret=False, hint=hint, link="") or claude_accounts.DEFAULT
     if not host.dry:
         try:
             name, token = claude_accounts.check_name(name), claude_accounts.check_token(token)

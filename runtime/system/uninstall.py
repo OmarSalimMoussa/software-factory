@@ -17,6 +17,7 @@ import json
 import os
 import sys
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -27,6 +28,9 @@ from runtime.shared.protocol import Refused  # noqa: E402
 from runtime.system import layout, steps_prepare  # noqa: E402
 from runtime.system.host import Account, CommandError, DryHost, Host, RealHost  # noqa: E402
 from runtime.system.job import REPO_ROOT, Install  # noqa: E402
+from runtime.system.steps_machine import DEPLOY_TITLE  # noqa: E402
+
+PROGRAM = "uninstall.py"
 
 UNITS = (layout.WARDEN_UNIT, layout.DASHBOARD_UNIT, layout.DAEMON_UNIT, layout.FIREWALL_UNIT, layout.SERVICES_UNIT)
 TEMPLATES = (layout.AGENT_RUN, layout.STACK_RUN)
@@ -68,7 +72,6 @@ def _try(host: Host, argv: list[str]) -> None:
 
 
 def stop(host: Host) -> None:
-    host.say("1. Stop the factory")
     instances = [f"{unit.removesuffix('.service')}*" for unit in TEMPLATES]
     _try(host, ["systemctl", "stop", *UNITS, *instances])
     _try(host, ["systemctl", "disable", *UNITS])
@@ -82,7 +85,6 @@ def stop(host: Host) -> None:
 
 
 def system_files(host: Host) -> None:
-    host.say("2. Remove the units, rules, firewall, AppArmor profile and managed settings")
     for name in (*UNITS, *TEMPLATES, f"{SLICE}"):
         _remove(host, layout.UNITS_DIR / name)
     _remove(host, layout.SLICE_CONTROL / f"{SLICE}.d")
@@ -104,7 +106,6 @@ def system_files(host: Host) -> None:
 
 
 def programs(host: Host, dashboard_port: str) -> None:
-    host.say("3. Remove the factory's commands and programs")
     for path in (paths.FACTORY_BIN, layout.CLAUDE_BIN.parent, paths.INSTALL, layout.TOOLS, layout.TOOLCHAIN,
                  paths.RUN, layout.DRILLS):  # fmt: skip
         _remove(host, path)
@@ -114,13 +115,11 @@ def programs(host: Host, dashboard_port: str) -> None:
 
 
 def state(host: Host, places: Places) -> None:
-    host.say("4. Remove the warden's state and the laptop's shared services")
     _remove(host, places.state)
     _remove(host, paths.SERVICES)
 
 
 def users(host: Host) -> None:
-    host.say("5. Remove the factory's users, their homes and groups")
     for user in (AGENT_USER, layout.STACK_USER):
         if host.account(user) is not None:
             host.run(["userdel", "--remove", user])
@@ -135,7 +134,6 @@ def users(host: Host) -> None:
 
 
 def owner_checkout(host: Host, owner: str, repo: Path | None) -> None:
-    host.say("6. Take the factory's git hooks off your checkout")
     if repo is None:
         host.say("  no --repo given: run `git config --unset core.hooksPath` in your checkout if it names the factory")
         return
@@ -151,19 +149,60 @@ def _remove(host: Host, path: Path) -> None:
             host.say(f"  removed {path}")
 
 
+STEPS = (
+    "Stop the factory",
+    "Remove the units, rules, firewall, AppArmor profile and managed settings",
+    "Remove the factory's commands and programs",
+    "Remove the warden's state and the laptop's shared services",
+    "Remove the factory's users, their homes and groups",
+    "Take the factory's git hooks off your checkout",
+)
+LEFT_FOR_YOU = (
+    f"Left for you: on GitHub, the warden's deploy key on the product (titled '{DEPLOY_TITLE}' or as you named it), "
+    "which the next install replaces; the server is untouched."
+)
+
+
 def remove_all(host: Host, places: Places, owner: str, repo: Path | None) -> None:
     """Every removal, in order; the installer calls it too, to take back a first install that failed."""
-    port = _dashboard_port(places)
-    stop(host)
-    system_files(host)
-    programs(host, port)
-    state(host, places)
-    users(host)
-    owner_checkout(host, owner, repo)
+    port = dashboard_port(places)
+    removals: tuple[Callable[[], None], ...] = (
+        lambda: stop(host),
+        lambda: system_files(host),
+        lambda: programs(host, port),
+        lambda: state(host, places),
+        lambda: users(host),
+        lambda: owner_checkout(host, owner, repo),
+    )
+    for number, (title, removal) in enumerate(zip(STEPS, removals, strict=True), 1):
+        host.step(number, title)
+        removal()
+
+
+def perform(host: Host, places: Places, owner: Account, repo: Path | None) -> str | None:
+    """The uninstall, as the command line and the console both run it: refused while a session is working or
+    waiting. A failure is told through the host; returns what stopped it, or None once everything is removed."""
+    ctx = Install(host, places, REPO_ROOT, (repo or Path(".")).resolve(), "HEAD", owner, {}, False)
+    try:
+        try:
+            steps_prepare.refuse_live_sessions(ctx)
+        except store.StoreError:
+            if not host.dry:
+                raise
+            host.say("  (a dry run cannot read the sessions' registry; the uninstall checks it as root)")
+        remove_all(host, places, owner.name, repo.resolve() if repo else None)
+    except Refused as exc:
+        problem = f"refused: {exc.reason}"
+    except CommandError as exc:
+        problem = str(exc)
+    else:
+        return None
+    host.fail(PROGRAM, problem)
+    return problem
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(prog="uninstall.py", description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(prog=PROGRAM, description=__doc__.splitlines()[0])
     parser.add_argument("--repo", type=Path, help="your checkout of the product, to take the factory's hooks off it")
     parser.add_argument("--dry-run", action="store_true", help="print every step; change nothing")
     args = parser.parse_args(argv)
@@ -175,31 +214,13 @@ def main(argv: list[str]) -> int:
     if owner is None:
         print("uninstall.py: the owner's account cannot be read", file=sys.stderr)
         return 2
-    places = Places.system()
-    ctx = Install(host, places, REPO_ROOT, (args.repo or Path(".")).resolve(), "HEAD", owner, {}, False)
-    try:
-        try:
-            steps_prepare.refuse_live_sessions(ctx)
-        except store.StoreError:
-            if not host.dry:
-                raise
-            host.say("  (a dry run cannot read the sessions' registry; the uninstall checks it as root)")
-        remove_all(host, places, owner.name, args.repo.resolve() if args.repo else None)
-    except Refused as exc:
-        print(f"uninstall.py: refused: {exc.reason}", file=sys.stderr)
+    if perform(host, Places.system(), owner, args.repo) is not None:
         return 1
-    except CommandError as exc:
-        print(f"uninstall.py: {exc}", file=sys.stderr)
-        return 1
-    host.say(
-        "The factory is removed from this machine. Left for you: on GitHub, the warden's deploy key on the product "
-        "(titled 'software-factory deploy' or as you named it), which the next install replaces; the server is "
-        "untouched."
-    )
+    host.say(f"The factory is removed from this machine. {LEFT_FOR_YOU}")
     return 0
 
 
-def _dashboard_port(places: Places) -> str:
+def dashboard_port(places: Places) -> str:
     """The port the dashboard was published on: the warden's published settings, or else this commit's default."""
     published = places.state / "public" / "settings.json"
     try:

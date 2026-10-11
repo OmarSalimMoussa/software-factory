@@ -102,7 +102,8 @@ def record(ctx: Install, drills: list[dict[str, object]]) -> None:
     """Written last, after every drill passed: until then the warden's vitals stay red and nothing starts."""
     state, host = ctx.places.state, ctx.host
     host.write(ctx.places.install_hash, install_digest(ctx) + "\n", mode=0o600, owner=WARDEN_USER)
-    body = {"commit": ctx.sha, "drills": drills, "managed_settings": str(MANAGED_SETTINGS)}
+    # The owner's own checkout of the product too: the install console offers it for the next install.
+    body = {"commit": ctx.sha, "drills": drills, "managed_settings": str(MANAGED_SETTINGS), "product": str(ctx.product)}
     host.write(layout.install_record(state), json.dumps(body, indent=1) + "\n", mode=0o600, owner=WARDEN_USER)
     if ctx.stage is not None and not host.dry:
         host.remove(Path(ctx.stage))

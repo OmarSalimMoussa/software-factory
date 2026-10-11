@@ -13,6 +13,7 @@ import os
 import pwd
 import shutil
 import subprocess
+import sys
 import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
@@ -36,6 +37,21 @@ class Account:
 Runner = Callable[[list[str], str | None], subprocess.CompletedProcess[str]]
 
 
+@dataclass(frozen=True, slots=True)
+class DeployKey:
+    """A key the owner adds to a GitHub repo as a deploy key. The factory's read key also hands its private half over,
+    once, for the product's CI to keep as an Actions secret."""
+
+    repo: str  # owner/name of the repo the key goes on
+    title: str  # the key's comment, which GitHub shows as its title
+    public: str
+    write: bool
+    why: str  # one sentence: what the key is for
+    private: str  # "" when the private half stays on this machine
+    secret: str  # the Actions secret that keeps ``private``, on ``ci_repo``; "" with no private half
+    ci_repo: str
+
+
 class CommandError(Exception):
     """A command the installer ran failed; the message names it and ends with what it printed."""
 
@@ -49,6 +65,30 @@ class Host(ABC):
 
     def say(self, text: str) -> None:
         print(text, flush=True)
+
+    # What the owner sees of a run beyond its lines: on the command line, more lines; the console draws each its way.
+
+    def step(self, number: int, title: str) -> None:
+        self.say(f"{number:>2}. {title}")
+
+    def fail(self, program: str, problem: str) -> None:
+        print(f"{program}: {problem}", file=sys.stderr, flush=True)
+
+    def show_code(self, secret: str, link: str) -> None:
+        """The 6-digit code's secret, handed to the owner once."""
+        self.say("  Add this to your authenticator app. It is shown once, now:")
+        self.say(f"    {link}")
+
+    def show_key(self, key: DeployKey) -> None:
+        access = "with write access" if key.write else "read-only"
+        self.say(f"  Add this as a deploy key to {key.repo}, {access}. {key.why}")
+        self.say(f"    {key.public}")
+        if key.private:
+            self.say(f"  Save the lines below, unchanged, as {key.ci_repo}'s secret {key.secret}. Shown once, now:")
+            self.say(key.private)
+
+    def show_folder(self, label: str, folder: Path) -> None:
+        self.say(f"  {label}: {folder}")
 
     @abstractmethod
     def run(
@@ -92,11 +132,18 @@ class Host(ABC):
     def account(self, name: str) -> Account | None: ...
 
     @abstractmethod
-    def ask(self, prompt: str, *, secret: bool) -> str: ...
+    def ask(self, prompt: str, *, secret: bool, hint: str, link: str) -> str:
+        """The owner's answer; ``hint`` says in one line what to give, ``link`` is where it is made ("" for none)."""
 
     @abstractmethod
     def scratch(self, owner: str) -> Path:
         """A new empty folder, owned by ``owner``."""
+
+
+def as_user(account: Account, argv: list[str], env: Mapping[str, str] | None) -> list[str]:
+    """``argv`` run by root as ``account``, with that user's home, runtime folder and session bus."""
+    merged = {**user_env(account), **(env or {})}
+    return ["runuser", "-u", account.name, "--", "env", *(f"{k}={v}" for k, v in merged.items()), *argv]
 
 
 def user_env(account: Account) -> dict[str, str]:
@@ -121,8 +168,7 @@ class RealHost(Host):
         account = self.account(user)
         if account is None:
             raise CommandError(argv, -1, f"there is no user {user}")
-        merged = {**user_env(account), **(env or {})}
-        return ["runuser", "-u", user, "--", "env", *(f"{k}={v}" for k, v in merged.items()), *argv]
+        return as_user(account, argv, env)
 
     def run(
         self, argv: list[str], *, user: str = "", cwd: Path | None = None, stdin: str | None = None,
@@ -194,7 +240,10 @@ class RealHost(Host):
         primary = grp.getgrgid(entry.pw_gid).gr_name
         return Account(name, entry.pw_uid, entry.pw_gid, Path(entry.pw_dir), (primary, *groups))
 
-    def ask(self, prompt: str, *, secret: bool) -> str:
+    def ask(self, prompt: str, *, secret: bool, hint: str, link: str) -> str:
+        for line in (hint, link):
+            if line:
+                self.say(f"  {line}")
         answer = getpass.getpass(prompt) if secret else input(prompt)
         return answer.strip()
 
@@ -261,7 +310,7 @@ class DryHost(Host):
     def account(self, name: str) -> Account | None:
         return self.users.get(name)
 
-    def ask(self, prompt: str, *, secret: bool) -> str:
+    def ask(self, prompt: str, *, secret: bool, hint: str, link: str) -> str:
         self._do(f"ask the owner: {prompt.strip()}")
         return "<answer>"
 

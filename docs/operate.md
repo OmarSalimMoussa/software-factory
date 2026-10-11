@@ -3,6 +3,37 @@
 What the owner does, day to day. The dashboard is the one window; the code is the 6-digit code from the
 authenticator app set up at install.
 
+## Install, reinstall and uninstall
+
+Use the install console, from your checkout of the factory:
+
+```
+sudo python3 runtime/system/console.py --repo <your checkout of the product>
+```
+
+It opens a page in your browser and prints the page's link too. The link works once, in the browser that opens it.
+
+- **This laptop** says whether the factory is installed, at which commit and since when, how the last drills did,
+  whether the warden, the dashboard, GlitchTip and Langfuse answer, and where the dashboard is on your tailnet.
+- **Install** (or **Reinstall**) offers the newest commit on your checkout's default branch, or one you name. Turn on
+  **Dry run** to see every step on this machine without changing anything. Each step is a row; open it to read what it
+  did. A first install that fails takes back what it made, unless you chose to keep it.
+- **Questions** appear under the step that asks: the 6-digit code's secret, shown once with Copy; the warden's deploy
+  key; the factory's read key, whose private half becomes the product's secret `FACTORY_READ_KEY`; and your GitHub
+  token and the agents' Claude token, typed into password fields. Add it to GitHub does a key's part on GitHub with
+  your signed-in `gh`; without it, the page links to GitHub's own page. Skip the read key when the product already
+  holds `FACTORY_READ_KEY` from an earlier install: that key still works.
+- **When the drills fail**, Open the drill sessions' output opens the folder with each drill session's whole output.
+- **Uninstall** first shows what it would remove, changing nothing. Remove everything does it.
+
+One action runs at a time. Close on the page stops the console once no action runs. Ctrl-C in the terminal stops it
+at any time: it first lets a running action end, refusing any question the action still asks, and a second Ctrl-C
+stops at once.
+
+The command lines run the same steps: `sudo python3 runtime/system/install.py --commit <sha> --repo <path>`, with
+`--dry-run`, `--healthchecks`, `--keep-on-failure` or `--set key=value`; and
+`sudo python3 runtime/system/uninstall.py [--repo <path>] [--dry-run]`.
+
 ## Start
 
 1. Plug the laptop in and run `factory status`: the vitals, the sessions and both environments.
@@ -95,7 +126,7 @@ To act on one:
 
 1. Pause the factory, then stop every agent.
 2. Change the factory's repo by hand: branch, test, merge, push.
-3. Reinstall from the reviewed commit: `sudo python3 runtime/system/install.py --commit <sha> --repo <path>`. The
+3. Reinstall from the reviewed commit with the install console (or `install.py --commit <sha> --repo <path>`). The
    installer refuses while any factory session is live.
 4. Run the server set-up again from that commit (`python3 -m standard.server.setup --product <path>`): a deploy
    refuses a build planned by another factory commit than the server runs.

@@ -34,8 +34,10 @@ from runtime.system import (  # noqa: E402
     steps_toolchain,
     steps_wire,
 )
-from runtime.system.host import CommandError, DryHost, Host, RealHost  # noqa: E402
+from runtime.system.host import Account, CommandError, DryHost, Host, RealHost  # noqa: E402
 from runtime.system.job import REPO_ROOT, Install, refuse  # noqa: E402
+
+PROGRAM = "install.py"
 
 
 def run_drills(ctx: Install) -> None:
@@ -102,8 +104,35 @@ FIRST_CHANGE = 3
 def run(ctx: Install) -> None:
     for number, (title, step) in enumerate(STEPS, 1):
         ctx.reached = number
-        ctx.host.say(f"{number:>2}. {title}")
+        ctx.host.step(number, title)
         step(ctx)
+
+
+def job(host: Host, places: Places, owner: Account, repo: Path, commit: str, changes: dict[str, Any],
+        healthchecks: bool) -> Install:  # fmt: skip
+    ctx = Install(host, places, REPO_ROOT, repo.resolve(), commit, owner, changes, healthchecks)
+    # Known before any step runs: only a first install is ever taken back.
+    ctx.first = not host.exists(layout.install_record(places.state))
+    return ctx
+
+
+def perform(ctx: Install, *, keep: bool) -> str | None:
+    """Every step, as the command line and the console both run them. A failure is told through the host, then a
+    failed first install is taken back; returns what stopped it, or None once the install finished."""
+    try:
+        run(ctx)
+    except (Refused, CommandError, Exception, KeyboardInterrupt) as exc:
+        if isinstance(exc, Refused):
+            problem = f"refused: {exc.reason}"
+        elif isinstance(exc, CommandError):
+            problem = str(exc)
+        else:
+            problem = f"stopped at step {ctx.reached}: {type(exc).__name__}: {exc}"
+        ctx.host.fail(PROGRAM, problem)
+        if rolls_back(ctx, keep=keep):
+            roll_back(ctx)
+        return problem
+    return None
 
 
 def rolls_back(ctx: Install, *, keep: bool) -> bool:
@@ -136,7 +165,7 @@ def parse_changes(items: list[str]) -> dict[str, Any]:
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(prog="install.py", description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(prog=PROGRAM, description=__doc__.splitlines()[0])
     parser.add_argument("--commit", required=True, help="the factory commit to install")
     parser.add_argument("--repo", required=True, type=Path, help="your checkout of the product the factory works on")
     parser.add_argument("--healthchecks", action="store_true", help="create the Healthchecks.io checks")
@@ -153,24 +182,8 @@ def main(argv: list[str]) -> int:
     if owner is None:
         print("install.py: the owner's account cannot be read", file=sys.stderr)
         return 2
-    places = Places.system()
-    ctx = Install(host, places, REPO_ROOT, args.repo.resolve(), args.commit, owner, parse_changes(args.set),
-                  args.healthchecks)  # fmt: skip
-    # Known before any step runs: only a first install is ever taken back.
-    ctx.first = not host.exists(layout.install_record(places.state))
-    try:
-        run(ctx)
-    except (Refused, CommandError, Exception, KeyboardInterrupt) as exc:
-        if isinstance(exc, Refused):
-            print(f"install.py: refused: {exc.reason}", file=sys.stderr)
-        elif isinstance(exc, CommandError):
-            print(f"install.py: {exc}", file=sys.stderr)
-        else:
-            print(f"install.py: stopped at step {ctx.reached}: {type(exc).__name__}: {exc}", file=sys.stderr)
-        if rolls_back(ctx, keep=args.keep_on_failure):
-            roll_back(ctx)
-        return 1
-    return 0
+    ctx = job(host, Places.system(), owner, args.repo, args.commit, parse_changes(args.set), args.healthchecks)
+    return 0 if perform(ctx, keep=args.keep_on_failure) is None else 1
 
 
 if __name__ == "__main__":

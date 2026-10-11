@@ -52,7 +52,11 @@ def create(ctx: Install) -> None:
         host.say("  skipped: run the install with --healthchecks to create them")
         return
     settings = ctx.need_settings()
-    key = host.ask("Healthchecks.io project API key (read-write): ", secret=True)
+    key = host.ask(
+        "Healthchecks.io project API key (read-write): ", secret=True,
+        hint="Make it in your Healthchecks.io project's Settings, under API Access.",
+        link="https://healthchecks.io/docs/api/",
+    )  # fmt: skip
     pings: dict[str, str] = {}
     for name, (timeout, grace) in periods(settings).items():
         if host.dry:

@@ -127,7 +127,7 @@ class RealRig:
                 os.chown(folder, owner.uid, owner.gid)
             for path in self.log_dir.iterdir():
                 os.chown(path, owner.uid, owner.gid)
-            self.ctx.host.say(f"  each drill session's whole output: {self.log_dir}")
+            self.ctx.host.show_folder("each drill session's whole output", self.log_dir)
 
     # what the drills call
 
