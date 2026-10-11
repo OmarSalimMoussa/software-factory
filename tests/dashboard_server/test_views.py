@@ -4,14 +4,15 @@ of values, at every depth. Unknown values (None) may stand anywhere."""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
 from dashboard_rig import Rig
-from dashboard_seed import FIXTURES
+from dashboard_seed import FIXTURES, STAGING, iso
 
 from runtime.dashboard.views.settings import LABELS
-from runtime.shared import store
+from runtime.shared import models, store
 from runtime.shared.settings import SCHEMA
 
 BROKEN = {"broken", "id", "error"}
@@ -139,3 +140,22 @@ def test_a_history_line_that_cannot_be_read_is_one_failed_row(rig: Rig) -> None:
     failed = [row for row in rows if row.get("broken")]
     assert failed == [{"broken": True, "id": "history line 6", "error": "line 6 of history.jsonl cannot be read"}]
     assert len(rows) == 25 and all(row.get("why") for row in rows if not row.get("broken"))
+
+
+@pytest.mark.parametrize(
+    ("prod", "runs"),
+    [(None, False), ("staging", True), ("down", False)],
+    ids=["an-older-build", "staging-build", "never-answered"],
+)
+def test_the_push_sheet_says_prod_runs_staging_only_when_prod_answers_on_stagings_build(
+    rig: Rig, tmp_path: Path, prod: str | None, runs: bool
+) -> None:
+    if prod is not None:
+        ok = prod == "staging"
+        probe = models.Probe(iso(rig.clock.now()), "prod", ok, STAGING if ok else "", 80, "" if ok else "refused", True)
+        store.append_jsonl(rig.places.probes, models.dump(probe))
+    # Like a product just moved onto the factory: no task waits on staging.
+    for task in (tmp_path / "repo" / "queue" / "tasks").glob("*.md"):
+        task.unlink()
+
+    assert rig.parts("/api/push")["push"]["data"]["prod_runs_staging"] is runs

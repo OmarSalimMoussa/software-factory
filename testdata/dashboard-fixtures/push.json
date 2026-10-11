@@ -104,6 +104,7 @@
     }
    }
   ],
+  "prod_runs_staging": false,
   "previous_prod": "5c4d3e2",
   "expected_staging_sha": "a1b2c3d",
   "blocked": null
