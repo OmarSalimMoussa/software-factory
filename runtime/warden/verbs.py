@@ -112,4 +112,9 @@ VERBS: dict[str, Verb] = {
     "rule.switch": _o("runtime.warden.settings_save:switch_rule", coded=True),
     "push.prod": _o("runtime.warden.github_push:push_prod", coded=True),
     "push.back": _o("runtime.warden.github_push:push_back", coded=True),
+    # contract: added by FB9, the agents' Claude accounts. No code: only the owner's own uid reaches owner.sock.
+    "account.list": _o("runtime.warden.accounts:list_accounts"),
+    "account.add": _o("runtime.warden.accounts:add"),
+    "account.remove": _o("runtime.warden.accounts:remove"),
+    "account.use": _o("runtime.warden.accounts:use"),
 }

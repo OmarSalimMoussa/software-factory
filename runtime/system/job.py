@@ -46,6 +46,7 @@ class Install:
     settings: Settings | None = None
     overrides: dict[str, Any] = field(default_factory=dict)
     first: bool = True  # no earlier install recorded
+    reached: int = 0  # the number of the step running, or the last one done
     product_origin: str = ""
     factory_origin: str = ""
     tools: dict[str, str] = field(default_factory=dict)  # the owner's uv and claude

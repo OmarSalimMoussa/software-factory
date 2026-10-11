@@ -1,5 +1,6 @@
 """Settings: every key of the settings schema as a row with its label and control, its saved value, its default and
-what runs now; and the owner's edits turned back into the values the warden saves.
+what runs now; and the owner's edits turned back into the values the warden saves. The Claude account section at the
+page's top is accounts.py's.
 
 The table below covers every key in runtime/shared/settings.SCHEMA; a key missing from it fails the page loudly.
 """
@@ -8,11 +9,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from runtime.dashboard.views import accounts
 from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, ago, epoch, model_label
 from runtime.shared.models import RETIRED
 from runtime.shared.settings import SCHEMA, Settings
 
-WANTS = ("settings", "sessions", "slots")
+WANTS = ("settings", "sessions", "slots", "accounts")
 _EDITED_ELSEWHERE = {"models.allowed", "models.efforts", "prices", "factory.clone", "intake.weights"}
 _ROLE_KEYS = {
     "implementer": None,
@@ -460,4 +462,4 @@ def wants(query: Query) -> dict[str, Any]:
 
 
 def parts(snap: Snap, query: Query) -> Parts:
-    return {"settings": lambda: page(snap)}
+    return {"accounts": lambda: accounts.section(snap), "settings": lambda: page(snap)}

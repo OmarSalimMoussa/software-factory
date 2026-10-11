@@ -27,6 +27,7 @@ from runtime.shared.protocol import Refused  # noqa: E402
 from runtime.system import (  # noqa: E402
     drills,
     healthchecks,
+    layout,
     steps_machine,
     steps_prepare,
     steps_services,
@@ -94,10 +95,30 @@ STEPS: tuple[tuple[str, Callable[[Install], None]], ...] = (
 )
 
 
+# The steps before this one change nothing on the machine, so a failure there leaves nothing to take back.
+FIRST_CHANGE = 3
+
+
 def run(ctx: Install) -> None:
     for number, (title, step) in enumerate(STEPS, 1):
+        ctx.reached = number
         ctx.host.say(f"{number:>2}. {title}")
         step(ctx)
+
+
+def rolls_back(ctx: Install, *, keep: bool) -> bool:
+    """Only a real first install that got as far as changing the machine, unless the owner keeps it to look at."""
+    return not ctx.host.dry and ctx.first and ctx.reached >= FIRST_CHANGE and not keep
+
+
+def roll_back(ctx: Install) -> None:
+    """A first install that failed takes back everything it made, so the next one starts from a clean machine. A
+    failed reinstall never does: removing it would delete the agents' clone, their queue and every stored secret."""
+    from runtime.system import uninstall
+
+    ctx.host.say("The install failed before it finished, so everything it made is removed again:")
+    uninstall.remove_all(ctx.host, ctx.places, ctx.owner.name, ctx.product)
+    ctx.host.say("The machine is as it was before this install. Fix what it said, then install again.")
 
 
 def parse_changes(items: list[str]) -> dict[str, Any]:
@@ -121,6 +142,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--healthchecks", action="store_true", help="create the Healthchecks.io checks")
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="a setting to save")
     parser.add_argument("--dry-run", action="store_true", help="print every step; change nothing")
+    keep = "leave a failed first install in place, to look at it, instead of removing it"
+    parser.add_argument("--keep-on-failure", action="store_true", help=keep)
     args = parser.parse_args(argv)
     if not args.dry_run and (os.geteuid() != 0 or "SUDO_USER" not in os.environ):
         print("install.py: run it with sudo, as the owner (or add --dry-run)", file=sys.stderr)
@@ -130,15 +153,22 @@ def main(argv: list[str]) -> int:
     if owner is None:
         print("install.py: the owner's account cannot be read", file=sys.stderr)
         return 2
+    places = Places.system()
+    ctx = Install(host, places, REPO_ROOT, args.repo.resolve(), args.commit, owner, parse_changes(args.set),
+                  args.healthchecks)  # fmt: skip
+    # Known before any step runs: only a first install is ever taken back.
+    ctx.first = not host.exists(layout.install_record(places.state))
     try:
-        ctx = Install(host, Places.system(), REPO_ROOT, args.repo.resolve(), args.commit, owner,
-                      parse_changes(args.set), args.healthchecks)  # fmt: skip
         run(ctx)
-    except Refused as exc:
-        print(f"install.py: refused: {exc.reason}", file=sys.stderr)
-        return 1
-    except CommandError as exc:
-        print(f"install.py: {exc}", file=sys.stderr)
+    except (Refused, CommandError, Exception, KeyboardInterrupt) as exc:
+        if isinstance(exc, Refused):
+            print(f"install.py: refused: {exc.reason}", file=sys.stderr)
+        elif isinstance(exc, CommandError):
+            print(f"install.py: {exc}", file=sys.stderr)
+        else:
+            print(f"install.py: stopped at step {ctx.reached}: {type(exc).__name__}: {exc}", file=sys.stderr)
+        if rolls_back(ctx, keep=args.keep_on_failure):
+            roll_back(ctx)
         return 1
     return 0
 

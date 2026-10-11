@@ -223,11 +223,12 @@ class App:
                 if write.check is not None:
                     write.check(body, ref, snap)
             args = write.args(body, ref, snap)
+            data = write.data(body) if write.data is not None else None
         except writes.Stale as exc:
             return _json(409, {"ok": False, "refused": "stale", "reason": str(exc)})
         except PartError as exc:
             return _json(400, {"ok": False, "refused": "input", "reason": str(exc)})
-        answer = self.warden.call(write.verb, {**args, "idempotency_key": key})
+        answer = self.warden.call(write.verb, {**args, "idempotency_key": key}, data)
         if not answer["ok"]:
             return self._refused(answer)
         if write.settle and snap is not None:

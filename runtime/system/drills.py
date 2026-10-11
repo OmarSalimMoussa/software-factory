@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from runtime.guard.wire import REFUSED as GUARD_REFUSAL
+from runtime.shared import claude_accounts
 from runtime.shared.paths import AGENT_USER, Places
 from runtime.shared.settings import Settings
 from runtime.system import layout
@@ -203,6 +204,7 @@ def secrets_unreadable(rig: Rig) -> Result:
     state = rig.places.state
     # Every slot's env file lies in the stack user's folder of slots, which no other user may even list.
     targets = [f"dir:{rig.places.stack_slots}", f"file:{layout.secrets(state) / 'claude.token'}",
+               f"dir:{claude_accounts.folder(layout.secrets(state))}",
                f"file:{rig.places.totp_secret}", f"file:{rig.places.services / stack.ENV_FILE}",
                f"file:{rig.places.reflections}", f"file:{state / 'reflections.json'}"]  # fmt: skip
     plain = rig.as_user(AGENT_USER, _probe(rig, *targets))

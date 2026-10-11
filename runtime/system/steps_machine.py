@@ -6,7 +6,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from runtime.shared import totp
+from runtime.shared import claude_accounts, totp
+from runtime.shared.claude_accounts import AccountError
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER
 from runtime.shared.settings import overrides_toml
 from runtime.system import layout, render
@@ -249,7 +250,7 @@ def _public_half(key: Path) -> Path:
 
 def secrets(ctx: Install) -> None:
     """The 6-digit code's secret (shown once), the deploy key, the product CI's read key for the factory repo, the
-    owner's GitHub token, the sign-in token, and the server's keys the server set-up saved for the owner."""
+    owner's GitHub token, the agents' Claude account, and the server's keys the server set-up saved for the owner."""
     host, folder = ctx.host, layout.secrets(ctx.places.state)
     github = ctx.need_settings().get_str("repo.github")
     if not host.exists(ctx.places.totp_secret):
@@ -274,17 +275,41 @@ def secrets(ctx: Install) -> None:
         host.say(f"  Save the lines below, unchanged, as {github}'s secret FACTORY_READ_KEY. They are shown once, now:")
         host.say(host.read(read_key).strip() if not host.dry else "<the private key>")
         host.remove(read_key)
-    asks = (
-        ("github.token", "Your GitHub token (Actions: write) for the warden: "),
-        ("claude.token", "The token `claude setup-token` printed, for the agents' sessions: "),
-    )
-    for name, prompt in asks:
-        if not host.exists(folder / name):
-            value = host.ask(prompt, secret=True)
-            if not value:
-                raise refuse(f"{name} is needed: run the install again and paste it")
-            host.write(folder / name, value + "\n", mode=0o600, owner=WARDEN_USER)
+    if not host.exists(folder / "github.token"):
+        value = host.ask("Your GitHub token (Actions: write) for the warden: ", secret=True)
+        if not value:
+            raise refuse("github.token is needed: run the install again and paste it")
+        host.write(folder / "github.token", value + "\n", mode=0o600, owner=WARDEN_USER)
+    _claude_account(ctx, folder)
     _server_keys(ctx, folder)
+
+
+def _claude_account(ctx: Install, folder: Path) -> None:
+    """The agents' first Claude account, asked for only when none exists. A lone claude.token, from an install before
+    accounts, becomes the account named main. The owner adds and switches the rest with `factory account`."""
+    host, accounts = ctx.host, claude_accounts.folder(folder)
+    if host.exists(accounts / claude_accounts.ACTIVE):
+        host.say("  the agents' Claude accounts are kept: `factory account list` shows them")
+        return
+    lone = folder / claude_accounts.UNIT_TOKEN
+    if host.exists(lone):
+        name, token = claude_accounts.DEFAULT, host.read(lone) if not host.dry else "<the token>"
+        host.say(f"  the agents' token becomes the Claude account {name}")
+    else:
+        token = host.ask("The token `claude setup-token` printed, for the agents' sessions: ", secret=True)
+        if not token:
+            raise refuse("the agents' Claude token is needed: run the install again and paste it")
+        asked = f"A name for this Claude account (Enter for {claude_accounts.DEFAULT}): "
+        name = host.ask(asked, secret=False) or claude_accounts.DEFAULT
+    if not host.dry:
+        try:
+            name, token = claude_accounts.check_name(name), claude_accounts.check_token(token)
+        except AccountError as exc:
+            raise refuse(f"the agents' Claude account cannot be kept: {exc}") from exc
+    host.mkdir(accounts, mode=0o700, owner=WARDEN_USER)
+    host.write(claude_accounts.token_file(folder, name), token + "\n", mode=0o600, owner=WARDEN_USER)
+    host.write(lone, token + "\n", mode=0o600, owner=WARDEN_USER)
+    host.write(accounts / claude_accounts.ACTIVE, name + "\n", mode=0o600, owner=WARDEN_USER)
 
 
 def _server_keys(ctx: Install, folder: Path) -> None:

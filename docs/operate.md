@@ -61,6 +61,28 @@ sandbox. At every install, a drill runs each tool and finds the product's Python
 - **Stop an agent** from the Agents page: it retires with everything under it, and its task returns to Proposed with
   its branch kept. Stopping the orchestrator stops the whole factory and needs the code.
 
+## Switch the Claude account
+
+The agents sign in to Claude with one of your accounts at a time. To move them to another, when one nears its
+limits:
+
+- **On the dashboard:** open Settings. Under Claude account, press Switch on the account you want. No code is needed.
+- **In a terminal:** run `factory account use <name>`.
+
+The factory makes that account active, restarts the agents' Claude daemon, and brings back every agent that was
+working or waiting, where it left off. You see each step as it runs. Until the daemon is back, no agent starts; until
+the switch ends, another switch is refused. An agent that cannot come back says why in the last step, and the warden
+then resumes it as it would after a crash.
+
+Add an account with Add account on the same page, or with `factory account add <name>`, which asks for the token
+that `claude setup-token` prints without showing it. `factory account list` shows every account and marks the active
+one. `factory account remove <name>` forgets an account the agents do not use. The factory never shows a token again,
+only its last four characters. Only you can do any of this: these commands reach the warden on the dashboard's own
+socket, which answers your user alone.
+
+The install asks for the first account's token and a name for it (`main` if you press Enter). An install from before
+accounts keeps its one token as the account `main`.
+
 ## Tune
 
 Change any setting on the Settings page and save with the code. Each value is checked before it is saved, the save

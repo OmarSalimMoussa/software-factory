@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from runtime.cli import factory
+from runtime.cli import accounts, factory
 from runtime.cli.factory import Call, CliError, build
 from runtime.guard.factory_calls import verb_of
 from runtime.warden.verbs import VERBS
@@ -122,3 +122,40 @@ def test_a_refusal_is_printed_with_its_rule_and_fails() -> None:
     out, err = io.StringIO(), io.StringIO()
     assert factory.show({"ok": False, "refused": "max-proposals", "reason": "wait"}, out, err) == 1
     assert err.getvalue() == "factory: refused (max-proposals): wait\n"
+
+
+def test_the_owners_account_commands_send_the_token_as_bytes_and_follow_a_switch_to_its_end() -> None:
+    token = "sk-ant-oat01-from-a-pipe-a1b2"
+    steps = [{"text": "Making work the active account", "state": "done", "detail": "its token ends in a1b2"},
+             {"text": "Restarting the agents' Claude daemon", "state": "running", "detail": ""}]  # fmt: skip
+    answers = iter([
+        {"ok": True, "name": "work", "active": False, "message": "Added work."},
+        {"ok": True, "name": "work", "op": "op-1", "message": "Switching the agents to work."},
+        {"ok": True, "op": {"state": "running", "steps": steps}},
+        {"ok": True, "op": {"state": "done", "steps": [steps[0], {**steps[1], "state": "done"}]}},
+    ])  # fmt: skip
+    calls: list[Call] = []
+
+    def ask(call: Call) -> dict[str, object]:
+        calls.append(call)
+        return next(answers)
+
+    out, err = io.StringIO(), io.StringIO()
+    piped = io.StringIO(token + "\n")
+    assert accounts.run(["add", "work"], ask, piped, out, err) == 0
+    assert accounts.run(["use", "work"], ask, io.StringIO(), out, err, sleep=lambda s: None) == 0
+
+    assert [(c.verb, c.args, c.data) for c in calls[:2]] == [
+        ("account.add", {"name": "work"}, (token + "\n").encode()),
+        ("account.use", {"name": "work"}, None),
+    ]
+    assert token[:-4] not in out.getvalue() + err.getvalue()
+    assert out.getvalue().splitlines() == [
+        "Added work.",
+        "Switching the agents to work.",
+        "  done   Making work the active account: its token ends in a1b2",
+        "  ...    Restarting the agents' Claude daemon",
+        "  done   Restarting the agents' Claude daemon",
+    ]
+    for argv in (["factory", "account", "use", "work"], ["factory", "account", "add", "work"]):
+        assert VERBS[verb_of(argv)].owner_socket  # the guard refuses every owner verb to a session

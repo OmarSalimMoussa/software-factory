@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.queue import formats, records
-from runtime.shared import models, store, totp
+from runtime.shared import claude_accounts, models, store, totp
 from runtime.shared import settings as settings_module
 from runtime.shared.models import CostRecord, Request, Session, Task
 from runtime.shared.paths import Places
@@ -611,6 +611,13 @@ def seed(root: Path, now: float = T0) -> Places:
         os.chmod(folder, 0o755)
     devices = {hashlib.sha256(TEST_TOKEN.encode()).hexdigest(): now + 365 * 86400}
     store.write_json(places.state / "devices.json", devices)
+    secrets = places.state / "secrets"
+    for name, days in (("main", 9), ("work", 2)):
+        path = claude_accounts.token_file(secrets, name)
+        store.write_text(path, f"sk-ant-oat01-seeded-token-{name}\n", mode=0o600)
+        os.utime(path, (now - days * 86400, now - days * 86400))
+    store.write_text(secrets / claude_accounts.UNIT_TOKEN, "sk-ant-oat01-seeded-token-main\n", mode=0o600)
+    store.write_text(claude_accounts.folder(secrets) / claude_accounts.ACTIVE, "main\n", mode=0o600)
     return places
 
 

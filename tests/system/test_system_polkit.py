@@ -30,10 +30,11 @@ def test_the_warden_may_start_only_the_two_templates(unit: str, allowed: bool) -
     assert (UNITS.fullmatch(unit) is not None) is allowed
 
 
-def test_the_rule_grants_only_start_stop_and_the_slices_budget() -> None:
+def test_the_rule_grants_only_start_stop_the_daemons_restart_and_the_slices_budget() -> None:
     granted = re.findall(r'verb === "([a-z-]+)"', RULE)
 
-    assert sorted(granted) == ["set-property", "start", "stop"]
+    assert sorted(granted) == ["restart", "set-property", "start", "stop"]
+    assert 'unit === "@daemon_unit@" && verb === "restart"' in RULE
     assert 'unit === "@slice@" && verb === "set-property"' in RULE
-    assert RULE.count("polkit.Result.YES") == 3  # the templates, the slice, the sleep locks
+    assert RULE.count("polkit.Result.YES") == 4  # the templates, the daemon's restart, the slice, the sleep locks
     assert 'subject.user !== "@warden_user@"' in RULE

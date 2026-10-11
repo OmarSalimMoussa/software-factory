@@ -20,6 +20,7 @@ STALE = "This changed; here it is now."
 Body = dict[str, Any]
 Args = Callable[[Body, str, "Snap | None"], dict[str, Any]]
 Check = Callable[[Body, str, Snap], None]
+Data = Callable[[Body], bytes]
 
 
 class Stale(Exception):
@@ -35,6 +36,7 @@ class Write:
     check: Check | None = None
     wants: tuple[str, ...] = ()
     settle: str = ""
+    data: Data | None = None  # bytes the warden takes apart from the arguments, such as a token
 
 
 def _text(body: Body, key: str) -> str:
@@ -117,6 +119,21 @@ def _push_back_args(body: Body, ref: str, snap: Snap | None) -> dict[str, Any]:
     return {"expected_sha": previous, "code": body.get("code")}
 
 
+def _account_name(body: Body) -> str:
+    name = body.get("name")
+    if not isinstance(name, str) or not name.strip():
+        raise PartError("Name the account.")
+    return name.strip()
+
+
+def _account_token(body: Body) -> bytes:
+    """The token, as bytes for the warden alone; the warden says what is wrong with one."""
+    token = body.get("token")
+    if not isinstance(token, str) or not token.strip():
+        raise PartError("Paste the account's token.")
+    return token.strip().encode()
+
+
 def _said(answer: dict[str, Any], fallback: str) -> str:
     message = answer.get("message")
     return message if isinstance(message, str) and message else fallback
@@ -156,8 +173,9 @@ def _w(
     check: Check | None = None,
     wants: tuple[str, ...] = (),
     settle: str = "",
+    data: Data | None = None,
 ) -> tuple[re.Pattern[str], Write]:
-    return re.compile(f"^/api/{path}$"), Write(verb, args, message, refresh, check, wants, settle)
+    return re.compile(f"^/api/{path}$"), Write(verb, args, message, refresh, check, wants, settle, data)
 
 
 _P = r"([A-Za-z0-9][A-Za-z0-9._-]{0,127})"
@@ -211,6 +229,12 @@ WRITES: list[tuple[re.Pattern[str], Write]] = [
        lambda a, s: _said(a, "Pushing to prod."), ["home", "shell"]),
     _w("push/back", "push.back", _push_back_args, lambda a, s: _said(a, "Pushing prod back."), ["home", "shell"],
        wants=("deploys",)),
+    _w("accounts", "account.add", lambda b, r, s: {"name": _account_name(b)}, lambda a, s: _said(a, "Added."),
+       ["settings"], data=_account_token),
+    _w(f"accounts/{_P}/use", "account.use", lambda b, r, s: {"name": r}, lambda a, s: _said(a, "Switching."),
+       ["settings", "agents", "shell"]),
+    _w(f"accounts/{_P}/remove", "account.remove", lambda b, r, s: {"name": r}, lambda a, s: _said(a, "Removed."),
+       ["settings"]),
 ]
 # fmt: on
 

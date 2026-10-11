@@ -1,7 +1,8 @@
 """How the warden starts and resumes sessions, and the real Launcher under it.
 
 The warden runs anything only by writing a request to public/launch/<id>.json and starting one of the two template
-units polkit lets it start.
+units polkit lets it start. The one other unit action polkit allows it is a restart of the agents' Claude daemon, when
+the owner switches Claude accounts.
 
 ``software-agent-run@<id>.service`` runs as the agent user: a new session (``kind: session``) or one short command
 (``kind: command``). ``software-stack-run@<id>.service`` runs ``scripts/dev`` as the stack user (``kind: stack``).
@@ -25,6 +26,7 @@ from runtime.shared.models import WORKING, Session
 from runtime.shared.paths import AGENT_USER, Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
+from runtime.system.layout import DAEMON_UNIT
 from runtime.warden import reap, registry, session_settings
 from runtime.warden.context import Context, StackResult
 from standard import config as product_config
@@ -78,7 +80,8 @@ def _systemctl(argv: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 class Units:
-    """Launcher through the two template units. ``run`` runs one systemctl command (a test passes a fake)."""
+    """Launcher through the two template units and the daemon's restart. ``run`` runs one systemctl command (a test
+    passes a fake)."""
 
     def __init__(self, places: Places, settings: Callable[[], Settings], run: Run = _systemctl) -> None:
         self.places = places
@@ -129,6 +132,12 @@ class Units:
         code, output = self._wait(AGENT_UNIT.format(request_id), request_id)
         if code != 0:
             raise LaunchError(f"claude --resume exited {code}: {output.strip()[-300:]}")
+
+    def restart_daemon(self) -> None:
+        """Restart the daemon that hosts every session: it loads the sign-in token again, and its sessions end."""
+        done = self.run(["restart", DAEMON_UNIT])
+        if done.returncode != 0:
+            raise LaunchError(f"the agents' Claude daemon did not restart: {done.stderr.strip()[-300:]}")
 
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         request_id = f"stack-{uuid.uuid4().hex}"

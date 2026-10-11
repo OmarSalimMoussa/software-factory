@@ -1,4 +1,49 @@
 {
+ "accounts": {
+  "title": "Claude account",
+  "hint": "The agents sign in to Claude with the active account. Switching restarts their Claude daemon, which stops every agent for a moment; each one that was working comes back where it left off.",
+  "op_title": "Switching the Claude account",
+  "rows": [
+   {
+    "name": "main",
+    "active": true,
+    "chip": "active",
+    "token": "…main",
+    "added": "Added Sep 30, 11:40 UTC",
+    "switch": null,
+    "remove": null
+   },
+   {
+    "name": "work",
+    "active": false,
+    "chip": null,
+    "token": "…work",
+    "added": "Added Oct 7, 11:40 UTC",
+    "switch": {
+     "label": "Switch",
+     "url": "/api/accounts/work/use",
+     "aria": "Switch the agents to work"
+    },
+    "remove": {
+     "label": "Remove",
+     "url": "/api/accounts/work/remove",
+     "title": "Remove work?",
+     "body": "The factory forgets work's token. Add it again any time with Add account.",
+     "keep": "Keep it"
+    }
+   }
+  ],
+  "empty": null,
+  "add": {
+   "title": "Add account",
+   "url": "/api/accounts",
+   "name": "Name",
+   "name_hint": "Lower-case letters, digits and dashes, such as work.",
+   "token": "Token",
+   "token_hint": "What `claude setup-token` printed. It is never shown again.",
+   "button": "Add account"
+  }
+ },
  "settings": {
   "repo": {
    "path": "/srv/products/acme-app"

@@ -4,6 +4,7 @@ retire each working or waiting session whose process is gone, and restart an orc
 Only working and waiting sessions are watched for crashes: a deprioritized one has no process by design, and a
 bench-pending or reviving one is in the warden's own hands. A crashed session is resumed up to watch.resume_tries
 times, then retired as crashed; the orchestrator is always resumed (the same session) and never retired by the watch.
+While the owner's switch of Claude accounts runs, its daemon restart is no crash: the switch brings its sessions back.
 """
 
 from __future__ import annotations
@@ -103,6 +104,8 @@ def _finished(ctx: Context, s: Session) -> bool:
 
 
 def watch(ctx: Context) -> None:
+    if permits.switching(ctx) is not None:
+        return
     settings = ctx.settings()
     tries, grace = settings.get_int("watch.resume_tries"), settings.get_int("watch.start_grace_seconds")
     watched = [s.id for s in lifecycle.read(ctx).values() if s.state in (WORKING, WAITING) and not s.parent]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import threading
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -40,6 +41,8 @@ class FakeLauncher:
         self.remote = REMOTE
         self.copy = False  # the next resume starts a copy instead
         self.messages: list[tuple[str, str]] = []
+        self.restarts = 0
+        self.on_restart: Callable[[], None] = lambda: None  # what else happens while the daemon restarts
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
         self.started.append((request_id, launch))
@@ -69,6 +72,11 @@ class FakeLauncher:
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         self.stacks.append((slot, verb))
         return StackResult(0, "", "stack.log")
+
+    def restart_daemon(self) -> None:
+        self.restarts += 1
+        self.procs.clear()  # stopping the daemon stops every session it hosts
+        self.on_restart()
 
     @property
     def resumed(self) -> list[str]:

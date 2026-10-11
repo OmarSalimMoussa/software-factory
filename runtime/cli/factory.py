@@ -5,7 +5,8 @@ asking from the calling process, never from these arguments. Every file the call
 body given with ``--body``) is read here, as the caller, and sent as bytes; the warden never opens a path a caller
 names. Nothing comes from stdin: Claude Code runs a call outside the sandbox, where the warden's socket is
 reachable, only when the call is ``factory …`` alone, with no pipe, redirect or heredoc. The guard puts
-``--agent-id <id>`` first on a subagent's call. `check`, `qa-browser` and `slot-api` run here without the warden.
+``--agent-id <id>`` first on a subagent's call. `check`, `qa-browser` and `slot-api` run here without the warden;
+`account` is the owner's alone, on owner.sock (runtime/cli/accounts.py).
 """
 
 from __future__ import annotations
@@ -79,6 +80,7 @@ def _parser() -> argparse.ArgumentParser:
     reflect.add_argument("text")
     sub.add_parser("status")
     sub.add_parser("settings").add_argument("what", choices=["show"])
+    sub.add_parser("account", help="the agents' Claude accounts, the owner's own: list, add, use or remove")
     _telemetry(sub)
     request = sub.add_parser("request", help="request new --from … --severity … --where … --body <file>")
     request.add_argument("what", choices=["new"])
@@ -399,6 +401,10 @@ def main(argv: list[str], places: Places | None = None) -> int:
         rest = global_options(argv)[1]
         if rest[:1] and rest[0] in LOCAL:
             return _local(rest, places)
+        if rest[:1] == ["account"]:
+            from runtime.cli import accounts
+
+            return accounts.main(rest[1:], places.owner_socket, ask, sys.stdin, sys.stdout, sys.stderr)
         call = build(argv, read_file)
     except (CliError, OSError) as exc:
         print(f"factory: {exc}", file=sys.stderr)

@@ -19,13 +19,13 @@ class Warden:
     def __init__(self, path: Path, timeout: Callable[[], float]) -> None:
         self.path, self.timeout = path, timeout
 
-    def call(self, verb: str, args: dict[str, Any]) -> dict[str, Any]:
+    def call(self, verb: str, args: dict[str, Any], data: bytes | None = None) -> dict[str, Any]:
         """The warden's answer, ``{"ok": true, ...}`` or a refusal; raises WardenDown when there is none."""
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
                 conn.settimeout(self.timeout())
                 conn.connect(str(self.path))
-                conn.sendall(protocol.request(verb, args))
+                conn.sendall(protocol.request(verb, args, data))
                 with conn.makefile("rb") as reader:
                     line = reader.readline(protocol.MAX_LINE + 1)
         except (OSError, TimeoutError) as exc:

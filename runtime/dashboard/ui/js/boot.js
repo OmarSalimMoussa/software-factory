@@ -117,6 +117,10 @@ document.addEventListener('click', e => {
   if (d.default) { defaultSetting(d.default); return; }
   if (d.listdel) { listDel(d.listdel, +d.i); return; }
   if (d.rule) { ruleToggle(d.rule, d.on === 'true'); return; }
+  if (d.acctUse) { useAccount(d.acctUse, t); return; }
+  if (d.acctRemove) { removeAccount(d.acctRemove); return; }
+  if (d.acctRemoveNow) { act(d.acctRemoveNow, {}, {btn: t, icon: 'x-mark', onOk: closeSheet}); return; }
+  if (d.acctAdd !== undefined) { addAccount(t); return; }
   const a = d.action;
   if (a === 'close-sheet') closeSheet();
   else if (a === 'sheet-back') sheetBack();
@@ -142,6 +146,7 @@ document.addEventListener('input', e => {
   if (t.id === 'gq') gsInput(t.value);
   else if (t.dataset.answer) UI.answers[t.dataset.answer] = t.value;
   else if (t.dataset.msg) UI.drafts[t.dataset.msg] = t.value;
+  else if (t.dataset.acct) UI.acct[t.dataset.acct] = t.value;
 });
 document.addEventListener('change', e => {
   const t = e.target, d = t.dataset;
@@ -161,6 +166,7 @@ document.addEventListener('keydown', e => {
   if (menu && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); const opts = $$('button', menu), i = opts.indexOf(ae); opts[(i + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length].focus(); return; }
   if (e.key === 'Enter' && ae.dataset.listadd) { e.preventDefault(); listAdd(ae.dataset.listadd, ae); return; }
   if (e.key === 'Enter' && ae.dataset.answer) { e.preventDefault(); needAct(ae.dataset.answer, 'answer', null, false); return; }
+  if (e.key === 'Enter' && ae.dataset.acct) { e.preventDefault(); addAccount($('[data-acct-add]')); return; }
   if (/INPUT|SELECT|TEXTAREA/.test(ae.tagName)) return;
   if (e.key === 'Enter' && ae.dataset.libsel) { ae.click(); return; }
   if (UI.device) return;

@@ -7,6 +7,7 @@ PAGE.settings = {
   render: pSettings,
   after: () => {
     updateSavebar();
+    const n = $('#acct-name'), k = $('#acct-token'); if (n) n.value = UI.acct.name; if (k) k.value = UI.acct.token;
     const r = UI.flashRow && $(`[data-row="${CSS.escape(UI.flashRow)}"]`);
     if (r) { r.scrollIntoView({block: 'center'}); r.classList.add('flash'); UI.flashRow = null; }
   }
@@ -19,8 +20,8 @@ const showVal = (r, v) => r.control === 'model' ? `${v.model} · ${v.effort}` : 
 function pSettings(env) {
   const d = partData(env, 'settings');
   const head = `<div class="page-h">${ph('Settings', 'Defaults live in settings.toml in the factory repo. Nothing changes until you save. Saving needs your 6-digit code, commits the new settings to the factory repo, and reloads only the part of the factory that reads them; no agent is stopped. Every change is listed under Recent changes.')}</div>`;
-  if (!d) return head + part(env, 'settings', () => '');
-  return `${head}
+  if (!d) return head + acctSection(env) + part(env, 'settings', () => '');
+  return `${head}${acctSection(env)}
     <div class="card repo-card"><div style="flex:1;min-width:0"><div class="label">Repo</div><div class="repo-path">${esc(d.repo.path)}</div></div><button class="btn" data-action="change-repo" data-write>Change repo</button></div>
     <div class="set-grid">${d.groups.map(g => `<div class="card set-card"><div class="sec-h"><div class="label">${esc(g.title)} ${g.hint ? hint(g.hint) : ''}</div></div>${g.rows.map(r => r.broken ? brokenRow(r) : setRow(r)).join('')}</div>`).join('')}
       <div class="card set-card"><div class="sec-h"><div class="label">Recent changes</div></div><ul class="audit">${d.audit.length ? d.audit.map(a => `<li><span>${esc(a.what)}</span><span class="faint">${a.sha ? `<span class="mono">${esc(a.sha)}</span> · ` : ''}${esc(a.ago)}</span></li>`).join('') : '<li><span class="muted">No setting has changed yet.</span></li>'}</ul></div></div>
@@ -79,4 +80,42 @@ function changeRepo() {
   const d = setData(); if (!d) return;
   codeSheet('Change repo', `<label class="search" style="max-width:none">${icon('book-open', 'sm')}<input id="repo-path" value="${esc(d.repo.path)}" aria-label="Repo path" autocomplete="off" spellcheck="false"></label><div class="muted" style="font-size:12px">The orchestrator must be stopped first. The factory works on one repo at a time.</div>`, 'Save',
     (code, key) => post('/api/settings/repo', {path: $('#repo-path').value.trim(), code}, key), {opTitle: 'Changing the repo'});
+}
+
+/* The Claude account section: the server lists the accounts and words every label. Switch runs as an operation, Remove
+   asks first, and Add account sends the token once; the page never draws a token back. */
+UI.acct = {name: '', token: ''};
+const acctData = () => { const env = UI.data['/api/settings']; return env ? partData(env, 'accounts') : null; };
+const acctRow = r => `<div class="set-row" data-row="acct:${esc(r.name)}"><div class="acct-id"><span class="k">${esc(r.name)}</span>${r.chip ? pill(r.chip, 'good') : ''}<span class="help"><span class="mono">${esc(r.token)}</span> · ${esc(r.added)}</span></div><div class="ctl">${r.switch ? `<button class="btn sm" data-acct-use="${esc(r.switch.url)}" aria-label="${esc(r.switch.aria)}" data-write>${icon('arrow-path', 'sm')}${esc(r.switch.label)}</button>` : ''}${r.remove ? `<button class="btn sm quiet" data-acct-remove="${esc(r.name)}" data-write>${esc(r.remove.label)}</button>` : ''}</div></div>`;
+function acctSection(env) {
+  return part(env, 'accounts', a => `<div class="card set-card acct-card"><div class="sec-h"><div class="label">${esc(a.title)} ${hint(a.hint)}</div></div>
+    ${a.rows.map(r => r.broken ? brokenRow(r) : acctRow(r)).join('')}${a.empty ? `<div class="set-row"><span class="muted">${esc(a.empty)}</span></div>` : ''}
+    <div class="acct-add"><div class="k">${esc(a.add.title)}</div><div class="acct-fields">
+      <label class="a-nl" for="acct-name">${esc(a.add.name)}</label><input class="a-ni" id="acct-name" data-acct="name" autocomplete="off" spellcheck="false" aria-describedby="acct-name-hint"><span class="help a-nh" id="acct-name-hint">${esc(a.add.name_hint)}</span>
+      <label class="a-tl" for="acct-token">${esc(a.add.token)}</label><input class="a-ti" id="acct-token" type="password" data-acct="token" autocomplete="off" spellcheck="false" aria-describedby="acct-token-hint"><span class="help a-th" id="acct-token-hint">${esc(a.add.token_hint)}</span>
+      <button class="btn primary a-b" data-acct-add data-write>${esc(a.add.button)}</button></div>
+      <div class="code-note" id="acct-note" role="status"></div></div></div>`);
+}
+const useAccount = (url, btn) => act(url, {}, {btn, icon: 'arrow-path', opTitle: acctData().op_title});
+function removeAccount(name) {
+  const r = acctData().rows.find(x => x.name === name); if (!r || !r.remove) return;
+  openSheet(r.remove.title, `<div class="muted">${esc(r.remove.body)}</div>`, `<button class="btn quiet" data-action="close-sheet">${esc(r.remove.keep)}</button><button class="btn danger" data-acct-remove-now="${esc(r.remove.url)}" data-write>${esc(r.remove.label)}</button>`);
+}
+async function addAccount(btn) {
+  if (UI.down) { writesOff(); return; }
+  const note = $('#acct-note'), say = (text, bad) => { note.textContent = text; note.className = 'code-note' + (bad ? ' bad' : ''); };
+  btn.disabled = true; say('');
+  let ans;
+  try { ans = await post(acctData().add.url, {name: $('#acct-name').value, token: $('#acct-token').value}); }
+  catch (e) {
+    if (e instanceof NeedsDevice) askDevice();
+    else if (e instanceof ApiDown) { wardenDown(e.since); say('The warden did not answer, so nothing changed. Try again.', true); }
+    else say(`That failed: ${e.message} Nothing changed.`, true);
+    return;
+  } finally { if (btn.isConnected) btn.disabled = false; }
+  if (!ans.ok) { say(ans.reason, true); return; }
+  UI.acct = {name: '', token: ''};
+  /* Left focused, a field holds the page's redraw back; the new account shows once it is let go. */
+  ['#acct-name', '#acct-token'].forEach(s => { const f = $(s); f.value = ''; f.blur(); });
+  toast(ans.message); refreshParts(ans.refresh);
 }

@@ -7,6 +7,7 @@ import json
 from dashboard_rig import Rig
 
 from runtime.shared import store
+from runtime.warden import ops
 
 STALE = {"ok": False, "refused": "stale", "reason": "This changed; here it is now."}
 
@@ -46,3 +47,24 @@ def test_a_move_sends_the_warden_its_own_order_once_the_device_saw_the_same(rig:
     )
     assert reply.status == 200
     assert store.read_json(rig.places.proposals)["open"] == ["t-0027", "t-0024", None, "t-0025"]
+
+
+def test_the_claude_account_section_shows_no_token_and_switches_as_an_operation(rig: Rig) -> None:
+    page = rig.get("/api/settings")
+    rows = json.loads(page.body)["parts"]["accounts"]["data"]["rows"]
+    assert b"sk-ant-oat01" not in page.body
+    assert [(r["name"], r["chip"], r["token"], r["switch"] is None, r["remove"] is None) for r in rows] == [
+        ("main", "active", "\u2026main", True, True),
+        ("work", None, "\u2026work", False, False),
+    ]
+    empty = rig.post("/api/accounts", {"name": "spare", "token": "  ", "idempotency_key": "account-add-01"})
+    assert (empty.status, json.loads(empty.body)["reason"]) == (400, "Paste the account's token.")
+    switched = json.loads(rig.post(rows[1]["switch"]["url"], {"idempotency_key": "account-use-01"}).body)
+    ops.join(switched["op"])
+    op = rig.parts(f"/api/ops/{switched['op']}")["op"]["data"]
+    assert (switched["message"], op["title"], op["state"]) == (
+        "Switching the agents to work.",
+        "Switching the Claude account",
+        "done",
+    )
+    assert op["result"]["message"] == "The agents now use work."

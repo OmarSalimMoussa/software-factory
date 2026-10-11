@@ -28,6 +28,7 @@ from runtime.shared.models import RETIRED
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import (
+    accounts,
     codes,
     deploys,
     doing,
@@ -394,6 +395,7 @@ READERS: dict[str, Reader] = {
     "history": _history,
     "thread": _thread,
     "cost": _cost,
+    "accounts": lambda ctx, args: accounts.listing(ctx),
 }
 
 

@@ -70,6 +70,7 @@ def _bring_back(ctx: Context, s: Session, message: str) -> None:
             raise Refused("state", f"this session is {s.state} now; send the message again")
         task = permits.read_task(ctx, s.task) if s.task else None
         permits.check_vitals(ctx, task is None or task.severity == SEVERE)
+        permits.check_daemon(ctx)
         if s.role in CAP and task is not None:
             permits.check_cap(ctx.settings(), sessions.values(), s.role)
         lifecycle.move(ctx, s, models.REVIVING, OWNER, "coming back with the owner's message")

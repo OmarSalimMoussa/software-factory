@@ -151,6 +151,17 @@ def _remove(host: Host, path: Path) -> None:
             host.say(f"  removed {path}")
 
 
+def remove_all(host: Host, places: Places, owner: str, repo: Path | None) -> None:
+    """Every removal, in order; the installer calls it too, to take back a first install that failed."""
+    port = _dashboard_port(places)
+    stop(host)
+    system_files(host)
+    programs(host, port)
+    state(host, places)
+    users(host)
+    owner_checkout(host, owner, repo)
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="uninstall.py", description=__doc__.splitlines()[0])
     parser.add_argument("--repo", type=Path, help="your checkout of the product, to take the factory's hooks off it")
@@ -173,13 +184,7 @@ def main(argv: list[str]) -> int:
             if not host.dry:
                 raise
             host.say("  (a dry run cannot read the sessions' registry; the uninstall checks it as root)")
-        port = _dashboard_port(places)
-        stop(host)
-        system_files(host)
-        programs(host, port)
-        state(host, places)
-        users(host)
-        owner_checkout(host, owner.name, args.repo.resolve() if args.repo else None)
+        remove_all(host, places, owner.name, args.repo.resolve() if args.repo else None)
     except Refused as exc:
         print(f"uninstall.py: refused: {exc.reason}", file=sys.stderr)
         return 1

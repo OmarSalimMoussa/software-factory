@@ -1,6 +1,7 @@
 // What the warden may ask systemd and logind for, and nothing more: start and stop the two template units that run
-// as the agent and stack users, set the factory slice's budget, and hold the sleep and lid locks while agents work.
-// It can start nothing as root and no unit of any other name.
+// as the agent and stack users, restart the agents' Claude daemon (so it loads the token of the account the owner
+// switched to), set the factory slice's budget, and hold the sleep and lid locks while agents work. It can start
+// nothing as root and no unit of any other name.
 polkit.addRule(function (action, subject) {
   if (subject.user !== "@warden_user@") {
     return polkit.Result.NOT_HANDLED;
@@ -9,6 +10,9 @@ polkit.addRule(function (action, subject) {
     var unit = action.lookup("unit") || "";
     var verb = action.lookup("verb") || "";
     if (/^software-(agent|stack)-run@[A-Za-z0-9_-]+\.service$/.test(unit) && (verb === "start" || verb === "stop")) {
+      return polkit.Result.YES;
+    }
+    if (unit === "@daemon_unit@" && verb === "restart") {
       return polkit.Result.YES;
     }
     if (unit === "@slice@" && verb === "set-property") {

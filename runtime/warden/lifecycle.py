@@ -141,6 +141,7 @@ def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
         raise Refused("args", "the note is too long; put the detail in the task")
     permits.check_not_factory(ctx)
     with ctx.lock:
+        permits.check_daemon(ctx)
         sessions = read(ctx)
         permit = permits.check_start(ctx, sessions, role, task, args.get("outage") is True)
         permits.check_vitals(ctx, task.severity == SEVERE)
@@ -167,6 +168,7 @@ def owner_start_orchestrator(ctx: Context, args: dict[str, Any], data: bytes | N
     with ctx.lock:
         if paused_path(ctx).exists():
             raise Refused("paused", "the factory is paused; resume it instead")
+        permits.check_daemon(ctx)
         sessions = read(ctx)
         current = [s for s in sessions.values() if s.role == ORCH and s.state != RETIRED]
         if current:
@@ -220,6 +222,7 @@ def owner_stop(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[s
 def resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     message = _text(args, "message")
     with ctx.lock:
+        permits.check_daemon(ctx)
         s = find(ctx, read(ctx), _text(args, "session"))
         if s.state == RETIRED:
             raise Refused("retired", f"{s.name} is retired, and a retired session can never be resumed")
@@ -348,6 +351,7 @@ def revive(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
             raise Refused("state", f"{s.name} is {s.state}; only a deprioritized session is revived")
         task = permits.read_task(ctx, s.task) if s.task else None
         permits.check_vitals(ctx, task is None or task.severity == SEVERE)
+        permits.check_daemon(ctx)
         if s.role in CAP and task is not None:
             permits.check_cap(ctx.settings(), sessions.values(), s.role)
             permits.check_revive_order(ctx, sessions, s.role, task, skip=s.id)
@@ -407,6 +411,7 @@ def owner_resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
         if settling:
             raise Refused("settling", f"the pause is still settling ({', '.join(settling)}); resume in a minute")
         permits.check_vitals(ctx, severe=True)
+        permits.check_daemon(ctx)
         back = [s for s in paused if s.state == models.DEPRIORITIZED]
         for s in back:
             move(ctx, s, models.REVIVING, OWNER, "resuming with the factory")

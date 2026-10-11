@@ -8,7 +8,7 @@ from system_fakes import dry_job, settings
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
-from runtime.system import install
+from runtime.system import install, steps_machine
 from runtime.system.host import DryHost
 from runtime.warden import registry
 
@@ -112,3 +112,63 @@ def test_the_install_makes_each_tool_cache_a_session_may_write_for_the_agent(tmp
 def test_a_writable_cache_must_be_a_folder_of_the_agents_home_no_session_could_escape_through(cache: str) -> None:
     with pytest.raises(SettingsError, match="sandbox.writable_caches"):
         settings(**{"sandbox.writable_caches": [".npm", cache]})
+
+
+WARDEN_OWNED = "(600, software-warden:software-warden)"
+
+
+@pytest.mark.parametrize(
+    ("dry", "present", "asked", "written"),
+    [
+        # A first install asks for the token and a name; the dry run shows it with its placeholder answers.
+        (True, {}, ["The token `claude setup-token` printed, for the agents' sessions:",
+                    "A name for this Claude account (Enter for main):"],
+         ["claude-accounts/<answer>.token", "claude.token", "claude-accounts/active"]),
+        # A reinstall over an install that kept one token makes it the account main, and the agents keep using it.
+        (False, {"claude.token": "sk-ant-oat01-kept-from-before-a1b2\n"}, [],
+         ["claude-accounts/main.token", "claude.token", "claude-accounts/active"]),
+        (False, {"claude.token": "sk-ant-oat01-kept-from-before-a1b2\n", "claude-accounts/active": "work\n"}, [], []),
+    ],
+)  # fmt: skip
+def test_the_secrets_step_keeps_the_agents_claude_accounts(
+    tmp_path: Path, dry: bool, present: dict[str, str], asked: list[str], written: list[str]
+) -> None:
+    job = dry_job(tmp_path)
+    job.settings = settings()
+    host, folder = job.host, job.places.state / "secrets"
+    assert isinstance(host, DryHost)
+    host.dry = dry
+    host.paths |= {
+        job.places.totp_secret,
+        folder / "deploy.key",
+        folder / "factory-read.key.pub",
+        folder / "github.token",
+    }
+    host.files.update({folder / name: text for name, text in present.items()})
+
+    steps_machine.secrets(job)
+
+    assert [a.removeprefix("ask the owner: ") for a in host.actions if a.startswith("ask the owner: ")] == asked
+    assert [a for a in host.actions if a.startswith("write: ")] == [
+        f"write: {folder}/{w} {WARDEN_OWNED}" for w in written
+    ]
+
+
+@pytest.mark.parametrize(
+    ("first", "reached", "keep", "rolled"),
+    [
+        (True, install.FIRST_CHANGE, False, True),
+        (False, install.FIRST_CHANGE + 5, False, False),  # a reinstall: removing it would delete real work
+        (True, install.FIRST_CHANGE - 1, False, False),  # nothing was changed yet
+        (True, install.FIRST_CHANGE + 5, True, False),  # the owner keeps it to look at
+    ],
+    ids=["first-install", "reinstall", "before-any-change", "kept"],
+)
+def test_only_a_failed_first_install_is_taken_back(
+    tmp_path: Path, first: bool, reached: int, keep: bool, rolled: bool
+) -> None:
+    job = dry_job(tmp_path)
+    job.host.dry = False  # the decision for a real run; nothing here runs a step
+    job.first, job.reached = first, reached
+
+    assert install.rolls_back(job, keep=keep) is rolled

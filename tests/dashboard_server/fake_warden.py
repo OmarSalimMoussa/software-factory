@@ -53,6 +53,9 @@ class Launcher:
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         return StackResult(exit=0, tail="", log="stack.log")
 
+    def restart_daemon(self) -> None:
+        self.calls.append(("restart", None))
+
 
 class GitHub:
     def dispatch_promote(self, sha: str) -> str:
@@ -100,12 +103,13 @@ class FakeWarden:
 
     def _patch(self) -> None:
         """No Claude session runs on a test machine, and its agent user does not exist here: while this warden
-        answers, the module functions that look for them see the seeded agent home instead. stop() puts the real ones
-        back, so a later test in the same run never inherits these."""
-        self._real = (backstop.processes, launch.agent_home, codes.check_code)
-        places, accept, real = self.places, self.accept, codes.check_code
+        answers, the module functions that look for them see the seeded agent home instead, and a resume is recorded
+        as a start is. stop() puts the real ones back, so a later test in the same run never inherits these."""
+        self._real = (backstop.processes, launch.agent_home, launch.resume, codes.check_code)
+        places, accept, real, calls = self.places, self.accept, codes.check_code, self.launcher.calls
         backstop.processes = dict
         launch.agent_home = lambda: places.state / "agent-home"
+        launch.resume = lambda ctx, s, message: calls.append(("resume", (s.id, message)))
         if accept is not None:
 
             def check(ctx: Any, code: object, *, lock_exempt: bool = False) -> None:
@@ -139,5 +143,5 @@ class FakeWarden:
             self.server.server_close()
             self.server = None
         if self._real is not None:
-            backstop.processes, launch.agent_home, codes.check_code = self._real
+            backstop.processes, launch.agent_home, launch.resume, codes.check_code = self._real
             self._real = None

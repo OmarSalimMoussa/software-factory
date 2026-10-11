@@ -1,5 +1,5 @@
-"""A long action's steps (a push, a settings save, a change of repo, a pause) as the warden runs them; a finished one
-says what it did and which parts of the page to reload."""
+"""A long action's steps (a push, a settings save, a change of repo, a pause, a switch of Claude accounts) as the
+warden runs them; a finished one says what it did and which parts of the page to reload."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ _TITLES = {
     "push": "Pushing to prod",
     "push back": "Pushing prod back",
     "pause": "Pausing the factory",
+    "account": "Switching the Claude account",
 }
 _REFRESH = {
     "settings": ["settings", "shell"],
@@ -20,6 +21,7 @@ _REFRESH = {
     "push": ["home", "shell"],
     "push back": ["home", "shell"],
     "pause": ["agents", "home", "shell"],
+    "account": ["settings", "agents", "shell"],
 }
 
 
@@ -37,6 +39,7 @@ def operation(answer: dict[str, Any]) -> dict[str, Any]:
             "push": f"Prod runs {str(sha)[:7]}.",
             "push back": f"Prod runs {str(sha)[:7]} again.",
             "pause": "Paused. Every agent is benched with its work kept.",
+            "account": f"The agents now use {op['result'].get('name')}.",
         }.get(op["kind"], "Done.")
     return {
         "id": op["id"],

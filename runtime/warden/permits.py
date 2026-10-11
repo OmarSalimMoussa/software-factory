@@ -1,5 +1,6 @@
 """Who may start, and on what: the owner's approval (or the warden's own outage record), the vitals, the caps, the
-model the approved rung names, and never the factory's own repo.
+model the approved rung names, never the factory's own repo, and never while a switch of Claude accounts restarts
+the agents' daemon.
 
 Every check raises Refused with what to do instead. The queue's tasks and statuses and the slots' leases belong to
 their own modules; the calls into them sit at the bottom of this file, where a test replaces them.
@@ -10,6 +11,8 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 from runtime.queue import approvals, statuses, tasks
 from runtime.queue.formats import FormatError
@@ -18,8 +21,8 @@ from runtime.shared.models import DEPRIORITIZED, RETIRED, WAITING, WORKING, Sess
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.slots import leases
+from runtime.warden import ops, registry
 from runtime.warden import outage as outage_record
-from runtime.warden import registry
 from runtime.warden.context import Context
 
 ORCH, IMPL, DESIGN = "orchestrator", "implementer", "designer"
@@ -29,6 +32,8 @@ CAP = {IMPL: "caps.implementers", DESIGN: "caps.designers"}
 FACTORY_REPO = "software-factory"
 LEVELS = ("green", "amber", "red", "unknown")
 SEVERE = "severe"
+# Where a switch of Claude accounts stands: its daemon restarting, or back (runtime/warden/accounts.py).
+RESTARTING, BACK = "restarting", "back"
 _REMOTE_NAME = re.compile(r"([^/:]+?)(\.git)?/*$")
 
 
@@ -73,6 +78,34 @@ def check_vitals(ctx: Context, severe: bool) -> None:
         raise Refused("vitals", "the machine's vitals are red, so nothing starts; see factory status")
     if level != "green" and not severe:
         raise Refused("vitals", f"the machine's vitals are {level}, so only severe work starts; see factory status")
+
+
+def switch_path(ctx: Context) -> Path:
+    return ctx.places.state / "account-switch.json"
+
+
+def switching(ctx: Context) -> dict[str, Any] | None:
+    """The switch of Claude accounts under way, or None. A record whose operation no longer runs was left by a switch
+    the warden's own restart cut short (ops.recover marked it failed), and counts for nothing."""
+    try:
+        record = store.read_json(switch_path(ctx))
+    except FileNotFoundError:
+        return None
+    except store.StoreError as exc:
+        raise Refused("state", f"the account switch's record cannot be read ({exc}); the state needs a look") from exc
+    try:
+        op = ops.get(ctx, {"id": record["op"]}, None)["op"]
+    # telemetry: expected — the operation's file was pruned, so its switch is long over
+    except Refused:
+        return None
+    return dict(record) if op["state"] == ops.RUNNING else None
+
+
+def check_daemon(ctx: Context) -> None:
+    """Nothing starts or resumes while a switch of Claude accounts restarts the daemon that would host it."""
+    record = switching(ctx)
+    if record is not None and record["daemon"] != BACK:
+        raise Refused("switching", "the factory is switching Claude accounts; try again in a minute")
 
 
 def check_cap(settings: Settings, sessions: Iterable[Session], role: str) -> None:
