@@ -1,0 +1,17 @@
+# The factory's config modules for its process environment: runtime/shared/environment.py for its own programs and
+# standard/environment.py for the standard build and deploy commands, each the one reader of its family's variables.
+# The factory's tuning lives in settings.toml and is read by runtime/shared/settings.py, never from the environment.
+config_files = ["environment.py"]
+readers = []
+python_trees = ["runtime", "checks", "standard", "plugin"]
+# The factory has no browser or Rust code that reads an environment.
+script_trees = []
+rust_trees = []
+# The factory runs no compose service of its own whose keys this check could follow.
+accessors = {}
+optional = []
+env_files = {}
+services = []
+
+[allow]
+"runtime/system/drill_probe.py" = "a drill's probe: it reports whether a named variable reached the user it runs as, which is the wall the drill proves"

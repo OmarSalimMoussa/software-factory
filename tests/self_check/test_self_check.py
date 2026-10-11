@@ -30,7 +30,6 @@ NOT_APPLICABLE = {
 }
 # Each waits for its values, written by the slice of work that also clears what the check then finds.
 NOT_YET = {
-    "config-readers": "slice 4: one environment reader for each program family",
     "size-ceilings": "slice 5: oversized files and folders split by concern, with no pins",
     "error-telemetry": "slice 6: where each part's errors go, then every catch site and marker made true",
     "network-door": "slice 7: each outside service reached through one owner",
