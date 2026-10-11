@@ -128,3 +128,11 @@ def test_managed_settings_hold_only_the_guard_and_the_rulebook_loader() -> None:
 def test_a_template_naming_an_unknown_value_fails_loudly(tmp_path: Path) -> None:
     with pytest.raises(render.RenderError, match="nobody_gave_this"):
         render.render("User=@nobody_gave_this@\n", _values())
+
+
+def test_neither_user_that_runs_agent_code_reaches_the_dashboard_or_the_tailnet() -> None:
+    text = render.artifact(render.FIREWALL, HERE, _values(**{"dashboard.port": 8400}))
+    for user in ("software-agent", "software-stack"):
+        assert f'meta skuid "{user}" tcp dport 8400 reject with tcp reset' in text
+        assert f'meta skuid "{user}" ip daddr 100.64.0.0/10 meta l4proto tcp reject with tcp reset' in text
+        assert f'meta skuid "{user}" ip6 daddr fd7a:115c:a1e0::/48 meta l4proto tcp reject with tcp reset' in text

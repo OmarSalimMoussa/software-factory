@@ -1,5 +1,8 @@
-# The agent user never reaches the owner's dashboard: not its port on any address, and nothing on the tailnet, where
-# the dashboard is published. Loaded by software-firewall.service; the table is the factory's alone.
+# Neither user that runs agent-written code reaches the owner's dashboard or the tailnet: not the dashboard's port on
+# any address, and nothing on the tailnet, where the dashboard is published and where prod's pgweb and Postgres
+# answer. The agent user runs the sessions and the checks; the stack user runs scripts/dev, its image builds and,
+# through rootless Docker, every container a slot starts, whose traffic leaves through the stack user's own
+# processes. Loaded by software-firewall.service; the table is the factory's alone.
 table inet @nft_table@ {}
 delete table inet @nft_table@
 table inet @nft_table@ {
@@ -9,5 +12,8 @@ table inet @nft_table@ {
     # Tailscale's fixed address ranges: the dashboard's tailnet address lies in them.
     meta skuid "@agent_user@" ip daddr 100.64.0.0/10 meta l4proto tcp reject with tcp reset
     meta skuid "@agent_user@" ip6 daddr fd7a:115c:a1e0::/48 meta l4proto tcp reject with tcp reset
+    meta skuid "@stack_user@" tcp dport @dashboard_port@ reject with tcp reset
+    meta skuid "@stack_user@" ip daddr 100.64.0.0/10 meta l4proto tcp reject with tcp reset
+    meta skuid "@stack_user@" ip6 daddr fd7a:115c:a1e0::/48 meta l4proto tcp reject with tcp reset
   }
 }

@@ -363,6 +363,29 @@ def stack_not_root(rig: Rig) -> Result:
     return Result(name, ok, f"security options {_first(info.out)}; system socket: {_first(system.out)}")
 
 
+# Tailscale's own address on every tailnet; its DNS answers there over TCP too, so a wall that lets the tailnet through
+# shows as a connection.
+TAILNET_PROBE = "100.100.100.100"
+
+
+def stack_off_tailnet(rig: Rig) -> Result:
+    """Agent-written code runs as the stack user, in its image builds and its containers: none reaches the tailnet,
+    where prod's pgweb and Postgres answer, or the dashboard."""
+    name = "the stack user and a slot's container reach neither the tailnet nor the dashboard"
+    port = rig.settings.get_int("dashboard.port")
+    plain = rig.as_user(layout.STACK_USER, _probe(rig, f"tcp:{TAILNET_PROBE}:53", f"tcp:127.0.0.1:{port}"))
+    image = rig.as_user(layout.STACK_USER, ["docker", "inspect", "--format", "{{.Config.Image}}", "factory-postgres"])
+    seconds = rig.settings.get_int("watch.http_timeout_seconds")
+    target = f"tcp:{TAILNET_PROBE}:53"
+    script = (f"if timeout {seconds} bash -c 'exec 3<>/dev/tcp/{TAILNET_PROBE}/53'; then echo '{target} -> connected'; "
+              f"else echo '{target} -> refused'; fi")  # fmt: skip
+    inside = rig.as_user(layout.STACK_USER, ["docker", "run", "--rm", "--entrypoint", "bash", image.out.strip(), "-c",
+                                             script])  # fmt: skip
+    found = {**outcomes(plain.out), **{f"container {t}": o for t, o in outcomes(inside.out).items()}}
+    ok = image.code == 0 and len(found) == 3 and not _breached(plain.out) and not _breached(inside.out)
+    return Result(name, ok, "; ".join(f"{t} -> {o}" for t, o in found.items()) or _first(plain.out + inside.out))
+
+
 def shared_services_answer(rig: Rig) -> Result:
     """The stack user's Docker publishes GlitchTip and Langfuse on the loopback, where the slots' stacks and the
     warden reach them."""
@@ -426,6 +449,7 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
     toolchain_answers,
     stack_not_root,
     shared_services_answer,
+    stack_off_tailnet,
     dashboard_unreachable,
     warden_runs_commands,
     check_walled_in,

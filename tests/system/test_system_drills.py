@@ -340,3 +340,25 @@ def test_the_bubblewrap_drill_hides_bubblewrap_and_fails_when_the_command_still_
 )
 def test_the_check_drill_fails_on_any_way_out_of_the_checkout(check: dict[str, str], ok: bool) -> None:
     assert drills.check_walled_in(FakeRig(check=check)).ok is ok
+
+
+@pytest.mark.parametrize(
+    ("plain", "container", "ok"),
+    [
+        ("ECONNREFUSED", "refused", True),
+        ("connected", "refused", False),
+        ("ECONNREFUSED", "connected", False),
+        ("ECONNREFUSED", "", False),  # the container never ran: nothing is proved
+    ],
+    ids=["walled-off", "stack-user-through", "container-through", "no-container"],
+)
+def test_the_stack_drill_needs_both_the_user_and_a_container_walled_off(plain: str, container: str, ok: bool) -> None:
+    class Stack(FakeRig):
+        def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran:
+            if argv[:2] == ["docker", "inspect"]:
+                return Ran(0, "docker.io/postgres:17.10\n")
+            if argv[:2] == ["docker", "run"]:
+                return Ran(0, f"tcp:{drills.TAILNET_PROBE}:53 -> {container}\n" if container else "")
+            return Ran(0, "".join(f"{t} -> {plain}\n" for t in argv[4:]))
+
+    assert drills.stack_off_tailnet(Stack()).ok is ok
