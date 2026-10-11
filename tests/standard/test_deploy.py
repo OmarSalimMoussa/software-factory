@@ -10,7 +10,8 @@ from pathlib import Path
 import pytest
 from deploy_kit import COMPOSE, FACTORY_TOML, SERVICES_ENV, TEMPLATE, FakeClock, FakeDocker, FakeHealth
 
-from standard.server.deploy import Paths, Tools, main
+from standard.server.deploy import main
+from standard.server.deploy_inputs import Paths, Tools
 
 SHA = "abcdef12" + "0" * 32
 FACTORY = "f" * 40

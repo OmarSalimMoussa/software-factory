@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 from test_stack import CONFIG, FACTORY_TOML
 
-from standard.server import heartbeat, setup
+from standard.server import heartbeat, setup, setup_steps
 from standard.server import setup_machine as machine
 from standard.server.setup_machine import Host, SetupError
 from standard.services import provision, stack
@@ -51,7 +51,7 @@ class Server:
         self.ci = False
         self.ups = 0
         self.calls: list[list[str]] = []
-        ports = {str(p): {"HTTPS": True} for p in setup.SERVE_HTTPS} | {"5434": {"TCPForward": "127.0.0.1:5434"}}
+        ports = {str(p): {"HTTPS": True} for p in setup_steps.SERVE_HTTPS} | {"5434": {"TCPForward": "127.0.0.1:5434"}}
         web = {f"shop-box.tail0.ts.net:{p}": {"Handlers": {"/": {"Proxy": f"http://127.0.0.1:{p}"}}} for p in ports}
         self.served = {"TCP": ports, "Web": web}
 
@@ -93,9 +93,9 @@ class Server:
         if script == machine.MAKE_DIR:
             self.dirs[args[0]] = f"{args[1]} {args[2]}"
             return _cp(argv)
-        if script == setup._MANIFEST:
+        if script == setup_steps._MANIFEST:
             return _cp(argv, 0, "".join(f"{digest}  {path}\n" for path, digest in self.code.items()))
-        if script == setup._INSTALL_CODE:
+        if script == setup_steps._INSTALL_CODE:
             assert stdin is not None
             with tarfile.open(fileobj=io.BytesIO(base64.b64decode(stdin))) as tar:
                 files = [(m.name, tar.extractfile(m)) for m in tar.getmembers() if m.isfile()]
@@ -139,13 +139,13 @@ def make_job(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     bootstrap = {"token": "read-token", "factory_dsn": "http://k@factory-glitchtip:8000/1"}
     monkeypatch.setattr(provision, "bootstrap", lambda config, services, run: bootstrap)
 
-    def make(server: Server, *, dirty: str = "", fresh: bool = False, ref: str = "a" * 40) -> setup.Job:
+    def make(server: Server, *, dirty: str = "", fresh: bool = False, ref: str = "a" * 40) -> setup_steps.Job:
         def local(argv: list[str], stdin: str | None) -> subprocess.CompletedProcess[str]:
             answers = {"status": dirty, "rev-parse": "a" * 40 + "\n", "ls-files": "standard/config.py\0"}
             return _cp(argv, 0, answers[argv[3]])
 
         host = Host(server, dry_run=False)
-        return setup.Job(CONFIG, FACTORY_TOML, host, local, fresh, key, tmp_path / "home", factory, ref)
+        return setup_steps.Job(CONFIG, FACTORY_TOML, host, local, fresh, key, tmp_path / "home", factory, ref)
 
     return make
 
@@ -201,11 +201,11 @@ def test_the_ci_key_is_the_one_key_and_can_only_run_the_gate(make_job: Any) -> N
 
     gate = 'command="/usr/local/bin/factory-ci-gate",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding'
     assert server.files["/home/ci/.ssh/authorized_keys"] == ("ci:ci 600", f"{gate} {KEY}\n")
-    assert server.files[setup.SUDOERS] == (
+    assert server.files[setup_steps.SUDOERS] == (
         "root:root 440",
         "ci ALL=(deploy) NOPASSWD: /usr/local/bin/factory-deploy *\n",
     )
-    write = next(c for c in server.calls if setup.SUDOERS in c and machine.WRITE_FILE in c)
+    write = next(c for c in server.calls if setup_steps.SUDOERS in c and machine.WRITE_FILE in c)
     assert write[-1] == "visudo -cq -f"
 
 
@@ -268,7 +268,7 @@ def test_the_heartbeat_runs_on_the_server_once_it_has_prod_s_ping_address(make_j
     server = Server()
     first = make_job(server)
     setup.run(first)
-    assert setup.HEARTBEAT_CRON not in server.files
+    assert setup_steps.HEARTBEAT_CRON not in server.files
     assert any("--healthchecks-ping" in item for item in first.todo)
 
     second = make_job(server)
@@ -278,7 +278,7 @@ def test_the_heartbeat_runs_on_the_server_once_it_has_prod_s_ping_address(make_j
     setup.run(third)
 
     assert server.files[str(heartbeat.PING_FILE)] == ("root:deploy 640", "https://hc-ping.com/5f1c\n")
-    assert server.files[setup.HEARTBEAT_CRON][1].endswith("*/5 * * * * deploy /usr/local/bin/factory-heartbeat\n")
+    assert server.files[setup_steps.HEARTBEAT_CRON][1].endswith("*/5 * * * * deploy /usr/local/bin/factory-heartbeat\n")
     assert third.host.changes == [] and third.todo == []
 
 
@@ -329,7 +329,7 @@ def test_shared_service_secrets_are_kept_never_made_anew_over_a_blank_or_unreada
     assert stack.generate_env(CONFIG, kind="server", existing=held)["POSTGRES_PASSWORD"] == held["POSTGRES_PASSWORD"]
 
     server = Server()
-    server.answers[("sudo", "-n", "sh", "-c", machine.READ_FILE, "read", f"{setup.SERVICES}/{stack.ENV_FILE}")] = (
-        1, "", "cat: Permission denied")  # fmt: skip
+    env_file = f"{setup_steps.SERVICES}/{stack.ENV_FILE}"
+    server.answers[("sudo", "-n", "sh", "-c", machine.READ_FILE, "read", env_file)] = (1, "", "cat: Permission denied")
     with pytest.raises(SetupError, match="on the server but cannot be read"):
         setup.run(make_job(server))
