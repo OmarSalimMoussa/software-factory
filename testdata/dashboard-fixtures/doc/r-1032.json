@@ -3,6 +3,8 @@
   "id": "r-1032",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "asdf test",
   "when": "Oct 7, 18:30 UTC · 2 days ago",
   "fm": [

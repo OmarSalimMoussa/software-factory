@@ -25,7 +25,7 @@ function pLibrary(env) {
   if (!d) return head + part(env, 'library', () => '');
   const L = UI.lib, res = d.results.filter(r => !r.broken);
   if (!res.find(r => r.id === L.sel) && !isPhone()) L.sel = res[0] ? res[0].id : null;
-  const look = k => { const x = d.kinds.find(y => y.key === k); return x ? ktile(x.icon, x.tone) : kindTile(k); };
+  const look = k => { const x = d.kinds.find(y => y.key === k); return ktile(x.icon, x.tone); };
   return `${head}
     <div class="lib">
       <div class="card filters">
@@ -51,7 +51,7 @@ function readerHTML(id) {
 }
 function docHTML(d) {
   const fmVal = v => { const t = v.doc ? `<span class="doclink" data-open-doc="${esc(v.doc)}" tabindex="0">${esc(v.text)}</span>` : esc(v.text); return v.tone == null ? t : `<span class="chip ${esc(v.tone)}">${t}</span>`; };
-  return `<div class="doc-head">${kindTile(d.kind)}<div><div class="dh-kind">${esc(d.kind_label)} <span class="faint mono" style="font-weight:500">${esc(d.id)}</span></div><div class="dh-when">${esc(d.when)}</div></div></div>${d.fm.length ? `<dl class="fm-grid">${d.fm.map(f => `<div><dt>${esc(f.label)}</dt><dd>${f.values.map(fmVal).join(' ')}</dd></div>`).join('')}</dl>` : ''}${safeHtml(d.html)}${d.art_url ? `<div class="spec-full"><span class="ico">${icon('document-text')}</span><div style="flex:1;min-width:0"><b>The full spec</b><div class="muted" style="font-size:12px">Design, diagram, mock-ups, QA and critic rounds, in its Claude artifact</div></div><a class="btn sm primary" href="${esc(d.art_url)}" target="_blank" rel="noopener">${icon('arrow-top-right-on-square', 'sm')}Open spec artifact</a></div>` : ''}`;
+  return `<div class="doc-head">${ktile(d.kind_icon, d.kind_tone)}<div><div class="dh-kind">${esc(d.kind_label)} <span class="faint mono" style="font-weight:500">${esc(d.id)}</span></div><div class="dh-when">${esc(d.when)}</div></div></div>${d.fm.length ? `<dl class="fm-grid">${d.fm.map(f => `<div><dt>${esc(f.label)}</dt><dd>${f.values.map(fmVal).join(' ')}</dd></div>`).join('')}</dl>` : ''}${safeHtml(d.html)}${d.art_url ? `<div class="spec-full"><span class="ico">${icon('document-text')}</span><div style="flex:1;min-width:0"><b>The full spec</b><div class="muted" style="font-size:12px">Design, diagram, mock-ups, QA and critic rounds, in its Claude artifact</div></div><a class="btn sm primary" href="${esc(d.art_url)}" target="_blank" rel="noopener">${icon('arrow-top-right-on-square', 'sm')}Open spec artifact</a></div>` : ''}`;
 }
 async function loadDoc(id) {
   let env;

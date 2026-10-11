@@ -3,6 +3,8 @@
   "id": "r-1003",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "This is great!",
   "when": "Oct 2, 14:48 UTC · 7 days ago",
   "fm": [

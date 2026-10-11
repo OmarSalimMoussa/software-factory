@@ -31,7 +31,7 @@ class Doc:
     raw: dict[str, Any]
 
     def chips(self) -> list[dict[str, Any]]:
-        out = [{"text": self.id, "tone": KIND_LOOK[self.kind][2], "mono": True}]
+        out = [{"text": self.id, "tone": KIND_LOOK[self.kind].tone, "mono": True}]
         tone = REFLECT_TONES.get(self.status) if self.kind == "reflection" else STATUS_TONES.get(self.status, "")
         out.append({"text": self.status, "tone": tone or ""})
         if self.inbox:

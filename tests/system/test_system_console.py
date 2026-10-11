@@ -110,6 +110,16 @@ def test_the_console_answers_only_its_own_page(tmp_path: Path, method: str, path
     assert _post(console, cookie, "/api/dismiss", {}).status == 200  # the same request, from the page, is taken
 
 
+@pytest.mark.parametrize(
+    ("state", "mark"), [("waiting", "ring"), ("running", "spin"), ("done", "check"), ("failed", "x-mark")]
+)
+def test_each_phase_says_how_the_page_draws_it(tmp_path: Path, state: str, mark: str) -> None:
+    console = _console(tmp_path)
+    run = Run("install", "marks", True, ("A phase",), 1, console.owner, Journal(tmp_path / "m.log", terminal=False))
+    run.rows[0].state = state
+    assert run.view()["phases"][0]["mark"] == mark
+
+
 def test_an_answer_reaches_the_step_that_asked_and_never_the_page_or_the_log(
     tmp_path: Path, caplog: pytest.LogCaptureFixture, capsys: pytest.CaptureFixture[str]
 ) -> None:

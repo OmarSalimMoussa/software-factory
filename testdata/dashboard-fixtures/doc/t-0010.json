@@ -3,6 +3,8 @@
   "id": "t-0010",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Team workspaces with roles",
   "when": "Oct 6, 11:00 UTC · 3 days ago",
   "fm": [

@@ -3,6 +3,8 @@
   "id": "t-0009",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Export to a spreadsheet app",
   "when": "Oct 5, 10:00 UTC · 4 days ago",
   "fm": [

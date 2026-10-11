@@ -3,6 +3,8 @@
   "id": "r-1020",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "intake: duplicate of the sign-in loop",
   "when": "Oct 5, 14:54 UTC · 4 days ago",
   "fm": [

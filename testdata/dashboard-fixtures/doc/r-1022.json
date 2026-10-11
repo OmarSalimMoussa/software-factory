@@ -3,6 +3,8 @@
   "id": "r-1022",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "The approve button moves when I hover it",
   "when": "Oct 5, 22:30 UTC · 4 days ago",
   "fm": [

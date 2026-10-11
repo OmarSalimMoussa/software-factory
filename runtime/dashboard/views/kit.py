@@ -12,7 +12,7 @@ import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 from runtime.shared.settings import Settings
 
@@ -61,13 +61,24 @@ INITIALS = {"orch": "OR", "intake": "IN", "design": "DS", "impl": "IM", "qa": "Q
 SURFACES = {"ui": "UI", "api": "API", "access": "Access", "desktop": "Desktop", "none": "No runtime change"}
 SEVERITY_TONES = {"severe": "bad", "major": "warn", "minor": ""}
 INBOX_TONES = {"users": "pink", "owner": "violet", "agents": "info"}
+
+
+class KindLook(NamedTuple):
+    """How the pages show one kind of file: its name, the name of a group of them, its icon and its tone."""
+
+    name: str
+    group: str
+    icon: str
+    tone: str
+
+
 KIND_LOOK = {
-    "goal": ("Goal", "flag", "accent"),
-    "task": ("Tasks", "queue-list", "info"),
-    "request": ("Requests", "chat-bubble-left-right", "amber"),
-    "spec": ("Specs", "document-text", "violet"),
-    "check": ("Checks", "check-circle", "good"),
-    "reflection": ("Reflections", "light-bulb", "pink"),
+    "goal": KindLook("Goal", "Goal", "flag", "accent"),
+    "task": KindLook("Task", "Tasks", "queue-list", "info"),
+    "request": KindLook("Request", "Requests", "chat-bubble-left-right", "amber"),
+    "spec": KindLook("Spec", "Specs", "document-text", "violet"),
+    "check": KindLook("Check", "Checks", "check-circle", "good"),
+    "reflection": KindLook("Reflection", "Reflections", "light-bulb", "pink"),
 }
 REFLECT_TONES = {
     "miss": "bad",

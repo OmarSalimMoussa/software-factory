@@ -3,6 +3,8 @@
   "id": "t-0018",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Dark-mode contrast on status words",
   "when": "Oct 7, 09:00 UTC · 2 days ago",
   "fm": [

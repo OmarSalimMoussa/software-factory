@@ -3,6 +3,8 @@
   "id": "r-1016",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "qa-visual: account menu clips at 390 px",
   "when": "Oct 4, 20:42 UTC · 5 days ago",
   "fm": [

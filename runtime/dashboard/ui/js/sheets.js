@@ -135,11 +135,11 @@ function openOps() { try { return JSON.parse(sessionStorage.getItem(OPS) || '[]'
 function keepOps(list) { try { sessionStorage.setItem(OPS, JSON.stringify(list)); } catch (e) { /* without storage an operation is followed only until the page reloads */ } }
 const holdOp = (id, title) => keepOps(openOps().filter(o => o.id !== id).concat([{id, title}]));
 const forgetOp = id => keepOps(openOps().filter(o => o.id !== id));
-const STEP = {done: ['done', () => icon('check', 'sm')], running: ['on', () => '<span class="spin"></span>'], failed: ['failed', () => icon('x-mark', 'sm')]};
 function drawSteps(op) {
   const ul = document.getElementById('steps-' + op.id); if (!ul) return;
   $('#sheet-title').textContent = op.title;
-  ul.innerHTML = op.steps.map(s => { const [cls, mark] = STEP[s.state] || ['', () => '<span class="dot ring"></span>']; return `<li class="${cls}">${mark()}<span>${esc(s.text)}${s.detail ? `<span class="detail">${esc(s.detail)}</span>` : ''}</span></li>`; }).join('');
+  const mark = m => m === 'spin' ? '<span class="spin"></span>' : m === 'ring' ? '<span class="dot ring"></span>' : icon(m, 'sm');
+  ul.innerHTML = op.steps.map(s => `<li class="${s.look.cls}">${mark(s.look.mark)}<span>${esc(s.text)}${s.detail ? `<span class="detail">${esc(s.detail)}</span>` : ''}</span></li>`).join('');
 }
 async function runOp(id, title, quiet) {
   holdOp(id, title);

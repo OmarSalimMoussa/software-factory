@@ -11,6 +11,7 @@ import pytest
 from dashboard_rig import Rig
 from dashboard_seed import FIXTURES, STAGING, iso
 
+from runtime.dashboard.views import ops
 from runtime.dashboard.views.settings import LABELS
 from runtime.shared import models, store
 from runtime.shared.settings import SCHEMA
@@ -106,6 +107,28 @@ def test_every_page_has_the_fixture_shapes(rig: Rig, url: str, fixtures: list[st
         for part, theirs in _fixture(name).items():
             assert part in parts, f"{url} has no {part}"
             assert shape(parts[part]["data"], theirs, part) == []
+
+
+def test_a_file_found_by_search_carries_the_look_of_its_kind(rig: Rig) -> None:
+    found = rig.parts("/api/search?q=upload")["search"]["data"]
+    tasks = next(group["items"] for group in found["groups"] if group["label"] == "Tasks")
+    assert tasks[0]["icon"] == {"kind": "ktile", "key": "queue-list", "tone": "info"}
+
+
+@pytest.mark.parametrize(
+    ("state", "look"),
+    [
+        ("waiting", {"cls": "", "mark": "ring"}),
+        ("running", {"cls": "on", "mark": "spin"}),
+        ("done", {"cls": "done", "mark": "check"}),
+        ("failed", {"cls": "failed", "mark": "x-mark"}),
+    ],
+)
+def test_each_step_of_an_operation_says_how_the_page_draws_it(state: str, look: dict[str, str]) -> None:
+    op = {"id": "op-1", "kind": "account", "state": "running", "result": {}, "steps": [
+        {"text": "Switch the account", "state": state, "detail": ""}
+    ]}  # fmt: skip
+    assert ops.operation({"op": op})["steps"][0]["look"] == look
 
 
 def test_the_outage_band_has_the_fixture_shape(rig: Rig) -> None:

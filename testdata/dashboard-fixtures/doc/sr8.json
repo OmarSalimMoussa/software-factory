@@ -3,6 +3,8 @@
   "id": "sr8",
   "kind": "reflection",
   "kind_label": "Reflection",
+  "kind_icon": "light-bulb",
+  "kind_tone": "pink",
   "title": "A regression check ran before the slot had rebuilt, and passed on the …",
   "when": "Oct 6, 18:00 UTC · 3 days ago",
   "fm": [

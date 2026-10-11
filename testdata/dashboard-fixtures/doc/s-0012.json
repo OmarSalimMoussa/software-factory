@@ -3,6 +3,8 @@
   "id": "s-0012",
   "kind": "spec",
   "kind_label": "Spec",
+  "kind_icon": "document-text",
+  "kind_tone": "violet",
   "title": "Usage page: totals per day",
   "when": "Oct 6, 12:00 UTC · 3 days ago",
   "fm": [

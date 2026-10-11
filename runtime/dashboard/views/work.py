@@ -197,6 +197,11 @@ def parked(snap: Snap) -> dict[str, Any]:
     return {"rows": [row for _, row in sorted(rows, key=lambda x: x[0], reverse=True)]}
 
 
+# The class of the dot each QA result draws on the checks tab: app.css colours a dot with no class as a pass, f as a
+# failure and b as blocked.
+_RESULT_DOT = {"pass": "", "fail": "f", "blocked": "b"}
+
+
 def checks(snap: Snap) -> dict[str, Any]:
     queue = snap.get("queue")
     rows: list[dict[str, Any]] = [
@@ -211,7 +216,10 @@ def checks(snap: Snap) -> dict[str, Any]:
                 "merge": c["title"],
                 "sha": c["commit"][:7],
                 "age": ago(epoch(c["at"]), snap.now),
-                "results": [{"scenario": r["scenario"], "state": r["result"]} for r in c["rows"]],
+                "results": [
+                    {"scenario": r["scenario"], "state": r["result"], "cls": _RESULT_DOT[r["result"]]}
+                    for r in c["rows"]
+                ],
                 "summary": f"{passed} of {len(c['rows'])} passed",
                 "tone": "bad" if failed else "good",
             }

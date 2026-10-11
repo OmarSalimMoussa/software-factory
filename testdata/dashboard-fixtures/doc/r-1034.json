@@ -3,6 +3,8 @@
   "id": "r-1034",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "Empty pages feel broken; tell people what to do next",
   "when": "Oct 8, 02:06 UTC · 2 days ago",
   "fm": [

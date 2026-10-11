@@ -3,6 +3,8 @@
   "id": "t-0012",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Usage page: totals per day",
   "when": "Oct 5, 09:00 UTC · 4 days ago",
   "fm": [

@@ -25,9 +25,7 @@ const cv = c => c.startsWith('--') ? `var(${c})` : c;
 const pill = (text, tone = '', extra = '') => `<span class="chip ${tone} ${extra}">${esc(text)}</span>`;
 const chip = c => pill(c.text, c.tone || '', c.mono ? 'mono' : '');
 const ava = (family, initials, size) => `<span class="ava ${family}"${size ? ` style="width:${size}px;height:${size}px;font-size:10px"` : ''}>${esc(initials || '')}</span>`;
-const KIND_LOOK = {goal: ['flag', 'accent'], task: ['queue-list', 'info'], request: ['chat-bubble-left-right', 'amber'], spec: ['document-text', 'violet'], check: ['check-circle', 'good'], reflection: ['light-bulb', 'pink']};
 const ktile = (ic, tone) => { const c = toneColor(tone); return `<span class="ktile" style="color:${c};background:color-mix(in srgb,${c} 15%,transparent)">${sicon(ic)}</span>`; };
-const kindTile = k => KIND_LOOK[k] ? ktile(...KIND_LOOK[k]) : `<span class="ktile">${icon('document-text', 'sm')}</span>`;
 /* A picture is an image the server serves under its own strict policy; a picture that fails to load says so in place. */
 const picture = (url, alt) => url ? `<img src="${esc(url)}" alt="${esc(alt || '')}" loading="lazy">` : `<span class="pic-gone">No picture</span>`;
 document.addEventListener('error', e => { const t = e.target; if (t.tagName === 'IMG' && !t.dataset.gone) { t.dataset.gone = '1'; t.outerHTML = '<span class="pic-gone">The picture could not be shown.</span>'; } }, true);

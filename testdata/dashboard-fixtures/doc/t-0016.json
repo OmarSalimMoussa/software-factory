@@ -3,6 +3,8 @@
   "id": "t-0016",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Billing page shows credit after a refund",
   "when": "Oct 8, 08:00 UTC · yesterday",
   "fm": [

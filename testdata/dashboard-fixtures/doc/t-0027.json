@@ -3,6 +3,8 @@
   "id": "t-0027",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Billing: the credit line shows twice",
   "when": "Oct 9, 08:40 UTC · 6 h ago",
   "fm": [

@@ -3,6 +3,8 @@
   "id": "t-0014",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Clearer empty states on Projects and Invoices",
   "when": "Oct 7, 11:00 UTC · 2 days ago",
   "fm": [

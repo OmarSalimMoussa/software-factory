@@ -3,6 +3,8 @@
   "id": "t-0025",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Show who sent each piece of feedback",
   "when": "Oct 6, 14:00 UTC · 3 days ago",
   "fm": [

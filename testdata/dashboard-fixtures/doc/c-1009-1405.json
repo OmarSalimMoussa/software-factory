@@ -3,6 +3,8 @@
   "id": "c-1009-1405",
   "kind": "check",
   "kind_label": "Check",
+  "kind_icon": "check-circle",
+  "kind_tone": "good",
   "title": "Merge t-0015: a scenario failed",
   "when": "Oct 9, 14:05 UTC · 25 min ago",
   "fm": [

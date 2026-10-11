@@ -3,6 +3,8 @@
   "id": "sr2",
   "kind": "reflection",
   "kind_label": "Reflection",
+  "kind_icon": "light-bulb",
+  "kind_tone": "pink",
   "title": "“Testers should never wait on a build; give them a seed to start from …",
   "when": "Oct 9, 11:40 UTC · 3 h ago",
   "fm": [

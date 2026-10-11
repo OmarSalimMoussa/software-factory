@@ -3,6 +3,8 @@
   "id": "r-1023",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "I want teams with roles",
   "when": "Oct 6, 03:48 UTC · 3 days ago",
   "fm": [

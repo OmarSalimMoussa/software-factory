@@ -22,6 +22,8 @@ from runtime.system.uninstall import LookingHost
 
 WAITING, RUNNING, DONE, FAILED = "waiting", "running", "done", "failed"
 STATE_TEXT = {WAITING: "Waiting", RUNNING: "Running", DONE: "Done", FAILED: "Failed"}
+# The mark the page draws beside a phase: an icon, or its own spinner or empty ring.
+STATE_MARK = {WAITING: "ring", RUNNING: "spin", DONE: "check", FAILED: "x-mark"}
 
 
 @dataclass
@@ -134,7 +136,10 @@ class Run:
 
     def view(self) -> dict[str, Any]:
         with self.cond:
-            phases = [{"title": r.title, "state": r.state, "state_text": STATE_TEXT[r.state]} for r in self.rows]
+            phases = [
+                {"title": r.title, "state": r.state, "state_text": STATE_TEXT[r.state], "mark": STATE_MARK[r.state]}
+                for r in self.rows
+            ]
             if self.ending is None:
                 chip = {"text": "Running", "tone": "accent"}
             else:

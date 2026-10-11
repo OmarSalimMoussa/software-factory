@@ -3,6 +3,8 @@
   "id": "r-1021",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "How do I cancel?",
   "when": "Oct 5, 20:12 UTC · 4 days ago",
   "fm": [

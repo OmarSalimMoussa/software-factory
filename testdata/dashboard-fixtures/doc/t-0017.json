@@ -3,6 +3,8 @@
   "id": "t-0017",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Sign-in sends people back to the sign-in page",
   "when": "Oct 8, 09:10 UTC · yesterday",
   "fm": [

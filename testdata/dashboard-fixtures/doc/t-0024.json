@@ -3,6 +3,8 @@
   "id": "t-0024",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Phone width: the account menu clips",
   "when": "Oct 8, 12:00 UTC · yesterday",
   "fm": [

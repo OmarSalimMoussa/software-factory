@@ -3,6 +3,8 @@
   "id": "r-1039",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "Make the billing credit line clearer",
   "when": "Oct 9, 01:36 UTC · 13 h ago",
   "fm": [

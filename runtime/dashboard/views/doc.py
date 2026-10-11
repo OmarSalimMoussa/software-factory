@@ -9,6 +9,7 @@ from runtime.dashboard import markdown
 from runtime.dashboard.views import docs
 from runtime.dashboard.views.kit import (
     INBOX_TONES,
+    KIND_LOOK,
     REFLECT_TONES,
     SEVERITY_TONES,
     SURFACES,
@@ -23,14 +24,6 @@ from runtime.dashboard.views.kit import (
 from runtime.queue.formats import outcome
 
 WANTS = (*docs.WANTS, "specs")
-_KIND_LABELS = {
-    "goal": "Goal",
-    "task": "Task",
-    "request": "Request",
-    "spec": "Spec",
-    "check": "Check",
-    "reflection": "Reflection",
-}
 
 
 def _value(text: str, tone: str | None = None, doc: str | None = None) -> dict[str, Any]:
@@ -118,7 +111,9 @@ def reader(snap: Snap, ref: str) -> dict[str, Any]:
     return {
         "id": doc.id,
         "kind": doc.kind,
-        "kind_label": _KIND_LABELS[doc.kind],
+        "kind_label": KIND_LOOK[doc.kind].name,
+        "kind_icon": KIND_LOOK[doc.kind].icon,
+        "kind_tone": KIND_LOOK[doc.kind].tone,
         "title": doc.title,
         "when": f"{when(doc.at, utc=True)} · {ago(doc.at, snap.now)}",
         "fm": fm,

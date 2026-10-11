@@ -3,6 +3,8 @@
   "id": "t-0023",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Partner sign-in from the import step",
   "when": "Oct 7, 15:45 UTC · 2 days ago",
   "fm": [

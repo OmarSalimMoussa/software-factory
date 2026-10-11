@@ -3,6 +3,8 @@
   "id": "t-0028",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Store listing screenshots",
   "when": "Oct 9, 07:15 UTC · 7 h ago",
   "fm": [

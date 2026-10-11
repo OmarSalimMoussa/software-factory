@@ -3,6 +3,8 @@
   "id": "sr7",
   "kind": "reflection",
   "kind_label": "Reflection",
+  "kind_icon": "light-bulb",
+  "kind_tone": "pink",
   "title": "Two minutes per item is too short for a scenario that waits for a larg…",
   "when": "Oct 7, 10:10 UTC · 2 days ago",
   "fm": [

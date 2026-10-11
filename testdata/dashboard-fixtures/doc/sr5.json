@@ -3,6 +3,8 @@
   "id": "sr5",
   "kind": "reflection",
   "kind_label": "Reflection",
+  "kind_icon": "light-bulb",
+  "kind_tone": "pink",
   "title": "Restarted the orchestrator after 41 minutes of silence while idle.",
   "when": "Oct 8, 03:12 UTC · yesterday",
   "fm": [

@@ -3,6 +3,8 @@
   "id": "t-0021",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Staging is down after the last deploy",
   "when": "Oct 9, 13:55 UTC · 35 min ago",
   "fm": [

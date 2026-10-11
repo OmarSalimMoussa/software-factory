@@ -3,6 +3,8 @@
   "id": "r-1035",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "The upload stopped at 80% and did not resume",
   "when": "Oct 8, 07:24 UTC · yesterday",
   "fm": [

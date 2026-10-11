@@ -3,6 +3,8 @@
   "id": "sr3",
   "kind": "reflection",
   "kind_label": "Reflection",
+  "kind_icon": "light-bulb",
+  "kind_tone": "pink",
   "title": "Three check runs were not enough after a rebase onto a moved migration.",
   "when": "Oct 8, 19:20 UTC · 19 h ago",
   "fm": [

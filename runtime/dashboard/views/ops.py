@@ -24,6 +24,15 @@ _REFRESH = {
     "account": ["settings", "agents", "shell"],
 }
 
+# How the sheet draws a step in each state the warden reports: a class for its row, and a mark that is an icon or the
+# page's own spinner or empty ring.
+_STEP_LOOK = {
+    "waiting": {"cls": "", "mark": "ring"},
+    "running": {"cls": "on", "mark": "spin"},
+    "done": {"cls": "done", "mark": "check"},
+    "failed": {"cls": "failed", "mark": "x-mark"},
+}
+
 
 def operation(answer: dict[str, Any]) -> dict[str, Any]:
     """The op.get answer as the sheet shows it; a finished one says what it did and which parts to reload."""
@@ -46,6 +55,9 @@ def operation(answer: dict[str, Any]) -> dict[str, Any]:
         "title": _TITLES.get(op["kind"], "Working"),
         "state": op["state"],
         # The warden's details are clauses; the owner reads them as sentences.
-        "steps": [{**step, "detail": step["detail"][:1].upper() + step["detail"][1:]} for step in op["steps"]],
+        "steps": [
+            {**step, "detail": step["detail"][:1].upper() + step["detail"][1:], "look": _STEP_LOOK[step["state"]]}
+            for step in op["steps"]
+        ],
         "result": result,
     }

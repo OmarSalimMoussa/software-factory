@@ -3,6 +3,8 @@
   "id": "t-0015",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Invoice list loads slowly with 200 items",
   "when": "Oct 7, 13:00 UTC · 2 days ago",
   "fm": [

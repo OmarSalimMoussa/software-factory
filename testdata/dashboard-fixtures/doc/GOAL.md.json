@@ -3,6 +3,8 @@
   "id": "GOAL.md",
   "kind": "goal",
   "kind_label": "Goal",
+  "kind_icon": "flag",
+  "kind_tone": "accent",
   "title": "GOAL.md",
   "when": "Oct 6, 09:00 UTC · 3 days ago",
   "fm": [

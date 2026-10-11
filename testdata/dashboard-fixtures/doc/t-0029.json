@@ -3,6 +3,8 @@
   "id": "t-0029",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Keep the last-used currency",
   "when": "Oct 8, 15:00 UTC · yesterday",
   "fm": [

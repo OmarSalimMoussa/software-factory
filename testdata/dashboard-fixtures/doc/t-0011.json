@@ -3,6 +3,8 @@
   "id": "t-0011",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Keyboard shortcuts for invoices",
   "when": "Oct 7, 09:30 UTC · 2 days ago",
   "fm": [

@@ -3,6 +3,8 @@
   "id": "sr4",
   "kind": "reflection",
   "kind_label": "Reflection",
+  "kind_icon": "light-bulb",
+  "kind_tone": "pink",
   "title": "Routed to rung 1, but the cause spanned two services; the intake verdi…",
   "when": "Oct 8, 16:00 UTC · 22 h ago",
   "fm": [

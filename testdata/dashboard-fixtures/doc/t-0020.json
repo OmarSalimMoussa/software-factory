@@ -3,6 +3,8 @@
   "id": "t-0020",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Long project names wrap badly",
   "when": "Oct 8, 10:00 UTC · yesterday",
   "fm": [

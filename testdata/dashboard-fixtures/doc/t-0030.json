@@ -3,6 +3,8 @@
   "id": "t-0030",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Import skips empty rows without saying so",
   "when": "Oct 7, 17:00 UTC · 2 days ago",
   "fm": [

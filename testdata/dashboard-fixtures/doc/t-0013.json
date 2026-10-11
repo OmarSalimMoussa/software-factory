@@ -3,6 +3,8 @@
   "id": "t-0013",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Invoice page: the Approve button jumps",
   "when": "Oct 7, 10:00 UTC · 2 days ago",
   "fm": [

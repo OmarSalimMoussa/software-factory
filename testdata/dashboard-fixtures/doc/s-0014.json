@@ -3,6 +3,8 @@
   "id": "s-0014",
   "kind": "spec",
   "kind_label": "Spec",
+  "kind_icon": "document-text",
+  "kind_tone": "violet",
   "title": "Clearer empty states",
   "when": "Oct 8, 10:00 UTC · yesterday",
   "fm": [

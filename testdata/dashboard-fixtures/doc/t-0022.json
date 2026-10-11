@@ -3,6 +3,8 @@
   "id": "t-0022",
   "kind": "task",
   "kind_label": "Task",
+  "kind_icon": "queue-list",
+  "kind_tone": "info",
   "title": "Retry an upload that drops midway",
   "when": "Oct 8, 16:20 UTC · 22 h ago",
   "fm": [

@@ -3,6 +3,8 @@
   "id": "r-1036",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "Export never finishes for my year-end report",
   "when": "Oct 8, 12:42 UTC · yesterday",
   "fm": [

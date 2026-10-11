@@ -3,6 +3,8 @@
   "id": "c-1009-1110",
   "kind": "check",
   "kind_label": "Check",
+  "kind_icon": "check-circle",
+  "kind_tone": "good",
   "title": "Merge t-0016: every scenario passed",
   "when": "Oct 9, 11:10 UTC · 3 h ago",
   "fm": [

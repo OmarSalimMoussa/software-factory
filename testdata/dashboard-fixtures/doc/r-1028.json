@@ -3,6 +3,8 @@
   "id": "r-1028",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "Is there a keyboard shortcut to send an invoice?",
   "when": "Oct 7, 00:18 UTC · 3 days ago",
   "fm": [

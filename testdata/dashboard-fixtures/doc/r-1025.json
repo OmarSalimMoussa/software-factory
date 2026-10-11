@@ -3,6 +3,8 @@
   "id": "r-1025",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "Prepare the store listing screenshots",
   "when": "Oct 6, 11:24 UTC · 3 days ago",
   "fm": [

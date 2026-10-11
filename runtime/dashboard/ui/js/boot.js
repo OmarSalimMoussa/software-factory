@@ -23,7 +23,7 @@ async function gsFetch(q) {
   UI.gs.data = p.ok ? p.data : null; UI.gs.error = p.ok ? null : `Search failed: ${p.error}`; drawGs();
 }
 const gsMark = (s, q) => { const e = esc(s), n = q.trim(); if (!n) return e; return e.replace(new RegExp('(' + esc(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig'), '<mark>$1</mark>'); };
-const gsIcon = i => i.kind === 'ktile' ? kindTile(i.key) : i.kind === 'ava' ? `<span class="ava ${esc(i.key)}" style="width:30px;height:30px;font-size:10px">${esc(i.text || '')}</span>` : `<span class="ico">${icon(i.key, 'sm')}</span>`;
+const gsIcon = i => i.kind === 'ktile' ? ktile(i.key, i.tone) : i.kind === 'ava' ? `<span class="ava ${esc(i.key)}" style="width:30px;height:30px;font-size:10px">${esc(i.text || '')}</span>` : `<span class="ico">${icon(i.key, 'sm')}</span>`;
 function drawGs() {
   const pop = $('#gs-pop'), q = UI.gs.q;
   if (!q.trim()) { pop.hidden = true; $('#gq').setAttribute('aria-expanded', 'false'); return; }

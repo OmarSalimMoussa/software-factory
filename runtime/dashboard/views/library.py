@@ -77,13 +77,13 @@ def library(snap: Snap, query: Query) -> dict[str, Any]:
         "kinds": [
             {
                 "key": key,
-                "label": label,
+                "label": look.group,
                 "count": sum(1 for d in found if d.kind == key),
                 "checked": key in kinds,
-                "icon": icon,
-                "tone": tone,
+                "icon": look.icon,
+                "tone": look.tone,
             }
-            for key, (label, icon, tone) in KIND_LOOK.items()
+            for key, look in KIND_LOOK.items()
         ],
         "ranges": RANGES,
         "range": query.get("range", "all"),

@@ -3,6 +3,8 @@
   "id": "s-0023",
   "kind": "spec",
   "kind_label": "Spec",
+  "kind_icon": "document-text",
+  "kind_tone": "violet",
   "title": "Partner sign-in from the import step",
   "when": "Oct 7, 18:00 UTC · 2 days ago",
   "fm": [

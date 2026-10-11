@@ -3,6 +3,8 @@
   "id": "r-1019",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "Usage page should show totals per day",
   "when": "Oct 5, 09:36 UTC · 4 days ago",
   "fm": [

@@ -3,6 +3,8 @@
   "id": "r-1017",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "Login loop on Safari",
   "when": "Oct 5, 02:00 UTC · 4 days ago",
   "fm": [

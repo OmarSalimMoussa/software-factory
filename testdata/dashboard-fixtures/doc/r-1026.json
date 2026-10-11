@@ -3,6 +3,8 @@
   "id": "r-1026",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "qa-backend: the invoice list takes 4 s with 200 items",
   "when": "Oct 6, 16:42 UTC · 3 days ago",
   "fm": [

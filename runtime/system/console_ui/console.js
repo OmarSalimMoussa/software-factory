@@ -107,7 +107,7 @@ function renderUninstall(u) {
 }
 
 /* ---------- a run: its phases, the question it waits on, and how it ended ---------- */
-const MARK = {waiting: () => '<span class="dot ring"></span>', running: () => '<span class="spin"></span>', done: () => icon('check', 'sm'), failed: () => icon('x-mark', 'sm')};
+const mark = m => m === 'spin' ? '<span class="spin"></span>' : m === 'ring' ? '<span class="dot ring"></span>' : icon(m, 'sm');
 function renderRun(run) {
   const sec = $('#run-sec');
   S.run = run;
@@ -132,7 +132,7 @@ function renderRun(run) {
       ol.insertAdjacentHTML('beforeend', `<li class="cphase" data-i="${i}"><span class="cmark"></span><span class="ct"></span><span class="cs"></span></li>`);
       li = ol.lastElementChild; $('.ct', li).textContent = ph.title;
     }
-    if (li.dataset.state !== ph.state) { li.dataset.state = ph.state; $('.cmark', li).innerHTML = MARK[ph.state](); $('.cs', li).textContent = ph.state_text; }
+    if (li.dataset.state !== ph.state) { li.dataset.state = ph.state; $('.cmark', li).innerHTML = mark(ph.mark); $('.cs', li).textContent = ph.state_text; }
   });
   const notes = run.notes.join('\n');
   if ($('#notes').textContent !== notes) $('#notes').textContent = notes;

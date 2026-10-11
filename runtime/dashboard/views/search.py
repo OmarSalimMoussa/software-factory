@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from runtime.dashboard.views import agentwords, docs, settings
-from runtime.dashboard.views.kit import Parts, Query, Snap
+from runtime.dashboard.views.kit import KIND_LOOK, Parts, Query, Snap
 from runtime.dashboard.views.shell import PAGES
 from runtime.shared.models import RETIRED
 
@@ -33,7 +33,7 @@ def search(snap: Snap, query: str) -> dict[str, Any]:
                 "id": d.id,
                 "title": d.title,
                 "sub": f"{d.id} · {docs.status_word(snap, d)}",
-                "icon": {"kind": "ktile", "key": d.kind},
+                "icon": {"kind": "ktile", "key": KIND_LOOK[d.kind].icon, "tone": KIND_LOOK[d.kind].tone},
             }
             for d in found
             if d.kind == kind

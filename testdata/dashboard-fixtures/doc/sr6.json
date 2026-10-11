@@ -3,6 +3,8 @@
   "id": "sr6",
   "kind": "reflection",
   "kind_label": "Reflection",
+  "kind_icon": "light-bulb",
+  "kind_tone": "pink",
   "title": "Critics read the whole spec each round; a changed-sections note would …",
   "when": "Oct 7, 13:30 UTC · 2 days ago",
   "fm": [

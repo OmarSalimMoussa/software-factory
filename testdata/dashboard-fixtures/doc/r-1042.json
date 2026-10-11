@@ -3,6 +3,8 @@
   "id": "r-1042",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "Signing in sends me back to the sign-in page",
   "when": "Oct 9, 14:30 UTC · just now",
   "fm": [

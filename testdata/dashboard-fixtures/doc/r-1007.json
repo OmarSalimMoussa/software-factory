@@ -3,6 +3,8 @@
   "id": "r-1007",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "tracker: 3 timeouts on the export endpoint",
   "when": "Oct 3, 06:00 UTC · 6 days ago",
   "fm": [

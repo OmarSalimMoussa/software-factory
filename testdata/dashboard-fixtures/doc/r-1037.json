@@ -3,6 +3,8 @@
   "id": "r-1037",
   "kind": "request",
   "kind_label": "Request",
+  "kind_icon": "chat-bubble-left-right",
+  "kind_tone": "amber",
   "title": "New error on staging: the relay cannot reach the network",
   "when": "Oct 8, 15:00 UTC · yesterday",
   "fm": [
