@@ -5,8 +5,9 @@ watch.probe_seconds (prod every tick while a push to prod is in flight or just l
 answer with; moves the outage along; and
 posts to the orchestrator's inbox: loop due once watch.loop_minutes pass after its last pass, staging red the moment
 staging fails, and triage due when intake.batch_size requests wait or the oldest has waited
-intake.batch_max_wait_hours. Last, it files prod's new GlitchTip issues as requests (errors_import), whose failure
-never stops a tick. The orchestrator's `factory tick` acknowledges each pass.
+intake.batch_max_wait_hours. Last, it files prod's new GlitchTip issues (errors_import) and the users' new reports
+(reports) as requests, each on its own timer. A step that fails never stops the steps after it. The orchestrator's
+`factory tick` acknowledges each pass.
 """
 
 from __future__ import annotations
@@ -14,10 +15,11 @@ from __future__ import annotations
 import copy
 import hashlib
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import files, format_check, formats, goal, tasks
+from runtime.queue import files, format_check, formats, goal, reports, tasks
 from runtime.queue.book import Queue
 from runtime.shared import models, store
 from runtime.shared.models import Probe
@@ -75,11 +77,30 @@ def tick(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
 def run_tick(
     ctx: Context, fetch: probes.Fetch = probes.http_get, proc: Path = vitals.PROC, supplies: Path = vitals.POWER
 ) -> None:
-    settings = ctx.settings()
+    """Each step runs on its own: one that fails is logged with its class, and the steps after it still run."""
     now = ctx.clock.now()
-    vitals.refresh(ctx, proc, supplies)
+    steps: list[tuple[str, Callable[[], object]]] = [
+        ("vitals", lambda: vitals.refresh(ctx, proc, supplies)),
+        ("probes", lambda: _probes(ctx, fetch, now)),
+        ("loop due", lambda: _loop_due(ctx, _memo(ctx.places), now)),
+        ("outage fix", lambda: _fix(ctx)),
+        ("triage due", lambda: _triage_due(ctx, _memo(ctx.places), now)),
+        ("queue format", lambda: format_check.sweep(ctx)),
+        ("goal", lambda: _goal(ctx, _memo(ctx.places))),
+        ("errors import", lambda: errors_import.poll(ctx)),
+        ("reports import", lambda: reports.poll(ctx)),
+    ]
+    for name, step in steps:
+        try:
+            step()
+        # telemetry: last-resort — the step's failure is logged with its trace, and the tick goes on
+        except Exception as exc:
+            log.exception("warden: the tick's %s step failed (%s)", name, type(exc).__name__)
+
+
+def _probes(ctx: Context, fetch: probes.Fetch, now: float) -> None:
     memo = _memo(ctx.places)
-    every = settings.get_int("watch.probe_seconds")
+    every = ctx.settings().get_int("watch.probe_seconds")
     for env in probes.ENVS:
         last = memo["probed"].get(env)
         close = env == probes.PROD and github_push.watching(ctx)
@@ -94,12 +115,6 @@ def run_tick(
             store.write_json(_memo_path(ctx.places), memo)
             if env == probes.STAGING:
                 heartbeat.ping(ctx, heartbeat.WARDEN)
-    _loop_due(ctx, memo, now)
-    _fix(ctx)
-    _triage_due(ctx, memo, now)
-    format_check.sweep(ctx)
-    _goal(ctx, memo)
-    errors_import.poll(ctx)
 
 
 def _staging(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from loop_fakes import FakeClock, FakeGitHub, World
+from loop_fakes import FakeClock, FakeGitHub, FakeStack, World
 
 from runtime.shared import settings as settings_mod
 from runtime.shared.paths import Places
@@ -31,7 +31,7 @@ def world(tmp_path: Path) -> World:
         settings=lambda: settings,
         caller=Caller("owner", role="owner"),
         clock=clock,
-        launcher=None,  # type: ignore[arg-type]  # nothing here launches
+        launcher=FakeStack(tmp_path),  # type: ignore[arg-type]  # the tick runs only scripts/dev on slot 0
         github=github,
         post_event=lambda kind, data: events.append((kind, data)),
     )

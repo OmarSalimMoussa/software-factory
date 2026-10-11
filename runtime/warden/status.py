@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from runtime.queue import proposals
+from runtime.queue import proposals, reports
 from runtime.shared import models
 from runtime.slots import leases
 from runtime.warden import codes, errors_import, plan, probes, registry, settings_save
@@ -34,6 +34,7 @@ def status(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
         **health,
         "plan": plan.reading(ctx),
         "errors_import": errors_import.note(ctx.places),
+        "reports_import": reports.note(ctx),
         "code_locked_until": None
         if until is None
         else datetime.fromtimestamp(until, UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),

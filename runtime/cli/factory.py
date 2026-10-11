@@ -178,7 +178,7 @@ def _slot(sub: Any) -> None:
     ops = slot.add_subparsers(dest="op", required=True)
     ops.add_parser("claim").add_argument("--note", default="")
     ops.add_parser("up").add_argument("services", nargs="*")
-    for name in ("down", "release", "list", "reports"):
+    for name in ("down", "release", "list"):
         ops.add_parser(name)
     ops.add_parser("free").add_argument("slot", type=int)
     ops.add_parser("sign-in").add_argument("email")

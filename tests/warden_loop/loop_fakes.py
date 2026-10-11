@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from runtime.warden.context import Clock, Context
+from runtime.warden.context import Clock, Context, StackResult
 from runtime.warden.probes import Answer
 
 
@@ -46,6 +46,21 @@ class FakeGitHub:
 
     def reachable(self) -> bool:
         return self.up
+
+
+@dataclass
+class FakeStack:
+    """scripts/dev on slot 0, for the tick's report pull: the product lists the verbs ``verbs`` names."""
+
+    logs: Path
+    verbs: str = "up down health"
+    calls: list[tuple[int, list[str], str]] = field(default_factory=list)
+
+    def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
+        self.calls.append((slot, verb, session))
+        log = self.logs / f"stack-{len(self.calls)}.log"
+        log.write_text(self.verbs if verb == ["verbs"] else "")
+        return StackResult(0, "", str(log))
 
 
 @dataclass

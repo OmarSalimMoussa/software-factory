@@ -2,9 +2,7 @@
 
 The loop calls poll on every tick; it reads the server's GlitchTip every errors.poll_minutes, with the read-only token
 the server set-up saved, keeps the unresolved issues of prod's projects and files each one it has not seen, from
-glitchtip, severity normal. errors-seen.json keeps the ids it filed, when it last read, whether the reads are failing,
-and the note `factory status` shows. A read that fails is logged once per run of failures and tried again at the next
-poll; it never stops the loop.
+glitchtip, severity normal. errors-seen.json keeps the ids it filed and the timer runtime/warden/imports.py keeps.
 """
 
 from __future__ import annotations
@@ -18,7 +16,7 @@ from runtime.queue.book import Queue
 from runtime.shared import store
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden import telemetry
+from runtime.warden import imports, telemetry
 from runtime.warden.context import Context
 from runtime.warden.telemetry import Issue
 
@@ -26,11 +24,15 @@ log = logging.getLogger(__name__)
 
 SENDER = "glitchtip"
 PREFIX = f"{telemetry.PROD}-"
-NOT_SET_UP = "errors import: the server set-up has not run"
-_FRESH: dict[str, Any] = {"seen": [], "polled": None, "failing": False, "note": None}
-# What a failing read is expected to raise; anything else is also caught, so the loop goes on, but logged with its
-# trace.
-_EXPECTED = (telemetry.TelemetryError, Refused, OSError)
+_FRESH: dict[str, Any] = {"seen": [], **imports.fresh()}
+# A TelemetryError's text names the service, the path and the cause's class, and never a key.
+TIMED = imports.Timed(
+    "errors import",
+    "importing prod's errors",
+    "errors.poll_minutes",
+    expected=(telemetry.TelemetryError, Refused, OSError),
+    told=(telemetry.TelemetryError,),
+)
 
 
 def path(places: Places) -> Path:
@@ -48,36 +50,25 @@ def _read(places: Places) -> dict[str, Any]:
 
 def note(places: Places) -> str | None:
     """What the last poll found, for `factory status`; None before the first."""
-    found = _read(places)["note"]
-    return found if isinstance(found, str) else None
+    return imports.note(_read(places))
 
 
 def poll(ctx: Context) -> None:
     state = _read(ctx.places)
-    now = ctx.clock.now()
-    settings = ctx.settings()
-    if state["polled"] is not None and now - state["polled"] < settings.get_int("errors.poll_minutes") * 60:
-        return
-    state["polled"] = now
-    try:
-        service = telemetry.glitchtip(ctx.places, telemetry.PROD)
+
+    def work() -> str:
+        try:
+            service = telemetry.glitchtip(ctx.places, telemetry.PROD)
+        except telemetry.NotSetUp:
+            return "the server set-up has not run"
+        settings = ctx.settings()
         issues = telemetry.unresolved(service, PREFIX, float(settings.get_int("telemetry.timeout_seconds")),
                                       settings.get_int("errors.max_pages"))  # fmt: skip
         filed = _file_new(ctx, state, issues)
-    except telemetry.NotSetUp:
-        state["failing"], state["note"] = False, NOT_SET_UP
-    except Exception as exc:
-        # A TelemetryError's text names the service, the path and the cause's class, and never a key.
-        why = str(exc) if isinstance(exc, telemetry.TelemetryError) else type(exc).__name__
-        if not state["failing"]:
-            log.warning("warden: importing prod's errors failed (%s); it runs again at the next poll", why,
-                        exc_info=not isinstance(exc, _EXPECTED))  # fmt: skip
-        state["failing"] = True
-        state["note"] = f"errors import: the read at {ctx.clock.iso()} failed ({why}); it runs again at the next poll"
-    else:
-        state["failing"] = False
-        state["note"] = f"errors import: read at {ctx.clock.iso()}; {filed} new {'issue' if filed == 1 else 'issues'}"
-    store.write_json(path(ctx.places), state)
+        return f"{filed} new {'issue' if filed == 1 else 'issues'}"
+
+    if imports.run(ctx, TIMED, state, work):
+        store.write_json(path(ctx.places), state)
 
 
 def _file_new(ctx: Context, state: dict[str, Any], issues: list[Issue]) -> int:

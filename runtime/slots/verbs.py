@@ -8,10 +8,8 @@ answer carries scripts/dev's exit status and the redacted tail of its output; th
 from __future__ import annotations
 
 import re
-from pathlib import Path
 from typing import Any
 
-from runtime.queue import reports
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import leases
@@ -57,11 +55,6 @@ def _answer(n: int, result: StackResult) -> dict[str, Any]:
     return ok(slot=n, exit=result.exit, tail=result.tail)
 
 
-def full_output(result: StackResult) -> str:
-    """The whole output of a run, which the warden saved for the owner; an agent never sees more than the tail."""
-    return Path(result.log).read_text(errors="replace")
-
-
 def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     op = args.get("op")
     session = _session(ctx)
@@ -77,10 +70,6 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
         return ok(slots=_list(ctx, session))
     if op == "free":
         return _free(ctx, session, args.get("slot"))
-    if op == "reports":
-        if session.role != ORCH:
-            raise Refused("slot", "the user-report pull is the orchestrator's")
-        return ok(**reports.pull(ctx, lambda argv: _run_full(ctx, 0, argv, session.id)))
     n = _slot(ctx, session)
     if op == "which":
         return ok(
@@ -161,8 +150,3 @@ def _free(ctx: Context, session: Session, n: object) -> dict[str, Any]:
     if result.exit == 0:
         leases.release(ctx, n)
     return ok(slot=n, exit=result.exit, tail=result.tail, released=result.exit == 0)
-
-
-def _run_full(ctx: Context, n: int, argv: list[str], session: str) -> tuple[int, str]:
-    result = ctx.launcher.run_stack(n, argv, session)
-    return result.exit, full_output(result)

@@ -110,3 +110,19 @@ def test_a_failed_errors_read_never_stops_the_loop_and_is_logged_once_a_run(
         "(TimeoutError)); it runs again at the next poll"
     ]
     assert "(TimeoutError)" in str(errors_import.note(ticking.ctx.places))
+
+
+def test_a_failing_tick_step_is_logged_and_the_steps_after_it_still_run(
+    ticking: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    file_requests(ticking, 0, 0)
+
+    def broken(*args: object) -> None:
+        raise OSError("no /proc")
+
+    monkeypatch.setattr(loop.vitals, "refresh", broken)
+    with caplog.at_level(logging.ERROR, logger=loop.__name__):
+        events = tick(ticking, tmp_path)
+    assert inbox.LOOP_DUE in events
+    assert [r.getMessage() for r in caplog.records] == ["warden: the tick's vitals step failed (OSError)"]
+    assert ticking.ctx.launcher.calls[0][:2] == (0, ["verbs"])  # type: ignore[attr-defined]  # the report pull ran

@@ -129,6 +129,9 @@ max_upload_kib = 512    # a picture, spec or triage plan sent with a factory com
 poll_minutes = 5        # how often the warden reads them
 max_pages = 5           # pages of issues one read covers, newest first
 
+[reports]               # the users' reports, from the product's optional scripts/dev reports verb
+poll_minutes = 10       # how often the warden asks for new ones
+
 [telemetry]             # `factory errors` and `factory traces`: agents read GlitchTip and Langfuse through the warden
 max_items = 20          # issues or traces one answer lists
 max_kib = 64            # the largest answer an agent gets; longer lists and texts are cut to fit

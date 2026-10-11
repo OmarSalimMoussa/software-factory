@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
+from pathlib import Path
 from typing import Any
 
+import pytest
 from queue_kit import World
 
 from runtime.queue import reports
+from runtime.warden.context import StackResult
 
 
 def _line(report_id: str, text: str) -> str:
@@ -70,3 +74,48 @@ def test_a_report_erased_before_it_was_pulled_is_never_filed(world: World) -> No
 
     assert (first["erased"], later["filed"]) == (["a1"], [])
     assert not world.queue().files.exists("reports/a1.md")
+
+
+def _stack(world: World, tmp_path: Path, out: str, code: int = 0) -> list[tuple[int, list[str]]]:
+    """scripts/dev on slot 0 answers ``out`` to reports, exiting ``code``."""
+
+    def stack(n: int, verb: list[str]) -> StackResult:
+        log = tmp_path / f"stack-{len(world.launcher.stacks)}.log"
+        log.write_text("up reports" if verb == ["verbs"] else out)
+        return StackResult(0 if verb == ["verbs"] else code, "", str(log))
+
+    world.launcher.stack = stack
+    return world.launcher.stacks
+
+
+def test_the_warden_pulls_reports_on_its_own_timer_on_slot_0(world: World, tmp_path: Path) -> None:
+    calls = _stack(world, tmp_path, _line("a1", "Slow page"))
+    ctx = world.ctx("warden", session="")
+
+    reports.poll(ctx)
+    reports.poll(ctx)  # within the period: nothing runs
+    assert [slot for slot, _ in calls] == [0, 0] and calls[-1][1] == ["reports"]
+    assert [r.report for r in world.queue().requests()[0] if r.inbox == "users"] == ["a1"]
+    assert reports.note(ctx) == "reports import: read at 2026-10-09T12:00:00Z; 1 new, 0 erased"
+
+    world.clock.at += world.settings.get_int("reports.poll_minutes") * 60
+    reports.poll(ctx)
+    assert len(calls) == 4 and calls[-1][1] == ["reports", "--since", "c-a1"]
+
+
+def test_a_failed_pull_is_logged_once_and_tried_again_at_the_next_poll(
+    world: World, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    _stack(world, tmp_path, "", code=3)
+    ctx = world.ctx("warden", session="")
+    period = world.settings.get_int("reports.poll_minutes") * 60
+
+    with caplog.at_level(logging.WARNING):
+        for _ in range(2):
+            reports.poll(ctx)
+            world.clock.at += period
+    assert [r.getMessage() for r in caplog.records] == [
+        "warden: pulling the users' reports failed (reports: scripts/dev reports exited 3); "
+        "it runs again at the next poll"
+    ]
+    assert "failed (reports: scripts/dev reports exited 3)" in str(reports.note(ctx))

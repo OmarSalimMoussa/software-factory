@@ -28,6 +28,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `budget` | The slice's memory and CPU, and the memory a test run needs |
 | `vitals`, `watch` | Amber and red levels; probe, loop, grace and silence times |
 | `errors` | How often the warden reads prod's new GlitchTip issues into requests, and how many pages one read covers |
+| `reports` | How often the warden asks the product for users' new reports |
 | `telemetry` | What `factory errors` and `factory traces` give an agent: how many items, how large, how long a call |
 | `cost`, `prices` | The daily budget, the plan-limit levels, and dollars per million tokens per model |
 | `sandbox` | The hosts a session may reach, and the tool caches in the agent's home it may write |
@@ -50,7 +51,7 @@ that wrote there could act outside its sandbox.
 
 | Setting | Takes effect |
 | --- | --- |
-| Caps, rounds, QA, vitals, watch, errors, telemetry, intake and routing values | At once: every guard call and warden pass reads them fresh |
+| Caps, rounds, QA, vitals, watch, errors, reports, telemetry, intake and routing values | At once: every guard call and warden pass reads them fresh |
 | A session's or a subagent's model and effort | At its next start |
 | The slice budget | Within a minute |
 | The slot count | At the next slot claim |

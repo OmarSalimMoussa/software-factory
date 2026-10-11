@@ -159,6 +159,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         [
             ("errors.poll_minutes", "Read prod's new errors every, minutes"),
             ("errors.max_pages", "Pages of errors one read covers"),
+            ("reports.poll_minutes", "Ask for users' new reports every, minutes"),
             ("telemetry.max_items", "Errors or traces one answer lists"),
             ("telemetry.max_kib", "Largest errors or traces answer, KiB"),
             ("telemetry.timeout_seconds", "Seconds a GlitchTip or Langfuse call may take"),
