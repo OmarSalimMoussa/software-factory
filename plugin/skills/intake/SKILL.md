@@ -39,8 +39,8 @@ You run beside the orchestrator in the main checkout, on the default branch. Rea
 ## Where it goes
 
 - **A severe request** (the fast lane): file its task at the top of the queue, linked to the request. Write its text
-  (what to change, and how to know it is fixed) to a file under `.factory/` in the worktree, then, in a call of
-  its own:
+  (what to change, and how to know it is fixed) with the Write tool to a file under `.factory/` in the worktree,
+  then, in a call of its own:
   `factory queue task new --body <file> --requests <id> --title "<what is wrong, in your words>" --goal-item <G> --severity <s>
   --surfaces <list> --cause "<file:line, what it does wrong>" --slices <n> --owner-class <class>`. Leave out
   `--cause` when it is unknown. If it was not severe after all, file it `major` or `minor`, say so in the verdict,
@@ -67,5 +67,6 @@ A second problem you found on the way goes after it as "also found: <one sentenc
 
 ## Never
 
-Edit a file, or change a task's status. Use the product: no browser, no calls to a stack. Change an error tracker's
+Edit a file, write one anywhere but your task's text under `.factory/` (the guard refuses the rest), or change a
+task's status. Use the product: no browser, no calls to a stack. Change an error tracker's
 issue. Read a secret. Start an agent. Run a git command that changes anything. Ask the owner anything.

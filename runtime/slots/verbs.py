@@ -3,6 +3,10 @@
 The slot is always worked out from the caller's lease, never from an argument: slot 0 is the orchestrator's, an
 implementer has the slot it claimed, and its testers share it. A stack command before ``claim`` is refused. The
 answer carries scripts/dev's exit status and the redacted tail of its output; the full log stays the owner's.
+
+A tester only reads its slot, signs in and opens its desktop: seeds and the stack are its parent's. One tester holds
+a slot's desktop at a time, from its `desktop up` until it hands back (its row retires) or its parent takes the
+desktop down; another tester's `desktop up` waits, so no one's new password cuts off a tester mid-step.
 """
 
 from __future__ import annotations
@@ -10,6 +14,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from runtime.shared import store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import leases
@@ -20,7 +25,7 @@ ORCH, IMPL = "orchestrator", "implementer"
 WORD = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@+-]{0,127}$")
 EMAIL = re.compile(r"^[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
 # Verbs a tester may run on its implementer's slot; the rest change the stack and are the implementer's own.
-TESTER_OPS = frozenset({"list", "which", "sign-in", "seed", "desktop"})
+TESTER_OPS = frozenset({"list", "which", "sign-in", "desktop"})
 
 
 def _session(ctx: Context) -> Session:
@@ -79,12 +84,40 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
             max_kib=settings.get_int("slots.api_max_kib"),
         )
     verb = _verb(op, args)
+    if op == "desktop":
+        _desktop_lease(ctx, n, verb)
     result = ctx.launcher.run_stack(n, verb, session.id)
     if op == "release":
         if result.exit != 0:
             return ok(slot=n, exit=result.exit, tail=result.tail, released=False)
         leases.release(ctx, n)
     return _answer(n, result)
+
+
+def _desktops(ctx: Context) -> dict[str, str]:
+    raw = store.read_json_or(ctx.places.state / "desktops.json", {})
+    if not isinstance(raw, dict) or not all(isinstance(v, str) for v in raw.values()):
+        raise store.StoreError(f"{ctx.places.state / 'desktops.json'}: not a holder per slot")
+    return raw
+
+
+def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> None:
+    """A tester's `desktop up` takes the slot's desktop while no other live tester holds it; its parent's `desktop
+    down` frees it."""
+    agent = ctx.caller.agent_id
+    if agent and verb[1] != "up":
+        raise Refused("slot", "a tester opens the desktop; its implementer takes it down")
+    with ctx.lock:
+        held = _desktops(ctx)
+        if not agent:
+            held.pop(str(n), None)
+        else:
+            holder = registry.read(ctx.places).get(held.get(str(n), ""))
+            if holder is not None and holder.id != agent and holder.state != RETIRED:
+                raise Refused("desktop", f"slot {n}'s desktop is {holder.name}'s until it hands back; test what "
+                                         "needs no desktop first, then try again")  # fmt: skip
+            held[str(n)] = agent
+        store.write_json(ctx.places.state / "desktops.json", held)
 
 
 def _verb(op: object, args: dict[str, Any]) -> list[str]:

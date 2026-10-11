@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from runtime.guard import browser, commands, factory_calls, git_rules, shell, subagents, writes
+from runtime.guard import browser, commands, factory_calls, git_rules, scratch, shell, subagents, writes
 from runtime.guard.facts import (
     ORCHESTRATOR,
     OWNER,
@@ -110,7 +110,7 @@ def _tool(call: Call) -> Decision:
     if (call.tool in _SCHEDULE_TOOLS or skill in _SCHEDULE_SKILLS) and not call.off("schedules"):
         return Refusal("schedules", "the warden drives the loop and wakes you; keep no schedule of your own")
     if call.tool in writes.EDIT_TOOLS:
-        return writes.check_edit(call)
+        return writes.check_edit(call) or scratch.check_edit(call)
     return None
 
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from runtime.guard import branches, expansions, factory_calls, git_rules, nested, prod, shell, writes
+from runtime.guard import branches, expansions, factory_calls, git_rules, nested, prod, scratch, shell, writes
 from runtime.guard.facts import Call, Decision, Refusal, inside, resolve
 from runtime.guard.wire import PARENTS, READ_TOOLS
 
@@ -124,7 +124,7 @@ def _leave_slice(call: Call, inv: shell.Invocation, cwd: Path) -> Decision:
 
 
 def _hand_pass(call: Call, inv: shell.Invocation, cwd: Path) -> Decision:
-    """A pass is recorded by `factory check` alone, for the tree it checked; running the runner by hand forges one."""
+    """The checks run only through `factory check`, which the warden walls in and alone records a pass for."""
     if call.off("git-bypass"):
         return None
     runner = call.places.install / "checks"
@@ -155,6 +155,7 @@ _RULES: tuple[Rule, ...] = (
     prod.check,
     branches.check,
     _git,
+    scratch.check_shell,
     _verb,
     _hand_pass,
     _expanded,

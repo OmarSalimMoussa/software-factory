@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from guard_kit import Kit
+from guard_kit import NOW, TESTER_ID, Kit, entry
 
 from runtime.guard.facts import Rewrite
 
@@ -52,7 +52,8 @@ def test_an_edit_through_a_link_out_of_the_worktree_is_refused(kit: Kit) -> None
 def test_the_orchestrators_worktree_is_the_main_checkout(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("orchestrator", worktree=kit.repo)
-    assert kit.rule("Write", {"file_path": str(kit.repo / "notes.md"), "content": "x"}) is None
+    assert kit.rule("Write", {"file_path": str(kit.repo / ".factory" / "body.md"), "content": "x"}) is None
+    assert kit.rule("Write", {"file_path": str(kit.repo / "notes.md"), "content": "x"}) == "orchestrator-writes"
     assert kit.rule("Write", {"file_path": str(kit.repo / "GOAL.md"), "content": "x"}) == "protected-paths"
     kit.session("implementer", sid="impl-1")
     assert kit.rule("Write", {"file_path": str(kit.worktree / "app.py"), "content": "x"}) == "own-worktree"
@@ -85,27 +86,34 @@ def test_the_queue_and_the_factory_command_are_used_only_as_the_role_allows(
 
 
 @pytest.mark.parametrize(
-    ("role", "command", "subagent", "rule"),
+    ("role", "command", "kind", "rule"),
     [
-        ("orchestrator", "factory task status t-0001 building", False, None),
-        ("orchestrator", "factory task status t-0001 building", True, "queue-status"),
-        ("orchestrator", "factory queue task new --title x", True, None),
-        ("orchestrator", "factory inbox --wait", True, "factory-verbs"),
-        ("orchestrator", "factory start implementer t-0001", False, None),
-        ("orchestrator", "factory start owner mine", False, "factory-verbs"),
-        ("orchestrator", "factory start orchestrator", False, "factory-verbs"),
-        ("designer", "factory spec save t-0001 spec.md", False, None),
-        ("designer", "factory qa-ready abc1234", False, "factory-verbs"),
-        ("implementer", "factory request new --from qa-backend", True, None),
-        ("implementer", "factory check", True, "factory-verbs"),
+        ("orchestrator", "factory task status t-0001 building", "", None),
+        ("orchestrator", "factory task status t-0001 building", "intake", "queue-status"),
+        ("orchestrator", "factory queue task new --title x", "intake", None),
+        ("orchestrator", "factory queue task new --title x", "triage", "factory-verbs"),
+        ("orchestrator", "factory triage apply --body plan.json", "triage", "factory-verbs"),
+        ("orchestrator", "factory queue check abc1234 --body r.md", "qa-regression", "factory-verbs"),
+        ("orchestrator", "factory inbox --wait", "intake", "factory-verbs"),
+        ("orchestrator", "factory start implementer t-0001", "", None),
+        ("orchestrator", "factory start owner mine", "", "factory-verbs"),
+        ("orchestrator", "factory start orchestrator", "", "factory-verbs"),
+        ("designer", "factory spec save t-0001 spec.md", "", None),
+        ("designer", "factory qa-ready abc1234", "", "factory-verbs"),
+        ("designer", "factory errors", "critic-security", "factory-verbs"),
+        ("implementer", "factory request new --from qa-backend", "qa-backend", "factory-verbs"),
+        ("implementer", "factory errors --where staging", "qa-backend", None),
+        ("implementer", "factory check", "qa-backend", "factory-verbs"),
     ],
 )
 def test_each_role_and_its_subagents_run_only_their_verbs(
-    tmp_path: Path, role: str, command: str, subagent: bool, rule: str | None
+    tmp_path: Path, role: str, command: str, kind: str, rule: str | None
 ) -> None:
     kit = Kit(tmp_path)
     kit.session(role, worktree=kit.repo if role == "orchestrator" else kit.worktree)
-    caller = {"agent_id": "a1234567890abc", "agent_type": "intake"} if subagent else {}
+    caller = {"agent_id": TESTER_ID, "agent_type": kind} if kind else {}
+    if kind.startswith("qa-"):
+        kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])  # a briefed tester, in its time
     assert kit.bash(command, cwd=str(kit.repo if role == "orchestrator" else kit.worktree), **caller) == rule
 
 
@@ -149,3 +157,59 @@ def test_a_subagents_factory_call_names_it_right_after_the_program(tmp_path: Pat
     assert isinstance(decision, Rewrite)
     assert decision.updated_input["command"] == "factory --agent-id a1234567890abc queue task new --title x"
     assert kit.decide("Bash", {"command": "factory status"}, cwd=str(kit.repo)) is None
+
+
+READER = {"agent_id": "a1234567890abc", "agent_type": "Explore"}  # a reader: no tester time to count
+
+
+@pytest.mark.parametrize(
+    ("command", "rule"),
+    [
+        ("git reset --hard", "subagent-writes"),
+        ("git stash", "subagent-writes"),
+        ("git checkout -- app.py", "subagent-writes"),
+        ("sed -i s/a/b/ app.py", "subagent-writes"),
+        ("echo x > app.py", "subagent-writes"),
+        ("echo x > .factory/notes.md", None),
+        ("git log --oneline", None),
+        ("git diff main", None),
+        ("echo x > /tmp/scratch.txt", None),
+    ],
+)
+def test_a_subagent_writes_only_in_its_sessions_scratch_and_runs_only_git_that_reads(
+    tmp_path: Path, command: str, rule: str | None
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    assert kit.bash(command, **READER) == rule
+
+
+@pytest.mark.parametrize(
+    ("path", "rule"), [("app.py", "subagent-writes"), (".factory/brief.md", None)], ids=["product-file", "scratch"]
+)
+def test_a_subagents_edit_tool_writes_only_in_its_sessions_scratch(tmp_path: Path, path: str, rule: str | None) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    assert kit.rule("Write", {"file_path": str(kit.worktree / path), "content": "x"}, **READER) == rule
+
+
+@pytest.mark.parametrize(
+    ("finishing", "command", "rule"),
+    [
+        ("", "git commit -m fix", "orchestrator-writes"),
+        ("MERGE_HEAD", "git commit --no-edit", None),
+        ("REVERT_HEAD", "git commit -m 'Revert the merge'", None),
+        ("", "echo x > app.py", "orchestrator-writes"),
+        ("", "echo x > .factory/body.md", None),
+    ],
+    ids=["plain-commit", "finishing-a-merge", "finishing-a-revert", "product-file", "scratch"],
+)
+def test_the_orchestrator_writes_no_product_code_and_commits_only_to_finish_a_merge_or_a_revert(
+    tmp_path: Path, finishing: str, command: str, rule: str | None
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("orchestrator", worktree=kit.repo)
+    (kit.repo / ".git").mkdir(exist_ok=True)
+    if finishing:
+        (kit.repo / ".git" / finishing).write_text("abc\n")
+    assert kit.bash(command, cwd=str(kit.repo)) == rule

@@ -26,17 +26,6 @@ _PLAIN_START = re.compile(r"^factory(\s|$)")
 # Outside single quotes the shell expands or joins on these, so the text is no longer one plain call.
 _SHELL_SPECIAL = frozenset("$`*?[{}")
 ALONE = "run factory on its own; write a body to a file in your worktree and pass it as an argument"
-# What a subagent never asks for: what steers its session's lifecycle, the loop, the queue's order, a merge or a
-# check run. Its parent does.
-SESSION_ONLY = frozenset(
-    {"start", "stop", "resume", "extend", "bench", "revive", "doing", "tick", "inbox", "inbox.wait", "push", "propose",
-     "propose.none", "route", "queue.next", "task.status", "merge.recorded", "needs-owner", "spec.save",
-     "card.comments", "qa-ready", "qa-clean", "check"}
-)  # fmt: skip
-# Errors and traces: of the subagents, only these kinds read them (a tester's kind starts with the prefix).
-TELEMETRY = frozenset({"errors", "traces"})
-TELEMETRY_SUBAGENTS = frozenset({"intake", "triage"})
-TESTER_PREFIX = "qa-"  # must mirror runtime.guard.subagents.TESTER
 _HELP = frozenset({"-h", "--help", "help"})
 _FLAG_VERBS = {("inbox", "--wait"): "inbox.wait", ("propose", "--none"): "propose.none"}
 _STARTS = frozenset({"implementer", "designer"})
@@ -79,11 +68,9 @@ def check_verb(call: Call, inv: shell.Invocation) -> Decision:
     actor = f"a subagent of the {call.role}" if call.in_subagent else f"the {call.role}"
     if entry is None or entry.owner_socket or call.role not in entry.roles:
         return Refusal("factory-verbs", f"`factory {verb}` is not for {actor}; see `factory --help`")
-    if call.in_subagent and verb in SESSION_ONLY:
-        return Refusal("factory-verbs", f"`factory {verb}` is your parent's to run; report to it instead")
-    reader = call.agent_type in TELEMETRY_SUBAGENTS or call.agent_type.startswith(TESTER_PREFIX)
-    if call.in_subagent and verb in TELEMETRY and not reader:
-        return Refusal("factory-verbs", f"`factory {verb}` is for intake, triage and testers; ask your parent instead")
+    if call.in_subagent and call.agent_type not in entry.kinds:
+        return Refusal("factory-verbs", f"`factory {verb}` is not a {call.agent_type} subagent's to run; report to "
+                                        "your parent instead")  # fmt: skip
     words = [w for w in inv.argv[2:] if not w.startswith("-")]
     if verb == "start" and words[:1] and words[0] not in _STARTS:
         return Refusal("factory-verbs", "the orchestrator starts implementers and designers; the owner starts the rest")

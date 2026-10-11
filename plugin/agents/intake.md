@@ -4,7 +4,7 @@ description: Use when the orchestrator starts you with one request (a severe one
 # The warden renders model and effort from settings (models.intake) before any session reads this file.
 model: "{{model}}"
 effort: "{{effort}}"
-disallowedTools: Edit, Write, NotebookEdit, Agent, mcp__claude-in-chrome, mcp__computer-use, AskUserQuestion
+disallowedTools: Edit, NotebookEdit, Agent, mcp__claude-in-chrome, mcp__computer-use, AskUserQuestion
 maxTurns: 100
 skills:
   - intake

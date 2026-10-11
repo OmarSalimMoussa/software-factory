@@ -175,23 +175,26 @@ def check_shell(call: Call, inv: shell.Invocation, cwd: Path) -> Decision:
     return found if found is not None and not call.off(found.rule) else None
 
 
-def _shell_writes(call: Call, inv: shell.Invocation, cwd: Path) -> Refusal | None:
-    for target in inv.writes:
-        if (found := protected(call, target, cwd)) is not None:
-            return found
+def written(inv: shell.Invocation) -> list[tuple[str, bool]]:
+    """Each path a shell invocation writes, with whether it removes (or, for a tree, may overwrite) what is there:
+    its redirects, and the files a program that changes files names."""
+    found = [(target, False) for target in inv.writes]
     args = inv.argv[1:]
     if inv.program in _COPIERS:
         target = _destination(args)
         # A tree copied into a folder that holds a protected path can overwrite it.
         tree = inv.program == "rsync" or any(_RECURSIVE.match(a) for a in args)
-        return protected(call, target, cwd, removes=tree) if target else None
+        return found + ([(target, tree)] if target else [])
     in_place = inv.program in {"sed", "perl"} and any(_IN_PLACE.match(a) or a.startswith("--in-place") for a in args)
     if inv.program not in _MUTATORS and not in_place:
-        return None
+        return found
     # mv's last word is where things go; what it moves away is removed from where it was.
     gone = args[:-1] if inv.program == "mv" else args
-    for word in (a for a in args if not a.startswith("-")):
-        removes = inv.program in _REMOVERS and word in gone
+    return found + [(word, inv.program in _REMOVERS and word in gone) for word in args if not word.startswith("-")]
+
+
+def _shell_writes(call: Call, inv: shell.Invocation, cwd: Path) -> Refusal | None:
+    for word, removes in written(inv):
         if (found := protected(call, word, cwd, removes=removes)) is not None:
             return found
     return None

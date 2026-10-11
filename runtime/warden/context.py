@@ -25,6 +25,7 @@ class Caller:
     session: str = ""  # the registered session among the caller's ancestors
     role: str = ""  # orchestrator, implementer, designer, owner, dashboard
     agent_id: str = ""  # set when a subagent's command sent it
+    agent_kind: str = ""  # that subagent's kind, from the registry
     uid: int = -1
     pid: int = -1
     worktree: str = ""

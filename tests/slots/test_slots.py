@@ -58,7 +58,9 @@ def test_the_slot_comes_from_the_lease_never_from_an_argument(world: World) -> N
         ({"op": "up", "services": ["--build"]}, ""),  # an option smuggled as a service
         ({"op": "sign-in", "email": "x; rm -rf /"}, ""),
         ({"op": "seed", "seed": ["load", "-x"]}, ""),
-        ({"op": "up"}, "agent-qa-1"),  # a tester signs in and seeds; it never rebuilds the stack
+        ({"op": "up"}, "agent-qa-1"),  # a tester signs in and opens the desktop; the stack is its parent's
+        ({"op": "seed", "seed": ["load", "cart"]}, "agent-qa-1"),
+        ({"op": "desktop", "desktop": ["down"]}, "agent-qa-1"),
     ],
 )
 def test_only_checked_words_reach_scripts_dev(world: World, args: dict[str, object], agent_id: str) -> None:
@@ -81,3 +83,24 @@ def test_the_orchestrator_frees_only_a_finished_sessions_slot(world: World) -> N
     world.launcher.stack = lambda n, verb: StackResult(0, "", "/log")
     assert slot(world.ctx(), {"op": "free", "slot": 1}, None)["released"] is True
     assert world.launcher.stacks == [(1, ["empty"])] and leases.read(world.places, 1) is None
+
+
+def test_one_tester_holds_a_slots_desktop_until_it_hands_back_or_its_parent_takes_it_down(world: World) -> None:
+    _implementer(world, 1)
+    for agent in ("agent-qa-1", "agent-qa-2", "agent-qa-3"):
+        world.session(agent, "qa-ux", f"impl-t-0001.{agent}", "t-0001", "/wt/impl-t-0001", agent_id=agent)
+    slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)
+    up = {"op": "desktop", "desktop": ["up", "tester-1@example.com"]}
+
+    slot(world.ctx("implementer", "s-1", "agent-qa-1"), up, None)
+    with pytest.raises(Refused, match="desktop is impl-t-0001.agent-qa-1's"):
+        slot(world.ctx("implementer", "s-1", "agent-qa-2"), up, None)
+
+    sessions = registry.read(world.places)
+    sessions["agent-qa-1"].state = RETIRED
+    registry.write(world.places, sessions)
+    slot(world.ctx("implementer", "s-1", "agent-qa-2"), up, None)  # the first handed back
+    slot(world.ctx("implementer", "s-1"), {"op": "desktop", "desktop": ["down"]}, None)
+    slot(world.ctx("implementer", "s-1", "agent-qa-3"), up, None)  # its parent took it down
+    assert [verb[:2] for _, verb in world.launcher.stacks] == [["desktop", "up"], ["desktop", "up"],
+                                                                ["desktop", "down"], ["desktop", "up"]]  # fmt: skip

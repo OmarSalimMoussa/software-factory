@@ -154,6 +154,8 @@ class Dispatcher:
         if caller.role not in verb.roles:
             who = caller.role or "a process the warden did not start"
             raise Refused("role", f"{who} may not {name}; it is for {', '.join(sorted(verb.roles))}")
+        if caller.agent_id and caller.agent_kind not in verb.kinds:
+            raise Refused("role", f"a {caller.agent_kind} subagent may not {name}; report to your parent instead")
         return verb
 
     def _run(

@@ -85,4 +85,4 @@ def acting_as(places: Places, caller: Caller, agent_id: str) -> Caller:
         raise Refused("agent", "that subagent is not registered under your session")
     if row.state == RETIRED:
         raise Refused("retired", f"{row.name} was {row.retired} and can never act again: hand back")
-    return dataclasses.replace(caller, agent_id=agent_id)
+    return dataclasses.replace(caller, agent_id=agent_id, agent_kind=row.role)

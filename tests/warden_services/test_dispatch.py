@@ -7,7 +7,9 @@ import pytest
 from warden_fakes import FakeClock, code_now
 
 from runtime.shared import protocol, totp
+from runtime.shared.models import WORKING, Session
 from runtime.shared.protocol import Refused
+from runtime.warden import registry
 from runtime.warden.context import Caller, Context
 from runtime.warden.dispatch import AGENT_SOCKET, OWNER_SOCKET, Dispatcher, Doors
 from runtime.warden.verbs import ANY, DASH, IMPL, OWNER, Verb
@@ -19,6 +21,7 @@ VERBS = {
     "proposal.approve": Verb("x:y", frozenset({DASH, OWNER}), owner_socket=True),
     "status": Verb("x:y", ANY),
     "qa-ready": Verb("x:y", frozenset({IMPL})),
+    "qa.result": Verb("x:y", frozenset({IMPL}), kinds=frozenset({"qa-ux"})),
 }
 
 
@@ -138,3 +141,24 @@ def test_a_verb_answers_only_its_roles_on_its_socket(
 ) -> None:
     assert ask(dispatcher, verb, caller, socket)["refused"] == rule
     assert handlers.ran == []
+
+
+@pytest.mark.parametrize(
+    ("verb", "kind", "allowed"),
+    [("qa.result", "qa-ux", True), ("qa.result", "critic-ux", False), ("qa-ready", "qa-ux", False)],
+    ids=["its-kind", "another-kind", "no-subagent-verb"],
+)
+def test_a_subagent_acts_in_its_parents_role_but_only_on_the_verbs_that_name_its_kind(
+    dispatcher: Dispatcher, doors: Doors, handlers: Handlers, verb: str, kind: str, allowed: bool
+) -> None:
+    impl = Caller(kind="agent", session="s-impl", role=IMPL)
+    sessions = {
+        "s-impl": Session("s-impl", "impl-a", IMPL, "impl", "m", "high", "t-0001", "", "/w", None, WORKING,
+                          "2026-10-09T12:00:00Z", "orchestrator"),
+        "a1234567890abc": Session("a1234567890abc", "impl-a.tester", kind, "impl", "m", "high", "t-0001", "s-impl",
+                                  "/w", None, WORKING, "2026-10-09T12:00:00Z", "s-impl"),
+    }  # fmt: skip
+    registry.write(doors.places, sessions)
+    answer = dispatcher.answer(impl, AGENT_SOCKET, protocol.request(verb, {}, agent_id="a1234567890abc"))
+    assert answer.get("ok", False) is allowed
+    assert handlers.ran == ([verb] if allowed else [])
