@@ -299,7 +299,10 @@ class RealRig:
         for argv in (["init", "-q"], ["add", "-A"], [*who, "commit", "-q", "-m", "drill"]):
             host.run(["git", "-C", str(checkout), *argv], user=AGENT_USER)
         try:
-            code, out = Units(self.places, lambda: self.settings).run_check(str(checkout), ["--only", "repo-shape"])
+            # --all: the scratch checkout is its own default branch, so a branch's check would find nothing to run.
+            code, out = Units(self.places, lambda: self.settings).run_check(
+                str(checkout), ["--all", "--only", "repo-shape"]
+            )
         except LaunchError as exc:
             return checkout, Ran(-1, str(exc))
         finally:

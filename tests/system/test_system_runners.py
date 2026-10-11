@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
-from system_fakes import settings
+from system_fakes import dry_job, settings
 
-from runtime.system import layout
+from runtime.system import layout, steps_machine
 from runtime.system.runners import launch_file as lf
+from runtime.system.runners import trust
 from runtime.system.runners.stack_run import size_bytes
 
 STATE = Path("/var/lib/software-factory")
@@ -140,3 +142,33 @@ def test_claude_gets_its_sign_in_token_on_a_pipe_and_in_no_environment(tmp_path:
     finally:
         for fd in fds:
             os.close(fd)
+
+
+@pytest.mark.parametrize("before", [None, {"numStartups": 7, "projects": {"/elsewhere": {"allowedTools": []}}}],
+                         ids=["no-file-yet", "a-file-claude-code-wrote"])  # fmt: skip
+def test_the_agents_checkout_is_trusted_and_the_rest_of_claude_codes_file_kept(
+    tmp_path: Path, before: dict[str, Any] | None
+) -> None:
+    config = tmp_path / ".claude.json"
+    if before is not None:
+        config.write_text(json.dumps(before))
+
+    assert trust.main([str(config), "/home/software-agent/shop"]) == 0
+
+    after = json.loads(config.read_text())
+    assert after["projects"]["/home/software-agent/shop"] == {"hasTrustDialogAccepted": True}
+    assert {k: v for k, v in after.items() if k != "projects"} == {
+        k: v for k, v in (before or {}).items() if k != "projects"
+    }
+    assert all(after["projects"][p] == v for p, v in (before or {}).get("projects", {}).items())
+    assert oct(config.stat().st_mode & 0o777) == "0o600"
+
+
+def test_the_install_has_the_agent_user_trust_its_checkout(tmp_path: Path) -> None:
+    job = dry_job(tmp_path)
+    job.settings = settings()
+    steps_machine.agent_checkout(job)
+    trusting = (
+        f"{layout.PYTHON} -I {job.places.install}/runtime/system/runners/trust.py {layout.AGENT_HOME}/.claude.json"
+    )
+    assert f"run: {trusting} {job.checkout()} (as software-agent)" in job.host.actions  # type: ignore[attr-defined]

@@ -283,6 +283,10 @@ def agent_checkout(ctx: Install) -> None:
     if code == 0 and kind.strip() and kind.strip() != "directory":
         raise refuse(f"{queue} is a {kind.strip()}, not a folder: remove it, then install again")
     ctx.host.mkdir(queue, mode=0o755, owner=WARDEN_USER)
+    # Claude Code starts no background session in a folder whose trust prompt nobody accepted.
+    trust = ctx.places.install / "runtime" / "system" / "runners" / "trust.py"  # placed by the step before
+    config = layout.AGENT_HOME / ".claude.json"
+    ctx.host.run([layout.PYTHON, "-I", str(trust), str(config), str(ctx.checkout())], user=AGENT_USER)
 
 
 _HOST_KEY = re.compile(r"^(ssh-ed25519|ecdsa-sha2-nistp(?:256|384|521)|ssh-rsa) [A-Za-z0-9+/=]+$")
