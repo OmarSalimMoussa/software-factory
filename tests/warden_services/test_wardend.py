@@ -32,6 +32,8 @@ def test_the_warden_tells_systemd_it_serves_on_the_socket_systemd_names() -> Non
         systemd.bind("\0" + name)  # an abstract socket, which systemd names with a leading @
         systemd.settimeout(5)
 
-        ready({"NOTIFY_SOCKET": f"@{name}"})
+        environ = {"NOTIFY_SOCKET": f"@{name}", "PATH": "/usr/bin"}
+        ready(environ)
 
         assert systemd.recv(64) == b"READY=1"
+        assert environ == {"PATH": "/usr/bin"}  # the programs the warden starts never send on it

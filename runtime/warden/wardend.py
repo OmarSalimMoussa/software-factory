@@ -14,7 +14,7 @@ import pwd
 import socket
 import threading
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, MutableMapping, Sequence
 from pathlib import Path
 
 from runtime.shared import error_reports, store
@@ -103,10 +103,11 @@ def _owner(places: Places) -> pwd.struct_passwd:
     return pwd.getpwnam(raw["user"])
 
 
-def ready(environ: dict[str, str]) -> None:
+def ready(environ: MutableMapping[str, str]) -> None:
     """Tell systemd the warden serves (Type=notify), once public/ holds what the dashboard reads at its start: the
-    dashboard, ordered after the warden, starts no sooner. Outside systemd there is no one to tell."""
-    target = environ.get("NOTIFY_SOCKET", "")
+    dashboard, ordered after the warden, starts no sooner. Outside systemd there is no one to tell. The socket leaves
+    the environment: a program the warden starts would inherit it, and systemd logs each message it refuses there."""
+    target = environ.pop("NOTIFY_SOCKET", "")
     if not target:
         return
     address = "\0" + target[1:] if target.startswith("@") else target  # @ names a socket in the abstract namespace
@@ -143,7 +144,7 @@ def main() -> int:
     ctx = doors.context(WARDEN)
     refusals = reflections.RefusalWatch()
     server.serve_refusals(places.refusal_socket, lambda line: refusals.record(ctx, line))
-    ready(dict(os.environ))
+    ready(os.environ)
     transcripts = [agent_home / ".claude" / "projects", Path(owner.pw_dir) / ".claude" / "projects"]
     every = passes(places, transcripts, agent_home)
     log.info("warden: serving; passes %s", ", ".join(name for name, _ in every))
