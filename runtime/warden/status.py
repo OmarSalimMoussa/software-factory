@@ -8,7 +8,7 @@ from typing import Any
 from runtime.queue import proposals, reports
 from runtime.shared import models
 from runtime.slots import leases
-from runtime.warden import codes, errors_import, plan, probes, registry, schedule, settings_save
+from runtime.warden import ci_watch, codes, errors_import, plan, probes, registry, schedule, settings_save
 from runtime.warden.context import Context
 
 
@@ -38,6 +38,7 @@ def status(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
         **health,
         "plan": plan.reading(ctx),
         "errors_import": errors_import.note(ctx.places),
+        "ci": ci_watch.read(ctx.places),
         "reports_import": reports.note(ctx),
         "code_locked_until": None
         if until is None

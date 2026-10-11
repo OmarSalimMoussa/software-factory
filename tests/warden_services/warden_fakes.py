@@ -56,6 +56,9 @@ class FakeGitHub:
     def dispatch_promote(self, sha: str) -> str:
         return "run"
 
+    def ci_run(self, sha: str) -> str | None:
+        return None  # CI has not started on it
+
     def full_sha(self, sha: str) -> str:
         return sha + "f" * (40 - len(sha))
 

@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from runtime.shared.paths import PROMOTE_WORKFLOW, Places
+from runtime.shared.paths import CI_WORKFLOW, PROMOTE_WORKFLOW, Places
 from runtime.shared.settings import Settings
 
 API = "https://api.github.com"
@@ -75,6 +75,16 @@ class RestGitHub:
         if not isinstance(full, str) or len(full) != 40:
             raise GitHubError(f"GitHub names no full commit for {sha}")
         return full
+
+    def ci_run(self, sha: str) -> str | None:
+        """The newest run of the product's CI on a push of ``sha``; None until GitHub has started one."""
+        query = urllib.parse.urlencode({"head_sha": sha, "event": "push", "per_page": 1})
+        body = self._json("GET", f"/repos/{self._repo()}/actions/workflows/{CI_WORKFLOW}/runs?{query}")
+        runs = body.get("workflow_runs")
+        if not isinstance(runs, list):
+            raise GitHubError("GitHub's list of CI runs is not a list")
+        found = runs[0].get("id") if runs and isinstance(runs[0], dict) else None
+        return str(found) if isinstance(found, int) else None
 
     def run(self, run_id: str) -> dict[str, Any]:
         """A workflow run: id, status (queued, waiting, in_progress, completed), conclusion, url, head_sha, and

@@ -29,6 +29,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import (
     accounts,
+    ci_watch,
     codes,
     deploys,
     doing,
@@ -383,6 +384,7 @@ READERS: dict[str, Reader] = {
     "factory": _factory,
     "probes": _probes,
     "deploys": lambda ctx, args: {env: deploys.builds(ctx.places, env) for env in probes.ENVS},
+    "ci": lambda ctx, args: ci_watch.read(ctx.places),
     "plan": lambda ctx, args: plan.reading(ctx),
     "vitals": lambda ctx, args: {"reading": store.read_json_or(ctx.places.vitals, None), "memory": _memory()},
     "rules": lambda ctx, args: {"rules": RULES, "off": sorted(public.read_switches(ctx.places))},

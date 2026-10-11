@@ -25,7 +25,18 @@ from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import deploys, errors_import, github_push, heartbeat, inbox, outage, probes, reflections, vitals
+from runtime.warden import (
+    ci_watch,
+    deploys,
+    errors_import,
+    github_push,
+    heartbeat,
+    inbox,
+    outage,
+    probes,
+    reflections,
+    vitals,
+)
 from runtime.warden.context import Context
 
 log = logging.getLogger(__name__)
@@ -91,6 +102,7 @@ def run_tick(
         ("goal", lambda: _goal(ctx, _memo(ctx.places))),
         ("errors import", lambda: errors_import.poll(ctx)),
         ("reports import", lambda: reports.poll(ctx)),
+        ("CI watch", lambda: ci_watch.poll(ctx)),
     ]
     for name, step in steps:
         try:

@@ -10,7 +10,7 @@ from runtime.dashboard.views.kit import Parts, Query, Snap, epoch, span, when
 from runtime.dashboard.views.shell import health
 from runtime.dashboard.views.task import built_from
 
-WANTS = ("settings", "probes", "queue", "deploys", "sessions", "cost", "cards", "qa", "specs", "rules", "outage")
+WANTS = ("settings", "probes", "queue", "deploys", "ci", "sessions", "cost", "cards", "qa", "specs", "rules", "outage")
 
 
 def _build(snap: Snap, env: str) -> dict[str, Any]:

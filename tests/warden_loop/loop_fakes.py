@@ -25,6 +25,7 @@ class FakeGitHub:
     on_run: Callable[[], None] | None = None
     dispatched: list[str] = field(default_factory=list)
     releases: str = "success"  # how the prod workflow's jobs after its deploy job end
+    ci: dict[str, Any] | None = None  # CI's run of a pushed commit, once GitHub started one
 
     def dispatch_promote(self, sha: str) -> str:
         self.dispatched.append(sha)
@@ -33,7 +34,12 @@ class FakeGitHub:
     def full_sha(self, sha: str) -> str:
         return sha + "f" * (40 - len(sha))
 
+    def ci_run(self, sha: str) -> str | None:
+        return None if self.ci is None else "ci-7"
+
     def run(self, run_id: str) -> dict[str, Any]:
+        if run_id == "ci-7" and self.ci is not None:
+            return self.ci
         if self.on_run is not None:
             self.on_run()
         return {

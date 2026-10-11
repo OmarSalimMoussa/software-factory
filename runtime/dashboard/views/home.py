@@ -25,6 +25,7 @@ WANTS = (
     "goal",
     "factory",
     "deploys",
+    "ci",
     "rules",
 )
 SPARK_DAYS = 14
@@ -56,6 +57,10 @@ def env_card(snap: Snap, env: str) -> dict[str, Any]:
         ahead = sum(1 for t in snap.get("queue")["tasks"] if t["status"] == "on-staging")
         if ahead:
             chips.append({"text": f"{ahead} {'task' if ahead == 1 else 'tasks'} ahead of prod", "tone": "accent"})
+        ci = snap.get("ci")
+        if ci is not None and ci["conclusion"] in ("failure", "timed_out", "cancelled", "startup_failure"):
+            jobs = ", ".join(ci["failed"]) or "a job"
+            chips.append({"text": f"CI failed on {ci['commit'][:8]}: {jobs}", "tone": "bad"})
     elif "prod-frozen" not in snap.get("rules")["off"]:
         chips.append({"text": "frozen", "tone": "muted"})
     current = snap.get("deploys")[env]["current"]
