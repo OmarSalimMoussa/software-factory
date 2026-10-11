@@ -17,11 +17,15 @@ Environment=@uv_env@
 LoadCredential=@claude_token@:@secrets@/claude.token
 ExecStart=@python@ -I @install@/runtime/system/runners/agent_run.py @state@ %i
 # systemd opens the output file and runs the exit recorder as root, so this user never reaches the warden's state.
-StandardOutput=truncate:@runs@/%i.log
+# append, not truncate: systemd opens the file again for the exit recorder, and truncating would empty it.
+StandardOutput=append:@runs@/%i.log
 StandardError=inherit
 ExecStopPost=+@python@ -I @install@/runtime/system/runners/record_exit.py @runs@/%i.exit
 UMask=0027
 TemporaryFileSystem=@state@:ro
+# The exit recorder runs in this unit's mount namespace too, + or not: runs/ is bound back for it. It stays the
+# warden's and 0700, so this unit's own user can neither read nor write it.
+BindPaths=@runs@
 BindReadOnlyPaths=@public@
 ProtectHome=tmpfs
 BindPaths=@agent_home@

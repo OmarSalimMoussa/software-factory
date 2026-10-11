@@ -30,6 +30,7 @@ from runtime.system import layout
 from runtime.system.drills import Ran
 from runtime.system.job import Install, refuse
 from runtime.warden import registry, session_settings
+from runtime.warden.launch import LaunchError, Units
 
 # What the drill is, said first: a command that probes the sandbox's walls looks like an attack without it.
 ABOUT = (
@@ -278,6 +279,14 @@ class RealRig:
 
     def now(self) -> float:
         return time.monotonic()
+
+    def warden_command(self, argv: list[str]) -> Ran:
+        """``argv`` as the agent, the way the warden runs it: its launcher, through the agent-run template unit."""
+        try:
+            code, out = Units(self.places, lambda: self.settings).agent_command(argv, str(self.ctx.checkout()))
+        except LaunchError as exc:
+            return Ran(-1, str(exc))
+        return Ran(code, out)
 
 
 @contextmanager

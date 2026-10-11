@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER
+from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER, queue_dir
 from runtime.shared.settings import overrides_toml
 from runtime.system import github_keys, layout, render, steps_wire
 from runtime.system.host import CommandError, Host
@@ -240,9 +240,17 @@ def _clone_checkout(ctx: Install, checkout: Path, dest: Path, origin: str, owner
 
 
 def agent_checkout(ctx: Install) -> None:
-    """The agent user's own checkout of the product, on its default branch; the owner keeps theirs."""
+    """The agent user's own checkout of the product, on its default branch, and in it the warden's queue; the owner
+    keeps theirs."""
     branch = ctx.need_settings().get_str("repo.default_branch")
     _clone_checkout(ctx, ctx.product, ctx.checkout(), ctx.product_origin, AGENT_USER, branch)
+    # A folder only the warden writes, in a checkout the agent owns, so only root can make it. A queue that is not a
+    # folder is refused, never followed: root would give the warden whatever a link there points to.
+    queue = queue_dir(ctx.checkout())
+    code, kind = ctx.host.query(["stat", "-c", "%F", str(queue)])
+    if code == 0 and kind.strip() and kind.strip() != "directory":
+        raise refuse(f"{queue} is a {kind.strip()}, not a folder: remove it, then install again")
+    ctx.host.mkdir(queue, mode=0o755, owner=WARDEN_USER)
 
 
 def warden_clone(ctx: Install) -> None:

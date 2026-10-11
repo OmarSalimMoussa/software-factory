@@ -9,7 +9,9 @@ restarts the warden if the process itself dies.
 from __future__ import annotations
 
 import logging
+import os
 import pwd
+import socket
 import threading
 import time
 from collections.abc import Callable, Sequence
@@ -101,6 +103,17 @@ def _owner(places: Places) -> pwd.struct_passwd:
     return pwd.getpwnam(raw["user"])
 
 
+def ready(environ: dict[str, str]) -> None:
+    """Tell systemd the warden serves (Type=notify), once public/ holds what the dashboard reads at its start: the
+    dashboard, ordered after the warden, starts no sooner. Outside systemd there is no one to tell."""
+    target = environ.get("NOTIFY_SOCKET", "")
+    if not target:
+        return
+    address = "\0" + target[1:] if target.startswith("@") else target  # @ names a socket in the abstract namespace
+    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+        sock.sendto(b"READY=1", address)
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     places = Places.system()
@@ -130,6 +143,7 @@ def main() -> int:
     ctx = doors.context(WARDEN)
     refusals = reflections.RefusalWatch()
     server.serve_refusals(places.refusal_socket, lambda line: refusals.record(ctx, line))
+    ready(dict(os.environ))
     transcripts = [agent_home / ".claude" / "projects", Path(owner.pw_dir) / ".claude" / "projects"]
     every = passes(places, transcripts, agent_home)
     log.info("warden: serving; passes %s", ", ".join(name for name, _ in every))

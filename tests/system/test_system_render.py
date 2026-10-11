@@ -7,7 +7,7 @@ import pytest
 from system_fakes import settings
 
 from runtime.shared.paths import Places
-from runtime.system import render
+from runtime.system import layout, render
 
 HERE = render.HERE
 PLACES = Places.system()
@@ -78,13 +78,26 @@ def test_agent_and_stack_units_fix_their_user_home_and_slice(name: str, user: st
         assert f"Environment=DOCKER_HOST=unix:///run/user/{uid}/docker.sock" in lines
 
 
-def test_the_warden_reads_transcripts_but_writes_nothing_outside_its_state() -> None:
+def test_the_warden_reads_transcripts_but_writes_only_its_state_and_the_agents_queue() -> None:
     lines = _unit("software-warden.service").splitlines()
 
     assert "AmbientCapabilities=CAP_DAC_READ_SEARCH" in lines
     assert "CapabilityBoundingSet=CAP_DAC_READ_SEARCH" in lines
     assert "ProtectSystem=strict" in lines
-    assert "ReadWritePaths=/var/lib/software-factory" in lines
+    assert "ProtectHome=read-only" in lines
+    # The agent's home holds the queue, the one folder there the warden owns.
+    assert f"ReadWritePaths=/var/lib/software-factory {layout.AGENT_HOME}" in lines
+
+
+@pytest.mark.parametrize("name", ["software-agent-run@.service", "software-stack-run@.service"])
+def test_a_request_units_exit_recorder_sees_the_runs_folder_and_keeps_the_output(name: str) -> None:
+    lines = _unit(name).splitlines()
+    runs = "/var/lib/software-factory/runs"
+
+    # The recorder runs in the unit's mount namespace, where the state folder is hidden; truncate: would empty the
+    # output when systemd opens the file again for it.
+    assert f"BindPaths={runs}" in lines
+    assert f"StandardOutput=append:{runs}/%i.log" in lines
 
 
 def test_managed_settings_hold_only_the_guard_and_the_rulebook_loader() -> None:

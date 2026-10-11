@@ -5,7 +5,9 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-Type=simple
+# Ready once public/ holds the settings the dashboard reads at its start: the dashboard is ordered after it.
+Type=notify
+NotifyAccess=main
 User=@warden_user@
 Group=@warden_user@
 # Lets new slot env files take the slots' group, so the stack user's runs can read them.
@@ -23,7 +25,9 @@ UMask=0022
 RuntimeDirectory=@run_name@
 RuntimeDirectoryMode=0755
 ProtectSystem=strict
-ReadWritePaths=@state@
+# The agent's home too, for the queue folder in its checkout: the only folder there the warden owns, so the only
+# one its writes can reach.
+ReadWritePaths=@state@ @agent_home@
 ProtectHome=read-only
 PrivateTmp=yes
 PrivateDevices=yes

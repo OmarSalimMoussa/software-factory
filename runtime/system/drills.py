@@ -72,6 +72,7 @@ class Rig(Protocol):
     def stop(self, unit: str) -> None: ...
     def wait(self, seconds: float) -> None: ...
     def now(self) -> float: ...
+    def warden_command(self, argv: list[str]) -> Ran: ...
 
 
 def refused_by(ran: Ran, rule: str) -> bool:
@@ -382,6 +383,16 @@ def dashboard_unreachable(rig: Rig) -> Result:
                   f"as root: {as_root}; as the agent: {_first(agent.out)}")  # fmt: skip
 
 
+def warden_runs_commands(rig: Rig) -> Result:
+    """The warden starts each session and stops one through its template unit: a command run there as the agent must
+    come back with what it printed and how it ended."""
+    good = rig.warden_command(["git", "rev-parse", "--is-inside-work-tree"])
+    bad = rig.warden_command(["git", "rev-parse", "--verify", "--quiet", "refs/heads/software-drill-none"])
+    ok = (good.code, good.out) == (0, "true\n") and bad.code == 1
+    return Result("the warden runs a command as the agent and reads what it printed and how it ended", ok,
+                  f"a command: exit {good.code}, {_first(good.out)!r}; a failing one: exit {bad.code}")  # fmt: skip
+
+
 DRILLS: tuple[Callable[[Rig], Result], ...] = (
     sandbox_runs,
     docker_denied,
@@ -401,6 +412,7 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
     stack_not_root,
     shared_services_answer,
     dashboard_unreachable,
+    warden_runs_commands,
 )
 
 

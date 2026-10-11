@@ -161,6 +161,24 @@ def test_root_never_opens_a_repository_the_owner_owns(tmp_path: Path) -> None:
     assert all(read.endswith(f"(as {job.owner.name})") for read in reads)
 
 
+@pytest.mark.parametrize("found", ["", "directory", "symbolic link"], ids=["missing", "a-folder", "a-link"])
+def test_the_install_gives_the_warden_its_queue_in_the_agents_checkout_and_never_follows_a_link(
+    tmp_path: Path, found: str
+) -> None:
+    job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    queue = Path(settings().get_str("repo.path")) / "queue"
+    job.host.answers[f"stat -c %F {queue}"] = (0, found) if found else (1, "")
+
+    if found == "symbolic link":
+        with pytest.raises(Refused, match="not a folder"):
+            install.run(job)
+        assert not any(action.startswith(f"make: {queue}/") for action in job.host.actions)
+    else:
+        install.run(job)
+        assert f"make: {queue}/ (755, software-warden:software-warden)" in job.host.actions
+
+
 def test_the_install_makes_each_tool_cache_a_session_may_write_for_the_agent(tmp_path: Path) -> None:
     job = dry_job(tmp_path)
 

@@ -43,6 +43,8 @@ class FakeRig:
     written: bool = False
     clock: float = 0.0
     claude_gone_at: float | None = None
+    # How the warden's launcher answers a command that succeeds, then one that fails.
+    warden: tuple[Ran, Ran] = (Ran(0, "true\n"), Ran(1, ""))
 
     def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran:
         return Ran(1, "")
@@ -73,6 +75,27 @@ class FakeRig:
 
     def now(self) -> float:
         return self.clock
+
+    def warden_command(self, argv: list[str]) -> Ran:
+        return self.warden[0] if "--is-inside-work-tree" in argv else self.warden[1]
+
+
+@pytest.mark.parametrize(
+    ("warden", "ok"),
+    [
+        ((Ran(0, "true\n"), Ran(1, "")), True),
+        # The exit recorder could not write its file: the warden learns nothing, and no session can start.
+        ((Ran(-1, "software-agent-run@cmd-1.service left no result (FileNotFoundError)"), Ran(-1, "")), False),
+        # The exit came back but the output was emptied: the warden cannot read what a command printed.
+        ((Ran(0, ""), Ran(1, "")), False),
+        ((Ran(0, "true\n"), Ran(0, "")), False),  # a failing command must come back failed
+    ],
+    ids=["reads-both", "no-result", "output-lost", "failure-hidden"],
+)
+def test_the_warden_command_drill_needs_the_output_and_the_exit_of_a_real_unit_run(
+    warden: tuple[Ran, Ran], ok: bool
+) -> None:
+    assert drills.warden_runs_commands(FakeRig(warden=warden)).ok is ok
 
 
 @pytest.mark.parametrize(
