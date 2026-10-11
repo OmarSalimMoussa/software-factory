@@ -3,7 +3,7 @@
 A computation done twice drifts: a second clock origin, a second rounding rule, a value the browser derives that the
 server already sends. Each computation names the folders it binds and how a line that performs it reads: a line
 matches when every pattern of one ``when`` row matches it. Its owners carry the grounds for doing it, and an owner that
-no longer performs it is stale.
+performs it nowhere is stale.
 """
 
 from __future__ import annotations

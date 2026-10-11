@@ -46,10 +46,18 @@ IDS: tuple[str, ...] = (
     "seeds-current",
     "tests",
 )
-PATTERN_CHECKS = frozenset({
-    "mirror-markers", "mirrored-constants", "no-console", "network-door", "js-import-rules", "vocabulary-homes",
-    "computation-owners", "quiet-modules",
-})  # fmt: skip
+PATTERN_CHECKS = frozenset(
+    {
+        "mirror-markers",
+        "mirrored-constants",
+        "no-console",
+        "network-door",
+        "js-import-rules",
+        "vocabulary-homes",
+        "computation-owners",
+        "quiet-modules",
+    }
+)
 NOTE = "note: "
 # Files in check-values/ that feed something other than a check: the QA surfaces table.
 OTHER_VALUES = ("surfaces.toml",)

@@ -106,7 +106,7 @@ def switch_path(ctx: Context) -> Path:
 
 
 def switching(ctx: Context) -> dict[str, Any] | None:
-    """The switch of Claude accounts under way, or None. A record whose operation no longer runs was left by a switch
+    """The switch of Claude accounts under way, or None. A record whose operation has ended was left by a switch
     the warden's own restart cut short (ops.recover marked it failed), and counts for nothing."""
     try:
         record = store.read_json(switch_path(ctx))

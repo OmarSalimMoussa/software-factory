@@ -144,3 +144,22 @@ def test_a_ratchet_compares_what_a_branch_changed_with_the_default_branch(
     problems = count_claims.run(repo, {})
     assert bool(problems) is fails  # docs/b.md, unchanged, is never measured
     assert not fails or problems[0].startswith("count-claims: docs/a.md has 2, over the 1 it has on the default branch")
+
+
+@pytest.mark.parametrize(("now", "fails"), [("all three of them", False), ("all three of them, the last two", True)])
+def test_a_ratchet_compares_a_file_the_branch_moved_with_the_file_it_came_from(
+    make_repo: MakeRepo, now: str, fails: bool
+) -> None:
+    page = "We keep {}.\n" + "".join(f"Line {n} of the page says what it says.\n" for n in range(20))
+    root = make_repo({"docs/a.md": page.format("all three of them")})
+    base = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, text=True).stdout
+    subprocess.run(["git", "checkout", "-q", "-b", "work"], cwd=root, check=True)
+    (root / "docs" / "moved").mkdir()
+    subprocess.run(["git", "mv", "docs/a.md", "docs/moved/a.md"], cwd=root, check=True)
+    (root / "docs" / "moved" / "a.md").write_text(page.format(now))
+    commit_all(root, "work")
+
+    problems = count_claims.run(Repo.open(root, ("docs/a.md", "docs/moved/a.md"), base.strip()), {})
+
+    assert bool(problems) is fails
+    assert not fails or problems[0].startswith("count-claims: docs/moved/a.md has 2, over the 1 it has on the default")

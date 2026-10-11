@@ -36,6 +36,19 @@ def tracked_files(root: Path) -> tuple[str, ...]:
     return tuple(rel for rel in dict.fromkeys(listed) if rel and (root / rel).is_file())
 
 
+def moved_from(root: Path, base: str) -> dict[str, str]:
+    listed = git(root, "diff", "--find-renames", "--find-copies", "--name-status", "-z", base, "HEAD").split("\0")
+    found: dict[str, str] = {}
+    at = 0
+    while at < len(listed) - 1:
+        if listed[at][:1] in ("R", "C"):
+            found[listed[at + 2]] = listed[at + 1]
+            at += 3
+        else:
+            at += 2
+    return found
+
+
 @dataclass
 class Repo:
     root: Path
@@ -53,16 +66,22 @@ class Repo:
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _excluded: frozenset[str] | None = field(default=None, repr=False)
     _excluded_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    _sources: dict[str, str] | None = field(default=None, repr=False)
 
     @classmethod
     def open(cls, root: Path, changed: Sequence[str] | None = None, base: str | None = None) -> Repo:
         return cls(root, tracked_files(root), None if changed is None else tuple(changed), base)
 
     def before(self, rel: str) -> str | None:
-        """``rel`` as it stood where the branch left the default branch; None when it was not there."""
+        """``rel`` as it stood where the branch left the default branch, or the file git finds the branch moved it, or
+        mostly copied it, from: a split never reads as new debt. None when it was in neither."""
         if self.base is None:
             return None
-        done = subprocess.run(["git", "show", f"{self.base}:{rel}"], cwd=self.root, capture_output=True, check=False)
+        with self._lock:
+            if self._sources is None:
+                self._sources = moved_from(self.root, self.base)
+        source = self._sources.get(rel, rel)
+        done = subprocess.run(["git", "show", f"{self.base}:{source}"], cwd=self.root, capture_output=True, check=False)
         return done.stdout.decode("utf-8", errors="replace") if done.returncode == 0 else None
 
     def tracked_before(self) -> tuple[str, ...]:

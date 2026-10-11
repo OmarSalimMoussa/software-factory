@@ -51,7 +51,7 @@ def packages(ctx: Install) -> None:
     try:
         host.run(apt, env=_APT_ENV)
     except CommandError:
-        # A package list older than the archive names files it no longer has: refreshed, the same install works.
+        # A package list older than the archive names files the archive has dropped: refreshed, the same install works.
         host.run(["apt-get", "update"], env=_APT_ENV)
         host.run(apt, env=_APT_ENV)
 
