@@ -181,15 +181,23 @@ def _start(ctx: Context, commit: str) -> str:
     return "started; the dashboard restarts while the factory is installed"
 
 
+def _asked_for_installed(places: Places, installed: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The upgrade asked for from the factory installed now, or to it: none once an install by hand replaced both."""
+    before = asked(places)
+    if before is None or installed is None or installed["commit"] not in (before["from"], before["to"]):
+        return None
+    return before
+
+
 def view(ctx: Context) -> dict[str, Any]:
     places = ctx.places
     installed = upgrades.read_installed(places)
-    before = asked(places)
+    before = _asked_for_installed(places, installed)
     return {
         "installed": installed["commit"] if installed else None,
         "offer": {**offer(places), "available": _for_installed(places)},
         "asked": before,
         "op": _op(ctx, before["op"]) if before else None,
-        "progress": progress_now(ctx),
+        "progress": progress_now(ctx) if before else None,
         "paused": lifecycle.paused_path(ctx).exists(),
     }
