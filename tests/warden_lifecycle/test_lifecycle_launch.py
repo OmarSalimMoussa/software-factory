@@ -19,7 +19,11 @@ FIXTURE = Path(__file__).resolve().parents[2] / "testdata" / "fixture-product"
 @pytest.mark.parametrize("role", ["orchestrator", "implementer"])
 def test_each_session_starts_sandboxed_in_its_worktree(world: World, tmp_path: Path, role: str) -> None:
     repo = Path(world.settings.get_str("repo.path"))
-    own = repo if role == "orchestrator" else repo / ".claude" / "worktrees" / "impl-t-0001"
+    folder = repo / ".claude" / "worktrees"
+    own = repo if role == "orchestrator" else folder / "impl-t-0001"
+    other = folder / "impl-t-0002"
+    for worktree in (own, other):
+        worktree.mkdir(parents=True, exist_ok=True)
     body = session_settings.render(world.settings, world.places, role, own, tmp_path / "agent")
     sandbox = body["sandbox"]
     assert (sandbox["enabled"], sandbox["failIfUnavailable"], sandbox["allowUnsandboxedCommands"]) == (
@@ -31,7 +35,15 @@ def test_each_session_starts_sandboxed_in_its_worktree(world: World, tmp_path: P
     # Its own worktree, and its tools' caches in the agent's home (sandbox.writable_caches), nothing else.
     caches = [str(tmp_path / "agent" / ".cache" / "uv"), str(tmp_path / "agent" / ".npm")]
     assert sandbox["filesystem"]["allowWrite"] == [str(own), *caches]
-    assert str(repo / ".claude" / "worktrees") in sandbox["filesystem"]["denyRead"]
+    if role == "orchestrator":
+        assert str(folder) in sandbox["filesystem"]["denyRead"]
+        assert sandbox["filesystem"]["denyWrite"] == [str(folder)]
+    else:
+        # Another session's worktree is denied by name, never the folder holding the session's own: a worktree read
+        # back inside a denied folder is mounted read-only, and no command can start in it.
+        assert str(other) in sandbox["filesystem"]["denyRead"]
+        assert not any(own.is_relative_to(Path(p)) for p in sandbox["filesystem"]["denyRead"])
+        assert "allowRead" not in sandbox["filesystem"]
     assert str(tmp_path / "agent" / ".claude" / ".credentials.json") in sandbox["filesystem"]["denyRead"]
     assert body["env"] == {"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"}
     assert ("statusLine" in body) == (role == "orchestrator")

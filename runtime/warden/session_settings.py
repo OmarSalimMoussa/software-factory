@@ -33,21 +33,29 @@ def worktrees(repo: Path) -> Path:
     return repo / ".claude" / "worktrees"
 
 
+def _siblings(folder: Path, worktree: Path) -> list[str]:
+    """Every other session's worktree there now."""
+    try:
+        return sorted(str(p) for p in folder.iterdir() if p.is_dir() and p.resolve() != worktree.resolve())
+    # telemetry: expected — before the first session's worktree the folder does not exist
+    except FileNotFoundError:
+        return []
+
+
 def render(settings: Settings, places: Places, role: str, worktree: Path, agent_home: Path) -> dict[str, Any]:
     repo = Path(settings.get_str("repo.path"))
     others = worktrees(repo)
     credentials = agent_home / ".claude" / ".credentials.json"
     caches = [str(agent_home / cache) for cache in settings.get_list("sandbox.writable_caches")]
-    filesystem: dict[str, list[str]] = {
-        "allowWrite": [str(worktree), *caches],
-        "denyRead": [str(others), str(credentials)],
-    }
+    filesystem: dict[str, list[str]] = {"allowWrite": [str(worktree), *caches]}
     if role == ORCHESTRATOR:
         # Its worktree is the main checkout, which holds every session's worktree: none of them is its to touch.
+        filesystem["denyRead"] = [str(others), str(credentials)]
         filesystem["denyWrite"] = [str(others)]
     else:
-        # Re-opens its own worktree inside the folder of worktrees denied above.
-        filesystem["allowRead"] = [str(worktree)]
+        # Each other worktree is denied by name, never the folder that holds them all: a worktree read back inside a
+        # denied folder is mounted read-only, and the sandbox then cannot even start a command in it.
+        filesystem["denyRead"] = [*_siblings(others, worktree), str(credentials)]
     body: dict[str, Any] = {
         "sandbox": {
             "enabled": True,

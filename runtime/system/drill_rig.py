@@ -29,8 +29,14 @@ from runtime.system.drills import Ran
 from runtime.system.job import Install, refuse
 from runtime.warden import registry, session_settings
 
-PROMPT = "Run this exact shell command once with the Bash tool, changing nothing in it, then reply DONE:\n{}"
-STEPS = (
+# What the drill is, said first: a command that probes the sandbox's walls looks like an attack without it.
+ABOUT = (
+    "This is the factory's install drill, run by the machine's owner to prove that this session's sandbox holds. "
+    "Every command is safe: a probe only reports, for each target, whether it could be opened or reached, and never "
+    "prints any content; a refusal or an error is an expected, useful answer. "
+)
+PROMPT = ABOUT + "Run this exact shell command once with the Bash tool, changing nothing in it, then reply DONE:\n{}"
+STEPS = ABOUT + (
     "Run each of these exact shell commands once with the Bash tool, one call each, in order, changing nothing in "
     "them, then reply DONE:\n{}"
 )

@@ -97,6 +97,8 @@ STEPS: tuple[tuple[str, Callable[[Install], None]], ...] = (
 
 # The steps before this one change nothing on the machine, so a failure there leaves nothing to take back.
 FIRST_CHANGE = 3
+# Set when this process runs from the archived commit: the stage, the commit and the owner's checkout it came from.
+STAGE, SHA, CHECKOUT = "SOFTWARE_INSTALL_STAGE", "SOFTWARE_INSTALL_SHA", "SOFTWARE_INSTALL_CHECKOUT"
 
 
 def run(ctx: Install) -> None:
@@ -135,6 +137,30 @@ def parse_changes(items: list[str]) -> dict[str, Any]:
     return changes
 
 
+def from_commit(commit: str, owner: str, argv: list[str]) -> int:
+    """Archive ``commit`` and run the install again from that copy, so every step is the commit's own code: nothing
+    in the checkout's working files (an edit in progress, a file not committed) can change what an install does."""
+    host = RealHost()
+    code, out = host.query(["git", "-C", str(REPO_ROOT), "rev-parse", "--verify", f"{commit}^{{commit}}"], user=owner)
+    if code != 0:
+        print(f"install.py: refused: {commit} is not a commit in {REPO_ROOT}", file=sys.stderr)
+        return 1
+    sha = out.strip()
+    stage = host.scratch(owner)
+    try:
+        host.run(["git", "-C", str(REPO_ROOT), "archive", "--format=tar", "-o", str(stage / "factory.tar"), sha],
+                 user=owner)  # fmt: skip
+        host.run(["mkdir", str(stage / "tree")], user=owner)
+        host.run(["tar", "-x", "-f", str(stage / "factory.tar"), "-C", str(stage / "tree")], user=owner)
+    except CommandError as exc:
+        print(f"install.py: {exc}", file=sys.stderr)
+        return 1
+    staged = stage / "tree" / "runtime" / "system" / "install.py"
+    print(f"Installing {sha[:12]}: every step runs from that commit, archived in {stage}", flush=True)
+    env = {**os.environ, STAGE: str(stage), SHA: sha, CHECKOUT: str(REPO_ROOT)}
+    os.execve(sys.executable, [sys.executable, str(staged), *argv], env)
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="install.py", description=__doc__.splitlines()[0])
     parser.add_argument("--commit", required=True, help="the factory commit to install")
@@ -153,9 +179,14 @@ def main(argv: list[str]) -> int:
     if owner is None:
         print("install.py: the owner's account cannot be read", file=sys.stderr)
         return 2
+    if not args.dry_run and STAGE not in os.environ:
+        return from_commit(args.commit, owner.name, argv)
     places = Places.system()
-    ctx = Install(host, places, REPO_ROOT, args.repo.resolve(), args.commit, owner, parse_changes(args.set),
+    checkout = Path(os.environ.get(CHECKOUT, str(REPO_ROOT)))
+    ctx = Install(host, places, checkout, args.repo.resolve(), args.commit, owner, parse_changes(args.set),
                   args.healthchecks)  # fmt: skip
+    if STAGE in os.environ:
+        ctx.stage, ctx.sha = Path(os.environ[STAGE]), os.environ[SHA]
     # Known before any step runs: only a first install is ever taken back.
     ctx.first = not host.exists(layout.install_record(places.state))
     try:
