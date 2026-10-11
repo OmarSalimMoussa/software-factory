@@ -47,6 +47,7 @@ VERBS: dict[str, Verb] = {
     "inbox": _v("runtime.warden.inbox:read", ORCH),
     "inbox.wait": _v("runtime.warden.inbox:wait", ORCH),
     "push": _v("runtime.warden.github_push:push_checked", ORCH),
+    "check": _v("runtime.warden.checks:check", ORCH, IMPL),
     "promote": _v("runtime.warden.github_push:promote_cli", OWNER),
     # reflections, status, settings (1B-3)
     "reflect": _v("runtime.warden.reflections:append", *ANY),

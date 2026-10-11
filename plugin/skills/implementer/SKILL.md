@@ -36,7 +36,7 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 - **Tests first,** at the seam a caller sees. A bug is reproduced in a failing test before you fix it (the
   `debugging` skill).
 - **Run only what covers your change:** the tests your diff picks (`factory check --only tests`), and the product's
-  own fast commands its `CLAUDE.md` names. Never the full `factory check` before your merge turn.
+  own fast commands its `CLAUDE.md` names. The warden runs the full `factory check` only on your merge turn.
 - **Your slot:** rebuild only what changed (`factory slot up <service>`). Prepare what your testers need: seeds
   (`factory slot seed load <name>`) and any setup a scenario names. A tester that needs a service stopped asks you.
 - **New behaviour gets a standing scenario** in `qa/scenarios/`, or an update to the one that covers it: three labels
@@ -69,10 +69,11 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 
 1. Tell the orchestrator QA is clean: the task, the branch, the last round's result, and each bug your testers caught
    with the test that now guards it. End your turn; its message wakes you.
-2. `git rebase <default branch>`, rerun the tests you picked, then `factory check`. It records a pass for the exact
-   tree it checked.
-3. Fix what it finds on your branch and run it again, at most `rounds.check_runs` runs. The last run must be on your
-   final commit. Out of runs: report what fails to the orchestrator.
+2. `git rebase <default branch>`, rerun the tests you picked, then `factory check`. The warden runs it on your
+   committed branch and records a pass for the exact tree it checked.
+3. Fix what it finds on your branch and run it again: the warden allows `rounds.check_runs` runs a turn and says
+   how many are left. The last run must be on your final commit. Out of runs: report what fails to the
+   orchestrator.
 4. Ask the orchestrator to merge, with the tree the pass names.
 
 ## 5. Until the default branch is checked

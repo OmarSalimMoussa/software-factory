@@ -112,7 +112,8 @@ live and nothing merged for a while, a regression walk of the scenarios that wai
    pass: `git revert -m 1 <merge> --no-edit`, the task back to `building`, its implementer told. Any other failure
    becomes a request. Green: `factory queue task status <task> checked`, and tell the implementer.
 5. **Ship.** `factory push` has the warden push the checked commit; CI deploys staging. Staging regressing after
-   your push: revert, check, push again at once. Prod moves only when the owner pushes it.
+   your push: revert, `factory check`, push again at once (`procedures/ops/revert.md`). Prod moves only when the
+   owner pushes it.
 
 ## When something is red
 

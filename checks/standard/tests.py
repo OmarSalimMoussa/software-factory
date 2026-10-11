@@ -4,7 +4,9 @@ check-values/test-map.toml says which tests read which paths: each changed path 
 in ``readers``, to the test paths that can break; a prefix in ``full`` runs every test; a path under no prefix runs
 every test and says so (map it). ``always`` joins every selection; a changed file with a ``skip_suffixes`` suffix
 selects nothing. --all runs every test. On a shared machine a run starts only when its memory ceiling and the reserve
-for every other session are free, and runs in a scope systemd stops at the ceiling (the budget.test_* settings).
+for every other session are free (the budget.test_* settings); the check's own unit holds that ceiling, and a test
+that passes it is killed. There the run also stops after checks.run_minutes, and scripts/dev test gets
+checks.test_seconds as FACTORY_TEST_SECONDS, the time one test may take, for the product's test runner to enforce.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ VALUES_FILE = "test-map.toml"
 VALUES = {"always": [str], "full": [str], "skip_suffixes": [str], "readers": {str: [str]}}
 
 MEMINFO = Path("/proc/meminfo")
+CGROUPS = Path("/sys/fs/cgroup")
 
 
 def _matches(rel: str, prefix: str) -> bool:
@@ -55,41 +58,34 @@ def available_mib() -> int:
     raise RuntimeError(f"{MEMINFO} has no MemAvailable line")
 
 
-def _capped(repo: Repo, command: list[str], ceiling: int) -> tuple[int, str]:
-    unit = f"factory-test-{os.getpid()}.scope"
-    done = subprocess.run(
-        [
-            "systemd-run",
-            "--user",
-            "--scope",
-            "--quiet",
-            f"--unit={unit}",
-            f"--property=MemoryMax={ceiling}M",
-            "--property=MemorySwapMax=0",
-            "--",
-            *command,
-        ],
-        cwd=repo.root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+def _oom_kills() -> int:
+    """How many processes the kernel killed in this run's own cgroup for passing its memory ceiling; 0 off systemd."""
+    try:
+        own = Path("/proc/self/cgroup").read_text().strip().splitlines()[-1].split("::", 1)[1]
+        events = (CGROUPS / own.lstrip("/") / "memory.events").read_text()
+    # telemetry: expected — a run outside a cgroup v2 unit (a developer's own machine) has no ceiling to pass
+    except (OSError, IndexError):
+        return 0
+    return next((int(line.split()[1]) for line in events.splitlines() if line.startswith("oom_kill ")), 0)
+
+
+def _run(repo: Repo, command: list[str]) -> tuple[int, str]:
+    if repo.test_seconds is None:
+        done = subprocess.run(command, cwd=repo.root, capture_output=True, text=True, check=False)
+        return done.returncode, (done.stdout + done.stderr).strip()
+    per_test, whole = repo.test_seconds
+    env = {**os.environ, "FACTORY_TEST_SECONDS": str(per_test)}
+    killed = _oom_kills()
+    try:
+        done = subprocess.run(command, cwd=repo.root, env=env, capture_output=True, text=True, timeout=whole,
+                              check=False)  # fmt: skip
+    except subprocess.TimeoutExpired as exc:
+        said = "".join(p if isinstance(p, str) else p.decode(errors="replace") for p in (exc.stdout, exc.stderr) if p)
+        return 1, f"{said.strip()}\nThe test run passed {whole} s, so it was stopped: find the test that hangs"
     output = (done.stdout + done.stderr).strip()
-    if done.returncode == 0:
-        return 0, output
-    # A scope that ended by itself is gone and reads `success`; one its ceiling stopped stays failed until reset.
-    result = subprocess.run(
-        ["systemctl", "--user", "show", "--property=Result", "--value", unit],
-        capture_output=True,
-        text=True,
-        check=False,
-    ).stdout.strip()
-    if result == "oom-kill":
-        subprocess.run(["systemctl", "--user", "reset-failed", unit], capture_output=True, check=False)
-        return done.returncode, (
-            f"{output}\nThe run passed its {ceiling} MiB memory ceiling, so systemd stopped "
-            "it: a test now keeps more memory than before; find it before raising the ceiling"
-        )
+    if done.returncode != 0 and _oom_kills() > killed and repo.test_memory is not None:
+        output += (f"\nThe run passed its {repo.test_memory[0]} MiB memory ceiling, so the kernel stopped a test: "
+                   "a test now keeps more memory than before; find it before raising the ceiling")  # fmt: skip
     return done.returncode, output
 
 
@@ -105,10 +101,7 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
         if paths == []:
             return []
     command = [str(repo.root / "scripts" / "dev"), "test", *(paths or [])]
-    if repo.test_memory is None:
-        done = subprocess.run(command, cwd=repo.root, capture_output=True, text=True, check=False)
-        status, output = done.returncode, (done.stdout + done.stderr).strip()
-    else:
+    if repo.test_memory is not None:
         ceiling, reserve = repo.test_memory
         free = available_mib()
         if free < ceiling + reserve:
@@ -117,7 +110,7 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
                 f"ceiling and {reserve} MiB kept for every other session): free some (stop a slot you do not "
                 "use, wait for another check to end), then run again"
             ]
-        status, output = _capped(repo, command, ceiling)
+    status, output = _run(repo, command)
     if status != 0:
         return [*notes, f"scripts/dev test {' '.join(paths or [])} failed (exit {status}):\n{output}"]
     return notes

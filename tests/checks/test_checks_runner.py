@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from checks.runner import cli, passes
+from checks.runner import cli
+from checks.runner.repo import Repo
 from checks.standard import tests as tests_check
 from runtime.shared.settings import Settings, build
 
@@ -32,62 +33,52 @@ def check(root: Path, *argv: str) -> tuple[int, str]:
     return cli.run(list(argv), root, settings(), out), out.getvalue()
 
 
-def tree(root: Path) -> str:
-    return subprocess.run(
-        ["git", "rev-parse", "HEAD^{tree}"], cwd=root, capture_output=True, text=True, check=True
-    ).stdout.strip()
-
-
-def test_the_whole_set_passes_on_the_fixture_and_records_its_tree(
-    fixture_product: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_the_whole_set_passes_on_the_fixture(fixture_product: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CI", "true")
     status, output = check(fixture_product, "--all")
     assert status == 0, output
-    assert passes.passed(fixture_product, tree(fixture_product))
 
 
-def test_a_pass_covers_only_its_own_tree(
+def test_since_a_commit_checks_only_what_head_adds_to_it(
     fixture_product: Path, monkeypatch: pytest.MonkeyPatch, commit: Callable[[Path, str], None]
 ) -> None:
-    monkeypatch.setenv("CI", "true")
+    monkeypatch.setenv("CI", "")
     subprocess.run(["git", "checkout", "-q", "-b", "work"], cwd=fixture_product, check=True)
     notes = fixture_product / "app" / "notes.py"
     notes.write_text(notes.read_text() + "\n\nLIMIT = 500\n")
     commit(fixture_product, "a limit")
+    first = subprocess.run(["git", "rev-parse", "HEAD"], cwd=fixture_product, capture_output=True, text=True,
+                           check=True).stdout.strip()  # fmt: skip
+    (fixture_product / "qa" / "scenarios" / "README.md").write_text("# QA scenarios\n\nEach opens with its labels.\n")
+    commit(fixture_product, "words")
+
+    assert "over 2 changed path(s)" in check(fixture_product, "--only", "qa-scenarios")[1]
+    assert "over 1 changed path(s)" in check(fixture_product, "--only", "qa-scenarios", "--since", first)[1]
+
+
+def test_an_uncommitted_change_is_refused(
+    fixture_product: Path, monkeypatch: pytest.MonkeyPatch, commit: Callable[[Path, str], None]
+) -> None:
+    monkeypatch.setenv("CI", "")
+    subprocess.run(["git", "checkout", "-q", "-b", "work"], cwd=fixture_product, check=True)
+    (fixture_product / "qa" / "scenarios" / "README.md").write_text("# QA scenarios\n\nEach opens with its labels.\n")
     status, output = check(fixture_product)
-    assert status == 0, output
-    passed = tree(fixture_product)
-    notes.write_text(notes.read_text() + "\nWIDTH = 80\n")
-    commit(fixture_product, "a width")
-    assert passes.passed(fixture_product, passed)
-    assert not passes.passed(fixture_product, tree(fixture_product))
+    assert status == 2 and "commit your changes first" in output
 
 
 @pytest.mark.parametrize(
-    ("argv", "dirty", "said"),
-    [
-        (["--only", "qa-scenarios"], False, "no pass is recorded"),
-        ([], True, "commit your changes first"),
-    ],
+    ("script", "said"),
+    [("sleep 5", "passed 1 s, so it was stopped"), ('echo "per test: $FACTORY_TEST_SECONDS"; exit 1', "per test: 45")],
+    ids=["hung-run", "per-test-limit-given"],
 )
-def test_a_partial_or_uncommitted_run_records_no_pass(
-    fixture_product: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    commit: Callable[[Path, str], None],
-    argv: list[str],
-    dirty: bool,
-    said: str,
-) -> None:
-    monkeypatch.setenv("CI", "true")
-    subprocess.run(["git", "checkout", "-q", "-b", "work"], cwd=fixture_product, check=True)
-    (fixture_product / "qa" / "scenarios" / "README.md").write_text("# QA scenarios\n\nEach opens with its labels.\n")
-    if not dirty:
-        commit(fixture_product, "words")
-    status, output = check(fixture_product, *argv)
-    assert said in output
-    assert status == (2 if dirty else 0)
-    assert not passes.passed(fixture_product, tree(fixture_product))
+def test_a_test_run_on_the_laptop_has_its_time_limits(make_repo: Callable[..., Path], script: str, said: str) -> None:
+    root = make_repo({"scripts/dev*": f"#!/bin/sh\n{script}\n"})
+    repo = Repo.open(root)
+    repo.test_seconds = (45, 1)
+    values = {"always": [], "full": [], "skip_suffixes": [], "readers": {}}
+
+    problems = tests_check.run(repo, values)
+    assert len(problems) == 1 and said in problems[0]
 
 
 @pytest.mark.parametrize(

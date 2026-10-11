@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 from loop_fakes import World
 
-from checks.runner import passes
 from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.protocol import Refused
@@ -42,6 +41,11 @@ def move(src: str, dst: str) -> Callable[[Path], None]:
         git(root, "mv", src, dst)
 
     return change
+
+
+def passed(world: World, tree: str) -> None:
+    """The warden's record of a whole check that passed on ``tree``."""
+    store.write_json(world.ctx.places.check_passes, [{"tree": tree, "commit": "", "branch": "", "task": "", "at": ""}])
 
 
 @pytest.fixture
@@ -101,7 +105,7 @@ def test_push_sends_only_a_commit_whose_tree_passed_the_checks(world: World, git
         github_push.push_checked(world.ctx, {"sha": checked}, None)
     assert refused.value.rule == "unchecked"
 
-    passes.record(world.checkout, git(world.checkout, "rev-parse", f"{checked}^{{tree}}"), "master", "now")
+    passed(world, git(world.checkout, "rev-parse", f"{checked}^{{tree}}"))
     answer = github_push.push_checked(world.ctx, {"sha": checked}, None)
     assert answer["commits"] == 1
     assert git(github_repo, "rev-parse", "master") == checked
@@ -111,7 +115,7 @@ def test_push_reads_the_agents_checkout_though_another_user_owns_it(
     world: World, github_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     checked = commit(world.checkout, write("src/app.py"))
-    passes.record(world.checkout, git(world.checkout, "rev-parse", f"{checked}^{{tree}}"), "master", "now")
+    passed(world, git(world.checkout, "rev-parse", f"{checked}^{{tree}}"))
     # Git's own test switch makes every repository another user's; the global config trusts the warden's mirror and
     # GitHub's stand-in, never the agent's checkout.
     config = github_repo.parent / "gitconfig"

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import socket
 import subprocess
@@ -279,6 +280,31 @@ class RealRig:
 
     def now(self) -> float:
         return time.monotonic()
+
+    def warden_check(self, probe: list[str]) -> tuple[Path, Ran]:
+        checkout = layout.AGENT_HOME / f"{_DRILL_NAME}-check"
+        host, agent = self.ctx.host, self.ctx.host.account(AGENT_USER)
+        if agent is None:
+            raise refuse(f"there is no user {AGENT_USER}")
+        shutil.rmtree(checkout, ignore_errors=True)
+        (checkout / "scripts").mkdir(parents=True)
+        dev = checkout / "scripts" / "dev"
+        dev.write_text("#!/bin/sh\ncase \"$1\" in\n  verbs) echo deps ;;\n"
+                       f"  deps) {{ echo probe:; {shlex.join(probe)}; }} >&2; exit 1 ;;\nesac\n")  # fmt: skip
+        dev.chmod(0o755)
+        for folder, _, files in os.walk(checkout):
+            for path in [Path(folder), *(Path(folder) / name for name in files)]:
+                os.chown(path, agent.uid, agent.gid)
+        who = ["-c", "user.name=drill", "-c", "user.email=drill@software.invalid"]
+        for argv in (["init", "-q"], ["add", "-A"], [*who, "commit", "-q", "-m", "drill"]):
+            host.run(["git", "-C", str(checkout), *argv], user=AGENT_USER)
+        try:
+            code, out = Units(self.places, lambda: self.settings).run_check(str(checkout), ["--only", "repo-shape"])
+        except LaunchError as exc:
+            return checkout, Ran(-1, str(exc))
+        finally:
+            shutil.rmtree(checkout, ignore_errors=True)
+        return checkout, Ran(code, out)
 
     def warden_command(self, argv: list[str]) -> Ran:
         """``argv`` as the agent, the way the warden runs it: its launcher, through the agent-run template unit."""

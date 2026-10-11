@@ -5,15 +5,15 @@ asking from the calling process, never from these arguments. Every file the call
 body given with ``--body``) is read here, as the caller, and sent as bytes; the warden never opens a path a caller
 names. Nothing comes from stdin: Claude Code runs a call outside the sandbox, where the warden's socket is
 reachable, only when the call is ``factory …`` alone, with no pipe, redirect or heredoc. The guard puts
-``--agent-id <id>`` first on a subagent's call. `check`, `qa-browser` and `slot-api` run here without the warden;
-`account` is the owner's alone, on owner.sock (runtime/cli/accounts.py).
+``--agent-id <id>`` first on a subagent's call. `qa-browser` and `slot-api` run here without the warden; `check` is
+the warden's, which runs it walled into the caller's checkout; `account` is the owner's alone, on owner.sock
+(runtime/cli/accounts.py).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import socket
 import sys
 from collections.abc import Callable
@@ -22,13 +22,9 @@ from pathlib import Path
 from typing import IO, Any
 
 from runtime.shared import protocol
-from runtime.shared.paths import CHECK_TOOLS, Places
+from runtime.shared.paths import Places
 
-LOCAL = ("check", "qa-browser", "slot-api")
-# Run under the tools' Python in isolated mode: the install's root comes in as the first argument.
-_RUN_CHECKS = (
-    "import sys; sys.path.insert(0, sys.argv.pop(1)); from checks.runner.cli import main; sys.exit(main(sys.argv[1:]))"
-)
+LOCAL = ("qa-browser", "slot-api")
 UNREACHABLE = 3
 
 
@@ -129,6 +125,11 @@ def _parser() -> argparse.ArgumentParser:
     ready.add_argument("--slices", nargs="+", required=True)
     sub.add_parser("qa-clean")
     sub.add_parser("ready-check")
+    check = sub.add_parser("check", help="the standard checks on your checkout; the warden runs them")
+    scope = check.add_mutually_exclusive_group()
+    scope.add_argument("--all", action="store_true", help="check everything, not only what the branch adds")
+    scope.add_argument("--list", action="store_true", help="name every check and its rule")
+    check.add_argument("--only", metavar="IDS", help="run only these checks (comma-separated); records no pass")
     return parser
 
 
@@ -280,6 +281,10 @@ def _call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
         return _qa_call(ns)
     if cmd == "qa-ready":
         return Call("qa-ready", {"head": ns.head, "slices": _words(ns.slices)})
+    if cmd == "check":
+        if ns.list:
+            return Call("check", {"list": True})
+        return Call("check", {"all": ns.all, **({"only": _words([ns.only])} if ns.only else {})})
     raise CliError(f"factory {cmd} has no request")
 
 
@@ -370,6 +375,13 @@ def show(answer: dict[str, Any], out: IO[str], err: IO[str]) -> int:
     if not answer.get("ok"):
         print(f"factory: refused ({answer.get('refused')}): {answer.get('reason')}", file=err)
         return 1
+    if "output" in answer and "exit" in answer:
+        # A check's report, as the check runner printed it, and its exit status.
+        print(answer["output"], end="", file=out)
+        return int(answer["exit"])
+    if "checks" in answer:
+        print("".join(f"{c['id']:20s} {c['rule']}\n" for c in answer["checks"]), end="", file=out)
+        return 0
     rest = {k: v for k, v in answer.items() if k != "ok"}
     print(
         rest["message"] if set(rest) <= {"message", "events"} and "message" in rest else json.dumps(rest, indent=1),
@@ -379,13 +391,6 @@ def show(answer: dict[str, Any], out: IO[str], err: IO[str]) -> int:
 
 
 def _local(argv: list[str], places: Places) -> int:
-    if argv[0] == "check":
-        # The checks find ruff, mypy and lint-imports beside the Python they run under: the pinned tools' own.
-        python = CHECK_TOOLS / "bin" / "python"
-        if not python.is_file():
-            raise CliError(f"the check tools are not installed at {CHECK_TOOLS}: reinstall the factory")
-        root = str(Path(__file__).resolve().parents[2])
-        os.execv(python, [str(python), "-I", "-c", _RUN_CHECKS, root, *argv[1:]])
     if argv[0] == "qa-browser":
         from runtime.qa import qa_browser
 

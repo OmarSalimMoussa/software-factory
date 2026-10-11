@@ -5,7 +5,9 @@ and GitHub's API.
 
 systemctl is the one fake with logic: a session start passes the agent-run unit's own check of its request and is
 recorded (no claude ever runs), while a command or a stack request runs the real unit runner, which runs git or the
-product's own scripts/dev. Anything else the warden asks a unit to run fails the rehearsal before it runs.
+product's own scripts/dev. A check request passes the check-run unit's own check of its request and passes: the
+checks themselves are tests/checks' to prove. Anything else the warden asks a unit to run fails the rehearsal before
+it runs.
 """
 
 from __future__ import annotations
@@ -120,6 +122,7 @@ class Systemd:
     agent_home: Path
     bin: Path  # where the rehearsal's docker is, first on the units' PATH
     sessions: list[dict[str, Any]] = field(default_factory=list)
+    checks: list[dict[str, Any]] = field(default_factory=list)
 
     def __call__(self, argv: list[str]) -> subprocess.CompletedProcess[str]:
         wait = argv[:1] == ["--wait"]
@@ -134,9 +137,15 @@ class Systemd:
             return subprocess.CompletedProcess(argv, 0, "", "")
         if raw["kind"] == "command":
             assert raw["argv"][0] == "git", f"the warden asked a unit to run {raw['argv']}"
-        runner = RUNNERS / ("agent_run.py" if unit.startswith("software-agent-run@") else "stack_run.py")
         runs = self.places.state / "runs"
         runs.mkdir(parents=True, exist_ok=True)
+        if raw["kind"] == "check":
+            launch_file.check_parts(raw, self.agent_home)
+            self.checks.append(raw)
+            (runs / f"{request_id}.log").write_text("factory check: 28 passed\n")
+            (runs / f"{request_id}.exit").write_text("0\n")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        runner = RUNNERS / ("agent_run.py" if unit.startswith("software-agent-run@") else "stack_run.py")
         # The unit runs as the agent (or stack) user, whose home holds the product checkout.
         env = {**os.environ, "HOME": str(self.agent_home), "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}"}
         with (runs / f"{request_id}.log").open("w") as log:

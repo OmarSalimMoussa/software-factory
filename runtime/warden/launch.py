@@ -1,11 +1,12 @@
 """How the warden starts and resumes sessions, and the real Launcher under it.
 
-The warden runs anything only by writing a request to public/launch/<id>.json and starting one of the two template
+The warden runs anything only by writing a request to public/launch/<id>.json and starting one of the three template
 units polkit lets it start. The one other unit action polkit allows it is a restart of the agents' Claude daemon, when
 the owner switches Claude accounts.
 
 ``software-agent-run@<id>.service`` runs as the agent user: a new session (``kind: session``) or one short command
 (``kind: command``). ``software-stack-run@<id>.service`` runs ``scripts/dev`` as the stack user (``kind: stack``).
+``software-check-run@<id>.service`` runs `factory check` as the agent user, walled into the checkout (``kind: check``).
 The units write their output to ``runs/<id>.log`` and their exit status to ``runs/<id>.exit`` in the warden's state
 (systemd opens both as root, so the unit's own user never reaches the warden's state).
 """
@@ -33,6 +34,7 @@ from standard import config as product_config
 
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
+CHECK_UNIT = "software-check-run@{}.service"
 # A started session's registry id until the backstop sees it running under its name and takes the id Claude Code
 # gave it (`claude --bg` ignores --session-id). The guard finds an unbound session the same way, by name.
 PENDING = "pending-"
@@ -132,6 +134,12 @@ class Units:
         code, output = self._wait(AGENT_UNIT.format(request_id), request_id)
         if code != 0:
             raise LaunchError(f"claude --resume exited {code}: {output.strip()[-300:]}")
+
+    def run_check(self, checkout: str, args: list[str]) -> tuple[int, str]:
+        """`factory check` with ``args`` on ``checkout``, in the check-run unit; its exit status and its report."""
+        request_id = f"check-{uuid.uuid4().hex}"
+        self._request(request_id, {"kind": "check", "checkout": checkout, "args": args})
+        return self._wait(CHECK_UNIT.format(request_id), request_id)
 
     def restart_daemon(self) -> None:
         """Restart the daemon that hosts every session: it loads the sign-in token again, and its sessions end."""

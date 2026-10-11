@@ -89,7 +89,18 @@ def test_the_warden_reads_transcripts_but_writes_only_its_state_and_the_agents_q
     assert f"ReadWritePaths=/var/lib/software-factory {layout.AGENT_HOME}" in lines
 
 
-@pytest.mark.parametrize("name", ["software-agent-run@.service", "software-stack-run@.service"])
+def test_a_check_runs_as_the_agent_in_the_slice_under_its_memory_ceiling_and_without_the_sign_in_token() -> None:
+    lines = _unit("software-check-run@.service", **{"budget.test_memory_ceiling_mib": 4096}).splitlines()
+
+    assert {"User=software-agent", "Slice=software-factory.slice", "MemoryMax=4096M", "MemorySwapMax=0",
+            "OOMPolicy=continue", "TemporaryFileSystem=/var/lib/software-factory:ro"} <= set(lines)  # fmt: skip
+    assert any(line.startswith("ExecStart=") and "runners/check_run.py" in line for line in lines)
+    assert not any(line.startswith("LoadCredential") for line in lines)
+
+
+@pytest.mark.parametrize(
+    "name", ["software-agent-run@.service", "software-stack-run@.service", "software-check-run@.service"]
+)
 def test_a_request_units_exit_recorder_sees_the_runs_folder_and_keeps_the_output(name: str) -> None:
     lines = _unit(name).splitlines()
     runs = "/var/lib/software-factory/runs"

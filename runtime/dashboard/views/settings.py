@@ -204,14 +204,24 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         ],
     ),
     (
+        "checks",
+        "Checks",
+        "Applies to the next check.",
+        [
+            ("checks.run_minutes", "Minutes one check may take"),
+            ("checks.test_seconds", "Seconds one test may take"),
+            ("checks.output_kib", "Most of a check's report an agent sees, KiB"),
+        ],
+    ),
+    (
         "budget",
         "Memory and CPU",
-        "The factory's memory cap and CPU weight apply within a minute.",
+        "The factory's memory cap and CPU weight apply within a minute; a check's memory at the next install.",
         [
             ("budget.slice_memory_high", "Memory where the factory slows"),
             ("budget.slice_memory_max", "Factory memory cap"),
             ("budget.slice_cpu_weight", "Factory CPU weight"),
-            ("budget.test_memory_ceiling_mib", "Memory one test run may use, MiB"),
+            ("budget.test_memory_ceiling_mib", "Memory one check may use, MiB"),
             ("budget.test_reserve_mib", "Memory kept free for tests, MiB"),
         ],
     ),

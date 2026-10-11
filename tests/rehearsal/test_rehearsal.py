@@ -9,11 +9,10 @@ from pathlib import Path
 import pytest
 from rehearsal_kit import Rehearsal, build, git
 
-from checks.runner import passes
 from runtime.queue.book import Queue
 from runtime.queue.format_check import check_queue
 from runtime.shared.models import FINISHED, RETIRED, WORKING
-from runtime.warden import deploys, loop, registry
+from runtime.warden import checks, deploys, loop, registry
 
 TASK = "t-0001"
 PICTURE = (
@@ -114,12 +113,12 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
     r.session(orch, ["queue", "task", "status", TASK, "turn"])
     assert registry.read(r.places)[impl].merge_turn
     git(worktree, "rebase", "-q", "master")
-    passes.record(worktree, git(worktree, "rev-parse", "HEAD^{tree}"), branch, r.clock.iso())
+    assert r.session(impl, ["check"])["passed"]
 
     # The orchestrator merges, records the merge, saves the check of master, and ships it.
     git(r.repo, "merge", "-q", "--no-ff", branch, "-m", f"Merge {branch}: new notes show first")
     merge = git(r.repo, "rev-parse", "HEAD")
-    assert passes.passed(r.repo, git(r.repo, "rev-parse", "HEAD^{tree}"))
+    assert checks.passed(r.places, git(r.repo, "rev-parse", "HEAD^{tree}"))
     r.session(orch, ["merge", "recorded", branch, merge])
     assert not registry.read(r.places)[impl].merge_turn
     report = r.body(r.repo, "check.md", REPORT.encode())

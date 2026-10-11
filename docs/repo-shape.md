@@ -109,7 +109,7 @@ stack.
 | `sign-in <email>` | Prints a one-time sign-in link for a test address |
 | `seed save <id> <name>`, `seed load <name> [--as <email>]`, `seed check` | Saved inputs a tester starts from |
 | `desktop up <email>`, `desktop down` | A remote desktop for steps outside the web UI, or "not supported" |
-| `test [path…]` | Runs the product's tests: all of them, or those under the paths |
+| `test [path…]` | Runs the product's tests: all of them, or those under the paths. When `FACTORY_TEST_SECONDS` is set, it stops any one test that runs longer and fails it |
 | `verbs` | Lists the verbs it supports |
 | `deps` | Optional: installs what the checks and tests read (package trees, tools); `factory check` runs it first |
 | `reports --since <cursor>` | Optional: prints erased reports, then new user reports, as JSON lines |

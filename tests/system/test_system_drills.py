@@ -45,6 +45,7 @@ class FakeRig:
     claude_gone_at: float | None = None
     # How the warden's launcher answers a command that succeeds, then one that fails.
     warden: tuple[Ran, Ran] = (Ran(0, "true\n"), Ran(1, ""))
+    check: dict[str, str] = field(default_factory=lambda: {"env": "unset", "write": "EROFS"})  # outcome by kind
 
     def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran:
         return Ran(1, "")
@@ -78,6 +79,13 @@ class FakeRig:
 
     def warden_command(self, argv: list[str]) -> Ran:
         return self.warden[0] if "--is-inside-work-tree" in argv else self.warden[1]
+
+    def warden_check(self, probe: list[str]) -> tuple[Path, Ran]:
+        """The check's report: its deps printed the probe's line for each target, each with ``self.check``."""
+        lines = [f"{target} -> {self.check.get(target.partition(':')[0], 'ENOENT')}" for target in probe[4:]]
+        return Path("/home/software-agent/drill-check"), Ran(
+            1, "factory check: deps failed: probe:\n" + "\n".join(lines)
+        )
 
 
 @pytest.mark.parametrize(
@@ -318,3 +326,17 @@ def test_the_bubblewrap_drill_hides_bubblewrap_and_fails_when_the_command_still_
 
     assert rig.asks == [(f"InaccessiblePaths={drills.layout.BWRAP}",)]
     assert not result.ok and "without the sandbox" in result.evidence
+
+
+@pytest.mark.parametrize(
+    ("check", "ok"),
+    [
+        ({"env": "unset", "write": "EROFS"}, True),
+        ({"env": "unset", "write": "written"}, False),
+        ({"env": "unset", "write": "EROFS", "file": "opened"}, False),
+        ({"env": "set", "write": "EROFS"}, False),
+    ],
+    ids=["walled-in", "git-folder-written", "sign-in-read", "token-in-environment"],
+)
+def test_the_check_drill_fails_on_any_way_out_of_the_checkout(check: dict[str, str], ok: bool) -> None:
+    assert drills.check_walled_in(FakeRig(check=check)).ok is ok

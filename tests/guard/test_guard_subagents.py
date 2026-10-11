@@ -209,22 +209,6 @@ def test_a_tester_on_the_remote_desktop_stops_at_its_desktop_time(
     assert (kit.rule(tool, {"file_path": "/x"}, **tester) == "tester-time") is refused
 
 
-@pytest.mark.parametrize(("runs", "rule"), [(2, None), (3, "check-runs")])
-def test_only_real_unrefused_check_runs_count_toward_the_limit(tmp_path: Path, runs: int, rule: str | None) -> None:
-    kit = Kit(tmp_path)
-    kit.session("implementer")
-    then = NOW - timedelta(minutes=5)
-    lines = [
-        entry(then, "assistant", [bash_use("g", "grep -n 'factory check' docs/x.md")]),
-        entry(then, "assistant", [bash_use("l", "factory check --list")]),
-        entry(then, "assistant", [bash_use("r", "factory check")]),
-        entry(then, "user", [result("r", "PreToolUse:Bash hook error: Refused by the factory guard (check-runs): no")]),
-    ]
-    lines += [entry(then, "assistant", [bash_use(f"x{n}", "factory check")]) for n in range(runs)]
-    kit.transcript(lines)
-    assert kit.bash("factory check") == rule
-
-
 @pytest.mark.parametrize("kind", ["intake", "Explore", "qa-backend"])
 def test_a_finished_subagent_of_any_kind_is_not_resumed(tmp_path: Path, kind: str) -> None:
     kit = Kit(tmp_path)

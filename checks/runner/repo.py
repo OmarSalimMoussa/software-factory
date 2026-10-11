@@ -44,6 +44,9 @@ class Repo:
     # (ceiling MiB, reserve MiB) a test run must fit in, from the budget.test_* settings; None where nothing else
     # shares the machine (CI), so no guard is needed.
     test_memory: tuple[int, int] | None = None
+    # (seconds one test may take, seconds the whole test run may take), from the checks.* settings; None on CI, where
+    # the workflow's own time limit stops a run that hangs.
+    test_seconds: tuple[int, int] | None = None
     _baseline: dict[str, Any] | None = field(default=None, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _excluded: frozenset[str] | None = field(default=None, repr=False)

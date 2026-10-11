@@ -95,7 +95,7 @@ def _whole(call: Call, command: str, found: list[shell.Invocation], cwd: Path) -
         )
     if not call.off("git-bypass") and any(map(git_rules.sets_config_from_env, found)):
         return Refusal("git-bypass", "git's configuration is the owner's, from the environment too")
-    return factory_calls.check_alone(call, command, found, cwd) or factory_calls.check_runs(call, found)
+    return factory_calls.check_alone(call, command, found, cwd)
 
 
 def _after_cd(call: Call, inv: shell.Invocation, cwd: Path) -> Path:

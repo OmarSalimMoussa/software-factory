@@ -70,6 +70,7 @@ DAEMON_UNIT = "software-agent-daemon.service"
 FIREWALL_UNIT = "software-firewall.service"
 AGENT_RUN = "software-agent-run@.service"
 STACK_RUN = "software-stack-run@.service"
+CHECK_RUN = "software-check-run@.service"
 SERVICES = (WARDEN_UNIT, DASHBOARD_UNIT, DAEMON_UNIT)
 # The laptop's shared services (the stack of standard/services/), run by the stack user; a reinstall leaves them up.
 SERVICES_UNIT = "software-services.service"

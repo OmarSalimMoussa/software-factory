@@ -18,7 +18,7 @@ from runtime.queue.statuses import OWNER, WARDEN
 from runtime.shared.models import RETIRED, Request, Task
 from runtime.shared.order import ordered
 from runtime.shared.protocol import Refused
-from runtime.warden import registry
+from runtime.warden import checks, registry
 from runtime.warden.context import Context
 
 SLOT_FREE = "proposal-slot-free"
@@ -79,6 +79,8 @@ def follow(ctx: Context, before: Task, after: Task) -> None:
     task's new status."""
     if (before.status == "turn") != (after.status == "turn"):
         _hold_turn(ctx, after.id, after.status == "turn")
+    if after.status == "turn" and before.status != "turn":
+        checks.new_turn(ctx, after.id)
     found = proposals.read(ctx.places)
     if after.status != "proposed" and proposals.remove(found, after.id) and before.status == "proposed":
         ctx.post_event(SLOT_FREE, {"task": after.id})

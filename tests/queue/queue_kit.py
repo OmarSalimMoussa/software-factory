@@ -41,8 +41,10 @@ class FakeLauncher:
 
     git: Callable[[list[str]], tuple[int, str]] = lambda argv: (0, "")
     stack: Callable[[int, list[str]], StackResult] = lambda n, verb: StackResult(0, "", "")
+    check: Callable[[str, list[str]], tuple[int, str]] = lambda checkout, args: (0, "")
     commands: list[list[str]] = field(default_factory=list)
     stacks: list[tuple[int, list[str]]] = field(default_factory=list)
+    checks: list[tuple[str, list[str]]] = field(default_factory=list)
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
         raise AssertionError("the queue starts no session")
@@ -60,6 +62,10 @@ class FakeLauncher:
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         self.stacks.append((slot, verb))
         return self.stack(slot, verb)
+
+    def run_check(self, checkout: str, args: list[str]) -> tuple[int, str]:
+        self.checks.append((checkout, args))
+        return self.check(checkout, args)
 
 
 @dataclass

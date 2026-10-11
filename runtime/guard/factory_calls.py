@@ -1,6 +1,6 @@
 """The factory command in a shell command: who may run which verb (`factory-verbs`, which also keeps the read-only
 telemetry verbs to intake, triage and the testers among subagents), a task's status set only by the orchestrator
-(`queue-status`), the command alone in its line (`factory-alone`), and an implementer's check runs (`check-runs`).
+(`queue-status`), and the command alone in its line (`factory-alone`). The warden counts an implementer's check runs.
 
 The factory command runs outside the sandbox so it can reach the warden. Claude Code exempts a call only when its
 whole text is `factory` or `factory …`, so the guard asks for exactly that: one plain command, the bare word first,
@@ -14,9 +14,8 @@ import re
 import shlex
 from pathlib import Path
 
-from runtime.guard import shell, transcript
-from runtime.guard.facts import IMPLEMENTER, ORCHESTRATOR, Call, Decision, Refusal, Rewrite, inside, resolve
-from runtime.guard.wire import REFUSED
+from runtime.guard import shell
+from runtime.guard.facts import ORCHESTRATOR, Call, Decision, Refusal, Rewrite, inside, resolve
 from runtime.warden.verbs import VERBS
 
 FACTORY = "factory"
@@ -27,8 +26,6 @@ _PLAIN_START = re.compile(r"^factory(\s|$)")
 # Outside single quotes the shell expands or joins on these, so the text is no longer one plain call.
 _SHELL_SPECIAL = frozenset("$`*?[{}")
 ALONE = "run factory on its own; write a body to a file in your worktree and pass it as an argument"
-# Verbs the command answers itself, without the warden.
-LOCAL = frozenset({"check"})
 # What a subagent never asks for: what steers its session's lifecycle, the loop, the queue's order, a merge or a
 # check run. Its parent does.
 SESSION_ONLY = frozenset(
@@ -65,12 +62,7 @@ def verb_of(argv: list[str]) -> str:
     candidates = [".".join(words[:2])]
     if words[0] == "queue" and len(words) > 1:
         candidates += [".".join(words[1:3]), words[1]]
-    return next((c for c in candidates if c in VERBS or c in LOCAL), words[0])
-
-
-def runs_check(inv: shell.Invocation) -> bool:
-    """Whether an invocation runs the checks, not only lists them or asks for help."""
-    return inv.program == FACTORY and verb_of(inv.argv) == "check" and not ({"--list", *_HELP} & set(inv.argv))
+    return next((c for c in candidates if c in VERBS), words[0])
 
 
 def check_verb(call: Call, inv: shell.Invocation) -> Decision:
@@ -85,7 +77,7 @@ def check_verb(call: Call, inv: shell.Invocation) -> Decision:
         return None
     entry = VERBS.get(verb)
     actor = f"a subagent of the {call.role}" if call.in_subagent else f"the {call.role}"
-    if verb not in LOCAL and (entry is None or entry.owner_socket or call.role not in entry.roles):
+    if entry is None or entry.owner_socket or call.role not in entry.roles:
         return Refusal("factory-verbs", f"`factory {verb}` is not for {actor}; see `factory --help`")
     if call.in_subagent and verb in SESSION_ONLY:
         return Refusal("factory-verbs", f"`factory {verb}` is your parent's to run; report to it instead")
@@ -141,28 +133,6 @@ def check_alone(call: Call, command: str, found: list[shell.Invocation], cwd: Pa
             path = resolve(candidate, cwd, call.home)
             if os.path.lexists(path) and not inside(Path(os.path.realpath(path)), worktree):
                 return Refusal("factory-alone", f"the factory command reads files only from your worktree, {worktree}")
-    return None
-
-
-def check_runs(call: Call, found: list[shell.Invocation]) -> Decision:
-    """An implementer runs the checks at most `rounds.check_runs` times, plus what it was extended by; a run the
-    guard refused never ran."""
-    if call.role != IMPLEMENTER or call.in_subagent or call.off("check-runs") or not any(map(runs_check, found)):
-        return None
-    current = str(call.payload.get("tool_use_id", ""))
-    refused = transcript.refused_ids(call.transcript, REFUSED)
-    runs = 0
-    for use in transcript.tool_uses(call.transcript, frozenset({"Bash"})):
-        if use.tool_use_id == current or use.tool_use_id in refused:
-            continue
-        try:
-            runs += any(map(runs_check, shell.invocations(str(use.args.get("command", "")))))
-        # A command the guard could not read was refused, so it never ran.
-        except shell.ShellError:
-            continue
-    limit = call.settings.get_int("rounds.check_runs") + call.extension("check_runs")
-    if runs >= limit:
-        return Refusal("check-runs", f"{runs} check runs already (limit {limit}); tell the orchestrator what fails")
     return None
 
 

@@ -1,0 +1,40 @@
+# One `factory check` the warden wrote to public/launch/<id>.json, run as the agent user in the factory's slice, with
+# no sign-in token. The product's own code runs here (its deps, its tests), so the runner walls it into the checkout
+# with bubblewrap: the rest of the agent's home is hidden, the git folder is read-only, and the pass the warden
+# records rests only on this unit's exit status, which systemd writes as root.
+[Unit]
+Description=software factory: check request %i
+CollectMode=inactive-or-failed
+
+[Service]
+Type=oneshot
+User=@agent_user@
+Group=@agent_user@
+Slice=@slice@
+# The whole check, its test run included, stays under this ceiling; a test that passes it is killed, the run goes on
+# and says so.
+MemoryMax=@test_memory_max@
+MemorySwapMax=0
+OOMPolicy=continue
+Environment=PATH=@path@
+Environment=@uv_env@
+ExecStart=@python@ -I @install@/runtime/system/runners/check_run.py @state@ %i
+# append, not truncate: systemd opens the file again for the exit recorder, and truncating would empty it.
+StandardOutput=append:@runs@/%i.log
+StandardError=inherit
+ExecStopPost=+@python@ -I @install@/runtime/system/runners/record_exit.py @runs@/%i.exit
+UMask=0027
+TemporaryFileSystem=@state@:ro
+# The exit recorder runs in this unit's mount namespace too, + or not: runs/ is bound back for it. It stays the
+# warden's and 0700, so this unit's own user can neither read nor write it.
+BindPaths=@runs@
+BindReadOnlyPaths=@public@
+ProtectHome=tmpfs
+BindPaths=@agent_home@
+InaccessiblePaths=-/run/docker.sock
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectKernelModules=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes

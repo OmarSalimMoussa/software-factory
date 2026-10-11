@@ -21,7 +21,6 @@ RULES: dict[str, str] = {
     "qa-ready": "a tester start with no ready record for the head",
     "qa-rounds": "a QA round past its setting",
     "critic-rounds": "a critic round past its setting",
-    "check-runs": "a `factory check` run past its setting",
     "resume-subagent": "a message to a finished or stopped subagent",
     "git-bypass": "skipped hooks, rewritten refs, config or remote changes, any push, a merge without --no-ff, "
     "a hand-run check, GitHub writes",

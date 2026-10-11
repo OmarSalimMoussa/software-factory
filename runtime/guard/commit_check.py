@@ -11,6 +11,7 @@ copy as `/usr/bin/python3 -I <install>/runtime/guard/commit_check.py <hook>`. St
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -21,9 +22,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from runtime.guard.facts import read_settings  # noqa: E402 - the path line above must run first
 from runtime.guard.writes import is_protected, protected_paths  # noqa: E402
 from runtime.shared.paths import INSTALL, SLICE, Places  # noqa: E402
-
-# `factory check`'s own reader of its pass record: exit 0 when a tree passed, 1 when it did not.
-PASSES = Path(__file__).resolve().parents[2] / "checks" / "runner" / "passes.py"
 
 
 class HookError(Exception):
@@ -71,11 +69,17 @@ def refusal(
     )
 
 
-def passed(tree: str) -> bool:
-    done = subprocess.run([sys.executable, "-I", str(PASSES), "check", tree], capture_output=True, text=True)
-    if done.returncode not in (0, 1):
-        raise HookError(f"the pass record cannot be read: {done.stderr.strip()[-200:]}")
-    return done.returncode == 0
+def passed(places: Places, tree: str) -> bool:
+    """Whether the warden recorded ``tree`` as passed; it alone writes the trees it publishes."""
+    path = places.public_check_passes
+    try:
+        trees = json.loads(path.read_text(encoding="utf-8"))["trees"]
+    # telemetry: expected — no check has passed on this machine yet
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise HookError(f"the warden's passed trees cannot be read ({type(exc).__name__})") from exc
+    return isinstance(trees, list) and tree in trees
 
 
 def _git(*args: str) -> str:
@@ -126,7 +130,7 @@ def main(argv: list[str]) -> int:
         if hook == "pre-push" or branch != default or not merging:
             return 0
         tree = _git("write-tree").strip()
-        if not passed(tree):
+        if not passed(Places.system(), tree):
             print(
                 f"commit-check: this merge's tree {tree} never passed `factory check`; the branch rebases onto "
                 f"{default} and runs `factory check`, then this merges",

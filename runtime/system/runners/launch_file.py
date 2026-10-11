@@ -22,14 +22,15 @@ from runtime.shared.settings import Settings
 from runtime.system import layout
 from runtime.warden import launch, session_settings
 
-SESSION, COMMAND, STACK, MESSAGE = "session", "command", "stack", "message"
+SESSION, COMMAND, STACK, MESSAGE, CHECK = "session", "command", "stack", "message", "check"
 REFUSED = 2
 TIMED_OUT = 124
 TOKEN_FD = "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR"  # where Claude Code finds the descriptor of its sign-in token
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,96}$")
 PROGRAMS = {"claude": str(layout.CLAUDE_BIN), "git": "/usr/bin/git", "rm": "/usr/bin/rm", "kill": "/usr/bin/kill"}
-# The one factory command the warden runs as the agent: the shape check of a repo the owner is changing to.
-REPO_SHAPE = [str(layout.FACTORY_BIN), "check", "--only", "repo-shape"]
+# What a check request may pass the check runner: its flags, and check ids or a commit after them.
+CHECK_FLAGS = frozenset({"--all", "--only", "--since"})
+_CHECK_WORD = re.compile(r"^[a-z0-9][a-z0-9,-]{0,511}$")
 # The verbs of the product's scripts/dev (factory spec, "scripts/dev"; plan R24 for reports).
 DEV_VERBS = frozenset({"up", "down", "empty", "health", "sign-in", "seed", "desktop", "test", "reports", "verbs"})
 SWEEP, PRUNE, DISK = "factory-sweep-slot", "factory-prune", "factory-disk"
@@ -126,8 +127,6 @@ def command_argv(raw: dict[str, Any], home: Path, state: Path) -> tuple[list[str
         raise BadRequest("argv must be a list of words")
     if not isinstance(cwd, str) or not os.path.isabs(cwd) or not _inside(Path(os.path.normpath(cwd)), home):
         raise BadRequest(f"cwd must be a folder in {home}")
-    if argv == REPO_SHAPE:
-        return argv, Path(os.path.normpath(cwd))
     program, args = argv[0], argv[1:]
     if program == "claude":
         _claude_ok(args, state)
@@ -154,6 +153,26 @@ def stack_parts(raw: dict[str, Any], settings: Settings) -> tuple[int, list[str]
     if not isinstance(session, str):
         raise BadRequest("session must be text")
     return slot, verb, session
+
+
+def check_parts(raw: dict[str, Any], home: Path) -> tuple[Path, list[str]]:
+    """The checkout a check reads, a folder in the agent's home, and the check runner's arguments: its flags, each
+    followed by check ids or a commit where it takes one."""
+    checkout, args = raw.get("checkout"), raw.get("args")
+    if not isinstance(checkout, str) or not os.path.isabs(checkout) or "\0" in checkout:
+        raise BadRequest("checkout must be an absolute path")
+    path = Path(os.path.normpath(checkout))
+    if path == home or not _inside(path, home):
+        raise BadRequest(f"checkout must be a folder in {home}")
+    if not isinstance(args, list) or not all(isinstance(a, str) for a in args):
+        raise BadRequest("args must be a list of words")
+    words = iter(args)
+    for word in words:
+        if word not in CHECK_FLAGS:
+            raise BadRequest(f"{word!r} is not a check flag: {', '.join(sorted(CHECK_FLAGS))}")
+        if word != "--all" and not _CHECK_WORD.match(next(words, "")):
+            raise BadRequest(f"{word} takes check ids or a commit")
+    return path, list(args)
 
 
 def checkout_for(session: str, settings: Settings, sessions: dict[str, Any]) -> Path:

@@ -108,6 +108,16 @@ class Places:
         return self.state / "pictures"
 
     @property
+    def check_passes(self) -> Path:
+        """Every tree a whole `factory check` passed, in the warden's state."""
+        return self.state / "check-passes.json"
+
+    @property
+    def public_check_passes(self) -> Path:
+        """The passed trees alone, for the merge hook, which runs as the agent and reads public/."""
+        return self.state / "public" / "check-passes.json"
+
+    @property
     def probes(self) -> Path:
         return self.state / "probes.jsonl"
 

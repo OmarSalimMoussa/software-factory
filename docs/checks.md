@@ -5,12 +5,20 @@ own: it only supplies the values a check compares against, in `check-values/`.
 
 ## The command
 
-- `factory check` checks what the branch adds, and records a pass keyed by the git tree when nothing was skipped.
+- `factory check` checks what the branch adds; on the default branch, what it adds to the newest commit that passed.
+  The warden runs it in a unit of its own, walled into the session's checkout: the product's code it runs (its
+  `deps` and its tests) writes only there and in the tools' caches, reads no other worktree, and cannot change the
+  shared git folder. A whole run that passes on a committed tree is recorded by the warden, keyed by that tree.
 - `factory check --all` checks everything.
-- `factory check --only <ids>` runs those checks; `factory check --list` prints every check with its rule.
+- `factory check --only <ids>` runs those checks and records no pass; `factory check --list` prints every check with
+  its rule.
+- An implementer runs the whole set only on its merge turn, `rounds.check_runs` times a turn. Runs of named checks
+  are free.
 - A merge whose tree already has a pass is not checked again: the merge hook finds the pass.
 - Tests run through the product's `scripts/dev test [path…]`. The factory picks the paths from the diff with
-  `check-values/test-map.toml`, and each test must finish within 45 seconds.
+  `check-values/test-map.toml`. On the laptop the whole run stops after `checks.run_minutes`, and the script gets
+  `FACTORY_TEST_SECONDS` (`checks.test_seconds`): the product's test runner stops any one test that runs longer.
+  The check's unit holds the memory ceiling, `budget.test_memory_ceiling_mib`.
 - `tools` runs ruff, mypy and import-linter at the versions the product pins. When the product has a `uv.lock`, the
   check first syncs the product's environment (`uv sync --frozen --all-extras`); a failed sync fails the check. Each
   tool then runs from the product's `.venv`, so mypy loads the product's own plugins. A tool the product does not

@@ -1,8 +1,9 @@
-"""`factory check`: run the standard set on the product checkout holding the current folder.
+"""The check runner: the standard set on the product checkout holding the current folder.
 
-By default it checks what the branch adds to the default branch (committed changes only, since a pass is recorded
-for HEAD's tree) and, when every check ran and passed, records that tree as passed. ``--all`` checks everything (CI).
-``--only <ids>`` runs the named checks and records nothing. ``--list`` names every check and its rule.
+On the laptop the warden runs it, walled into one checkout (runtime/warden/checks.py), and records a pass itself from
+the exit status; on CI the product's workflow runs it with ``--all``. By default it checks what the branch adds to
+the default branch (committed changes only); ``--since <commit>`` checks what HEAD adds to that commit instead.
+``--all`` checks everything. ``--only <ids>`` runs the named checks. ``--list`` names every check and its rule.
 Exit 0 when every check passed, 1 when one failed, 2 when the run could not start.
 """
 
@@ -14,11 +15,10 @@ import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO
 
-from checks.runner import catalog, passes
+from checks.runner import catalog
 from checks.runner.catalog import NOTE, Check
 from checks.runner.repo import GitError, Repo, git
 from checks.runner.values import ValuesError
@@ -40,7 +40,8 @@ def _parser() -> argparse.ArgumentParser:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--all", action="store_true", help="check everything, not only what the branch adds")
     group.add_argument("--list", action="store_true", help="name every check and its rule")
-    parser.add_argument("--only", metavar="IDS", help="run only these checks (comma-separated); records no pass")
+    group.add_argument("--since", metavar="COMMIT", help="check what HEAD adds to this commit")
+    parser.add_argument("--only", metavar="IDS", help="run only these checks (comma-separated)")
     return parser
 
 
@@ -67,17 +68,17 @@ def chosen(only: str | None) -> list[str]:
     return [check_id for check_id in catalog.IDS if check_id in wanted]
 
 
-def changed_paths(root: Path, settings: Settings | None) -> tuple[str, ...] | None:
-    """What the branch changed since it left the default branch, or None when it adds nothing."""
+def changed_paths(root: Path, settings: Settings | None, since: str | None) -> tuple[str, ...] | None:
+    """What HEAD changed since ``since``, or since the branch left the default branch; None when it adds nothing."""
     if settings is None:
         raise Refusal("on CI, run factory check --all")
     if git(root, "status", "--porcelain", "--untracked-files=no").strip():
         raise Refusal("commit your changes first: factory check checks what the branch has committed")
     branch = settings.get_str("repo.default_branch")
     try:
-        base = git(root, "merge-base", "HEAD", branch).strip()
+        base = git(root, "merge-base", "HEAD", since or branch).strip()
     except GitError as exc:
-        raise Refusal(f"cannot find where this branch left {branch}: {exc}") from exc
+        raise Refusal(f"cannot find where this branch left {since or branch}: {exc}") from exc
     if base == git(root, "rev-parse", "HEAD").strip():
         return None
     return tuple(p for p in git(root, "diff", "--name-only", "-z", base, "HEAD").split("\0") if p)
@@ -116,7 +117,7 @@ def run(argv: list[str], cwd: Path, settings: Settings | None, out: TextIO) -> i
     try:
         ids = chosen(args.only)
         root = Path(git(cwd, "rev-parse", "--show-toplevel").strip())
-        changed = None if args.all else changed_paths(root, settings)
+        changed = None if args.all else changed_paths(root, settings, args.since)
     except (Refusal, GitError) as exc:
         out.write(f"factory check: {exc}\n")
         return 2
@@ -134,7 +135,7 @@ def run(argv: list[str], cwd: Path, settings: Settings | None, out: TextIO) -> i
     if settings is not None and not on_ci():
         ceiling = settings.get_int("budget.test_memory_ceiling_mib")
         repo.test_memory = (ceiling, settings.get_int("budget.test_reserve_mib"))
-    checked_tree = git(root, "rev-parse", "HEAD^{tree}").strip()
+        repo.test_seconds = (settings.get_int("checks.test_seconds"), settings.get_int("checks.run_minutes") * 60)
     started = time.monotonic()
     scope = "everything" if changed is None else f"{len(changed)} changed path(s)"
     out.write(f"factory check: {len(ids)} check(s) over {scope}\n")
@@ -149,7 +150,6 @@ def run(argv: list[str], cwd: Path, settings: Settings | None, out: TextIO) -> i
         out.write(f"factory check: {len(failed)} of {len(ids)} failed in {seconds:.0f}s: {', '.join(failed)}\n")
         return 1
     out.write(f"factory check: {len(ids)} passed in {seconds:.0f}s\n")
-    _record(root, checked_tree, args.only is not None, out)
     return 0
 
 
@@ -167,20 +167,6 @@ def prepare(root: Path) -> str:
         said = (done.stderr.strip() or done.stdout.strip())[-1500:]
         return f"scripts/dev deps failed (exit {done.returncode}), so no check can read the product's packages: {said}"
     return ""
-
-
-def _record(root: Path, tree: str, partial: bool, out: TextIO) -> None:
-    """Record ``tree`` as passed, only when the run covered the whole set and read exactly that tree."""
-    if partial:
-        out.write("factory check: --only ran part of the set, so no pass is recorded\n")
-        return
-    dirty = git(root, "status", "--porcelain", "--untracked-files=no").strip()
-    if dirty or git(root, "rev-parse", "HEAD^{tree}").strip() != tree:
-        out.write("factory check: the worktree is not the committed tree it checked, so no pass is recorded\n")
-        return
-    branch = git(root, "rev-parse", "--abbrev-ref", "HEAD").strip()
-    passes.record(root, tree, branch, datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"))
-    out.write(f"factory check: recorded tree {tree} as passed\n")
 
 
 def main(argv: list[str]) -> int:

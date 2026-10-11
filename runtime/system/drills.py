@@ -73,6 +73,10 @@ class Rig(Protocol):
     def wait(self, seconds: float) -> None: ...
     def now(self) -> float: ...
     def warden_command(self, argv: list[str]) -> Ran: ...
+    def warden_check(self, probe: list[str]) -> tuple[Path, Ran]:
+        """A check the warden runs, through the check-run unit, on a scratch checkout in the agent's home whose
+        ``scripts/dev deps`` runs ``probe`` and fails with what it printed; that checkout and the check's report."""
+        ...
 
 
 def refused_by(ran: Ran, rule: str) -> bool:
@@ -393,6 +397,17 @@ def warden_runs_commands(rig: Rig) -> Result:
                   f"a command: exit {good.code}, {_first(good.out)!r}; a failing one: exit {bad.code}")  # fmt: skip
 
 
+def check_walled_in(rig: Rig) -> Result:
+    """The product code a check runs (here its deps verb) is walled into its checkout by the check-run unit."""
+    name = "a check's product code reads no sign-in or other worktree, and cannot change the shared git folder"
+    targets = [f"file:{layout.AGENT_HOME}/.claude/.credentials.json", f"dir:{rig.worktree_b}",
+               "env:CREDENTIALS_DIRECTORY", "env:CLAUDE_CODE_OAUTH_TOKEN"]  # fmt: skip
+    checkout, ran = rig.warden_check(_probe(rig, *targets, f"write:{Path('.git') / 'config'}"))
+    found = outcomes(ran.out)
+    ok = len(found) == len(targets) + 1 and not _breached(ran.out)
+    return Result(name, ok, "; ".join(f"{t} -> {o}" for t, o in found.items()) or f"{checkout}: {_first(ran.out)}")
+
+
 DRILLS: tuple[Callable[[Rig], Result], ...] = (
     sandbox_runs,
     docker_denied,
@@ -413,6 +428,7 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
     shared_services_answer,
     dashboard_unreachable,
     warden_runs_commands,
+    check_walled_in,
 )
 
 

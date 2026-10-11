@@ -21,14 +21,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from checks.runner import passes
 from runtime.guard.writes import UnknownProtectedPaths, is_protected, protected_paths
 from runtime.shared import store
 from runtime.shared.models import Probe
 from runtime.shared.paths import PROMOTE_JOB, Places
 from runtime.shared.protocol import Refused, ok
 from runtime.shared.settings import Settings
-from runtime.warden import deploys, inbox, ops, probes
+from runtime.warden import checks, deploys, inbox, ops, probes
 from runtime.warden.context import Context
 from runtime.warden.github import GitHubError
 
@@ -96,22 +95,12 @@ def push_checked(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
             raise Refused("protected-path", f"the range touches {', '.join(bad[:5])}, which only the owner changes: "
                                             "revert those changes, or ask the owner")  # fmt: skip
         tree = git.run("rev-parse", f"{sha}^{{tree}}").strip()
-        if not _passed(Path(checkout), tree):
-            raise Refused("unchecked", f"{sha[:12]} has not passed factory check: check {branch}, then push")
+        if not checks.passed(ctx.places, tree):
+            raise Refused("unchecked", f"{sha[:12]} has not passed factory check: run factory check on {branch}, "
+                                       "then push")  # fmt: skip
         count = int(git.run("rev-list", "--count", f"{remote}..{sha}"))
         git.run("push", "--quiet", url, f"{sha}:refs/heads/{branch}")
     return ok(sha=sha, commits=count, message=f"Pushed {count} commits; CI takes {sha[:12]} to staging")
-
-
-def _passed(checkout: Path, tree: str) -> bool:
-    """Whether `factory check` recorded ``tree`` in the checkout's pass record; a link there is never followed."""
-    try:
-        fd = os.open(checkout / ".git" / passes.RECORD, os.O_RDONLY | os.O_NOFOLLOW)
-    # telemetry: expected — no check has passed in this checkout yet
-    except FileNotFoundError:
-        return False
-    with os.fdopen(fd, encoding="utf-8") as record:
-        return any(line.split(" ", 1)[0] == tree for line in record)
 
 
 class _Git:

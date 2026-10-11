@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 """A drill's probe: tries each target and prints, one line each, what happened. It never prints what it read.
 
-    drill_probe.py --seconds N file:/path dir:/path unix:/path tcp:host:port env:NAME get:http://... ...
+    drill_probe.py --seconds N file:/path dir:/path write:/path unix:/path tcp:host:port env:NAME get:http://... ...
 
-Each line reads ``<target> -> <outcome>``: opened, listed, connected or set when the wall let it through; the errno's
+Each line reads ``<target> -> <outcome>``: opened, listed, written, connected or set when the wall let it through (a
+write opens the file to append and writes nothing); the errno's
 name (EACCES, EPERM, ECONNREFUSED, ENOENT...) or unset when it did not. A ``get`` is the one target meant to get
 through: it answers with the HTTP status. Stdlib only, so it runs inside any sandbox.
 """
@@ -17,7 +18,7 @@ import sys
 import urllib.error
 import urllib.request
 
-BREACHES = frozenset({"opened", "listed", "connected", "set"})
+BREACHES = frozenset({"opened", "listed", "written", "connected", "set"})
 
 
 def _errno(exc: OSError) -> str:
@@ -43,6 +44,9 @@ def probe(target: str, seconds: float) -> str:
         if kind == "dir":
             os.listdir(rest)
             return "listed"
+        if kind == "write":
+            with open(rest, "ab"):
+                return "written"
         if kind == "get":
             return _get(rest, seconds)
         if kind == "unix":

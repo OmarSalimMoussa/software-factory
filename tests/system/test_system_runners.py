@@ -36,6 +36,8 @@ def _parse(raw: dict[str, Any]) -> object:
         return lf.session_argv(raw, STATE)
     if kind == lf.COMMAND:
         return lf.command_argv(raw, HOME, STATE)
+    if kind == lf.CHECK:
+        return lf.check_parts(raw, HOME)
     slot, _, session = lf.stack_parts(raw, settings())
     return lf.checkout_for(session, settings(), SESSIONS)
 
@@ -46,13 +48,13 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
         {"kind": "command", "argv": ["git", "worktree", "list"], "cwd": str(REPO)}, HOME, STATE
     )
     resumed, _ = lf.command_argv({"kind": "command", "argv": RESUME, "cwd": str(REPO)}, HOME, STATE)
-    shape, _ = lf.command_argv({"kind": "command", "argv": lf.REPO_SHAPE, "cwd": str(REPO)}, HOME, STATE)
+    shape = lf.check_parts({"kind": "check", "checkout": str(REPO), "args": ["--only", "repo-shape"]}, HOME)
 
     assert argv[0] == str(layout.CLAUDE_BIN)
     assert argv[-2:] == ["--", "-- build it"]  # a prompt that looks like a flag stays the prompt
     assert command[0] == "/usr/bin/git" and cwd == REPO
     assert resumed == [str(layout.CLAUDE_BIN), *RESUME[1:]]
-    assert shape == ["/usr/local/bin/factory", "check", "--only", "repo-shape"]
+    assert shape == (REPO, ["--only", "repo-shape"])
     assert lf.checkout_for("s1", settings(), SESSIONS) == REPO / ".claude" / "worktrees" / "impl-cart"
     assert lf.checkout_for("", settings(), SESSIONS) == REPO
 
@@ -83,6 +85,13 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
         {"kind": "stack", "slot": 1, "verb": ["rm", "-rf"], "session": "s1"},
         {"kind": "stack", "slot": 1, "verb": [], "session": "s1"},
         {"kind": "stack", "slot": 1, "verb": ["up"], "session": "s2"},
+        {"kind": "check", "checkout": str(HOME), "args": []},
+        {"kind": "check", "checkout": "/etc", "args": []},
+        {"kind": "check", "checkout": f"{HOME}/../software-warden", "args": []},
+        {"kind": "check", "checkout": str(REPO), "args": ["--list"]},
+        {"kind": "check", "checkout": str(REPO), "args": ["--only"]},
+        {"kind": "check", "checkout": str(REPO), "args": ["--only", "--all"]},
+        {"kind": "check", "checkout": str(REPO), "args": ["--since", "HEAD; rm -rf ~"]},
     ],
 )
 def test_a_request_outside_its_bounds_is_refused_before_anything_runs(raw: dict[str, Any]) -> None:

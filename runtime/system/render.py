@@ -42,6 +42,7 @@ UNIT_FILES = (
     Artifact(f"units/{layout.DAEMON_UNIT}", layout.UNITS_DIR / layout.DAEMON_UNIT, 0o644),
     Artifact(f"units/{layout.AGENT_RUN}", layout.UNITS_DIR / layout.AGENT_RUN, 0o644),
     Artifact(f"units/{layout.STACK_RUN}", layout.UNITS_DIR / layout.STACK_RUN, 0o644),
+    Artifact(f"units/{layout.CHECK_RUN}", layout.UNITS_DIR / layout.CHECK_RUN, 0o644),
     Artifact(f"units/{layout.SERVICES_UNIT}", layout.UNITS_DIR / layout.SERVICES_UNIT, 0o644),
     Artifact("units/system-sleep.sh", layout.SLEEP_HOOK, 0o755),
 )
@@ -95,6 +96,7 @@ def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str
         "memory_high": settings.get_str("budget.slice_memory_high"),
         "memory_max": settings.get_str("budget.slice_memory_max"),
         "cpu_weight": str(settings.get_int("budget.slice_cpu_weight")),
+        "test_memory_max": f"{settings.get_int('budget.test_memory_ceiling_mib')}M",
         "restart_seconds": str(settings.get_int("watch.tick_seconds")),
         "dashboard_port": str(settings.get_int("dashboard.port")),
     }

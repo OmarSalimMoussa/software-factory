@@ -94,7 +94,7 @@ SCHEMA: dict[str, Spec] = {
     "budget.slice_memory_high": Spec("size", when=MINUTE),
     "budget.slice_memory_max": Spec("size", when=MINUTE),
     "budget.slice_cpu_weight": Spec("int", 1, 10000, when=MINUTE),
-    "budget.test_memory_ceiling_mib": Spec("int", 512, 65536),
+    "budget.test_memory_ceiling_mib": Spec("int", 512, 65536, when="Next install"),
     "budget.test_reserve_mib": Spec("int", 0, 65536),
     "vitals.memory_amber_gib": Spec("float", 0.5, 256),
     "vitals.memory_red_gib": Spec("float", 0.25, 256),
@@ -117,6 +117,9 @@ SCHEMA: dict[str, Spec] = {
     "watch.refusal_window_minutes": Spec("int", 5, 1440),
     "watch.socket_read_seconds": Spec("int", 1, 120),  # contract: added by 1B-3, a request line must arrive by then
     "queue.max_upload_kib": Spec("int", 16, 8192),
+    "checks.run_minutes": Spec("int", 1, 240),
+    "checks.test_seconds": Spec("int", 1, 600),
+    "checks.output_kib": Spec("int", 4, 1024),
     "errors.poll_minutes": Spec("int", 1, 120),  # contract: added by FB6, prod's GlitchTip issues become requests
     "errors.max_pages": Spec("int", 1, 50),
     "reports.poll_minutes": Spec("int", 1, 1440),

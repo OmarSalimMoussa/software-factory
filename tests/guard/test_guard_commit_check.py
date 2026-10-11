@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from checks.runner.passes import RECORD
-from runtime.guard.commit_check import is_factory_repo, passed, refusal
+from runtime.guard.commit_check import HookError, is_factory_repo, passed, refusal
 from runtime.guard.writes import ALWAYS_PROTECTED
-from runtime.shared.paths import INSTALL
+from runtime.shared import store
+from runtime.shared.paths import INSTALL, Places
 
 HOOKS = Path(__file__).resolve().parents[2] / "checks" / "git-hooks"
 
@@ -72,13 +72,15 @@ def test_the_factory_never_commits_to_its_own_repo(url: str, factory: bool) -> N
     assert bool(reason) is factory
 
 
-def test_a_merge_lands_only_with_the_exact_tree_that_passed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    monkeypatch.chdir(tmp_path)
+def test_a_merge_lands_only_with_a_tree_the_warden_recorded_as_passed(tmp_path: Path) -> None:
+    places = Places.under(tmp_path)
     tree = "a" * 40
-    assert not passed(tree)
-    (tmp_path / ".git" / RECORD).write_text(f"{tree} impl-a 2026-10-09T12:00:00Z\n")
-    assert passed(tree) and not passed("b" * 40)
+    assert not passed(places, tree)
+    store.write_json(places.public_check_passes, {"trees": [tree]})
+    assert passed(places, tree) and not passed(places, "b" * 40)
+    places.public_check_passes.write_text("{not json")
+    with pytest.raises(HookError, match="cannot be read"):
+        passed(places, tree)
 
 
 @pytest.mark.parametrize("hook", ["pre-commit", "pre-merge-commit", "pre-push"])
