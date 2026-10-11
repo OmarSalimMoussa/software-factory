@@ -28,23 +28,35 @@ from typing import TextIO
 from standard import compose as compose_mod
 from standard import config as config_mod
 from standard import envfile
+from standard import plan as plan_mod
 from standard.compose import ComposeError
 from standard.config import Config, ConfigError
 from standard.envfile import EnvError, atomic_write
-from standard.plan import DEPLOY_IMAGE
+from standard.plan import DEPLOY_IMAGE, PlanError
 from standard.server import deploy_steps as steps
 from standard.server import edge
 from standard.server.deploy_steps import SHORT, DeployError, Get
 from standard.services import provision
 from standard.services.provision import ProvisionError, Run, checked
 
-# The sections the server acts on: a commit that changes one needs the owner to run the server set-up again.
-SERVER_SECTIONS = ("product", "services", "env", "server", "workspaces", "deploy", "edge")
 USAGE = "usage: factory-deploy <staging|prod> <commit> [follow | pin <ref|->]"
 _COMMIT = re.compile(r"[0-9a-f]{8,40}")
 _REF = re.compile(r"-|[A-Za-z0-9._/][A-Za-z0-9._/-]{0,99}")
 
 Hook = Callable[[list[str], Path, dict[str, str]], subprocess.CompletedProcess[str]]
+
+
+def server_owned(config: Config) -> dict[str, object]:
+    """The settings the server set-up acts on, each named as the owner finds it in factory.toml. A build that changes
+    one needs the set-up run again; every other setting is the build's own, read from its deploy image."""
+    return {
+        "[product]": config.product,
+        "[services]": config.services,
+        "[server]": config.server,
+        "[workspaces] domains and ports": [(ws.name, ws.domain, ws.port) for ws in config.workspaces],
+        "[deploy] health": config.deploy.health,  # the server's heartbeat asks prod's
+        "[edge] routes": config.edge.routes,  # one redirects file serves both workspaces
+    }
 
 
 class Refused(Exception):
@@ -79,7 +91,6 @@ class Paths:
     lock: Path = Path("/srv/factory/state/deploy.lock")
     services_env: Path = Path("/srv/factory/services/services.env")
     edge_sites: Path = Path("/srv/factory/edge/sites")
-    factory_commit: Path = Path("/usr/local/lib/software-factory/COMMIT")
     product_toml: Path = Path("/etc/software-factory/product.toml")
     docker_socket: str = "/var/run/docker.sock"
 
@@ -241,7 +252,10 @@ class _Deploy:
                 checked(run, ["docker", "cp", f"{container}:/deploy", str(incoming)])
             finally:
                 run(["docker", "rm", container], None)
-            commit, images = self.check_image(incoming, image)
+            commit, images, shipped = self.check_image(incoming, image)
+            # Every setting the set-up does not act on is the build's own: a push back deploys with its own.
+            self.config, self.ws = shipped, shipped.workspace(self.ws.name)
+            self.env_file = self.env_dir / shipped.env.file
             changed = steps.sync(incoming, self.stack, keep={self.config.env.file})
         link, target = self.stack / self.config.env.file, f"../{self.env_dir.name}/{self.config.env.file}"
         if not link.is_symlink() or os.readlink(link) != target:
@@ -252,36 +266,31 @@ class _Deploy:
         self.log(f"deploy files: {commit} in {self.stack} ({len(changed)} changed)")
         return commit, images, changed
 
-    def check_image(self, incoming: Path, image: str) -> tuple[str, list[str]]:
+    def check_image(self, incoming: Path, image: str) -> tuple[str, list[str], Config]:
+        """The build's full commit, its images and its own settings; DeployError if the server cannot deploy it."""
         commit = (incoming / "COMMIT").read_text(encoding="utf-8").strip()
         if not commit.startswith(self.args.commit):
             raise DeployError(f"{image} holds commit {commit!r}, not {self.args.commit}: the tag names another build")
         try:
-            plan = json.loads((incoming / "plan.json").read_text(encoding="utf-8"))
+            plan = plan_mod.read(json.loads((incoming / "plan.json").read_text(encoding="utf-8")))
         except ValueError as exc:
             raise DeployError(f"{image}'s plan.json is not JSON: {exc}") from exc
-        ours = self.paths.factory_commit.read_text(encoding="utf-8").strip()
-        theirs = plan.get("factory_commit") if isinstance(plan, dict) else None
-        if theirs != ours:
+        except PlanError as exc:
             raise DeployError(
-                f"this commit was planned by factory {theirs!r}, and the server runs factory {ours!r}: "
-                "run the server set-up again from the factory commit .github/factory-ref names"
-            )
-        images = plan.get("images")
-        if not isinstance(images, list) or not all(
-            isinstance(i, dict) and isinstance(i.get("ref"), str) for i in images
-        ):
-            raise DeployError(f"{image}'s plan.json has no list of images, each with a ref")
+                f"{image}'s plan.json is not a plan the server's factory reads ({exc}): the factory that planned it "
+                "writes another shape. Run the server set-up from the factory commit .github/factory-ref names"
+            ) from exc
         shipped = config_mod.parse(incoming / config_mod.FILE)
-        differ = [f"[{s}]" for s in SERVER_SECTIONS if shipped.raw.get(s) != self.config.raw.get(s)]
+        ours, theirs = server_owned(self.config), server_owned(shipped)
+        differ = [what for what in ours if ours[what] != theirs[what]]
         if differ:
             raise DeployError(
-                f"factory.toml at this commit differs from the server's copy in {', '.join(differ)}: "
-                "run the server set-up again"
+                f"factory.toml at this commit differs from the server's copy in {', '.join(differ)}, which the "
+                "server set-up acts on: run the server set-up again"
             )
-        if (incoming / self.config.env.file).exists():
-            raise DeployError(f"the deploy files hold {self.config.env.file}, the env file the factory writes")
-        return commit, [str(i["ref"]) for i in images]
+        if (incoming / shipped.env.file).exists():
+            raise DeployError(f"the deploy files hold {shipped.env.file}, the env file the factory writes")
+        return commit, [i.ref for i in plan.images], shipped
 
     def settings(self) -> dict[str, str]:
         """Provision the workspace's shared services, then write its env file; the env file's values."""

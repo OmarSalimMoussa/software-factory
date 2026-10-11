@@ -24,11 +24,13 @@ Only one deploy runs on a server at a time; a second one waits. Each step stops 
 1. **Pin.** A `follow` while staging is pinned says so and ends without touching anything. `pin <ref>` records the
    pin; `pin -` removes it. Then the deploy goes on.
 2. **Deploy files.** It pulls the commit's deploy image and copies its files out. It refuses the image when its
-   commit is not the one asked for, when CI planned it with another factory than the one installed on the server,
-   or when its `factory.toml` differs from the server's copy in a section the server acts on (`product`,
-   `services`, `env`, `server`, `workspaces`, `deploy`, `edge`). The fix for the last two is to run the server
-   set-up again. The files then go into the workspace's stack folder in place: each file is overwritten, never
-   swapped, and a file the commit no longer has is deleted. Containers that mount a file keep seeing it.
+   commit is not the one asked for, when its `plan.json` has a shape the server's factory does not read, or when
+   its `factory.toml` differs from the server's copy in a setting the server set-up acts on (`[product]`,
+   `[services]`, `[server]`, each workspace's domain and port, `[deploy] health`, `[edge] routes`). The fix for the
+   last two is to run the server set-up again. Every other setting is the build's own: the deploy uses the copy in
+   its image, so pushing prod back deploys the older build with the settings it shipped with. The files then go
+   into the workspace's stack folder in place: each file is overwritten, never swapped, and a file the commit no
+   longer has is deleted. Containers that mount a file keep seeing it.
 3. **Settings.** It gives the workspace its share of the shared services (below), then writes the env file.
 4. **Images.** It pulls every image the commit's plan names.
 5. **Drain.** It asks the running stack's health address how much work is busy. While work is busy it waits, in

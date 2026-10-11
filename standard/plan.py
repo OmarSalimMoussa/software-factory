@@ -143,6 +143,30 @@ def make(repo: Path, commit: str, factory_commit: str) -> Plan:
     return Plan(config.product.name, config.product.registry, commit, short, factory_commit, found, files(config))
 
 
+def read(data: object) -> Plan:
+    """A plan.json as this factory writes it, or PlanError: its fields must be exactly a Plan's, and each image's
+    exactly an Image's. The server deploys any build whose plan has this shape, whichever factory commit planned it,
+    so pushing prod back to a build an older factory planned works for as long as the shape holds."""
+    want, want_image = [f.name for f in dataclasses.fields(Plan)], [f.name for f in dataclasses.fields(Image)]
+    if not isinstance(data, dict) or sorted(data) != sorted(want):
+        found = sorted(data) if isinstance(data, dict) else type(data).__name__
+        raise PlanError([f"want exactly the fields {want}, not {found}"])
+    images, problems = data["images"], []
+    if not isinstance(images, list) or not images:
+        raise PlanError(["images is not a list of images"])
+    for n, image in enumerate(images):
+        if not isinstance(image, dict) or sorted(image) != sorted(want_image):
+            problems.append(f"image {n + 1} wants exactly the fields {want_image}")
+        elif not isinstance(image["ref"], str) or not isinstance(image["name"], str):
+            problems.append(f"image {n + 1}'s name and ref are not text")
+    files = data["files"]
+    if not isinstance(files, list) or not all(isinstance(f, str) for f in files):
+        problems.append("files is not a list of paths")
+    if problems:
+        raise PlanError(problems)
+    return Plan(**{**data, "images": tuple(Image(**i) for i in images), "files": tuple(files)})
+
+
 def image_ref(config: Config, image: str) -> str:
     """``<registry>/<product>-<image>``, without a tag."""
     return f"{config.product.registry}/{config.product.name}-{image}"

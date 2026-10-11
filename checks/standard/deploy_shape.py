@@ -20,7 +20,7 @@ from standard import compose as compose_mod
 from standard import config as config_mod
 from standard import plan as plan_mod
 from standard.compose import Compose, ComposeError
-from standard.config import Config, ConfigError
+from standard.config import FACTORY_REF, FACTORY_REF_LINE, Config, ConfigError
 
 ID = "deploy-shape"
 RULE = "The product builds, smoke-tests and deploys the standard way, as factory.toml describes"
@@ -29,11 +29,9 @@ VALUES = None
 
 TEMPLATES = Path(__file__).resolve().parents[2] / "templates" / "ci"
 WORKFLOWS = ("ci.yml", PROMOTE_WORKFLOW)
-FACTORY_REF = ".github/factory-ref"
 # CI signs in to this registry with the workflow's own GITHUB_TOKEN; it holds no other registry's password.
 REGISTRY = "ghcr.io/"
 LOOPBACK = "127.0.0.1"
-_REF = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}")
 _ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
 
 
@@ -63,7 +61,7 @@ def ref_problems(repo: Repo) -> list[str]:
     if FACTORY_REF not in repo.tracked:
         return [f"{FACTORY_REF} is missing (or not committed): write {wanted}"]
     lines = repo.read(FACTORY_REF).splitlines()
-    if len(lines) != 1 or not _REF.fullmatch(lines[0]):
+    if len(lines) != 1 or not FACTORY_REF_LINE.fullmatch(lines[0]):
         return [f"{FACTORY_REF} must hold {wanted}; it holds {repo.read(FACTORY_REF)[:80]!r}"]
     return []
 

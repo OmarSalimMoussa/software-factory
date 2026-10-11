@@ -138,13 +138,13 @@ def make_job(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     bootstrap = {"token": "read-token", "factory_dsn": "http://k@factory-glitchtip:8000/1"}
     monkeypatch.setattr(provision, "bootstrap", lambda config, services, run: bootstrap)
 
-    def make(server: Server, *, dirty: str = "", fresh: bool = False) -> setup.Job:
+    def make(server: Server, *, dirty: str = "", fresh: bool = False, ref: str = "a" * 40) -> setup.Job:
         def local(argv: list[str], stdin: str | None) -> subprocess.CompletedProcess[str]:
             answers = {"status": dirty, "rev-parse": "a" * 40 + "\n", "ls-files": "standard/config.py\0"}
             return _cp(argv, 0, answers[argv[3]])
 
         host = Host(server, dry_run=False)
-        return setup.Job(CONFIG, FACTORY_TOML, host, local, fresh, key, tmp_path / "home", factory)
+        return setup.Job(CONFIG, FACTORY_TOML, host, local, fresh, key, tmp_path / "home", factory, ref)
 
     return make
 
@@ -207,11 +207,23 @@ def test_the_ci_key_is_the_one_key_and_can_only_run_the_gate(make_job: Any) -> N
     assert write[-1] == "visudo -cq -f"
 
 
-def test_a_checkout_with_uncommitted_changes_is_refused_before_the_server_is_touched(make_job: Any) -> None:
+@pytest.mark.parametrize(
+    ("job", "said"),
+    [
+        ({"dirty": " M standard/config.py\n"}, "not committed"),
+        (
+            {"ref": "b" * 40},
+            "the factory checkout is at aaaaaaaa, and the product's .github/factory-ref names bbbbbbbb",
+        ),
+    ],
+)
+def test_a_checkout_the_product_does_not_name_is_refused_before_the_server_is_touched(
+    make_job: Any, job: dict[str, str], said: str
+) -> None:
     server = Server()
 
-    with pytest.raises(SetupError, match="not committed"):
-        setup.run(make_job(server, dirty=" M standard/config.py\n"))
+    with pytest.raises(SetupError, match=said):
+        setup.run(make_job(server, **job))
 
     assert server.calls == []
 

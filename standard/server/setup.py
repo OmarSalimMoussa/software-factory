@@ -25,7 +25,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from standard.config import FILE, Config, ConfigError, load
+from standard.config import FACTORY_REF, FACTORY_REF_LINE, FILE, Config, ConfigError, load
 from standard.server import heartbeat as heartbeat_mod
 from standard.server import setup_machine as machine
 from standard.server.setup_machine import Host, SetupError, ensure_dirs, ensure_file, remote_text
@@ -77,6 +77,7 @@ class Job:
     ci_key: Path | None  # None: a pair made in ``home``
     home: Path  # the owner's ~/.config/software-factory
     factory: Path
+    factory_ref: str  # the factory commit the product's CI plans every build with
     code: dict[str, bytes] = field(default_factory=dict)  # path under CODE -> content
     admin_group: str = ""
     services: dict[str, str] = field(default_factory=dict)
@@ -96,6 +97,18 @@ def _local(job: Job, argv: list[str], what: str) -> str:
     return done.stdout
 
 
+def factory_ref(product: Path) -> str:
+    """The commit the product's .github/factory-ref names (one line, owner/name@<40-character sha>)."""
+    try:
+        text = (product / FACTORY_REF).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise SetupError([f"{FACTORY_REF} in the product cannot be read: {exc}"]) from exc
+    found = FACTORY_REF_LINE.fullmatch(text.strip())
+    if found is None:
+        raise SetupError([f"{FACTORY_REF} must hold one line, owner/name@<40-character sha>; it holds {text[:80]!r}"])
+    return found.group(1)
+
+
 def prepare(job: Job) -> None:
     """Everything read on the laptop, before the server is touched: the code it will run must be a commit."""
     git = ["git", "-C", str(job.factory)]
@@ -105,6 +118,10 @@ def prepare(job: Job) -> None:
             ["the factory checkout has changes that are not committed; the server runs only a commit: " + dirty]
         )
     head = _local(job, [*git, "rev-parse", "HEAD"], "reading the factory's commit").strip()
+    if head != job.factory_ref:
+        raise SetupError([f"the factory checkout is at {head[:8]}, and the product's {FACTORY_REF} names "
+                          f"{job.factory_ref[:8]}: check out that commit, so the server runs the factory the product's "
+                          "CI plans its builds with"])  # fmt: skip
     files = _local(job, [*git, "ls-files", "-z", "--", "standard"], "listing the factory's code").split("\0")
     job.code = {"COMMIT": f"{head}\n".encode()}
     job.code |= {name: (job.factory / name).read_bytes() for name in files if name}
@@ -396,7 +413,8 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             home = Path.home() / ".config" / "software-factory"
             product_toml = (args.product / FILE).read_text()
-            job = Job(config, product_toml, host, provision.real_run, args.fresh, args.ci_key, home, FACTORY)
+            ref = factory_ref(args.product)
+            job = Job(config, product_toml, host, provision.real_run, args.fresh, args.ci_key, home, FACTORY, ref)
             job.ping = args.healthchecks_ping
             run(job)
     except ConfigError as exc:

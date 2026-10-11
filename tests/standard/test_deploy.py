@@ -17,6 +17,10 @@ FACTORY = "f" * 40
 DRAIN = "http://127.0.0.1:8300/healthz"
 ORIGIN = "https://notes.example.com/healthz"
 LIVE = (200, {"workspace": "prod", "build_commit": "abcdef12", "busy": 0})
+APP = {"name": "app", "service": "app", "context": ".", "dockerfile": "Dockerfile", "target": None, "args": {},
+       "after": None, "ref": "ghcr.io/owner/notes-app"}  # fmt: skip
+PLAN = {"product": "notes", "registry": "ghcr.io/owner", "commit": SHA, "short": SHA[:8], "factory_commit": FACTORY,
+        "images": [APP], "files": ["compose.yml", "notes.env.template", "hooks/after.sh", "factory.toml"]}  # fmt: skip
 
 
 @dataclass
@@ -44,7 +48,6 @@ class Server:
             lock=self.root / "srv" / "factory" / "state" / "deploy.lock",
             services_env=self.root / "srv" / "factory" / "services" / "services.env",
             edge_sites=self.root / "srv" / "factory" / "edge" / "sites",
-            factory_commit=self.root / "lib" / "COMMIT",
             product_toml=self.root / "etc" / "product.toml",
         )
         tools = Tools(
@@ -65,7 +68,6 @@ class Server:
 def server(tmp_path: Path) -> Server:
     files = {
         "etc/product.toml": FACTORY_TOML,
-        "lib/COMMIT": FACTORY + "\n",
         "srv/factory/services/services.env": SERVICES_ENV,
         "srv/notes/prod/env/notes.env": "MAIL_HOST=mail.example.com\n",
         "image/deploy/compose.yml": COMPOSE,
@@ -73,9 +75,7 @@ def server(tmp_path: Path) -> Server:
         "image/deploy/factory.toml": FACTORY_TOML,
         "image/deploy/hooks/after.sh": "#!/bin/sh\n",
         "image/deploy/COMMIT": SHA + "\n",
-        "image/deploy/plan.json": json.dumps(
-            {"factory_commit": FACTORY, "images": [{"name": "app", "ref": "ghcr.io/owner/notes-app"}]}
-        ),
+        "image/deploy/plan.json": json.dumps(PLAN),
     }
     for name, text in files.items():
         (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
@@ -130,8 +130,10 @@ def test_a_pinned_staging_ignores_a_follow_and_touches_nothing(server: Server) -
     ("file", "text", "says"),
     [
         ("COMMIT", "9" * 40 + "\n", "holds commit '9999"),
-        ("plan.json", json.dumps({"factory_commit": "e" * 40, "images": []}), "the server runs factory 'ffff"),
-        ("factory.toml", FACTORY_TOML.replace("/admin/export*", "/other*"), "differs from the server's copy in [edge]"),
+        ("plan.json", json.dumps({**PLAN, "steps": []}), "is not a plan the server's factory reads"),
+        ("plan.json", json.dumps({**PLAN, "images": [{"ref": "ghcr.io/owner/notes-app"}]}), "image 1 wants exactly"),
+        ("factory.toml", FACTORY_TOML.replace('host = "api.', 'host = "www.'), "the server's copy in [edge] routes"),
+        ("factory.toml", FACTORY_TOML.replace("port = 8300", "port = 8302"), "[workspaces] domains and ports"),
     ],
 )
 def test_a_deploy_image_that_does_not_match_the_server_is_refused(
@@ -143,6 +145,17 @@ def test_a_deploy_image_that_does_not_match_the_server_is_refused(
 
     assert says in capsys.readouterr().out
     assert "compose -p" not in server.steps() and server.steps()[-1] == "logout ghcr.io"
+
+
+def test_a_build_an_older_factory_planned_deploys_with_its_own_deploy_settings(server: Server) -> None:
+    (server.image / "plan.json").write_text(json.dumps({**PLAN, "factory_commit": "e" * 40}))
+    own = FACTORY_TOML.replace("/admin/export*", "/old-admin*").replace("drain_minutes = 1", "drain_minutes = 2")
+    (server.image / "factory.toml").write_text(own)
+
+    assert server.deploy("prod", "abcdef12") == 0
+
+    site = (server.root / "srv/factory/edge/sites/notes-prod.caddy").read_text()
+    assert "respond /old-admin* 404" in site and "/admin/export*" not in site
 
 
 @pytest.mark.parametrize(

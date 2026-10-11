@@ -148,9 +148,10 @@ To act on one:
 2. Change the factory's repo by hand: branch, test, merge, push. Wait for the factory's CI to pass on the commit.
 3. Download that commit's release and run it, as in "Install, reinstall and uninstall" above (or reinstall from your
    checkout). The installer refuses while any factory session is live.
-4. Run the server set-up again from that commit (`python3 -m standard.server.setup --product <path>`): a deploy
-   refuses a build planned by another factory commit than the server runs.
-5. In the product, move `.github/factory-ref` to that commit, and copy in `templates/ci/` again if it changed.
+4. In the product, move `.github/factory-ref` to that commit, and copy in `templates/ci/` again if it changed.
+5. Run the server set-up again from that commit (`python3 -m standard.server.setup --product <path>`). It refuses a
+   factory checkout at another commit than `.github/factory-ref` names. Older builds stay deployable, so pushing
+   prod back still works after the upgrade.
 6. Start the orchestrator again.
 
 ## When something is wrong

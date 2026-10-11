@@ -15,6 +15,9 @@ from pathlib import Path
 from typing import Any
 
 FILE = "factory.toml"
+# One line, owner/name@<40-character sha>: the factory commit the product's CI plans and checks with.
+FACTORY_REF = ".github/factory-ref"
+FACTORY_REF_LINE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@([0-9a-f]{40})")
 WORKSPACES = ("staging", "prod")
 RELEASE_KINDS = ("chrome-web-store",)
 # What an [env.set] value may name; each workspace and slot fills them in.

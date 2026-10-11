@@ -112,10 +112,11 @@ Sign in to GlitchTip and Langfuse with `[services] owner_email`.
 
 Run the set-up again, from a factory checkout at the right commit:
 
-- **After a factory change** the product moves to. A deploy refuses to run while the server's factory code is not the
-  commit the product's `.github/factory-ref` names. Check out that commit of the factory, then run the set-up.
-- **After a change to `factory.toml`** that touches the server: a deploy refuses while the server's copy of those
-  settings differs from the one the product ships.
+- **After a factory change** the product moves to. The set-up refuses a factory checkout at any other commit than
+  the one the product's `.github/factory-ref` names, so move that first. A deploy refuses a build whose plan has a
+  shape the server's factory does not read.
+- **After a change to `factory.toml`** that touches the server: a deploy refuses while the server's copy of the
+  settings the set-up acts on differs from the one the build ships ([deploy.md](deploy.md)).
 - **After a change to the shared services**, which comes with a factory change. The set-up brings them up again and
   joins them back to each workspace's networks.
 
