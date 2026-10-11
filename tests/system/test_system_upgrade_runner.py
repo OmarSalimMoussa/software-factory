@@ -4,17 +4,20 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from runtime.shared import releases
+from runtime.shared import releases, store, upgrades
+from runtime.shared.paths import Places
 from runtime.system import release
 from runtime.system.runners import upgrade
 
 OLD = "a" * 40
+ROOT = Path(__file__).resolve().parents[2]
 API = "https://api.github.com/repos/acme/factory"
 BOT = {"login": releases.CI_BOT}
 STORAGE = "https://objects.example/release-asset"
@@ -95,3 +98,32 @@ def test_a_release_it_cannot_trust_is_never_installed(tmp_path: Path, wrong: dic
     with pytest.raises((upgrade.Stop, releases.ReleaseError), match=says):
         upgrade.fetch(rel, upgrade.check(rel, OLD, commit), commit, folder)
     assert list(folder.iterdir()) == []
+
+
+def test_the_whole_run_reads_the_shipped_defaults_and_hands_the_checked_file_to_the_install(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data, commit = _release_file(tmp_path)
+    places = Places.under(tmp_path / "machine")
+    places.install.mkdir(parents=True)
+    shutil.copy(ROOT / "settings.toml", places.defaults)  # its repo.path and repo.github are the install's to set
+    places.upgrade.mkdir(parents=True)
+    store.write_json(
+        upgrades.installed_path(places), {"commit": OLD, "owner": "o", "product": "/p", "repo": "acme/factory"}
+    )
+    upgrades.token_path(places).write_text("github_pat_x\n")
+    monkeypatch.setattr(releases, "http_get", _github(data, commit, []))
+    ran: list[list[str]] = []
+
+    def run(argv: list[str], **how: object) -> subprocess.CompletedProcess[str]:
+        ran.append(argv)
+        assert Path(argv[2]).read_bytes() == data  # the checked file, where only root may write
+        upgrades.write_progress(places, OLD, commit, upgrades.DONE, "")
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(upgrade.subprocess, "run", run)
+
+    assert upgrade.upgrade(places, commit) == 0
+    assert [argv[3:] for argv in ran] == [["--upgrade"]]
+    said = upgrades.read_progress(places)
+    assert said is not None and said["state"] == upgrades.DONE
