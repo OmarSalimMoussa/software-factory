@@ -84,7 +84,7 @@ class Server:
     ) -> subprocess.CompletedProcess[str]:
         if script == machine.READ_FILE:
             found = self.files.get(args[0])
-            return _cp(argv, 1, "", "No such file") if found is None else _cp(argv, 0, f"{found[0]}\n{found[1]}")
+            return _cp(argv, 3) if found is None else _cp(argv, 0, f"{found[0]}\n{found[1]}")
         if script in (machine.WRITE_FILE, machine.WRITE_IN_PLACE):
             assert stdin is not None
             self.files[args[0]] = (f"{args[1]} {args[2]}", stdin)
@@ -313,3 +313,17 @@ def test_the_heartbeat_checks_in_only_when_prod_answers_as_prod(
 def test_the_python_the_server_needs_is_the_one_the_factory_requires() -> None:
     declared = tomllib.loads((Path(setup.__file__).parents[2] / "pyproject.toml").read_text())["project"]
     assert declared["requires-python"] == ">=" + ".".join(map(str, machine.PYTHON_AT_LEAST))
+
+
+def test_shared_service_secrets_are_kept_never_made_anew_over_a_blank_or_unreadable_file(make_job: Any) -> None:
+    held = stack.generate_env(CONFIG, kind="server", existing={})
+    blank = {**held, "POSTGRES_PASSWORD": ""}
+    with pytest.raises(stack.StackError, match="POSTGRES_PASSWORD empty"):
+        stack.generate_env(CONFIG, kind="server", existing=blank)
+    assert stack.generate_env(CONFIG, kind="server", existing=held)["POSTGRES_PASSWORD"] == held["POSTGRES_PASSWORD"]
+
+    server = Server()
+    server.answers[("sudo", "-n", "sh", "-c", machine.READ_FILE, "read", f"{setup.SERVICES}/{stack.ENV_FILE}")] = (
+        1, "", "cat: Permission denied")  # fmt: skip
+    with pytest.raises(SetupError, match="on the server but cannot be read"):
+        setup.run(make_job(server))

@@ -55,7 +55,8 @@ _LOCK = (
     "systemctl restart ssh.socket 2>/dev/null || systemctl restart ssh"
 )
 
-READ_FILE = 'stat -c "%U:%G %a" "$1" && cat "$1"'
+# Exit 3: no such file. Any other failure is a file that is there but cannot be read, never one that is absent.
+READ_FILE = '[ -e "$1" ] || [ -L "$1" ] || exit 3; stat -c "%U:%G %a" "$1" && cat "$1"'
 # A new file is whole or absent, never half written: a broken sudoers file stops every sudo on the machine.
 WRITE_FILE = (
     'umask 077; t=$(mktemp "$1.XXXXXX") || exit 1; trap \'rm -f "$t"\' EXIT; '
@@ -132,10 +133,13 @@ def ssh_runner(config: Config, known_hosts: Path) -> Run:
 
 
 def remote_text(host: Host, path: str) -> tuple[str, str] | None:
-    """``("owner:group mode", content)`` of a file on the server, or None when it is not there."""
+    """``("owner:group mode", content)`` of a file on the server, or None when it is not there. A file that is
+    there but cannot be read stops the set-up: read as absent, it would be written over (its secrets made anew)."""
     done = host.read(["sudo", "-n", "sh", "-c", READ_FILE, "read", path])
-    if done.returncode != 0:
+    if done.returncode == 3:
         return None
+    if done.returncode != 0:
+        raise SetupError([f"{path} is on the server but cannot be read: {said(done)}"])
     stat, _, text = done.stdout.partition("\n")
     return stat, text
 

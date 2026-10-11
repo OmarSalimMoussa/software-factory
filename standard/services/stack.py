@@ -65,10 +65,13 @@ def public_url(config: Config, kind: Literal["server", "laptop"], port: int) -> 
 
 
 def generate_env(config: Config, *, kind: Literal["server", "laptop"], existing: dict[str, str]) -> dict[str, str]:
-    values = {
-        key: existing[key] if existing.get(key) else prefix + secrets.token_hex(size)
-        for key, (prefix, size) in _SECRETS.items()
-    }
+    """The shared services' settings: each secret ``existing`` holds kept, and one it lacks made. A secret it holds
+    blank is refused: the data already stored was made with a value, which a new one would not open."""
+    blank = sorted(key for key in _SECRETS if key in existing and not existing[key])
+    if blank:
+        raise StackError(f"{ENV_FILE} holds {', '.join(blank)} empty: put back the value the services were set up "
+                         "with, or remove the services' data and the line to start them afresh")  # fmt: skip
+    values = {key: existing.get(key) or prefix + secrets.token_hex(size) for key, (prefix, size) in _SECRETS.items()}
     values |= {
         "NEXTAUTH_URL": public_url(config, kind, PORTS["langfuse"]),
         "LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT": public_url(config, kind, PORTS["minio"]),

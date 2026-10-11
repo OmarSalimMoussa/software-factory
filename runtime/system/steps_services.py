@@ -59,7 +59,10 @@ def place(ctx: Install) -> None:
     except ValueError as exc:
         raise refuse(f"The shared services' settings in {env} cannot be read ({exc}): fix the file by hand, keeping "
                      "its secrets, then install again") from exc  # fmt: skip
-    values = stack.generate_env(config, kind="laptop", existing=existing)
+    try:
+        values = stack.generate_env(config, kind="laptop", existing=existing)
+    except stack.StackError as exc:
+        raise refuse(f"The shared services' settings in {env} cannot be kept: {exc}. Then install again") from exc
     host.write(env, stack.render_env(values), mode=0o640, group=group)
     host.say("kept the secrets services.env held" if existing else "made services.env's secrets")
 
