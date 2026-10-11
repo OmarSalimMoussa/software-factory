@@ -37,8 +37,10 @@ STANDARD_README_EXEMPT = ("check-values", ".github")
 _WEB = (".ts", ".tsx", ".js", ".jsx", ".mjs")
 _INDEX_RE = re.compile(r"(^|/)index\.(ts|tsx|js|jsx|mjs)$")
 _RE_EXPORT_RE = re.compile(r"\bexport\s+(type\s+)?(\*|\{[^}]*\})[^;]*?\bfrom\b\s*[^;\n]*;?")
+# Read over code tokens joined by single spaces (mask.python_code), so a docstring or comment naming a call is no call.
 _ENV_DEFAULT_RE = re.compile(
-    r"\benviron\.get\([^()]*,|\bgetenv\([^()]*,|\b(environ\.get|getenv)\([^()]*\)\s*or\b|\benviron\.setdefault\("
+    r"\benviron \. get \([^()]*,|\bgetenv \([^()]*,|\b(environ \. get|getenv) \([^()]*\) or\b"
+    r"|\benviron \. setdefault \("
 )
 _SERVICE_RE = re.compile(r"(^|/)(\w+_)?service\.py$")
 
@@ -112,7 +114,13 @@ def env_problems(repo: Repo, trees: list[str], allow: dict[str, str]) -> list[st
     out: list[str] = []
     answered: set[str] = set()
     for rel in _product_python(repo, trees):
-        hits = [n for n, line in enumerate(repo.read(rel).splitlines(), 1) if _ENV_DEFAULT_RE.search(line)]
+        try:
+            code = mask.python_code(repo.read(rel))
+        # telemetry: surfaced — a file that does not tokenize is a problem line in `out`, the check's verdict
+        except SyntaxError as exc:
+            out.append(f"{rel}: does not tokenize, so its environment reads cannot be checked: {exc}")
+            continue
+        hits = [n for n, line in sorted(code.items()) if _ENV_DEFAULT_RE.search(line)]
         if rel in allow:
             if hits:
                 answered.add(rel)
