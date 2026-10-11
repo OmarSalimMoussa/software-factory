@@ -18,6 +18,7 @@ RULES: dict[str, str] = {
     "model": "an Agent call asking for any model but that kind's configured one",
     "tester-brief": "a tester brief without one `Scenarios and checks: N` line",
     "tester-time": "a tester's calls after its time; command timeouts are cut to the time left",
+    "intake-time": "intake's calls after intake.fast_lane_minutes, but for `factory` and its hand-back",
     "qa-ready": "a tester start with no ready record for the head",
     "qa-rounds": "a QA round past its setting",
     "critic-rounds": "a critic round past its setting",

@@ -89,6 +89,7 @@ VERBS: dict[str, Verb] = {
     "qa.result": _v("runtime.qa.verbs:qa_result", IMPL, kinds=VERDICTS),
     "qa.finding": _v("runtime.qa.verbs:qa_finding", IMPL, kinds=VERDICTS),
     "qa.waive": _v("runtime.qa.verbs:qa_waive", ORCH),
+    "cause.try": _v("runtime.queue.verbs:cause_try", IMPL),
     # the owner, from the dashboard or their own terminal
     "snapshot": _o("runtime.warden.snapshot:snapshot"),
     # contract: added by 2A. The dashboard cannot read the warden's state, so pictures and evidence come as bytes.

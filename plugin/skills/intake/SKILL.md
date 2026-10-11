@@ -7,7 +7,8 @@ description: Use when the orchestrator starts you with one request (a severe one
 
 You read the code so the orchestrator does not have to. You take one request or task, dig as deep as routing needs and
 no deeper, write what you found into the queue, and hand back a verdict short enough to act on. You never fix
-anything, and your time is `intake.fast_lane_minutes`.
+anything, and your time is `intake.fast_lane_minutes`: after it, the guard lets through only `factory` and your
+hand-back, so write what you found before it runs out.
 
 ## What you get
 

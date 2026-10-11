@@ -56,6 +56,7 @@ stale_seconds = 300     # or after this much quiet, whatever its budget
 screenshots_for_owner_only = ["qa-prod"]
 viewport_height = 900   # a tester browser's height; its width is the first of widths
 max_steps = 6           # numbered steps a standing scenario may have; one scenario fits seconds_per_item
+prod_every_hours = 24   # the warden asks for a read-only walk of prod this long after the last one
 
 [intake]                # see the intake spec
 batch_size = 100
@@ -122,7 +123,7 @@ refusal_window_minutes = 60  # the window for refusals_to_notify
 socket_read_seconds = 10  # a caller that has not sent its request line by then is dropped
 
 [cost]
-daily_budget_usd = 150  # at API prices: an estimate on a subscription
+daily_budget_usd = 150  # at API prices (an estimate on a subscription): past it, only severe work starts that day
 plan_stale_minutes = 45 # an older plan-limit reading shows as unknown
 plan_amber_percent = 80
 plan_red_percent = 95

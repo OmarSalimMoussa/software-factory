@@ -134,7 +134,7 @@ def decide_tool(call: Call) -> Decision:
         if refusal is not None:
             return refusal
     current = call
-    for rule in (subagents.check_tester_time, browser.check, _tool, _by_tool):
+    for rule in (subagents.check_tester_time, browser.check, _tool, _by_tool, subagents.check_intake_time):
         decision = rule(current)
         if isinstance(decision, Refusal):
             return decision

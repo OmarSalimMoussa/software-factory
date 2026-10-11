@@ -87,6 +87,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("qa.stale_seconds", "Seconds before a silent tester is let go"),
             ("qa.screenshots_for_owner_only", "Testers whose screenshots only you see"),
             ("qa.max_steps", "Steps a standing scenario may have"),
+            ("qa.prod_every_hours", "Hours between read-only walks of prod"),
         ],
     ),
     (

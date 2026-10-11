@@ -157,3 +157,14 @@ def test_staging_goes_red_after_failures_in_a_row_and_never_while_a_push_deploys
     assert inbox.STAGING_RED in _staging_fails(ticking, tmp_path, 1)
     red = next(e for e in inbox.read(ticking.ctx, {}, None)["events"] if e["kind"] == inbox.STAGING_RED)
     assert red["data"]["suspect"] == "c" * 40 and red["data"]["request"].startswith("r-")
+
+
+def test_a_read_only_walk_of_prod_is_asked_for_a_day_after_the_last_one(ticking: World, tmp_path: Path) -> None:
+    file_requests(ticking, 0, 0)
+    run(ticking, tmp_path)  # the first tick starts the count
+    ticking.clock.t += ticking.ctx.settings().get_int("qa.prod_every_hours") * 3600
+
+    run(ticking, tmp_path)
+
+    due = [e for e in inbox.unacknowledged(ticking.ctx.places) if e["kind"] == inbox.QA_PROD_DUE]
+    assert [e["data"]["kind"] for e in due] == ["daily"]

@@ -249,6 +249,24 @@ def check_tester_time(call: Call) -> Decision:
     return Rewrite(updated) if updated != call.tool_input else None
 
 
+def check_intake_time(call: Call) -> Decision:
+    """Intake's own calls once intake.fast_lane_minutes passed since its brief: only a plain `factory` call (it writes
+    what it found with one) and its hand-back still go. A model cannot tell how long it has worked."""
+    intake = call.in_subagent and call.agent_type == INTAKE
+    if not intake or call.tool == "SubagentHandback" or call.off("intake-time"):
+        return None
+    if call.tool == "Bash" and factory_calls.plain_words(str(call.tool_input.get("command", ""))) is not None:
+        return None
+    try:
+        _, started = transcript.first_brief(transcript.subagent_transcript(call.transcript, call.agent_id))
+    except transcript.BriefError as exc:
+        return Refusal("intake-time", f"your time cannot be read ({exc}); write what you found, then hand back")
+    limit = call.settings.get_int("intake.fast_lane_minutes")
+    if (call.now - started).total_seconds() < limit * 60:
+        return None
+    return Refusal("intake-time", f"your {limit} minutes are spent: write what you found with factory, then hand back")
+
+
 def _time_left(call: Call) -> float | Refusal:
     """Seconds left of the tester's budget: its items' time, and at most the desktop time once it drives the
     remote desktop."""

@@ -60,6 +60,7 @@ def test_one_call_written_on_several_lines_is_counted_once(ctx: Context, root: P
         (10, 0.01575, "t-0007", "2026-10-09T10:01:02Z"),
         (20, 0.0165, "t-0007", "2026-10-09T10:01:02Z"),
     ]
+    assert cost.spent_days(ctx) == {"2026-10-09": [pytest.approx(0.03225), 0]}  # what the budget gate reads
 
 
 def test_an_unpriced_model_costs_unknown_and_a_failed_call_is_recorded(ctx: Context, root: Path) -> None:

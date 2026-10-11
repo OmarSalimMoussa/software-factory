@@ -21,7 +21,7 @@ from runtime.shared.models import DEPRIORITIZED, RETIRED, WAITING, WORKING, Sess
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.slots import leases
-from runtime.warden import ops, registry
+from runtime.warden import cost, ops, registry
 from runtime.warden import outage as outage_record
 from runtime.warden.context import Context
 
@@ -72,12 +72,18 @@ def vitals_level(ctx: Context) -> str:
 
 
 def check_vitals(ctx: Context, severe: bool) -> None:
-    """Red blocks every start; amber, or vitals not read yet, block all but severe work."""
+    """Red blocks every start; amber, or vitals not read yet, block all but severe work. So does a day whose known
+    spend, at API prices, reached cost.daily_budget_usd."""
     level = vitals_level(ctx)
     if level == "red":
         raise Refused("vitals", "the machine's vitals are red, so nothing starts; see factory status")
     if level != "green" and not severe:
         raise Refused("vitals", f"the machine's vitals are {level}, so only severe work starts; see factory status")
+    budget = ctx.settings().get_float("cost.daily_budget_usd")
+    spent = cost.spent_days(ctx).get(ctx.clock.iso()[:10], [0.0, 0])[0]
+    if spent >= budget and not severe:
+        raise Refused("budget", f"today's spend is ${spent:,.0f} of the ${budget:,.0f} budget (cost.daily_budget_usd), "
+                                "so only severe work starts until the UTC day ends")  # fmt: skip
 
 
 def switch_path(ctx: Context) -> Path:

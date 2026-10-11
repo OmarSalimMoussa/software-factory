@@ -24,8 +24,9 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 3. Your first message names the slot the warden claimed for you: `factory slot up`. If none was free, build what
    needs no stack and `factory slot claim` when one frees.
 4. Your permit holds the task's slice count. If the work needs more, or you find an owner class the task does not
-   name, or you cannot confirm the cause after the tries `routing.cause_tries` allows, stop and report
-   `needs rung <N>` to the orchestrator, with why.
+   name, stop and report `needs rung <N>` to the orchestrator, with why. Record each try at a cause that did not
+   hold: `factory cause --tried "<the idea, and what ruled it out>"`. The warden counts them; at the last one it
+   tells the orchestrator, and you stop and report what you know.
 5. A spec becomes your branch's first commit, in the product's `docs/specs/`.
 
 ## 2. Build

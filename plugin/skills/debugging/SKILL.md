@@ -23,6 +23,7 @@ A fix without a cause is a guess. Find the cause first, then fix it once.
 5. **Keep telemetry honest.** A platform failure must report, and a new failure path gets its test. A user's
    failure goes to the UI, never to the error tracker.
 6. **Three fixes that did not hold mean your model is wrong.** Stop, write down what you know and what you ruled out,
-   and ask the orchestrator. After `routing.cause_tries` tries without a confirmed cause, report `needs rung <N>`.
+   and ask the orchestrator. Record each try that did not hold with `factory cause --tried "…"`: the warden counts
+   them, and at `routing.cause_tries` it tells the orchestrator the task needs a higher rung.
 
 Report the cause, the fix, the test, and how you saw it work on your slot.

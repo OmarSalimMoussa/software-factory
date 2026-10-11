@@ -362,6 +362,17 @@ def _running(ctx: Context, op_id: object) -> bool:
         return False
 
 
+def qa_prod_path(places: Places) -> Path:
+    return places.state / "qa-prod-due.json"
+
+
+def post_qa_prod(ctx: Context, sha: str, kind: str, since: str) -> None:
+    """Ask the orchestrator for a read-only walk of prod at ``sha``, looking at issues first seen since ``since``; the
+    loop asks again qa.prod_every_hours after the last ask."""
+    ctx.post_event(inbox.QA_PROD_DUE, {"sha": sha, "kind": kind, "since": since})
+    store.write_json(qa_prod_path(ctx.places), {"at": ctx.clock.now(), "iso": ctx.clock.iso()})
+
+
 def _watch_until(ctx: Context, until: float) -> None:
     with _watch_lock:
         raw = store.read_json(_watch_path(ctx.places))
@@ -432,7 +443,7 @@ def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list
     def qa_prod() -> str:
         _watch_until(ctx, ctx.clock.now() + watch_s)
         # The tester looks for issues first seen since prod began to answer on this build.
-        ctx.post_event(inbox.QA_PROD_DUE, {"sha": sha, "kind": kind, "since": ctx.clock.iso()})
+        post_qa_prod(ctx, sha, kind, ctx.clock.iso())
         return "the orchestrator starts it"
 
     return [

@@ -189,7 +189,23 @@ def run_pass(ctx: Context, roots: Sequence[Path]) -> int:
             agent_id = sub.name.removeprefix("agent-").removesuffix(".jsonl")
             payer = _subagent_payer(session, agent_id, sub.with_name(f"agent-{agent_id}.meta.json"), by_agent)
             records += read_file(ctx, sub, payer, cursor)
+    days = spent_days(ctx)
     for record in records:
         store.append_jsonl(ctx.places.cost, models.dump(record))
+        known = days.setdefault(record.at[:10], [0.0, 0])
+        known[0 if record.usd is not None else 1] += record.usd if record.usd is not None else 1
+    store.write_json(_days_path(ctx), days, mode=0o600)
     store.write_json(ctx.places.cost_cursor, cursor, mode=0o600)
     return len(records)
+
+
+def _days_path(ctx: Context) -> Path:
+    return ctx.places.state / "cost-days.json"
+
+
+def spent_days(ctx: Context) -> dict[str, list[float]]:
+    """Each UTC day's known dollars and its calls with an unknown price, as the passes recorded them."""
+    found = store.read_json_or(_days_path(ctx), {})
+    if not isinstance(found, dict):
+        raise store.StoreError(f"{_days_path(ctx)}: not an object")
+    return found

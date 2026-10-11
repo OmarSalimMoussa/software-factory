@@ -109,6 +109,8 @@ def _parser() -> argparse.ArgumentParser:
     needs.add_argument("--ask", default="")
     needs.add_argument("--question", default="")
     sub.add_parser("turn", help="give the merge turn to the next qa-clean task").add_argument("what", choices=["next"])
+    cause = sub.add_parser("cause", help="cause --tried '<the idea, and what ruled it out>': one try that did not hold")
+    cause.add_argument("--tried", required=True)
     _slot(sub)
     qa = sub.add_parser("qa", help="qa plan | finding --head … --severity … --where … --body <file> | result --head … "
                                    "| waive <task> <finding> --why …")  # fmt: skip
@@ -274,6 +276,8 @@ def _call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
         return Call("needs-owner", args, read_file(ns.picture))
     if cmd == "turn":
         return Call("turn.next", {})
+    if cmd == "cause":
+        return Call("cause.try", {"tried": ns.tried})
     if cmd == "slot":
         return _slot_call(ns)
     if cmd == "qa":

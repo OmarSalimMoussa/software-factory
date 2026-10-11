@@ -231,3 +231,19 @@ def test_every_brief_ends_with_the_note_on_reflecting(tmp_path: Path) -> None:
     assert isinstance(decision, Rewrite)
     assert decision.updated_input["prompt"].endswith("Write to SELF_REFLECT.md when a miss got past you.\n")
     assert not isinstance(kit.decide("Agent", decision.updated_input), Refusal)
+
+
+def test_intakes_time_runs_out_and_then_only_factory_and_its_hand_back_go(tmp_path: Path) -> None:
+    kit = Kit(tmp_path)
+    kit.session("orchestrator")
+    intake = {"agent_id": TESTER_ID, "agent_type": "intake"}
+    limit = 20 * 60
+    kit.settings(intake__fast_lane_minutes=20)
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=limit - 10), "user", "Request r-1")])
+    assert kit.rule("Read", {"file_path": "/x"}, **intake) is None
+
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=limit + 10), "user", "Request r-1")])
+
+    assert kit.rule("Read", {"file_path": "/x"}, **intake) == "intake-time"
+    assert kit.rule("Bash", {"command": "factory task facts t-0001 --body facts.json"}, **intake) is None
+    assert kit.decide("SubagentHandback", {"message": "placed"}, **intake) is None

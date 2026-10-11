@@ -29,6 +29,7 @@ QA_PROD_DUE = "qa-prod due"  # prod answers on a build the owner pushed: walk it
 # The crash watch: a run benched for higher work, or retired after its process kept ending.
 BENCHED, CRASHED = "benched", "crashed"
 GOAL_CHANGED = "goal-changed"  # the loop read a new GOAL.md: the scores changed, so the proposals may too
+NEEDS_RUNG = "needs rung"  # an implementer spent routing.cause_tries without confirming a cause
 # Every owner decision (plan R4), so the orchestrator acts at once; `answered` carries the answer to a question only
 # the orchestrator can act on (R15): the warden hands a session's own answer to it directly.
 OWNER_DECISIONS = (
@@ -36,7 +37,18 @@ OWNER_DECISIONS = (
     "stopped", "paused", "resumed", "proposal-slot-free", "goal-changed", "answered", "orchestrator-started",
 )  # fmt: skip
 KINDS = frozenset(
-    {LOOP_DUE, STAGING_RED, PROD_RED, SEVERE_REQUEST, TRIAGE_DUE, QA_PROD_DUE, BENCHED, CRASHED, *OWNER_DECISIONS}
+    {
+        LOOP_DUE,
+        STAGING_RED,
+        PROD_RED,
+        SEVERE_REQUEST,
+        TRIAGE_DUE,
+        QA_PROD_DUE,
+        BENCHED,
+        CRASHED,
+        NEEDS_RUNG,
+        *OWNER_DECISIONS,
+    }
 )
 
 # One condition for every inbox in the process: a waiter re-reads its own file when woken.

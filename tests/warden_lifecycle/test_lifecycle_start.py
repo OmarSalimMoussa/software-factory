@@ -62,6 +62,21 @@ def test_red_vitals_block_every_start_and_amber_all_but_severe(
         assert refusal(world) == "vitals"
 
 
+@pytest.mark.parametrize(("severity", "starts"), [("normal", False), ("severe", True)])
+def test_a_day_whose_spend_reached_the_budget_starts_only_severe_work(
+    world: World, severity: str, starts: bool
+) -> None:
+    world.approve(severity=severity)
+    today = world.clock.iso()[:10]
+    store.write_json(
+        world.places.state / "cost-days.json", {today: [world.settings.get_float("cost.daily_budget_usd"), 3]}
+    )
+    if starts:
+        lifecycle.start(world.ctx(), START, None)
+    else:
+        assert refusal(world) == "budget"
+
+
 @pytest.mark.parametrize(
     "remote", ["git@github.com:someone/software-factory.git", "https://github.com/x/SOFTWARE-FACTORY"]
 )

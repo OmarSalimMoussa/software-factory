@@ -6,15 +6,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.queue import cards, documents, intake, owner, tasks, triage, turn
+from runtime.queue import cards, documents, formats, intake, owner, tasks, triage, turn
 from runtime.queue import propose as proposing
 from runtime.queue import route as ladders
 from runtime.queue.book import Queue
 from runtime.shared.models import REQUEST_SEVERITIES
 from runtime.shared.protocol import Refused, ok
+from runtime.warden import inbox, registry
 from runtime.warden.context import Context
 
 Args = dict[str, Any]
+CAUSE_TRY = "cause-try"
 
 
 def _text(args: Args, key: str, required: bool = True) -> str:
@@ -22,6 +24,31 @@ def _text(args: Args, key: str, required: bool = True) -> str:
     if not isinstance(value, str) or (required and not value.strip()):
         raise Refused("args", f"{key} is required" if required else f"{key} is text")
     return value
+
+
+def cause_try(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
+    """An implementer's try at confirming a cause that did not hold, with what ruled it out, in its task's log. The
+    warden counts them: at routing.cause_tries in one session it tells the orchestrator the task needs a higher rung,
+    and the session tries no more."""
+    session = registry.read(ctx.places).get(ctx.caller.session)
+    if session is None or session.role != "implementer" or not session.task:
+        raise Refused("cause", "a cause is tried in an implementer's run")
+    tried = formats.one_line(_text(args, "tried"))
+    limit = ctx.settings().get_int("routing.cause_tries")
+    queue = Queue.of(ctx)
+    with ctx.lock, queue.lock():
+        earlier = [e for e in queue.read_log(session.task) if e.get("event") == CAUSE_TRY
+                   and e.get("actor") == session.name and e["at"] >= session.started]  # fmt: skip
+        if len(earlier) >= limit:
+            raise Refused("cause-tries", f"your {limit} tries are spent: stop, and wait for the orchestrator")
+        queue.log(session.task, ctx.clock.iso(), session.name, CAUSE_TRY, tried)
+    left = limit - len(earlier) - 1
+    if left:
+        return ok(tries_left=left)
+    why = f"{limit} tries did not confirm a cause"
+    ctx.post_event(inbox.NEEDS_RUNG, {"session": session.id, "name": session.name, "task": session.task, "why": why})
+    return ok(tries_left=0, message="That was your last try: stop, and report what you know and what you ruled out. "
+                                    "The warden told the orchestrator, which moves the task up a rung.")  # fmt: skip
 
 
 def request_new(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:

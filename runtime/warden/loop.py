@@ -103,6 +103,7 @@ def run_tick(
         ("errors import", lambda: errors_import.poll(ctx)),
         ("reports import", lambda: reports.poll(ctx)),
         ("CI watch", lambda: ci_watch.poll(ctx)),
+        ("daily qa-prod", lambda: _qa_prod_due(ctx, now)),
     ]
     for name, step in steps:
         run_once(ctx, f"the tick's {name} step", step)
@@ -223,6 +224,28 @@ def _goal(ctx: Context, memo: dict[str, Any]) -> None:
     if not first:
         ctx.post_event(inbox.GOAL_CHANGED, {"rescored": changed})
     log.info("warden: GOAL.md changed; %d task scores changed", changed)
+
+
+def _qa_prod_due(ctx: Context, now: float) -> None:
+    """A read-only walk of prod qa.prod_every_hours after the last one asked for, on the build prod runs now. The
+    first tick only starts the count."""
+    path = github_push.qa_prod_path(ctx.places)
+    last = store.read_json_or(path, None)
+    if last is None:
+        store.write_json(path, {"at": now, "iso": ctx.clock.iso()})
+        return
+    if (
+        not isinstance(last, dict)
+        or not isinstance(last.get("at"), int | float)
+        or not isinstance(last.get("iso"), str)
+    ):
+        raise store.StoreError(f"{path}: want at and iso")
+    if now - last["at"] < ctx.settings().get_int("qa.prod_every_hours") * 3600:
+        return
+    current = deploys.builds(ctx.places, probes.PROD)["current"]
+    if current is None:
+        return  # prod has answered on no build yet: nothing to walk
+    github_push.post_qa_prod(ctx, current["commit"], "daily", last["iso"])
 
 
 def _fix(ctx: Context) -> None:
