@@ -18,10 +18,9 @@ from runtime.queue.statuses import OWNER, WARDEN
 from runtime.shared.models import RETIRED, Request, Task
 from runtime.shared.order import Ranking, ordered
 from runtime.shared.protocol import Refused
-from runtime.warden import checks, registry
+from runtime.warden import checks, inbox, registry
 from runtime.warden.context import Context
 
-SLOT_FREE = "proposal-slot-free"
 LANDED = frozenset({"merged", "checked", "on-staging", "promoted", "closed"})
 SCORED = frozenset({"queued", "parked", "proposed"})
 _FACTS: dict[str, type] = {
@@ -92,7 +91,7 @@ def follow(ctx: Context, before: Task, after: Task) -> None:
         turn.released(ctx, after.id)
     found = proposals.read(ctx.places)
     if after.status != "proposed" and proposals.remove(found, after.id) and before.status == "proposed":
-        ctx.post_event(SLOT_FREE, {"task": after.id})
+        ctx.post_event(inbox.SLOT_FREE, {"task": after.id})
     if after.status == "approved" and after.id not in found.approved:
         found.approved.append(after.id)
     if after.status != "approved":

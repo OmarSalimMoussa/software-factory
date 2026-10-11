@@ -15,6 +15,13 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 
+def model_role(kind: str) -> str | None:
+    """The [models] role an agent or subagent kind runs on: qa-backend is qa_backend, and every critic shares
+    critic. None for a kind with no model of its own to set, such as Explore."""
+    role = "critic" if kind.startswith("critic-") else kind.replace("-", "_")
+    return role if f"models.{role}" in SCHEMA else None
+
+
 class SettingsError(Exception):
     """The settings cannot be used; the message lists every problem."""
 
@@ -28,10 +35,11 @@ class Spec:
     """What one setting may hold, and when a change to it takes effect."""
 
     kind: str  # int, float, str, bool, size, list, model, prices, weights
-    low: float | None = None
-    high: float | None = None
+    low: float | None = None  # for a list, the fewest items it may hold
+    high: float | None = None  # for a list, the most
     required: bool = False
     when: str = "At once"
+    item: str = "str"  # for a list, each item's kind: str (never blank) or int (above zero)
 
 
 AT_ONCE, NEXT_START, MINUTE, ORCH = "At once", "Next start", "Within a minute", "Next orchestrator start"
@@ -49,8 +57,8 @@ SCHEMA: dict[str, Spec] = {
     "repo.github": Spec("str", required=True, when=ORCH),
     # contract: the product's extra paths only a person changes, beyond the factory's own protected set.
     "repo.protected_paths": Spec("list", required=True),
-    "models.allowed": Spec("list", required=True, when=NEXT_START),
-    "models.efforts": Spec("list", required=True, when=NEXT_START),
+    "models.allowed": Spec("list", 1, required=True, when=NEXT_START),
+    "models.efforts": Spec("list", 1, required=True, when=NEXT_START),
     **{f"models.{role}": Spec("model", when=NEXT_START) for role in _ROLES},
     "caps.implementers": Spec("int", 1, 6),
     "caps.designers": Spec("int", 1, 4),
@@ -70,7 +78,7 @@ SCHEMA: dict[str, Spec] = {
     "qa.prod_every_hours": Spec("int", 1, 168),
     "qa.desktop_seconds": Spec("int", 60, 900),
     "qa.evidence_days": Spec("int", 1, 60),
-    "qa.widths": Spec("list"),
+    "qa.widths": Spec("list", 1, 6, item="int"),
     "qa.quiet_seconds": Spec("int", 30, 900),
     "qa.stale_seconds": Spec("int", 60, 3600),
     "qa.screenshots_for_owner_only": Spec("list"),
@@ -157,7 +165,7 @@ SCHEMA: dict[str, Spec] = {
     "dashboard.wrong_codes_to_lock": Spec("int", 1, 20),
     "dashboard.lock_minutes": Spec("int", 5, 1440),
     "dashboard.device_days": Spec("int", 1, 365),
-    "dashboard.hosts": Spec("list", when=AT_INSTALL),
+    "dashboard.hosts": Spec("list", 1, when=AT_INSTALL),
     "dashboard.page_size": Spec("int", 10, 500),
     "dashboard.probe_strip": Spec("int", 3, 60),
     "dashboard.working_now_max": Spec("int", 1, 24),
@@ -227,6 +235,21 @@ def _size_ok(value: object) -> bool:
     return isinstance(value, str) and value[:-1].isdigit() and value[-1:] in ("K", "M", "G", "T")
 
 
+def _list_problems(key: str, spec: Spec, value: Any) -> list[str]:
+    """A list, item by item: one that saves must work where it is read (no tester browser opens at no width)."""
+    if not isinstance(value, list):
+        return [f"{key} must be a list"]
+    if spec.low is not None and len(value) < spec.low:
+        return [f"{key} must hold at least {spec.low:g}"]
+    if spec.high is not None and len(value) > spec.high:
+        return [f"{key} may hold at most {spec.high:g}"]
+    if spec.item == "int":
+        good = all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in value)
+        return [] if good else [f"{key} must hold whole numbers above zero"]
+    good = all(isinstance(v, str) and v.strip() for v in value)
+    return [] if good else [f"{key} must hold text, none of it blank"]
+
+
 def problems_for(key: str, value: Any, tree: Mapping[str, Any]) -> list[str]:
     """Why ``value`` cannot be the setting ``key``; empty when it can."""
     spec = SCHEMA.get(key)
@@ -247,7 +270,7 @@ def problems_for(key: str, value: Any, tree: Mapping[str, Any]) -> list[str]:
             return [f"{key} must be set"]
         return []
     if spec.kind == "list":
-        return [] if isinstance(value, list) else [f"{key} must be a list"]
+        return _list_problems(key, spec, value)
     if spec.kind == "size":
         return [] if _size_ok(value) else [f"{key} must be a size such as 12G"]
     if spec.kind == "model":

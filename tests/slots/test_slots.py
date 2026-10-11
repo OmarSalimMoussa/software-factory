@@ -25,11 +25,7 @@ def test_claim_takes_the_first_free_slot_and_keeps_it(world: World) -> None:
     assert slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)["slot"] == 1
     assert slot(world.ctx("implementer", "s-2"), {"op": "claim", "note": "a\nnote"}, None)["slot"] == 2
     lease = leases.read(world.places, 2)
-    assert lease is not None and (lease.holder, lease.checkout, lease.note) == (
-        "impl-t-0002",
-        "/wt/impl-t-0002",
-        "a note",
-    )
+    assert lease is not None and (lease.holder, lease.note) == ("impl-t-0002", "a note")
     with pytest.raises(Refused) as refused:
         slot(world.ctx("implementer", "s-3"), {"op": "claim"}, None)
     assert refused.value.rule == "slots-full"

@@ -8,9 +8,7 @@ Langfuse project keys were created with them.
 from __future__ import annotations
 
 import json
-import os
 import secrets
-import tempfile
 from pathlib import Path
 from typing import Literal
 
@@ -95,22 +93,6 @@ def parse_env(text: str, where: str) -> dict[str, str]:
     if problems:
         raise StackError("; ".join(problems))
     return values
-
-
-def write_env(path: Path, values: dict[str, str]) -> None:
-    fd, temp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
-    try:
-        with os.fdopen(fd, "w") as out:
-            out.write(render_env(values))
-        os.chmod(temp, 0o600)
-        os.replace(temp, path)
-    except BaseException:
-        Path(temp).unlink(missing_ok=True)
-        raise
-
-
-def read_env(path: Path) -> dict[str, str]:
-    return parse_env(path.read_text(), str(path))
 
 
 def services(*, edge: bool) -> list[str]:

@@ -121,7 +121,7 @@ def read_settings(places: Places) -> Settings:
 
 def read_ready(places: Places, session_id: str) -> list[dict[str, Any]]:
     """A session's ready records, oldest first: ``{"records": [{"head", "slices", "at"}, ...]}``."""
-    path = public(places) / "ready" / f"{session_id}.json"
+    path = places.ready(session_id)
     raw = store.read_json_or(path, {"records": []})
     records = raw.get("records") if isinstance(raw, dict) else None
     if not isinstance(records, list) or not all(

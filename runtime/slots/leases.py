@@ -18,7 +18,7 @@ from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.warden.context import Context
 
-KEYS = ("checkout", "holder", "since", "note")
+KEYS = ("holder", "since", "note")
 # The stack unit's own verb, beside the product's scripts/dev verbs: remove every container, volume, network and
 # image labelled with the request's slot, and every container still on one of its networks.
 SWEEP = "factory-sweep-slot"
@@ -27,7 +27,6 @@ SWEEP = "factory-sweep-slot"
 @dataclass(frozen=True, slots=True)
 class Lease:
     slot: int
-    checkout: str
     holder: str
     since: str
     note: str
@@ -47,9 +46,9 @@ def read(places: Places, n: int) -> Lease | None:
         raise store.StoreError(f"{_path(places, n)}: {exc}") from exc
     pairs = [line.partition("=") for line in text.splitlines()]
     values = {key: value for key, sep, value in pairs if sep}
-    if [key for key, _, _ in pairs] != list(KEYS) or not values["checkout"] or not values["holder"]:
-        raise store.StoreError(f"{_path(places, n)}: a lease holds checkout, holder, since and note")
-    return Lease(n, values["checkout"], values["holder"], values["since"], values["note"])
+    if [key for key, _, _ in pairs] != list(KEYS) or not values["holder"]:
+        raise store.StoreError(f"{_path(places, n)}: a lease holds holder, since and note")
+    return Lease(n, values["holder"], values["since"], values["note"])
 
 
 def numbers(places: Places, settings: Settings) -> list[int]:
@@ -65,7 +64,7 @@ def held_by(places: Places, settings: Settings, holder: str) -> Lease | None:
     )
 
 
-def claim(ctx: Context, holder: str, checkout: str, note: str = "") -> int:
+def claim(ctx: Context, holder: str, note: str = "") -> int:
     """The slot ``holder`` holds, or the first free one, leased to it now; refused when every slot is held."""
     settings = ctx.settings()
     with store.locked(ctx.places.slots / ".lock"):
@@ -75,7 +74,7 @@ def claim(ctx: Context, holder: str, checkout: str, note: str = "") -> int:
         for n in range(1, settings.get_int("slots.count") + 1):
             if read(ctx.places, n) is None:
                 line = " ".join(note.split())
-                text = f"checkout={checkout}\nholder={holder}\nsince={ctx.clock.iso()}\nnote={line}\n"
+                text = f"holder={holder}\nsince={ctx.clock.iso()}\nnote={line}\n"
                 store.write_text(_path(ctx.places, n), text, mode=0o600)
                 return n
     raise Refused("slots-full", "every stack slot is held; ask the orchestrator to free a finished one")

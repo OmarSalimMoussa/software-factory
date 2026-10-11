@@ -18,7 +18,7 @@ from runtime.shared import models, store
 from runtime.shared.models import RETIRED, WAITING, WORKING, RecordError, Session, Task
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import leases
-from runtime.warden import backstop, doing, launch, ops, outage, permits, registry, session_settings
+from runtime.warden import backstop, doing, inbox, launch, ops, outage, permits, registry
 from runtime.warden.context import Context
 from runtime.warden.launch import LaunchError
 from runtime.warden.permits import CAP, DESIGN, FAMILY, IMPL, ORCH, SEVERE, actor
@@ -245,9 +245,8 @@ def start_run(ctx: Context, role: str, task: Task, note: str, outage_fix: bool) 
 def _claim_at_start(ctx: Context, name: str, role: str, task_id: str) -> int | None:
     if role != IMPL:
         return None
-    worktree = session_settings.worktrees(Path(ctx.settings().get_str("repo.path"))) / name
     try:
-        return leases.claim(ctx, name, str(worktree), f"started for {task_id}")
+        return leases.claim(ctx, name, f"started for {task_id}")
     # telemetry: expected — every slot is held; the implementer claims one when it frees
     except Refused:
         return None
@@ -267,7 +266,7 @@ def owner_start_orchestrator(ctx: Context, args: dict[str, Any], data: bytes | N
         model, effort = ctx.settings().model("orchestrator")
         fields = {"name": ORCH, "role": ORCH, "model": model, "effort": effort, "task": "", **_by(ctx, ORCH)}
         s = launch.start_session(ctx, sessions, fields, FIRST_LINE, worktree="")
-    ctx.post_event("orchestrator-started", {"session": s.id})
+    ctx.post_event(inbox.ORCHESTRATOR_STARTED, {"session": s.id})
     return ok(session=s.id, name=s.name)
 
 
@@ -306,7 +305,7 @@ def owner_stop(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[s
         if target.role == ORCH:
             paused_path(ctx).unlink(missing_ok=True)
     after_retire(ctx, retired)
-    ctx.post_event("stopped", {"session": target.id, "name": target.name, "retired": [s.id for s in retired]})
+    ctx.post_event(inbox.STOPPED, {"session": target.id, "name": target.name, "retired": [s.id for s in retired]})
     return ok(retired=[s.name for s in retired])
 
 
@@ -361,7 +360,7 @@ def extend(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
         extra = raise_limit(ctx, sessions, s, limit, by_orchestrator=who != OWNER)
         registry.write(ctx.places, sessions)
     if who == OWNER:
-        ctx.post_event("limit-extended", {"session": s.id, "name": s.name, "limit": limit, "extra": extra})
+        ctx.post_event(inbox.LIMIT_EXTENDED, {"session": s.id, "name": s.name, "limit": limit, "extra": extra})
     return ok(name=s.name, limit=limit, extra=extra)
 
 
@@ -474,7 +473,7 @@ def owner_pause(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
         ops.complete(ctx, op_id, 0, f"{len(ranked)} told", PAUSED)
         record = {"at": ctx.clock.iso(), "sessions": [s.id for s in ranked], "op": op_id}
         store.write_json(paused_path(ctx), record, mode=0o600)
-    ctx.post_event("paused", {"sessions": [s.id for s in ranked]})
+    ctx.post_event(inbox.PAUSED, {"sessions": [s.id for s in ranked]})
     return ok(op=op_id, benched=[s.name for s in ranked],
               grace_seconds=ctx.settings().get_int("watch.bench_grace_seconds"))  # fmt: skip
 
@@ -507,5 +506,5 @@ def owner_resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
         registry.write(ctx.places, sessions)
         paused_path(ctx).unlink()
     failed = {s.name: why for s in back if (why := bring_back(ctx, s.id, OWNER))}
-    ctx.post_event("resumed", {"sessions": [s.id for s in back], "failed": sorted(failed)})
+    ctx.post_event(inbox.RESUMED, {"sessions": [s.id for s in back], "failed": sorted(failed)})
     return ok(resumed=[s.name for s in back if s.name not in failed], failed=failed)

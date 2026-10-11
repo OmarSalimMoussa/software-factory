@@ -22,7 +22,7 @@ def session(sid: str, state: str, worktree: str, **fields: Any) -> Session:
 def lease(ctx: Context, holder: str) -> Path:
     path = ctx.places.slot(2) / "lease"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"checkout=/w\nholder={holder}\nsince=2026-10-09T10:00:00Z\nnote=\n")
+    path.write_text(f"holder={holder}\nsince=2026-10-09T10:00:00Z\nnote=\n")
     return path
 
 

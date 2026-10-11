@@ -33,7 +33,8 @@ PROGRAMS = {"claude": str(layout.CLAUDE_BIN), "git": "/usr/bin/git", "rm": "/usr
 CHECK_FLAGS = frozenset({"--all", "--only", "--since"})
 _CHECK_WORD = re.compile(r"^[a-z0-9][a-z0-9,-]{0,511}$")
 # The verbs of the product's scripts/dev (factory spec, "scripts/dev"; plan R24 for reports).
-DEV_VERBS = frozenset({"up", "down", "empty", "health", "sign-in", "seed", "desktop", "test", "reports", "verbs"})
+# The product's tests run in the check unit (`factory check`), never on a slot.
+DEV_VERBS = frozenset({"up", "down", "empty", "health", "sign-in", "seed", "desktop", "reports", "verbs"})
 SWEEP, PRUNE, DISK = leases.SWEEP, "factory-prune", "factory-disk"
 OWN_VERBS = frozenset({SWEEP, PRUNE, DISK})
 # What every session runs under, start or resume, as launch._carried passes it: flag, then its value.

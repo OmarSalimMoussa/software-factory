@@ -35,21 +35,28 @@ _AT = {
     "on-staging": 9,
     "promoted": 10,
 }
+# Each task status's tone, the one table every page draws a status by.
+TONES = {
+    "queued": "ring", "parked": "ring", "proposed": "warn", "approved": "good", "designing": "accent",
+    "review": "warn", "building": "accent", "deprioritized": "warn", "decide": "warn", "qa": "accent",
+    "qa-clean": "accent", "turn": "accent", "merged": "accent", "checked": "good", "on-staging": "good",
+    "promoted": "good", "closed": "ring",
+}  # fmt: skip
 _WORDS = {
-    "queued": ("ring", "Queued"),
-    "parked": ("ring", "Parked"),
-    "proposed": ("warn", "Waiting for you"),
-    "designing": ("accent", "Designing"),
-    "review": ("warn", "Needs your Go"),
-    "deprioritized": ("warn", "Deprioritized, back first"),
-    "qa-clean": ("accent", "QA passed, waiting to merge"),
-    "turn": ("accent", "Merging"),
-    "merged": ("accent", "Merged, being checked"),
-    "checked": ("good", "Checked, on its way to staging"),
-    "on-staging": ("good", "On staging"),
-    "promoted": ("good", "On prod"),
-    "decide": ("warn", "Needs your decision"),
-    "closed": ("ring", "Closed"),
+    "queued": "Queued",
+    "parked": "Parked",
+    "proposed": "Waiting for you",
+    "designing": "Designing",
+    "review": "Needs your Go",
+    "deprioritized": "Deprioritized, back first",
+    "qa-clean": "QA passed, waiting to merge",
+    "turn": "Merging",
+    "merged": "Merged, being checked",
+    "checked": "Checked, on its way to staging",
+    "on-staging": "On staging",
+    "promoted": "On prod",
+    "decide": "Needs your decision",
+    "closed": "Closed",
 }
 _TASK_FIELDS = frozenset(f.name for f in dataclasses.fields(Task))
 LANDED = ("merged", "checked", "on-staging", "promoted")
@@ -95,18 +102,17 @@ def status(snap: Snap, task: dict[str, Any]) -> dict[str, str]:
     if state == "approved":
         order = snap.get("proposals")["approved"]
         place = order.index(task["id"]) + 1 if task["id"] in order else None
-        return {"tone": "good", "word": f"Approved, {ordinal(place)} in line" if place else "Approved"}
+        return {"tone": TONES[state], "word": f"Approved, {ordinal(place)} in line" if place else "Approved"}
     if state == "building":
         fixing = (snap.state.get("outage") or {}).get("task") == task["id"]
-        return {"tone": "accent", "word": "Fixing prod" if fixing else "Building"}
+        return {"tone": TONES[state], "word": "Fixing prod" if fixing else "Building"}
     if state == "qa":
         session = worker(snap, task["id"])
         if session is None or not session["facts"].get("qa_round"):
-            return {"tone": "accent", "word": "In QA"}
+            return {"tone": TONES[state], "word": "In QA"}
         total = snap.settings.get_int("rounds.qa") + session["extensions"].get("qa", 0)
-        return {"tone": "accent", "word": f"QA, round {session['facts']['qa_round']} of {total}"}
-    tone, word = _WORDS[state]
-    return {"tone": tone, "word": word}
+        return {"tone": TONES[state], "word": f"QA, round {session['facts']['qa_round']} of {total}"}
+    return {"tone": TONES[state], "word": _WORDS[state]}
 
 
 def progress_at(task: dict[str, Any], log: list[dict[str, Any]]) -> int:

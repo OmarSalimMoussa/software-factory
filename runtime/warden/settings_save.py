@@ -27,7 +27,7 @@ from runtime.shared.models import RETIRED
 from runtime.shared.paths import SLICE, Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import AT_INSTALL, Settings, SettingsError
-from runtime.warden import ops, public, registry
+from runtime.warden import ops, permits, public, registry
 from runtime.warden.context import Context
 from runtime.warden.verbs import OWNER
 
@@ -37,8 +37,6 @@ log = logging.getLogger("factory.warden")
 READ_ONLY = frozenset({"models.allowed", "prices", "factory.github"})
 REPO_KEYS = ("repo.path", "repo.default_branch", "repo.github", "repo.protected_paths")
 _save_lock = threading.Lock()
-# owner/name at the end of any git remote URL: git@host:owner/name.git, https://host/owner/name, ssh://...
-_REMOTE = re.compile(r"[:/]([^/:]+/[^/]+?)(?:\.git)?/?$")
 _RULE = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
 
 
@@ -84,9 +82,8 @@ _PLACEHOLDERS = ("{{model}}", "{{effort}}")
 
 
 def _role_of(agent: str) -> str | None:
-    """The [models] role a launcher takes its model from: qa-backend is qa_backend, critic-ux critic."""
-    role = "critic" if agent.startswith("critic-") else _LAUNCHER_ROLES.get(agent, agent.replace("-", "_"))
-    return role if f"models.{role}" in settings_module.SCHEMA else None
+    """The [models] role a launcher takes its model from (settings.model_role), the implementer's the large rung's."""
+    return _LAUNCHER_ROLES.get(agent) or settings_module.model_role(agent)
 
 
 def render_plugin(places: Places, settings: Settings) -> None:
@@ -195,11 +192,6 @@ def save(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     return {"op": ops.launch(ctx, "settings", _steps(ctx, changes), {})}
 
 
-def _owner_name(remote: str) -> str:
-    match = _REMOTE.search(remote.strip())
-    return match.group(1).lower() if match else remote.strip().lower()
-
-
 def change_repo(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """Point the factory at another product repo (coded): never its own, only with every factory session retired."""
     current = ctx.settings()
@@ -214,15 +206,14 @@ def change_repo(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
     path = Path(new.get_str("repo.path"))
     if not path.is_absolute():
         raise Refused("repo", "repo.path must be an absolute path to the factory's checkout of the product")
-    own = new.get_str("factory.github").lower()
-    if not own:
+    if not new.get_str("factory.github"):
         raise Refused("repo", "the factory cannot tell its own repo: reinstall, so factory.github names it")
     if path == ctx.places.install or ctx.places.install in path.parents:
         raise Refused("repo", "the factory never works on itself")
     code, out = ctx.launcher.agent_command(["git", "remote", "get-url", "origin"], str(path))
     if code != 0:
         raise Refused("repo", f"{path} is not a git checkout with an origin remote")
-    if own in (_owner_name(out), _owner_name(new.get_str("repo.github"))):
+    if any(permits.is_factory_repo(new, remote) for remote in (out, new.get_str("repo.github"))):
         raise Refused("repo", "the factory never works on its own repo")
 
     def shape() -> str:

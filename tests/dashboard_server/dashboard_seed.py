@@ -494,7 +494,7 @@ def seed(root: Path, now: float = T0) -> Places:
     for n, holder in ((1, "impl-sign-in-loop"), (2, "impl-retry-upload"), (3, "impl-staging-down")):
         store.write_text(
             places.slot(n) / "lease",
-            f"checkout=/srv/wt/{holder}\nholder={holder}\nsince={iso(now)}\n" "note=building\n",
+            f"holder={holder}\nsince={iso(now)}\n" "note=building\n",
         )
     store.write_json(places.proposals, {"open": ["t-0027", "t-0024", "t-0025"], "approved": []})
     cards = []

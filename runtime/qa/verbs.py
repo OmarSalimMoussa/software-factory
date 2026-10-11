@@ -48,7 +48,7 @@ def _head(ctx: Context, session: Session) -> str:
 
 
 def _ready_path(ctx: Context, session: Session) -> Path:
-    return ctx.places.state / "public" / "ready" / f"{session.id}.json"
+    return ctx.places.ready(session.id)
 
 
 def ready_records(ctx: Context, session: Session) -> list[dict[str, Any]]:

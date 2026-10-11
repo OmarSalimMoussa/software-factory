@@ -15,7 +15,7 @@ from runtime.queue.formats import dump_request, one_line
 from runtime.queue.statuses import OWNER
 from runtime.shared.models import RETIRED, STOPPED, Task
 from runtime.shared.protocol import Refused
-from runtime.warden import lifecycle, permits, registry
+from runtime.warden import inbox, lifecycle, permits, registry
 from runtime.warden.context import Context
 from runtime.warden.launch import LaunchError
 
@@ -42,7 +42,7 @@ def approve(ctx: Context, task_id: str) -> dict[str, Any]:
         except BaseException:
             approvals.void(ctx.places, task_id)
             raise
-    ctx.post_event("approved", {"task": task_id, "rung": approval.rung, "model": model})
+    ctx.post_event(inbox.APPROVED, {"task": task_id, "rung": approval.rung, "model": model})
     return {"task": task_id, "rung": approval.rung, "model": model}
 
 
@@ -51,7 +51,7 @@ def later(ctx: Context, task_id: str) -> dict[str, Any]:
     with ctx.lock, queue.lock():
         task = _proposed(queue, task_id)
         tasks.transition(ctx, queue, task, "queued", "not-now", OWNER, "not now", not_now=True)
-    ctx.post_event("not-now", {"task": task_id})
+    ctx.post_event(inbox.NOT_NOW, {"task": task_id})
     return {"task": task_id}
 
 
@@ -62,7 +62,7 @@ def drop(ctx: Context, task_id: str, reason: str) -> dict[str, Any]:
     with ctx.lock, queue.lock():
         task = queue.task(task_id)
         tasks.transition(ctx, queue, task, "closed", "drop", OWNER, f"dropped: {one_line(reason)}")
-    ctx.post_event("dropped", {"task": task_id, "reason": one_line(reason), "requests": task.requests})
+    ctx.post_event(inbox.DROPPED, {"task": task_id, "reason": one_line(reason), "requests": task.requests})
     return {"task": task_id}
 
 
@@ -103,7 +103,7 @@ def boost(ctx: Context, task_id: str, on: bool) -> dict[str, Any]:
         queue.write({task_rel(task_id): formats.dump_task(task)})
         queue.log(task_id, ctx.clock.iso(), OWNER, "boost" if on else "unboost", "boosted" if on else "unboosted")
     if on:
-        ctx.post_event("boosted", {"task": task_id})
+        ctx.post_event(inbox.BOOSTED, {"task": task_id})
     return {"task": task_id, "boosted": on}
 
 
@@ -145,7 +145,7 @@ def go(ctx: Context, card_id: str) -> dict[str, Any]:
         tasks.transition(ctx, queue, task, "building", "go", OWNER, "Go on the spec")
         documents.approve_spec(ctx, queue, task.id)
         cards.settle(ctx, found, card, "go")
-    ctx.post_event("go", {"task": card.task, "card": card_id})
+    ctx.post_event(inbox.GO, {"task": card.task, "card": card_id})
     return {"card": card_id, "task": card.task}
 
 
@@ -163,9 +163,9 @@ def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
     """A stuck task: Extend the spent limit of its live session, send it To a designer (rung 3), or Park it. The
     warden tells the session itself, or ends it when its task leaves the run, so nothing is relayed."""
     to, event, kind = {
-        "extend": ("building", "extend", "decided-extend"),
-        "designer": ("proposed", "to-designer", "to-designer"),
-        "park": ("parked", "park", "park"),
+        "extend": ("building", "extend", inbox.DECIDED_EXTEND),
+        "designer": ("proposed", "to-designer", inbox.TO_DESIGNER),
+        "park": ("parked", "park", inbox.PARK),
     }[choice]
     queue = Queue.of(ctx)
     with ctx.lock, queue.lock():
@@ -205,6 +205,6 @@ def answer(ctx: Context, card_id: str, text: str) -> dict[str, Any]:
     words = f"The owner answered your question on {card.task or 'your work'}: {one_line(text)}"
     if not cards.wake(ctx, card, words):
         # The orchestrator asked, or the asker no longer runs: the orchestrator hears it and acts on it.
-        ctx.post_event("answered", {"card": card_id, "task": card.task, "session": card.asked_by,
+        ctx.post_event(inbox.ANSWERED, {"card": card_id, "task": card.task, "session": card.asked_by,
                                     "answer": one_line(text)})  # fmt: skip
     return {"card": card_id}

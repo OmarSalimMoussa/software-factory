@@ -11,29 +11,12 @@ from runtime.dashboard.views.kit import INBOX_TONES, KIND_LOOK, REFLECT_TONES, S
 from runtime.queue.formats import outcome
 
 WANTS = ("settings", "queue", "goal", "reflections", "proposals", "sessions", "outage")
+# A task status's chip takes its tone from the one table; a chip has no hollow ring, so ring reads as info. Then
+# the statuses only documents have.
 STATUS_TONES = {
-    "building": "accent",
-    "qa": "accent",
-    "qa-clean": "accent",
-    "designing": "accent",
-    "turn": "accent",
-    "merged": "accent",
-    "queued": "info",
-    "waiting": "info",
-    "proposed": "warn",
-    "review": "warn",
-    "decide": "warn",
-    "deprioritized": "warn",
-    "approved": "good",
-    "checked": "good",
-    "on-staging": "good",
-    "promoted": "good",
-    "pass": "good",
-    "fail": "bad",
-    "task": "accent",
-    "person-written": "violet",
-    "draft": "warn",
-}
+    **{status: "info" if tone == "ring" else tone for status, tone in taskwords.TONES.items()},
+    "waiting": "info", "pass": "good", "fail": "bad", "task": "accent", "person-written": "violet", "draft": "warn",
+}  # fmt: skip
 
 
 @dataclass(frozen=True, slots=True)

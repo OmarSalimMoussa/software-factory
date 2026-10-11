@@ -111,17 +111,6 @@ def test_generate_env_keeps_existing_secrets_fills_missing_ones_and_follows_the_
     assert stack.generate_env(CONFIG, kind=kind, existing=values) == values
 
 
-def test_the_env_file_is_private_and_reads_back(tmp_path: Path) -> None:
-    values = stack.generate_env(CONFIG, kind="laptop", existing={})
-    path = tmp_path / stack.ENV_FILE
-
-    stack.write_env(path, values)
-
-    assert path.stat().st_mode & 0o777 == 0o600
-    assert stack.read_env(path) == values
-    assert [p.name for p in tmp_path.iterdir()] == [stack.ENV_FILE]
-
-
 def test_up_names_the_service_that_did_not_turn_healthy(tmp_path: Path) -> None:
     rows = [
         {"Service": name, "State": "running", "Health": "healthy", "ExitCode": 0} for name in stack.services(edge=False)

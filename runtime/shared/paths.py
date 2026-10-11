@@ -89,10 +89,6 @@ class Places:
         return self.state / "history.jsonl"
 
     @property
-    def decisions(self) -> Path:
-        return self.state / "decisions.jsonl"
-
-    @property
     def approvals(self) -> Path:
         return self.state / "approvals"
 
@@ -164,9 +160,9 @@ class Places:
     def reflections(self) -> Path:
         return self.state / "SELF_REFLECT.md"
 
-    @property
-    def ready(self) -> Path:
-        return self.state / "ready"
+    def ready(self, session_id: str) -> Path:
+        """An implementer's QA-ready records, in public/ where the guard reads them."""
+        return self.state / "public" / "ready" / f"{session_id}.json"
 
     @property
     def slots(self) -> Path:

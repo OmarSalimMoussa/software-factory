@@ -283,7 +283,7 @@ def _qa(ctx: Context, args: dict[str, Any]) -> Any:
     sessions = [s for s in registry.read(ctx.places).values() if s.task in wanted and not s.parent and s.worktree]
     found: dict[str, Any] = {tid: {"ready": [], "results": [], "evidence": []} for tid in wanted}
     for s in sorted(sessions, key=lambda s: s.started):
-        ready = store.read_json_or(ctx.places.state / "public" / "ready" / f"{s.id}.json", {"records": []})
+        ready = store.read_json_or(ctx.places.ready(s.id), {"records": []})
         found[s.task]["ready"] += ready.get("records", []) if isinstance(ready, dict) else []
         found[s.task]["results"] += store.read_jsonl(ctx.places.state / "qa-results" / f"{s.id}.jsonl")
     for entry in store.read_jsonl(ctx.places.evidence / "index.jsonl"):

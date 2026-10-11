@@ -32,9 +32,13 @@ GOAL_CHANGED = "goal-changed"  # the loop read a new GOAL.md: the scores changed
 NEEDS_RUNG = "needs rung"  # an implementer spent routing.cause_tries without confirming a cause
 # Every owner decision (plan R4), so the orchestrator acts at once; `answered` carries the answer to a question only
 # the orchestrator can act on (R15): the warden hands a session's own answer to it directly.
+APPROVED, NOT_NOW, DROPPED, BOOSTED, GO = "approved", "not-now", "dropped", "boosted", "go"
+DECIDED_EXTEND, LIMIT_EXTENDED, TO_DESIGNER, PARK = "decided-extend", "limit-extended", "to-designer", "park"
+STOPPED, PAUSED, RESUMED, SLOT_FREE = "stopped", "paused", "resumed", "proposal-slot-free"
+ANSWERED, ORCHESTRATOR_STARTED = "answered", "orchestrator-started"
 OWNER_DECISIONS = (
-    "approved", "not-now", "dropped", "boosted", "go", "decided-extend", "limit-extended", "to-designer", "park",
-    "stopped", "paused", "resumed", "proposal-slot-free", "goal-changed", "answered", "orchestrator-started",
+    APPROVED, NOT_NOW, DROPPED, BOOSTED, GO, DECIDED_EXTEND, LIMIT_EXTENDED, TO_DESIGNER, PARK, STOPPED, PAUSED,
+    RESUMED, SLOT_FREE, GOAL_CHANGED, ANSWERED, ORCHESTRATOR_STARTED,
 )  # fmt: skip
 KINDS = frozenset(
     {

@@ -12,8 +12,7 @@ from runtime.shared import store
 from runtime.shared.models import Request
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
-
-SEVERE_REQUEST = "severe request"
+from runtime.warden.inbox import SEVERE_REQUEST
 
 
 def body_text(data: bytes | None, what: str, limit_kib: int) -> str:

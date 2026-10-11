@@ -14,6 +14,7 @@ from typing import Any
 from runtime.shared.models import RETIRED, WORKING, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
+from runtime.shared.settings import model_role
 from runtime.warden import lifecycle, registry
 from runtime.warden.context import Caller, Context
 from runtime.warden.cost import family_of
@@ -31,11 +32,8 @@ def _agent_id(args: dict[str, Any]) -> str:
 
 def _model(ctx: Context, kind: str) -> tuple[str, str]:
     """The model and effort the guard holds this kind to; ("", "") for a kind with no setting, such as Explore."""
-    key = "critic" if kind.startswith("critic-") else kind.replace("-", "_")
-    try:
-        return ctx.settings().model(key)
-    except KeyError:
-        return "", ""
+    role = model_role(kind)
+    return ctx.settings().model(role) if role is not None else ("", "")
 
 
 def started(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:

@@ -69,7 +69,7 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     if op == "claim":
         if session.role != IMPL:
             raise Refused("slot", "only an implementer claims a slot; slot 0 is the orchestrator's")
-        n = leases.claim(ctx, session.name, session.worktree, str(args.get("note", "")))
+        n = leases.claim(ctx, session.name, str(args.get("note", "")))
         return ok(slot=n, port=leases.port(settings, n))
     if op == "list":
         return ok(slots=_list(ctx, session))

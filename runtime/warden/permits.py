@@ -35,7 +35,8 @@ LEVELS = ("green", "amber", "red", "unknown")
 SEVERE = "severe"
 # Where a switch of Claude accounts stands: its daemon restarting, or back (runtime/warden/accounts.py).
 RESTARTING, BACK = "restarting", "back"
-_REMOTE_NAME = re.compile(r"([^/:]+?)(\.git)?/*$")
+# owner/name at the end of any git remote or GitHub name: git@host:owner/name.git, https://host/owner/name, owner/name.
+_REMOTE = re.compile(r"[:/]([^/:]+/[^/]+?)(?:\.git)?/*$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +144,17 @@ def check_revive_order(ctx: Context, sessions: dict[str, Session], role: str, ta
             raise Refused("revive-first", f"revive {other.name} first: it outranks {task.id}")
 
 
+def is_factory_repo(settings: Settings, remote: str) -> bool:
+    """Whether a remote, or an owner/name, is the factory's own repo: the one factory.github names, or any repo
+    named as the factory is (a fork or a copy of it)."""
+    found = _REMOTE.search("/" + remote.strip())
+    if found is None:
+        return False
+    owner_name = found.group(1).lower()
+    own = settings.get_str("factory.github").lower()
+    return (bool(own) and owner_name == own) or owner_name.rsplit("/", 1)[-1] == FACTORY_REPO
+
+
 def check_not_factory(ctx: Context) -> None:
     """Refuse when the product's repo, by its setting or by its checkout's remote, is the factory's own."""
     settings = ctx.settings()
@@ -150,10 +162,8 @@ def check_not_factory(ctx: Context) -> None:
     code, out = ctx.launcher.agent_command(["git", "-C", repo, "remote", "get-url", "origin"], repo)
     if code != 0:
         raise Refused("repo", f"the repo's remote cannot be read: {out.strip()[-200:]}; check repo.path")
-    for remote in (settings.get_str("repo.github"), out.strip()):
-        found = _REMOTE_NAME.search(remote)
-        if found and found.group(1).lower() == FACTORY_REPO:
-            raise Refused("own-repo", "the factory never works on its own repo; point repo.path at a product")
+    if any(is_factory_repo(settings, remote) for remote in (settings.get_str("repo.github"), out.strip())):
+        raise Refused("own-repo", "the factory never works on its own repo; point repo.path at a product")
 
 
 def model_for(settings: Settings, role: str, rung: int, slices: int | None) -> tuple[str, str]:
@@ -261,7 +271,7 @@ def move_task(ctx: Context, task_id: str, to: str, event: str, by: str = statuse
 
 
 def claim_slot(ctx: Context, session: Session) -> int:
-    return leases.claim(ctx, session.name, session.worktree, "revived")
+    return leases.claim(ctx, session.name, "revived")
 
 
 def free_slot(ctx: Context, slot: int) -> None:

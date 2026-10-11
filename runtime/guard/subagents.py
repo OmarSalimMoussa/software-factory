@@ -26,7 +26,7 @@ from runtime.guard.facts import (
 )
 from runtime.guard.wire import REFUSED
 from runtime.shared.models import RETIRED, WITH_PARENT
-from runtime.shared.settings import SCHEMA
+from runtime.shared.settings import SCHEMA, model_role
 
 INTAKE = "intake"
 TESTER, CRITIC = "qa-", "critic-"
@@ -61,17 +61,12 @@ def _kind(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     return None
 
 
-def model_key(kind: str) -> str:
-    """The setting that holds a subagent kind's model: every critic shares one."""
-    return "models.critic" if kind.startswith(CRITIC) else "models." + kind.replace("-", "_")
-
-
 def _model(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     asked = str(call.tool_input.get("model") or "")
     if not asked or call.off("model"):
         return None
-    key = model_key(kind)
-    configured = str(call.settings[key]["model"]) if key in SCHEMA else ""
+    role = model_role(kind)
+    configured = call.settings.model(role)[0] if role is not None else ""
     family = configured.split("-")[1] if configured.count("-") >= 1 else configured
     if configured and asked in {configured, family}:
         return None
