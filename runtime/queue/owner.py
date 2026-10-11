@@ -206,7 +206,6 @@ def _before_decide(queue: Queue, task_id: str) -> str:
 def _tell(ctx: Context, sid: str, message: str) -> None:
     try:
         lifecycle.deliver(ctx, sid, message, OWNER)
-    # telemetry: surfaced — the session's limit is raised all the same; its next refused call names the new limit
     except (LaunchError, Refused) as exc:
         log.warning("warden: the owner's extension did not reach session %s (%s)", sid, type(exc).__name__)
 

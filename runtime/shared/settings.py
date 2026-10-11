@@ -140,6 +140,7 @@ def read_some(tree: Any, keys: Sequence[str]) -> dict[str, Any]:
     for key in keys:
         try:
             value = _leaf(root, key)
+        # telemetry: surfaced — a missing setting is one of the `problems` the load raises
         except KeyError:
             problems.append(f"{key} is missing")
             continue
@@ -225,6 +226,7 @@ def build(defaults: dict[str, Any], overrides: Mapping[str, Any]) -> Settings:
     for key in SCHEMA:
         try:
             value = _leaf(tree, key)
+        # telemetry: surfaced — a missing setting is one of the `problems` the load raises
         except KeyError:
             if key != "prices":
                 problems.append(f"{key} is missing")

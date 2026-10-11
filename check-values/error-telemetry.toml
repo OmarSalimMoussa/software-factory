@@ -59,6 +59,24 @@ seams = []
 log_modules = []
 
 [[components]]
+prefix = "runtime/qa/qa_browser.py"
+name = "qa browser command"
+sink = "exit"
+grounds = "`factory qa-browser`, run in the tester's session: its stderr and exit status reach the session"
+reporters = []
+seams = []
+log_modules = []
+
+[[components]]
+prefix = "runtime/shared/error_reports.py"
+name = "GlitchTip reporter"
+sink = "exit"
+grounds = "a send that fails cannot log, which would come back to it: its one line goes to stderr, the journal"
+reporters = []
+seams = []
+log_modules = []
+
+[[components]]
 prefix = "runtime/dashboard/ui/"
 name = "dashboard page"
 sink = "surface"

@@ -40,6 +40,7 @@ def read(places: Places, n: int) -> Lease | None:
     """Slot n's lease, or None when it is free; a lease that cannot be read raises StoreError."""
     try:
         text = _path(places, n).read_text()
+    # telemetry: expected — no lease: the slot is free
     except FileNotFoundError:
         return None
     except OSError as exc:

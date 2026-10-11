@@ -38,7 +38,6 @@ def _copy_tree(source: Path, target: Path) -> list[str]:
             src = here / name
             try:
                 fd = os.open(src, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK)
-            # telemetry: expected — a link in a run is never followed, so it is left behind
             except OSError as exc:
                 if exc.errno == errno.ELOOP:
                     continue
@@ -91,11 +90,13 @@ def intake(ctx: Context, runs: Path, session_id: str, task: str, head: str, test
 def _meta(run: Path) -> dict[str, Any]:
     try:
         fd = os.open(run / "run.json", os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK)
+    # telemetry: expected — a run with no plain record of its own reads as no facts; its pictures still show
     except OSError:
         return {}
     with os.fdopen(fd) as fh:
         try:
             raw = json.loads(fh.read(65536))
+        # telemetry: expected — a record that is not JSON reads as no facts; the run's pictures still show
         except ValueError:
             return {}
     return raw if isinstance(raw, dict) else {}

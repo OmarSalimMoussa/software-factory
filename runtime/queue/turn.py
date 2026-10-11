@@ -132,7 +132,6 @@ def _tell(ctx: Context, task: Task, message: str) -> None:
         return
     try:
         lifecycle.deliver(ctx, impl.id, message, lifecycle.WARDEN)
-    # telemetry: surfaced — the move stands; the implementer reads it from its task's status when it next looks
     except (LaunchError, Refused) as exc:
         log.warning("warden: %s's implementer %s was not told of its move (%s)", task.id, impl.id, type(exc).__name__)
 

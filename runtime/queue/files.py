@@ -117,6 +117,7 @@ class QueueFiles:
             for i, part in enumerate(parts):
                 made = False
                 if create:
+                    # telemetry: expected — the folder is there already, which is what was wanted
                     with suppress(FileExistsError):
                         os.mkdir(part, 0o755, dir_fd=fd)
                         made = True
@@ -149,6 +150,7 @@ class QueueFiles:
     def exists(self, rel: str) -> bool:
         try:
             self.read(rel)
+        # telemetry: expected — a file that is not there is the False this asks about
         except FileNotFoundError:
             return False
         return True
@@ -158,6 +160,7 @@ class QueueFiles:
         with self._root() as root:
             try:
                 fd = self._walk(root, _parts(sub), create=False)
+            # telemetry: expected — no folder yet: it holds no files
             except FileNotFoundError:
                 return []
             try:
@@ -171,12 +174,14 @@ class QueueFiles:
         with self._root() as root:
             try:
                 fd = self._walk(root, _parts(sub), create=False)
+            # telemetry: expected — no folder yet: it holds no files
             except FileNotFoundError:
                 return {}
             try:
                 found = {}
                 for name in sorted(n for n in os.listdir(fd) if NAME.match(n)):
-                    with suppress(FileNotFoundError):  # gone between the listing and its stat
+                    # telemetry: expected — the file went between the listing and its stat
+                    with suppress(FileNotFoundError):
                         st = os.stat(name, dir_fd=fd, follow_symlinks=False)
                         found[name] = (st.st_ino, st.st_size, st.st_mtime_ns)
                 return found
@@ -230,6 +235,7 @@ class QueueFiles:
                     os.fsync(dir_fd)
             finally:
                 for dir_fd, tmp, _ in staged:
+                    # telemetry: expected — a staged file already renamed into place is gone from its temporary name
                     with suppress(FileNotFoundError):
                         os.unlink(tmp, dir_fd=dir_fd)
                 for dir_fd in dirs.values():
@@ -241,11 +247,13 @@ class QueueFiles:
         with self._root() as root:
             try:
                 dir_fd = self._walk(root, parent, create=False)
+            # telemetry: expected — no folder: there is nothing to remove, the False this returns
             except FileNotFoundError:
                 return False
             try:
                 os.unlink(name, dir_fd=dir_fd)
                 os.fsync(dir_fd)
+            # telemetry: expected — no file: there is nothing to remove, the False this returns
             except FileNotFoundError:
                 return False
             finally:

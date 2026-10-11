@@ -71,6 +71,7 @@ def send(request: urllib.request.Request, timeout: int, limit: int) -> str:
     opener = urllib.request.build_opener(_NoRedirect())
     try:
         answer = opener.open(request, timeout=timeout)
+    # telemetry: expected — an error status is an answer: the call reads its status and body
     except urllib.error.HTTPError as exc:
         answer = exc
     with answer:
@@ -107,6 +108,7 @@ def handle(message: dict[str, Any], call: Callable[[dict[str, Any]], str]) -> di
             return {"jsonrpc": "2.0", "id": ident, "error": {"code": -32602, "message": "unknown tool"}}
         try:
             result = {"content": [{"type": "text", "text": call(params.get("arguments", {}))}], "isError": False}
+        # telemetry: surfaced — the session's tool `result` is an error saying what was not sent
         except (SlotApiError, OSError) as exc:
             result = {"content": [{"type": "text", "text": f"not sent: {exc}"}], "isError": True}
     else:
@@ -120,6 +122,7 @@ def serve(lines: IO[str], out: IO[str], call: Callable[[dict[str, Any]], str]) -
             continue
         try:
             message = json.loads(line)
+        # telemetry: surfaced — the session is sent a `reply` saying its line is not JSON
         except ValueError:
             reply: dict[str, Any] | None = {
                 "jsonrpc": "2.0",

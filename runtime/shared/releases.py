@@ -58,6 +58,7 @@ def http_get(url: str, headers: dict[str, str], timeout: float) -> Answer:
     try:
         with _OPENER.open(request, timeout=timeout) as reply:
             return Answer(reply.status, {k.lower(): v for k, v in reply.headers.items()}, reply.read())
+    # telemetry: expected — an error status is an answer: the caller reads its status and body
     except urllib.error.HTTPError as exc:
         return Answer(exc.code, {k.lower(): v for k, v in exc.headers.items()}, exc.read())
 

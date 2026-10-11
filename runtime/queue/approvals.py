@@ -67,5 +67,6 @@ def has_go(places: Places, task_id: str) -> bool:
 
 def void(places: Places, task_id: str) -> None:
     for path in (_path(places, task_id), _go_path(places, task_id)):
+        # telemetry: expected — an approval that is not there is void already
         with suppress(FileNotFoundError):
             path.unlink()

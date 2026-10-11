@@ -36,6 +36,7 @@ PARSERS: dict[str, Callable[[str, str], object]] = {
 def _parse(rel: str, raw: bytes) -> tuple[object | None, list[str]]:
     try:
         text = raw.decode()
+    # telemetry: surfaced — a file that is not text is the problem `_parse` returns, which the sweep files
     except UnicodeDecodeError:
         return None, ["the file is not UTF-8 text"]
     folder = rel.split("/", 1)[0]
@@ -46,6 +47,7 @@ def _parse(rel: str, raw: bytes) -> tuple[object | None, list[str]]:
         if parser is None:
             return None, [f"{folder}/ holds no queue files"]
         return parser(text, ""), []
+    # telemetry: surfaced — the format's `problems` are what `_parse` returns, which the sweep files
     except FormatError as exc:
         return None, exc.problems
 

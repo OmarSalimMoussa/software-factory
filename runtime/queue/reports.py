@@ -122,6 +122,7 @@ def pull(ctx: Context, run: Runner) -> dict[str, Any]:
                 continue
             try:
                 item = _read(line)
+            # telemetry: surfaced — a line that cannot be read is one of the `unreadable`, which are reported
             except ValueError as exc:
                 unreadable.append(f"line {n}: {exc}")
                 continue

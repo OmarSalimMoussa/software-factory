@@ -182,6 +182,7 @@ def parse_log(text: str, rel: str = "") -> list[dict[str, str]]:
     for n, line in enumerate(text.splitlines(), 1):
         try:
             entry = json.loads(line)
+        # telemetry: surfaced — a line that is not JSON is one of the log's `problems`
         except ValueError:
             problems.append(f"line {n} is not JSON")
             continue

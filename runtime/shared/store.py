@@ -74,6 +74,7 @@ def read_json(path: Path) -> Any:
 def read_json_or(path: Path, missing: Any) -> Any:
     try:
         return read_json(path)
+    # telemetry: expected — a file that is not there is what the caller's `missing` value stands for
     except FileNotFoundError:
         return missing
 
@@ -89,6 +90,7 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     """Every record; a line that is not a JSON object raises StoreError naming the line."""
     try:
         lines = path.read_text().splitlines()
+    # telemetry: expected — a log not written yet holds no records
     except FileNotFoundError:
         return []
     except OSError as exc:

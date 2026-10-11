@@ -106,7 +106,6 @@ def wake(ctx: Context, card: Card, message: str) -> bool:
         return False
     try:
         lifecycle.deliver(ctx, asker.id, message, statuses.OWNER)
-    # telemetry: surfaced — the card shows the owner's answer, and the session reads it from its task when it resumes
     except LaunchError as exc:
         log.warning("warden: the owner's word on %s did not reach session %s (%s)", card.id, asker.id,
                     type(exc).__name__)  # fmt: skip

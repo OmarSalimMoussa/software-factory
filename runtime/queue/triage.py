@@ -167,6 +167,7 @@ def _batch(queue: Queue, batch: list[str], problems: list[str]) -> dict[str, Req
     for rid in batch:
         try:
             req = queue.request(rid)
+        # telemetry: surfaced — a request that does not exist is one of the plan's `problems`
         except FileNotFoundError:
             problems.append(f"{rid} does not exist")
             continue
@@ -215,6 +216,7 @@ def _new_task(
         return None
     try:
         facts = tasks.facts_from({k: v for k, v in spec.items() if k not in ("body", "requests")})
+    # telemetry: surfaced — facts the plan cannot use are one of its `problems`
     except Refused as exc:
         problems.append(f"{where}: {exc.reason}")
         return None
@@ -238,6 +240,7 @@ def _new_task(
     problems += [f"{where} waits for {a}, which does not exist" for a in task.after if a not in existing]
     try:
         formats.parse_task(formats.dump_task(dataclasses.replace(task, id="t-0000", status="queued")))
+    # telemetry: surfaced — a task that does not keep the format is one of the plan's `problems`
     except FormatError as exc:
         problems += [f"{where}: {p}" for p in exc.problems]
     return task

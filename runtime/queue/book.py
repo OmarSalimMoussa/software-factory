@@ -81,6 +81,7 @@ class Queue:
                     rel = f"requests/{inbox}/{name}"
                     try:
                         good.append(formats.parse_request(self.files.read(rel).decode(), rel))
+                    # telemetry: surfaced — a request that cannot be read is one of the `broken` rows, which say so
                     except (FormatError, UnicodeDecodeError) as exc:
                         broken.append(Broken(rel, str(exc)))
         return good, broken
@@ -92,6 +93,7 @@ class Queue:
             rel = f"requests/{inbox}/{request_id}.md"
             try:
                 raw = self.files.read(rel)
+            # telemetry: expected — the request is not in this inbox; the next one is looked in
             except FileNotFoundError:
                 continue
             return formats.parse_request(raw.decode(), rel)
@@ -105,6 +107,7 @@ class Queue:
                 rel = f"tasks/{name}"
                 try:
                     good.append(formats.parse_task(self.files.read(rel).decode(), rel))
+                # telemetry: surfaced — a task that cannot be read is one of the `broken` rows, which say so
                 except (FormatError, UnicodeDecodeError) as exc:
                     broken.append(Broken(rel, str(exc)))
         return good, broken
@@ -118,6 +121,7 @@ class Queue:
     def spec(self, task_id: str) -> Spec | None:
         try:
             raw = self.files.read(spec_rel(task_id))
+        # telemetry: expected — no spec yet: the task has none until its designer saves one
         except FileNotFoundError:
             return None
         return records.parse_spec(raw.decode(), spec_rel(task_id))
@@ -129,6 +133,7 @@ class Queue:
             rel = f"checks/{name}"
             try:
                 good.append(records.parse_check(self.files.read(rel).decode(), rel))
+            # telemetry: surfaced — a check record that cannot be read is one of the `broken` rows, which say so
             except (FormatError, UnicodeDecodeError) as exc:
                 broken.append(Broken(rel, str(exc)))
         return good, broken
@@ -159,6 +164,7 @@ class Queue:
     def read_log(self, task_id: str) -> list[dict[str, str]]:
         try:
             raw = self.files.read(log_rel(task_id))
+        # telemetry: expected — no log yet: nothing has happened to the task
         except FileNotFoundError:
             return []
         return records.parse_log(raw.decode(), log_rel(task_id))
