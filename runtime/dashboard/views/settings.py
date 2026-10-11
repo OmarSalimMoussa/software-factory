@@ -12,7 +12,7 @@ from typing import Any
 from runtime.dashboard.views import accounts
 from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, ago, epoch, model_label
 from runtime.shared.models import RETIRED
-from runtime.shared.settings import SCHEMA, Settings
+from runtime.shared.settings import AT_INSTALL, SCHEMA, Settings
 
 WANTS = ("settings", "sessions", "slots", "accounts")
 _EDITED_ELSEWHERE = {"models.allowed", "models.efforts", "prices", "factory.github", "intake.weights"}
@@ -172,7 +172,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
     (
         "dashboard",
         "Dashboard",
-        "Applies as soon as you save; the port, addresses and threads at the next start.",
+        "Applies as soon as you save; threads at the next start. The port and addresses are set at install.",
         [
             ("dashboard.retired_linger_minutes", "Minutes a retired agent stays in the live tree"),
             ("dashboard.refresh_seconds", "Refresh every, seconds"),
@@ -296,10 +296,11 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
     (
         "factory",
         "Factory",
-        "Set by the installer, except how long the warden waits for its own commands.",
+        "Set by the installer, except how long the warden waits for its commands and how many requests it answers.",
         [
             ("factory.github", "The factory's own repo, which it never works on"),
             ("factory.command_seconds", "Seconds the warden waits for its own commands"),
+            ("factory.warden_threads", "Requests the warden answers at once"),
         ],
     ),
     (
@@ -323,7 +324,12 @@ LABELS = {key: label for _, _, _, rows in GROUPS for key, label in rows}
 
 def control(key: str) -> str:
     kind = SCHEMA[key].kind
-    if key in _EDITED_ELSEWHERE or key.startswith("repo.") or kind in ("prices", "weights"):
+    if (
+        key in _EDITED_ELSEWHERE
+        or key.startswith("repo.")
+        or kind in ("prices", "weights")
+        or SCHEMA[key].when == AT_INSTALL
+    ):
         return "readonly"
     if kind == "model":
         return "model"

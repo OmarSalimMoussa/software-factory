@@ -183,6 +183,7 @@ docker_budget_gib = 60
 [factory]
 github = ""             # owner/name of the factory's own repo on GitHub, which it never works on; the installer sets it
 command_seconds = 120   # how long the warden waits for one of its own commands (git, systemctl)
+warden_threads = 16     # requests the warden answers at once, on each of its sockets
 
 [install]               # read by the installer: a change takes effect at the next install
 drill = { model = "claude-haiku-5-5", effort = "low" }  # the model the drills drive a sandboxed command with

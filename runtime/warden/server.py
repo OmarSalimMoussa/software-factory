@@ -3,7 +3,7 @@ and refusals.sock where the guard reports each refusal.
 
 A caller is known from its socket's peer process, never from its request: the peer's uid, then, for the agent user,
 the registered session whose Claude process is among the peer's ancestors (Claude Code's own record of each session
-process names its pid). Each stream socket answers on a bounded pool of ``dashboard.max_threads`` threads.
+process names its pid). Each stream socket answers on a bounded pool of ``factory.warden_threads`` threads.
 """
 
 from __future__ import annotations

@@ -35,6 +35,9 @@ class Spec:
 
 
 AT_ONCE, NEXT_START, MINUTE, ORCH = "At once", "Next start", "Within a minute", "Next orchestrator start"
+# Wired by the install into what nothing else rewrites (the firewall, the tailnet's serve entry, the check-in periods):
+# changed only with the install's --set, so a save never leaves them out of step.
+AT_INSTALL = "Set at install"
 _ROLES = (
     "orchestrator designer implementer_large implementer_small intake triage critic qa_backend qa_security qa_ux "
     "qa_visual qa_ui_function qa_regression qa_prod"
@@ -102,7 +105,7 @@ SCHEMA: dict[str, Spec] = {
     "vitals.battery_red": Spec("int", 0, 100),
     "vitals.firewall_stale_seconds": Spec("int", 30, 3600),
     "watch.tick_seconds": Spec("int", 5, 120),
-    "watch.probe_seconds": Spec("int", 15, 600),
+    "watch.probe_seconds": Spec("int", 15, 600, when=AT_INSTALL),
     "watch.outage_after": Spec("int", 2, 5),
     "watch.http_timeout_seconds": Spec("int", 1, 60),  # contract: added by 1B-2
     "watch.inbox_wait_seconds": Spec("int", 5, 300),  # contract: added by 1B-2
@@ -114,7 +117,7 @@ SCHEMA: dict[str, Spec] = {
     "watch.reap_retry_minutes": Spec("int", 1, 1440),
     "watch.start_grace_seconds": Spec("int", 30, 600),  # contract: a start's process must appear within this
     "watch.message_seconds": Spec("int", 3, 60),  # contract: how long the owner's message is held out to a session
-    "watch.loop_minutes": Spec("int", 5, 120),
+    "watch.loop_minutes": Spec("int", 5, 120, when=AT_INSTALL),
     "watch.orchestrator_silent_minutes": Spec("int", 10, 180),
     "watch.orchestrator_busy_silent_minutes": Spec("int", 10, 600),
     "watch.refusals_to_notify": Spec("int", 1, 50),
@@ -141,13 +144,13 @@ SCHEMA: dict[str, Spec] = {
     "sandbox.allowed_domains": Spec("list", when=NEXT_START),
     # contract: added by FB8. Folders in the agent's home every session may write; the install makes them.
     "sandbox.writable_caches": Spec("list", when="Next install"),
-    "dashboard.port": Spec("int", 1024, 65535, when="Next warden start"),
+    "dashboard.port": Spec("int", 1024, 65535, when=AT_INSTALL),
     "dashboard.refresh_seconds": Spec("int", 5, 120),
     "dashboard.stale_seconds": Spec("int", 15, 600),
     "dashboard.wrong_codes_to_lock": Spec("int", 1, 20),
     "dashboard.lock_minutes": Spec("int", 5, 1440),
     "dashboard.device_days": Spec("int", 1, 365),
-    "dashboard.hosts": Spec("list", when="Next warden start"),
+    "dashboard.hosts": Spec("list", when=AT_INSTALL),
     "dashboard.page_size": Spec("int", 10, 500),
     "dashboard.probe_strip": Spec("int", 3, 60),
     "dashboard.working_now_max": Spec("int", 1, 24),
@@ -164,7 +167,8 @@ SCHEMA: dict[str, Spec] = {
     "gc.docker_budget_gib": Spec("int", 5, 2000),
     # The factory's own repo on GitHub (owner/name), which it never works on; the installer sets it.
     "factory.github": Spec("str", when="Next install"),
-    "factory.command_seconds": Spec("int", 10, 900),  # contract: added by 1B-3
+    "factory.command_seconds": Spec("int", 10, 900),
+    "factory.warden_threads": Spec("int", 2, 64, when="Next warden start"),  # contract: added by 1B-3
     # contract: added by builder 3, read by the installer only.
     "install.drill": Spec("model", when="Next install"),
     "install.drill_seconds": Spec("int", 30, 900, when="Next install"),

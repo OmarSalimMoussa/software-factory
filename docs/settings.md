@@ -52,12 +52,13 @@ that wrote there could act outside its sandbox.
 
 | Setting | Takes effect |
 | --- | --- |
-| Caps, rounds, QA, vitals, watch, errors, reports, telemetry, intake and routing values | At once: every guard call and warden pass reads them fresh |
+| Caps, rounds, QA, vitals, watch, errors, reports, telemetry, intake and routing values, but those below | At once: every guard call and warden pass reads them fresh |
 | A session's or a subagent's model and effort | At its next start |
 | The slice budget | Within a minute |
 | The slot count | At the next slot claim |
 | The repo | At the next orchestrator start; stop the old one first |
-| The dashboard's port, hosts and threads | At the next warden start |
+| The dashboard's threads, and the warden's (`factory.warden_threads`) | At the next warden start |
 | The sandbox's writable caches and the `install` group | At the next install |
+| The dashboard's port and hosts, the probe period and the loop period | Only with the install's `--set`: the install wires them into the firewall, the tailnet's link and the check-in periods, so the Settings page shows them read-only |
 
 The dashboard shows the value running now beside one that waits, such as "4 at the next slot claim".

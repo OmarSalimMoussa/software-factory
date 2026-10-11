@@ -44,6 +44,7 @@ def save(ctx: Context, **args: Any) -> dict[str, Any]:
         ({"prices": {}}, None, "settings"),
         ({"repo.path": "/elsewhere"}, None, "settings"),
         ({"caps.implementers": 4}, "0000000000000000", "stale"),
+        ({"dashboard.port": 9000}, None, "settings"),  # wired into the firewall and the tailnet at install
     ],
 )
 @pytest.mark.usefixtures("install")

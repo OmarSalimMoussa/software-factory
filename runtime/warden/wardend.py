@@ -142,7 +142,7 @@ def main() -> int:
         sessions_folder=agent_home / ".claude" / "sessions",
         proc=Path("/proc"),
     )
-    server.serve(places, peers, dispatcher, current.get_int("dashboard.max_threads"))
+    server.serve(places, peers, dispatcher, current.get_int("factory.warden_threads"))
     ctx = doors.context(WARDEN)
     refusals = reflections.RefusalWatch()
     server.serve_refusals(places.refusal_socket, lambda line: refusals.record(ctx, line))
