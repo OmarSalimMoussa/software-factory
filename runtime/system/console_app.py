@@ -272,7 +272,8 @@ class Console:
 
             def act() -> dict[str, Any]:
                 problem = install.perform(ctx, keep=keep)
-                self.kept = self.kept or (problem is not None and keep and not dry)
+                if not dry:
+                    self.kept = problem is not None and keep
                 return console_page.install_ending(ctx, problem, keep, run, self.reader)
 
             self._start(run, act)
@@ -297,7 +298,10 @@ class Console:
             host = (self.hosts.real if confirm else self.hosts.dry)(run)
 
             def act() -> dict[str, Any]:
-                return console_page.uninstall_ending(run, uninstall.perform(host, self.places, self.owner, checkout))
+                ending = console_page.uninstall_ending(run, uninstall.perform(host, self.places, self.owner, checkout))
+                if confirm:
+                    self.kept = False  # no failed install is left for the sealed copy to stay beside
+                return ending
 
             self._start(run, act)
         return _json(200, {"ok": True})

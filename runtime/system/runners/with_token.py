@@ -1,7 +1,7 @@
 """The agents' Claude daemon, started with the sign-in token systemd loaded for its unit.
 
 Run as ``/usr/bin/python3 -I <install>/runtime/system/runners/with_token.py <claude> daemon run``. The token never
-appears on a command line; the daemon's sessions scrub it from every shell they start. Stdlib only.
+appears on a command line or in an environment: claude reads it from a pipe it inherits. Stdlib only.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from runtime.system.runners import launch_file as lf  # noqa: E402 - the path li
 
 def main(argv: list[str]) -> int:
     try:
-        env = lf.claude_env(dict(os.environ))
+        env, _ = lf.claude_env(dict(os.environ))  # the token's pipe is inheritable, so it survives the exec
     except lf.BadRequest as exc:
         print(f"with-token: {exc}", file=sys.stderr, flush=True)
         return lf.REFUSED

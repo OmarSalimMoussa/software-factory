@@ -15,7 +15,6 @@ Slice=@slice@
 Environment=XDG_RUNTIME_DIR=/run/user/@agent_uid@
 Environment=PATH=@path@
 Environment=@uv_env@
-Environment=CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1
 LoadCredential=@claude_token@:@secrets@/claude.token
 ExecStart=@python@ -I @install@/runtime/system/runners/with_token.py @claude@ daemon run
 Restart=always

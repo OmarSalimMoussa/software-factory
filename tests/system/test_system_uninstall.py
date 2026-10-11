@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from runtime.shared.paths import MANAGED_SETTINGS
-from runtime.system import layout, uninstall
+from runtime.system import layout, sealed, uninstall
 from runtime.system.host import DryHost
 
 
@@ -34,8 +34,15 @@ def test_the_uninstall_removes_every_sealed_copy_but_the_one_it_runs_from(
     monkeypatch: pytest.MonkeyPatch, runs_from: Path, removed: bool
 ) -> None:
     monkeypatch.setattr(uninstall, "REPO_ROOT", runs_from)
-    host = DryHost(paths={layout.STAGE_ROOT})
+    own, stale = layout.STAGE_ROOT / "0123abcd-0a1b2c3d", layout.STAGE_ROOT / "4567ef01-2b3c4d5e"
+    copies = [own, sealed.release_folder(own), stale, sealed.release_folder(stale)]
+    find = f"find {layout.STAGE_ROOT} -mindepth 1 -maxdepth 1"
+    host = DryHost(paths={layout.STAGE_ROOT, *copies}, answers={find: (0, "\n".join(map(str, copies)))})
 
     uninstall.sealed_copies(host)
 
     assert (f"remove: {layout.STAGE_ROOT}" in host.actions) is removed
+    if not removed:
+        # A copy an earlier failed install kept goes; the one this runs from goes when it ends.
+        gone = {action.removeprefix("remove: ") for action in host.actions if action.startswith("remove: ")}
+        assert gone == {str(stale), str(sealed.release_folder(stale))}

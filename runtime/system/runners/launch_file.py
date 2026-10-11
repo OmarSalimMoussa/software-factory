@@ -25,6 +25,7 @@ from runtime.warden import launch, session_settings
 SESSION, COMMAND, STACK, MESSAGE = "session", "command", "stack", "message"
 REFUSED = 2
 TIMED_OUT = 124
+TOKEN_FD = "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR"  # where Claude Code finds the descriptor of its sign-in token
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,96}$")
 PROGRAMS = {"claude": str(layout.CLAUDE_BIN), "git": "/usr/bin/git", "rm": "/usr/bin/rm", "kill": "/usr/bin/kill"}
 # The one factory command the warden runs as the agent: the shape check of a repo the owner is changing to.
@@ -166,8 +167,11 @@ def checkout_for(session: str, settings: Settings, sessions: dict[str, Any]) -> 
     return path
 
 
-def claude_env(environ: dict[str, str]) -> dict[str, str]:
-    """The unit's environment with the sign-in token systemd loaded for it; Claude Code scrubs it from shells."""
+def claude_env(environ: dict[str, str]) -> tuple[dict[str, str], tuple[int, ...]]:
+    """The unit's environment for claude, and the descriptors to pass it: a pipe holding the sign-in token systemd
+    loaded for the unit. Claude Code reads the pipe to its end, so the token is in no environment and no descriptor
+    a shell it starts could read. Never the token in the environment with CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: that also
+    runs every command sandboxed, the excluded `factory` too, which then cannot reach the warden."""
     folder = environ.get("CREDENTIALS_DIRECTORY")
     if not folder:
         raise BadRequest("the unit loaded no sign-in token")
@@ -175,7 +179,11 @@ def claude_env(environ: dict[str, str]) -> dict[str, str]:
         token = (Path(folder) / layout.CLAUDE_TOKEN).read_text(encoding="utf-8").strip()
     except OSError as exc:
         raise BadRequest(f"the sign-in token cannot be read ({type(exc).__name__})") from exc
-    return {**environ, "CLAUDE_CODE_OAUTH_TOKEN": token, "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"}
+    read, write = os.pipe()
+    with os.fdopen(write, "w", encoding="utf-8") as pipe:
+        pipe.write(token + "\n")  # far below a pipe's buffer, so the write never waits for a reader
+    os.set_inheritable(read, True)
+    return {**environ, TOKEN_FD: str(read)}, (read,)
 
 
 def message_argv(raw: dict[str, Any]) -> list[str]:
@@ -189,7 +197,7 @@ def message_argv(raw: dict[str, Any]) -> list[str]:
     return [PROGRAMS["claude"], "--resume", session, text]
 
 
-def run_in_terminal(argv: list[str], cwd: Path, env: dict[str, str], hold: int) -> int:
+def run_in_terminal(argv: list[str], cwd: Path, env: dict[str, str], hold: int, fds: tuple[int, ...] = ()) -> int:
     """Run ``argv`` in a pseudo-terminal for ``hold`` seconds, then let go of it.
 
     `claude --resume <id> <text>` on a running background session sends the text as its next turn, then attaches,
@@ -199,7 +207,7 @@ def run_in_terminal(argv: list[str], cwd: Path, env: dict[str, str], hold: int) 
     leader, follower = pty.openpty()
     try:
         proc = subprocess.Popen(argv, cwd=cwd, env={**env, "TERM": "xterm-256color"}, stdin=follower,
-                                stdout=follower, stderr=follower, start_new_session=True)  # fmt: skip
+                                stdout=follower, stderr=follower, start_new_session=True, pass_fds=fds)  # fmt: skip
     except OSError as exc:
         os.close(leader)
         os.close(follower)
@@ -234,10 +242,10 @@ def _plain(raw: bytes) -> str:
     return re.sub(r"\x1b\[[0-9;?]*[ -/]*[@-~]", "", raw.decode(errors="replace")).strip()
 
 
-def run(argv: list[str], cwd: Path, env: dict[str, str], timeout: int) -> int:
+def run(argv: list[str], cwd: Path, env: dict[str, str], timeout: int, fds: tuple[int, ...] = ()) -> int:
     """Run with the unit's own output (the warden's runs/<id>.log); the exit status is the unit's."""
     try:
-        return subprocess.run(argv, cwd=cwd, env=env, timeout=timeout, check=False).returncode
+        return subprocess.run(argv, cwd=cwd, env=env, timeout=timeout, pass_fds=fds, check=False).returncode
     except subprocess.TimeoutExpired:
         print(f"runner: {Path(argv[0]).name} ran past {timeout} s and was stopped", flush=True)
         return TIMED_OUT

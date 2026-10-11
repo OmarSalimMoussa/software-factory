@@ -45,7 +45,8 @@ def test_each_session_starts_sandboxed_in_its_worktree(world: World, tmp_path: P
         assert not any(own.is_relative_to(Path(p)) for p in sandbox["filesystem"]["denyRead"])
         assert "allowRead" not in sandbox["filesystem"]
     assert str(tmp_path / "agent" / ".claude" / ".credentials.json") in sandbox["filesystem"]["denyRead"]
-    assert body["env"] == {"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"}
+    # The scrub runs every command sandboxed, the excluded `factory` too, which then cannot reach the warden.
+    assert "env" not in body
     assert ("statusLine" in body) == (role == "orchestrator")
 
 

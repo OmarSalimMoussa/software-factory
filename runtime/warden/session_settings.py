@@ -67,7 +67,6 @@ def render(settings: Settings, places: Places, role: str, worktree: Path, agent_
             "filesystem": filesystem,
         },
         "permissions": {"deny": [f"Read(/{credentials})"]},  # "//" starts an absolute path in a permission rule
-        "env": {"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"},
     }
     if role == ORCHESTRATOR:
         script = places.plugin / "hooks" / "statusline.py"

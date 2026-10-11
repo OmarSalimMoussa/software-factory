@@ -24,16 +24,17 @@ def main(argv: list[str]) -> int:
         environ = dict(os.environ)
         if raw["kind"] == lf.MESSAGE:
             command, repo = lf.message_argv(raw), Path(settings.get_str("repo.path"))
-            return lf.run_in_terminal(command, repo, lf.claude_env(environ), settings.get_int("watch.message_seconds"))
+            env, fds = lf.claude_env(environ)
+            return lf.run_in_terminal(command, repo, env, settings.get_int("watch.message_seconds"), fds)
         if raw["kind"] == lf.SESSION:
             command, cwd = lf.session_argv(raw, state), Path(settings.get_str("repo.path"))
         else:
             command, cwd = lf.command_argv(raw, Path.home(), state)
-        env = lf.claude_env(environ) if command[0] == lf.PROGRAMS["claude"] else environ
+        env, fds = lf.claude_env(environ) if command[0] == lf.PROGRAMS["claude"] else (environ, ())
     except lf.BadRequest as exc:
         print(f"agent-run: refused: {exc}", flush=True)
         return lf.REFUSED
-    return lf.run(command, cwd, env, settings.get_int("factory.command_seconds"))
+    return lf.run(command, cwd, env, settings.get_int("factory.command_seconds"), fds)
 
 
 if __name__ == "__main__":

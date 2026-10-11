@@ -86,6 +86,8 @@ def stop(host: Host) -> None:
         _try(host, ["loginctl", "disable-linger", user])
         _try(host, ["systemctl", "stop", f"user@{account.uid}.service"])
         _try(host, ["pkill", "-KILL", "-u", user])
+    # The slice and the parent systemd makes from its name stay active, empty, until stopped or the next boot.
+    _try(host, ["systemctl", "stop", SLICE, f"{SLICE.split('-')[0]}.slice"])
 
 
 def system_files(host: Host) -> None:
@@ -125,12 +127,17 @@ def programs(host: Host, dashboard_port: str) -> None:
 
 
 def sealed_copies(host: Host) -> None:
-    """Every sealed copy, unless this runs from one (the console, or a first install taking itself back): that copy
-    goes when its program ends."""
-    if REPO_ROOT.is_relative_to(layout.STAGE_ROOT):
-        host.say(f"kept {layout.STAGE_ROOT}: this runs from a sealed copy in it, which goes when it ends")
+    """Every sealed copy but the one this runs from (the console, or a first install taking itself back), which goes
+    when its program ends."""
+    if not REPO_ROOT.is_relative_to(layout.STAGE_ROOT):
+        _remove(host, layout.STAGE_ROOT)
         return
-    _remove(host, layout.STAGE_ROOT)
+    own = layout.STAGE_ROOT / REPO_ROOT.relative_to(layout.STAGE_ROOT).parts[0]
+    _, listed = host.query(["find", str(layout.STAGE_ROOT), "-mindepth", "1", "-maxdepth", "1"])
+    for line in listed.splitlines():
+        if line.strip() and Path(line.strip()) not in (own, sealed.release_folder(own)):
+            _remove(host, Path(line.strip()))
+    host.say(f"kept {own}: this runs from it, and it goes when it ends")
 
 
 def state(host: Host, places: Places) -> None:

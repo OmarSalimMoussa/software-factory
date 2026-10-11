@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -115,3 +116,18 @@ def test_a_message_is_held_out_in_a_terminal_and_a_failure_of_its_own_is_reporte
     tmp_path: Path, script: str, status: int
 ) -> None:
     assert lf.run_in_terminal([sys.executable, "-c", script], tmp_path, {}, 1) == status
+
+
+def test_claude_gets_its_sign_in_token_on_a_pipe_and_in_no_environment(tmp_path: Path) -> None:
+    (tmp_path / layout.CLAUDE_TOKEN).write_text("sk-test-token\n")
+    env, fds = lf.claude_env({"CREDENTIALS_DIRECTORY": str(tmp_path)})
+    # What Claude Code does with the descriptor its variable names: read the token to the pipe's end.
+    reads = (f"import os; token = os.read(int(os.environ['{lf.TOKEN_FD}']), 4096).decode().strip(); "
+             "raise SystemExit(0 if token == 'sk-test-token' else 3)")  # fmt: skip
+    try:
+        assert not any("sk-test-token" in value for value in env.values())
+        assert "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB" not in env
+        assert lf.run([sys.executable, "-c", reads], tmp_path, env, 30, fds) == 0
+    finally:
+        for fd in fds:
+            os.close(fd)
