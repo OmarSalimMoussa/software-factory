@@ -118,7 +118,7 @@ def main(argv: list[str], places: Places) -> int:
         return 2
     try:
         # Claude Code names the session it starts this server for; nothing else here reads the environment.
-        session_id = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+        session_id = os.environ.get("CLAUDE_CODE_SESSION_ID")
         if not session_id:
             raise BrowserError("Claude Code gave no session id (CLAUDE_CODE_SESSION_ID)")
         settings = settings_module.build(store.read_json(places.state / "public" / "settings.json"), {})

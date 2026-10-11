@@ -268,7 +268,9 @@ def main(argv: list[str]) -> int:
     if not args.dry_run and not root:
         print("Run it with sudo, as yourself (or add --dry-run).", file=sys.stderr)
         return 2
-    owner = RealHost().account(os.environ.get("SUDO_USER") or getpass.getuser())
+    # sudo names the owner who ran it; a dry run without sudo has none, and is then the owner's own.
+    sudo_user = os.environ.get("SUDO_USER")
+    owner = RealHost().account(getpass.getuser() if sudo_user is None else sudo_user)
     if owner is None:
         print(f"{PROGRAM}: the owner's account cannot be read", file=sys.stderr)
         return 2

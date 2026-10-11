@@ -55,11 +55,11 @@ def main(
     execv: Exec = os.execv,
     note: Note = system_log,
 ) -> int:
-    command = environ.get("SSH_ORIGINAL_COMMAND", "")
-    args = deploy_args(command)
+    command = environ.get("SSH_ORIGINAL_COMMAND")  # what the client asked to run; a plain login asks nothing
+    args = None if command is None else deploy_args(command)
     if args is None:
         # repr() keeps a newline or a control byte from forging a second log line.
-        note(f"refused: {command[:300]!r}")
+        note("refused: a login with no command" if command is None else f"refused: {command[:300]!r}")
         print(f"{TAG}: refused", file=sys.stderr)
         return 2
     try:

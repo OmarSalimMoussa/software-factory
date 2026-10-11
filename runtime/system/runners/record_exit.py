@@ -12,7 +12,14 @@ from pathlib import Path
 
 
 def main(argv: list[str]) -> int:
-    status = os.environ.get("EXIT_STATUS") or os.environ.get("SERVICE_RESULT") or "unknown"
+    # systemd sets EXIT_STATUS only when the main process exited, and SERVICE_RESULT for every stop.
+    exit_status, service_result = os.environ.get("EXIT_STATUS"), os.environ.get("SERVICE_RESULT")
+    if exit_status:
+        status = exit_status
+    elif service_result:
+        status = service_result
+    else:
+        status = "unknown"
     path = Path(argv[0])
     path.write_text(status + "\n", encoding="utf-8")
     path.chmod(0o644)

@@ -29,8 +29,10 @@ def main(argv: list[str], environ: dict[str, str] | None = None) -> int:
     environ = dict(os.environ) if environ is None else environ
     if not argv or argv[0] not in PAUSING:
         return 0
-    if argv[0] == "stop" and environ.get("SERVICE_RESULT") != CLEAN:
-        print(f"pause_checks: the warden ended by {environ.get('SERVICE_RESULT') or 'an unknown cause'}, not a stop; "
+    result = environ.get("SERVICE_RESULT")  # systemd's word for how the warden ended; it may give none
+    if argv[0] == "stop" and result != CLEAN:
+        cause = "an unknown cause" if result is None else result
+        print(f"pause_checks: the warden ended by {cause}, not a stop; "
               "the alerts stay on", file=sys.stderr)  # fmt: skip
         return 0
     places = Places.system()

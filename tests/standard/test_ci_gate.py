@@ -20,6 +20,14 @@ def execv(path: str, argv: list[str]) -> NoReturn:
     raise Execed(path, argv)
 
 
+def test_a_login_with_no_command_is_refused(tmp_path: Path) -> None:
+    product = tmp_path / "product.toml"
+    product.write_text(FACTORY_TOML)
+    notes: list[str] = []
+    assert ci_gate.main({}, product, execv, notes.append) == 2
+    assert notes == ["refused: a login with no command"]
+
+
 @pytest.mark.parametrize(
     ("command", "args"),
     [
