@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.dashboard.views import proposals, taskwords
+from runtime.dashboard.views import proposals
 from runtime.dashboard.views.kit import (
     PartError,
     Parts,
@@ -19,6 +19,7 @@ from runtime.dashboard.views.kit import (
     version,
     when,
 )
+from runtime.dashboard.views.words import taskwords
 from runtime.queue.formats import TASK_ID
 from runtime.shared.models import RETIRED
 

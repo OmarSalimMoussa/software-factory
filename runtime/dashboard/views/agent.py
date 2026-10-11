@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.dashboard.views import agentwords as words
 from runtime.dashboard.views import messaging
 from runtime.dashboard.views.agents import history_row, in_tree
 from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, epoch, version
 from runtime.dashboard.views.shell import factory_state
+from runtime.dashboard.views.words import agentwords as words
 from runtime.shared.models import DEPRIORITIZED, RETIRED
 
 WANTS = ("settings", "sessions", "queue", "cost", "factory")

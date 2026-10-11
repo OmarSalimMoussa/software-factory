@@ -15,9 +15,10 @@ from pathlib import Path
 from typing import Any
 
 from runtime.system import qr
-from runtime.system.host import Account, DeployKey, DryHost, Host, RealHost
+from runtime.system.host import Account, DeployKey, DryHost, Host
 from runtime.system.job import refuse
 from runtime.system.journal import Journal
+from runtime.system.real_host import RealHost
 from runtime.system.uninstall import LookingHost
 
 WAITING, RUNNING, DONE, FAILED = "waiting", "running", "done", "failed"

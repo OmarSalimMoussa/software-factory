@@ -8,7 +8,8 @@ import tomllib
 from typing import Any
 
 from runtime.shared.models import DEPRIORITIZED, RETIRED
-from runtime.shared.settings import SCHEMA, SettingsError, _flatten, build
+from runtime.shared.settings import SettingsError, _flatten, build
+from runtime.shared.settings_schema import SCHEMA
 from runtime.system import layout
 from runtime.system.host import Account, Host
 from runtime.system.job import Install, github_name, github_origin, refuse

@@ -5,9 +5,10 @@ from __future__ import annotations
 import html
 from typing import Any
 
-from runtime.dashboard.views import agentwords, messaging, proposals, taskwords
+from runtime.dashboard.views import messaging, proposals
 from runtime.dashboard.views.kit import Parts, Query, Snap, clock, epoch, iso, model_word, plural, span, when
 from runtime.dashboard.views.shell import github_url, health, prod_runs_staging
+from runtime.dashboard.views.words import agentwords, taskwords
 from runtime.shared.models import RETIRED, WAITING
 from runtime.shared.paths import PROMOTE_WORKFLOW
 

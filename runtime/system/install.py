@@ -29,7 +29,7 @@ from runtime.shared import environment  # noqa: E402 - the path line above must 
 from runtime.shared.paths import Places  # noqa: E402
 from runtime.shared.protocol import Refused  # noqa: E402
 from runtime.system import ci_check, healthchecks, layout, release, sealed
-from runtime.system.host import Account, CommandError, Host, RealHost  # noqa: E402
+from runtime.system.host import Account, CommandError, Host  # noqa: E402
 from runtime.system.install_drills import drills
 from runtime.system.install_steps import (
     steps_machine,
@@ -41,6 +41,7 @@ from runtime.system.install_steps import (
 )
 from runtime.system.job import REPO_ROOT, Install, refuse  # noqa: E402
 from runtime.system.journal import Journal  # noqa: E402
+from runtime.system.real_host import RealHost  # noqa: E402
 from runtime.system.uninstall import LookingHost  # noqa: E402
 
 PROGRAM = "install.py"

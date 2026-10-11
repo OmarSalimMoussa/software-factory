@@ -6,9 +6,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from runtime.dashboard.views import agentwords as words
 from runtime.dashboard.views.kit import PartError, Snap, broken, when
 from runtime.dashboard.views.shell import factory_state
+from runtime.dashboard.views.words import agentwords as words
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING
 
 _NOTES = {

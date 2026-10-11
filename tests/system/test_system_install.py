@@ -10,10 +10,11 @@ from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVIN
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
 from runtime.system import ci_check, install, layout, render, uninstall
-from runtime.system.host import DryHost, RealHost
+from runtime.system.host import DryHost
 from runtime.system.install_steps import steps_machine, steps_prepare, steps_secrets, steps_services, steps_wire
 from runtime.system.job import Install
 from runtime.system.journal import Journal
+from runtime.system.real_host import RealHost
 from runtime.warden.sessions import registry
 
 

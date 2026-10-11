@@ -18,7 +18,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from runtime.shared.settings import SCHEMA, Settings
+from runtime.shared.settings import Settings
+from runtime.shared.settings_schema import SCHEMA
 from runtime.slots import leases
 from runtime.system import layout
 from runtime.warden.sessions import launch, session_settings

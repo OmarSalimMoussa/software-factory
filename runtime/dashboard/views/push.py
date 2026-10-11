@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.dashboard.views import taskwords
 from runtime.dashboard.views.home import env_card
 from runtime.dashboard.views.kit import Parts, Query, Snap, epoch, span, when
 from runtime.dashboard.views.shell import health, prod_runs_staging
 from runtime.dashboard.views.task import built_from
+from runtime.dashboard.views.words import taskwords
 
 WANTS = ("settings", "probes", "queue", "deploys", "ci", "sessions", "cost", "cards", "qa", "specs", "rules", "outage")
 

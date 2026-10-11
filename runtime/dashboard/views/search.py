@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.dashboard.views import agentwords, docs, settings
+from runtime.dashboard.views import docs, settings
 from runtime.dashboard.views.kit import KIND_LOOK, Parts, Query, Snap
 from runtime.dashboard.views.shell import PAGES
+from runtime.dashboard.views.words import agentwords, settingwords
 from runtime.shared.models import RETIRED
 
 WANTS = (*docs.WANTS, "cost")
@@ -67,7 +68,7 @@ def search(snap: Snap, query: str) -> dict[str, Any]:
                 }
             )
     rows = []
-    for _, title, _, keys in settings.GROUPS:
+    for _, title, _, keys in settingwords.GROUPS:
         for key, label in keys:
             if _has(q, label, key, title):
                 value = settings.shown(key, settings.saved(snap.settings, key))

@@ -31,17 +31,12 @@ from runtime.shared import environment  # noqa: E402 - the path line above must 
 from runtime.shared.paths import Places  # noqa: E402
 from runtime.shared.protocol import Refused  # noqa: E402
 from runtime.system import install, layout, sealed
-from runtime.system.host import (  # noqa: E402
-    Account,
-    CommandError,  # noqa: E402
-    Host,
-    RealHost,
-    as_user,
-)
+from runtime.system.host import Account, CommandError, Host, as_user  # noqa: E402
 from runtime.system.install_console import console_page  # noqa: E402
 from runtime.system.install_console.console_app import Choices, Console, Hosts, Reply, refused  # noqa: E402
 from runtime.system.install_console.console_run import ConsoleHost, ConsoleLookingHost  # noqa: E402
 from runtime.system.job import REPO_ROOT  # noqa: E402
+from runtime.system.real_host import RealHost  # noqa: E402
 
 log = logging.getLogger("factory.console")
 

@@ -26,7 +26,8 @@ from runtime.shared import store
 from runtime.shared.models import RETIRED
 from runtime.shared.paths import SLICE, Places
 from runtime.shared.protocol import Refused
-from runtime.shared.settings import AT_INSTALL, Settings, SettingsError
+from runtime.shared.settings import Settings, SettingsError
+from runtime.shared.settings_schema import AT_INSTALL, SCHEMA
 from runtime.warden import public
 from runtime.warden.context import Context
 from runtime.warden.owner import ops
@@ -181,9 +182,7 @@ def save(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     fixed = sorted(key for key in changes if key in READ_ONLY)
     if fixed:
         raise Refused("settings", f"{', '.join(fixed)} {'is' if len(fixed) == 1 else 'are'} set by the installer")
-    wired = sorted(
-        key for key in changes if key in settings_module.SCHEMA and settings_module.SCHEMA[key].when == AT_INSTALL
-    )
+    wired = sorted(key for key in changes if key in SCHEMA and SCHEMA[key].when == AT_INSTALL)
     if wired:
         raise Refused("settings", f"{', '.join(wired)} {'is' if len(wired) == 1 else 'are'} wired in at install: "
                       f"install again with --set {wired[0]}=<value>")  # fmt: skip

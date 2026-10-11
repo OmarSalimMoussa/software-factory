@@ -12,9 +12,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from runtime.dashboard.views import proposals, settings, taskwords
+from runtime.dashboard.views import proposals, settings
 from runtime.dashboard.views.agent import agent_version
 from runtime.dashboard.views.kit import PartError, Snap, plural
+from runtime.dashboard.views.words import taskwords
 
 STALE = "This changed; here it is now."
 Body = dict[str, Any]

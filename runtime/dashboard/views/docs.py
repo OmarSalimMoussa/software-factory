@@ -6,8 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from runtime.dashboard.views import taskwords
 from runtime.dashboard.views.kit import INBOX_TONES, KIND_LOOK, REFLECT_TONES, Snap, epoch, first_line
+from runtime.dashboard.views.words import taskwords
 from runtime.queue.formats import outcome
 
 WANTS = ("settings", "queue", "goal", "reflections", "proposals", "sessions", "outage")

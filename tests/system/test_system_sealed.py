@@ -13,7 +13,8 @@ from system_fakes import SHA
 from runtime.shared import environment
 from runtime.shared.protocol import Refused
 from runtime.system import layout, sealed
-from runtime.system.host import DryHost, RealHost, user_env
+from runtime.system.host import DryHost, user_env
+from runtime.system.real_host import RealHost
 
 STAGE = layout.STAGE_ROOT / f"{SHA}-0a1b2c3d"
 CHECKOUT = Path("/home/owner/software-factory")

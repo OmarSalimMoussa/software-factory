@@ -28,10 +28,11 @@ from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, S
 from runtime.shared.protocol import Refused  # noqa: E402
 from runtime.system import layout, sealed  # noqa: E402
 from runtime.system.github_keys import WARDEN_TITLE  # noqa: E402
-from runtime.system.host import Account, CommandError, DryHost, Host, RealHost  # noqa: E402
+from runtime.system.host import Account, CommandError, DryHost, Host  # noqa: E402
 from runtime.system.install_steps import steps_prepare, steps_wire
 from runtime.system.job import REPO_ROOT, Install  # noqa: E402
 from runtime.system.journal import Journal  # noqa: E402
+from runtime.system.real_host import RealHost  # noqa: E402
 
 PROGRAM = "uninstall.py"
 

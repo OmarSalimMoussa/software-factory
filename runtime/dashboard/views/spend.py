@@ -6,7 +6,6 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from runtime.dashboard.views import agentwords, taskwords
 from runtime.dashboard.views.kit import (
     FAMILIES,
     PartError,
@@ -22,6 +21,7 @@ from runtime.dashboard.views.kit import (
     span,
     when,
 )
+from runtime.dashboard.views.words import agentwords, taskwords
 
 WANTS = ("settings", "plan", "cost", "queue", "sessions")
 RANGES = {"1": "Today", "7": "Last 7 days", "14": "Last 14 days"}

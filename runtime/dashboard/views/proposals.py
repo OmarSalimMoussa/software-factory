@@ -10,8 +10,8 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from runtime.dashboard.views import agentwords, taskwords
 from runtime.dashboard.views.kit import Snap, ago, broken, epoch, plural, spelled, version
+from runtime.dashboard.views.words import agentwords, taskwords
 
 _settled: dict[int, dict[str, Any]] = {}
 _done: dict[str, tuple[float, str]] = {}

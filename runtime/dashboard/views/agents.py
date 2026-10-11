@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.dashboard.views import agentwords as words
 from runtime.dashboard.views.kit import (
     FAMILIES,
     Parts,
@@ -20,6 +19,7 @@ from runtime.dashboard.views.kit import (
     when,
 )
 from runtime.dashboard.views.shell import factory_state
+from runtime.dashboard.views.words import agentwords as words
 from runtime.shared.models import DEPRIORITIZED, HOLDS_SLOT, RETIRED
 
 WANTS = ("settings", "sessions", "queue", "cost", "factory", "slots", "history")

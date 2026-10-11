@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.dashboard.views import taskwords
 from runtime.dashboard.views.kit import (
     PartError,
     Parts,
@@ -20,6 +19,7 @@ from runtime.dashboard.views.kit import (
     when,
 )
 from runtime.dashboard.views.shell import prod_runs_staging
+from runtime.dashboard.views.words import taskwords
 from runtime.queue.formats import outcome
 from runtime.shared import order
 

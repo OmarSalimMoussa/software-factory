@@ -26,7 +26,8 @@ from runtime.guard.facts import (
 )
 from runtime.guard.wire import REFUSED
 from runtime.shared.models import RETIRED, WITH_PARENT
-from runtime.shared.settings import SCHEMA, model_role
+from runtime.shared.settings import model_role
+from runtime.shared.settings_schema import SCHEMA
 
 INTAKE = "intake"
 TESTER, CRITIC = "qa-", "critic-"

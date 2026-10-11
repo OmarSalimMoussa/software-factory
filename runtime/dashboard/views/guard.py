@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.dashboard.views import agentwords
 from runtime.dashboard.views.home import memory_free
 from runtime.dashboard.views.kit import Parts, Query, Snap
+from runtime.dashboard.views.words import agentwords
 from runtime.shared.models import RETIRED
 
 WANTS = ("settings", "vitals", "slots", "sessions", "queue", "refusals", "rules", "docker")
