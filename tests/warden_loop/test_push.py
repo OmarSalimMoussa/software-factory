@@ -13,8 +13,8 @@ from runtime.queue import formats, records, turn
 from runtime.shared import models, store, upgrades
 from runtime.shared.models import Probe, Task
 from runtime.shared.protocol import Refused
-from runtime.warden import inbox, pins
-from runtime.warden.delivery import deploys, github_push, prod_push
+from runtime.warden import inbox
+from runtime.warden.delivery import deploys, github_push, pins, prod_push
 from runtime.warden.health import probes
 from runtime.warden.owner import ops
 

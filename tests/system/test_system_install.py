@@ -18,7 +18,7 @@ from runtime.system.install_steps import steps_machine, steps_prepare, steps_sec
 from runtime.system.job import REPO_ROOT, Install
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
-from runtime.warden import pins
+from runtime.warden.delivery import pins
 from runtime.warden.sessions import registry
 
 

@@ -125,7 +125,7 @@ VERBS: dict[str, Verb] = {
     "orchestrator.start": _o("runtime.warden.sessions.lifecycle:owner_start_orchestrator"),
     "factory.pause": _o("runtime.warden.sessions.revive:owner_pause", coded=True),
     "factory.resume": _o("runtime.warden.sessions.revive:owner_resume"),
-    "factory.upgrade": _o("runtime.warden.factory_upgrade:start", coded=True),
+    "factory.upgrade": _o("runtime.warden.owner.factory_upgrade:start", coded=True),
     "outage.stop": _o("runtime.warden.delivery.outage:owner_stop_fix"),
     "settings.save": _o("runtime.warden.owner.settings_save:save", coded=True),
     "repo.change": _o("runtime.warden.owner.settings_save:change_repo", coded=True),

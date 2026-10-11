@@ -26,12 +26,12 @@ from runtime.shared import models, protocol, store
 from runtime.shared.models import RETIRED
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
-from runtime.warden import factory_upgrade, gc, public
+from runtime.warden import gc, public
 from runtime.warden.context import Context
 from runtime.warden.delivery import ci_watch, deploys, outage, prod_push
 from runtime.warden.folds import Cost, History, Refusals, Streaks, kept
 from runtime.warden.health import probes
-from runtime.warden.owner import accounts, codes, messages, reflections, settings_save
+from runtime.warden.owner import accounts, codes, factory_upgrade, messages, reflections, settings_save
 from runtime.warden.sessions import doing, lifecycle, permits, registry
 from runtime.warden.spend import plan
 

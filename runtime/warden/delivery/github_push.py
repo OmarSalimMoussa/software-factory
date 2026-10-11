@@ -22,9 +22,9 @@ from runtime.shared import environment
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.shared.settings import Settings
-from runtime.warden import checks, pins
+from runtime.warden import checks
 from runtime.warden.context import Context
-from runtime.warden.delivery import deploys
+from runtime.warden.delivery import deploys, pins
 from runtime.warden.health import probes
 
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")

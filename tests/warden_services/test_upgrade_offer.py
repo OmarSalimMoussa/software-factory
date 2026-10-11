@@ -15,10 +15,9 @@ from runtime.shared import releases, upgrades
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.system.runners import upgrade as upgrade_runner
-from runtime.warden import factory_upgrade
 from runtime.warden.context import Context
 from runtime.warden.dispatch import Doors
-from runtime.warden.owner import ops
+from runtime.warden.owner import factory_upgrade, ops
 from runtime.warden.sessions import lifecycle
 
 OLD, NEW = "a" * 40, "b" * 40
