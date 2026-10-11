@@ -17,7 +17,6 @@ from pathlib import Path
 import pytest
 
 from checks.runner import catalog, cli
-from runtime.shared import settings as settings_mod
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -91,8 +90,7 @@ def test_the_factory_passes_each_gated_check(check_id: str) -> None:
 @pytest.mark.parametrize("check_id", RATCHETS)
 def test_this_push_holds_each_ratchet(check_id: str) -> None:
     out = io.StringIO()
-    settings = settings_mod.load(ROOT / "settings.toml", None)
-    status = cli.run(["--since", base_of_this_push(), "--only", check_id], ROOT, settings, out)
+    status = cli.run(["--since", base_of_this_push(), "--only", check_id], ROOT, None, out)
     assert status == 0, out.getvalue()
 
 

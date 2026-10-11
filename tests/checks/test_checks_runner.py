@@ -58,6 +58,24 @@ def test_since_a_commit_checks_only_what_head_adds_to_it(
     assert "over 1 changed path(s)" in check(fixture_product, "--only", "qa-scenarios", "--since", first)[1]
 
 
+@pytest.mark.parametrize(
+    ("since", "status", "said"),
+    [(True, 0, "over 1 changed path(s)"), (False, 2, "on CI, run factory check --all, or --since")],
+    ids=["since-a-commit", "a-bare-branch-run"],
+)
+def test_on_ci_without_settings_only_a_named_base_or_everything_runs(
+    fixture_product: Path, commit: Callable[[Path, str], None], since: bool, status: int, said: str
+) -> None:
+    subprocess.run(["git", "checkout", "-q", "-b", "work"], cwd=fixture_product, check=True)
+    first = subprocess.run(["git", "rev-parse", "HEAD"], cwd=fixture_product, capture_output=True, text=True,
+                           check=True).stdout.strip()  # fmt: skip
+    (fixture_product / "qa" / "scenarios" / "README.md").write_text("# QA scenarios\n\nEach opens with its labels.\n")
+    commit(fixture_product, "words")
+    out = io.StringIO()
+    argv = ["--only", "qa-scenarios", *(["--since", first] if since else [])]
+    assert (cli.run(argv, fixture_product, None, out), said in out.getvalue()) == (status, True), out.getvalue()
+
+
 def test_an_uncommitted_change_is_refused(
     fixture_product: Path, monkeypatch: pytest.MonkeyPatch, commit: Callable[[Path, str], None]
 ) -> None:

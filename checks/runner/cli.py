@@ -52,8 +52,8 @@ def on_ci() -> bool:
 
 
 def effective_settings() -> Settings | None:
-    """The machine's effective settings, which the warden publishes; None on CI, where only --all runs and nothing
-    else shares the machine, so a test run needs no memory guard."""
+    """The machine's effective settings, which the warden publishes; None on CI, where only --all or --since runs and
+    nothing else shares the machine, so a test run needs no memory guard."""
     if on_ci():
         return None
     return settings_mod.build(store.read_json(Places.system().state / "public" / "settings.json"), {})
@@ -72,15 +72,18 @@ def chosen(only: str | None) -> list[str]:
 def changed_paths(root: Path, settings: Settings | None, since: str | None) -> tuple[str, tuple[str, ...]] | None:
     """Where the branch left the default branch (or ``since``), and what HEAD changed since; None when it adds
     nothing."""
-    if settings is None:
-        raise Refusal("on CI, run factory check --all")
+    if since is not None:
+        compared = since
+    elif settings is not None:
+        compared = settings.get_str("repo.default_branch")
+    else:  # on CI no settings name the default branch, so only a named base or everything can be checked
+        raise Refusal("on CI, run factory check --all, or --since the commit to compare with")
     if git(root, "status", "--porcelain", "--untracked-files=no").strip():
         raise Refusal("commit your changes first: factory check checks what the branch has committed")
-    branch = settings.get_str("repo.default_branch")
     try:
-        base = git(root, "merge-base", "HEAD", since or branch).strip()
+        base = git(root, "merge-base", "HEAD", compared).strip()
     except GitError as exc:
-        raise Refusal(f"cannot find where this branch left {since or branch}: {exc}") from exc
+        raise Refusal(f"cannot find where this branch left {compared}: {exc}") from exc
     if base == git(root, "rev-parse", "HEAD").strip():
         return None
     return base, tuple(p for p in git(root, "diff", "--name-only", "-z", base, "HEAD").split("\0") if p)
