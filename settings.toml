@@ -31,6 +31,7 @@ qa_prod = { model = "claude-haiku-5-5", effort = "high" }
 implementers = 3
 designers = 2
 subagents_at_once = 4
+browsers_at_once = 4    # browser testers on the whole machine at once: each one is a browser in the slice's memory
 
 [subagents]             # which subagent kinds each role may start
 browser_personas = ["qa-ui-function", "qa-ux", "qa-visual", "qa-regression", "qa-prod"]

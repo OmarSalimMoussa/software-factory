@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import socket
+import threading
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -106,3 +107,27 @@ def test_a_guard_that_runs_out_of_its_time_refuses_the_call_instead_of_letting_i
     assert time.monotonic() - started < 2
     assert code == 2 and "ran out of time" in err
     assert handled(kit.payload("Read", {"file_path": "/x"}))[0] == 0
+
+
+def test_a_subagent_the_warden_never_registered_is_registered_again_on_its_calls(kit: Kit) -> None:
+    kit.places.socket.parent.mkdir(parents=True, exist_ok=True)
+    asked: list[dict[str, object]] = []
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+        server.bind(str(kit.places.socket))
+        server.listen(1)
+        server.settimeout(5)
+
+        def answer() -> None:
+            conn, _ = server.accept()
+            with conn:
+                asked.append(json.loads(conn.makefile("rb").readline()))
+                conn.sendall(b'{"ok": true}\n')
+
+        warden = threading.Thread(target=answer)
+        warden.start()
+        payload = {"hook_event_name": "PreToolUse", "session_id": SID, "agent_id": TESTER_ID,
+                   "agent_type": "qa-ux", "tool_name": "Read", "tool_input": {"file_path": "/x"}}  # fmt: skip
+        _handle(kit, payload)
+        warden.join(5)
+
+    assert [(a["verb"], a["args"]) for a in asked] == [("subagent.start", {"agent_id": TESTER_ID, "kind": "qa-ux"})]

@@ -18,7 +18,7 @@ from runtime.shared import store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import leases
-from runtime.warden import registry
+from runtime.warden import public, registry
 from runtime.warden.context import Context, StackResult
 
 ORCH, IMPL = "orchestrator", "implementer"
@@ -94,9 +94,9 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
 
 
 def _desktops(ctx: Context) -> dict[str, str]:
-    raw = store.read_json_or(ctx.places.state / "desktops.json", {})
+    raw = store.read_json_or(public.desktops_path(ctx.places), {})
     if not isinstance(raw, dict) or not all(isinstance(v, str) for v in raw.values()):
-        raise store.StoreError(f"{ctx.places.state / 'desktops.json'}: not a holder per slot")
+        raise store.StoreError(f"{public.desktops_path(ctx.places)}: not a holder per slot")
     return raw
 
 
@@ -116,7 +116,7 @@ def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> None:
                 raise Refused("desktop", f"slot {n}'s desktop is {holder.name}'s until it hands back; test what "
                                          "needs no desktop first, then try again")  # fmt: skip
             held[str(n)] = agent
-        store.write_json(ctx.places.state / "desktops.json", held)
+        store.write_json(public.desktops_path(ctx.places), held)
 
 
 def _verb(op: object, args: dict[str, Any]) -> list[str]:

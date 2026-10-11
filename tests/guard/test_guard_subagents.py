@@ -12,6 +12,7 @@ import pytest
 from guard_kit import NOW, TESTER_ID, Kit, agent_use, bash_use, entry, result
 
 from runtime.guard.facts import Refusal, Rewrite
+from runtime.shared import store
 
 TESTER = {"agent_id": TESTER_ID, "agent_type": "qa-backend"}
 
@@ -187,26 +188,37 @@ def test_a_testers_time_runs_out_and_its_shell_timeouts_are_cut_but_its_report_g
 
 
 @pytest.mark.parametrize(
-    ("used", "tool", "refused"),
+    ("leased", "tool", "refused"),
     [
-        (None, "mcp__computer-use__screenshot", True),
-        (None, "mcp__qa-browser__browser_mouse_click_xy", True),
-        ("mcp__computer-use__left_click", "Read", True),
-        (None, "mcp__qa-browser__browser_click", False),
-        (None, "Read", False),
+        (True, "mcp__computer-use__screenshot", True),
+        (True, "Read", True),
+        (False, "mcp__qa-browser__browser_mouse_click_xy", False),  # a mouse step on a web page is no desktop use
+        (False, "Read", False),
     ],
 )
-def test_a_tester_on_the_remote_desktop_stops_at_its_desktop_time(
-    tmp_path: Path, used: str | None, tool: str, refused: bool
+def test_a_tester_holding_a_desktop_stops_at_its_desktop_time(
+    tmp_path: Path, leased: bool, tool: str, refused: bool
 ) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer")
-    lines = [entry(NOW - timedelta(seconds=310), "user", "Scenarios and checks: 10")]
-    if used:
-        lines.append(entry(NOW - timedelta(seconds=200), "assistant", [{"type": "tool_use", "id": "x", "name": used}]))
-    kit.subagent(TESTER_ID, lines)
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=310), "user", "Scenarios and checks: 10")])
+    store.write_json(kit.public / "desktops.json", {"2": TESTER_ID} if leased else {})
     tester = {"agent_id": TESTER_ID, "agent_type": "qa-ui-function"}
     assert (kit.rule(tool, {"file_path": "/x"}, **tester) == "tester-time") is refused
+
+
+@pytest.mark.parametrize(("running", "level", "refused"), [(3, "green", False), (4, "green", True), (0, "amber", True)])
+def test_browser_testers_are_capped_across_the_machine_and_start_only_on_green_vitals(
+    tmp_path: Path, running: int, level: str, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    for n in range(running):  # other implementers' browser testers
+        kit.session("implementer", sid=f"other-{n}")
+        kit.session("qa-ux", sid=f"tester-{n}", parent=f"other-{n}", agent_id=f"a{n}")
+    store.write_json(kit.public / "vitals.json", {"level": level})
+    brief = "Scenarios and checks: 1\nWalk the sign-in."
+    assert (kit.rule("Agent", {"subagent_type": "qa-ux", "prompt": brief}) == "subagents-at-once") is refused
 
 
 @pytest.mark.parametrize("kind", ["intake", "Explore", "qa-backend"])

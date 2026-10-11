@@ -93,6 +93,24 @@ def read_switches(places: Places) -> frozenset[str]:
     return frozenset(off)
 
 
+def read_vitals_level(places: Places) -> str:
+    """The machine's vitals level the warden last published; "unknown" before its first reading."""
+    raw = store.read_json_or(public(places) / "vitals.json", {"level": "unknown"})
+    level = raw.get("level") if isinstance(raw, dict) else None
+    if not isinstance(level, str):
+        raise store.StoreError(f"{public(places) / 'vitals.json'}: holds no level")
+    return level
+
+
+def read_desktops(places: Places) -> dict[str, str]:
+    """Who holds each slot's desktop: slot number to subagent id; none before any tester took one."""
+    path = public(places) / "desktops.json"
+    raw = store.read_json_or(path, {})
+    if not isinstance(raw, dict) or not all(isinstance(v, str) for v in raw.values()):
+        raise store.StoreError(f"{path}: not a holder per slot")
+    return {str(k): v for k, v in raw.items()}
+
+
 def read_settings(places: Places) -> Settings:
     """The effective settings the warden published, checked again against the schema."""
     tree = store.read_json(public(places) / "settings.json")

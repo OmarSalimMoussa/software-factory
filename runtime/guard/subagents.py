@@ -20,7 +20,9 @@ from runtime.guard.facts import (
     Decision,
     Refusal,
     Rewrite,
+    read_desktops,
     read_ready,
+    read_vitals_level,
 )
 from runtime.guard.wire import REFUSED
 from runtime.shared.models import RETIRED, WITH_PARENT
@@ -77,9 +79,31 @@ def _model(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision
     return Refusal("model", f"a {kind} {wanted}; leave the model out")
 
 
+def _browsers(call: Call, kind: str) -> Decision:
+    """A browser tester holds a browser in the slice's memory: the whole machine runs at most caps.browsers_at_once,
+    whichever sessions start them, and starts one only while the machine's vitals are green."""
+    personas = call.settings.get_list("subagents.browser_personas")
+    if kind not in personas:
+        return None
+    alive = {sid for sid, s in call.sessions.items() if s.state in ("working", "waiting")}
+    running = [s for s in call.sessions.values() if s.parent in alive and s.state == "working" and s.role in personas]
+    cap = call.settings.get_int("caps.browsers_at_once")
+    if len(running) >= cap:
+        return Refusal("subagents-at-once", f"{len(running)} browser testers run on this machine, its cap of {cap}; "
+                                            "wait for one to report")  # fmt: skip
+    level = read_vitals_level(call.places)
+    if level != "green":
+        return Refusal("subagents-at-once", f"the machine's vitals are {level}: a browser tester starts once they "
+                                            "are green; test what needs no browser first")  # fmt: skip
+    return None
+
+
 def _at_once(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     if call.off("subagents-at-once"):
         return None
+    machine = _browsers(call, kind)
+    if machine is not None:
+        return machine
     running = [c for c in calls if _running(call, c)]
     cap = call.settings.get_int("caps.subagents_at_once")
     # One place is kept for intake, so a severe request is never left waiting for a tester to finish.
@@ -280,9 +304,10 @@ def _time_left(call: Call) -> float | Refusal:
     budget = float(items * call.settings.get_int("qa.seconds_per_item"))
     desktop_s = call.settings.get_int("qa.desktop_seconds")
     spent = (call.now - started).total_seconds()
-    desktop = call.tool.startswith(browser.DESKTOP)
-    if desktop and spent >= desktop_s:
-        return Refusal("tester-time", f"the remote desktop is for a tester's first {desktop_s} s; report what you have")
-    if desktop or transcript.used_any(path, browser.DESKTOP):
+    # Desktop time is a tester's that holds a slot's desktop lease: a mouse step on a web page is no desktop use.
+    if call.agent_id in read_desktops(call.places).values():
+        if spent >= desktop_s:
+            return Refusal("tester-time", f"the remote desktop is for a tester's first {desktop_s} s; report what you "
+                                          "have")  # fmt: skip
         budget = min(budget, desktop_s)
     return budget - spent if budget > spent else Refusal("tester-time", TIME_UP)

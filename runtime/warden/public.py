@@ -1,6 +1,7 @@
 """What the warden publishes for other users to read, in its state folder's public/ (0755).
 
-The guard and the sessions read the effective settings and the rule switches here; the warden alone writes them.
+The guard and the sessions read the effective settings, the rule switches, the machine's vitals level and who holds
+each slot's desktop here; the warden alone writes them.
 """
 
 from __future__ import annotations
@@ -27,6 +28,16 @@ def write_switches(places: Places, off: Iterable[str]) -> None:
     record = {"off": sorted(set(off))}
     store.write_json(places.switches, record, mode=0o600)
     store.write_json(folder(places) / "switches.json", record)
+
+
+def write_vitals_level(places: Places, level: str) -> None:
+    """The machine's vitals level, for the guard's start of a browser tester."""
+    store.write_json(folder(places) / "vitals.json", {"level": level})
+
+
+def desktops_path(places: Places) -> Path:
+    """Who holds each slot's desktop (slot number to subagent id), for the guard's desktop time."""
+    return folder(places) / "desktops.json"
 
 
 def read_switches(places: Places) -> set[str]:

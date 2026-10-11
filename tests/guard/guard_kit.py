@@ -52,6 +52,7 @@ class Kit:
         (self.places.plugin / "self-reflect.md").write_text("Write to SELF_REFLECT.md when a miss got past you.\n")
         self.settings()
         self.transcript([])
+        store.write_json(self.public / "vitals.json", {"level": "green"})  # the warden's last reading
 
     @property
     def public(self) -> Path:
