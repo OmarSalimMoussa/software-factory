@@ -7,7 +7,7 @@ import dataclasses
 import pytest
 from queue_kit import World
 
-from runtime.queue import statuses, tasks, turn
+from runtime.queue import documents, statuses, tasks, turn
 from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
 from runtime.shared.models import Task
 from runtime.shared.protocol import Refused
@@ -79,3 +79,15 @@ def test_one_task_holds_the_merge_turn_and_turn_next_picks_by_after_then_the_ord
     tasks.move(world.ctx(), first.id, "merged", "merged", "warden", "merged")
     assert turn.holder(world.places) is None
     assert turn.next_turn(world.ctx(), {}, None)["task"] == second.id  # the blocked one waits for its after task
+
+
+def test_an_approved_spec_gives_its_task_the_slice_count_it_lists(world: World) -> None:
+    task = world.task(slices=1)
+    world.queue().write_task(dataclasses.replace(task, status="designing", run=3))
+    with pytest.raises(Refused, match="--slices"):
+        documents.save_spec(world.ctx("designer", "s-design"), task.id, b"# A spec\n\nThe plan.\n", None)
+    documents.save_spec(world.ctx("designer", "s-design"), task.id, b"# A spec\n\nFour slices.\n", 4)
+    assert world.queue().task(task.id).slices == 1  # an estimate until the spec is approved
+
+    tasks.set_status(world.ctx(), task.id, "building", "spec-approved", "")
+    assert world.queue().task(task.id).slices == 4

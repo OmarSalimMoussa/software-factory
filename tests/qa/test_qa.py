@@ -117,3 +117,30 @@ def test_only_a_registered_tester_reports_a_result(ready_world: World) -> None:
     qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
     with pytest.raises(Refused, match="registered tester"):
         _result(ready_world, "")
+
+
+@pytest.mark.parametrize(
+    ("log", "found"),
+    [
+        (f"{'b' * 40}\t2/2\n{'a' * 40}\t1/2\n", ["a" * 40, "b" * 40]),
+        (f"{'c' * 40}\t2/2\n{'b' * 40}\t2/2\n{'a' * 40}\t1/2\n", ["a" * 40, "c" * 40]),  # the newest per slice
+        (f"{'a' * 40}\t1/2\n", None),
+    ],
+    ids=["both-slices", "a-slice-redone", "a-slice-missing"],
+)
+def test_qa_ready_finds_each_slices_commit_by_its_trailer(
+    ready_world: World, log: str, found: list[str] | None
+) -> None:
+    task = ready_world.queue().task("t-0001")
+    ready_world.queue().write_task(dataclasses.replace(task, slices=2))
+    answers = {"rev-parse": HEAD, "show": PREFIXES, "diff": "web/page.ts\n", "merge-base": "", "log": log}
+    ready_world.launcher.git = lambda argv: (0, answers[argv[3]])
+    impl = ready_world.ctx("implementer", IMPL_ID)
+
+    if found is None:
+        with pytest.raises(Refused, match="Slice: 2/2"):
+            qa.qa_ready(impl, {"head": HEAD[:12]}, None)
+        return
+    qa.qa_ready(impl, {"head": HEAD[:12]}, None)
+    record = json.loads((ready_world.places.state / "public" / "ready" / f"{IMPL_ID}.json").read_text())["records"][-1]
+    assert record["slices"] == found

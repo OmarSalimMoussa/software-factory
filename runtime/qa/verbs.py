@@ -7,6 +7,7 @@ runs; the guard reads the records from public/ to let testers start, and counts 
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,10 @@ def _implementer(ctx: Context) -> Session:
     if session is None or session.role != IMPL or session.state == RETIRED:
         raise Refused("qa", "QA belongs to a live implementer's run")
     return session
+
+
+# A slice's commit ends its message with this trailer: `Slice: 2/4`.
+_SLICE = re.compile(r"(\d+)/\d+")
 
 
 def _git(ctx: Context, cwd: str, *argv: str) -> str:
@@ -81,11 +86,13 @@ def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     branch here: its merge turn names it, and the warden finds its merge by it."""
     session = _implementer(ctx)
     asked, slices = args.get("head"), args.get("slices")
-    if not isinstance(asked, str) or not SHA.match(asked) or not isinstance(slices, list) or not slices:
-        raise Refused("qa-ready", "qa-ready names the head and one commit per slice: qa-ready <head> --slices …")
-    if not all(isinstance(s, str) and SHA.match(s) for s in slices):
-        raise Refused("qa-ready", "each slice is a commit sha")
+    if not isinstance(asked, str) or not SHA.match(asked):
+        raise Refused("qa-ready", "qa-ready names the head: qa-ready <head>")
     task = tasks.read(ctx, session.task)
+    if slices is None:
+        slices = _slice_commits(ctx, session, asked, task.slices)
+    if not isinstance(slices, list) or not slices or not all(isinstance(s, str) and SHA.match(s) for s in slices):
+        raise Refused("qa-ready", "each slice is a commit sha")
     if task.slices and len(slices) != task.slices:
         raise Refused("qa-ready", f"{task.id} has {task.slices} slices; name one commit for each, not {len(slices)}")
     head = _head(ctx, session)
@@ -116,6 +123,27 @@ def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     if task.status == "building":
         tasks.move(ctx, task.id, "qa", "qa-ready", IMPL, f"ready for QA at {head[:9]}", branch=branch)
     return ok(head=head, slot=lease.slot, testers=[{"tester": t, "why": why} for t, why in testers.items()])
+
+
+def _slice_commits(ctx: Context, session: Session, head: str, count: int | None) -> list[str]:
+    """The commit each slice ended with, found by its `Slice: <n>/<N>` trailer on the branch: the newest per slice,
+    in slice order. Refused, naming what is missing, unless every slice of the task's count has one."""
+    default = ctx.settings().get_str("repo.default_branch")
+    log = _git(ctx, session.worktree, "log", "--format=%H%x09%(trailers:key=Slice,valueonly,separator=%x20)",
+               f"{default}..{head}")  # fmt: skip
+    found: dict[int, str] = {}
+    for line in log.splitlines():
+        commit, _, trailer = line.partition("\t")
+        mark = _SLICE.fullmatch(trailer.strip())
+        if mark and int(mark.group(1)) not in found:
+            found[int(mark.group(1))] = commit
+    want = count if count else max(found, default=0)
+    missing = [str(n) for n in range(1, want + 1) if n not in found]
+    if not want or missing:
+        named = f"Slice: {', '.join(missing) or 1}/{want or 'N'}"
+        raise Refused("qa-ready", f"no commit on your branch carries the trailer {named}; end each slice's commit "
+                                  "with it, or name the commits with --slices")  # fmt: skip
+    return [found[n] for n in range(1, want + 1)]
 
 
 def ready_check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:

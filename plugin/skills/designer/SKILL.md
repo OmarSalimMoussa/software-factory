@@ -37,10 +37,11 @@ Write the spec as one Markdown file in your worktree, a `# Title` line then thes
 5. **QA:** the standing scenarios to add or change, and checks specific enough to pass or fail, each doable in one
    tester item.
 6. **Slices:** an order an implementer can build and verify one at a time. Their number is the build's slice
-   count, and it routes the build: at most `routing.small_max_slices` goes to a small implementer.
+   count: give it when you save the spec, and once the spec is approved it routes the build (at most
+   `routing.small_max_slices` goes to a small implementer) and is what `qa-ready` holds the build to.
 7. **Risks and open questions,** with the orchestrator's answer to each.
 
-Save it to the queue with `factory spec save <task> <file>`, and again after every revision. It refuses a file off
+Save it to the queue with `factory spec save <task> <file> --slices <N>`, and again after every revision. It refuses a file off
 the queue's format with the reason: fix it and save again.
 
 ## 3. Critic rounds

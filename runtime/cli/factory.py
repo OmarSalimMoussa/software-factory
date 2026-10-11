@@ -97,6 +97,7 @@ def _parser() -> argparse.ArgumentParser:
     spec.add_argument("what", choices=["save"])
     spec.add_argument("task")
     spec.add_argument("file")
+    spec.add_argument("--slices", type=int, required=True, help="the number of slices the spec lists")
     card = sub.add_parser("card")
     card.add_argument("what", choices=["comments"])
     card.add_argument("task")
@@ -116,7 +117,7 @@ def _parser() -> argparse.ArgumentParser:
         qa.add_argument(f"--{key}", type=int)
     ready = sub.add_parser("qa-ready")
     ready.add_argument("head")
-    ready.add_argument("--slices", nargs="+", required=True)
+    ready.add_argument("--slices", nargs="+", help="one commit per slice; by default each slice's Slice: n/N commit")
     sub.add_parser("qa-clean")
     sub.add_parser("ready-check")
     check = sub.add_parser("check", help="the standard checks on your checkout; the warden runs them")
@@ -261,7 +262,7 @@ def _call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
     if cmd == "propose":
         return _propose_call(ns, read_file)
     if cmd == "spec":
-        return Call("spec.save", {"task": ns.task}, read_file(ns.file))
+        return Call("spec.save", {"task": ns.task, "slices": ns.slices}, read_file(ns.file))
     if cmd == "card":
         return Call("card.comments", {"task": ns.task, "count": ns.count})
     if cmd == "needs-owner":
@@ -274,7 +275,7 @@ def _call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
     if cmd == "qa":
         return _qa_call(ns)
     if cmd == "qa-ready":
-        return Call("qa-ready", {"head": ns.head, "slices": _words(ns.slices)})
+        return Call("qa-ready", {"head": ns.head, **({"slices": _words(ns.slices)} if ns.slices else {})})
     if cmd == "check":
         if ns.list:
             return Call("check", {"list": True})

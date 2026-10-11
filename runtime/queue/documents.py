@@ -5,11 +5,13 @@ saved check of the default branch. Each arrives as bytes the caller read itself,
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 
 from runtime.queue import formats, intake, records
-from runtime.queue.book import Queue, spec_rel
+from runtime.queue.book import Queue, spec_rel, task_rel
 from runtime.queue.formats import FormatError
 from runtime.queue.records import CheckRecord, Spec
+from runtime.shared import store
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
 
@@ -23,8 +25,15 @@ def _parsed(text: str, what: str) -> tuple[str, str]:
     return head[2:].strip(), body.strip()
 
 
-def save_spec(ctx: Context, task_id: str, data: bytes | None) -> Spec:
-    """A designer's draft spec of its task; a revision keeps the spec's status and brief."""
+def _slices_path(ctx: Context) -> Path:
+    return ctx.places.state / "spec-slices.json"
+
+
+def save_spec(ctx: Context, task_id: str, data: bytes | None, slices: object) -> Spec:
+    """A designer's draft spec of its task, with the number of slices it lists; a revision keeps the spec's status
+    and brief. The count becomes the task's when the spec is approved: it routes the build and qa-ready holds it."""
+    if isinstance(slices, bool) or not isinstance(slices, int) or slices < 1:
+        raise Refused("slices", "name the number of slices the spec lists: --slices <N>")
     text = intake.body_text(data, "spec", ctx.settings().get_int("queue.max_upload_kib"))
     title, body = _parsed(text, "spec")
     queue = Queue.of(ctx)
@@ -37,7 +46,9 @@ def save_spec(ctx: Context, task_id: str, data: bytes | None) -> Spec:
         if old is not None:
             spec = dataclasses.replace(spec, status=old.status, brief=old.brief)
         queue.write({spec_rel(task_id): records.dump_spec(spec)})
-        queue.log(task_id, ctx.clock.iso(), "designer", "spec", f"spec saved: {title}")
+        queue.log(task_id, ctx.clock.iso(), "designer", "spec", f"spec saved: {title}, {slices} slices")
+        counts = store.read_json_or(_slices_path(ctx), {})
+        store.write_json(_slices_path(ctx), {**counts, task_id: slices}, mode=0o600)
     return spec
 
 
@@ -60,8 +71,14 @@ def save_check(ctx: Context, commit: str, data: bytes | None) -> CheckRecord:
 
 
 def approve_spec(ctx: Context, queue: Queue, task_id: str) -> None:
-    """The spec of a task whose build may start is approved; the caller holds the queue lock."""
+    """The spec of a task whose build may start is approved, and the task takes the spec's slice count; the caller
+    holds the queue lock."""
     spec = queue.spec(task_id)
     if spec is not None:
         approved = dataclasses.replace(spec, status="approved", updated=ctx.clock.iso())
         queue.write({spec_rel(task_id): records.dump_spec(approved)})
+    count = store.read_json_or(_slices_path(ctx), {}).get(task_id)
+    task = queue.task(task_id)
+    if isinstance(count, int) and count != task.slices:
+        queue.write({task_rel(task_id): formats.dump_task(dataclasses.replace(task, slices=count))})
+        queue.log(task_id, ctx.clock.iso(), "warden", "facts", f"slices {count}, as the approved spec lists")

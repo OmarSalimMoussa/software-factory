@@ -102,7 +102,7 @@ def propose_none(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]
 
 
 def spec_save(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
-    spec = documents.save_spec(ctx, _text(args, "task"), data)
+    spec = documents.save_spec(ctx, _text(args, "task"), data, args.get("slices"))
     return ok(task=spec.task, status=spec.status)
 
 
