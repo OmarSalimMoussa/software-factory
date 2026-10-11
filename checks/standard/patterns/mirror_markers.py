@@ -17,8 +17,7 @@ from typing import Any
 from checks.runner import scope
 from checks.runner.repo import Repo
 from checks.runner.values import ValuesError
-from checks.standard import mirrored_constants
-from checks.standard.patterns import copies, engine
+from checks.standard.patterns import copies, engine, mirrored_constants
 
 ID = "mirror-markers"
 RULE = 'Every "must mirror" note is claimed by a test, a group, recorded debt or a reason'

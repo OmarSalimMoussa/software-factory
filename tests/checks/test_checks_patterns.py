@@ -8,7 +8,7 @@ import pytest
 
 from checks.runner.repo import Repo
 from checks.runner.values import ValuesError
-from checks.standard import (
+from checks.standard.patterns import (
     computation_owners,
     js_import_rules,
     mirror_markers,
