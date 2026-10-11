@@ -34,12 +34,23 @@ def asked_path(places: Places) -> Path:
     return places.state / "upgrade-asked.json"
 
 
+OFFER_KEYS = {"available", "checked_at", "note", "base"}
+
+
 def offer(places: Places) -> dict[str, Any]:
-    """The newest release ahead of the installed factory, when GitHub was last asked, and why that failed."""
-    raw = store.read_json_or(offer_path(places), {"available": None, "checked_at": None, "note": None})
-    if not isinstance(raw, dict) or set(raw) != {"available", "checked_at", "note"}:
-        raise store.StoreError(f"{offer_path(places)}: needs available, checked_at and note")
+    """The newest release ahead of ``base`` (the install it was asked for), when GitHub was last asked, and why that
+    failed."""
+    raw = store.read_json_or(offer_path(places), {"available": None, "checked_at": None, "note": None, "base": None})
+    if not isinstance(raw, dict) or set(raw) != OFFER_KEYS:
+        raise store.StoreError(f"{offer_path(places)}: needs {', '.join(sorted(OFFER_KEYS))}")
     return raw
+
+
+def _for_installed(places: Places) -> dict[str, Any] | None:
+    """What is on offer for the factory installed now: none when it was asked for another install."""
+    installed = upgrades.read_installed(places)
+    found = offer(places)
+    return found["available"] if installed is not None and found["base"] == installed["commit"] else None
 
 
 def asked(places: Places) -> dict[str, Any] | None:
@@ -53,13 +64,14 @@ def asked(places: Places) -> dict[str, Any] | None:
 def poll(ctx: Context) -> None:
     settings, places, now = ctx.settings(), ctx.places, ctx.clock.now()
     last, every = offer(places), settings.get_int("install.release_check_hours") * 3600
-    if last["checked_at"] is not None and now - last["checked_at"] < every:
-        return
-    available, note = last["available"], None
+    available, note, base = None, None, None
     try:
         installed = upgrades.read_installed(places)
+        base = installed["commit"] if installed else None
+        # A new install asks again at once: what was on offer may be the very release it installed.
+        if base == last["base"] and last["checked_at"] is not None and now - last["checked_at"] < every:
+            return
         if installed is None:
-            available = None
             note = "Upgrade once by hand from a release file; the dashboard offers every upgrade after that."
         else:
             timeout = float(settings.get_int("watch.http_timeout_seconds"))
@@ -67,10 +79,12 @@ def poll(ctx: Context) -> None:
             available = _ahead(rel, installed["commit"])
     # telemetry: surfaced — the page shows the note; logged when it starts or changes, not at every pass
     except (releases.ReleaseError, store.StoreError) as exc:
+        available = last["available"] if base == last["base"] else None
         note = f"GitHub could not be asked for a newer factory: {exc}"
         if note != last["note"]:
             log.warning("warden: the release check failed (%s)", type(exc).__name__)
-    store.write_json(offer_path(places), {"available": available, "checked_at": now, "note": note}, mode=0o600)
+    record = {"available": available, "checked_at": now, "note": note, "base": base}
+    store.write_json(offer_path(places), record, mode=0o600)
 
 
 def _ahead(rel: releases.Releases, installed: str) -> dict[str, Any] | None:
@@ -86,7 +100,7 @@ def _ahead(rel: releases.Releases, installed: str) -> dict[str, Any] | None:
 def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     places = ctx.places
     commit = args.get("commit")
-    available = offer(places)["available"]
+    available = _for_installed(places)
     if not isinstance(commit, str) or available is None or available["commit"] != commit:
         raise Refused("stale", "This changed: that release is not the one on offer now")
     with ctx.lock:
@@ -173,7 +187,7 @@ def view(ctx: Context) -> dict[str, Any]:
     before = asked(places)
     return {
         "installed": installed["commit"] if installed else None,
-        "offer": offer(places),
+        "offer": {**offer(places), "available": _for_installed(places)},
         "asked": before,
         "op": _op(ctx, before["op"]) if before else None,
         "progress": progress_now(ctx),

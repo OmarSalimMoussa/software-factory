@@ -54,8 +54,12 @@ def allowed(git: Git, places: Places, remote: str, head: str) -> set[str]:
 
 
 def tree_passes(git: Git, places: Places, commit: str) -> bool:
-    parent_tree = f"{commit}^^{{tree}}"
-    return _pin(git, places, commit) is not None and checks.passed(places, git("rev-parse", parent_tree).strip())
+    """A pin's tree counts as checked when its parent's passed, or its parent is a pin that counts: an upgrade's pin
+    may sit on the one before it, not pushed yet."""
+    if _pin(git, places, commit) is None:
+        return False
+    parent = git("rev-parse", f"{commit}^").strip()
+    return checks.passed(places, git("rev-parse", f"{parent}^{{tree}}").strip()) or tree_passes(git, places, parent)
 
 
 def push_pending(ctx: Context) -> None:

@@ -422,3 +422,16 @@ def test_a_git_failure_names_git_s_own_reason_not_its_closing_advice(
 ) -> None:
     with pytest.raises(Refused, match="does not appear to be a git repository"):
         github_push._Git(world.ctx).run("fetch", "--quiet", str(tmp_path / "nowhere"), "+refs/heads/x:refs/x")
+
+
+def test_an_upgrade_s_pin_on_the_last_one_not_yet_pushed_goes_out_after_it(
+    world: World, github_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    passed(world, git(world.checkout, "rev-parse", "HEAD^{tree}"))
+    first = _pin(world, "acme/software-factory@" + "d" * 40)
+    second = _pin(world, "acme/software-factory@" + "e" * 40)
+
+    pins.push_pending(world.ctx)
+
+    assert git(github_repo, "rev-parse", "master") == second
+    assert git(github_repo, "rev-parse", "master^") == first

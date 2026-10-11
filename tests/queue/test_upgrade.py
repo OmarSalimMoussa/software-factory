@@ -12,7 +12,7 @@ from runtime.queue import approvals, formats, intake, turn
 from runtime.queue.book import Queue, task_rel
 from runtime.shared import store
 from runtime.slots import leases
-from runtime.warden import deploys, errors_import, github_push, inbox, probes, upgrade
+from runtime.warden import deploys, errors_import, factory_upgrade, github_push, inbox, probes, upgrade
 from runtime.warden.context import Caller
 
 FULL = "f" * 40
@@ -64,3 +64,12 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
     approval = approvals.current(places, merged.id)
     assert approval is not None and approval.routed == 2
     assert upgrade.migrate(ctx) == []  # once brought over, nothing changes
+
+
+def test_a_release_offer_that_names_no_install_is_asked_for_again(world: World) -> None:
+    path = factory_upgrade.offer_path(world.places)
+    store.write_json(path, {"available": None, "checked_at": 1.0, "note": None})
+    ctx = dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden"))
+
+    assert "the release offer, asked again" in upgrade.migrate(ctx)
+    assert not path.exists() and upgrade.migrate(ctx) == []

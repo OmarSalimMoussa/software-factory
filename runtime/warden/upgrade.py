@@ -17,7 +17,7 @@ from runtime.queue import approvals, formats, turn
 from runtime.queue.book import Queue
 from runtime.shared import store
 from runtime.slots import leases
-from runtime.warden import deploys, errors_import, github_push, imports, probes, registry
+from runtime.warden import deploys, errors_import, factory_upgrade, github_push, imports, probes, registry
 from runtime.warden.context import Context
 
 log = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ def migrate(ctx: Context) -> list[str]:
     done: list[str] = []
     steps: list[Callable[[Context], str]] = [
         _inbox_cursor, _leases, _errors_filed, _turn, _merges, _released, _typed_verdicts, _approvals_routed,
+        _release_offer,
     ]  # fmt: skip
     for step in steps:
         try:
@@ -43,6 +44,16 @@ def migrate(ctx: Context) -> list[str]:
             log.info("warden: brought the state over: %s", said)
             done.append(said)
     return done
+
+
+def _release_offer(ctx: Context) -> str:
+    """A release offer that names no install it was asked for goes: the releases pass asks GitHub again at once."""
+    path = factory_upgrade.offer_path(ctx.places)
+    raw = store.read_json_or(path, None)
+    if not isinstance(raw, dict) or "base" in raw:
+        return ""
+    path.unlink()
+    return "the release offer, asked again"
 
 
 def _inbox_cursor(ctx: Context) -> str:
