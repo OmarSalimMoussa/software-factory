@@ -27,6 +27,7 @@ from runtime.shared.models import (
     CRASHED,
     DEPRIORITIZED,
     FINISHED,
+    PENDING,
     WAITING,
     WORKING,
     Session,
@@ -174,7 +175,7 @@ def watch(ctx: Context) -> None:
                 retired = lifecycle.retire(ctx, registry.subtree(sessions, sid), s, FINISHED, WARDEN, why)
             elif sid in backstop.processes() or not hosting:
                 continue
-            elif sid.startswith(launch.PENDING):
+            elif sid.startswith(PENDING):
                 if _age(ctx, s.since) < grace:
                     continue
                 why = f"its session never appeared within {grace} s of its start"

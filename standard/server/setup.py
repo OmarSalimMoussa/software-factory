@@ -28,11 +28,10 @@ from pathlib import Path
 from standard.config import FACTORY_REF, FACTORY_REF_LINE, FILE, Config, ConfigError, load
 from standard.server import heartbeat as heartbeat_mod
 from standard.server import setup_machine as machine
-from standard.server.setup_machine import Host, SetupError, ensure_dirs, ensure_file, remote_text
+from standard.server.setup_machine import FACTORY, Host, SetupError, ensure_dirs, ensure_file, remote_text
 from standard.services import provision, stack
 from standard.services.provision import Run
 
-FACTORY = Path(__file__).resolve().parents[2]
 CODE = "/usr/local/lib/software-factory"
 PRODUCT_TOML = "/etc/software-factory/product.toml"
 SUDOERS = "/etc/sudoers.d/factory-ci"

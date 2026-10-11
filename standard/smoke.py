@@ -24,14 +24,13 @@ from pathlib import Path
 from typing import Any
 
 from standard import config as settings
-from standard import envfile, probe
+from standard import envfile, probe, yaml_subset
 from standard.config import Config, Expect
 from standard.probe import Result, Run, State
-from standard.services import provision
+from standard.services import provision, stack
 from standard.services.provision import POSTGRES
 
 WORKSPACE = "smoke"
-POSTGRES_IMAGE = "postgres:17.10"  # must mirror the shared services' postgres (standard/services/compose.yml)
 DEAD = "http://127.0.0.1:9"  # the discard port: nothing listens, so every telemetry send fails
 DOCKER_SOCKET = "/var/run/docker.sock"
 POLL_SECONDS = 2
@@ -121,12 +120,14 @@ class Smoke:
             self.networks.append(network)
         self._docker(["docker", "pull", "--quiet", probe.IMAGE], f"pull the probe image {probe.IMAGE}")
         password = secrets.token_hex(16)
+        # The shared services' own Postgres, read from their compose file, so the smoke runs what the product runs on.
+        image = yaml_subset.load(stack.COMPOSE.read_text())["services"]["postgres"]["image"]
         self.postgres = True
         self._docker(
             ["docker", "run", "-d", "--name", POSTGRES, "--network", self.network]
             + ["-e", f"POSTGRES_USER={self.database}", "-e", f"POSTGRES_PASSWORD={password}"]
-            + ["-e", f"POSTGRES_DB={self.database}", POSTGRES_IMAGE],
-            f"start the scratch Postgres ({POSTGRES_IMAGE})",
+            + ["-e", f"POSTGRES_DB={self.database}", image],
+            f"start the scratch Postgres ({image})",
         )
         self._wait_postgres()
         env_file = self._write_env(password)

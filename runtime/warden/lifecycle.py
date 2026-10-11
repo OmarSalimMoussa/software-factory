@@ -15,7 +15,7 @@ from typing import Any
 
 from runtime.queue import statuses
 from runtime.shared import models, store
-from runtime.shared.models import RETIRED, WAITING, WORKING, RecordError, Session, Task
+from runtime.shared.models import PENDING, RETIRED, WAITING, WORKING, RecordError, Session, Task
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import leases
 from runtime.warden import backstop, doing, inbox, launch, ops, outage, permits, registry
@@ -45,7 +45,7 @@ def read(ctx: Context) -> dict[str, Session]:
 
 def find(ctx: Context, sessions: dict[str, Session], ref: str) -> Session:
     """A session by id (a start's pending id too), or by name: the live one, else the latest retired one."""
-    if ref.startswith(launch.PENDING) and ref not in sessions:
+    if ref.startswith(PENDING) and ref not in sessions:
         ref = next((r["session"] for r in store.read_jsonl(ctx.places.history) if r.get("was") == ref), ref)
     if ref in sessions:
         return sessions[ref]

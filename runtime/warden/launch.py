@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.shared import store
-from runtime.shared.models import WORKING, Session
+from runtime.shared.models import PENDING, WORKING, Session
 from runtime.shared.paths import AGENT_USER, Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
@@ -34,9 +34,6 @@ from runtime.warden.context import Context, StackResult
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
 CHECK_UNIT = "software-check-run@{}.service"
-# A started session's registry id until the backstop sees it running under its name and takes the id Claude Code
-# gave it (`claude --bg` ignores --session-id). The guard finds an unbound session the same way, by name.
-PENDING = "pending-"
 # What `claude --bg` prints for the session it started; the install drills it on the Claude Code it installs.
 BACKGROUNDED = re.compile(r"^backgrounded · ([0-9a-f]{8})\b", re.MULTILINE)
 

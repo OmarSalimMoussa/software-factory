@@ -16,12 +16,10 @@ from typing import Any
 
 from runtime.shared import settings as settings_module
 from runtime.shared import store
+from runtime.shared.models import PENDING, RETIRED
 from runtime.shared.paths import Places
 from runtime.shared.settings import Settings
 
-# A session's registry key until the warden's next tick sees it running; must mirror runtime.warden.launch.PENDING.
-PENDING = "pending-"
-RETIRED = "retired"  # must mirror runtime.shared.models.RETIRED
 UNPERMITTED = "unpermitted"
 OWNER = "owner"
 ORCHESTRATOR, IMPLEMENTER, DESIGNER = "orchestrator", "implementer", "designer"

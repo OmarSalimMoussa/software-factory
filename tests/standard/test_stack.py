@@ -8,7 +8,7 @@ from typing import Literal
 
 import pytest
 
-from standard import smoke, yaml_subset
+from standard import yaml_subset
 from standard.config import Config, parse_text
 from standard.services import stack
 
@@ -134,10 +134,9 @@ def test_up_names_the_service_that_did_not_turn_healthy(tmp_path: Path) -> None:
     ]  # fmt: skip
 
 
-def test_every_image_is_pinned_and_the_smoke_postgres_is_the_services_own() -> None:
+def test_every_image_is_pinned() -> None:
     images = re.findall(r"^\s+image: (\S+)$", stack.COMPOSE.read_text(), re.M)
     # A digest, or a version to its last part: postgres numbers its releases in two parts (17.10), the rest in three.
     exact = re.compile(r"(@sha256:|/postgres:\d+\.\d+$|:\d+\.\d+\.\d+)")
     floating = [i for i in images if not exact.search(i)]
     assert floating == [], f"pin each to an exact version: {floating}"
-    assert f"docker.io/{smoke.POSTGRES_IMAGE}" in images

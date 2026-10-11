@@ -6,7 +6,6 @@ import io
 import json
 import subprocess
 import tarfile
-import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -310,9 +309,16 @@ def test_the_heartbeat_checks_in_only_when_prod_answers_as_prod(
     assert calls == pinged
 
 
-def test_the_python_the_server_needs_is_the_one_the_factory_requires() -> None:
-    declared = tomllib.loads((Path(setup.__file__).parents[2] / "pyproject.toml").read_text())["project"]
-    assert declared["requires-python"] == ">=" + ".".join(map(str, machine.PYTHON_AT_LEAST))
+def test_the_server_needs_the_python_the_factorys_pyproject_declares(
+    make_job: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "pyproject.toml").write_text('[project]\nrequires-python = ">=3.99"\n')
+    monkeypatch.setattr(machine, "FACTORY", tmp_path, raising=False)
+
+    with pytest.raises(SetupError) as raised:
+        setup.run(make_job(Server()))
+
+    assert "Python 3.12. To do: install Python 3.99 or newer" in " ".join(raised.value.problems)
 
 
 def test_shared_service_secrets_are_kept_never_made_anew_over_a_blank_or_unreadable_file(make_job: Any) -> None:

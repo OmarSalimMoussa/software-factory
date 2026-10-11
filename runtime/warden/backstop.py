@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from runtime.shared import store
-from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, Session
+from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, PENDING, RETIRED, REVIVING, Session
 from runtime.warden import launch, registry
 from runtime.warden.context import Context
 from runtime.warden.launch import LaunchError
@@ -131,7 +131,7 @@ def bind(sessions: dict[str, Session], procs: dict[str, Proc]) -> tuple[bool, di
     for proc in procs.values():
         known = sessions.get(proc.session)
         pending = [s for s in sessions.values()
-                   if s.id.startswith(launch.PENDING) and s.name == proc.name and s.state != RETIRED]  # fmt: skip
+                   if s.id.startswith(PENDING) and s.name == proc.name and s.state != RETIRED]  # fmt: skip
         if known is None and len(pending) == 1:
             known = sessions.pop(pending[0].id)
             bound[known.id] = proc.session

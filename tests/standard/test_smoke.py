@@ -10,7 +10,9 @@ from urllib.parse import urlsplit
 import pytest
 
 from standard import config as settings
+from standard import yaml_subset
 from standard.probe import Result
+from standard.services import stack
 from standard.smoke import Smoke, SmokeError
 
 FIXTURE = Path(__file__).resolve().parents[2] / "testdata" / "fixture-product"
@@ -168,6 +170,13 @@ def test_the_steps_run_in_order_against_a_scratch_workspace_and_leave_nothing_be
         assert line in docker.env_text.splitlines()
     assert "DATABASE_URL=postgresql://notes_smoke:" in docker.env_text
     assert not slept and said[-1].startswith("smoke: PASS")
+
+
+def test_the_scratch_postgres_runs_the_shared_services_own_image(product: Path) -> None:
+    docker, _, _, failure = smoke(product)
+    started = next(argv for argv in docker.calls if label(argv) == "start postgres")
+    services = yaml_subset.load(stack.COMPOSE.read_text())["services"]
+    assert failure is None and started[-1] == services["postgres"]["image"]
 
 
 @pytest.mark.parametrize(

@@ -19,7 +19,7 @@ from typing import Any
 
 from runtime.shared import claude_accounts, store
 from runtime.shared.claude_accounts import ACTIVE, SHOWN, UNIT_TOKEN, AccountError
-from runtime.shared.models import REVIVING, WAITING, WORKING
+from runtime.shared.models import PENDING, REVIVING, WAITING, WORKING
 from runtime.shared.protocol import Refused, ok
 from runtime.system import layout
 from runtime.warden import backstop, launch, lifecycle, ops, permits, registry
@@ -146,7 +146,7 @@ def use(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any
             raise Refused("switching", "a switch of accounts is running: wait for it to finish")
         sessions = lifecycle.read(ctx)
         moving = [s.name for s in sessions.values()
-                  if s.state == REVIVING or (s.state == WORKING and s.id.startswith(launch.PENDING))]  # fmt: skip
+                  if s.state == REVIVING or (s.state == WORKING and s.id.startswith(PENDING))]  # fmt: skip
         if moving:
             raise Refused("settling", f"{', '.join(moving)} is starting or coming back now; switch again in a minute")
         live = [s for s in sessions.values() if s.state in (WORKING, WAITING) and not s.parent]

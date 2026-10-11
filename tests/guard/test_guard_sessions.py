@@ -11,8 +11,8 @@ import pytest
 from guard_kit import NOW, SID, TESTER_ID, Kit
 
 from runtime.guard import decide
-from runtime.guard.facts import PENDING, Refusal
-from runtime.warden import launch
+from runtime.guard.facts import Refusal
+from runtime.shared.models import PENDING
 
 
 @pytest.mark.parametrize(
@@ -150,11 +150,10 @@ def test_the_orchestrator_cannot_go_idle_without_its_inbox_wait(
 
 def test_a_session_the_warden_has_not_bound_yet_is_known_by_the_name_it_was_started_under(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
-    kit.session("implementer", sid=launch.PENDING + "0f0f")
+    kit.session("implementer", sid=PENDING + "0f0f")
     # Claude Code's own record of the running session pairs the id the hook sees with the name the warden gave it.
     records = kit.home / ".claude" / "sessions"
     records.mkdir(parents=True)
     (records / "4242.json").write_text(json.dumps({"pid": 4242, "sessionId": SID, "name": "implementer-a"}))
-    assert PENDING == launch.PENDING
     assert kit.bash("uv run pytest") is None
     assert kit.bash("claude --bg x") == "raw-starts"

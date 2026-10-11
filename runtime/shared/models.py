@@ -17,6 +17,9 @@ T = TypeVar("T")
 WORKING, WAITING, DEPRIORITIZED, RETIRED = "working", "waiting", "deprioritized", "retired"
 # Written before the warden acts, so the crash watch and the backstop never misread a session in between.
 BENCH_PENDING, REVIVING = "bench-pending", "reviving"
+# A started session's registry id until the backstop sees it running under its name and takes the id Claude Code
+# gave it (`claude --bg` ignores --session-id). The guard finds an unbound session the same way, by name.
+PENDING = "pending-"
 STATES = (WORKING, WAITING, BENCH_PENDING, DEPRIORITIZED, REVIVING, RETIRED)
 HOLDS_SLOT = (WORKING, WAITING, BENCH_PENDING, REVIVING)
 FINISHED, STOPPED, WITH_PARENT, CRASHED = "finished", "stopped", "with-parent", "crashed"

@@ -5,8 +5,10 @@ machine checks it never changes on an existing server.
 from __future__ import annotations
 
 import json
+import re
 import shlex
 import subprocess
+import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,6 +16,9 @@ from typing import Any
 
 from standard.config import Config
 from standard.services.provision import Run
+
+# The factory checkout the set-up runs from: its pyproject.toml says which Python the factory needs.
+FACTORY = Path(__file__).resolve().parents[2]
 
 LOCKDOWN = "/etc/ssh/sshd_config.d/00-factory-lockdown.conf"
 # sshd keeps the first value it reads for a setting, and reads the drop-ins in name order before its main file.
@@ -31,7 +36,6 @@ TAILSCALE = ["sudo", "-n", "sh", "-c", "command -v tailscale >/dev/null || exit 
 SWAP = ["swapon", "--show", "--noheadings"]
 # The interpreter every factory command on the server starts with (its wrappers' #! line).
 PYTHON = ["/usr/bin/python3", "-c", "import sys; print('%d.%d' % sys.version_info[:2])"]
-PYTHON_AT_LEAST = (3, 12)  # must mirror requires-python in the factory's pyproject.toml; a test pins the two
 DOCKER = ["sudo", "-n", "sh", "-c", 'docker version --format "{{.Server.Version}}" && docker compose version --short']
 
 _APT = ["sudo", "-n", "env", "DEBIAN_FRONTEND=noninteractive", "apt-get"]
@@ -253,14 +257,26 @@ def _docker(host: Host) -> Check:
     return Check("docker", True, "Docker " + ", compose ".join(done.stdout.split()), todo, fix)
 
 
+def python_floor() -> tuple[int, ...]:
+    """The oldest Python the factory runs on, as requires-python in its pyproject.toml declares it (>=X.Y)."""
+    try:
+        declared = tomllib.loads((FACTORY / "pyproject.toml").read_text())["project"]["requires-python"]
+    except (OSError, tomllib.TOMLDecodeError, KeyError) as exc:
+        raise SetupError([f"the factory's pyproject.toml declares no requires-python: {exc!r}"]) from exc
+    if not isinstance(declared, str) or not re.fullmatch(r">=\d+(\.\d+)*", declared):
+        raise SetupError([f"the factory's requires-python {declared!r} is not a plain >=X.Y floor"])
+    return tuple(int(part) for part in declared[2:].split("."))
+
+
 def _python(host: Host) -> Check:
     done = host.read(PYTHON)
-    want = ".".join(map(str, PYTHON_AT_LEAST))
+    floor = python_floor()
+    want = ".".join(map(str, floor))
     todo = f"install Python {want} or newer as /usr/bin/python3 (Ubuntu 24.04 and Debian 13 have it)"
     found = tuple(int(part) for part in done.stdout.strip().split(".")) if done.returncode == 0 else ()
     if not found:
         return Check("python", False, f"no /usr/bin/python3 answers ({said(done)})", todo)
-    return Check("python", found >= PYTHON_AT_LEAST, f"Python {done.stdout.strip()}", todo)
+    return Check("python", found >= floor, f"Python {done.stdout.strip()}", todo)
 
 
 def checks(host: Host, config: Config) -> list[Check]:
