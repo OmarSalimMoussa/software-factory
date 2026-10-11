@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from runtime.system import github_keys
-from runtime.system.host import Host
+from runtime.system.host import Account, Host
 from runtime.system.job import Install, github_name, refuse
 
 PASSED, RUNNING, FAILED, UNKNOWN = "passed", "running", "failed", "unknown"
@@ -65,7 +65,7 @@ def origin(host: Host, owner: str, checkout: Path) -> str:
     return out.strip() if code == 0 else ""
 
 
-def verdict(host: Host, owner: str, factory_origin: str, sha: str) -> Verdict:
+def verdict(host: Host, owner: Account, factory_origin: str, sha: str) -> Verdict:
     """The factory's CI on ``sha``: passed only when GitHub holds at least one check run for it and every one passed."""
     short = sha[:12]
     repo = github_name(factory_origin)
@@ -76,7 +76,7 @@ def verdict(host: Host, owner: str, factory_origin: str, sha: str) -> Verdict:
     if not gh:
         return _unknown(NO_GH)
     asked = [gh, "api", "--paginate", f"repos/{repo}/commits/{sha}/check-runs?per_page=100", "--jq", CHECK_FIELDS]
-    code, out = host.query(asked, user=owner)
+    code, out = host.query(asked, user=owner.name)
     if code != 0:
         return _unknown(f"gh could not read the factory's CI on {short}: {out.strip()[-300:]}")
     checks = []
@@ -107,7 +107,7 @@ def passed(ctx: Install) -> None:
         host.say(f"would ask GitHub, with your gh, for every check run of the factory's CI on {short} in {repo}: "
                  "each must have passed")  # fmt: skip
         return
-    found = verdict(host, ctx.owner.name, ctx.factory_origin, ctx.sha)
+    found = verdict(host, ctx.owner, ctx.factory_origin, ctx.sha)
     if found.state != PASSED:
         raise refuse(found.refusal())
     host.say(f"the factory's CI passed on {short}: {', '.join(check.name for check in found.checks)}")

@@ -46,9 +46,9 @@ def signed_in_gh(ctx: Install) -> str:
     host = ctx.host
     if host.dry:
         return ""
-    gh = github_keys.owner_gh(host, ctx.owner.name)
+    gh = github_keys.owner_gh(host, ctx.owner)
     while not gh and host.confirm("Sign in to GitHub", SIGN_IN, yes="I signed in", no="I will add the keys myself"):
-        gh = github_keys.owner_gh(host, ctx.owner.name)
+        gh = github_keys.owner_gh(host, ctx.owner)
     return gh
 
 

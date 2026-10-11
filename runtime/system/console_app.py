@@ -256,7 +256,7 @@ class Console:
         dry, keep = flags["dry"] is True, flags["keep"] is True
         if not dry and self.release is None:
             origin = ci_check.origin(self.reader, self.owner.name, self.checkout)
-            found = ci_check.verdict(self.reader, self.owner.name, origin, commit.strip())
+            found = ci_check.verdict(self.reader, self.owner, origin, commit.strip())
             if found.state != ci_check.PASSED:
                 return refused(409, console_page.sentence(found.refusal()))
         with self._lock:

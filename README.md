@@ -30,9 +30,12 @@ The same two lines update it. The release file is one Python file that the facto
 which every check passed. Run with sudo, it checks itself, unpacks into a sealed, read-only copy and opens the install
 console in your browser: a page that installs, reinstalls or uninstalls the factory as a few phases with a progress
 bar, and asks in place for each secret. `--terminal` installs in the terminal instead, and `--uninstall` removes the
-factory. Every command and its output goes to a log in `/var/log/software-factory/`. The install copies the programs
-the product's scripts need (the setting `install.toolchain`) from your PATH, and the Python the product asks for from
-your uv, so the agents and the stack run the same tools you do. From a checkout of the factory, `runtime/system/` runs
-the same steps for a commit whose CI passed.
+factory. Every command and its output goes to a log in `/var/log/software-factory/`. The install runs on Debian or
+Ubuntu, and checks everything it needs before it changes anything. It copies the programs the product's scripts need
+(the setting `install.toolchain`) as your own shell finds them, rc files and all (nvm, mise, fnm), and refuses one whose
+version differs from the product's `.nvmrc` or `.node-version`. It copies the Python the product asks for from your uv,
+so the agents and the stack run the same tools you do. It takes port 443 on your tailnet only when nothing else serves
+there, and the uninstall puts back the Tailscale operator it cleared. From a checkout of the factory, `runtime/system/`
+runs the same steps for a commit whose CI passed.
 
 How to run it: [docs/operate.md](docs/operate.md). The shape a product must take: [docs/repo-shape.md](docs/repo-shape.md).

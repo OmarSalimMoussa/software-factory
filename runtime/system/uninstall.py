@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from runtime.shared import paths, store  # noqa: E402 - the path line above must run first
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER, Places  # noqa: E402
 from runtime.shared.protocol import Refused  # noqa: E402
-from runtime.system import layout, sealed, steps_prepare  # noqa: E402
+from runtime.system import layout, sealed, steps_prepare, steps_wire  # noqa: E402
 from runtime.system.github_keys import WARDEN_TITLE  # noqa: E402
 from runtime.system.host import Account, CommandError, DryHost, Host, RealHost  # noqa: E402
 from runtime.system.job import REPO_ROOT, Install  # noqa: E402
@@ -124,14 +124,32 @@ def _with_leftovers(path: Path) -> tuple[Path, ...]:
     return (path, *(path.with_name(f"{path.name}.{end}") for end in ("new", "old", "partial", "bundle")))
 
 
-def programs(host: Host, dashboard_port: str) -> None:
+def programs(host: Host, places: Places, dashboard_port: str) -> None:
     for path in (paths.FACTORY_BIN, layout.CLAUDE_BIN.parent, *_with_leftovers(paths.INSTALL), layout.TOOLS,
                  *_with_leftovers(layout.TOOLCHAIN), paths.RUN, layout.DRILLS):  # fmt: skip
         _remove(host, path)
     sealed_copies(host)
-    code, served = host.query(["tailscale", "serve", "status"])
-    if code == 0 and f"127.0.0.1:{dashboard_port}" in served:
+    tailnet(host, places, dashboard_port)
+
+
+def tailnet(host: Host, places: Places, dashboard_port: str) -> None:
+    """Take the dashboard off the tailnet, but never another handler on its port, and put back the operator the
+    install cleared."""
+    ours = f"http://127.0.0.1:{dashboard_port}"
+    code, status = host.query(["tailscale", "serve", "status", "--json"])
+    handlers = steps_wire.https_handlers(status) if code == 0 else None
+    if handlers and set(handlers.values()) == {ours}:
         _try(host, ["tailscale", "serve", "--https=443", "off"])
+    elif handlers and ours in handlers.values():
+        host.tell("Your tailnet's port 443 serves more than the dashboard, so it stays: take the dashboard's handler "
+                  "off it yourself (tailscale serve status shows it).")  # fmt: skip
+    record = steps_wire.read_tailnet_record(host, places.state)
+    operator = record.get("operator")
+    if isinstance(operator, str) and operator:
+        _try(host, ["tailscale", "set", f"--operator={operator}"])
+    elif record and operator is None:
+        host.tell("The install could not read your Tailscale operator, so it is not put back: if you had one, set it "
+                  "again with sudo tailscale set --operator=<you>.")  # fmt: skip
 
 
 def sealed_copies(host: Host) -> None:
@@ -204,7 +222,7 @@ def remove_all(host: Host, places: Places, owner: str, repo: Path | None, *, pha
     removals: tuple[Callable[[], None], ...] = (
         lambda: stop(host),
         lambda: system_files(host),
-        lambda: programs(host, port),
+        lambda: programs(host, places, port),
         lambda: state(host, places),
         lambda: users(host),
         lambda: owner_checkout(host, owner, repo),

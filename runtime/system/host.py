@@ -35,6 +35,7 @@ class Account:
     gid: int
     home: Path
     groups: tuple[str, ...]
+    shell: str  # the login shell passwd names
 
 
 # A command whose exit code the caller reads itself: argv and its standard input, as standard/services runs them.
@@ -337,7 +338,9 @@ class RealHost(Host):
             return None
         groups = tuple(g.gr_name for g in grp.getgrall() if name in g.gr_mem)
         primary = grp.getgrgid(entry.pw_gid).gr_name
-        return Account(name, entry.pw_uid, entry.pw_gid, Path(entry.pw_dir), (primary, *groups))
+        # An empty shell field means /bin/sh, as login(1) reads it.
+        shell = entry.pw_shell or "/bin/sh"
+        return Account(name, entry.pw_uid, entry.pw_gid, Path(entry.pw_dir), (primary, *groups), shell)
 
     def ask(self, prompt: str, *, secret: bool, hint: str, link: str) -> str:
         self.journal.screen("")

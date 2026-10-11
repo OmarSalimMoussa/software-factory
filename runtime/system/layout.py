@@ -119,3 +119,9 @@ def public(state: Path) -> Path:
 
 def install_record(state: Path) -> Path:
     return state / "install.json"
+
+
+def tailnet_record(state: Path) -> Path:
+    """What the install changed on Tailscale, for the uninstall to put back: the operator it cleared and what it
+    serves."""
+    return state / "tailnet.json"

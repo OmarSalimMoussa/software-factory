@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from runtime.system import (
     steps_secrets,
     steps_services,
     steps_wire,
+    uninstall,
 )
 from runtime.system.host import DryHost, RealHost
 from runtime.system.job import Install
@@ -285,3 +287,49 @@ def test_a_saved_value_for_a_setting_the_release_no_longer_has_is_dropped_and_th
     assert job.settings is not None and job.settings.get_int("caps.implementers") == 2
     assert "factory.clone" not in job.settings.overrides and job.settings.get_str("factory.github")
     assert "Dropped your saved factory.clone: this release has no such setting." in capsys.readouterr().out
+
+
+def _serving(*handlers: tuple[str, str]) -> str:
+    web = {"box.tail0.ts.net:443": {"Handlers": {path: {"Proxy": target} for path, target in handlers}}}
+    return json.dumps({"TCP": {"443": {"HTTPS": True}}, "Web": web})
+
+
+def test_the_dashboard_never_takes_a_tailnet_port_that_serves_something_else(tmp_path: Path) -> None:
+    job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    steps_prepare.check_machine(job)
+    steps_prepare.settle_settings(job)
+    job.host.answers["tailscale serve status --json"] = (0, _serving(("/", "http://127.0.0.1:3000")))
+
+    with pytest.raises(Refused, match="already serves http://127.0.0.1:3000 at / on port 443"):
+        steps_wire.tailnet(job)
+
+    assert not any("tailscale set" in action or "tailscale serve" in action for action in job.host.actions)
+
+
+def test_the_install_keeps_the_operator_it_clears_and_the_uninstall_puts_it_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    steps_prepare.check_machine(job)
+    steps_prepare.settle_settings(job)
+    job.host.answers["tailscale debug prefs"] = (0, json.dumps({"OperatorUser": "owner"}))
+    written: dict[Path, str] = {}
+    monkeypatch.setattr(job.host, "write", lambda path, text, **kw: written.__setitem__(path, text))
+
+    steps_wire.tailnet(job)
+
+    record = layout.tailnet_record(job.places.state)
+    ours = f"http://127.0.0.1:{settings().get_int('dashboard.port')}"
+    assert json.loads(written[record]) == {"operator": "owner", "served": ours}
+    job.host.files[record] = written[record]
+    job.host.dry = False  # decides like a real uninstall; a dry host still changes nothing
+    job.host.answers["tailscale serve status --json"] = (0, _serving(("/", ours)))
+    asked: list[str] = []
+    answer = job.host.query
+    monkeypatch.setattr(job.host, "query", lambda argv, **kw: asked.append(" ".join(argv)) or answer(argv, **kw))
+
+    uninstall.tailnet(job.host, job.places, str(settings().get_int("dashboard.port")))
+
+    assert asked[1:] == ["tailscale serve --https=443 off", "tailscale set --operator=owner"]

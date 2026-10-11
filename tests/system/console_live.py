@@ -50,7 +50,7 @@ def main() -> int:
         f"{git} log -1 --format=%H%n%h%n%s main --": (0, f"{NEWEST}\n0123456\nThe drive's newest commit\n"),
         **ci_answers(REPO_ROOT, NEWEST, PASSING),
     })  # fmt: skip
-    owner = Account(getpass.getuser(), os.getuid(), os.getgid(), root / "home", ("owner",))
+    owner = Account(getpass.getuser(), os.getuid(), os.getgid(), root / "home", ("owner",), "/bin/bash")
     opened: list[str] = []
 
     def dry(run: Run) -> Host:

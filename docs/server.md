@@ -15,8 +15,8 @@ address. `--lockdown` only locks SSH down, as its own step.
 
 ## Before you start
 
-- The server runs Ubuntu 24.04 and you can sign in as the `[server] admin` user with your SSH key. That user needs
-  sudo without a password. On a brand-new server, create it once as root:
+- The server runs Ubuntu 24.04, whose Python is new enough (the set-up checks for 3.12 or newer), and you can sign in
+  as the `[server] admin` user with your SSH key. That user needs sudo without a password. On a brand-new server, create it once as root:
   `adduser --disabled-password --gecos "" <admin>`, add your public key to `/home/<admin>/.ssh/authorized_keys`,
   and allow it sudo in `/etc/sudoers.d/<admin>` with `<admin> ALL=(ALL) NOPASSWD:ALL` (mode 0440).
 - `[server] host_key` holds the server's SSH host key. The set-up trusts that key only, and stops if the server shows

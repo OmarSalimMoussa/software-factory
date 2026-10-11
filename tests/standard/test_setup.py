@@ -6,6 +6,7 @@ import io
 import json
 import subprocess
 import tarfile
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -27,9 +28,10 @@ READY: dict[str, tuple[Any, ...]] = {
     "tailscale": (0, json.dumps({"BackendState": "Running", "Self": {"DNSName": "shop-box.tail0.ts.net."}})),
     "swap": (0, "/swapfile file 4G 0B -2\n"),
     "docker": (0, "29.0.1\n2.40.0\n"),
+    "python": (0, "3.12\n"),
 }
 CHECKS = {"ufw": machine.UFW, "sshd": machine.SSHD, "tailscale": machine.TAILSCALE, "swap": machine.SWAP}
-CHECKS["docker"] = machine.DOCKER
+CHECKS["docker"], CHECKS["python"] = machine.DOCKER, machine.PYTHON
 
 
 def _cp(argv: list[str], code: int = 0, out: str = "", err: str = "") -> subprocess.CompletedProcess[str]:
@@ -161,6 +163,7 @@ def make_job(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
         ("tailscale", (3, ""), "Tailscale is not installed"),
         ("swap", (0, ""), "swap none"),
         ("docker", (1, "", "sudo: docker: command not found"), "Docker is not ready"),
+        ("python", (0, "3.10\n"), "Python 3.10. To do: install Python 3.12 or newer"),
     ],
 )
 def test_an_existing_machine_that_fails_a_check_stops_without_changing_anything(
@@ -305,3 +308,8 @@ def test_the_heartbeat_checks_in_only_when_prod_answers_as_prod(
 
     assert heartbeat.beat(CONFIG, "https://hc-ping.com/5f1c", get) == code
     assert calls == pinged
+
+
+def test_the_python_the_server_needs_is_the_one_the_factory_requires() -> None:
+    declared = tomllib.loads((Path(setup.__file__).parents[2] / "pyproject.toml").read_text())["project"]
+    assert declared["requires-python"] == ">=" + ".".join(map(str, machine.PYTHON_AT_LEAST))

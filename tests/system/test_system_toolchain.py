@@ -6,10 +6,10 @@ import json
 from pathlib import Path
 
 import pytest
-from system_fakes import dry_job
+from system_fakes import dry_job, lookup
 
 from runtime.shared.protocol import Refused
-from runtime.system import install, steps_toolchain
+from runtime.system import install, steps_prepare, steps_toolchain
 from runtime.system.host import DryHost
 from runtime.system.job import Install
 
@@ -19,8 +19,9 @@ KEY = "cpython-3.14.4-linux-x86_64-gnu"
 
 def _on_path(job: Install, name: str, found: str, real: str = "") -> None:
     assert isinstance(job.host, DryHost)
-    job.host.answers[f'sh -lc readlink -f "$(command -v {name})"'] = (0, real or found)
-    job.host.answers[f"sh -lc command -v {name}"] = (0, found)
+    # The shell's start-up files print before the lookup answers.
+    job.host.answers[lookup(name)] = (0, f"Now using node v22\n{steps_prepare.LOOKUP_MARK}\n{found}\n")
+    job.host.answers[f"readlink -f {found}"] = (0, real or found)
 
 
 def _listed(job: Install, folder: str, *names: str) -> None:
@@ -130,7 +131,8 @@ def test_the_python_the_product_asks_for_is_copied_from_the_owners_uv(
 @pytest.mark.parametrize(
     ("case", "reason"),
     [
-        ("missing", "The product needs node, which you do not have installed"),
+        ("missing", "the product needs node, which your shell does not find"),
+        ("pinned", "the product pins node 20 in .nvmrc, and your shell's node is 22.1.0"),
         ("shadow", "node brings a program named factory, which would stand in for the factory's"),
         ("python", "Python 3.14, which your uv has not installed: run uv python install 3.14, then install again"),
     ],
@@ -142,7 +144,10 @@ def test_a_tool_the_owner_lacks_or_one_that_shadows_the_factory_refuses_the_inst
     home = _owners_tools(job, "nvm")
     assert isinstance(job.host, DryHost)
     if case == "missing":
-        job.host.answers['sh -lc readlink -f "$(command -v node)"'] = (1, "")
+        job.host.answers[lookup("node")] = (1, steps_prepare.LOOKUP_MARK + "\n")
+    elif case == "pinned":
+        (job.product / ".nvmrc").write_text("v20\n")
+        job.host.answers[f"{home}/.nvm/versions/node/v22.1.0/bin/node --version"] = (0, "v22.1.0\n")
     elif case == "shadow":
         _listed(job, f"{home}/.nvm/versions/node/v22.1.0/bin", "factory", "node")
     else:

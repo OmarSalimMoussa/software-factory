@@ -10,7 +10,7 @@ from typing import Any
 from runtime.shared.models import DEPRIORITIZED, RETIRED
 from runtime.shared.settings import SCHEMA, SettingsError, _flatten, build
 from runtime.system import layout
-from runtime.system.host import Host
+from runtime.system.host import Account, Host
 from runtime.system.job import Install, github_name, github_origin, refuse
 from runtime.warden import registry
 
@@ -21,15 +21,30 @@ _OWNER_TOOLS = ("uv", "claude")
 _RESTING = (DEPRIORITIZED, RETIRED)
 
 
-def login_tool(host: Host, user: str, name: str) -> tuple[int, str]:
-    """The file ``user``'s login shell runs for ``name``, every link followed; the shell's exit code beside it."""
-    code, out = host.query(["sh", "-lc", f'readlink -f "$(command -v {name})"'], user=user)
-    return code, out.strip()
+# The shell's start-up files may print; only what follows this line is the lookup's answer.
+LOOKUP_MARK = "--- the factory looks up a tool ---"
+
+
+def login_path(host: Host, account: Account, name: str) -> tuple[int, str]:
+    """Where ``account``'s own shell finds ``name`` when started as at a terminal: a login shell that reads its rc files
+    too, where nvm, mise and fnm put their tools on PATH. "" when it finds none; the shell's exit code beside it."""
+    code, out = host.query([account.shell, "-lic", f"echo '{LOOKUP_MARK}'; command -v {name}"], user=account.name)
+    answer = out.rpartition(LOOKUP_MARK)[2].split()
+    return code, answer[-1] if answer else ""
+
+
+def login_tool(host: Host, account: Account, name: str) -> tuple[int, str]:
+    """The file ``account``'s shell runs for ``name`` (``login_path``), every link followed; the exit code beside it."""
+    code, found = login_path(host, account, name)
+    if code != 0 or not found:
+        return code, ""
+    code, real = host.query(["readlink", "-f", found], user=account.name)
+    return code, real.strip()
 
 
 def owner_tool(ctx: Install, name: str) -> tuple[int, str]:
     """The owner's ``name`` (``login_tool``), kept for ``ctx.tool``."""
-    code, found = login_tool(ctx.host, ctx.owner.name, name)
+    code, found = login_tool(ctx.host, ctx.owner, name)
     ctx.tools[name] = found
     return code, found
 
@@ -37,6 +52,10 @@ def owner_tool(ctx: Install, name: str) -> tuple[int, str]:
 def check_machine(ctx: Install) -> None:
     host, owner = ctx.host, ctx.owner.name
     problems = [f"{tool} is not installed" for tool in _MACHINE_TOOLS if host.query(["which", tool])[0] != 0]
+    if any(host.query(["which", tool])[0] != 0 for tool in ("apt-get", "dpkg-query")):
+        problems.append(
+            "apt-get is not here: the factory installs its packages with apt, so it runs on Debian or Ubuntu"
+        )
     for tool in _OWNER_TOOLS:
         code, found = owner_tool(ctx, tool)
         if (code != 0 or not found) and not host.dry:

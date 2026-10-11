@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 from runtime.system import steps_prepare
-from runtime.system.host import Host
+from runtime.system.host import Account, Host
 from runtime.system.job import Install, github_name
 
 WARDEN_TITLE = "software-factory warden"
@@ -21,29 +21,29 @@ def read_title(product: str) -> str:
     return f"{product} CI (read-only)"
 
 
-def owner_gh(host: Host, owner: str) -> str:
+def owner_gh(host: Host, owner: Account) -> str:
     """The owner's `gh`, when it is installed and signed in to github.com; "" otherwise."""
     code, found = steps_prepare.login_tool(host, owner, "gh")
     if code != 0 or not found:
         return ""
-    status, _ = host.query([found, "auth", "status", "--hostname", "github.com"], user=owner)
+    status, _ = host.query([found, "auth", "status", "--hostname", "github.com"], user=owner.name)
     return found if status == 0 else ""
 
 
-def default_branch(host: Host, owner: str, checkout: Path) -> str:
+def default_branch(host: Host, owner: Account, checkout: Path) -> str:
     """The default branch of the GitHub repo ``checkout`` clones: what the checkout knows of it, else what GitHub says
     with the owner's `gh`; "" when neither knows."""
     git = ["git", "-C", str(checkout)]
-    code, out = host.query([*git, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], user=owner)
+    code, out = host.query([*git, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], user=owner.name)
     branch = out.strip().removeprefix("origin/")
     if code == 0 and branch:
         return branch
-    code, origin = host.query([*git, "remote", "get-url", "origin"], user=owner)
+    code, origin = host.query([*git, "remote", "get-url", "origin"], user=owner.name)
     repo = github_name(origin) if code == 0 else None
     gh = owner_gh(host, owner) if repo else ""
     if not gh:
         return ""
-    code, out = host.query([gh, "api", f"repos/{repo}", "--jq", ".default_branch"], user=owner)
+    code, out = host.query([gh, "api", f"repos/{repo}", "--jq", ".default_branch"], user=owner.name)
     return out.strip() if code == 0 else ""
 
 

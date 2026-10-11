@@ -26,12 +26,15 @@ from pathlib import Path
 from runtime.shared.paths import FACTORY_BIN
 from runtime.system import layout
 from runtime.system.job import Install, refuse
-from runtime.system.steps_prepare import owner_tool
+from runtime.system.steps_prepare import login_path, owner_tool
 
 # Each name goes into a shell command line, so it is a plain program name and nothing else.
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
 # The name uv gives a managed Python's folder, such as cpython-3.14.4-linux-x86_64-gnu; it becomes a path here.
 _PYTHON_KEY = re.compile(r"^[a-z]+-[0-9][A-Za-z0-9._+-]*$")
+# The files a product pins a tool's version in, the first found counting; Python's pin is uv's (python_request).
+_PINS = {"node": (".nvmrc", ".node-version")}
+_VERSION = re.compile(r"^\d+(?:\.\d+){0,2}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,9 +56,9 @@ def _listing(ctx: Install, argv: list[str], folder: Path) -> list[str]:
 def locate(ctx: Install, name: str) -> tuple[str, str] | None:
     """Where the owner's PATH finds ``name``, and the file that is with every link followed; None when it lacks it.
     A dry run that cannot look answers two empty paths."""
-    host, owner = ctx.host, ctx.owner.name
+    host = ctx.host
     code, real = owner_tool(ctx, name)
-    found = host.query(["sh", "-lc", f"command -v {name}"], user=owner)[1].strip()
+    found = login_path(host, ctx.owner, name)[1]
     if code != 0 or (not real and not host.dry):
         return None
     return found, real
@@ -81,6 +84,27 @@ def tool(ctx: Install, name: str, found: str, real: str) -> Tool | None:
     programs = tuple(sorted({name, *siblings}))
     host.say(f"{name}: {', '.join(programs)} from {beside}")
     return Tool(name, "", tuple((str(beside / p), p) for p in programs), programs)
+
+
+def pin_problems(ctx: Install, real: dict[str, str]) -> list[str]:
+    """Each tool whose version differs from the one the product pins (a version number in one of its ``_PINS``
+    files): the agents and the stack would run another version than the product asks for."""
+    problems = []
+    for name, files in _PINS.items():
+        pinned = next((ctx.product / f for f in files if (ctx.product / f).is_file()), None)
+        if name not in real or not real[name] or pinned is None:
+            continue
+        lines = [line.strip() for line in pinned.read_text(encoding="utf-8").splitlines() if line.strip()]
+        want = lines[0].removeprefix("v") if lines else ""
+        if not _VERSION.match(want):
+            ctx.host.say(f"{name}: {pinned.name} names {want!r}, not a version number, so it is not compared")
+            continue
+        code, out = ctx.host.query([real[name], "--version"], user=ctx.owner.name)
+        have = out.strip().removeprefix("v")
+        if code != 0 or not (have == want or have.startswith(want + ".")):
+            problems.append(f"the product pins {name} {want} in {pinned.name}, and your shell's {name} is "
+                            f"{have or 'unreadable'}")  # fmt: skip
+    return problems
 
 
 def python_request(product: Path) -> str:
@@ -232,9 +256,11 @@ def toolchain(ctx: Install) -> None:
         )
     located = {name: locate(ctx, name) for name in names}
     missing = [name for name, where in located.items() if where is None]
-    if missing:
-        raise refuse(f"The product needs {', '.join(missing)}, which you do not have installed: install each for "
-                     "yourself, or take it out of the setting install.toolchain, then install again")  # fmt: skip
+    problems = [f"the product needs {', '.join(missing)}, which your shell does not find: install each for yourself, "
+                "or take it out of the setting install.toolchain"] if missing else []  # fmt: skip
+    problems += pin_problems(ctx, {name: where[1] for name, where in located.items() if where})
+    if problems:
+        raise refuse(f"The product's tools are not ready: {'; '.join(problems)}. Then install again")
     tools = []
     for name, where in located.items():
         planned = tool(ctx, name, *where) if where else None

@@ -180,7 +180,7 @@ def checkout_ci(host: Host, owner: Account, factory: Path, offered: dict[str, An
     if offered["problem"]:
         return None
     origin = ci_check.origin(host, owner.name, factory)
-    return ci_view(ci_check.verdict(host, owner.name, origin, offered["value"]))
+    return ci_view(ci_check.verdict(host, owner, origin, offered["value"]))
 
 
 def release_offer(manifest: dict[str, Any]) -> dict[str, Any]:
@@ -199,7 +199,7 @@ def commit_choice(host: Host, owner: Account, factory: Path, given: str | None) 
     if given:
         ref, note = given, "The commit you named with --commit"
     else:
-        branch = github_keys.default_branch(host, owner.name, factory)
+        branch = github_keys.default_branch(host, owner, factory)
         if not branch:
             problem = (f"The default branch of {factory} cannot be found: sign in to the GitHub CLI (gh auth login), "
                        "or name a commit with --commit.")  # fmt: skip
