@@ -14,7 +14,7 @@ from runtime.shared import store
 from runtime.slots import leases
 from runtime.warden import inbox, upgrade
 from runtime.warden.context import Caller
-from runtime.warden.delivery import deploys, github_push
+from runtime.warden.delivery import deploys, prod_push
 from runtime.warden.health import errors_import, probes
 
 FULL = "f" * 40
@@ -61,7 +61,7 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
     assert filed == {"7": {"request": req.id, "at": req.at}} and not (places.state / "errors-seen.json").exists()
     assert turn.holder(places) == {"task": in_turn.id, "branch": "b", "base": FULL}
     assert turn.merges(places) == {FULL: merged.id}
-    assert github_push.released(places) == "c" * 40
+    assert prod_push.released(places) == "c" * 40
     assert findings.open_count(ctx, in_turn.id, FULL, "qa-ux") == 1
     approval = approvals.current(places, merged.id)
     assert approval is not None and approval.routed == 2

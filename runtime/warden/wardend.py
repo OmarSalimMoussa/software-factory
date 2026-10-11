@@ -24,7 +24,7 @@ from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, Places
 from runtime.shared.settings import Settings
 from runtime.warden import gc, imports, inbox, loop, public, schedule, server, upgrade
 from runtime.warden.context import Caller, Clock, Context
-from runtime.warden.delivery import github, github_push
+from runtime.warden.delivery import github, prod_push
 from runtime.warden.dispatch import Dispatcher, Doors, resolve
 from runtime.warden.owner import ops, reflections, settings_save
 from runtime.warden.sessions import crashwatch, launch, reap, registry
@@ -71,7 +71,7 @@ def run_passes(ctx: Context, passes: Sequence[tuple[str, Pass]]) -> None:
 
 def _ask_branch(ctx: Context) -> None:
     # In its own thread: a fetch can take minutes, and a failure is reported there, once while it lasts.
-    loop.run_once(ctx, "the branch ask", lambda: github_push.ask_branch(ctx))
+    loop.run_once(ctx, "the branch ask", lambda: prod_push.ask_branch(ctx))
 
 
 def _pull_reports(ctx: Context) -> None:

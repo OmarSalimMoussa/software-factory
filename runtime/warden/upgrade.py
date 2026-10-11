@@ -19,7 +19,7 @@ from runtime.shared import store
 from runtime.slots import leases
 from runtime.warden import imports
 from runtime.warden.context import Context
-from runtime.warden.delivery import deploys, github_push
+from runtime.warden.delivery import deploys, prod_push
 from runtime.warden.health import errors_import, probes
 from runtime.warden.sessions import registry
 
@@ -124,12 +124,12 @@ def _merges(ctx: Context) -> str:
 
 def _released(ctx: Context) -> str:
     """The commit the last releases ran at: prod's current build, which the old factory released against."""
-    if github_push.released(ctx.places) is not None:
+    if prod_push.released(ctx.places) is not None:
         return ""
     current = deploys.builds(ctx.places, probes.PROD)["current"]
     if current is None:
         return ""
-    store.write_json(github_push.released_path(ctx.places), {"commit": current["commit"], "at": ctx.clock.iso()})
+    store.write_json(prod_push.released_path(ctx.places), {"commit": current["commit"], "at": ctx.clock.iso()})
     return "the last released commit"
 
 

@@ -30,7 +30,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import gc, public
 from runtime.warden.context import Context
-from runtime.warden.delivery import ci_watch, deploys, github_push, outage
+from runtime.warden.delivery import ci_watch, deploys, outage, prod_push
 from runtime.warden.health import probes
 from runtime.warden.owner import accounts, codes, messages, reflections, settings_save
 from runtime.warden.sessions import doing, lifecycle, permits, registry
@@ -368,7 +368,7 @@ def _factory(ctx: Context, args: dict[str, Any]) -> Any:
 def _staging_pinned(ctx: Context) -> str | None:
     """Why staging's build may not go to prod, as the push would refuse it; None when it may."""
     on_default = deploys.on_default(ctx.places, probes.STAGING)
-    return None if on_default is True else github_push.staging_off_default(ctx.settings(), on_default)
+    return None if on_default is True else prod_push.staging_off_default(ctx.settings(), on_default)
 
 
 def _proposals(ctx: Context, args: dict[str, Any]) -> dict[str, Any]:
@@ -388,7 +388,7 @@ READERS: dict[str, Reader] = {
     "probes": _probes,
     "deploys": lambda ctx, args: {
         **{env: deploys.builds(ctx.places, env) for env in probes.ENVS},
-        "push_back": github_push.push_back_target(ctx),
+        "push_back": prod_push.push_back_target(ctx),
         # Why staging's build may not go to prod, as the push would refuse it; None when it may.
         "staging_pinned": _staging_pinned(ctx),
     },

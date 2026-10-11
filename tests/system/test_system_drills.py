@@ -16,7 +16,7 @@ from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.system import install
 from runtime.system.install_drills import drills
-from runtime.system.install_drills.drills import Ran, Result
+from runtime.system.install_drills.evidence import Ran, Result
 
 
 def _stream(command: str, result: str) -> str:

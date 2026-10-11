@@ -14,7 +14,7 @@ from runtime.shared import models, store
 from runtime.shared.models import Probe, Task
 from runtime.shared.protocol import Refused
 from runtime.warden import inbox
-from runtime.warden.delivery import deploys, github_push
+from runtime.warden.delivery import deploys, github_push, prod_push
 from runtime.warden.health import probes
 from runtime.warden.owner import ops
 
@@ -78,7 +78,7 @@ def github_repo(world: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_the_warden_trusts_github_by_the_host_keys_it_pinned_and_no_other(world: World, github_repo: Path) -> None:
-    command = github_push._Git(world.ctx).env["GIT_SSH_COMMAND"]
+    command = github_push.Git(world.ctx).env["GIT_SSH_COMMAND"]
     assert "-o StrictHostKeyChecking=yes" in command
     assert f"-o UserKnownHostsFile={world.ctx.places.github_known_hosts}" in command
 
@@ -164,7 +164,7 @@ def test_push_to_prod_refuses_a_stale_sha_or_a_red_staging(
     probe(world, probes.STAGING, True, STAGING)
     probe(world, probes.STAGING, staging_ok, STAGING if staging_ok else "")
     with pytest.raises(Refused) as refused:
-        github_push.push_prod(world.ctx, {"expected_staging_sha": expected}, None)
+        prod_push.push_prod(world.ctx, {"expected_staging_sha": expected}, None)
     assert refused.value.rule == rule
     assert world.github.dispatched == []
 
@@ -174,14 +174,14 @@ def test_push_to_prod_runs_its_steps_and_asks_for_a_qa_prod_pass(world: World, b
     probe(world, probes.STAGING, True, build)
     probe(world, probes.PROD, True, PROD)
     world.github.on_run = lambda: probe(world, probes.PROD, True, build)  # the loop sees prod on the new build
-    started = github_push.push_prod(world.ctx, {"expected_staging_sha": build}, None)
+    started = prod_push.push_prod(world.ctx, {"expected_staging_sha": build}, None)
     ops.join(started["op"], timeout=30)
     op = ops.get(world.ctx, {"id": started["op"]}, None)["op"]
     assert [step["state"] for step in op["steps"]] == [ops.DONE] * 5, op
     # A product may report a short build; its prod workflow checks out the full commit.
     assert world.github.dispatched == [world.github.full_sha(build)]
     assert world.events == [(inbox.QA_PROD_DUE, {"sha": build, "kind": "push", "since": world.clock.iso()})]
-    assert github_push.watching(world.ctx)
+    assert prod_push.watching(world.ctx)
 
 
 def test_a_failed_release_after_a_good_deploy_fails_only_the_last_step(world: World) -> None:
@@ -189,12 +189,12 @@ def test_a_failed_release_after_a_good_deploy_fails_only_the_last_step(world: Wo
     probe(world, probes.PROD, True, PROD)
     world.github.on_run = lambda: probe(world, probes.PROD, True, STAGING)
     world.github.releases = "failure"
-    started = github_push.push_prod(world.ctx, {"expected_staging_sha": STAGING}, None)
+    started = prod_push.push_prod(world.ctx, {"expected_staging_sha": STAGING}, None)
     ops.join(started["op"], timeout=30)
     steps = ops.get(world.ctx, {"id": started["op"]}, None)["op"]["steps"]
     assert [step["state"] for step in steps[:-1]] == [ops.DONE] * 4 and steps[-1]["state"] != ops.DONE
     assert "prod is live" in str(steps[-1])
-    assert github_push.released(world.ctx.places) is None  # the next push tries the release again
+    assert prod_push.released(world.ctx.places) is None  # the next push tries the release again
 
 
 def test_the_next_push_releases_what_changed_since_the_last_releases_that_finished(world: World) -> None:
@@ -203,7 +203,7 @@ def test_the_next_push_releases_what_changed_since_the_last_releases_that_finish
     for build in (STAGING, later):
         probe(world, probes.STAGING, True, build)
         world.github.on_run = lambda build=build: probe(world, probes.PROD, True, build)
-        started = github_push.push_prod(world.ctx, {"expected_staging_sha": build}, None)
+        started = prod_push.push_prod(world.ctx, {"expected_staging_sha": build}, None)
         ops.join(started["op"], timeout=30)
 
     assert world.github.released == ["-", STAGING]
@@ -212,7 +212,7 @@ def test_the_next_push_releases_what_changed_since_the_last_releases_that_finish
 def test_push_back_goes_only_to_the_build_before_prods_current_one_in_the_deploy_log(world: World) -> None:
     places, at = world.ctx.places, world.clock.iso()
     with pytest.raises(Refused) as refused:
-        github_push.push_back(world.ctx, {"expected_sha": OLD}, None)
+        prod_push.push_back(world.ctx, {"expected_sha": OLD}, None)
     assert refused.value.rule == "no-previous"
 
     for env, commit in ((probes.PROD, OLD), (probes.STAGING, STAGING), (probes.PROD, PROD), (probes.PROD, PROD)):
@@ -223,7 +223,7 @@ def test_push_back_goes_only_to_the_build_before_prods_current_one_in_the_deploy
     }
     assert deploys.builds(places, probes.STAGING)["previous"] is None
     with pytest.raises(Refused) as refused:
-        github_push.push_back(world.ctx, {"expected_sha": STAGING}, None)
+        prod_push.push_back(world.ctx, {"expected_sha": STAGING}, None)
     assert refused.value.rule == "stale"
     assert world.github.dispatched == []
 
@@ -293,11 +293,11 @@ def test_push_back_goes_to_what_prod_ran_when_the_last_push_began_even_if_that_p
         deploys.record(world.ctx.places, probes.PROD, commit, world.clock.iso())
     probe(world, probes.STAGING, True, STAGING)
     probe(world, probes.PROD, True, PROD)
-    monkeypatch.setattr(github_push, "_steps", lambda *args: [])  # the push starts, and its build never answers
+    monkeypatch.setattr(prod_push, "_steps", lambda *args: [])  # the push starts, and its build never answers
 
-    github_push.push_prod(world.ctx, {"expected_staging_sha": STAGING}, None)
+    prod_push.push_prod(world.ctx, {"expected_staging_sha": STAGING}, None)
 
-    assert github_push.push_back_target(world.ctx) == PROD  # not OLD, two builds back
+    assert prod_push.push_back_target(world.ctx) == PROD  # not OLD, two builds back
 
 
 @pytest.mark.parametrize("on_default", [False, None], ids=["off-it", "unknown"])
@@ -308,7 +308,7 @@ def test_a_staging_build_not_known_on_the_default_branch_never_goes_to_prod(
     probe(world, probes.PROD, True, PROD)
 
     with pytest.raises(Refused) as refused:
-        github_push.push_prod(world.ctx, {"expected_staging_sha": STAGING}, None)
+        prod_push.push_prod(world.ctx, {"expected_staging_sha": STAGING}, None)
     assert refused.value.rule == "staging-pinned"
 
 
@@ -324,12 +324,12 @@ def test_a_build_github_did_not_place_on_the_branch_is_asked_again_and_reported_
             raise Refused("push-failed", "git fetch failed: Connection timed out")
         return answer
 
-    monkeypatch.setattr(github_push, "on_default", on_default)
+    monkeypatch.setattr(prod_push, "on_default", on_default)
     retry = world.ctx.settings().get_int("watch.branch_retry_minutes") * 60
     with caplog.at_level(logging.WARNING, logger=github_push.__name__):
         for wait, left in ((0, 2), (retry - 1, 2), (1, 1), (retry, 0), (retry, 0)):  # the same build all along
             world.clock.t += wait
-            github_push.ask_branch(world.ctx)
+            prod_push.ask_branch(world.ctx)
             assert len(answers) == left  # asked again only once the retry is due, and never once known
     assert deploys.on_default(world.ctx.places, probes.STAGING) is True
     assert [r.getMessage() for r in caplog.records] == [
@@ -343,8 +343,8 @@ def test_whether_a_commit_is_on_the_default_branch_is_asked_of_github_itself(wor
     commit(world.checkout, write("src/local.py"))
     local = git(world.checkout, "rev-parse", "HEAD")
 
-    assert github_push.on_default(world.ctx, pushed) is True
-    assert github_push.on_default(world.ctx, local) is False  # GitHub's branch does not hold it
+    assert prod_push.on_default(world.ctx, pushed) is True
+    assert prod_push.on_default(world.ctx, local) is False  # GitHub's branch does not hold it
     shutil.rmtree(github_repo)  # GitHub does not answer
     with pytest.raises(Refused, match="git fetch failed"):
-        github_push.on_default(world.ctx, pushed)
+        prod_push.on_default(world.ctx, pushed)

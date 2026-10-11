@@ -56,7 +56,7 @@ VERBS: dict[str, Verb] = {
     "inbox.wait": _v("runtime.warden.inbox:wait", ORCH),
     "push": _v("runtime.warden.delivery.github_push:push_checked", ORCH),
     "check": _v("runtime.warden.checks:check", ORCH, IMPL),
-    "promote": _v("runtime.warden.delivery.github_push:promote_cli", OWNER),
+    "promote": _v("runtime.warden.delivery.prod_push:promote_cli", OWNER),
     # reflections, status, settings (1B-3)
     "reflect": _v("runtime.warden.owner.reflections:append", *ANY, kinds=frozenset({INTAKE, TRIAGE})),
     "status": _v("runtime.warden.status:status", *ANY, kinds=READERS),
@@ -129,8 +129,8 @@ VERBS: dict[str, Verb] = {
     "settings.save": _o("runtime.warden.owner.settings_save:save", coded=True),
     "repo.change": _o("runtime.warden.owner.settings_save:change_repo", coded=True),
     "rule.switch": _o("runtime.warden.owner.settings_save:switch_rule", coded=True),
-    "push.prod": _o("runtime.warden.delivery.github_push:push_prod", coded=True),
-    "push.back": _o("runtime.warden.delivery.github_push:push_back", coded=True),
+    "push.prod": _o("runtime.warden.delivery.prod_push:push_prod", coded=True),
+    "push.back": _o("runtime.warden.delivery.prod_push:push_back", coded=True),
     # contract: added by FB9, the agents' Claude accounts. No code: only the owner's own uid reaches owner.sock.
     "account.list": _o("runtime.warden.owner.accounts:list_accounts"),
     "account.add": _o("runtime.warden.owner.accounts:add"),

@@ -27,7 +27,7 @@ from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.warden import inbox
 from runtime.warden.context import Context
-from runtime.warden.delivery import ci_watch, deploys, github_push, outage
+from runtime.warden.delivery import ci_watch, deploys, github_push, outage, prod_push
 from runtime.warden.health import errors_import, heartbeat, probes, vitals
 from runtime.warden.owner import reflections
 
@@ -127,7 +127,7 @@ def _probes(ctx: Context, fetch: probes.Fetch, now: float) -> None:
     every = ctx.settings().get_int("watch.probe_seconds")
     for env in probes.ENVS:
         last = memo["probed"].get(env)
-        close = env == probes.PROD and github_push.watching(ctx)
+        close = env == probes.PROD and prod_push.watching(ctx)
         if last is None or close or now - last >= every:
             memo["probed"][env] = now
             probe = probes.take(ctx, env, fetch)
@@ -214,7 +214,7 @@ def _goal(ctx: Context, memo: dict[str, Any]) -> None:
 def _qa_prod_due(ctx: Context, now: float) -> None:
     """A read-only walk of prod qa.prod_every_hours after the last one asked for, on the build prod runs now. The
     first tick only starts the count."""
-    path = github_push.qa_prod_path(ctx.places)
+    path = prod_push.qa_prod_path(ctx.places)
     last = store.read_json_or(path, None)
     if last is None:
         store.write_json(path, {"at": now, "iso": ctx.clock.iso()})
@@ -230,7 +230,7 @@ def _qa_prod_due(ctx: Context, now: float) -> None:
     current = deploys.builds(ctx.places, probes.PROD)["current"]
     if current is None:
         return  # prod has answered on no build yet: nothing to walk
-    github_push.post_qa_prod(ctx, current["commit"], "daily", last["iso"])
+    prod_push.post_qa_prod(ctx, current["commit"], "daily", last["iso"])
 
 
 def _rescore(ctx: Context, now: float) -> None:
