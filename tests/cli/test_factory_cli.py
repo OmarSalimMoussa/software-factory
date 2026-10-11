@@ -85,7 +85,9 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["slot", "seed", "load", "basic", "--as", "tester-1@example.com"],
         ["slot", "desktop", "up", "tester-1@example.com"],
         ["qa", "plan"],
-        ["qa", "result", "--head", "abc1234", "--blockers", "0", "--majors", "1", "--minors", "2"],
+        ["qa", "result", "--head", "abc1234"],
+        ["qa", "finding", "--head", "abc1234", "--severity", "major", "--where", "/cart", "--body", FILE],
+        ["qa", "waive", "t-0001", "f-2", "--why", "the spec asks for it"],
         ["qa-ready", "abc1234", "--slices", "abc1234", "def5678"],
         ["qa-clean"],
         ["ready-check"],
@@ -108,8 +110,7 @@ def test_propose_none_names_no_task() -> None:
 
 
 def test_the_subagent_id_the_guard_puts_first_travels_with_the_request() -> None:
-    call = _build(["--agent-id", "a1b2c3", "qa", "result", "--head", "abc1234", "--blockers", "0", "--majors", "0",
-                   "--minors", "0"])  # fmt: skip
+    call = _build(["--agent-id", "a1b2c3", "qa", "result", "--head", "abc1234"])
     assert (call.verb, call.agent_id) == ("qa.result", "a1b2c3")
     assert _build(["qa-clean"]).agent_id == ""
     with pytest.raises(CliError):

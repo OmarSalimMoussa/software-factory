@@ -4,7 +4,7 @@ description: Use when an implementer starts you to test the security of its chan
 # The warden renders model and effort from settings (models.qa_security) before any session reads this file.
 model: "{{model}}"
 effort: "{{effort}}"
-disallowedTools: Edit, Write, NotebookEdit, Agent, mcp__claude-in-chrome, mcp__computer-use, AskUserQuestion
+disallowedTools: Edit, NotebookEdit, Agent, mcp__claude-in-chrome, mcp__computer-use, AskUserQuestion
 maxTurns: 300
 skills:
   - qa-security

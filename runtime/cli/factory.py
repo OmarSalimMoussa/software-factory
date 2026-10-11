@@ -110,11 +110,15 @@ def _parser() -> argparse.ArgumentParser:
     needs.add_argument("--question", default="")
     sub.add_parser("turn", help="give the merge turn to the next qa-clean task").add_argument("what", choices=["next"])
     _slot(sub)
-    qa = sub.add_parser("qa")
-    qa.add_argument("what", choices=["plan", "result"])
+    qa = sub.add_parser("qa", help="qa plan | finding --head … --severity … --where … --body <file> | result --head … "
+                                   "| waive <task> <finding> --why …")  # fmt: skip
+    qa.add_argument("what", choices=["plan", "finding", "result", "waive"])
+    qa.add_argument("words", nargs="*")
     qa.add_argument("--head", default="")
-    for key in ("blockers", "majors", "minors"):
-        qa.add_argument(f"--{key}", type=int)
+    qa.add_argument("--severity", default="")
+    qa.add_argument("--where", default="")
+    qa.add_argument("--body")
+    qa.add_argument("--why", default="")
     ready = sub.add_parser("qa-ready")
     ready.add_argument("head")
     ready.add_argument("--slices", nargs="+", help="one commit per slice; by default each slice's Slice: n/N commit")
@@ -273,7 +277,7 @@ def _call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
     if cmd == "slot":
         return _slot_call(ns)
     if cmd == "qa":
-        return _qa_call(ns)
+        return _qa_call(ns, read_file)
     if cmd == "qa-ready":
         return Call("qa-ready", {"head": ns.head, **({"slices": _words(ns.slices)} if ns.slices else {})})
     if cmd == "check":
@@ -339,13 +343,21 @@ def _slot_call(ns: argparse.Namespace) -> Call:
     return Call("slot", args)
 
 
-def _qa_call(ns: argparse.Namespace) -> Call:
+def _qa_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
     if ns.what == "plan":
         return Call("qa.plan", {})
-    counts = {k: getattr(ns, k) for k in ("blockers", "majors", "minors")}
-    if not ns.head or any(v is None for v in counts.values()):
-        raise CliError("factory qa result --head <sha> --blockers <n> --majors <n> --minors <n>")
-    return Call("qa.result", {"head": ns.head, **counts})
+    if ns.what == "waive":
+        if len(ns.words) != 2 or not ns.why:
+            raise CliError("factory qa waive <task> <finding> --why '…'")
+        return Call("qa.waive", {"task": ns.words[0], "finding": ns.words[1], "why": ns.why})
+    if not ns.head:
+        raise CliError(f"factory qa {ns.what} --head <sha> …")
+    if ns.what == "result":
+        return Call("qa.result", {"head": ns.head})
+    if not (ns.severity and ns.where and ns.body):
+        raise CliError("factory qa finding --head <sha> --severity blocker|major|minor --where '…' --body <file>")
+    args = {"head": ns.head, "severity": ns.severity, "where": ns.where}
+    return Call("qa.finding", args, read_file(ns.body))
 
 
 def read_file(path: str) -> bytes:

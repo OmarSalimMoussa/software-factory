@@ -49,8 +49,9 @@ From the OWASP Top 10:2025, the OWASP API Security Top 10 and the OWASP Top 10 f
 ## Report
 
 One finding per weakness: severity (`blocker`, `major` or `minor`) by what an attacker gains, the exact request or
-input, what came back, and the fix you expect. Say what you did not test. Last, record your verdict on the head
-`factory ready-check` named: `factory qa result --head <sha> --blockers <n> --majors <n> --minors <n>`.
+input, what came back, and the fix you expect. Say what you did not test. Record each finding as you find it, on the head `factory ready-check` named: its text to a file under
+`.factory/` with the Write tool, then `factory qa finding --head <sha> --severity <s> --where "<where>" --body
+<file>`. Last, `factory qa result --head <sha>`: your verdict is counted from the findings you recorded.
 
 ## Never
 

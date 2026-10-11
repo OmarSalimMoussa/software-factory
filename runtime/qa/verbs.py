@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from runtime.qa import evidence, plan, qa_browser
+from runtime.qa import evidence, findings, plan, qa_browser
 from runtime.queue import tasks
 from runtime.queue.formats import SHA
 from runtime.queue.statuses import IMPL
@@ -146,6 +146,16 @@ def _slice_commits(ctx: Context, session: Session, head: str, count: int | None)
     return [found[n] for n in range(1, want + 1)]
 
 
+def _touched(ctx: Context, session: Session, task: Task, tested: str, head: str) -> set[str]:
+    """The testers the commits from ``tested`` to ``head`` require: those whose surfaces they touch."""
+    settings = ctx.settings()
+    surfaces = f"{settings.get_str('repo.default_branch')}:{SURFACES_FILE}"
+    prefixes = plan.surface_prefixes(_git(ctx, settings.get_str("repo.path"), "show", surfaces))
+    changed = _git(ctx, session.worktree, "diff", "--name-only", "--no-renames", tested, head).splitlines()
+    rung = task.run if task.run is not None else session.rung
+    return set(plan.required([], rung or 0, plan.diff_surfaces(changed, prefixes)))
+
+
 def ready_check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """A tester's first step: the last ready record still holds, and the slot still runs its head."""
     session = _implementer(ctx)
@@ -160,25 +170,42 @@ def ready_check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
     return ok(head=head, slot=latest["slot"], testers=latest.get("testers", []))
 
 
-def _count(args: dict[str, Any], key: str) -> int:
-    value = args.get(key)
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise Refused("qa-result", f"--{key} is a whole number from 0")
-    return value
-
-
-def qa_result(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """A tester's last step: its counts of open findings on the head it tested, and its runs into evidence."""
+def _tester_on_head(ctx: Context, args: dict[str, Any], verb: str) -> tuple[Session, Session, str]:
+    """The implementer, its registered tester that asks, and the full head of the last ready record it names."""
     session = _implementer(ctx)
     tester = registry.read(ctx.places).get(ctx.caller.agent_id) if ctx.caller.agent_id else None
     if tester is None or not tester.role.startswith("qa-"):
-        raise Refused("qa-result", "only a registered tester reports a QA result")
+        raise Refused(verb, "only a registered tester reports a QA finding or result")
     head = args.get("head")
     records = ready_records(ctx, session)
     if not isinstance(head, str) or not records or not str(records[-1]["head"]).startswith(head) or len(head) < 7:
-        raise Refused("qa-result", "report on the head of the last ready record: --head <sha>")
-    counts = {key: _count(args, key) for key in ("blockers", "majors", "minors")}
-    full = str(records[-1]["head"])
+        raise Refused(verb, "report on the head of the last ready record: --head <sha>")
+    return session, tester, str(records[-1]["head"])
+
+
+def qa_finding(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
+    """A tester records one finding on the head it tests, as it finds it."""
+    session, tester, full = _tester_on_head(ctx, args, "qa-finding")
+    finding = findings.add(ctx, session.task, full, tester.role, ctx.caller.agent_id, args, data)
+    return ok(finding=finding, head=full)
+
+
+def qa_waive(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
+    """The orchestrator's ruling on a disputed finding: it no longer counts, for the reason given."""
+    task, finding = args.get("task"), args.get("finding")
+    if not isinstance(task, str) or not isinstance(finding, str):
+        raise Refused("qa-waive", "factory qa waive <task> <finding> --why '…'")
+    findings.waive(ctx, task, finding, str(args.get("why", "")))
+    return ok(task=task, waived=finding)
+
+
+def qa_result(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
+    """A tester's last step: its verdict on the head it tested, counted from the findings it recorded, and its runs
+    into evidence."""
+    session, tester, full = _tester_on_head(ctx, args, "qa-result")
+    records = ready_records(ctx, session)
+    found = findings.counts(ctx, session.task, full, agent=ctx.caller.agent_id)
+    counts = {"blockers": found["blocker"], "majors": found["major"], "minors": found["minor"]}
     result = {"head": full, "tester": tester.role, "agent": ctx.caller.agent_id, "at": ctx.clock.iso(), **counts}
     store.append_jsonl(_results_path(ctx, session), result)
     verdict = (
@@ -194,7 +221,8 @@ def qa_result(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
 
 
 def qa_clean(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Refused until every required tester reported on the final head with no open blocker or major."""
+    """Refused until every required tester has a verdict on the final head with no open blocker or major. A clean
+    verdict on an earlier head carries forward when the commits since it touch none of that tester's surfaces."""
     session = _implementer(ctx)
     records = ready_records(ctx, session)
     if not records:
@@ -202,13 +230,19 @@ def qa_clean(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     head = str(records[-1]["head"])
     if _head(ctx, session) != head:
         raise Refused("qa-clean", f"your head moved past {head[:9]}: run qa-ready on it and test it again")
-    latest: dict[str, dict[str, Any]] = {}
+    task = tasks.read(ctx, session.task)
+    latest: dict[str, str] = {}  # each tester's newest head with a verdict
     for result in store.read_jsonl(_results_path(ctx, session)):
-        if result["head"] == head:
-            latest[str(result["tester"])] = result
-    missing = [t for t in records[-1].get("testers", []) if t not in latest]
-    open_ = [t for t, r in latest.items() if t in records[-1].get("testers", []) and (r["blockers"] or r["majors"])]
-    said = ([f"no result from {', '.join(missing)}"] if missing else []) + (
+        latest[str(result["tester"])] = str(result["head"])
+    missing: list[str] = []
+    open_: list[str] = []
+    for tester in records[-1].get("testers", []):
+        tested = latest.get(tester)
+        if tested is None or (tested != head and tester in _touched(ctx, session, task, tested, head)):
+            missing.append(tester)
+        elif findings.open_count(ctx, task.id, tested, tester):
+            open_.append(tester)
+    said = ([f"no result from {', '.join(missing)} on what changed since it tested"] if missing else []) + (
         [f"open blockers or majors from {', '.join(open_)}"] if open_ else []
     )
     if said:

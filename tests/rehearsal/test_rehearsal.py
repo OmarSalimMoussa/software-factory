@@ -105,8 +105,10 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
         agent = f"a{n}7f3c9e1d2b4a6"
         r.hook(impl, "subagent.start", {"agent_id": agent, "kind": tester})
         r.session(impl, ["ready-check"], agent_id=agent)
-        result = ["qa", "result", "--head", head, "--blockers", "0", "--majors", "0", "--minors", "1"]
-        r.session(impl, result, agent_id=agent)
+        note = r.body(worktree, f"finding-{n}.md", b"The empty list says nothing about how to add a note.\n")
+        finding = ["qa", "finding", "--head", head, "--severity", "minor", "--where", "/notes", "--body", note]
+        r.session(impl, finding, agent_id=agent)
+        assert r.session(impl, ["qa", "result", "--head", head], agent_id=agent)["minors"] == 1
         r.hook(impl, "subagent.end", {"agent_id": agent})
     r.session(impl, ["qa-clean"])
 

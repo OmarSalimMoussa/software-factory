@@ -50,9 +50,9 @@ With no `slot-api` tools, report "no slot-api" as your whole result.
 ## Report
 
 One finding per problem: severity (`blocker`, `major` or `minor`), the route, what you sent, what came back, and what
-the spec or the rulebook expected. Then a short table of the latency you measured. Say what you did not test. Last,
-record your verdict on the head `factory ready-check` named:
-`factory qa result --head <sha> --blockers <n> --majors <n> --minors <n>`.
+the spec or the rulebook expected. Then a short table of the latency you measured. Say what you did not test. Record each finding as you find it, on the head `factory ready-check` named: its text to a file under
+`.factory/` with the Write tool, then `factory qa finding --head <sha> --severity <s> --where "<where>" --body
+<file>`. Last, `factory qa result --head <sha>`: your verdict is counted from the findings you recorded.
 
 ## Never
 

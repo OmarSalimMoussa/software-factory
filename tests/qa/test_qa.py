@@ -84,9 +84,14 @@ def ready_world(world: World, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     return world
 
 
-def _result(world: World, agent: str, majors: int = 0) -> None:
-    args = {"head": HEAD[:9], "blockers": 0, "majors": majors, "minors": 2}
-    qa.qa_result(world.ctx("implementer", IMPL_ID, agent), args, None)
+def _result(world: World, agent: str, majors: int = 0) -> list[str]:
+    """The tester ``agent`` records ``majors`` major findings and two minor ones, then its verdict; the majors' ids."""
+    ctx = world.ctx("implementer", IMPL_ID, agent)
+    found = [qa.qa_finding(ctx, {"head": HEAD[:9], "severity": severity, "where": "/cart"}, b"It breaks.")["finding"]
+             for severity in ["major"] * majors + ["minor"] * 2]  # fmt: skip
+    verdict = qa.qa_result(ctx, {"head": HEAD[:9]}, None)
+    assert (verdict["majors"], verdict["minors"]) == (majors, 2)
+    return found[:majors]
 
 
 def test_qa_clean_waits_for_every_required_tester_on_the_head(ready_world: World) -> None:
@@ -98,10 +103,10 @@ def test_qa_clean_waits_for_every_required_tester_on_the_head(ready_world: World
         _result(world, agent)
     with pytest.raises(Refused, match="no result from qa-backend"):
         qa.qa_clean(impl, {}, None)
-    _result(world, "ag-be", majors=1)
+    disputed = _result(world, "ag-be", majors=1)
     with pytest.raises(Refused, match="open blockers or majors from qa-backend"):
         qa.qa_clean(impl, {}, None)
-    _result(world, "ag-be")
+    qa.qa_waive(world.ctx(), {"task": "t-0001", "finding": disputed[0], "why": "the spec asks for it"}, None)
     qa.qa_clean(impl, {}, None)
     assert world.queue().task("t-0001").status == "qa-clean"
 
@@ -144,3 +149,35 @@ def test_qa_ready_finds_each_slices_commit_by_its_trailer(
     qa.qa_ready(impl, {"head": HEAD[:12]}, None)
     record = json.loads((ready_world.places.state / "public" / "ready" / f"{IMPL_ID}.json").read_text())["records"][-1]
     assert record["slices"] == found
+
+
+@pytest.mark.parametrize(
+    ("since", "rerun"),
+    [("server/api/cart.py", ["qa-backend"]), ("web/cart.ts", ["qa-ui-function", "qa-ux", "qa-visual"])],
+    ids=["a-backend-fix", "a-screen-fix"],
+)
+def test_a_clean_verdict_carries_to_the_next_head_unless_its_surfaces_changed(
+    ready_world: World, monkeypatch: pytest.MonkeyPatch, since: str, rerun: list[str]
+) -> None:
+    world, impl = ready_world, ready_world.ctx("implementer", IMPL_ID)
+    qa.qa_ready(impl, {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
+    for agent in ("ag-ux", "ag-vis", "ag-fn"):
+        _result(world, agent)
+    _result(world, "ag-be", majors=1)
+
+    head2 = "b" * 40
+    answers = {"rev-parse": head2, "show": PREFIXES, "merge-base": ""}
+
+    def git(argv: list[str]) -> tuple[int, str]:
+        if argv[3] != "diff":
+            return 0, answers[argv[3]]
+        # The fix since the first round touches one surface; the branch's whole diff still touches both.
+        return 0, f"{since}\n" if HEAD in argv else "web/page.ts\nserver/api/cart.py\n"
+
+    world.launcher.git = git
+    monkeypatch.setattr(health, "http_get", lambda url, timeout, limit: json.dumps({"build_commit": head2}).encode())
+    qa.qa_ready(impl, {"head": head2[:12], "slices": [head2[:7]]}, None)
+
+    with pytest.raises(Refused) as refused:
+        qa.qa_clean(impl, {}, None)
+    assert f"no result from {', '.join(rerun)}" in refused.value.reason

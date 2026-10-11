@@ -85,9 +85,10 @@ VERBS: dict[str, Verb] = {
     "qa-ready": _v("runtime.qa.verbs:qa_ready", IMPL),
     "qa-clean": _v("runtime.qa.verbs:qa_clean", IMPL),
     "ready-check": _v("runtime.qa.verbs:ready_check", IMPL, kinds=VERDICTS),
-    "qa.result": _v(
-        "runtime.qa.verbs:qa_result", IMPL, kinds=VERDICTS
-    ),  # contract: a tester's verdict on the head, for qa-clean
+    # contract: a tester's verdict on the head, for qa-clean, counted from the findings it recorded
+    "qa.result": _v("runtime.qa.verbs:qa_result", IMPL, kinds=VERDICTS),
+    "qa.finding": _v("runtime.qa.verbs:qa_finding", IMPL, kinds=VERDICTS),
+    "qa.waive": _v("runtime.qa.verbs:qa_waive", ORCH),
     # the owner, from the dashboard or their own terminal
     "snapshot": _o("runtime.warden.snapshot:snapshot"),
     # contract: added by 2A. The dashboard cannot read the warden's state, so pictures and evidence come as bytes.

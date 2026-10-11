@@ -57,11 +57,13 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
    (`qa.widths`); what changed and why, with file paths; the spec's checks; the scenarios to walk (round 1 walks
    each scenario your branch adds or changes, cold); the test address each tester signs in as; and every finding
    earlier rounds raised, with what you did about it.
-5. **Findings** are claims to check (the `taking-review` skill): fix it, dispute it with evidence, or file it when it
-   is outside your task: `factory request new --from <tester> --severity normal --where "<where>" --body <file>`.
+5. **Findings** are claims to check (the `taking-review` skill): fix it, dispute it with evidence (the orchestrator
+   may waive it: `factory qa waive <task> <finding> --why "…"`), or file it when it is outside your task: `factory request new --from <tester> --severity normal --where "<where>" --body <file>`.
    Each bug a tester caught gets a test, or a scenario step, that would catch it again.
 6. **A round is a head.** After fixes, commit, rebuild, run `factory qa-ready` on the new head, and rerun the testers
-   whose last round found something. A finished tester is never messaged again: start a new one.
+   whose last round found something and those whose surfaces your new commits touch; a clean verdict on the rest
+   carries to the new head. `factory qa-clean` names any it still needs. A finished tester is never messaged again:
+   start a new one.
 7. **Clean.** The loop ends when a round brings no new blocker or major, at most `rounds.qa` rounds. Then
    `factory qa-clean`: the warden refuses it until every required tester recorded its verdict on that head with no
    open blocker or major. Out of rounds: send what is open to the orchestrator and file the minors.
