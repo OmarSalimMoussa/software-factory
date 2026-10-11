@@ -56,7 +56,6 @@ def main(
     execv: Exec = os.execv,
     note: Note = system_log,
 ) -> int:
-    """``command`` is what the SSH client asked the forced command to run; None for a login that asked nothing."""
     args = None if command is None else deploy_args(command)
     if args is None:
         # repr() keeps a newline or a control byte from forging a second log line.

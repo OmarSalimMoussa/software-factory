@@ -197,8 +197,7 @@ def parked(snap: Snap) -> dict[str, Any]:
     return {"rows": [row for _, row in sorted(rows, key=lambda x: x[0], reverse=True)]}
 
 
-# The class of the dot each QA result draws on the checks tab: app.css colours a dot with no class as a pass, f as a
-# failure and b as blocked.
+# Each QA result's dot class on the checks tab: app.css colours no class as a pass, f as a failure, b as blocked.
 _RESULT_DOT = {"pass": "", "fail": "f", "blocked": "b"}
 
 

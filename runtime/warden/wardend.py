@@ -160,8 +160,6 @@ def main() -> int:
     ctx = doors.context(WARDEN)
     refusals = reflections.RefusalWatch()
     server.serve_refusals(places.refusal_socket, lambda line: refusals.record(ctx, line))
-    # The socket leaves the environment: a program the warden starts would inherit it, and systemd logs each message
-    # it refuses there.
     ready(environment.take_notify_socket())
     transcripts = [agent_home / ".claude" / "projects", Path(owner.pw_dir) / ".claude" / "projects"]
     every = passes(places, transcripts, agent_home)

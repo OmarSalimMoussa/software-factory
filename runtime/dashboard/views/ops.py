@@ -24,8 +24,7 @@ _REFRESH = {
     "account": ["settings", "agents", "shell"],
 }
 
-# How the sheet draws a step in each state the warden reports: a class for its row, and a mark that is an icon or the
-# page's own spinner or empty ring.
+# The sheet's row class and mark for a step in each state: an icon, or the page's own spinner or empty ring.
 _STEP_LOOK = {
     "waiting": {"cls": "", "mark": "ring"},
     "running": {"cls": "on", "mark": "spin"},
