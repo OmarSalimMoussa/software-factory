@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from runtime.shared import environment
 from runtime.system import layout, qr
 from runtime.system.background import Answered, Pending, Running, shown
 from runtime.system.journal import Journal
@@ -203,7 +204,7 @@ class RealHost(Host):
     def _spawn(self, argv: list[str], user: str, env: Mapping[str, str] | None) -> tuple[list[str], dict[str, str]]:
         """The command line and the environment it starts with: as root, this process's own with the fixed PATH; as
         another user, ``runuser`` starts it with only what ``as_user`` declares."""
-        root = {**os.environ, "PATH": layout.ROOT_PATH}
+        root = {**environment.handed_on(), "PATH": layout.ROOT_PATH}
         if not user:
             return argv, {**root, **(env or {})}
         account = self.account(user)
@@ -225,12 +226,12 @@ class RealHost(Host):
         self, argv: list[str], *, user: str = "", cwd: Path | None = None, stdin: str | None = None,
         env: Mapping[str, str] | None = None, timeout: float | None = None,
     ) -> str:  # fmt: skip
-        command, environ = self._spawn(argv, user, env)
+        command, child_env = self._spawn(argv, user, env)
         began = time.monotonic()
         # Without input of its own, a command reads nothing: never the owner's terminal.
         feed: dict[str, Any] = {"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}
         try:
-            done = self._started(command, cwd=cwd, env=environ, timeout=timeout, **feed)
+            done = self._started(command, cwd=cwd, env=child_env, timeout=timeout, **feed)
         except subprocess.TimeoutExpired as exc:
             said = "".join(part if isinstance(part, str) else part.decode(errors="replace")
                            for part in (exc.stdout, exc.stderr) if part)  # fmt: skip
@@ -243,22 +244,22 @@ class RealHost(Host):
 
     def query(self, argv: list[str], *, user: str = "", cwd: Path | None = None) -> tuple[int, str]:
         try:
-            command, environ = self._spawn(argv, user, None)
+            command, child_env = self._spawn(argv, user, None)
         # telemetry: expected — a user the install has not made yet, as a dry run on a new machine finds
         except CommandError as exc:
             self.journal.command(shown(argv), user, exc.code, exc.output, 0)
             return exc.code, exc.output
         began = time.monotonic()
-        done = self._started(command, cwd=cwd, env=environ, stdin=subprocess.DEVNULL)
+        done = self._started(command, cwd=cwd, env=child_env, stdin=subprocess.DEVNULL)
         self.journal.command(shown(argv), user, done.returncode, done.stdout + done.stderr, time.monotonic() - began)
         return done.returncode, done.stdout + done.stderr
 
     def runner(self, user: str, env: Mapping[str, str]) -> Runner:
         def run(argv: list[str], stdin: str | None) -> subprocess.CompletedProcess[str]:
             feed: dict[str, Any] = {"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}
-            command, environ = self._spawn(argv, user, env)
+            command, child_env = self._spawn(argv, user, env)
             began = time.monotonic()
-            done = self._started(command, env=environ, **feed)
+            done = self._started(command, env=child_env, **feed)
             # What these commands print is the shared services' keys and tokens: the log keeps only how they ended.
             self.journal.command(shown(argv), user, done.returncode, "(output not kept: it holds keys)",
                                  time.monotonic() - began)  # fmt: skip
@@ -267,8 +268,8 @@ class RealHost(Host):
         return run
 
     def background(self, argv: list[str], *, user: str, env: Mapping[str, str]) -> Pending:
-        command, environ = self._spawn(argv, user, env)
-        return Running(self.journal, argv, user, command, environ)
+        command, child_env = self._spawn(argv, user, env)
+        return Running(self.journal, argv, user, command, child_env)
 
     def pipe(self, source: list[str], user: str, sink: list[str]) -> None:
         made, made_env = self._spawn(source, user, None)

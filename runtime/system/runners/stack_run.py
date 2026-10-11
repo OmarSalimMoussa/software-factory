@@ -20,7 +20,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from runtime.shared.paths import Places  # noqa: E402 - the path line above must run first
+from runtime.shared import environment  # noqa: E402 - the path line above must run first
+from runtime.shared.paths import Places  # noqa: E402
 from runtime.shared.settings import Settings  # noqa: E402
 from runtime.slots import leases  # noqa: E402
 from runtime.system import layout  # noqa: E402
@@ -151,7 +152,7 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
         return 1
     for note in notes:
         print(f"stack-run: {note}", flush=True)
-    env = {**os.environ, **leases.env(places, settings, slot, env_file)}
+    env = {**environment.handed_on(), **leases.env(places, settings, slot, env_file)}
     status, said = lf.run_captured([str(checkout / "scripts" / "dev"), *verb], checkout, env, timeout)
     print(provision.redact(said, hidden), end="", flush=True)
     if verb[0] != EMPTY or status != 0:

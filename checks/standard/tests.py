@@ -11,13 +11,13 @@ checks.test_seconds as FACTORY_TEST_SECONDS, the time one test may take, for the
 
 from __future__ import annotations
 
-import os
 import subprocess
 from pathlib import Path
 from typing import Any
 
 from checks.runner.catalog import NOTE
 from checks.runner.repo import Repo
+from runtime.shared import environment
 
 ID = "tests"
 RULE = "The changed code's tests pass"
@@ -74,7 +74,7 @@ def _run(repo: Repo, command: list[str]) -> tuple[int, str]:
         done = subprocess.run(command, cwd=repo.root, capture_output=True, text=True, check=False)
         return done.returncode, (done.stdout + done.stderr).strip()
     per_test, whole = repo.test_seconds
-    env = {**os.environ, "FACTORY_TEST_SECONDS": str(per_test)}
+    env = {**environment.handed_on(), "FACTORY_TEST_SECONDS": str(per_test)}
     killed = _oom_kills()
     try:
         done = subprocess.run(command, cwd=repo.root, env=env, capture_output=True, text=True, timeout=whole,

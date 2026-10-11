@@ -20,8 +20,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from runtime.shared import environment, store
 from runtime.shared import settings as settings_module
-from runtime.shared import store
 from runtime.shared.paths import AGENT_USER, Places
 from runtime.shared.settings import Settings
 
@@ -117,8 +117,7 @@ def main(argv: list[str], places: Places) -> int:
         print("factory qa-browser <role>", file=sys.stderr)
         return 2
     try:
-        # Claude Code names the session it starts this server for; nothing else here reads the environment.
-        session_id = os.environ.get("CLAUDE_CODE_SESSION_ID")
+        session_id = environment.claude_session_id()  # Claude Code names the session it starts this server for
         if not session_id:
             raise BrowserError("Claude Code gave no session id (CLAUDE_CODE_SESSION_ID)")
         settings = settings_module.build(store.read_json(places.state / "public" / "settings.json"), {})

@@ -25,7 +25,8 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.shared.paths import Places  # noqa: E402 - the path line above must run first
+from runtime.shared import environment  # noqa: E402 - the path line above must run first
+from runtime.shared.paths import Places  # noqa: E402
 from runtime.shared.protocol import Refused  # noqa: E402
 from runtime.system import (  # noqa: E402
     ci_check,
@@ -152,7 +153,7 @@ def run(ctx: Install) -> None:
 
 def job(host: Host, places: Places, owner: Account, repo: Path, commit: str, changes: dict[str, Any],
         healthchecks: bool) -> Install:  # fmt: skip
-    source = sealed.staged(os.environ)
+    source = environment.staged()
     factory = REPO_ROOT if source is None else source.checkout
     ctx = Install(host, places, factory, repo.resolve(), commit, owner, changes, healthchecks)
     if source is not None:
@@ -264,17 +265,17 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--keep-on-failure", action="store_true", help=keep)
     parser.add_argument("--verbose", action="store_true", help="print every detail the log keeps")
     args = parser.parse_args(argv)
-    root = os.geteuid() == 0 and "SUDO_USER" in os.environ
+    # sudo names the owner who ran it; a dry run without sudo has none, and is then the owner's own.
+    sudo_user = environment.sudo_user()
+    root = os.geteuid() == 0 and sudo_user is not None
     if not args.dry_run and not root:
         print("Run it with sudo, as yourself (or add --dry-run).", file=sys.stderr)
         return 2
-    # sudo names the owner who ran it; a dry run without sudo has none, and is then the owner's own.
-    sudo_user = os.environ.get("SUDO_USER")
     owner = RealHost().account(getpass.getuser() if sudo_user is None else sudo_user)
     if owner is None:
         print(f"{PROGRAM}: the owner's account cannot be read", file=sys.stderr)
         return 2
-    if not args.dry_run and sealed.STAGE not in os.environ:
+    if not args.dry_run and environment.staged() is None:
         return from_commit(args.commit, owner.name, argv)
     if root:
         journal = Journal.create(layout.LOGS, "install", group=owner.groups[0], verbose=args.verbose)

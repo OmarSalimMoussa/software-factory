@@ -12,12 +12,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from runtime.system.runners import launch_file as lf  # noqa: E402 - the path line above must run first
+from runtime.shared import environment  # noqa: E402 - the path line above must run first
+from runtime.system.runners import launch_file as lf  # noqa: E402
 
 
 def main(argv: list[str]) -> int:
     try:
-        env, _ = lf.claude_env(dict(os.environ))  # the token's pipe is inheritable, so it survives the exec
+        # The token's pipe is inheritable, so it survives the exec.
+        env, _ = lf.claude_env(environment.handed_on(), environment.credentials_folder())
     except lf.BadRequest as exc:
         print(f"with-token: {exc}", file=sys.stderr, flush=True)
         return lf.REFUSED

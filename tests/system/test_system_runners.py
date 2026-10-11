@@ -10,6 +10,7 @@ from system_fakes import settings
 
 from runtime.system import layout
 from runtime.system.runners import launch_file as lf
+from runtime.system.runners import record_exit
 from runtime.system.runners.stack_run import size_bytes
 
 STATE = Path("/var/lib/software-factory")
@@ -129,7 +130,7 @@ def test_a_message_is_held_out_in_a_terminal_and_a_failure_of_its_own_is_reporte
 
 def test_claude_gets_its_sign_in_token_on_a_pipe_and_in_no_environment(tmp_path: Path) -> None:
     (tmp_path / layout.CLAUDE_TOKEN).write_text("sk-test-token\n")
-    env, fds = lf.claude_env({"CREDENTIALS_DIRECTORY": str(tmp_path)})
+    env, fds = lf.claude_env({}, str(tmp_path))
     # What Claude Code does with the descriptor its variable names: read the token to the pipe's end.
     reads = (f"import os; token = os.read(int(os.environ['{lf.TOKEN_FD}']), 4096).decode().strip(); "
              "raise SystemExit(0 if token == 'sk-test-token' else 3)")  # fmt: skip
@@ -140,3 +141,24 @@ def test_claude_gets_its_sign_in_token_on_a_pipe_and_in_no_environment(tmp_path:
     finally:
         for fd in fds:
             os.close(fd)
+
+
+@pytest.mark.parametrize(
+    ("variables", "written"),
+    [
+        ({"EXIT_STATUS": "3", "SERVICE_RESULT": "exit-code"}, "3"),
+        ({"SERVICE_RESULT": "timeout"}, "timeout"),
+        ({}, "unknown"),
+    ],
+    ids=["an-exit-status", "a-service-result", "neither"],
+)
+def test_a_stopped_request_records_how_it_ended(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variables: dict[str, str], written: str
+) -> None:
+    for key in ("EXIT_STATUS", "SERVICE_RESULT"):
+        monkeypatch.delenv(key, raising=False)
+    for key, value in variables.items():
+        monkeypatch.setenv(key, value)
+    target = tmp_path / "request.exit"
+    assert record_exit.main([str(target)]) == 0
+    assert target.read_text() == f"{written}\n"

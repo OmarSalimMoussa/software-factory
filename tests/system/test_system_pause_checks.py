@@ -25,6 +25,5 @@ def test_only_a_clean_stop_or_a_sleep_pauses_the_alerts(
     calls: list[str] = []
     monkeypatch.setattr(pause_checks.healthchecks, "pause", lambda state, settings: calls.append("pause") or [])
     monkeypatch.setattr(pause_checks.settings, "load", lambda defaults, overrides: None)
-    environ = {"SERVICE_RESULT": result} if result else {}
-    assert pause_checks.main(argv, environ) == 0
+    assert pause_checks.main(argv, result or None) == 0
     assert calls == (["pause"] if paused else [])

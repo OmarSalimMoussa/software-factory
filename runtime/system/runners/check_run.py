@@ -10,7 +10,6 @@ to the warden. Stdlib only.
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -18,7 +17,8 @@ from pathlib import Path
 # `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from runtime.shared.paths import CHECK_TOOLS  # noqa: E402 - the path line above must run first
+from runtime.shared import environment  # noqa: E402 - the path line above must run first
+from runtime.shared.paths import CHECK_TOOLS  # noqa: E402
 from runtime.system import layout  # noqa: E402
 from runtime.system.runners import launch_file as lf  # noqa: E402
 
@@ -84,7 +84,7 @@ def main(argv: list[str]) -> int:
     except subprocess.TimeoutExpired:
         print("check-run: git did not answer in time", flush=True)
         return lf.TIMED_OUT
-    return lf.run(argv_, checkout, dict(os.environ), timeout)
+    return lf.run(argv_, checkout, environment.handed_on(), timeout)
 
 
 if __name__ == "__main__":

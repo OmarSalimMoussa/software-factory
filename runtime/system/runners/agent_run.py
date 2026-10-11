@@ -6,14 +6,14 @@ are the unit's, which systemd hands to the warden. Stdlib only.
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
 # `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from runtime.system.runners import launch_file as lf  # noqa: E402 - the path line above must run first
+from runtime.shared import environment  # noqa: E402 - the path line above must run first
+from runtime.system.runners import launch_file as lf  # noqa: E402
 
 
 def main(argv: list[str]) -> int:
@@ -21,16 +21,20 @@ def main(argv: list[str]) -> int:
     try:
         raw = lf.read(state, request_id, (lf.SESSION, lf.COMMAND, lf.MESSAGE))
         settings, _ = lf.published(state)
-        environ = dict(os.environ)
+        inherited = environment.handed_on()
         if raw["kind"] == lf.MESSAGE:
             command, repo = lf.message_argv(raw), Path(settings.get_str("repo.path"))
-            env, fds = lf.claude_env(environ)
+            env, fds = lf.claude_env(inherited, environment.credentials_folder())
             return lf.run_in_terminal(command, repo, env, settings.get_int("watch.message_seconds"), fds)
         if raw["kind"] == lf.SESSION:
             command, cwd = lf.session_argv(raw, state), Path(settings.get_str("repo.path"))
         else:
             command, cwd = lf.command_argv(raw, Path.home(), state)
-        env, fds = lf.claude_env(environ) if command[0] == lf.PROGRAMS["claude"] else (environ, ())
+        env, fds = (
+            lf.claude_env(inherited, environment.credentials_folder())
+            if command[0] == lf.PROGRAMS["claude"]
+            else (inherited, ())
+        )
     except lf.BadRequest as exc:
         print(f"agent-run: refused: {exc}", flush=True)
         return lf.REFUSED

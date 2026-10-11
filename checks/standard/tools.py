@@ -9,7 +9,6 @@ and import-linter over the contracts its ``[tool.importlinter]`` holds, when the
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import tomllib
@@ -18,6 +17,7 @@ from typing import Any
 
 from checks.runner import tools
 from checks.runner.repo import Repo
+from runtime.shared import environment
 
 ID = "tools"
 RULE = "ruff format and check, mypy, import-linter, at the versions the product pins"
@@ -56,7 +56,7 @@ def sync(repo: Repo) -> str:
     uv = shutil.which("uv")
     if uv is None:
         return f"uv is not on PATH, so the product's {LOCK} cannot be synced and its own tools cannot run"
-    env = {key: value for key, value in os.environ.items() if key not in _ELSEWHERE}
+    env = {key: value for key, value in environment.handed_on().items() if key not in _ELSEWHERE}
     status, output = _run(repo, [uv, *SYNC], env)
     return f"uv sync failed (exit {status}), so the product's own tools cannot run:\n{output}" if status else ""
 

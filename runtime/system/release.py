@@ -30,7 +30,8 @@ from typing import Any
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.system import layout, sealed  # noqa: E402 - the path line above must run first
+from runtime.shared import environment  # noqa: E402 - the path line above must run first
+from runtime.system import layout, sealed  # noqa: E402
 
 NAME = "software-factory.pyz"
 MANIFEST, TREE, MAIN = "release.json", "factory/", "__main__.py"
@@ -300,13 +301,13 @@ def launch(here: str, argv: list[str]) -> int:
         if args.check:
             print("Its files match its manifest.")
         return 0
-    if os.geteuid() != 0 or "SUDO_USER" not in os.environ:
+    if os.geteuid() != 0 or environment.sudo_user() is None:
         print(f"Run it with sudo, as yourself: sudo python3 {Path(here).name}", file=sys.stderr)
         return 2
     stage = seal(archive, layout.STAGE_ROOT)
     script, passed = _passed(args, archive.sha)
     sealed.exec_staged(archive.sha, stage, script, passed, release=sealed.release_folder(stage),
-                       display=() if args.terminal or args.uninstall else sealed.DISPLAY)  # fmt: skip
+                       display=() if args.terminal or args.uninstall else environment.DISPLAY)  # fmt: skip
 
 
 def main(argv: list[str]) -> int:

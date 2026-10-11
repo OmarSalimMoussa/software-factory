@@ -18,8 +18,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
+from runtime.shared.environment import Staged
 from runtime.shared.paths import Places
-from runtime.system import ci_check, console_page, install, release, sealed, uninstall
+from runtime.system import ci_check, console_page, install, release, uninstall
 from runtime.system.console_run import Run
 from runtime.system.host import Account, Host
 from runtime.system.job import REPO_ROOT
@@ -82,7 +83,7 @@ class Console:
     by ``log_group`` ("" leaves the folder's group alone)."""
 
     def __init__(self, places: Places, owner: Account, reader: Host, hosts: Hosts, opener: Callable[[str], bool], *,
-                 commit: str | None, repo: Path | None, source: sealed.Staged | None, logs: Path, log_group: str,
+                 commit: str | None, repo: Path | None, source: Staged | None, logs: Path, log_group: str,
                  choices: Choices) -> None:  # fmt: skip
         self.places, self.owner, self.reader, self.hosts, self.opener = places, owner, reader, hosts, opener
         self.commit, self.repo, self.source, self.choices = commit, repo, source, choices

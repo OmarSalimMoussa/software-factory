@@ -12,7 +12,6 @@ tick.
 from __future__ import annotations
 
 import logging
-import os
 import re
 import shlex
 import subprocess
@@ -25,7 +24,7 @@ from typing import Any
 from runtime.guard.writes import UnknownProtectedPaths, is_protected, protected_paths
 from runtime.queue.book import Queue
 from runtime.queue.turn import merges
-from runtime.shared import store
+from runtime.shared import environment, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import PROMOTE_JOB, Places
 from runtime.shared.protocol import Refused, ok
@@ -192,7 +191,7 @@ class _Git:
         self.mirror = mirror_path(ctx.places)
         self.timeout = ctx.settings().get_int("watch.push_wait_minutes") * 60
         self.env = {
-            **os.environ,
+            **environment.handed_on(),
             "GIT_TERMINAL_PROMPT": "0",
             "GIT_SSH_COMMAND": f"ssh -i {shlex.quote(str(key))} -o IdentitiesOnly=yes -o BatchMode=yes "
                                "-o StrictHostKeyChecking=yes "

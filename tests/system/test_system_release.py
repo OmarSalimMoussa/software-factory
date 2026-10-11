@@ -14,6 +14,7 @@ from typing import Any, NoReturn
 
 import pytest
 
+from runtime.shared import environment
 from runtime.system import release, sealed
 
 COMMIT = ["-c", "user.name=Owner", "-c", "user.email=owner@example.com", "-c", "commit.gpgsign=false"]
@@ -82,7 +83,7 @@ def test_the_release_file_checks_its_own_hashes_and_refuses_a_changed_file(
 @pytest.mark.parametrize(
     ("argv", "script", "passed", "display"),
     [
-        (["--repo", "/home/owner/shop"], "console.py", ["--repo", "/home/owner/shop"], sealed.DISPLAY),
+        (["--repo", "/home/owner/shop"], "console.py", ["--repo", "/home/owner/shop"], environment.DISPLAY),
         (["--terminal", "--repo", "/home/owner/shop", "--set", "caps.implementers=2", "--verbose"], "install.py",
          ["--repo", "/home/owner/shop", "--set", "caps.implementers=2", "--verbose"], ()),
         (["--uninstall", "--dry-run"], "uninstall.py", ["--dry-run"], ()),

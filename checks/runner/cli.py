@@ -22,8 +22,8 @@ from checks.runner import catalog
 from checks.runner.catalog import NOTE, Check
 from checks.runner.repo import GitError, Repo, git
 from checks.runner.values import ValuesError
+from runtime.shared import environment, store
 from runtime.shared import settings as settings_mod
-from runtime.shared import store
 from runtime.shared.paths import Places
 from runtime.shared.settings import Settings, SettingsError
 
@@ -46,15 +46,10 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def on_ci() -> bool:
-    """CI runners hold nothing else, so a test run there needs no memory guard; CI sets CI=true."""
-    return os.environ.get("CI") == "true"
-
-
 def effective_settings() -> Settings | None:
     """The machine's effective settings, which the warden publishes; None on CI, where only --all or --since runs and
     nothing else shares the machine, so a test run needs no memory guard."""
-    if on_ci():
+    if environment.on_ci():
         return None
     return settings_mod.build(store.read_json(Places.system().state / "public" / "settings.json"), {})
 
@@ -138,7 +133,7 @@ def run(argv: list[str], cwd: Path, settings: Settings | None, out: TextIO) -> i
         return 1
     base, changed = branch if branch is not None else (None, None)
     repo = Repo.open(root, changed, base)
-    if settings is not None and not on_ci():
+    if settings is not None and not environment.on_ci():  # CI runners hold nothing else: no memory guard
         ceiling = settings.get_int("budget.test_memory_ceiling_mib")
         repo.test_memory = (ceiling, settings.get_int("budget.test_reserve_mib"))
         repo.test_seconds = (settings.get_int("checks.test_seconds"), settings.get_int("checks.run_minutes") * 60)

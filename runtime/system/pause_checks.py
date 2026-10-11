@@ -8,14 +8,13 @@ alerts on and the owner hears of it. Stdlib only.
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
 # `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.shared import settings  # noqa: E402 - the path line above must run first
+from runtime.shared import environment, settings  # noqa: E402 - the path line above must run first
 from runtime.shared.paths import Places  # noqa: E402
 from runtime.system import healthchecks  # noqa: E402
 
@@ -25,11 +24,10 @@ PAUSING = ("pre", "stop")
 CLEAN = "success"
 
 
-def main(argv: list[str], environ: dict[str, str] | None = None) -> int:
-    environ = dict(os.environ) if environ is None else environ
+def main(argv: list[str], result: str | None) -> int:
+    """``result`` is systemd's word for how the warden ended, when it stopped; None when systemd gave none."""
     if not argv or argv[0] not in PAUSING:
         return 0
-    result = environ.get("SERVICE_RESULT")  # systemd's word for how the warden ended; it may give none
     if argv[0] == "stop" and result != CLEAN:
         cause = "an unknown cause" if result is None else result
         print(f"pause_checks: the warden ended by {cause}, not a stop; "
@@ -48,4 +46,4 @@ def main(argv: list[str], environ: dict[str, str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main(sys.argv[1:], environment.systemd_result()))

@@ -27,7 +27,8 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.shared.paths import Places  # noqa: E402 - the path line above must run first
+from runtime.shared import environment  # noqa: E402 - the path line above must run first
+from runtime.shared.paths import Places  # noqa: E402
 from runtime.shared.protocol import Refused  # noqa: E402
 from runtime.system import console_page, install, layout, sealed  # noqa: E402
 from runtime.system.console_app import Choices, Console, Hosts, Reply, refused  # noqa: E402
@@ -124,8 +125,8 @@ def display(reader: Host, owner: Account, inherited: Mapping[str, str]) -> dict[
     """Where the owner's desktop session draws: their user manager's environment holds it; sudo may have kept it."""
     code, out = reader.query(["systemctl", "--user", "show-environment"], user=owner.name)
     found = dict(line.split("=", 1) for line in out.splitlines() if "=" in line) if code == 0 else {}
-    session = {key: found[key] for key in sealed.DISPLAY if key in found}
-    return session or {key: inherited[key] for key in sealed.DISPLAY if key in inherited}
+    session = {key: found[key] for key in environment.DISPLAY if key in found}
+    return session or {key: inherited[key] for key in environment.DISPLAY if key in inherited}
 
 
 def opener(owner: Account, drawn: Mapping[str, str]) -> Callable[[str], bool]:
@@ -152,16 +153,18 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--dry-run", action="store_true", help="start with the dry run chosen")
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="a setting each install saves")
     args = parser.parse_args(argv)
-    if os.geteuid() != 0 or "SUDO_USER" not in os.environ:
+    sudo_user = environment.sudo_user()
+    if os.geteuid() != 0 or sudo_user is None:
         print(f"{PROGRAM}: run it with sudo, as the owner", file=sys.stderr)
         return 2
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     reader = RealHost()
-    owner = reader.account(os.environ["SUDO_USER"])
+    owner = reader.account(sudo_user)
     if owner is None:
         print(f"{PROGRAM}: the owner's account cannot be read", file=sys.stderr)
         return 2
-    if sealed.STAGE not in os.environ:
+    source = environment.staged()
+    if source is None:
         # The whole console runs from the commit it offers, so the steps it runs are that commit's own.
         offered = console_page.commit_choice(reader, owner, REPO_ROOT, args.commit)
         if offered["problem"]:
@@ -173,20 +176,20 @@ def main(argv: list[str]) -> int:
             print(f"{PROGRAM}: {exc.reason if isinstance(exc, Refused) else exc}", file=sys.stderr)
             return 1
         sealed.exec_staged(sha, stage, "runtime/system/console.py", ["--commit", sha, *_without_commit(argv)],
-                           checkout=REPO_ROOT, display=sealed.DISPLAY)  # fmt: skip
+                           checkout=REPO_ROOT, display=environment.DISPLAY)  # fmt: skip
     console: Console | None = None
     try:
         choices = Choices(args.healthchecks, args.keep_on_failure, args.dry_run, install.parse_changes(args.set))
         console = Console(Places.system(), owner, reader, Hosts(ConsoleHost, ConsoleLookingHost),
-                          opener(owner, display(reader, owner, os.environ)), commit=args.commit,
-                          repo=args.repo.resolve() if args.repo else None, source=sealed.staged(os.environ),
+                          opener(owner, display(reader, owner, environment.desktop_session())), commit=args.commit,
+                          repo=args.repo.resolve() if args.repo else None, source=source,
                           logs=layout.LOGS, log_group=owner.groups[0], choices=choices)  # fmt: skip
         return until_stopped(console)
     except Refused as exc:
         print(f"{PROGRAM}: {exc.reason}", file=sys.stderr)
         return 2
     finally:
-        sealed.finish(reader, Path(os.environ[sealed.STAGE]), kept=console is not None and console.kept)
+        sealed.finish(reader, source.stage, kept=console is not None and console.kept)
 
 
 def until_stopped(console: Console) -> int:

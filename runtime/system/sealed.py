@@ -9,41 +9,17 @@ from __future__ import annotations
 import os
 import secrets
 from collections.abc import Mapping
-from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn
 
+from runtime.shared import environment
+from runtime.shared.environment import CHECKOUT, RELEASE, SHA, STAGE
 from runtime.system import layout
 from runtime.system.host import Host
 from runtime.system.job import refuse
 
-# Set only in the environment of a process that runs from a sealed copy: the copy, its commit, and where it came from:
-# the owner's checkout, or a release file whose manifest and history wait in the release folder beside the copy.
-STAGE, SHA = "SOFTWARE_INSTALL_STAGE", "SOFTWARE_INSTALL_SHA"
-CHECKOUT, RELEASE = "SOFTWARE_INSTALL_CHECKOUT", "SOFTWARE_INSTALL_RELEASE"
-# What a sealed copy starts with, beside the variables above, the owner's name and their terminal's type.
+# What a sealed copy starts with, beside the hand-off variables, the owner's name and their terminal's type.
 BASE_ENV = {"PATH": layout.ROOT_PATH, "LANG": "C.UTF-8", "HOME": "/root"}
-# The owner's desktop session, which only the console keeps: it opens pages and files there.
-DISPLAY = ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY")
-
-
-@dataclass(frozen=True, slots=True)
-class Staged:
-    """What a process that runs from a sealed copy knows of it."""
-
-    stage: Path
-    sha: str
-    checkout: Path | None  # the owner's factory checkout it was sealed from; None for a release
-    release: Path | None  # the release folder; None for a checkout
-
-
-def staged(environ: Mapping[str, str]) -> Staged | None:
-    """The sealed copy this process runs from; None when it runs from a checkout."""
-    if STAGE not in environ:
-        return None
-    checkout, release = environ.get(CHECKOUT), environ.get(RELEASE)
-    return Staged(Path(environ[STAGE]), environ[SHA], Path(checkout) if checkout else None,
-                  Path(release) if release else None)  # fmt: skip
 
 
 def release_folder(stage: Path) -> Path:
@@ -87,7 +63,7 @@ def exec_staged(sha: str, stage: Path, script: str, argv: list[str], *, checkout
                 release: Path | None = None, display: tuple[str, ...] = ()) -> NoReturn:  # fmt: skip
     """Run ``script`` (a path inside the factory) again from the sealed copy: from then on every line of factory code
     is the commit's own. ``display`` names the variables of the owner's desktop session it keeps, when set."""
-    env = declared_env(os.environ, sha, stage, checkout=checkout, release=release, display=display)
+    env = declared_env(environment.handed_on(), sha, stage, checkout=checkout, release=release, display=display)
     # -B: root writes past missing write bits, so Python must not write its bytecode into the sealed copy.
     os.execve(layout.PYTHON, [layout.PYTHON, "-I", "-B", str(stage / script), *argv], env)
 

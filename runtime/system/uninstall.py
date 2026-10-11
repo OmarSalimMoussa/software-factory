@@ -22,7 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.shared import paths, store  # noqa: E402 - the path line above must run first
+from runtime.shared import environment, paths, store  # noqa: E402 - the path line above must run first
 from runtime.shared import settings as settings_module  # noqa: E402
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER, Places  # noqa: E402
 from runtime.shared.protocol import Refused  # noqa: E402
@@ -272,12 +272,12 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--dry-run", action="store_true", help="go through every step; change nothing")
     parser.add_argument("--verbose", action="store_true", help="print every detail the log keeps")
     args = parser.parse_args(argv)
-    root = os.geteuid() == 0 and "SUDO_USER" in os.environ
+    # sudo names the owner who ran it; a dry run without sudo has none, and is then the owner's own.
+    sudo_user = environment.sudo_user()
+    root = os.geteuid() == 0 and sudo_user is not None
     if not args.dry_run and not root:
         print("Run it with sudo, as yourself (or add --dry-run).", file=sys.stderr)
         return 2
-    # sudo names the owner who ran it; a dry run without sudo has none, and is then the owner's own.
-    sudo_user = os.environ.get("SUDO_USER")
     owner = RealHost().account(getpass.getuser() if sudo_user is None else sudo_user)
     if owner is None:
         print(f"{PROGRAM}: the owner's account cannot be read", file=sys.stderr)
@@ -288,7 +288,7 @@ def main(argv: list[str]) -> int:
         journal = Journal(verbose=True)  # a dry run as the owner keeps no log: what it would do is its whole point
     host: Host = LookingHost(journal) if args.dry_run else RealHost(journal)
     journal.screen("Dry run: what Uninstall removes" if args.dry_run else "Removing the factory from this computer")
-    source = sealed.staged(os.environ)
+    source = environment.staged()
     try:
         failed = perform(host, Places.system(), owner, args.repo) is not None
     finally:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import socket
 import threading
 import uuid
@@ -10,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from runtime.queue import reports
-from runtime.shared import store
+from runtime.shared import environment, store
 from runtime.warden import imports
 from runtime.warden.context import Context
 from runtime.warden.wardend import passes, ready, run_passes
@@ -62,14 +63,14 @@ def test_a_pass_that_works_in_a_thread_reports_its_failure_there_once_while_it_l
     ]
 
 
-def test_the_warden_tells_systemd_it_serves_on_the_socket_systemd_names() -> None:
+def test_the_warden_tells_systemd_it_serves_on_the_socket_systemd_names(monkeypatch: pytest.MonkeyPatch) -> None:
     name = f"software-test-{uuid.uuid4().hex}"
     with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as systemd:
         systemd.bind("\0" + name)  # an abstract socket, which systemd names with a leading @
         systemd.settimeout(5)
 
-        environ = {"NOTIFY_SOCKET": f"@{name}", "PATH": "/usr/bin"}
-        ready(environ)
+        monkeypatch.setenv("NOTIFY_SOCKET", f"@{name}")
+        ready(environment.take_notify_socket())
 
         assert systemd.recv(64) == b"READY=1"
-        assert environ == {"PATH": "/usr/bin"}  # the programs the warden starts never send on it
+        assert "NOTIFY_SOCKET" not in os.environ  # the programs the warden starts never send on it

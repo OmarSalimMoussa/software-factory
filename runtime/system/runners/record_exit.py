@@ -6,14 +6,17 @@ a number as the exit status and anything else as what ended the run. Stdlib only
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
+# `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+from runtime.shared import environment  # noqa: E402 - the path line above must run first
+
 
 def main(argv: list[str]) -> int:
-    # systemd sets EXIT_STATUS only when the main process exited, and SERVICE_RESULT for every stop.
-    exit_status, service_result = os.environ.get("EXIT_STATUS"), os.environ.get("SERVICE_RESULT")
+    exit_status, service_result = environment.systemd_exit_status(), environment.systemd_result()
     if exit_status:
         status = exit_status
     elif service_result:

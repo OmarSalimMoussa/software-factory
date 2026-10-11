@@ -10,6 +10,7 @@ from typing import Any, NoReturn
 import pytest
 from system_fakes import SHA
 
+from runtime.shared import environment
 from runtime.shared.protocol import Refused
 from runtime.system import layout, sealed
 from runtime.system.host import DryHost, RealHost, user_env
@@ -35,7 +36,7 @@ def test_a_sealed_copy_is_unpacked_by_root_into_a_new_folder_and_made_read_only_
     ]
 
 
-@pytest.mark.parametrize("display", [(), sealed.DISPLAY], ids=["install", "console"])
+@pytest.mark.parametrize("display", [(), environment.DISPLAY], ids=["install", "console"])
 def test_a_sealed_copy_starts_isolated_with_only_the_declared_environment(
     monkeypatch: pytest.MonkeyPatch, display: tuple[str, ...]
 ) -> None:
@@ -43,7 +44,7 @@ def test_a_sealed_copy_starts_isolated_with_only_the_declared_environment(
         "PATH": "/home/owner/.venv/bin:/usr/bin", "PYTHONPATH": "/home/owner/src", "VIRTUAL_ENV": "/home/owner/.venv",
         "UV_PYTHON": "3.14", "SUDO_USER": "owner", "TERM": "xterm-256color", "DISPLAY": ":0",
         "WAYLAND_DISPLAY": "wayland-0", "XAUTHORITY": "/run/user/1000/xauth",
-        sealed.STAGE: "/tmp/elsewhere", sealed.SHA: "junk", sealed.CHECKOUT: "/tmp/junk",
+        environment.STAGE: "/tmp/elsewhere", environment.SHA: "junk", environment.CHECKOUT: "/tmp/junk",
     }  # fmt: skip
     for key, value in inherited.items():
         monkeypatch.setenv(key, value)
@@ -64,7 +65,7 @@ def test_a_sealed_copy_starts_isolated_with_only_the_declared_environment(
                                 "--commit", SHA]  # fmt: skip
     assert env == {
         "PATH": layout.ROOT_PATH, "LANG": "C.UTF-8", "HOME": "/root", "SUDO_USER": "owner", "TERM": "xterm-256color",
-        sealed.STAGE: str(STAGE), sealed.SHA: SHA, sealed.CHECKOUT: str(CHECKOUT),
+        environment.STAGE: str(STAGE), environment.SHA: SHA, environment.CHECKOUT: str(CHECKOUT),
         **{key: inherited[key] for key in display},
     }  # fmt: skip
 
@@ -118,3 +119,28 @@ def test_the_sealed_copy_goes_when_its_program_ends_unless_kept(stage: Path, kep
 
     assert (f"remove: {stage}" in host.actions) is removed
     assert (f"remove: {sealed.release_folder(stage)}" in host.actions) is removed
+
+
+@pytest.mark.parametrize(
+    ("variables", "known"),
+    [
+        ({}, None),
+        (
+            {environment.STAGE: "/stage", environment.SHA: "abc", environment.CHECKOUT: "/checkout"},
+            environment.Staged(Path("/stage"), "abc", Path("/checkout"), None),
+        ),
+        (
+            {environment.STAGE: "/stage", environment.SHA: "abc", environment.RELEASE: "/release"},
+            environment.Staged(Path("/stage"), "abc", None, Path("/release")),
+        ),
+    ],
+    ids=["run-from-a-checkout", "sealed-from-a-checkout", "sealed-from-a-release"],
+)
+def test_a_process_knows_the_sealed_copy_it_runs_from(
+    monkeypatch: pytest.MonkeyPatch, variables: dict[str, str], known: environment.Staged | None
+) -> None:
+    for key in (environment.STAGE, environment.SHA, environment.CHECKOUT, environment.RELEASE):
+        monkeypatch.delenv(key, raising=False)
+    for key, value in variables.items():
+        monkeypatch.setenv(key, value)
+    assert environment.staged() == known
