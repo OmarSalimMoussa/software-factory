@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from runtime.shared import claude_accounts, releases, totp
+from runtime.shared import claude_accounts, releases, totp, upgrades
 from runtime.shared.claude_accounts import AccountError
 from runtime.shared.paths import WARDEN_USER
 from runtime.system import github_keys, layout
@@ -92,8 +92,12 @@ def secrets(ctx: Install) -> None:
 def _factory_token(ctx: Install) -> None:
     """The owner's read-only token for the factory's own repo, asked for once: the warden finds new releases with it,
     and the dashboard's Upgrade downloads them. Checked on GitHub before it is kept."""
-    host, path = ctx.host, releases.token_path(ctx.places)
+    host, path, mine = ctx.host, releases.token_path(ctx.places), upgrades.token_path(ctx.places)
     if host.exists(path):
+        # Root's own copy, for the upgrade unit, made from the token the owner gave.
+        if not host.exists(mine) and not host.dry:
+            host.mkdir(ctx.places.upgrade, mode=0o755)
+            host.write(mine, host.read(path), mode=0o600)
         return
     settings = ctx.need_settings()
     factory = settings.get_str("factory.github")
@@ -112,6 +116,8 @@ def _factory_token(ctx: Install) -> None:
             raise refuse(f"That token cannot read the factory's releases ({exc}): make one as asked, then install "
                          "again") from exc  # fmt: skip
     host.write(path, value + "\n", mode=0o600, owner=WARDEN_USER)
+    host.mkdir(ctx.places.upgrade, mode=0o755)
+    host.write(mine, value + "\n", mode=0o600)
 
 
 def check_factory_token(repo: str, token: str, timeout: float) -> None:

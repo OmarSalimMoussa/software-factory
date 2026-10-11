@@ -348,7 +348,9 @@ def test_whether_a_commit_is_on_the_default_branch_is_asked_of_github_itself(wor
 
 
 def _pin(world: World, ref: str = "acme/software-factory@" + "d" * 40) -> str:
-    """The commit an upgrade makes, as root, to move the product to its factory, recorded as the owner's."""
+    """The commit an upgrade makes, as root, to move the product to its factory, recorded as the owner's with the
+    blob each path holds."""
+    parent = git(world.checkout, "rev-parse", "HEAD")
 
     def change(root: Path) -> None:
         (root / ".github").mkdir(exist_ok=True)
@@ -358,7 +360,12 @@ def _pin(world: World, ref: str = "acme/software-factory@" + "d" * 40) -> str:
     made = commit(world.checkout, change)
     places = world.ctx.places
     places.upgrade.mkdir(parents=True, exist_ok=True)
-    store.write_json(upgrades.pins_path(places), [*upgrades.read_pins(places), made])
+    blobs = {
+        ".github/factory-ref": upgrades.blob_id(ref + "\n"),
+        ".github/workflows/ci.yml": upgrades.blob_id("changed\n"),
+    }
+    store.write_json(upgrades.pins_path(places),
+                     [*upgrades.read_pins(places), {"commit": made, "parent": parent, "blobs": blobs}])  # fmt: skip
     return made
 
 

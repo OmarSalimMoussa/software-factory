@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -62,7 +63,7 @@ def poll(ctx: Context) -> None:
             note = "Upgrade once by hand from a release file; the dashboard offers every upgrade after that."
         else:
             timeout = float(settings.get_int("watch.http_timeout_seconds"))
-            rel = releases.Releases.of(places, installed["repo"], timeout, releases.http_get)
+            rel = releases.Releases.of(releases.token_path(places), installed["repo"], timeout, releases.http_get)
             available = _ahead(rel, installed["commit"])
     # telemetry: surfaced — the page shows the note; logged when it starts or changes, not at every pass
     except (releases.ReleaseError, store.StoreError) as exc:
@@ -89,7 +90,7 @@ def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
     if not isinstance(commit, str) or available is None or available["commit"] != commit:
         raise Refused("stale", "This changed: that release is not the one on offer now")
     with ctx.lock:
-        progress, before = upgrades.read_progress(places), asked(places)
+        progress, before = progress_now(ctx), asked(places)
         if progress is not None and progress["state"] == upgrades.RUNNING:
             raise Refused("upgrading", "An upgrade is already under way")
         getting_ready = _op(ctx, before["op"]) if before else None
@@ -106,6 +107,27 @@ def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
                   "op": op_id}  # fmt: skip
         store.write_json(asked_path(places), record, mode=0o600)
     return ok(op=op_id)
+
+
+def progress_now(ctx: Context) -> dict[str, Any] | None:
+    """Root's progress, with an upgrade that went quiet for longer than one may run read as stopped: a reboot, or a
+    unit that never started, ends one without a word."""
+    found, before = upgrades.read_progress(ctx.places), asked(ctx.places)
+    limit = ctx.settings().get_int("install.upgrade_minutes") * 60
+    quiet = "The upgrade went quiet and did not finish. Its log in /var/log/software-factory says more; upgrade again."
+    if before is not None and (found is None or found["to"] != before["to"] or found["at"] < before["at"]):
+        op = _op(ctx, before["op"])
+        if op is not None and op["state"] == ops.DONE and ctx.clock.now() - _epoch(before["at"]) > limit:
+            return {"from": before["from"], "to": before["to"], "state": upgrades.FAILED, "step": "", "problem": quiet,
+                    "log": "", "at": before["at"]}  # fmt: skip
+        return found
+    if found is not None and found["state"] == upgrades.RUNNING and ctx.clock.now() - _epoch(found["at"]) > limit:
+        return {**found, "state": upgrades.FAILED, "problem": quiet}
+    return found
+
+
+def _epoch(iso: str) -> float:
+    return datetime.fromisoformat(iso).timestamp()
 
 
 def _op(ctx: Context, op_id: str) -> dict[str, Any] | None:
@@ -154,6 +176,6 @@ def view(ctx: Context) -> dict[str, Any]:
         "offer": offer(places),
         "asked": before,
         "op": _op(ctx, before["op"]) if before else None,
-        "progress": upgrades.read_progress(places),
+        "progress": progress_now(ctx),
         "paused": lifecycle.paused_path(ctx).exists(),
     }

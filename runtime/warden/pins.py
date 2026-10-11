@@ -17,7 +17,6 @@ from runtime.warden import checks
 from runtime.warden.context import Context
 
 Git = Callable[..., str]
-PIN_PATHS = (".github/factory-ref", ".github/workflows/")
 
 
 def _pushed_path(places: Places) -> Path:
@@ -29,11 +28,16 @@ def _changed(git: Git, commit: str) -> set[str]:
 
 
 def _pin(git: Git, places: Places, commit: str) -> set[str] | None:
-    """The paths a pin changes; None for a commit that is not one, or that changes anything else."""
-    if commit not in upgrades.read_pins(places):
+    """The paths a pin changes, when the commit is one root recorded, on its recorded parent, holding exactly the
+    blobs root worked out for it; None for any other commit."""
+    record = next((p for p in upgrades.read_pins(places) if p["commit"] == commit), None)
+    if record is None or git("rev-parse", f"{commit}^").strip() != record["parent"]:
         return None
     paths = _changed(git, commit)
-    return paths if all(p.startswith(PIN_PATHS) for p in paths) else None
+    listed = git("ls-tree", "-r", commit, "--", *record["blobs"]).splitlines()
+    held = {line.split("\t", 1)[1]: line.split()[2] for line in listed if "\t" in line}
+    wanted = {path: blob for path, blob in record["blobs"].items() if blob}
+    return paths if paths and paths <= set(record["blobs"]) and held == wanted else None
 
 
 def allowed(git: Git, places: Places, remote: str, head: str) -> set[str]:
@@ -61,7 +65,7 @@ def push_pending(ctx: Context) -> None:
 
     places = ctx.places
     record = store.read_json_or(_pushed_path(places), {"pushed": [], "tried_at": None})
-    waiting = [c for c in upgrades.read_pins(places) if c not in record["pushed"]]
+    waiting = [p["commit"] for p in upgrades.read_pins(places) if p["commit"] not in record["pushed"]]
     every = ctx.settings().get_int("watch.branch_retry_minutes") * 60
     if not waiting or (record["tried_at"] is not None and ctx.clock.now() - record["tried_at"] < every):
         return

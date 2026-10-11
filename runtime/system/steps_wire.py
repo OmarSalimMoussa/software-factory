@@ -9,10 +9,10 @@ from pathlib import Path
 
 from runtime.shared import upgrades
 from runtime.shared.paths import AGENT_USER, MANAGED_SETTINGS, SCRATCH, SLICE, WARDEN_USER
+from runtime.shared.protocol import Refused
 from runtime.system import layout, render
 from runtime.system.host import CommandError, Host
 from runtime.system.job import Install, github_name, refuse
-from standard.config import FACTORY_REF
 
 _HTTPS = 443
 _TAILSCALE_LINK = re.compile(r"https://login\.tailscale\.com/\S+")
@@ -88,49 +88,59 @@ def factory_repo(ctx: Install) -> str:
     return str(ctx.release["repo"]) if ctx.release else github_name(ctx.factory_origin) or ""
 
 
-# Workflows the factory once copied into products, and copies no more.
-RETIRED_WORKFLOWS = ("heartbeat.yml",)
 PIN_AUTHOR = ["-c", "user.name=software factory", "-c", "user.email=factory@software.invalid"]
 
 
 def product_pin(ctx: Install) -> None:
     """An upgrade moves the agents' copy of the product to the factory it installs, in one commit on the default
     branch that only root may make: no agent may change .github. The warden pushes it as the owner's (runtime/warden/
-    pins.py)."""
+    pins.py). A move that cannot be made is told and left to the owner: the factory itself is upgraded either way."""
+    try:
+        _pin(ctx)
+    # telemetry: surfaced — the owner is told the product stays where it was, and to move its pin by hand
+    except (CommandError, Refused) as exc:
+        ctx.host.tell(f"The product stays on its factory for now ({exc}): move .github/factory-ref by hand.")
+
+
+def _pin(ctx: Install) -> None:
     host, checkout, repo = ctx.host, ctx.checkout(), factory_repo(ctx)
     branch = ctx.need_settings().get_str("repo.default_branch")
-    git = ["git", "-C", str(checkout)]
+    # No hooks, and plumbing that applies no filter: nothing the agent configured shapes what root records.
+    git = ["git", "-C", str(checkout), "-c", "core.hooksPath=/dev/null"]
     on = host.query([*git, "symbolic-ref", "--short", "HEAD"], user=AGENT_USER)[1].strip()
     dirty = host.query([*git, "status", "--porcelain", "--untracked-files=no"], user=AGENT_USER)[1].strip()
-    if ctx.first or not repo or on != branch or dirty:
+    if ctx.first or host.dry or not repo or on != branch or dirty:
         host.say(f"the product's factory pin is left as it is (first {ctx.first}, repo {repo!r}, on {on!r}, "
                  f"changes {bool(dirty)})")  # fmt: skip
         return
-    want = {FACTORY_REF: f"{repo}@{ctx.sha}\n"} | {
-        f".github/workflows/{p.name}": p.read_text(encoding="utf-8")
-        for p in sorted((ctx.tree() / "templates" / "ci").glob("*.yml"))
-    }
-    held = {rel: host.query(["cat", str(checkout / rel)], user=AGENT_USER) for rel in want}
-    changed = [rel for rel, text in want.items() if held[rel] != (0, text)]
-    retired = [
-        f".github/workflows/{name}"
-        for name in RETIRED_WORKFLOWS
-        if host.query(["test", "-e", str(checkout / ".github" / "workflows" / name)], user=AGENT_USER)[0] == 0
-    ]
-    if not changed and not retired:
+    want = upgrades.pin_files(ctx.tree() / "templates" / "ci", repo, ctx.sha)
+    parent = host.run([*git, "rev-parse", "--verify", f"refs/heads/{branch}^{{commit}}"], user=AGENT_USER).strip()
+    held = set(host.run([*git, "ls-tree", "-r", "--name-only", parent, "--", *want], user=AGENT_USER).splitlines())
+    blobs = {rel: upgrades.blob_id(text) if text is not None else None for rel, text in want.items()
+             if text is not None or rel in held}  # fmt: skip
+    env = {"GIT_INDEX_FILE": str(checkout / ".git" / "factory-pin.index")}
+    host.run([*git, "read-tree", parent], user=AGENT_USER, env=env)
+    for rel, text in want.items():
+        if text is not None:
+            host.run([*git, "hash-object", "-w", "--no-filters", "--stdin"], user=AGENT_USER, stdin=text)
+            host.run([*git, "update-index", "--add", "--cacheinfo", f"100644,{blobs[rel]},{rel}"], user=AGENT_USER,
+                     env=env)  # fmt: skip
+        elif rel in held:
+            host.run([*git, "update-index", "--force-remove", rel], user=AGENT_USER, env=env)
+    tree = host.run([*git, "write-tree"], user=AGENT_USER, env=env).strip()
+    host.run(["rm", "-f", env["GIT_INDEX_FILE"]], user=AGENT_USER)
+    if tree == host.run([*git, "rev-parse", f"{parent}^{{tree}}"], user=AGENT_USER).strip():
         host.say(f"the product already uses the factory at {ctx.sha[:12]}")
         return
-    host.run(["mkdir", "-p", str(checkout / ".github" / "workflows")], user=AGENT_USER)
-    for rel in changed:
-        host.write(checkout / rel, want[rel], mode=0o644, owner=AGENT_USER)
-    if retired:
-        host.run([*git, "rm", "--quiet", *retired], user=AGENT_USER)
-    host.run([*git, "add", *changed], user=AGENT_USER)
     message = f"The product moves to the factory at {ctx.sha[:12]}, as the owner's upgrade asked"
-    host.run([*git, *PIN_AUTHOR, "commit", "--quiet", "--no-verify", "-m", message], user=AGENT_USER)
-    made = "c" * 40 if host.dry else host.run([*git, "rev-parse", "HEAD"], user=AGENT_USER).strip()
-    pins = [] if host.dry else upgrades.read_pins(ctx.places)
-    host.write(upgrades.pins_path(ctx.places), json.dumps([*pins, made]) + "\n", mode=0o644)
+    made = host.run([*git, *PIN_AUTHOR, "commit-tree", tree, "-p", parent, "-m", message], user=AGENT_USER).strip()
+    listed = host.run([*git, "ls-tree", "-r", made, "--", *blobs], user=AGENT_USER).splitlines()
+    if {line.split("\t", 1)[1]: line.split()[2] for line in listed} != {k: v for k, v in blobs.items() if v}:
+        raise refuse("the commit git made holds other files than root gave it")
+    host.run([*git, "update-ref", f"refs/heads/{branch}", made, parent], user=AGENT_USER)
+    host.run([*git, "read-tree", "-m", "-u", parent, made], user=AGENT_USER)  # the working tree follows the branch
+    pins = [*upgrades.read_pins(ctx.places), {"commit": made, "parent": parent, "blobs": blobs}]
+    host.write(upgrades.pins_path(ctx.places), json.dumps(pins, indent=1) + "\n", mode=0o644)
     host.tell(f"The product moves to this factory in commit {made[:12]}; the warden pushes it when it starts.")
 
 
@@ -247,6 +257,7 @@ def record(ctx: Install, drills: list[dict[str, object]]) -> None:
     host.mkdir(ctx.places.upgrade, mode=0o755)
     mine = {"commit": ctx.sha, "owner": ctx.owner.name, "product": str(ctx.product), "repo": factory_repo(ctx)}
     host.write(upgrades.installed_path(ctx.places), json.dumps(mine, indent=1) + "\n", mode=0o644)
+    host.write(upgrades.settings_path(ctx.places), json.dumps(ctx.overrides, indent=1) + "\n", mode=0o600)
     host.say(f"the factory at {ctx.sha[:12]} is installed")
 
 

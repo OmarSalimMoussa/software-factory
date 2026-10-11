@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from warden_fakes import OWNER_CALLER, FakeLauncher
 from runtime.shared import releases, upgrades
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
+from runtime.system.runners import upgrade as upgrade_runner
 from runtime.warden import factory_upgrade, lifecycle, ops
 from runtime.warden.context import Context
 from runtime.warden.dispatch import Doors
@@ -40,7 +42,7 @@ def _github(calls: list[str], down: bool = False) -> releases.Get:
         assert headers["Authorization"] == "Bearer github_pat_read_only"
         if url.endswith("/releases/latest"):
             body = {"target_commitish": NEW, "tag_name": releases.tag(NEW), "published_at": "2026-10-11T18:31:17Z",
-                    "assets": []}  # fmt: skip
+                    "author": {"login": releases.CI_BOT}, "assets": []}  # fmt: skip
         elif url.endswith(f"/compare/{OLD}...{NEW}"):
             body = {
                 "status": "ahead",
@@ -151,3 +153,36 @@ def test_an_agent_that_never_settles_stops_the_upgrade_before_it_starts(
     op = ops.get(ctx, {"id": op_id}, None)["op"]
     assert op["state"] == ops.FAILED and "impl-t-0001 did not settle" in op["steps"][1]["detail"]
     assert launcher.upgrades == []
+
+
+@pytest.mark.parametrize("started", [True, False], ids=["went-quiet-mid-way", "never-said-a-word"])
+def test_an_upgrade_quiet_for_longer_than_one_may_run_reads_as_stopped(
+    ctx: Context, monkeypatch: pytest.MonkeyPatch, started: bool
+) -> None:
+    _installed(ctx.places)
+    monkeypatch.setattr(releases, "http_get", _github([]))
+    factory_upgrade.poll(ctx)
+    ops.join(factory_upgrade.start(ctx, {"commit": NEW}, None)["op"], 10)
+    if started:
+        upgrades.write_progress(ctx.places, OLD, NEW, upgrades.RUNNING, "Copying the factory into place")
+        ctx.clock.t = datetime.fromisoformat(upgrades.read_progress(ctx.places)["at"]).timestamp()
+    limit = ctx.settings().get_int("install.upgrade_minutes") * 60
+
+    ctx.clock.t += limit - 1
+    before = factory_upgrade.view(ctx)["progress"]
+    ctx.clock.t += 2
+    after = factory_upgrade.view(ctx)["progress"]
+
+    assert (before or {}).get("state") in ((upgrades.RUNNING,) if started else (None,))
+    assert after is not None and after["state"] == upgrades.FAILED and "went quiet" in after["problem"]
+    factory_upgrade.start(ctx, {"commit": NEW}, None)  # and the owner may upgrade again
+
+
+def test_the_units_last_word_marks_a_killed_upgrade_stopped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    places = Places.under(tmp_path)
+    upgrades.write_progress(places, OLD, NEW, upgrades.RUNNING, "Downloading the release")
+    monkeypatch.setenv("SERVICE_RESULT", "timeout")
+
+    assert upgrade_runner.ended(places, NEW) == 0
+    said = upgrades.read_progress(places)
+    assert said is not None and said["state"] == upgrades.FAILED and "(timeout)" in said["problem"]

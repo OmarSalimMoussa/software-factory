@@ -16,6 +16,7 @@ from runtime.system.runners import upgrade
 
 OLD = "a" * 40
 API = "https://api.github.com/repos/acme/factory"
+BOT = {"login": releases.CI_BOT}
 STORAGE = "https://objects.example/release-asset"
 
 
@@ -36,10 +37,13 @@ def _github(data: bytes, commit: str, seen: list[tuple[str, dict[str, str]]], **
     tag = releases.tag(commit)
     digest = wrong.get("digest", hashlib.sha256(data).hexdigest())
     answers: dict[str, Any] = {
-        f"{API}/releases/tags/{tag}": {"target_commitish": commit, "tag_name": tag,
+        f"{API}/releases/tags/{tag}": {"target_commitish": commit, "tag_name": tag, "author": BOT,
                                        "published_at": "2026-10-11T00:00:00Z",
-                                       "assets": [{"name": releases.ASSET, "url": f"{API}/releases/assets/1"},
-                                                  {"name": releases.CHECKSUM, "url": f"{API}/releases/assets/2"}]},
+                                       "assets": [{"name": releases.ASSET, "url": f"{API}/releases/assets/1",
+                                                   "uploader": wrong.get("uploader", BOT)},
+                                                  {"name": releases.CHECKSUM, "url": f"{API}/releases/assets/2",
+                                                   "uploader": BOT}]},
+        f"{API}/git/ref/tags/{tag}": {"object": {"sha": wrong.get("tagged", commit), "type": "commit"}},
         API: {"default_branch": "main"},
         f"{API}/compare/{OLD}...{commit}": {"status": wrong.get("newer", "ahead"), "commits": []},
         f"{API}/compare/{commit}...main": {"status": wrong.get("on", "identical"), "commits": []},
@@ -77,8 +81,10 @@ def test_a_release_ci_made_newer_and_on_the_branch_is_fetched_and_its_file_check
 @pytest.mark.parametrize(
     ("wrong", "says"),
     [({"runs": 0}, "CI has not passed"), ({"newer": "behind"}, "is not newer"),
-     ({"on": "diverged"}, "is not on the factory's main"), ({"digest": "0" * 64}, "does not match its checksum")],
-    ids=["ci-did-not-pass", "older-than-installed", "off-the-default-branch", "file-not-as-published"],
+     ({"on": "diverged"}, "is not on the factory's main"), ({"digest": "0" * 64}, "does not match its checksum"),
+     ({"tagged": "f" * 40}, "does not point at"), ({"uploader": {"login": "someone"}}, "not uploaded by CI")],
+    ids=["ci-did-not-pass", "older-than-installed", "off-the-default-branch", "file-not-as-published",
+         "tag-moved-elsewhere", "file-uploaded-by-a-person"],
 )  # fmt: skip
 def test_a_release_it_cannot_trust_is_never_installed(tmp_path: Path, wrong: dict[str, Any], says: str) -> None:
     data, commit = _release_file(tmp_path)
@@ -86,6 +92,6 @@ def test_a_release_it_cannot_trust_is_never_installed(tmp_path: Path, wrong: dic
     folder = tmp_path / "download"
     folder.mkdir()
 
-    with pytest.raises(upgrade.Stop, match=says):
+    with pytest.raises((upgrade.Stop, releases.ReleaseError), match=says):
         upgrade.fetch(rel, upgrade.check(rel, OLD, commit), commit, folder)
     assert list(folder.iterdir()) == []

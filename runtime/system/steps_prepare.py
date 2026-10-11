@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import json
 import tomllib
+from pathlib import PurePosixPath
 from typing import Any
 
+from runtime.shared import store, upgrades
 from runtime.shared.models import RESTING
-from runtime.shared.settings import SCHEMA, SettingsError, build, flatten
+from runtime.shared.settings import AT_INSTALL, SCHEMA, SettingsError, build, flatten
 from runtime.system import layout
 from runtime.system.host import Account, Host
 from runtime.system.job import Install, github_name, github_origin, refuse
@@ -113,9 +115,14 @@ def sealed_copy(ctx: Install) -> None:
 
 def _saved_overrides(ctx: Install) -> dict[str, Any]:
     try:
-        text = ctx.host.read(ctx.places.overrides)
+        # Unattended, root reads the warden's file as one that could point anywhere.
+        rel = ctx.places.overrides.relative_to(ctx.places.state)
+        text = store.read_inside(ctx.places.state, rel) if ctx.unattended else ctx.host.read(ctx.places.overrides)
     except FileNotFoundError:
         return {}
+    except store.StoreError as exc:
+        raise refuse(f"Your saved settings cannot be read safely ({exc}): upgrade by hand from the release "
+                     "file") from exc  # fmt: skip
     except PermissionError:
         if not ctx.host.dry:
             raise
@@ -186,9 +193,31 @@ def settle_settings(ctx: Install) -> None:
             f"The settings cannot be used: {problems}. Set each with --set key=value, then install again"
         ) from exc
     ctx.overrides = overrides
-    if not str(ctx.settings.get_str("repo.path")).startswith(f"{layout.AGENT_HOME}/"):
+    if ctx.unattended:
+        _as_last_installed(ctx, overrides)
+    repo = PurePosixPath(ctx.settings.get_str("repo.path"))
+    if not str(repo).startswith(f"{layout.AGENT_HOME}/") or ".." in repo.parts:
         raise refuse(f"The setting repo.path must be a folder inside {layout.AGENT_HOME}, the agents' home: set it "
                      "with --set repo.path=..., then install again")  # fmt: skip
+
+
+# The settings an install acts on as root: the rest the running factory applies itself.
+ROOT_APPLIED = frozenset(
+    k for k, s in SCHEMA.items() if s.when in ("Next install", AT_INSTALL) or k.startswith("repo.")
+)
+
+
+def _as_last_installed(ctx: Install, overrides: dict[str, Any]) -> None:
+    """Unattended, the install applies the settings root applied last, and no other: the warden writes the saved
+    ones, and only the owner's own run of the release file may change what root acts on."""
+    last = upgrades.read_settings(ctx.places)
+    if last is None:
+        raise refuse("This laptop's last install kept no record of its settings: upgrade once by hand from the "
+                     "release file")  # fmt: skip
+    changed = sorted(k for k in ROOT_APPLIED if overrides.get(k) != last.get(k))
+    if changed:
+        raise refuse(f"Settings an install applies changed since the last one ({', '.join(changed)}): upgrade by hand "
+                     "from the release file to apply them")  # fmt: skip
 
 
 def stop_factory(ctx: Install) -> None:

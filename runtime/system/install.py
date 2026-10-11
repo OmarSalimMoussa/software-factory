@@ -275,15 +275,16 @@ def upgrade(commit: str) -> int:
     journal = Journal.create(layout.LOGS, "upgrade", group=owner.groups[0], verbose=False, terminal=False)
     host = UnattendedHost(journal, places, installed["commit"], commit)
     ctx = job(host, places, owner, Path(installed["product"]), commit, {}, False)
+    ctx.unattended = True
     problem: str | None = "The upgrade was stopped before it finished. Upgrade again to finish the job."
     try:
         if ctx.first:
             raise refuse("There is no install to upgrade: install the factory by hand first")
         problem = perform(ctx, keep=False)
-    finally:
-        sealed.finish(RealHost(journal), ctx.stage, kept=False)
         if problem is None:
             host.progress(upgrades.DONE, "")
+    finally:
+        sealed.finish(RealHost(journal), ctx.stage, kept=False)
     return 0 if problem is None else 1
 
 

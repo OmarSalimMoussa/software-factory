@@ -11,5 +11,7 @@ Type=oneshot
 User=root
 Environment=PATH=@path@
 ExecStart=@python@ -I @install@/runtime/system/runners/upgrade.py %i
+# However the run ended (a timeout's kill too), an upgrade still marked running is marked stopped.
+ExecStopPost=@python@ -I @install@/runtime/system/runners/upgrade.py --ended %i
 TimeoutStartSec=@upgrade_minutes@
 UMask=0022

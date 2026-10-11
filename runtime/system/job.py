@@ -56,6 +56,7 @@ class Install:
     settings: Settings | None = None
     overrides: dict[str, Any] = field(default_factory=dict)
     first: bool = True  # no earlier install recorded
+    unattended: bool = False  # the dashboard's upgrade, run by root's unit: nobody is at the keyboard
     reached: int = 0  # the number of the step running, or the last one done
     product_origin: str = ""
     factory_origin: str = ""

@@ -24,6 +24,7 @@ API = "https://api.github.com"
 ASSET = "software-factory.pyz"
 CHECKSUM = f"{ASSET}.sha256"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
+CI_BOT = "github-actions[bot]"  # the account a workflow's own token acts as: the release job's
 _HEADERS = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
 # GitHub's compare lists at most this many commits; a longer changelog says how many it leaves out.
 _COMPARE_MAX = 250
@@ -86,14 +87,15 @@ class Releases:
         self._token, self._timeout, self._get = token, timeout, get
 
     @classmethod
-    def of(cls, places: Places, repo: str, timeout: float, get: Get) -> Releases:
+    def of(cls, path: Path, repo: str, timeout: float, get: Get) -> Releases:
+        """With the token kept at ``path``: the warden's own, or root's copy for the upgrade unit."""
         try:
-            token = token_path(places).read_text(encoding="utf-8").strip()
+            token = path.read_text(encoding="utf-8").strip()
         except OSError as exc:
-            raise ReleaseError(f"the factory token at {token_path(places)} cannot be read ({type(exc).__name__}): "
-                               "upgrade once from the release file, which asks for it") from exc  # fmt: skip
-        if not token:
-            raise ReleaseError(f"the factory token at {token_path(places)} is empty")
+            raise ReleaseError(f"the factory token at {path} cannot be read ({type(exc).__name__}): upgrade once "
+                               "from the release file, which asks for it") from exc  # fmt: skip
+        if not token or not token.isprintable():
+            raise ReleaseError(f"the factory token at {path} is empty or not one line of text")
         return cls(repo, token, timeout, get)
 
     def default_branch(self) -> str:
@@ -107,13 +109,31 @@ class Releases:
         self._json(f"/repos/{self._repo}/actions/runs?per_page=1")
 
     def latest(self) -> Release:
-        return _release(self._json(f"/repos/{self._repo}/releases/latest"))
+        return self._release(self._json(f"/repos/{self._repo}/releases/latest"))
 
     def of_commit(self, commit: str) -> Release:
-        found = _release(self._json(f"/repos/{self._repo}/releases/tags/{tag(commit)}"))
-        if found.commit != commit:
-            raise ReleaseError(f"the release {tag(commit)} is of {found.commit[:12]}, not {commit[:12]}")
+        """The release of ``commit``, once its tag on GitHub points at that very commit."""
+        found = self._release(self._json(f"/repos/{self._repo}/releases/tags/{tag(commit)}"))
+        pointed = self._json(f"/repos/{self._repo}/git/ref/tags/{tag(commit)}").get("object")
+        if found.commit != commit or not isinstance(pointed, dict) or pointed.get("sha") != commit:
+            raise ReleaseError(f"the tag {tag(commit)} does not point at {commit[:12]}")
         return found
+
+    def _release(self, body: dict[str, Any]) -> Release:
+        """A release CI's own token made: its tag names its commit, and CI uploaded each file to this repo."""
+        commit, name, published = body.get("target_commitish"), body.get("tag_name"), body.get("published_at")
+        assets, author = body.get("assets"), body.get("author")
+        if not isinstance(commit, str) or not FULL_SHA.match(commit) or name != tag(commit):
+            raise ReleaseError(f"the release {name} names no full commit its tag is made of")
+        if not isinstance(published, str) or not isinstance(assets, list) or not _by_ci(author):
+            raise ReleaseError(f"the release {name} is not one CI made")
+        own = f"{API}/repos/{self._repo}/releases/assets/"
+        files = {str(a.get("name")): str(a.get("url")) for a in assets if isinstance(a, dict)}
+        if not all(isinstance(a, dict) and _by_ci(a.get("uploader")) for a in assets) or not all(
+            url.lower().startswith(own.lower()) for url in files.values()
+        ):
+            raise ReleaseError(f"a file of the release {name} was not uploaded by CI to this repo")
+        return Release(commit, name, published, files)
 
     def changes(self, base: str, head: str) -> tuple[str, list[str]]:
         """How ``head`` stands to ``base`` (ahead, behind...) and the subjects of the commits it adds, oldest first."""
@@ -178,12 +198,5 @@ class Releases:
         return answer
 
 
-def _release(body: dict[str, Any]) -> Release:
-    commit, name, published = body.get("target_commitish"), body.get("tag_name"), body.get("published_at")
-    assets = body.get("assets")
-    if not isinstance(commit, str) or not FULL_SHA.match(commit) or not isinstance(name, str):
-        raise ReleaseError("the release names no full commit, or no tag")
-    if name != tag(commit) or not isinstance(published, str) or not isinstance(assets, list):
-        raise ReleaseError(f"the release {name} is not one CI made of {commit[:12]}")
-    files = {str(a.get("name")): str(a.get("url")) for a in assets if isinstance(a, dict)}
-    return Release(commit, name, published, files)
+def _by_ci(account: object) -> bool:
+    return isinstance(account, dict) and account.get("login") == CI_BOT

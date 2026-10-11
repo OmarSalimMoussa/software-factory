@@ -1,13 +1,14 @@
 """An upgrade of the factory, in root's own folder: what is installed, and how an upgrade under way is going.
 
 Only root writes here (the install, and the upgrade service the dashboard starts); the warden reads it for the
-dashboard, which keeps showing an upgrade while the warden and the dashboard stop and start again. Root never trusts
-the warden's folder for an upgrade: whose laptop it is, and which product checkout, come from the install's own
-record here.
+dashboard, which keeps showing an upgrade while the warden and the dashboard stop and start again. For an upgrade
+nobody watches, root takes whose laptop it is, the product checkout, the factory repo, the token and the settings an
+install applies from here; of the warden's folder, only the settings the running factory applies itself.
 """
 
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -15,12 +16,30 @@ from typing import Any
 from runtime.shared import store
 from runtime.shared.paths import Places
 from runtime.shared.releases import FULL_SHA
+from standard.config import FACTORY_REF
 
 RUNNING, DONE, FAILED = "running", "done", "failed"
 
 
 def installed_path(places: Places) -> Path:
     return places.upgrade / "installed.json"
+
+
+def settings_path(places: Places) -> Path:
+    """The saved settings the last install applied, which an unattended upgrade applies as they were."""
+    return places.upgrade / "settings.json"
+
+
+def read_settings(places: Places) -> dict[str, Any] | None:
+    raw = store.read_json_or(settings_path(places), None)
+    if raw is not None and not isinstance(raw, dict):
+        raise store.StoreError(f"{settings_path(places)}: not an object of settings")
+    return raw
+
+
+def token_path(places: Places) -> Path:
+    """Root's own copy of the read-only factory token, which the upgrade unit reads instead of the warden's."""
+    return places.upgrade / "factory.token"
 
 
 def progress_path(places: Places) -> Path:
@@ -68,9 +87,33 @@ def pins_path(places: Places) -> Path:
     return places.upgrade / "pins.json"
 
 
-def read_pins(places: Places) -> list[str]:
-    """The commits an upgrade made to move the product to its factory: the owner's, by asking for the upgrade."""
+# Workflows the factory once copied into products, and copies no more.
+RETIRED_WORKFLOWS = ("heartbeat.yml",)
+
+
+def pin_files(templates: Path, repo: str, commit: str) -> dict[str, str | None]:
+    """What moving a product to the factory at ``commit`` sets: each path's text, or None for one it removes."""
+    found: dict[str, str | None] = {FACTORY_REF: f"{repo}@{commit}\n"}
+    found |= {f".github/workflows/{p.name}": p.read_text(encoding="utf-8") for p in sorted(templates.glob("*.yml"))}
+    return found | {f".github/workflows/{name}": None for name in RETIRED_WORKFLOWS}
+
+
+def blob_id(text: str) -> str:
+    """The id git gives a file of ``text``, worked out here: root does not take git's word, run as the agent, for it."""
+    data = text.encode()
+    return hashlib.sha1(b"blob %d\0" % len(data) + data, usedforsecurity=False).hexdigest()
+
+
+def read_pins(places: Places) -> list[dict[str, Any]]:
+    """The commits upgrades made to move the product to their factory, each with its parent and the blob each path
+    it changed holds (None for one it removed): the owner's, by asking for the upgrade."""
     raw = store.read_json_or(pins_path(places), [])
-    if not isinstance(raw, list) or not all(isinstance(c, str) and FULL_SHA.match(c) for c in raw):
-        raise store.StoreError(f"{pins_path(places)}: needs a list of full commits")
-    return raw
+    good = isinstance(raw, list) and all(
+        isinstance(p, dict) and set(p) == {"commit", "parent", "blobs"} and isinstance(p["commit"], str)
+        and FULL_SHA.match(p["commit"]) and isinstance(p["parent"], str) and isinstance(p["blobs"], dict)
+        for p in raw
+    )  # fmt: skip
+    if not good:
+        raise store.StoreError(f"{pins_path(places)}: needs a list of commits, parents and blobs")
+    found: list[dict[str, Any]] = raw
+    return found

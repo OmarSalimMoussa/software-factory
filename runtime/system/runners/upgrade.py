@@ -1,21 +1,23 @@
 """software-upgrade@<commit>.service: the owner's Upgrade from the dashboard, as root, to the release of <commit>.
 
 Run as ``/usr/bin/python3 -I <install>/runtime/system/runners/upgrade.py <commit>``. The warden may start this unit
-and nothing more, and the runner trusts nothing it says: whose laptop, which product and which factory repo come from
-root's own record of the last install. On GitHub, with the owner's read-only factory token, it checks the release:
-CI made it of that commit after CI passed on a push to the factory's default branch, the commit is on that branch, and
-it moves forward from the installed commit. It downloads the release file, checks it against the checksum beside it
-and its own manifest, and runs it with --upgrade, which asks nothing and writes each step where the dashboard reads
-it. Stdlib only.
+and nothing more, and the runner trusts no word of it: whose laptop, which product, which factory repo and the token
+come from root's own records of the last install. On GitHub it checks the release: CI's bot made it of that commit
+and uploaded its files, its tag points at the commit, CI passed on a push of it to the factory's default branch, the
+commit is on that branch, and it moves forward from the installed commit. It downloads the release file, checks it
+against the checksum beside it and its own manifest, and runs it with --upgrade, which asks nothing and writes each
+step where the dashboard reads it. Stdlib only.
 """
 
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
@@ -76,9 +78,10 @@ def upgrade(places: Places, commit: str) -> int:
     folder = Path(tempfile.mkdtemp(prefix="download-", dir=places.upgrade))
     try:
         report(CHECKING)
-        settings = settings_module.load(places.defaults, places.overrides)
+        # The release's defaults alone: the overrides are the warden's file, which root does not read here.
+        settings = settings_module.load(places.defaults, None)
         timeout = float(settings.get_int("watch.http_timeout_seconds"))
-        rel = releases.Releases.of(places, installed["repo"], timeout, releases.http_get)
+        rel = releases.Releases.of(upgrades.token_path(places), installed["repo"], timeout, releases.http_get)
         found = check(rel, installed["commit"], commit)
         report(DOWNLOADING)
         path = fetch(rel, found, commit, folder)
@@ -93,16 +96,34 @@ def upgrade(places: Places, commit: str) -> int:
     return done.returncode
 
 
+def ended(places: Places, commit: str) -> int:
+    """The unit's last word, however it ended (a timeout's kill included): an upgrade still running stopped."""
+    said = upgrades.read_progress(places)
+    if said is not None and said["to"] == commit and said["state"] == upgrades.RUNNING:
+        why = os.environ.get("SERVICE_RESULT", "unknown")
+        upgrades.write_progress(places, said["from"], commit, upgrades.FAILED, "",
+                                f"The upgrade stopped before it finished ({why}). Its log in {layout.LOGS} says more; "
+                                "upgrade again.", said["log"])  # fmt: skip
+    return 0
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) != 1 or not releases.FULL_SHA.match(argv[0]):
-        print("usage: upgrade.py <the full commit of the release to install>", file=sys.stderr)
+    finished = argv[:1] == ["--ended"]
+    given = argv[1:] if finished else argv
+    if len(given) != 1 or not releases.FULL_SHA.match(given[0]):
+        print("usage: upgrade.py [--ended] <the full commit of the release to install>", file=sys.stderr)
         return 2
-    places, commit = Places.system(), argv[0]
+    places, commit = Places.system(), given[0]
+    if finished:
+        return ended(places, commit)
     try:
         return upgrade(places, commit)
-    except (Stop, releases.ReleaseError, store.StoreError, settings_module.SettingsError, OSError) as exc:
+    # telemetry: last-resort — whatever stopped it, root's progress says so and the unit's log has the trace
+    except Exception as exc:
         said = str(exc) if isinstance(exc, Stop) else f"The upgrade stopped: {exc}. Upgrade again, or by hand."
         print(f"upgrade: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+        if not isinstance(exc, Stop | releases.ReleaseError):
+            traceback.print_exc()
         try:
             frm = (upgrades.read_installed(places) or {}).get("commit", "")
         # telemetry: last-resort — the record is unreadable; the progress still says the upgrade stopped, and why
