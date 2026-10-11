@@ -173,4 +173,4 @@ def test_the_one_unit_the_warden_starts_as_root_is_the_upgrade_to_a_full_commit(
     unit = _unit("software-upgrade@.service").splitlines()
     assert {"User=root", "ExecStart=/usr/bin/python3 -I /opt/software-factory/runtime/system/runners/upgrade.py %i",
             "TimeoutStartSec=90min"} <= set(unit)  # fmt: skip
-    assert not any(line.startswith("Slice=") for line in unit)  # the install it runs stops the factory's slice
+    assert not any(line.startswith("Slice=") for line in unit)

@@ -28,8 +28,7 @@ def _changed(git: Git, commit: str) -> set[str]:
 
 
 def _pin(git: Git, places: Places, commit: str) -> set[str] | None:
-    """The paths a pin changes, when the commit is one root recorded, on its recorded parent, holding exactly the
-    blobs root worked out for it; None for any other commit."""
+    """The paths a pin root recorded changes, on its parent and with exactly its blobs; None for any other commit."""
     record = next((p for p in upgrades.read_pins(places) if p["commit"] == commit), None)
     if record is None or git("rev-parse", f"{commit}^").strip() != record["parent"]:
         return None
@@ -55,12 +54,11 @@ def allowed(git: Git, places: Places, remote: str, head: str) -> set[str]:
 
 
 def tree_passes(git: Git, places: Places, commit: str) -> bool:
-    parent_tree = f"{commit}^^{{tree}}"  # the tree of the pin's parent
+    parent_tree = f"{commit}^^{{tree}}"
     return _pin(git, places, commit) is not None and checks.passed(places, git("rev-parse", parent_tree).strip())
 
 
 def push_pending(ctx: Context) -> None:
-    """The warden's pins pass: push each pin not yet on GitHub, as the owner's upgrade asked."""
     from runtime.warden import github_push  # it reads this module's rules when it pushes
 
     places = ctx.places

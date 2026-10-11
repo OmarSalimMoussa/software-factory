@@ -110,21 +110,19 @@ def _pin(ctx: Install) -> None:
     on = host.query([*git, "symbolic-ref", "--short", "HEAD"], user=AGENT_USER)[1].strip()
     dirty = host.query([*git, "status", "--porcelain", "--untracked-files=no"], user=AGENT_USER)[1].strip()
     if ctx.first or host.dry or not repo or on != branch or dirty:
-        host.say(f"the product's factory pin is left as it is (first {ctx.first}, repo {repo!r}, on {on!r}, "
-                 f"changes {bool(dirty)})")  # fmt: skip
+        host.say(f"the product's pin is left as it is (first {ctx.first}, {repo!r}, on {on!r}, changes {bool(dirty)})")
         return
     want = upgrades.pin_files(ctx.tree() / "templates" / "ci", repo, ctx.sha)
     parent = host.run([*git, "rev-parse", "--verify", f"refs/heads/{branch}^{{commit}}"], user=AGENT_USER).strip()
     held = set(host.run([*git, "ls-tree", "-r", "--name-only", parent, "--", *want], user=AGENT_USER).splitlines())
-    blobs = {rel: upgrades.blob_id(text) if text is not None else None for rel, text in want.items()
-             if text is not None or rel in held}  # fmt: skip
+    blobs = {rel: upgrades.blob_id(text) if text else None for rel, text in want.items() if text or rel in held}
     env = {"GIT_INDEX_FILE": str(checkout / ".git" / "factory-pin.index")}
     host.run([*git, "read-tree", parent], user=AGENT_USER, env=env)
     for rel, text in want.items():
         if text is not None:
             host.run([*git, "hash-object", "-w", "--no-filters", "--stdin"], user=AGENT_USER, stdin=text)
-            host.run([*git, "update-index", "--add", "--cacheinfo", f"100644,{blobs[rel]},{rel}"], user=AGENT_USER,
-                     env=env)  # fmt: skip
+            entry = f"100644,{blobs[rel]},{rel}"
+            host.run([*git, "update-index", "--add", "--cacheinfo", entry], user=AGENT_USER, env=env)
         elif rel in held:
             host.run([*git, "update-index", "--force-remove", rel], user=AGENT_USER, env=env)
     tree = host.run([*git, "write-tree"], user=AGENT_USER, env=env).strip()

@@ -492,7 +492,6 @@ def test_an_upgrade_moves_the_agents_product_to_its_factory_in_one_commit_root_r
     job.settings = settings(**{"repo.path": str(repo)})
     job.first, job.sha, job.factory_origin, job.stage = first, "e" * 40, FACTORY_ORIGIN, REPO_ROOT
     monkeypatch.setattr(steps_wire, "AGENT_USER", "")  # this test's user stands in for the agent's
-    # and root's own record is written as this user, too
     monkeypatch.setattr(job.host, "write", lambda path, text, **how: (path.parent.mkdir(parents=True, exist_ok=True),
                                                                       path.write_text(text)))  # fmt: skip
 

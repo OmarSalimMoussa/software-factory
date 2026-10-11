@@ -99,27 +99,28 @@ def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
         installed = upgrades.read_installed(places)
         if installed is None:
             raise Refused("upgrade", "Upgrade once by hand from a release file first")
-        steps = [("Pausing the factory", lambda: _pause(ctx)),
-                 ("Waiting for every agent to settle", lambda: _settled(ctx)),
-                 ("Starting the upgrade", lambda: _start(ctx, commit))]  # fmt: skip
+        steps = [
+            ("Pausing the factory", lambda: _pause(ctx)),
+            ("Waiting for every agent to settle", lambda: _settled(ctx)),
+            ("Starting the upgrade", lambda: _start(ctx, commit)),
+        ]
         op_id = ops.launch(ctx, KIND, steps, {"to": commit})
-        record = {"from": installed["commit"], "to": commit, "changelog": available["changelog"], "at": ctx.clock.iso(),
-                  "op": op_id}  # fmt: skip
+        record = {"from": installed["commit"], "to": commit, "changelog": available["changelog"], "op": op_id}
+        record["at"] = ctx.clock.iso()
         store.write_json(asked_path(places), record, mode=0o600)
     return ok(op=op_id)
 
 
 def progress_now(ctx: Context) -> dict[str, Any] | None:
-    """Root's progress, with an upgrade that went quiet for longer than one may run read as stopped: a reboot, or a
-    unit that never started, ends one without a word."""
+    """Root's progress, an upgrade quiet for longer than one may run read as stopped: a reboot ends one silently."""
     found, before = upgrades.read_progress(ctx.places), asked(ctx.places)
     limit = ctx.settings().get_int("install.upgrade_minutes") * 60
     quiet = "The upgrade went quiet and did not finish. Its log in /var/log/software-factory says more; upgrade again."
     if before is not None and (found is None or found["to"] != before["to"] or found["at"] < before["at"]):
         op = _op(ctx, before["op"])
         if op is not None and op["state"] == ops.DONE and ctx.clock.now() - _epoch(before["at"]) > limit:
-            return {"from": before["from"], "to": before["to"], "state": upgrades.FAILED, "step": "", "problem": quiet,
-                    "log": "", "at": before["at"]}  # fmt: skip
+            stopped = {"state": upgrades.FAILED, "step": "", "problem": quiet, "log": ""}
+            return {"from": before["from"], "to": before["to"], "at": before["at"], **stopped}
         return found
     if found is not None and found["state"] == upgrades.RUNNING and ctx.clock.now() - _epoch(found["at"]) > limit:
         return {**found, "state": upgrades.FAILED, "problem": quiet}
@@ -157,8 +158,7 @@ def _settled(ctx: Context) -> str:
         if not busy:
             return "every agent has settled"
         if ctx.clock.now() >= deadline:
-            raise ops.StepError(f"{', '.join(busy)} did not settle within {wait} minutes; resume the factory, then "
-                                "upgrade again")  # fmt: skip
+            raise ops.StepError(f"{', '.join(busy)} did not settle within {wait} minutes: resume, then upgrade again")
         time.sleep(settings.get_int("watch.tick_seconds"))
 
 

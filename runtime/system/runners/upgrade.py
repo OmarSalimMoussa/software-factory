@@ -101,9 +101,8 @@ def ended(places: Places, commit: str) -> int:
     said = upgrades.read_progress(places)
     if said is not None and said["to"] == commit and said["state"] == upgrades.RUNNING:
         why = os.environ.get("SERVICE_RESULT", "unknown")
-        upgrades.write_progress(places, said["from"], commit, upgrades.FAILED, "",
-                                f"The upgrade stopped before it finished ({why}). Its log in {layout.LOGS} says more; "
-                                "upgrade again.", said["log"])  # fmt: skip
+        problem = f"The upgrade stopped before it finished ({why}). Its log in {layout.LOGS} says more; upgrade again."
+        upgrades.write_progress(places, said["from"], commit, upgrades.FAILED, "", problem, said["log"])
     return 0
 
 

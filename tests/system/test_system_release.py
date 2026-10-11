@@ -136,7 +136,7 @@ def test_the_upgrade_service_runs_it_as_root_itself_and_it_upgrades_what_is_inst
 ) -> None:
     out, made = _built(tmp_path)
     monkeypatch.setattr(release.os, "geteuid", lambda: 0)
-    monkeypatch.delenv("SUDO_USER", raising=False)  # a unit runs it, not a person with sudo
+    monkeypatch.delenv("SUDO_USER", raising=False)
     monkeypatch.setattr(release.layout, "STAGE_ROOT", tmp_path / "stages")
     started: list[tuple[str, list[str], tuple[str, ...]]] = []
 
@@ -149,7 +149,7 @@ def test_the_upgrade_service_runs_it_as_root_itself_and_it_upgrades_what_is_inst
     if starts is None:
         with pytest.raises(SystemExit) as stopped:
             release.launch(str(out), argv)
-        assert stopped.value.code == 2 and started == []  # argparse refuses it
+        assert stopped.value.code == 2 and started == []
     elif starts:
         with pytest.raises(SystemExit):
             release.launch(str(out), argv)

@@ -52,6 +52,5 @@ def test_the_rule_grants_only_start_stop_the_daemons_restart_and_the_slices_budg
     assert sorted(granted) == ["restart", "set-property", "start", "start", "stop"]  # the upgrade's start alone
     assert 'unit === "@daemon_unit@" && verb === "restart"' in RULE
     assert 'unit === "@slice@" && verb === "set-property"' in RULE
-    # the templates, the upgrade, the daemon's restart, the slice, the sleep locks
     assert RULE.count("polkit.Result.YES") == 5
     assert 'subject.user !== "@warden_user@"' in RULE

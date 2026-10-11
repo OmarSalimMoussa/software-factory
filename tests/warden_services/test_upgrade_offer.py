@@ -175,7 +175,7 @@ def test_an_upgrade_quiet_for_longer_than_one_may_run_reads_as_stopped(
 
     assert (before or {}).get("state") in ((upgrades.RUNNING,) if started else (None,))
     assert after is not None and after["state"] == upgrades.FAILED and "went quiet" in after["problem"]
-    factory_upgrade.start(ctx, {"commit": NEW}, None)  # and the owner may upgrade again
+    factory_upgrade.start(ctx, {"commit": NEW}, None)
 
 
 def test_the_units_last_word_marks_a_killed_upgrade_stopped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

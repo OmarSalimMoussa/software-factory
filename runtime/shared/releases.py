@@ -75,7 +75,7 @@ class Release:
     commit: str
     tag: str
     published: str
-    assets: dict[str, str]  # each file's name, and the API address it downloads from
+    assets: dict[str, str]
 
 
 class Releases:
@@ -88,12 +88,11 @@ class Releases:
 
     @classmethod
     def of(cls, path: Path, repo: str, timeout: float, get: Get) -> Releases:
-        """With the token kept at ``path``: the warden's own, or root's copy for the upgrade unit."""
         try:
             token = path.read_text(encoding="utf-8").strip()
         except OSError as exc:
-            raise ReleaseError(f"the factory token at {path} cannot be read ({type(exc).__name__}): upgrade once "
-                               "from the release file, which asks for it") from exc  # fmt: skip
+            why = f"the factory token at {path} cannot be read ({type(exc).__name__})"
+            raise ReleaseError(f"{why}: upgrade once from the release file, which asks for it") from exc
         if not token or not token.isprintable():
             raise ReleaseError(f"the factory token at {path} is empty or not one line of text")
         return cls(repo, token, timeout, get)
@@ -112,7 +111,6 @@ class Releases:
         return self._release(self._json(f"/repos/{self._repo}/releases/latest"))
 
     def of_commit(self, commit: str) -> Release:
-        """The release of ``commit``, once its tag on GitHub points at that very commit."""
         found = self._release(self._json(f"/repos/{self._repo}/releases/tags/{tag(commit)}"))
         pointed = self._json(f"/repos/{self._repo}/git/ref/tags/{tag(commit)}").get("object")
         if found.commit != commit or not isinstance(pointed, dict) or pointed.get("sha") != commit:
@@ -142,17 +140,17 @@ class Releases:
         commits = body.get("commits")
         if not isinstance(status, str) or not isinstance(commits, list):
             raise ReleaseError(f"GitHub's comparison of {base[:12]} and {head[:12]} has no status or commits")
-        subjects = [str(c.get("commit", {}).get("message", "")).split("\n", 1)[0] for c in commits
-                    if isinstance(c, dict)]  # fmt: skip
+        subjects = [
+            str(c.get("commit", {}).get("message", "")).split("\n", 1)[0] for c in commits if isinstance(c, dict)
+        ]
         total = body.get("total_commits")
         if isinstance(total, int) and total > _COMPARE_MAX:
             subjects.append(f"…and {total - len(subjects)} more")
         return status, subjects
 
     def ci_passed(self, commit: str, branch: str) -> bool:
-        """Whether CI passed on a push of ``commit`` to ``branch``: the only runs that make a release."""
-        query = urllib.parse.urlencode({"head_sha": commit, "branch": branch, "event": "push", "status": "success",
-                                        "per_page": 1})  # fmt: skip
+        wanted = {"head_sha": commit, "branch": branch, "event": "push", "status": "success", "per_page": 1}
+        query = urllib.parse.urlencode(wanted)
         count = self._json(f"/repos/{self._repo}/actions/runs?{query}").get("total_count")
         return isinstance(count, int) and count > 0
 
@@ -191,8 +189,8 @@ class Releases:
         except OSError as exc:
             raise ReleaseError(f"GitHub did not answer GET {where} ({type(exc).__name__})") from exc
         if answer.status in (401, 403, 404):
-            raise ReleaseError(f"GitHub refused GET {where}: HTTP {answer.status}. The factory token needs "
-                               "Contents: Read and Actions: Read on the factory repo")  # fmt: skip
+            needs = "The factory token needs Contents: Read and Actions: Read on the factory repo"
+            raise ReleaseError(f"GitHub refused GET {where}: HTTP {answer.status}. {needs}")
         if answer.status >= 400:
             raise ReleaseError(f"GitHub refused GET {where}: HTTP {answer.status}")
         return answer

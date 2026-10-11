@@ -348,8 +348,7 @@ def test_whether_a_commit_is_on_the_default_branch_is_asked_of_github_itself(wor
 
 
 def _pin(world: World, ref: str = "acme/software-factory@" + "d" * 40) -> str:
-    """The commit an upgrade makes, as root, to move the product to its factory, recorded as the owner's with the
-    blob each path holds."""
+    """The commit an upgrade makes, as root, recorded as the owner's with each path's blob."""
     parent = git(world.checkout, "rev-parse", "HEAD")
 
     def change(root: Path) -> None:
@@ -377,7 +376,7 @@ def _pin(world: World, ref: str = "acme/software-factory@" + "d" * 40) -> str:
 def test_the_owners_pin_ships_on_its_parents_check_and_lets_nothing_else_through(
     world: World, github_repo: Path, after: str | None, ships: bool
 ) -> None:
-    passed(world, git(world.checkout, "rev-parse", "HEAD^{tree}"))  # GitHub's tip, as checked
+    passed(world, git(world.checkout, "rev-parse", "HEAD^{tree}"))
     pin = _pin(world)
     head = commit(world.checkout, write(after)) if after else pin
     if after:
@@ -413,6 +412,6 @@ def test_the_warden_pushes_a_pin_itself_and_only_tries_again_after_a_while(
     )
 
     pins.push_pending(world.ctx)
-    pins.push_pending(world.ctx)  # pushed: nothing waits
+    pins.push_pending(world.ctx)
 
     assert tries == [pin] and git(github_repo, "rev-parse", "master") == pin

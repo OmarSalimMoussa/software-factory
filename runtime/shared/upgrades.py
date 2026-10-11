@@ -50,8 +50,7 @@ _INSTALLED = ("commit", "owner", "product", "repo")
 
 
 def read_installed(places: Places) -> dict[str, str] | None:
-    """The last finished install: its commit, the owner's login, the owner's product checkout and the factory's
-    repo (owner/name); None before one. Raises StoreError when the record cannot be used."""
+    """The last finished install's commit, owner, product checkout and factory repo; None before one."""
     raw = store.read_json_or(installed_path(places), None)
     if raw is None:
         return None
@@ -63,8 +62,7 @@ def read_installed(places: Places) -> dict[str, str] | None:
 
 
 def read_progress(places: Places) -> dict[str, Any] | None:
-    """The last upgrade's progress: from and to, its state, the step it is at, what stopped it and its log; None
-    before the first. Raises StoreError when the record cannot be used."""
+    """The last upgrade's from and to, state, step, what stopped it and its log; None before the first."""
     raw = store.read_json_or(progress_path(places), None)
     if raw is None:
         return None
@@ -104,16 +102,17 @@ def blob_id(text: str) -> str:
     return hashlib.sha1(b"blob %d\0" % len(data) + data, usedforsecurity=False).hexdigest()
 
 
+def _pin_ok(pin: object) -> bool:
+    if not isinstance(pin, dict) or set(pin) != {"commit", "parent", "blobs"}:
+        return False
+    shas = isinstance(pin["commit"], str) and bool(FULL_SHA.match(pin["commit"])) and isinstance(pin["parent"], str)
+    return shas and isinstance(pin["blobs"], dict)
+
+
 def read_pins(places: Places) -> list[dict[str, Any]]:
-    """The commits upgrades made to move the product to their factory, each with its parent and the blob each path
-    it changed holds (None for one it removed): the owner's, by asking for the upgrade."""
+    """Each commit an upgrade made to move the product to its factory, its parent, and each path's blob (or None)."""
     raw = store.read_json_or(pins_path(places), [])
-    good = isinstance(raw, list) and all(
-        isinstance(p, dict) and set(p) == {"commit", "parent", "blobs"} and isinstance(p["commit"], str)
-        and FULL_SHA.match(p["commit"]) and isinstance(p["parent"], str) and isinstance(p["blobs"], dict)
-        for p in raw
-    )  # fmt: skip
-    if not good:
+    if not isinstance(raw, list) or not all(_pin_ok(p) for p in raw):
         raise store.StoreError(f"{pins_path(places)}: needs a list of commits, parents and blobs")
     found: list[dict[str, Any]] = raw
     return found

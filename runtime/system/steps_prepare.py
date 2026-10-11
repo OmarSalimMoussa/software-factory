@@ -208,8 +208,7 @@ ROOT_APPLIED = frozenset(
 
 
 def _as_last_installed(ctx: Install, overrides: dict[str, Any]) -> None:
-    """Unattended, the install applies the settings root applied last, and no other: the warden writes the saved
-    ones, and only the owner's own run of the release file may change what root acts on."""
+    """Unattended, only the owner's own run of the release file may change what root acts on: not the warden."""
     last = upgrades.read_settings(ctx.places)
     if last is None:
         raise refuse("This laptop's last install kept no record of its settings: upgrade once by hand from the "
