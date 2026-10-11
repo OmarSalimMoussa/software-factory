@@ -100,6 +100,7 @@ def run_tick(
         ("triage due", lambda: _triage_due(ctx, _memo(ctx.places), now)),
         ("queue format", lambda: format_check.sweep(ctx)),
         ("goal", lambda: _goal(ctx, _memo(ctx.places))),
+        ("rescore", lambda: _rescore(ctx, now)),
         ("errors import", lambda: errors_import.poll(ctx)),
         ("reports import", lambda: reports.poll(ctx)),
         ("CI watch", lambda: ci_watch.poll(ctx)),
@@ -246,6 +247,18 @@ def _qa_prod_due(ctx: Context, now: float) -> None:
     if current is None:
         return  # prod has answered on no build yet: nothing to walk
     github_push.post_qa_prod(ctx, current["commit"], "daily", last["iso"])
+
+
+def _rescore(ctx: Context, now: float) -> None:
+    """Every waiting task scored again at once, every intake.rescore_hours: a score's age part is fixed when it is
+    written, and the order reads the scores side by side."""
+    path = ctx.places.state / "rescored.json"
+    last = store.read_json_or(path, {"at": None})
+    at = last.get("at") if isinstance(last, dict) else None
+    if isinstance(at, int | float) and now - at < ctx.settings().get_int("intake.rescore_hours") * 3600:
+        return
+    tasks.rescore(ctx)
+    store.write_json(path, {"at": now})
 
 
 def _fix(ctx: Context) -> None:

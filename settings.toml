@@ -67,6 +67,7 @@ minor_severity = 0.4    # a minor task's severity part; a major one counts 1
 requests_full = 20      # requests gathered at which that part reaches 1
 users_full = 10         # distinct users at which that part reaches 1
 age_full_days = 14      # age at which that part reaches 1
+rescore_hours = 6       # every waiting task is scored again together this often, so their age parts stay alike
 
 [routing]               # see the routing spec
 small_max_slices = 1

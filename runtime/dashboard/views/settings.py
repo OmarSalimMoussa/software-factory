@@ -98,6 +98,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("intake.batch_size", "Triage batch size"),
             ("intake.batch_max_wait_hours", "Longest wait, hours"),
             ("intake.fast_lane_minutes", "Fast-lane minutes"),
+            ("intake.rescore_hours", "Hours between scoring every waiting task again"),
             ("intake.weights", "Score weights"),
             ("intake.minor_severity", "A minor task's severity part"),
             ("intake.requests_full", "Requests that count in full"),

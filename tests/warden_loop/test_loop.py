@@ -168,3 +168,21 @@ def test_a_read_only_walk_of_prod_is_asked_for_a_day_after_the_last_one(ticking:
 
     due = [e for e in inbox.unacknowledged(ticking.ctx.places) if e["kind"] == inbox.QA_PROD_DUE]
     assert [e["data"]["kind"] for e in due] == ["daily"]
+
+
+def test_every_waiting_task_is_scored_again_together_on_its_schedule(
+    ticking: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    file_requests(ticking, 0, 0)
+    rescored: list[float] = []
+    monkeypatch.setattr(loop.tasks, "rescore", lambda ctx: rescored.append(ctx.clock.now()) or 0)
+    every = ticking.ctx.settings().get_int("intake.rescore_hours") * 3600
+
+    start = ticking.clock.t
+    run(ticking, tmp_path)  # the goal step's first reading of GOAL.md scores them too
+    ticking.clock.t += every - 1
+    run(ticking, tmp_path)
+    ticking.clock.t += 1
+    run(ticking, tmp_path)
+
+    assert sorted(set(rescored)) == [start, start + every]

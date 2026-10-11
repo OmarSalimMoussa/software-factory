@@ -83,6 +83,7 @@ SCHEMA: dict[str, Spec] = {
     "intake.requests_full": Spec("int", 2, 200),
     "intake.users_full": Spec("int", 2, 200),
     "intake.age_full_days": Spec("int", 1, 90),
+    "intake.rescore_hours": Spec("int", 1, 48),
     "routing.small_max_slices": Spec("int", 1, 3),
     "routing.large_max_slices": Spec("int", 1, 6),
     "routing.max_proposals": Spec("int", 1, 5),
