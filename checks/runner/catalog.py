@@ -34,7 +34,6 @@ IDS: tuple[str, ...] = (
     "complexity-ratchet",
     "count-claims",
     "qa-scenarios",
-    "env-template-sync",
     "network-door",
     "config-readers",
     "js-import-rules",
@@ -45,7 +44,6 @@ IDS: tuple[str, ...] = (
     "pinned-config",
     "generated-current",
     "seeds-current",
-    "queue-format",
     "tests",
 )
 NOTE = "note: "

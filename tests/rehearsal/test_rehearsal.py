@@ -9,9 +9,8 @@ from pathlib import Path
 import pytest
 from rehearsal_kit import Rehearsal, at_once, build, git
 
-from runtime.queue import turn
+from runtime.queue import format_check, turn
 from runtime.queue.book import Queue
-from runtime.queue.format_check import check_queue
 from runtime.shared.models import FINISHED, RETIRED, WORKING
 from runtime.warden import checks, crashwatch, deploys, loop, registry
 
@@ -164,4 +163,4 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
     assert sessions[orch].state == WORKING
 
     assert [verb for verb, answer in r.answers if not answer["ok"]] == []
-    assert check_queue(r.repo) == []
+    assert not any(format_check.check(Queue.of(r.warden()).blobs()).values())

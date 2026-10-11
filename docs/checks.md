@@ -42,10 +42,10 @@ check that reads no values needs no file.
 | `tree-rules`, `doc-refs`, `no-console` | `tree-rules.toml`, `doc-refs.toml`, `no-console.toml` |
 | `network-door`, `config-readers`, `js-import-rules` | `network-door.toml`, `config-readers.toml`, `js-import-rules.toml` |
 | `vocabulary-homes`, `computation-owners`, `quiet-modules` | the file of the same name, `.toml` |
-| `image-sources`, `env-template-sync`, `pinned-config`, `generated-current` | the file of the same name, `.toml` |
+| `image-sources`, `pinned-config`, `generated-current` | the file of the same name, `.toml` |
 | `size-ceilings`, `comment-budgets` (their pins) | `baseline.json` |
 
-`repo-shape`, `deploy-shape`, `testing-imports`, `qa-scenarios`, `seeds-current` and `queue-format` read no
+`repo-shape`, `deploy-shape`, `testing-imports`, `qa-scenarios` and `seeds-current` read no
 values. `deploy-shape` reads the product's `factory.toml` instead: it holds the product to the standard build and
 deploy, from the workflows and the hooks to the images, the deploy files and the ports
 ([repo-shape.md](repo-shape.md)).

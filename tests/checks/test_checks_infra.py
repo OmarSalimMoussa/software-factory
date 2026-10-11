@@ -9,7 +9,6 @@ import pytest
 from checks.runner.repo import Repo
 from checks.standard import (
     config_readers,
-    env_template_sync,
     generated_current,
     image_sources,
     pinned_config,
@@ -95,16 +94,6 @@ def test_a_stale_generated_file_and_a_failing_check_command_fail(make_repo: Make
     assert "guide: out.txt differs" in problems[1]
 
 
-def test_env_template_keys_missing_from_the_local_file_fail(make_repo: MakeRepo) -> None:
-    root = make_repo({"app.env.template": "# A=0\nA=1\nB=2\n"})
-    values = {"pairs": [{"template": "app.env.template", "env": "app.env"}]}
-    assert "app.env is missing" in env_template_sync.run(Repo.open(root), values)[0]
-    (root / "app.env").write_text("B=x\nEXTRA=1\n")
-    assert env_template_sync.run(Repo.open(root), values) == [
-        f"{env_template_sync.ID}: app.env lacks A, which app.env.template lists"
-    ]
-
-
 def test_a_failing_seed_check_fails_with_what_it_printed(make_repo: MakeRepo) -> None:
     root = make_repo({"scripts/dev*": "#!/bin/sh\necho 'seed old-notes: format 1, expected 2'\nexit 3\n"})
     (problem,) = seeds_current.run(Repo.open(root), {})
@@ -119,7 +108,6 @@ def test_a_failing_seed_check_fails_with_what_it_printed(make_repo: MakeRepo) ->
         (generated_current, {"check_commands": [], "print_commands": [{"name": "g", "command": ["true"],
                                                                        "file": "gen.md"}]}),
         (config_readers, {**READERS, "services": [{"compose": "compose.yml", "name": "api", "config": "c.py"}]}),
-        (env_template_sync, {"pairs": [{"template": "app.env.template", "env": "app.env"}]}),
     ],
 )  # fmt: skip
 def test_a_listed_file_that_is_missing_is_a_problem_not_a_pass(make_repo: MakeRepo, check: Any,

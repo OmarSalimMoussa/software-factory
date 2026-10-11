@@ -4,6 +4,7 @@ failing file and content (R30)."""
 from __future__ import annotations
 
 import dataclasses
+import logging
 
 import pytest
 from queue_kit import World
@@ -98,14 +99,20 @@ def test_a_write_that_fails_queue_format_is_refused_whole(world: World) -> None:
     assert world.queue().task(task.id).goal_item == "G1"
 
 
-def test_the_sweep_files_one_request_per_failing_file_and_content(world: World) -> None:
+def test_the_sweep_reports_a_broken_queue_file_once_at_its_content_and_files_no_request(
+    world: World, caplog: pytest.LogCaptureFixture
+) -> None:
     world.write_raw("tasks/t-0042.md", "not a task")
-    first = format_check.sweep(world.ctx())
-    assert len(first) == 1 and format_check.sweep(world.ctx()) == []
-    world.write_raw("tasks/t-0042.md", "still not a task")
-    assert len(format_check.sweep(world.ctx())) == 1
-    filed = world.queue().request(first[0])
-    assert (filed.inbox, filed.from_role, filed.where) == ("agents", "warden", "queue/tasks/t-0042.md")
+    with caplog.at_level(logging.ERROR, logger=format_check.__name__):
+        first = format_check.sweep(world.ctx())
+        world.write_raw("tasks/t-0001.md", world.queue().files.read("tasks/t-0042.md").decode())  # another change
+        again = format_check.sweep(world.ctx())
+        world.write_raw("tasks/t-0042.md", "still not a task")
+        changed = format_check.sweep(world.ctx())
+
+    assert (first, changed) == (["tasks/t-0042.md"], ["tasks/t-0042.md"]) and "tasks/t-0042.md" not in again
+    assert len([r for r in caplog.records if "t-0042" in r.getMessage()]) == 2
+    assert world.queue().requests()[0] == []  # no agent could act on one
 
 
 def test_the_sweep_reads_nothing_while_the_queue_is_unchanged_and_a_rewrite_is_read_again(

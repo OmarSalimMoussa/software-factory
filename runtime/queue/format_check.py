@@ -1,27 +1,29 @@
 """queue-format: the deterministic check of every queue file, alone and against each other (intake spec).
 
 ``check`` reads files as bytes by their path under queue/ and returns every problem by file. Every queue write runs
-it on the queue the write would make; the warden's sweep runs it over the whole queue every pass and files one
-request per failing file and content (R30), so an unchanged broken file is reported once.
+it on the queue the write would make; the warden's sweep runs it over the whole queue when it changed, and reports
+each failing file once at its content as a fault of the warden's own: no agent may write the queue.
 """
 
 from __future__ import annotations
 
 import hashlib
+import logging
 from collections.abc import Callable, Mapping
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from runtime.queue import formats, records
 from runtime.queue.formats import FormatError
 from runtime.queue.records import CheckRecord, Spec
 from runtime.shared import store
-from runtime.shared.models import INBOXES, Request, Task
+from runtime.shared.models import Request, Task
 
 if TYPE_CHECKING:
     from runtime.queue.book import Queue
     from runtime.warden.context import Context
 
+
+log = logging.getLogger(__name__)
 
 PARSERS: dict[str, Callable[[str, str], object]] = {
     "requests": formats.parse_request,
@@ -90,22 +92,6 @@ def check(blobs: Mapping[str, bytes]) -> dict[str, list[str]]:
     return problems
 
 
-def check_queue(repo: Path) -> list[str]:
-    """Every problem in a checkout's queue/, as ``queue/<file>: <problem>``; a checkout without one has none.
-
-    This is the standard check's read, as the caller: the warden's own reads go through the safe file layer.
-    """
-    root = repo / "queue"
-    folders = [f"requests/{inbox}" for inbox in INBOXES] + ["tasks", "specs", "checks"]
-    blobs = {
-        f"{folder}/{path.name}": path.read_bytes()
-        for folder in folders
-        for path in sorted((root / folder).glob("*"))
-        if path.name.endswith((".md", ".log.jsonl")) and path.is_file() and not path.is_symlink()
-    }
-    return [f"queue/{rel}: {problem}" for rel, found in sorted(check(blobs).items()) for problem in found]
-
-
 # The queue's stamps at the last sweep, by the warden's state folder.
 _SWEPT: dict[str, str] = {}
 
@@ -115,32 +101,27 @@ def _stamp(queue: Queue) -> str:
 
 
 def sweep(ctx: Context) -> list[str]:
-    """Check the whole queue and file one request for each failing file not filed at this content; the new ids."""
-    from runtime.queue import intake
+    """Check the whole queue and report each failing file once at its content, as the platform failure it is: only
+    the warden writes the queue, so no agent could act on a request about it. The files newly reported."""
     from runtime.queue.book import Queue
 
     queue = Queue.of(ctx)
-    filed_path = ctx.places.state / "queue-format-filed.json"
+    seen_path = ctx.places.state / "queue-format-reported.json"
     with ctx.lock, queue.lock():
         stamp = _stamp(queue)
         if _SWEPT.get(str(ctx.places.state)) == stamp:
             return []  # nothing in the queue changed since the last sweep
         blobs = queue.blobs()
         failing = {rel: found for rel, found in check(blobs).items() if found}
-        filed = store.read_json_or(filed_path, {})
-        if not isinstance(filed, dict):
-            raise store.StoreError(f"{filed_path}: not an object")
-        new: list[str] = []
-        for rel, found in sorted(failing.items()):
-            key = f"{rel}:{hashlib.sha256(blobs[rel]).hexdigest()}"
-            if key in filed:
-                continue
-            body = f"queue-format refuses queue/{rel}:\n\n" + "\n".join(f"- {p}" for p in found)
-            req = intake.file_request(ctx, queue, "agents", "warden", "normal", f"queue/{rel}", body)
-            filed[key] = req.id
-            new.append(req.id)
-        if new:
-            store.write_json(filed_path, filed, mode=0o600)
-            stamp = _stamp(queue)  # with what it filed
+        reported = store.read_json_or(seen_path, [])
+        if not isinstance(reported, list):
+            raise store.StoreError(f"{seen_path}: not a list")
+        keys = {rel: f"{rel}:{hashlib.sha256(blobs[rel]).hexdigest()}" for rel in failing}
+        new = sorted(rel for rel, key in keys.items() if key not in reported)
+        for rel in new:
+            # The problems quote the file, which holds what users wrote: the log names the file and the count only.
+            log.error("warden: queue/%s does not fit the queue format (%d problems); the warden alone writes the "
+                      "queue, so this is a fault of its own", rel, len(failing[rel]))  # fmt: skip
+        store.write_json(seen_path, sorted(keys.values()), mode=0o600)
         _SWEPT[str(ctx.places.state)] = stamp
     return new
