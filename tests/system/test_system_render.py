@@ -67,6 +67,8 @@ def test_agent_and_stack_units_fix_their_user_home_and_slice(name: str, user: st
     # %U and %h name root in a system unit, whatever User= says: the user's own id and home are written in.
     assert f"Environment=XDG_RUNTIME_DIR=/run/user/{uid}" in lines
     assert f"BindPaths=/home/{user}" in lines
+    # ProtectHome=tmpfs hides /run/user too: without this bind the user's Docker socket and runtime folder vanish.
+    assert f"BindPaths=/run/user/{uid}" in lines
     # Product code finds the product's toolchain first, never the owner's home it was copied from.
     assert "Environment=PATH=/opt/software-factory-toolchain/bin:/usr/local/bin:/usr/bin:/bin" in lines
     # uv finds the product's Python among the toolchain's copies, and never downloads one.
