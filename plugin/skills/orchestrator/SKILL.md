@@ -126,7 +126,9 @@ merged for a while, a regression walk of the scenarios that waited longest.
 
 ## When something is red
 
-- **Staging red:** your last push is the first suspect: revert it and push. The warden filed the severe request.
+- **Staging red:** staging failed several probes in a row after its deploy landed. The event names the warden's
+  last push as the first suspect and the build staging ran well before it; decide whether to revert it and push.
+  The warden filed the severe request.
 - **Prod red** is a clear outage only when the warden says so. The warden files its severe request, which goes to
   intake at once, and
   `factory start implementer <task>` starts the one fix without an approval, at rung 1 or 2. The fix ships to

@@ -120,16 +120,30 @@ def _probes(ctx: Context, fetch: probes.Fetch, now: float) -> None:
 
 
 def _staging(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
-    """Staging red is posted once per red spell, at its first counted failure; a network failure changes nothing."""
+    """Staging red is posted once per red spell, after watch.outage_after counted failures in a row, as for prod;
+    a network failure changes nothing, nor does a failure while the deploy of the warden's last push lands. The
+    event and the request name that push as the first suspect; reverting stays the orchestrator's call."""
     if probe.ok:
         memo["staging_red"] = False
-    elif probe.counts and not memo["staging_red"]:
-        memo["staging_red"] = True
-        reflections.incident(ctx, f"Staging went red at {probe.at}; the orchestrator was told to revert or fix it.")
-        body = (f"Staging's health check failed at {probe.at}: {probe.error}. Revert the change that broke it at once, "
-                "or fix it forward.")  # fmt: skip
-        req = file_red(ctx, "staging", body)
-        ctx.post_event(inbox.STAGING_RED, {"probe": models.dump(probe), "request": req})
+        return
+    if not probe.counts or memo["staging_red"]:
+        return
+    if deploys.in_flight(ctx.places, probes.STAGING, ctx.clock.now()):
+        return
+    needed = ctx.settings().get_int("watch.outage_after")
+    streak = probes.recent(ctx.places, probes.STAGING, needed)
+    if len(streak) < needed or not all(p.counts for p in streak):
+        return
+    memo["staging_red"] = True
+    suspect = deploys.builds(ctx.places, probes.STAGING)["current"]
+    pushed = deploys.last_push(ctx.places, probes.STAGING)
+    reflections.incident(ctx, f"Staging went red at {streak[0].at}; the orchestrator was told to revert or fix it.")
+    body = (f"Staging's health check failed {needed} probes in a row since {streak[0].at}: {probe.error}. "
+            + (f"The warden's last push, {pushed[:12]}, is the first suspect. " if pushed else "")
+            + "Revert the change that broke it at once, or fix it forward.")  # fmt: skip
+    req = file_red(ctx, "staging", body)
+    ctx.post_event(inbox.STAGING_RED, {"probe": models.dump(probe), "request": req, "suspect": pushed or None,
+                                       "last_good": suspect["commit"] if suspect else None})  # fmt: skip
 
 
 def file_red(ctx: Context, where: str, body: str) -> str:

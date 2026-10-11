@@ -114,6 +114,7 @@ def push_checked(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
                                        "then push")  # fmt: skip
         count = int(git.run("rev-list", "--count", f"{remote}..{sha}"))
         git.run("push", "--quiet", url, f"{sha}:refs/heads/{branch}")
+    deploys.expect(ctx.places, probes.STAGING, sha, ctx.clock.now(), settings.get_int("watch.deploy_minutes"))
     return ok(sha=sha, commits=count, message=f"Pushed {count} commits; CI takes {sha[:12]} to staging")
 
 
@@ -294,6 +295,7 @@ def _start(ctx: Context, kind: str, sha: str) -> dict[str, Any]:
     settings = ctx.settings()
     wait_s = settings.get_int("watch.push_wait_minutes") * 60
     watch_s = settings.get_int("watch.loop_minutes") * 60
+    deploys.expect(ctx.places, probes.PROD, sha, ctx.clock.now(), settings.get_int("watch.push_wait_minutes"))
     with _watch_lock:  # the last step moves watch_until; it waits for this record to exist
         op_id = ops.launch(ctx, kind, _steps(ctx, kind, sha, wait_s, watch_s), {"sha": sha})
         until = ctx.clock.now() + wait_s + watch_s

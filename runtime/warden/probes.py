@@ -27,6 +27,7 @@ from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
+from runtime.warden import deploys
 from runtime.warden.context import Context
 from standard import config
 
@@ -121,6 +122,8 @@ def take(ctx: Context, env: str, fetch: Fetch) -> Probe:
         else:
             probe = _failed(ctx, at, env, _ms(started), "the answer names no build_commit")
     store.append_jsonl(ctx.places.probes, models.dump(probe))
+    if probe.ok:
+        deploys.answered(ctx.places, env, probe.commit)
     return probe
 
 

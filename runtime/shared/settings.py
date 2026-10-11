@@ -107,6 +107,7 @@ SCHEMA: dict[str, Spec] = {
     "watch.http_timeout_seconds": Spec("int", 1, 60),  # contract: added by 1B-2
     "watch.inbox_wait_seconds": Spec("int", 5, 300),  # contract: added by 1B-2
     "watch.push_wait_minutes": Spec("int", 5, 240),  # contract: added by 1B-2
+    "watch.deploy_minutes": Spec("int", 5, 240),
     "watch.resume_tries": Spec("int", 1, 5),
     "watch.bench_grace_seconds": Spec("int", 10, 300),
     "watch.reap_retry_minutes": Spec("int", 1, 1440),

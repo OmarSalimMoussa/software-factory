@@ -141,6 +141,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("watch.http_timeout_seconds", "Seconds before a probe times out"),
             ("watch.inbox_wait_seconds", "Seconds the orchestrator's inbox wait lasts"),
             ("watch.push_wait_minutes", "Minutes a push to prod may take"),
+            ("watch.deploy_minutes", "Minutes staging's deploy of a push may take"),
             ("watch.resume_tries", "Resumes to try before a crashed agent retires"),
             ("watch.bench_grace_seconds", "Seconds a pushed-out agent gets to commit"),
             ("watch.start_grace_seconds", "Seconds a starting agent gets to appear"),

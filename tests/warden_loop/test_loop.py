@@ -10,7 +10,8 @@ from loop_fakes import World, healthy
 from runtime.queue import formats
 from runtime.shared import store
 from runtime.shared.models import INBOXES, Request
-from runtime.warden import errors_import, inbox, loop, telemetry
+from runtime.warden import deploys, errors_import, inbox, loop, probes, telemetry
+from runtime.warden.probes import Answer
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -127,3 +128,31 @@ def test_a_failing_tick_step_is_logged_and_the_steps_after_it_still_run(
     assert inbox.LOOP_DUE in events
     assert [r.getMessage() for r in caplog.records] == ["warden: the tick's vitals step failed (OSError)"]
     assert ticking.ctx.launcher.calls[0][:2] == (0, ["verbs"])  # type: ignore[attr-defined]  # the report pull ran
+
+
+def _staging_fails(world: World, tmp_path: Path, times: int) -> list[str]:
+    """Staging fails ``times`` probes in a row, a probe period apart; the events of the last tick."""
+    kinds: list[str] = []
+    for _ in range(times):
+        world.clock.t += world.ctx.settings().get_int("watch.probe_seconds")
+        loop.run_tick(world.ctx, lambda url, timeout: Answer(502, b"") if "staging" in url else healthy("a" * 40),
+                      *kernel(tmp_path))  # fmt: skip
+        kinds = [e["kind"] for e in inbox.read(world.ctx, {}, None)["events"]]
+    return kinds
+
+
+def test_staging_goes_red_after_failures_in_a_row_and_never_while_a_push_deploys_it(
+    ticking: World, tmp_path: Path
+) -> None:
+    file_requests(ticking, 0, 0)
+    needed = ticking.ctx.settings().get_int("watch.outage_after")
+    deploys.expect(ticking.ctx.places, probes.STAGING, "c" * 40, ticking.clock.now(), 30)
+    assert inbox.STAGING_RED not in _staging_fails(ticking, tmp_path, needed + 2)  # the deploy's restart
+    deploys.answered(ticking.ctx.places, probes.STAGING, "c" * 40)  # it landed, then broke
+
+    ticking.clock.t += ticking.ctx.settings().get_int("watch.probe_seconds")
+    loop.run_tick(ticking.ctx, lambda url, timeout: healthy("c" * 40), *kernel(tmp_path))
+    assert inbox.STAGING_RED not in _staging_fails(ticking, tmp_path, needed - 1)
+    assert inbox.STAGING_RED in _staging_fails(ticking, tmp_path, 1)
+    red = next(e for e in inbox.read(ticking.ctx, {}, None)["events"] if e["kind"] == inbox.STAGING_RED)
+    assert red["data"]["suspect"] == "c" * 40 and red["data"]["request"].startswith("r-")

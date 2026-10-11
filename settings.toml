@@ -104,6 +104,7 @@ outage_after = 2        # failed prod probes in a row that count as an outage
 http_timeout_seconds = 10  # a probe or a GitHub call that takes longer has timed out
 inbox_wait_seconds = 50    # `factory inbox --wait` asks again after this much quiet
 push_wait_minutes = 30     # a push to prod that has not answered on the new build by then has failed
+deploy_minutes = 30     # how long staging's deploy of a push may take: its restart is no red staging until then
 resume_tries = 2        # a crashed session is retired after this many failed resumes
 bench_grace_seconds = 60  # time a pushed-out session gets to commit before it pauses
 start_grace_seconds = 120  # a started session that has not appeared by then is retired as crashed

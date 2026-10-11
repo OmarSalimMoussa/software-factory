@@ -4,7 +4,7 @@ import pytest
 from loop_fakes import World, answers, healthy
 
 from runtime.shared.protocol import Refused
-from runtime.warden import outage, probes
+from runtime.warden import deploys, outage, probes
 from runtime.warden.probes import Answer, NetworkFailure
 
 PROD_RED = "prod red"
@@ -68,3 +68,14 @@ def test_an_outage_allows_one_bypass_run_only(world: World) -> None:
         outage.mark_bypass(world.ctx, "t-0002", "s-2")
     probe_prod(world, Answer(500, b""))  # still down: the same outage, still no second run
     assert not outage.bypass_allowed(world.ctx)
+
+
+def test_the_owners_push_restarting_prod_is_no_outage_until_prod_answers_on_the_new_build(world: World) -> None:
+    deploys.expect(world.ctx.places, probes.PROD, "b" * 40, world.clock.now(), 30)
+    probe_prod(world, Answer(502, b""), Answer(502, b""), Answer(502, b""))  # the containers restart
+    assert outage.read(world.ctx.places) is None and world.events == []
+
+    probe_prod(world, healthy("b" * 40))  # it landed: from now on a failure counts
+    probe_prod(world, Answer(502, b""), Answer(502, b""))
+    current = outage.read(world.ctx.places)
+    assert current is not None and current.stage == outage.DOWN

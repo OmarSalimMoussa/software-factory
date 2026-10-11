@@ -15,7 +15,7 @@ from runtime.shared import models, store
 from runtime.shared.models import Outage, Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import inbox, probes, reflections, registry
+from runtime.warden import deploys, inbox, probes, reflections, registry
 from runtime.warden.context import Context
 
 DOWN, FIXING, ON_STAGING, STOPPED = "down", "fixing", "on-staging", "stopped"
@@ -45,6 +45,8 @@ def observe(ctx: Context, probe: Probe) -> None:
             return
         if current is not None or not probe.counts:
             return
+        if deploys.in_flight(ctx.places, probes.PROD, ctx.clock.now()):
+            return  # the owner's push restarts prod; a failure until it answers on the new build is the restart
         needed = ctx.settings().get_int("watch.outage_after")
         streak = probes.recent(ctx.places, probes.PROD, needed)
         if len(streak) < needed or not all(p.counts for p in streak):
