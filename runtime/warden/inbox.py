@@ -1,8 +1,10 @@
 """The orchestrator's inbox: every event that should start one of its loop passes.
 
-The warden only appends to inbox.jsonl; a cursor file keeps the last event handed over, so a read returns only
-what is new and marks it delivered. ``factory inbox --wait`` blocks here until an event arrives or
-watch.inbox_wait_seconds pass with none; the command then asks again.
+The warden only appends to inbox.jsonl; a cursor file keeps the last event handed over and the last one the
+orchestrator acted on. ``factory inbox --wait`` first acknowledges the events the previous wait handed over (the
+orchestrator runs it again once it acted on them), then blocks until an event arrives or watch.inbox_wait_seconds
+pass with none; the command then asks again. ``factory inbox`` lists every event not acknowledged yet, so after a
+restart, or a background wait whose answer was lost, nothing is missed.
 """
 
 from __future__ import annotations
@@ -72,24 +74,46 @@ def poster(places: Places, clock: Clock) -> Callable[[str, dict[str, Any]], None
 
 
 def pending(places: Places, kind: str) -> bool:
-    """Whether an event of ``kind`` waits undelivered, so the loop never piles up copies of one reminder."""
+    """Whether an event of ``kind`` waits unacknowledged, so the loop never piles up copies of one reminder."""
     with store.locked(_lock(places)):
-        return any(r["kind"] == kind for r in _undelivered(places))
+        acked = _read_cursor(places)["acked"]
+        return any(r["kind"] == kind for r in store.read_jsonl(places.inbox) if r["seq"] > acked)
 
 
-def _undelivered(places: Places) -> list[dict[str, Any]]:
-    delivered = store.read_json_or(_cursor(places), {"delivered": 0})
-    if not isinstance(delivered, dict) or not isinstance(delivered.get("delivered"), int):
-        raise store.StoreError(f"{_cursor(places)}: no delivered count")
-    return [r for r in store.read_jsonl(places.inbox) if r["seq"] > delivered["delivered"]]
-
-
-def _take(places: Places, clock: Clock) -> list[dict[str, Any]]:
+def unacknowledged(places: Places) -> list[dict[str, Any]]:
+    """Every event the orchestrator has not acted on yet, oldest first."""
     with store.locked(_lock(places)):
-        events = _undelivered(places)
-        if events:
-            store.write_json(_cursor(places), {"delivered": events[-1]["seq"], "at": clock.iso()}, mode=0o600)
+        acked = _read_cursor(places)["acked"]
+        return [r for r in store.read_jsonl(places.inbox) if r["seq"] > acked]
+
+
+def _read_cursor(places: Places) -> dict[str, int]:
+    raw = store.read_json_or(_cursor(places), {"handed": 0, "acked": 0})
+    if not isinstance(raw, dict) or not all(isinstance(raw.get(k), int) for k in ("handed", "acked")):
+        raise store.StoreError(f"{_cursor(places)}: want the handed and acked counts")
+    return {"handed": raw["handed"], "acked": raw["acked"]}
+
+
+def _write_cursor(places: Places, clock: Clock, handed: int, acked: int) -> None:
+    store.write_json(_cursor(places), {"handed": handed, "acked": acked, "at": clock.iso()}, mode=0o600)
+
+
+def _hand(places: Places, clock: Clock, after: str) -> list[dict[str, Any]]:
+    """The events after the handed (``after="handed"``) or the acked cursor, now handed over."""
+    with store.locked(_lock(places)):
+        cursor = _read_cursor(places)
+        events = [r for r in store.read_jsonl(places.inbox) if r["seq"] > cursor[after]]
+        if events and events[-1]["seq"] > cursor["handed"]:
+            _write_cursor(places, clock, events[-1]["seq"], cursor["acked"])
     return events
+
+
+def acknowledge(places: Places, clock: Clock) -> None:
+    """Everything handed over so far was acted on: the next wait, or the end of a loop pass, says so."""
+    with store.locked(_lock(places)):
+        cursor = _read_cursor(places)
+        if cursor["acked"] < cursor["handed"]:
+            _write_cursor(places, clock, cursor["handed"], cursor["handed"])
 
 
 def _answer(events: list[dict[str, Any]]) -> dict[str, Any]:
@@ -99,14 +123,15 @@ def _answer(events: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def read(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Every undelivered event, oldest first, now marked delivered."""
-    return _answer(_take(ctx.places, ctx.clock))
+    """Every event not acknowledged yet, oldest first: what a restarted orchestrator still owes."""
+    return _answer(_hand(ctx.places, ctx.clock, "acked"))
 
 
 def wait(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Like read, but blocks until an event arrives or watch.inbox_wait_seconds pass with none."""
+    """Acknowledge what was handed over, then block until a new event arrives or watch.inbox_wait_seconds pass."""
+    acknowledge(ctx.places, ctx.clock)
     end = time.monotonic() + ctx.settings().get_int("watch.inbox_wait_seconds")
     with _posted:
-        while not (events := _take(ctx.places, ctx.clock)) and (left := end - time.monotonic()) > 0:
+        while not (events := _hand(ctx.places, ctx.clock, "handed")) and (left := end - time.monotonic()) > 0:
             _posted.wait(left)
     return _answer(events)

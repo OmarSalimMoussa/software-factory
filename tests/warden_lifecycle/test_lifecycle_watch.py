@@ -14,7 +14,7 @@ from runtime.shared.models import (
     WAITING,
     WORKING,
 )
-from runtime.warden import backstop, crashwatch, lifecycle, permits
+from runtime.warden import backstop, crashwatch, inbox, lifecycle, permits
 from runtime.warden.backstop import Proc
 
 NOW = "2026-10-09T12:00:00Z"
@@ -98,3 +98,11 @@ def test_a_silent_orchestrator_is_restarted_as_the_same_session(world: World) ->
     crashwatch.watch_sessions(world.ctx())
     assert world.launcher.stopped == ["0c0c0c0c"] and world.launcher.resumed == ["0c0c0c0c"]
     assert world.session("0c0c0c0c").state == WORKING
+
+
+def test_a_restarted_orchestrator_is_told_the_events_it_has_not_acted_on(world: World) -> None:
+    world.seat("0c0c0c0c", role="orchestrator", family="orch")
+    inbox.post_event(world.places, world.clock, inbox.TRIAGE_DUE, {"waiting": 3})
+    crashwatch.watch(world.ctx())
+    resumed = next(argv for argv in world.launcher.commands if argv[:2] == ["claude", "--resume"])
+    assert "Events you have not acted on yet: triage due." in resumed[-1]

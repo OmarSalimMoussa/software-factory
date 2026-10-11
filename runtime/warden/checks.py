@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any
 
 from checks.runner import catalog
-from runtime.queue import cards
 from runtime.queue.book import Queue
 from runtime.shared import store
 from runtime.shared.models import RETIRED, Session
@@ -114,6 +113,8 @@ def _count_run(ctx: Context, session: Session) -> int:
         done = runs.get(task.id, 0)
         limit = ctx.settings().get_int("rounds.check_runs") + session.extensions.get("check_runs", 0)
         if done >= limit:
+            from runtime.queue import cards  # cards reaches the queue's tasks, which reach this module
+
             if cards.spent(ctx, session, "check_runs", f"{session.name} used up its check runs again"):
                 raise Refused("check-runs", f"{done} check runs already this merge turn (limit {limit}); the owner "
                                             "decides now: stop and wait")  # fmt: skip

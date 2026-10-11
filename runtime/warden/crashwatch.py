@@ -38,6 +38,7 @@ log = logging.getLogger(__name__)
 WARDEN = lifecycle.WARDEN
 RESTARTED = "The warden restarted you after your process ended: rerun your startup checks, then carry on."
 SILENT = "The warden restarted you: your loop was silent for {minutes} min. Rerun your startup checks, then carry on."
+OWED = " Events you have not acted on yet: {kinds}. `factory inbox` lists them."
 IDLE = "idle"
 # A session whose task has moved past its part is finished; a process that ends before that crashed.
 DONE_AT = {
@@ -133,7 +134,7 @@ def watch(ctx: Context) -> None:
                 s.resume_tries += 1  # never reset by a resume, so a session that keeps dying is retired
                 registry.write(ctx.places, sessions)
                 try:
-                    launch.resume(ctx, s, RESTARTED)
+                    launch.resume(ctx, s, RESTARTED + (_owed(ctx) if s.role == ORCH else ""))
                 except LaunchError as exc:
                     log.warning("resume %d of crashed session %s failed (%s)", s.resume_tries, sid, type(exc).__name__)
                 if s.role == ORCH:
@@ -146,6 +147,12 @@ def watch(ctx: Context) -> None:
         lifecycle.after_retire(ctx, retired)
         if retired[0].retired == CRASHED:
             ctx.post_event(inbox.CRASHED, {"session": sid, "name": retired[0].name, "task": retired[0].task})
+
+
+def _owed(ctx: Context) -> str:
+    """The orchestrator's restart message names the events it has not acted on, so none is lost with its process."""
+    kinds = [e["kind"] for e in inbox.unacknowledged(ctx.places)]
+    return OWED.format(kinds=", ".join(dict.fromkeys(kinds))) if kinds else ""
 
 
 def watch_orchestrator(ctx: Context) -> None:
@@ -164,7 +171,7 @@ def watch_orchestrator(ctx: Context) -> None:
         if silent < limit:
             return
         try:
-            lifecycle.restart(ctx, orchestrator, SILENT.format(minutes=int(silent // 60)))
+            lifecycle.restart(ctx, orchestrator, SILENT.format(minutes=int(silent // 60)) + _owed(ctx))
             reflections.incident(ctx, f"The orchestrator's loop was silent for {int(silent // 60)} min; the warden "
                                       "restarted it.")  # fmt: skip
         except LaunchError as exc:

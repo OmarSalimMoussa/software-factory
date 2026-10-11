@@ -66,8 +66,9 @@ def last_tick(places: Places) -> float | None:
 
 
 def tick(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """The orchestrator finished a loop pass; the next loop due counts from now."""
+    """The orchestrator finished a loop pass, having acted on what it was handed; the next loop due counts from now."""
     now = ctx.clock.now()
+    inbox.acknowledge(ctx.places, ctx.clock)
     store.write_json(_tick_path(ctx.places), {"at": now, "iso": ctx.clock.iso()})
     heartbeat.ping(ctx, heartbeat.ORCHESTRATOR)
     due = formats.iso(now + ctx.settings().get_int("watch.loop_minutes") * 60)
