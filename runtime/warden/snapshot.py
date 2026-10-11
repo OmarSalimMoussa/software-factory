@@ -2,7 +2,7 @@
 
 The dashboard names what it wants; each name is read on its own, and one that cannot be read comes back as an error
 for that name alone, so a broken file fails one part of a page, never the page. Cost, probe streaks and refusals are
-folded from their logs as the logs grow, so a poll reads only the lines added since the last one.
+folded from their logs as the logs grow (folds.py), so a poll reads only the lines added since the last one.
 """
 
 from __future__ import annotations
@@ -10,12 +10,10 @@ from __future__ import annotations
 import base64
 import copy
 import dataclasses
-import json
 import logging
 import os
 import re
 import stat
-import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -31,6 +29,7 @@ from runtime.slots import leases
 from runtime.warden import gc, public
 from runtime.warden.context import Context
 from runtime.warden.delivery import ci_watch, deploys, outage, prod_push
+from runtime.warden.folds import Cost, History, Refusals, Streaks, kept
 from runtime.warden.health import probes
 from runtime.warden.owner import accounts, codes, messages, reflections, settings_save
 from runtime.warden.sessions import doing, lifecycle, permits, registry
@@ -51,128 +50,6 @@ _IMAGES = {
 # An answer is one JSON line of at most protocol.MAX_LINE bytes, and base64 grows bytes by a third.
 _MAX_IMAGE = protocol.MAX_LINE * 3 // 4 - 4096
 _MAX_IDS = 200  # task ids one snapshot reads logs, specs or QA records for
-
-
-class _Fold:
-    """A JSON-lines log folded as it grows: each new whole line is stepped once; a replaced log starts over."""
-
-    def __init__(self) -> None:
-        self.inode, self.offset, self.lines = -1, 0, 0
-        self.reset()
-
-    def reset(self) -> None:
-        raise NotImplementedError
-
-    def step(self, raw: dict[str, Any]) -> None:
-        raise NotImplementedError
-
-    def unreadable(self, path: Path, exc: Exception) -> None:
-        """A line that cannot be read fails the whole fold, unless the fold draws it as a row of its own."""
-        raise store.StoreError(f"{path}: line {self.lines} cannot be read") from exc
-
-    def read(self, path: Path) -> None:
-        try:
-            info = path.stat()
-        # telemetry: expected — nothing was logged yet
-        except FileNotFoundError:
-            return
-        if info.st_ino != self.inode or info.st_size < self.offset:
-            self.inode, self.offset, self.lines = info.st_ino, 0, 0
-            self.reset()
-        with path.open("rb") as fh:
-            fh.seek(self.offset)
-            data = fh.read(info.st_size - self.offset)
-        whole = data[: data.rfind(b"\n") + 1]
-        for line in whole.splitlines():
-            self.lines += 1
-            if line.strip():
-                try:
-                    self.step(json.loads(line))
-                except (ValueError, KeyError, TypeError) as exc:
-                    self.unreadable(path, exc)
-        self.offset += len(whole)
-
-
-class _History(_Fold):
-    """Every retirement history.jsonl records, oldest first, under the session id it ended with; a line that cannot
-    be read is kept as a row that says so, so one bad line never hides the rest of History."""
-
-    def reset(self) -> None:
-        self.rows: list[dict[str, Any]] = []
-        self.bound: dict[str, str] = {}
-
-    def step(self, raw: dict[str, Any]) -> None:
-        if "was" in raw:
-            self.bound[str(raw["was"])] = str(raw["session"])
-        elif raw["state"] == RETIRED:
-            fields = ("at", "session", "name", "retired", "by", "why")
-            self.rows.append({"line": self.lines, **{k: str(raw[k]) for k in fields}})
-
-    def unreadable(self, path: Path, exc: Exception) -> None:
-        self.rows.append({"line": self.lines, "error": f"line {self.lines} of {path.name} cannot be read"})
-
-    def answer(self) -> list[dict[str, Any]]:
-        return [{**row, "session": self.bound.get(row["session"], row["session"])} if "session" in row else row
-                for row in self.rows]  # fmt: skip
-
-
-class _Cost(_Fold):
-    """Every call's cost by day and family, agent and model, and in total by agent, task and model. Each total is
-    [dollars, calls with unknown price]: an unknown price is counted, never added as zero."""
-
-    def reset(self) -> None:
-        self.days: dict[str, dict[str, dict[str, list[float]]]] = {}
-        self.totals: dict[str, dict[str, list[float]]] = {"agent": {}, "task": {}, "model": {}}
-
-    def step(self, raw: dict[str, Any]) -> None:
-        record = models.load(models.CostRecord, raw)
-        agent = record.subagent or record.session
-        day = self.days.setdefault(record.at[:10], {"family": {}, "agent": {}, "model": {}})
-        cells = [
-            day["family"].setdefault(record.family, [0.0, 0]),
-            day["agent"].setdefault(agent, [0.0, 0]),
-            day["model"].setdefault(record.model, [0.0, 0]),
-            self.totals["agent"].setdefault(agent, [0.0, 0]),
-            self.totals["task"].setdefault(record.task, [0.0, 0]),
-            self.totals["model"].setdefault(record.model, [0.0, 0]),
-        ]
-        for cell in cells:
-            cell[0 if record.usd is not None else 1] += record.usd if record.usd is not None else 1
-
-    def answer(self, days: int) -> dict[str, Any]:
-        return {"days": {d: self.days[d] for d in sorted(self.days)[-days:]}, "totals": self.totals}
-
-
-class _Streaks(_Fold):
-    """Since when each environment is healthy, or down by a counted failure; an uncounted failure changes nothing."""
-
-    def reset(self) -> None:
-        self.state: dict[str, dict[str, Any]] = {}
-
-    def step(self, raw: dict[str, Any]) -> None:
-        probe = models.load(models.Probe, raw)
-        if (probe.ok or probe.counts) and self.state.get(probe.env, {}).get("ok") is not probe.ok:
-            self.state[probe.env] = {"ok": probe.ok, "since": probe.at}
-
-
-class _Refusals(_Fold):
-    """The guard's refusals, by day and rule."""
-
-    def reset(self) -> None:
-        self.days: dict[str, dict[str, int]] = {}
-
-    def step(self, raw: dict[str, Any]) -> None:
-        day = self.days.setdefault(str(raw["at"])[:10], {})
-        day[str(raw["rule"])] = day.get(str(raw["rule"]), 0) + 1
-
-
-_folds: dict[tuple[str, str], Any] = {}
-_folds_lock = threading.Lock()
-
-
-def _kept(kind: type[Any], path: Path) -> Any:
-    with _folds_lock:
-        return _folds.setdefault((kind.__name__, str(path)), kind())
 
 
 # ---- the readers, one per name the dashboard may want ---------------------------------------------------------------
@@ -282,7 +159,7 @@ def _qa(ctx: Context, args: dict[str, Any]) -> Any:
 
 def _probes(ctx: Context, args: dict[str, Any]) -> Any:
     strip = ctx.settings().get_int("dashboard.probe_strip")
-    streaks = _kept(_Streaks, ctx.places.probes)
+    streaks = kept(Streaks, ctx.places.probes)
     streaks.read(ctx.places.probes)
     return {
         "recent": {env: [models.dump(p) for p in probes.recent(ctx.places, env, strip)] for env in probes.ENVS},
@@ -294,7 +171,7 @@ def _cost(ctx: Context, args: dict[str, Any]) -> Any:
     days = args.get("days", 1)
     if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 366:
         raise Refused("snapshot", "days is a whole number from 1 to 366")
-    book = _kept(_Cost, ctx.places.cost)
+    book = kept(Cost, ctx.places.cost)
     book.read(ctx.places.cost)
     # A copy: the answer is sent after the lock is let go, while the next snapshot may fold new calls in.
     return copy.deepcopy(book.answer(days))
@@ -309,13 +186,13 @@ def _thread(ctx: Context, args: dict[str, Any]) -> Any:
 
 
 def _history(ctx: Context, args: dict[str, Any]) -> Any:
-    book = _kept(_History, ctx.places.history)
+    book = kept(History, ctx.places.history)
     book.read(ctx.places.history)
     return book.answer()
 
 
 def _refusals(ctx: Context, args: dict[str, Any]) -> Any:
-    tally = _kept(_Refusals, ctx.places.refusals)
+    tally = kept(Refusals, ctx.places.refusals)
     tally.read(ctx.places.refusals)
     return dict(tally.days.get(ctx.clock.iso()[:10], {}))
 
