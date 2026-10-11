@@ -1,25 +1,27 @@
 'use strict';
 /* The install console: its one-time link admits this browser alone; it shows the offered commit's CI; a dry install
-   draws every step as a row, asks each question in place under its step (the 6-digit code's secret, the GitHub and
-   Claude tokens), shows the keys to add by hand as the installer's own lines, keeps a typed secret off the page, and
-   finishes; at desktop and phone width, in both themes, with 24 px targets. */
+   draws its phases with a progress bar and never a command, asks each question in place (the 6-digit code's secret as
+   a QR code with its key, the keys to add by hand, the GitHub and Claude tokens), keeps a typed secret off the page,
+   offers its log, and finishes; at desktop and phone width, in both themes, with 24 px targets. */
 const {drive, consoleServer} = require('./lib.cjs');
 
 const SECRET = 'sk-ant-oat01-typed-in-the-console-5e5e';
-const ASKED = ['authenticator', 'GitHub token', 'claude setup-token', 'name for this Claude account'];
+const ASKED = ['authenticator', 'deploy key to acme/shop', 'deploy key to acme/software-factory', 'GitHub token', 'claude setup-token', 'name for this Claude account'];
+const PHASES = 8;
 
 async function dryInstall(t, p, tag) {
   if (!(await p.isChecked('#f-dry'))) await p.click('.cf-switch');
   t.check((await p.textContent('#f-go')) === 'Dry run', `${tag}: the button does not say Dry run`);
   await p.click('#f-go');
-  await p.waitForSelector('.crow', {timeout: 8000});
+  await p.waitForSelector('.cphase', {timeout: 8000});
   const asked = [];
   while (asked.length < 10) {
     await p.waitForSelector('.cq, .cend', {timeout: 20000});
     if (await p.$('.cend')) break;
     const title = await p.textContent('#q-title');
     asked.push(title);
-    t.check(await p.$('.crow[data-state="running"] .cq'), `${tag}: "${title}" is not drawn under the step that asks it`);
+    t.check(await p.$('.cphase[data-state="running"]') && await p.$('#q-top .cq'), `${tag}: "${title}" is not asked while its phase runs`);
+    if (asked.length === 1) t.check(await p.$eval('.cq svg.cqr path', el => el.getAttribute('d').length > 100).catch(() => false), `${tag}: the 6-digit code's secret has no QR code`);
     if (await p.$('#q-in')) {
       await p.fill('#q-in', (await p.getAttribute('#q-in', 'type')) === 'password' ? SECRET : '');
       await p.press('#q-in', 'Enter');
@@ -35,11 +37,13 @@ async function dryInstall(t, p, tag) {
   t.check(ASKED.every((want, i) => (asked[i] || '').includes(want)) && asked.length === ASKED.length, `${tag}: asked ${JSON.stringify(asked)}`);
   await p.waitForSelector('.cend', {timeout: 20000});
   t.check((await p.textContent('.cend')).includes('The dry run finished. Nothing changed.'), `${tag}: the run did not finish: ${await p.textContent('.cend')}`);
-  const secrets = await p.$$eval('.crow', els => els.map(e => e.textContent).find(t => t.includes('Keep the secrets')) || '');
-  t.check(secrets.includes('Add this as a deploy key to acme/shop') && secrets.includes('FACTORY_READ_KEY'), `${tag}: the keys to add by hand are not the step's own lines`);
-  const states = await p.$$eval('.crow', els => els.map(e => e.dataset.state));
-  t.check(states.length > 20 && states.every(s => s === 'done'), `${tag}: the steps are not all done: ${states.join(',')}`);
-  t.check(!(await p.evaluate(() => document.body.innerText)).includes(SECRET), `${tag}: the typed secret is on the page`);
+  const states = await p.$$eval('.cphase', els => els.map(e => e.dataset.state));
+  t.check(states.length === PHASES && states.every(s => s === 'done'), `${tag}: the phases are not all done: ${states.join(',')}`);
+  t.check((await p.getAttribute('.cbar', 'aria-valuenow')) === '100', `${tag}: the progress bar did not fill`);
+  t.check(!(await p.isHidden('#run-log')), `${tag}: the run offers no log`);
+  const text = await p.evaluate(() => document.body.innerText);
+  t.check(!text.includes(SECRET), `${tag}: the typed secret is on the page`);
+  t.check(!/would (run|write|make|remove|copy)|\$ |systemctl|git -C|apt-get/.test(await p.textContent('#run')), `${tag}: a command reached the run`);
 }
 
 async function targets(t, p, tag) {

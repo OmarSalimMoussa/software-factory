@@ -33,7 +33,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `sandbox` | The hosts a session may reach, and the tool caches in the agent's home it may write |
 | `dashboard` | Port, refresh and stale times, the code lock, page size, the hosts it answers |
 | `gc` | The nightly prune's hour, how long images stay, the Docker disk budget |
-| `install` | The drills' model and time, the guard's timeout, the check-ins' grace, the product's toolchain |
+| `install` | The drills' model, time and how many run at once, the guard's timeout, the check-ins' grace, the product's toolchain, how long publishing the dashboard may wait |
 
 `models.allowed` and `prices` are set at install and are read-only on the dashboard. Staging's and prod's health
 addresses are not settings: the warden reads them from `factory.toml` in the product's checkout at every probe.

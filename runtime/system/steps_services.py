@@ -2,7 +2,8 @@
 the warden and the dashboard keep from them.
 
 The stack user's rootless Docker runs them, so the files are root's and the stack user only reads them. The secrets
-in services.env are made once and kept at every reinstall: the databases were created with them.
+in services.env are made once and kept at every reinstall: the databases were created with them. Their images, the
+largest download of a first install, are pulled in the background from as soon as Docker runs until they start.
 """
 
 from __future__ import annotations
@@ -12,19 +13,27 @@ import json
 from runtime.shared import error_reports
 from runtime.shared.paths import DASHBOARD_USER, WARDEN_USER
 from runtime.system import layout
+from runtime.system.host import CommandError
 from runtime.system.job import Install, refuse
 from standard import config as product_config
 from standard.services import provision, stack
 
 # What a server's edge reads; the laptop runs no edge.
 _SERVER_ONLY = frozenset({stack.EDGE_CADDYFILE.name})
+_IMAGES = "the shared services' images"
 
 
 def _config(ctx: Install) -> product_config.Config:
     try:
         return product_config.load(ctx.product)
     except product_config.ConfigError as exc:
-        raise refuse(f"the product's {product_config.FILE} cannot be used: {exc}") from exc
+        raise refuse(
+            f"The product's {product_config.FILE} cannot be used ({exc}): fix it in the product, then install again"
+        ) from exc
+
+
+def _docker_env(ctx: Install) -> dict[str, str]:
+    return {"DOCKER_HOST": f"unix://{layout.rootless_socket(ctx.uid(layout.STACK_USER))}"}
 
 
 def place(ctx: Install) -> None:
@@ -48,15 +57,33 @@ def place(ctx: Install) -> None:
     try:
         existing = stack.parse_env(host.read(env), str(env)) if host.exists(env) else {}
     except ValueError as exc:
-        raise refuse(f"{exc}: fix it by hand, keeping its secrets, then install again") from exc
+        raise refuse(f"The shared services' settings in {env} cannot be read ({exc}): fix the file by hand, keeping "
+                     "its secrets, then install again") from exc  # fmt: skip
     values = stack.generate_env(config, kind="laptop", existing=existing)
     host.write(env, stack.render_env(values), mode=0o640, group=group)
-    host.say("  kept the secrets services.env held" if existing else "  made services.env's secrets")
+    host.say("kept the secrets services.env held" if existing else "made services.env's secrets")
+
+
+def _pull_argv(ctx: Install) -> list[str]:
+    return [*stack.compose_argv(ctx.places.services, edge=False), "pull", "--quiet"]
+
+
+def pull(ctx: Install) -> None:
+    """Start downloading every image the shared services run, as the stack user, and go on: the start waits."""
+    ctx.pending[_IMAGES] = ctx.host.background(_pull_argv(ctx), user=layout.STACK_USER, env=_docker_env(ctx))
 
 
 def start(ctx: Install) -> None:
-    """Enabled, so they come back after a reboot. Already running, they reload: a changed service is recreated and
-    the rest keep running, with each slot's data."""
+    """Once their images are here: enabled, so they come back after a reboot. Already running, they reload: a
+    changed service is recreated and the rest keep running, with each slot's data. A download that failed in the
+    background (a network blip, a daemon still starting) is tried once more, here."""
+    code, _ = ctx.await_pending(_IMAGES)
+    if code != 0:
+        try:
+            ctx.host.run(_pull_argv(ctx), user=layout.STACK_USER, env=_docker_env(ctx))
+        except CommandError as exc:
+            raise refuse("The shared services could not be downloaded: check this computer's internet connection, "
+                         "then install again") from exc  # fmt: skip
     ctx.host.run(["systemctl", "enable", layout.SERVICES_UNIT])
     ctx.host.run(["systemctl", "reload-or-restart", layout.SERVICES_UNIT])
 
@@ -69,19 +96,20 @@ def keys(ctx: Install) -> None:
     host, config = ctx.host, _config(ctx)
     public_key, secret_key = "LANGFUSE_INIT_PROJECT_PUBLIC_KEY", "LANGFUSE_INIT_PROJECT_SECRET_KEY"
     if host.dry:
-        host.say(f"  would make GlitchTip's {config.product.name} organization, a read token and the factory's own "
+        host.say(f"would make GlitchTip's {config.product.name} organization, a read token and the factory's own "
                  f"project, as {layout.STACK_USER}")  # fmt: skip
         found = {"token": "<token>", "factory_dsn": "<dsn>"}
         services = {public_key: "<public key>", secret_key: "<secret key>"}
     else:
-        socket = layout.rootless_socket(ctx.uid(layout.STACK_USER))
-        run = host.runner(layout.STACK_USER, {"DOCKER_HOST": f"unix://{socket}"})
+        run = host.runner(layout.STACK_USER, _docker_env(ctx))
         try:
             services = provision.read_services_env(ctx.places.services / stack.ENV_FILE)
             found = provision.bootstrap(config, services, run)
             error_reports.parse_dsn(found["factory_dsn"])
         except (provision.ProvisionError, error_reports.DsnError) as exc:
-            raise refuse(f"GlitchTip could not be set up for the factory: {exc}") from exc
+            host.say(f"GlitchTip could not be set up: {exc}")
+            raise refuse("GlitchTip, where the factory's errors go, could not be set up: install again; if it stops "
+                         "here again, the log says why") from exc  # fmt: skip
     folder = layout.secrets(ctx.places.state)
     keys = {
         layout.LAPTOP_GLITCHTIP: {"url": layout.GLITCHTIP_URL, "org": config.product.name, "token": found["token"]},

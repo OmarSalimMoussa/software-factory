@@ -11,7 +11,7 @@ import pytest
 from system_fakes import SHA
 
 from runtime.shared.protocol import Refused
-from runtime.system import console, layout, sealed
+from runtime.system import layout, sealed
 from runtime.system.host import DryHost, RealHost, user_env
 
 STAGE = layout.STAGE_ROOT / f"{SHA}-0a1b2c3d"
@@ -35,7 +35,7 @@ def test_a_sealed_copy_is_unpacked_by_root_into_a_new_folder_and_made_read_only_
     ]
 
 
-@pytest.mark.parametrize("display", [(), console._DISPLAY], ids=["install", "console"])
+@pytest.mark.parametrize("display", [(), sealed.DISPLAY], ids=["install", "console"])
 def test_a_sealed_copy_starts_isolated_with_only_the_declared_environment(
     monkeypatch: pytest.MonkeyPatch, display: tuple[str, ...]
 ) -> None:
@@ -106,7 +106,7 @@ def test_a_command_the_installer_starts_sees_only_what_it_declares(
     ids=["ended", "kept-beside-a-failed-install", "not-a-sealed-copy"],
 )
 def test_the_sealed_copy_goes_when_its_program_ends_unless_kept(stage: Path, kept: bool, removed: bool | None) -> None:
-    host = DryHost()
+    host = DryHost(paths={sealed.release_folder(stage)})  # a release's manifest and history go with its copy
     host.dry = False  # decides like a real run; a dry host still changes nothing
 
     if removed is None:
@@ -117,3 +117,4 @@ def test_the_sealed_copy_goes_when_its_program_ends_unless_kept(stage: Path, kep
     sealed.finish(host, stage, kept=kept)
 
     assert (f"remove: {stage}" in host.actions) is removed
+    assert (f"remove: {sealed.release_folder(stage)}" in host.actions) is removed

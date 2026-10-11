@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -156,10 +158,38 @@ def test_a_drill_that_breaks_fails_by_name_and_the_rest_still_run() -> None:
         def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran:
             raise OSError("systemd-run is gone")
 
-    results = drills.run_all(Broken())
+    results = drills.run_all(Broken(), 4)
 
     assert len(results) == len(drills.DRILLS)
     assert next(r for r in results if r.name == "docker_denied").evidence.startswith("the drill broke: OSError")
+
+
+@dataclass
+class Overlapping(FakeRig):
+    """Sessions that take a while, counting how many run at once."""
+
+    running: int = 0
+    most: int = 0
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None, properties: tuple[str, ...] = ()) -> Ran:
+        with self.lock:
+            self.running += 1
+            self.most = max(self.most, self.running)
+        time.sleep(0.05)
+        with self.lock:
+            self.running -= 1
+        return super().sandboxed(*commands, extra=extra, properties=properties)
+
+
+def test_session_drills_run_side_by_side_and_every_drill_reports_once_in_order() -> None:
+    rig = Overlapping()
+
+    results = drills.run_all(rig, 3)
+
+    named = {drill: drill(FakeRig()).name for drill in drills.DRILLS}
+    assert [r.name for r in results] == [named[drill] for drill in drills.DRILLS]
+    assert rig.most == 3
 
 
 def test_the_install_refuses_to_finish_while_a_drill_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -170,11 +200,12 @@ def test_the_install_refuses_to_finish_while_a_drill_fails(tmp_path: Path, monke
         yield FakeRig()
 
     monkeypatch.setattr(drill_rig, "opened", opened)
-    monkeypatch.setattr(drills, "run_all", lambda rig: [Result("a", True, "held"), Result("b", False, "breached")])
+    monkeypatch.setattr(drills, "run_all", lambda rig, at_once: [Result("a", True, "held"),
+                                                                  Result("b", False, "breached")])  # fmt: skip
     job = dry_job(tmp_path)
-    job.host.dry = False
+    job.host.dry, job.settings = False, settings()
 
-    with pytest.raises(Refused, match="1 drill"):
+    with pytest.raises(Refused, match="1 of the safety checks failed"):
         install.run_drills(job)
     assert job.drilled == [
         {"name": "a", "ok": True, "evidence": "held"},

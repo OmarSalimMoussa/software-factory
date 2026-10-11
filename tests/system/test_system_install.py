@@ -8,46 +8,100 @@ from system_fakes import dry_job, settings
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
-from runtime.system import ci_check, install, steps_machine
-from runtime.system.host import DryHost
+from runtime.system import ci_check, install, layout, steps_machine, steps_secrets, steps_services, steps_wire
+from runtime.system.host import DryHost, RealHost
+from runtime.system.job import Install
+from runtime.system.journal import Journal
 from runtime.warden import registry
 
 
-def test_the_dry_run_lists_every_step_in_order_and_changes_nothing(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def _answered(job: Install) -> None:
+    """Every secret and key in place already, so a run asks the owner nothing."""
+    assert isinstance(job.host, DryHost)
+    folder = job.places.state / "secrets"
+    job.host.paths |= {job.places.totp_secret, folder / "deploy.key", folder / "factory-read.key.pub",
+                       folder / "github.token", folder / "claude-accounts" / "active"}  # fmt: skip
+    job.host.files[job.owner.home / layout.OWNER_SERVER_KEYS] = "{}"
+
+
+def test_the_phases_hold_every_step_once_and_in_order() -> None:
+    steps = [step for phase in install.PHASES for _, step in phase.steps]
+
+    assert steps == [step for _, step in install.STEPS] and len(set(steps)) == len(steps)
+    assert all(phase.steps for phase in install.PHASES)
+    assert len({phase.title for phase in install.PHASES}) == len(install.PHASES)
+
+
+@pytest.mark.parametrize("verbose", [False, True], ids=["plain", "verbose"])
+def test_the_terminal_shows_only_the_phases_unless_verbose_and_a_dry_run_changes_nothing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], verbose: bool
 ) -> None:
     job = dry_job(tmp_path)
+    _answered(job)
+    assert isinstance(job.host, DryHost)
+    job.host.journal = Journal(verbose=verbose)
 
     install.run(job)
 
-    printed = [line for line in capsys.readouterr().out.splitlines() if line[:3].strip().rstrip(".").isdigit()]
-    assert printed == [f"{n:>2}. {title}" for n, (title, _) in enumerate(install.STEPS, 1)]
+    out = capsys.readouterr().out.splitlines()
+    phases = [f"  \u2713 {phase.title}" for phase in install.PHASES]
+    if verbose:
+        assert [line for line in out if line in phases] == phases
+        assert any("would run: systemctl" in line for line in out)
+    else:
+        assert out == phases
     assert any(action.startswith("write: /etc/systemd/system/software-factory.slice") for action in job.host.actions)
     # The owner's own git hooks read the settings published under it; no factory user may list or enter it.
     assert f"make: {tmp_path / 'root' / 'state'}/ (710, software-warden:owner)" in job.host.actions
     assert not (tmp_path / "root").exists()
 
 
-def test_the_shared_services_are_placed_on_rootless_docker_and_keyed_before_the_factory_starts(
+def test_a_failure_shows_one_plain_sentence_and_the_log_keeps_the_command(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(ctx: Install) -> None:
+        ctx.host.run(["false", "--secret-flag"])
+
+    phases = (install.Phase("Checking this computer", (("Checking the tools", lambda ctx: None),)),
+              install.Phase("Preparing this computer", (("Installing the system packages", broken),)))  # fmt: skip
+    monkeypatch.setattr(install, "PHASES", phases)
+    job = dry_job(tmp_path)
+    log = tmp_path / "install.log"
+    job.host = RealHost(Journal(log))
+
+    problem = install.perform(job, keep=True)
+
+    out = capsys.readouterr().out
+    assert problem == ("The install could not finish installing the system packages: a command it ran failed. Run it "
+                       "again; if it stops here again, the log says why.")  # fmt: skip
+    assert out.splitlines() == ["  \u2713 Checking this computer", "  \u2717 Preparing this computer", "", problem]
+    kept = log.read_text(encoding="utf-8")
+    assert "$ false --secret-flag" in kept and "exit 1 after" in kept and "--secret-flag" not in out
+
+
+def test_the_shared_services_are_downloaded_early_and_started_and_keyed_before_the_factory_starts(
     tmp_path: Path,
 ) -> None:
     job = dry_job(tmp_path)
 
     install.run(job)
 
-    titles = [title for title, _ in install.STEPS]
-    order = ["Set up the stack user's rootless Docker", "Place the shared services", "Install the units",
-             "Start the shared services", "Keep the shared services' keys", "Start the factory"]  # fmt: skip
-    assert [titles.index(title) for title in order] == sorted(titles.index(title) for title in order)
+    steps = [step for _, step in install.STEPS]
+    order = [steps_machine.rootless_docker, steps_services.place, steps_services.pull, steps_secrets.secrets,
+             steps_wire.units, steps_services.start, steps_services.keys, steps_wire.start]  # fmt: skip
+    assert [steps.index(step) for step in order] == sorted(steps.index(step) for step in order)
     root = tmp_path / "root"
+    assert isinstance(job.host, DryHost)
+    pulled = next(n for n, a in enumerate(job.host.actions) if a.startswith("start in the background: docker compose"))
+    started = job.host.actions.index("run: systemctl reload-or-restart software-services.service")
+    assert job.host.actions[pulled].endswith("pull --quiet (as software-stack)") and pulled < started
     for action in (
         f"write: {root}/services/services.env (640, root:software-stack)",
-        "run: systemctl reload-or-restart software-services.service",
         f"write: {root}/state/secrets/laptop-glitchtip.json (600, software-warden:software-warden)",
         f"write: {root}/state/secrets/laptop-langfuse.json (600, software-warden:software-warden)",
         f"write: {root}/state/secrets/factory-dsn (640, software-warden:software-dashboard)",
     ):
-        assert isinstance(job.host, DryHost) and action in job.host.actions
+        assert action in job.host.actions
 
 
 def _session(state: str) -> Session:
@@ -146,9 +200,11 @@ def test_the_secrets_step_keeps_the_agents_claude_accounts(
     }
     host.files.update({folder / name: text for name, text in present.items()})
 
-    steps_machine.secrets(job)
+    steps_secrets.secrets(job)
 
-    assert [a.removeprefix("ask the owner: ") for a in host.actions if a.startswith("ask the owner: ")] == asked
+    # Without a signed-in GitHub CLI, a real install also asks the owner to sign in; that is not this test's question.
+    questions = [a.removeprefix("ask the owner: ") for a in host.actions if a.startswith("ask the owner: ")]
+    assert [q for q in questions if q != "Sign in to GitHub"] == asked
     assert [a for a in host.actions if a.startswith("write: ")] == [
         f"write: {folder}/{w} {WARDEN_OWNED}" for w in written
     ]

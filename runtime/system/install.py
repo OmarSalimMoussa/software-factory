@@ -1,13 +1,13 @@
-"""Install the factory from one commit of the owner's clone, as root:
+"""Install the factory from one commit, as root. The release file runs it (``sudo python3 software-factory.pyz
+--terminal --repo <product checkout>``); from the owner's clone of the factory it is
 
     sudo python3 runtime/system/install.py --commit <sha> --repo <product checkout> [--healthchecks] [--set k=v]...
 
-Add ``--dry-run`` (no sudo needed) to print every step and what it would do, changing nothing. The install runs from a
-sealed, read-only copy of the commit and takes only a commit the factory's CI passed: nothing is tested on this
-machine. It places that copy; sets up the users, the units, polkit, the firewall, Claude Code's managed settings and
-the sandbox's needs; starts the shared services every slot uses, then the factory; and runs the drills. It refuses to
-begin while any session is working or waiting, and refuses to finish while any drill fails. Rerun it after every
-change to the factory.
+Add ``--dry-run`` (no sudo needed) to go through every step, reading this machine and changing nothing, and
+``--verbose`` to print every detail the log keeps. The install runs from a sealed, read-only copy of the commit and
+takes only a commit the factory's CI passed: nothing is tested on this machine. It shows a few phases; every command
+and its output goes to a log in /var/log/software-factory. It refuses to begin while any session is working or
+waiting, and refuses to finish while any drill fails. Rerun it after every change to the factory.
 """
 
 from __future__ import annotations
@@ -17,7 +17,9 @@ import getpass
 import os
 import sys
 import tomllib
+import traceback
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -30,15 +32,19 @@ from runtime.system import (  # noqa: E402
     drills,
     healthchecks,
     layout,
+    release,
     sealed,
     steps_machine,
     steps_prepare,
+    steps_secrets,
     steps_services,
     steps_toolchain,
     steps_wire,
 )
-from runtime.system.host import Account, CommandError, DryHost, Host, RealHost  # noqa: E402
+from runtime.system.host import Account, CommandError, Host, RealHost  # noqa: E402
 from runtime.system.job import REPO_ROOT, Install, refuse  # noqa: E402
+from runtime.system.journal import Journal  # noqa: E402
+from runtime.system.uninstall import LookingHost  # noqa: E402
 
 PROGRAM = "install.py"
 
@@ -46,58 +52,86 @@ PROGRAM = "install.py"
 def run_drills(ctx: Install) -> None:
     if ctx.host.dry:
         for drill in drills.DRILLS:
-            ctx.host.say(f"  would drill: {drill.__name__}")
+            ctx.host.say(f"would drill: {drill.__name__}")
         return
     from runtime.system import drill_rig
 
     with drill_rig.opened(ctx) as rig:
-        results = drills.run_all(rig)
+        results = drills.run_all(rig, ctx.need_settings().get_int("install.drills_at_once"))
     for result in results:
-        ctx.host.say(f"  {'pass' if result.ok else 'FAIL'}: {result.name}: {result.evidence}")
+        ctx.host.say(f"{'pass' if result.ok else 'FAIL'}: {result.name}: {result.evidence}")
     ctx.drilled = [{"name": r.name, "ok": r.ok, "evidence": r.evidence} for r in results]
     failed = [r.name for r in results if not r.ok]
     if failed:
-        raise refuse(f"{len(failed)} drill(s) failed ({'; '.join(failed)}): the install is not recorded, so the "
-                     "warden starts nothing; fix what each says, then install again")  # fmt: skip
+        raise refuse(f"{len(failed)} of the safety checks failed ({'; '.join(failed)}), so the factory will not start. "
+                     "The log says what each one found: fix that, then install again.")  # fmt: skip
 
 
 def record(ctx: Install) -> None:
     steps_wire.record(ctx, ctx.drilled)
 
 
-STEPS: tuple[tuple[str, Callable[[Install], None]], ...] = (
-    ("Check the machine", steps_prepare.check_machine),
-    ("Refuse while a session is working or waiting", steps_prepare.refuse_live_sessions),
-    ("Run from a sealed copy of the commit", steps_prepare.sealed_copy),
-    ("Check that the factory's CI passed on the commit", ci_check.passed),
-    ("Settle the settings", steps_prepare.settle_settings),
-    ("Install the packages", steps_machine.packages),
-    ("Create the users", steps_machine.users),
-    ("Stop the running factory", steps_prepare.stop_factory),
-    ("Lay out the state folder", steps_machine.state_tree),
-    ("Place the factory, read-only", steps_machine.place),
-    ("Install Claude Code for the agents", steps_machine.claude_binary),
-    ("Install the product's toolchain", steps_toolchain.toolchain),
-    ("Let bubblewrap run", steps_machine.apparmor),
-    ("Give the agent user its checkout", steps_machine.agent_checkout),
-    ("Give the warden its clone of the factory", steps_machine.warden_clone),
-    ("Set up the stack user's rootless Docker", steps_machine.rootless_docker),
-    ("Place the shared services", steps_services.place),
-    ("Keep the secrets", steps_machine.secrets),
-    ("Write Claude Code's managed settings", steps_wire.managed_settings),
-    ("Install the units", steps_wire.units),
-    ("Write the polkit rule", steps_wire.polkit),
-    ("Write the firewall", steps_wire.firewall),
-    ("Install the factory command", steps_wire.factory_command),
-    ("Point both product checkouts at the factory's git hooks", steps_wire.git_hooks),
-    ("Publish the dashboard on the tailnet", steps_wire.tailnet),
-    ("Start the shared services", steps_services.start),
-    ("Keep the shared services' keys", steps_services.keys),
-    ("Start the factory", steps_wire.start),
-    ("Run the drills", run_drills),
-    ("Create the Healthchecks.io checks", healthchecks.create),
-    ("Record the install", record),
-)
+@dataclass(frozen=True)
+class Phase:
+    """A few steps the owner sees as one line: its title, then what each step is doing."""
+
+    title: str
+    steps: tuple[tuple[str, Callable[[Install], None]], ...]
+
+
+PHASES: tuple[Phase, ...] = (
+    Phase("Checking this computer", (
+        ("Checking the tools this computer needs", steps_prepare.check_machine),
+        ("Checking that no agent is at work", steps_prepare.refuse_live_sessions),
+        ("Checking the copy the install runs from", steps_prepare.sealed_copy),
+        ("Checking that the factory's own checks passed", ci_check.passed),
+        ("Checking the settings", steps_prepare.settle_settings),
+    )),
+    Phase("Preparing this computer", (
+        ("Installing the system packages", steps_machine.packages),
+        ("Creating the factory's users", steps_machine.users),
+        ("Stopping the running factory", steps_prepare.stop_factory),
+        ("Making the factory's folders", steps_machine.state_tree),
+    )),
+    # Downloading the shared services takes longest on a first install, so it starts here and runs in the background
+    # while the owner answers the questions and the factory is set up.
+    Phase("Fetching the shared services", (
+        ("Setting up the shared services' own Docker", steps_machine.rootless_docker),
+        ("Placing the shared services", steps_services.place),
+        ("Downloading the shared services", steps_services.pull),
+    )),
+    Phase("Connecting your accounts", (
+        ("Setting up your keys and accounts", steps_secrets.secrets),
+        ("Setting up the Healthchecks.io checks", healthchecks.create),
+    )),
+    Phase("Setting up the factory", (
+        ("Copying the factory into place", steps_machine.place),
+        ("Giving the agents their copy of the product", steps_machine.agent_checkout),
+        ("Giving the warden its copy of the factory", steps_machine.warden_clone),
+        ("Installing Claude Code for the agents", steps_machine.claude_binary),
+        ("Copying your tools for the agents", steps_toolchain.toolchain),
+        ("Letting the agents' sandbox run", steps_machine.apparmor),
+        ("Writing Claude Code's settings for the agents", steps_wire.managed_settings),
+        ("Writing the factory's services", steps_wire.units),
+        ("Writing the factory's permissions", steps_wire.polkit),
+        ("Writing the factory's firewall", steps_wire.firewall),
+        ("Installing the factory command", steps_wire.factory_command),
+        ("Adding the factory's checks to the product", steps_wire.git_hooks),
+        ("Publishing the dashboard on your tailnet", steps_wire.tailnet),
+    )),
+    Phase("Starting up", (
+        ("Starting the shared services", steps_services.start),
+        ("Connecting the shared services", steps_services.keys),
+        ("Starting the factory", steps_wire.start),
+    )),
+    Phase("Running the safety checks", (
+        ("Proving the agents' walls hold", run_drills),
+    )),
+    Phase("Finishing", (
+        ("Recording the install", record),
+    )),
+)  # fmt: skip
+STEPS = tuple(step for phase in PHASES for step in phase.steps)
 
 
 # The steps before this one change nothing on the machine, so a failure there leaves nothing to take back.
@@ -105,41 +139,72 @@ FIRST_CHANGE = next(number for number, (_, step) in enumerate(STEPS, 1) if step 
 
 
 def run(ctx: Install) -> None:
-    for number, (title, step) in enumerate(STEPS, 1):
-        ctx.reached = number
-        ctx.host.step(number, title)
-        step(ctx)
+    number = 0
+    for index, phase in enumerate(PHASES, 1):
+        ctx.host.phase(index, phase.title)
+        for title, step in phase.steps:
+            number += 1
+            ctx.reached, ctx.doing = number, title
+            ctx.host.step(number, title)
+            step(ctx)
+    ctx.host.done()
 
 
 def job(host: Host, places: Places, owner: Account, repo: Path, commit: str, changes: dict[str, Any],
         healthchecks: bool) -> Install:  # fmt: skip
-    # Run from the sealed copy (from_commit), the owner's checkout is named by the process that sealed it.
-    checkout = Path(os.environ.get(sealed.CHECKOUT, str(REPO_ROOT)))
-    ctx = Install(host, places, checkout, repo.resolve(), commit, owner, changes, healthchecks)
-    if sealed.STAGE in os.environ:
-        ctx.stage, ctx.sha = Path(os.environ[sealed.STAGE]), os.environ[sealed.SHA]
+    source = sealed.staged(os.environ)
+    factory = REPO_ROOT if source is None else source.checkout
+    ctx = Install(host, places, factory, repo.resolve(), commit, owner, changes, healthchecks)
+    if source is not None:
+        ctx.stage, ctx.sha = source.stage, source.sha
+    if source is not None and source.release is not None:
+        ctx.release = release.read_manifest(source.release)
+        ctx.bundle = source.release / release.BUNDLE
+        ctx.subject = str(ctx.release["subject"])
     # Known before any step runs: only a first install is ever taken back.
     ctx.first = not host.exists(layout.install_record(places.state))
     return ctx
 
 
+def sentence(text: str) -> str:
+    text = text.strip()
+    text = text[:1].upper() + text[1:]
+    return text if text.endswith((".", ":", "?")) or "\n" in text else text + "."
+
+
+def plain(ctx: Install, exc: BaseException) -> str:
+    """What stopped the install, in one plain sentence that says what to do; the log keeps the detail."""
+    if isinstance(exc, Refused):
+        return sentence(exc.reason)
+    doing = ctx.doing[:1].lower() + ctx.doing[1:] if ctx.doing else "starting"
+    if isinstance(exc, KeyboardInterrupt):
+        return "The install was stopped before it finished. Run it again to finish the job."
+    if isinstance(exc, CommandError):
+        return (f"The install could not finish {doing}: a command it ran failed. Run it again; if it stops here "
+                "again, the log says why.")  # fmt: skip
+    return (f"The install broke while {doing} ({type(exc).__name__}). Run it again; if it breaks here again, the "
+            "log says why.")  # fmt: skip
+
+
 def perform(ctx: Install, *, keep: bool) -> str | None:
     """Every step, as the command line and the console both run them. A failure is told through the host, then a
-    failed first install is taken back; returns what stopped it, or None once the install finished."""
+    failed first install is taken back; returns what stopped it, in plain words, or None once the install finished."""
     try:
         run(ctx)
-    except (Refused, CommandError, Exception, KeyboardInterrupt) as exc:
-        if isinstance(exc, Refused):
-            problem = f"refused: {exc.reason}"
-        elif isinstance(exc, CommandError):
-            problem = str(exc)
-        else:
-            problem = f"stopped at step {ctx.reached}: {type(exc).__name__}: {exc}"
-        ctx.host.fail(PROGRAM, problem)
+    except (Exception, KeyboardInterrupt) as exc:
+        problem = plain(ctx, exc)
+        ctx.host.say(f"stopped at step {ctx.reached} ({ctx.doing}): {type(exc).__name__}: {exc}")
+        if not isinstance(exc, Refused | CommandError | KeyboardInterrupt):
+            ctx.host.say("".join(traceback.format_exception(exc)))
+        ctx.host.fail(problem)
+        ctx.cancel_pending()
         if rolls_back(ctx, keep=keep):
             roll_back(ctx)
         return problem
     return None
+
+
+ROLL_BACK = "Taking back the failed install"
 
 
 def rolls_back(ctx: Install, *, keep: bool) -> bool:
@@ -152,9 +217,16 @@ def roll_back(ctx: Install) -> None:
     failed reinstall never does: removing it would delete the agents' clone, their queue and every stored secret."""
     from runtime.system import uninstall
 
-    ctx.host.say("The install failed before it finished, so everything it made is removed again:")
-    uninstall.remove_all(ctx.host, ctx.places, ctx.owner.name, ctx.product)
-    ctx.host.say("The machine is as it was before this install. Fix what it said, then install again.")
+    ctx.host.phase(len(PHASES) + 1, ROLL_BACK)
+    try:
+        uninstall.remove_all(ctx.host, ctx.places, ctx.owner.name, ctx.product, phases=False)
+    # What is left, the uninstaller removes: it finds each part that is there and takes it away.
+    except (Exception, KeyboardInterrupt) as exc:
+        ctx.host.say(f"the roll-back stopped: {type(exc).__name__}: {exc}")
+        ctx.host.fail("The install could not take back everything it made: uninstall the factory, then install again.")
+        return
+    ctx.host.done()
+    ctx.host.tell("Everything this install made is removed again, so the computer is as it was before it.")
 
 
 def parse_changes(items: list[str]) -> dict[str, Any]:
@@ -179,7 +251,6 @@ def from_commit(commit: str, owner: str, argv: list[str]) -> int:
     except (Refused, CommandError) as exc:
         print(f"{PROGRAM}: {exc.reason if isinstance(exc, Refused) else exc}", file=sys.stderr)
         return 1
-    print(f"Installing {sha[:12]}: every step runs from that commit, sealed read-only in {stage}", flush=True)
     sealed.exec_staged(sha, stage, "runtime/system/install.py", argv, checkout=REPO_ROOT)
 
 
@@ -189,26 +260,42 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--repo", required=True, type=Path, help="your checkout of the product the factory works on")
     parser.add_argument("--healthchecks", action="store_true", help="create the Healthchecks.io checks")
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="a setting to save")
-    parser.add_argument("--dry-run", action="store_true", help="print every step; change nothing")
+    parser.add_argument("--dry-run", action="store_true", help="go through every step; change nothing")
     keep = "leave a failed first install in place, to look at it, instead of removing it"
     parser.add_argument("--keep-on-failure", action="store_true", help=keep)
+    parser.add_argument("--verbose", action="store_true", help="print every detail the log keeps")
     args = parser.parse_args(argv)
-    if not args.dry_run and (os.geteuid() != 0 or "SUDO_USER" not in os.environ):
-        print("install.py: run it with sudo, as the owner (or add --dry-run)", file=sys.stderr)
+    root = os.geteuid() == 0 and "SUDO_USER" in os.environ
+    if not args.dry_run and not root:
+        print("Run it with sudo, as yourself (or add --dry-run).", file=sys.stderr)
         return 2
-    host: Host = DryHost() if args.dry_run else RealHost()
     owner = RealHost().account(os.environ.get("SUDO_USER") or getpass.getuser())
     if owner is None:
-        print("install.py: the owner's account cannot be read", file=sys.stderr)
+        print(f"{PROGRAM}: the owner's account cannot be read", file=sys.stderr)
         return 2
     if not args.dry_run and sealed.STAGE not in os.environ:
         return from_commit(args.commit, owner.name, argv)
+    if root:
+        journal = Journal.create(layout.LOGS, "install", group=owner.groups[0], verbose=args.verbose)
+    else:
+        journal = Journal(verbose=True)  # a dry run as the owner keeps no log: what it would do is its whole point
+    host: Host = LookingHost(journal) if args.dry_run else RealHost(journal)
     ctx = job(host, Places.system(), owner, args.repo, args.commit, parse_changes(args.set), args.healthchecks)
+    verb = "Reinstalling" if not ctx.first else "Installing"
+    journal.screen(f"{'Dry run: ' if args.dry_run else ''}{verb} the factory at {(ctx.sha or ctx.commit)[:12]}"
+                   f"{f': {ctx.subject}' if ctx.subject else ''}")  # fmt: skip
     problem: str | None = "interrupted"
     try:
         problem = perform(ctx, keep=args.keep_on_failure)
     finally:
-        sealed.finish(host, ctx.stage, kept=problem is not None and args.keep_on_failure)
+        # A real host even for a dry run: the copy a dry run ran from was made for real.
+        sealed.finish(RealHost(journal), ctx.stage, kept=problem is not None and args.keep_on_failure)
+    if problem is None:
+        found = steps_wire.dashboard_address(host)
+        journal.screen("The dry run finished. Nothing changed." if args.dry_run else
+                       f"The factory is installed.{f' Open the dashboard: {found}' if found else ''}")  # fmt: skip
+    if journal.path:
+        journal.screen(journal.where())
     return 0 if problem is None else 1
 
 

@@ -1,7 +1,7 @@
 'use strict';
 /* Spend: plan limits with reset time and age (warning colours near the limit, unknown when stale), the stacked chart
    with square joins and the budget on the axis, ranges and slices with an unknown price. */
-const {drive, ready} = require('./lib.cjs');
+const {drive, settle} = require('./lib.cjs');
 
 drive('spend', async t => {
   const p = await t.open(1440, 900, 'spend');
@@ -16,17 +16,17 @@ drive('spend', async t => {
   t.check(tickX === budX, 'budget label not in line with the axis labels');
   t.check((await p.textContent('.hero-num')).includes('2 calls with unknown price'), 'unknown-price calls not said');
   await t.shot(p, 'spend-1440.png');
-  await p.click('[data-range="7"]'); await p.waitForTimeout(500);
+  await p.click('[data-range="7"]'); await settle(p);
   t.check((await p.textContent('.hero-num .label')) === 'Last 7 days' && (await p.$$eval(`${svg} clipPath`, els => els.length)) === 7, 'range 7 not drawn');
-  await p.click('[data-range="1"]'); await p.waitForTimeout(500);
+  await p.click('[data-range="1"]'); await settle(p);
   t.check((await p.textContent('.hero-num .label')) === 'Today', 'range Today not drawn');
   // agents that spent in the last 14 days fill more than one page
-  await p.click('[data-range="14"]'); await p.waitForTimeout(500);
-  await p.click('[data-slice="agent"]'); await p.waitForTimeout(500);
+  await p.click('[data-range="14"]'); await settle(p);
+  await p.click('[data-slice="agent"]'); await settle(p);
   t.check((await p.$$('.bars .bar-row')).length === 25 && await p.$('[data-more="slice"]'), 'agent slice first page wrong');
-  await p.click('[data-more="slice"]'); await p.waitForTimeout(500);
+  await p.click('[data-more="slice"]'); await settle(p);
   t.check((await p.$$('.bars .bar-row')).length > 25, 'slice Show more failed');
-  await p.click('[data-slice="model"]'); await p.waitForTimeout(500);
+  await p.click('[data-slice="model"]'); await settle(p);
   t.check((await p.textContent('.bars')).includes('unknown'), 'a model with no price is not shown as unknown');
   await p.close();
   await t.srv.set({scenario: 'near-limit'});

@@ -3,7 +3,8 @@
 It never touches the warden's own registry. Drills that need a permitted session see a drill view instead: a
 temporary public/ holding the warden's published settings and switches and a registry of drill sessions only,
 mounted over the real public/ for that one command. Two drill worktrees and their branches are added to the product
-checkout for the drills and removed afterwards.
+checkout for the drills and removed afterwards; any an earlier, stopped install left are removed first. Sessions run
+side by side, so what they share (the drill registry, the numbering of their logs) is changed under one lock.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import os
 import shutil
 import socket
 import subprocess
+import threading
 import time
 import uuid
 from collections.abc import Iterator
@@ -86,11 +88,14 @@ class RealRig:
         stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
         self.log_dir = ctx.owner.home / ".cache" / "software-factory" / "drills" / stamp
         self.logged = 0
+        self.lock = threading.Lock()
 
     # setting up and tearing down
 
     def open(self) -> None:
         host, repo = self.ctx.host, str(self.ctx.checkout())
+        self._remove_worktrees()
+        host.query(["git", "-C", repo, "worktree", "prune"], user=AGENT_USER)
         shutil.rmtree(layout.DRILLS, ignore_errors=True)
         layout.DRILLS.mkdir(mode=0o755)
         agent = host.account(AGENT_USER)
@@ -123,14 +128,21 @@ class RealRig:
         deadline = time.monotonic() + self.timeout
         while not path.is_file():
             if time.monotonic() > deadline:
-                raise refuse(f"the warden has not published {path}: is it running?")
+                self.ctx.host.say(f"the warden has not published {path}")
+                raise refuse(
+                    "The warden did not start, so the safety checks cannot run: install again; if it stops "
+                    "here again, the log says why"
+                )
             time.sleep(1)
 
-    def close(self) -> None:
+    def _remove_worktrees(self) -> None:
         host, repo = self.ctx.host, str(self.ctx.checkout())
         for worktree, branch in ((self.worktree_a, self.branch_a), (self.worktree_b, self.branch_b)):
             host.query(["git", "-C", repo, "worktree", "remove", "--force", str(worktree)], user=AGENT_USER)
             host.query(["git", "-C", repo, "branch", "-D", branch], user=AGENT_USER)
+
+    def close(self) -> None:
+        self._remove_worktrees()
         shutil.rmtree(layout.DRILLS, ignore_errors=True)
         if self.log_dir.exists():
             owner = self.ctx.owner
@@ -187,8 +199,9 @@ class RealRig:
         listed = "\n".join(f"Command {n}: {command}" for n, command in enumerate(commands, 1))
         prompt = PROMPT.format(commands[0]) if len(commands) == 1 else STEPS.format(listed)
         sid = str(uuid.uuid4())
-        self.sessions[sid] = _session(sid, f"{_DRILL_NAME}-{sid[:8]}", self.worktree_a)
-        registry.write(self.view, self.sessions)
+        with self.lock:
+            self.sessions[sid] = _session(sid, f"{_DRILL_NAME}-{sid[:8]}", self.worktree_a)
+            registry.write(self.view, dict(self.sessions))
         body = session_settings.render(self.settings, self.places, "implementer", self.worktree_a, layout.AGENT_HOME)
         for key, value in (extra or {}).items():
             body[key] = {**body.get(key, {}), **value}
@@ -210,12 +223,14 @@ class RealRig:
         return layout.DRILLS / "debug" / f"{sid}.txt"
 
     def _log(self, prompt: str, ran: Ran, debug: Path) -> None:
-        self.logged += 1
+        with self.lock:
+            self.logged += 1
+            number = self.logged
         self.log_dir.mkdir(parents=True, exist_ok=True)
-        path = self.log_dir / f"{self.logged:02d}-session.txt"
+        path = self.log_dir / f"{number:02d}-session.txt"
         path.write_text(f"# asked\n{prompt}\n# exit {ran.code}\n{ran.out}", encoding="utf-8")
         if debug.is_file():
-            shutil.copyfile(debug, self.log_dir / f"{self.logged:02d}-debug.txt")
+            shutil.copyfile(debug, self.log_dir / f"{number:02d}-debug.txt")
 
     def exists(self, path: Path) -> bool:
         return path.exists()

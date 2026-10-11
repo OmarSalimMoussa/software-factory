@@ -46,6 +46,9 @@ UV_ENV = {"UV_PYTHON_INSTALL_DIR": str(TOOLCHAIN_PYTHON), "UV_PYTHON_DOWNLOADS":
 # Where each install and console runs from: a sealed, root-owned and read-only copy of one commit, in a folder of its
 # own named <sha>-<random>, removed when it ends.
 STAGE_ROOT = Path("/var/lib/software-factory-stage")
+# Where each install and uninstall keeps its log: every command, its output and how long it took. Root writes it; the
+# owner's group reads it.
+LOGS = Path("/var/log/software-factory")
 # The one PATH the installer and the console run with, and every command they run as root.
 ROOT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -73,6 +76,7 @@ SERVICES_UNIT = "software-services.service"
 
 PACKAGES = ("bubblewrap", "socat", "uidmap", "nftables", "apparmor-utils")
 ROOTLESS_SETUP = "dockerd-rootless-setuptool.sh"
+ROOTLESS_EXTRAS = "docker-ce-rootless-extras"  # the package of Docker's own that brings it
 CLAUDE_TOKEN = "claude-token"  # the credential name the agent units load the sign-in token under
 
 

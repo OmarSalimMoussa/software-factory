@@ -49,7 +49,7 @@ def _call(url: str, key: str, body: dict[str, Any] | None, timeout: int) -> dict
 def create(ctx: Install) -> None:
     host = ctx.host
     if not ctx.healthchecks:
-        host.say("  skipped: run the install with --healthchecks to create them")
+        host.say("skipped: run the install with --healthchecks to create them")
         return
     settings = ctx.need_settings()
     key = host.ask(
@@ -60,14 +60,18 @@ def create(ctx: Install) -> None:
     pings: dict[str, str] = {}
     for name, (timeout, grace) in periods(settings).items():
         if host.dry:
-            host.say(f"  would create the check '{name}' ({timeout} s, grace {grace} s)")
+            host.say(f"would create the check '{name}' ({timeout} s, grace {grace} s)")
             continue
         body = {"name": f"software factory: {name}", "timeout": timeout, "grace": grace, "unique": ["name"],
                 "channels": "*"}  # fmt: skip
         try:
             pings[name] = str(_call(API, key, body, settings.get_int("watch.http_timeout_seconds"))["ping_url"])
         except (OSError, ValueError, KeyError) as exc:
-            raise refuse(f"Healthchecks.io refused the {name} check ({type(exc).__name__}): check the API key") from exc
+            host.say(f"Healthchecks.io refused the {name} check: {type(exc).__name__}: {exc}")
+            raise refuse(
+                "Healthchecks.io did not take the API key: make a read-write key in your project's settings, "
+                "then install again"
+            ) from exc
     record = {"api_key": key, "pings": pings, "checks": {n: url.rsplit("/", 1)[-1] for n, url in pings.items()}}
     host.write(keys_path(ctx.places.state), json.dumps(record) + "\n", mode=0o600, owner=WARDEN_USER)
 

@@ -20,6 +20,7 @@ import sys
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
@@ -94,10 +95,14 @@ class Live:
         self.switches: dict[str, Any] = {}
         self.warden: FakeWarden | None = None
         self.roots: list[Path] = []
+        self.timers: list[threading.Timer] = []
         self.app = self.fresh()
 
     def remove(self, *_: Any) -> None:
-        """The drive stops the server with SIGTERM: every seeded folder goes with it."""
+        """The drive stops the server with SIGTERM: every seeded folder goes, once no stand-in still writes to it."""
+        for timer in self.timers:
+            timer.cancel()
+            timer.join()
         self.warden = None
         for root in self.roots:
             shutil.rmtree(root, ignore_errors=True)
@@ -141,9 +146,14 @@ class Live:
     def on_event(self, kind: str, data: dict[str, Any]) -> None:
         """The orchestrator's part: a free proposal place is filled from the reserve, then with nothing else."""
         if kind == "proposal-slot-free":
-            threading.Timer(REFILL_SECONDS, self.refill, args=(self.places,)).start()
+            self.later(REFILL_SECONDS, self.refill)
         if kind == "paused":
-            threading.Timer(0.3, self.benched, args=(self.places,)).start()
+            self.later(0.3, self.benched)
+
+    def later(self, seconds: float, stand_in: Callable[[Any], None]) -> None:
+        timer = threading.Timer(seconds, stand_in, args=(self.places,))
+        self.timers.append(timer)
+        timer.start()
 
     def benched(self, places: Any) -> None:
         """The crash watch's part: once the grace is over, each paused session's bench is finished."""

@@ -1,6 +1,7 @@
 'use strict';
 /* Shared by the dashboard drives: Playwright core, headless Chrome, a fresh live server per drive, and small checks.
-   PLAYWRIGHT_CORE and CHROME override where they are found; SHOTS names a folder for screenshots. */
+   PLAYWRIGHT_CORE and CHROME override where they are found; SHOTS names a folder for screenshots; CPU_SLOWDOWN runs
+   every page's CPU that many times slower, as on a slow runner. */
 const path = require('path'), fs = require('fs'), os = require('os'), {spawn} = require('child_process');
 
 function playwright() {
@@ -49,7 +50,9 @@ async function drive(name, fn, start = liveServer) {
     open: async (width, height, hash = 'home', {admit = true} = {}) => {
       const ctx = await browser.newContext({viewport: {width, height}});
       if (admit) await ctx.addCookies([{name: 'owner', value: '1', url: srv.url}]);
+      await ctx.addInitScript(countRequests);
       const p = await ctx.newPage();
+      if (process.env.CPU_SLOWDOWN) await (await ctx.newCDPSession(p)).send('Emulation.setCPUThrottlingRate', {rate: Number(process.env.CPU_SLOWDOWN)});
       const tag = `${width}`;
       p.on('pageerror', e => errors.push(`${tag} pageerror: ${e.message}`));
       p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(`${tag} console: ${m.text()}`); });
@@ -68,12 +71,66 @@ async function drive(name, fn, start = liveServer) {
   console.log(`${name}: ${errors.length ? '\n  ' + errors.join('\n  ') : 'NO_ERRORS'}`);
   if (errors.length) process.exitCode = 1;
 }
-/* A page is ready once its data is drawn: no loading line, and the live indicator past "Connecting". */
+/* Runs in each page before its own scripts: counts the requests the page has not yet acted on. A request counts until
+   its answer is read (if the page reads it) and every reaction to it has run, so a request that the reaction starts
+   is counted before the first one stops counting. */
+function countRequests() {
+  let open = 0;
+  const send = window.fetch, close = () => setTimeout(() => { open--; }, 0);
+  window.fetch = (...args) => {
+    open++;
+    return send(...args).then(res => {
+      const read = res.json.bind(res);
+      let reading = false;
+      res.json = () => { reading = true; return read().finally(close); };
+      setTimeout(() => { if (!reading) open--; }, 0);
+      return res;
+    }, e => { close(); throw e; });
+  };
+  Object.defineProperty(window, 'openRequests', {get: () => open});
+}
+/* The page is still: no request open and nothing moving for three frames in a row. A motion that never ends (a
+   spinner) or only changes colour (a row's wash) does not count. */
+async function settle(p) {
+  await p.waitForFunction(token => {
+    const moves = a => {
+      const props = a instanceof CSSTransition ? [a.transitionProperty] : a.effect.getKeyframes().flatMap(k => Object.keys(k));
+      return props.some(x => !/^(offset|easing|composite|computedOffset)$|color|background|shadow/i.test(x));
+    };
+    const moving = document.getAnimations().some(a => a.playState === 'running' && a.effect.getComputedTiming().endTime !== Infinity && moves(a));
+    if (window.stillToken !== token) Object.assign(window, {stillToken: token, stillFrames: 0});
+    window.stillFrames = window.openRequests || moving ? 0 : window.stillFrames + 1;
+    return window.stillFrames >= 3;
+  }, Math.random(), {polling: 'raf', timeout: 15000});
+}
+/* A page is ready once its data is drawn and it is still: something drawn and no loading line, the live indicator past
+   "Connecting", no request open. A tab or filter keeps the old view drawn while its own loads: the open request is
+   what tells them apart. */
 async function ready(p) {
-  await p.waitForFunction(() => document.querySelector('#page') && !document.querySelector('#page .loading') && document.querySelector('#live-text').textContent !== 'Connecting', null, {timeout: 8000});
-  await p.waitForTimeout(80);
+  await p.waitForFunction(() => document.querySelector('#page').childElementCount && !document.querySelector('#page .loading') && document.querySelector('#live-text').textContent !== 'Connecting' && window.openRequests === 0, null, {timeout: 15000});
+  await settle(p);
+}
+/* Whether the page reaches a state within a few seconds: for a state that arrives on the server's own time, or one
+   that shows only for a moment. */
+const until = (p, fn, arg) => p.waitForFunction(fn, arg, {timeout: 8000}).then(() => true, () => false);
+/* One edge or size of an element, read on every frame while act runs and the page settles (null while it is absent):
+   the in-between steps of a motion. The page's motion plays ten times slower meanwhile, so a starved machine that
+   draws few frames still draws some of them mid-way. */
+async function frames(p, sel, side, act) {
+  const cdp = await p.context().newCDPSession(p);
+  await cdp.send('Animation.enable'); await cdp.send('Animation.setPlaybackRate', {playbackRate: 0.1});
+  await p.evaluate(([sel, side]) => {
+    const log = window.frameLog = [];
+    const read = () => { const el = document.querySelector(sel); log.push(el ? el.getBoundingClientRect()[side] : null); window.frameTick = requestAnimationFrame(read); };
+    read();
+  }, [sel, side]);
+  await act();
+  await settle(p);
+  const log = await p.evaluate(() => { cancelAnimationFrame(window.frameTick); return window.frameLog; });
+  await cdp.send('Animation.setPlaybackRate', {playbackRate: 1}); await cdp.detach();
+  return log;
 }
 const heights = (p, sel) => p.$$eval(sel, els => els.map(e => Math.round(e.getBoundingClientRect().height)));
 const texts = (p, sel) => p.$$eval(sel, els => els.map(e => e.textContent.trim()));
 
-module.exports = {drive, ready, heights, texts, consoleServer};
+module.exports = {drive, ready, settle, until, frames, heights, texts, consoleServer};

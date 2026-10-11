@@ -1,7 +1,7 @@
 'use strict';
 /* Settings: a control for each kind, changed rows with "was", Undo and Reset to default, the save bar, the coded save
    with its steps, Change repo sending the path (and refused while running), a conflict from another device. */
-const {drive, ready, texts} = require('./lib.cjs');
+const {drive, settle, until, texts} = require('./lib.cjs');
 
 drive('settings', async t => {
   const p = await t.open(1440, 900, 'settings');
@@ -28,34 +28,34 @@ drive('settings', async t => {
   for (let i = 0; i < 6; i++) await p.click('[data-step="1"][data-key="caps.designers"]');
   t.check(await p.inputValue('[data-setn="caps.designers"]') === '4', 'stepper went past its range');
   await t.shot(p, 'settings-changed-1440.png');
-  await p.click('[data-action="discard"]'); await p.waitForTimeout(400);
+  await p.click('[data-action="discard"]'); await settle(p);
   t.check(!(await p.$eval('#savebar', e => e.classList.contains('show'))), 'savebar still shows after Discard');
   // save: the review lists each change, the code, the steps, then the audit
   await p.click('[data-row="models.intake"] [data-ddbtn]'); await p.click('[data-ddopt][data-ddkind="model"][data-ddkey="models.intake"][data-v="Haiku 5.5"]');
   await p.click('[data-step="1"][data-key="caps.designers"]');
-  await p.click('[data-action="review"]'); await p.waitForTimeout(400);
+  await p.click('[data-action="review"]'); await settle(p);
   t.check((await p.textContent('#sheet-body .changes')).includes('Sonnet 5.5 · medium → Haiku 5.5 · medium'), 'review does not list the change');
-  await t.code(p); await p.waitForTimeout(400);
-  t.check((await p.textContent('#sheet-title')) === 'Saving settings' && await p.$('.steps li'), 'no save steps');
+  await t.code(p);
+  t.check(await until(p, () => document.querySelector('#sheet-title').textContent === 'Saving settings' && document.querySelector('.steps li')), 'no save steps');
   await p.waitForFunction(() => document.querySelector('.audit') && document.querySelector('.audit').textContent.includes('Haiku 5.5'), null, {timeout: 8000}).catch(() => t.errors.push('audit did not record the save'));
   const save = (await t.srv.calls()).filter(c => c.method === 'POST' && c.path === '/api/settings').at(-1);
   t.check(save && JSON.stringify(save.body.changes) === '{"models.intake":{"model":"Haiku 5.5","effort":"medium"},"caps.designers":3}', 'save sent: ' + JSON.stringify(save && save.body.changes));
   t.check(!(await p.$eval('#savebar', e => e.classList.contains('show'))), 'savebar still shows after saving');
   // Change repo sends the path; the factory refuses while it runs, and says why (it is not a wrong code)
-  await p.click('[data-action="change-repo"]'); await p.waitForTimeout(400);
-  await p.fill('#repo-path', '/srv/products/other-app'); await t.code(p); await p.waitForTimeout(500);
+  await p.click('[data-action="change-repo"]'); await settle(p);
+  await p.fill('#repo-path', '/srv/products/other-app'); await t.code(p); await settle(p);
   t.check((await p.textContent('#code-note')).includes('Stop the factory first'), 'repo refusal not shown: ' + await p.textContent('#code-note'));
   const repo = (await t.srv.calls()).filter(c => c.method === 'POST' && c.path === '/api/settings/repo').at(-1); t.check(repo && repo.body.path === '/srv/products/other-app', 'repo path not sent');
-  await p.keyboard.press('Escape'); await p.waitForTimeout(350);
+  await p.keyboard.press('Escape'); await settle(p);
   // an edit made against a value another device then changed is dropped, and the owner is told
   await p.click('[data-step="1"][data-key="rounds.qa"]');
   await t.srv.set({saved: {'rounds.qa': 6}});
-  await p.evaluate(() => loadPage()); await p.waitForTimeout(500);
+  await p.evaluate(() => loadPage()); await settle(p);
   t.check(await p.inputValue('[data-setn="rounds.qa"]') === '6', 'the conflicting edit was kept');
   t.check((await p.textContent('#toasts')).includes('changed on another device'), 'no conflict toast');
   await p.close();
   const m = await t.open(390, 844, 'settings');
-  await m.click('[data-step="1"][data-key="caps.designers"]'); await m.waitForTimeout(350);
+  await m.click('[data-step="1"][data-key="caps.designers"]'); await settle(m);
   await t.wide(m, '390 settings');
   const [sb, nav] = await m.evaluate(() => [document.querySelector('#savebar').getBoundingClientRect().bottom, document.querySelector('#bottomnav').getBoundingClientRect().top]);
   t.check(sb <= nav, 'phone: the save bar sits under the bottom bar');

@@ -1,9 +1,10 @@
-"""The installer's only hands on the machine. Every step acts through a Host, so a dry run prints what each step
+"""The installer's only hands on the machine. Every step acts through a Host, so a dry run says what each step
 would do and changes nothing: the same step functions run against a DryHost.
 
 A real Host runs as root. Its commands as root run with the one fixed PATH; commands as another user go through
 ``runuser`` with nothing but that user's home, runtime folder and session bus, so a user's own tools (git, uv,
-systemctl --user) see their own configuration and nothing of the installer's.
+systemctl --user) see their own configuration and nothing of the installer's. What a host does goes to its journal:
+the owner sees phases and questions, and every command with its output goes to the log.
 """
 
 from __future__ import annotations
@@ -14,15 +15,17 @@ import os
 import pwd
 import shutil
 import subprocess
-import sys
 import tempfile
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from runtime.system import layout
+from runtime.system import layout, qr
+from runtime.system.background import Answered, Pending, Running, shown
+from runtime.system.journal import Journal
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,33 +66,53 @@ class CommandError(Exception):
 
 class Host(ABC):
     dry: bool
+    journal: Journal
 
     def say(self, text: str) -> None:
-        print(text, flush=True)
+        """A detail line: the log's, never the owner's main view."""
+        self.journal.line(text.strip())
 
-    # What the owner sees of a run beyond its lines: on the command line, more lines; the console draws each its way.
+    def tell(self, text: str) -> None:
+        """A plain sentence the owner should read."""
+        self.journal.note(text)
+
+    def phase(self, number: int, title: str) -> None:
+        self.journal.phase(title)
 
     def step(self, number: int, title: str) -> None:
-        self.say(f"{number:>2}. {title}")
+        self.journal.activity(title)
 
-    def fail(self, program: str, problem: str) -> None:
-        print(f"{program}: {problem}", file=sys.stderr, flush=True)
+    def fail(self, problem: str) -> None:
+        self.journal.failed(problem)
+
+    def done(self) -> None:
+        self.journal.summary()
 
     def show_code(self, secret: str, link: str) -> None:
-        """The 6-digit code's secret, handed to the owner once."""
-        self.say("  Add this to your authenticator app. It is shown once, now:")
-        self.say(f"    {link}")
+        """The 6-digit code's secret, handed to the owner once: a QR code to scan, and the key to type instead."""
+        screen = self.journal.screen
+        screen("")
+        screen("Scan this with your authenticator app for the 6-digit code. It is shown once, now:")
+        for line in qr.half_blocks(qr.matrix(link)):
+            screen(f"  {line}")
+        screen(f"Or type this key into the app: {secret}")
+        screen("")
+        self.journal.line("the 6-digit code's secret was shown")
 
     def show_key(self, key: DeployKey) -> None:
-        access = "with write access" if key.write else "read-only"
-        self.say(f"  Add this as a deploy key to {key.repo}, {access}. {key.why}")
-        self.say(f"    {key.public}")
+        screen, kind = self.journal.screen, "a deploy key with write access" if key.write else "a read-only deploy key"
+        screen("")
+        screen(f"Add this key to {key.repo} on GitHub, as {kind}. {key.why}")
+        screen(f"  {key.public}")
         if key.private:
-            self.say(f"  Save the lines below, unchanged, as {key.ci_repo}'s secret {key.secret}. Shown once, now:")
-            self.say(key.private)
+            screen(f"Then save the lines below, unchanged, as {key.ci_repo}'s Actions secret {key.secret}. They are "
+                   "shown once, now:")  # fmt: skip
+            screen(key.private)
+        screen("")
+        self.journal.line(f"the key for {key.repo} was shown to add by hand")
 
     def show_folder(self, label: str, folder: Path) -> None:
-        self.say(f"  {label}: {folder}")
+        self.journal.line(f"{label}: {folder}")
 
     @abstractmethod
     def run(
@@ -100,8 +123,9 @@ class Host(ABC):
         cwd: Path | None = None,
         stdin: str | None = None,
         env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
     ) -> str:
-        """Run a command that changes the machine; its output, or CommandError."""  # fmt: skip
+        """Run a command that changes the machine; its output, or CommandError (exit 124 past ``timeout`` seconds)."""
 
     @abstractmethod
     def query(self, argv: list[str], *, user: str = "", cwd: Path | None = None) -> tuple[int, str]:
@@ -110,6 +134,10 @@ class Host(ABC):
     @abstractmethod
     def runner(self, user: str, env: Mapping[str, str]) -> Runner:
         """Commands as ``user`` for code that reads each exit code itself; each is printed as it runs."""
+
+    @abstractmethod
+    def background(self, argv: list[str], *, user: str, env: Mapping[str, str]) -> Pending:
+        """Start a command as ``user`` and return at once; its output goes to the log once it is waited for."""
 
     @abstractmethod
     def pipe(self, source: list[str], user: str, sink: list[str]) -> None:
@@ -140,6 +168,10 @@ class Host(ABC):
     def ask(self, prompt: str, *, secret: bool, hint: str, link: str) -> str:
         """The owner's answer; ``hint`` says in one line what to give, ``link`` is where it is made ("" for none)."""
 
+    @abstractmethod
+    def confirm(self, title: str, text: str, *, yes: str, no: str) -> bool:
+        """Whether the owner did what ``text`` asks (``yes``), or chose ``no``."""
+
 
 def as_user(account: Account, argv: list[str], env: Mapping[str, str] | None) -> list[str]:
     """``argv`` run by root as ``account``, with that user's home, runtime folder and session bus."""
@@ -164,6 +196,9 @@ def user_env(account: Account) -> dict[str, str]:
 class RealHost(Host):
     dry = False
 
+    def __init__(self, journal: Journal | None = None) -> None:
+        self.journal = journal or Journal()
+
     def _spawn(self, argv: list[str], user: str, env: Mapping[str, str] | None) -> tuple[list[str], dict[str, str]]:
         """The command line and the environment it starts with: as root, this process's own with the fixed PATH; as
         another user, ``runuser`` starts it with only what ``as_user`` declares."""
@@ -175,37 +210,69 @@ class RealHost(Host):
             raise CommandError(argv, -1, f"there is no user {user}")
         return as_user(account, argv, env), root
 
+    @staticmethod
+    def _started(command: list[str], **how: Any) -> subprocess.CompletedProcess[str]:
+        """``command`` run to its end; a program that is not there ends as the shell's 127 would, never raises."""
+        try:
+            done: subprocess.CompletedProcess[str] = subprocess.run(command, text=True, capture_output=True,
+                                                                    check=False, **how)  # fmt: skip
+        except FileNotFoundError as exc:
+            return subprocess.CompletedProcess(command, 127, "", f"cannot start {command[0]}: {exc.strerror}")
+        return done
+
     def run(
         self, argv: list[str], *, user: str = "", cwd: Path | None = None, stdin: str | None = None,
-        env: Mapping[str, str] | None = None,
+        env: Mapping[str, str] | None = None, timeout: float | None = None,
     ) -> str:  # fmt: skip
-        self.say(f"  run: {' '.join(argv)[:160]}" + (f" (as {user})" if user else ""))
         command, environ = self._spawn(argv, user, env)
-        done = subprocess.run(command, cwd=cwd, input=stdin, text=True, capture_output=True, check=False, env=environ)
+        began = time.monotonic()
+        # Without input of its own, a command reads nothing: never the owner's terminal.
+        feed: dict[str, Any] = {"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}
+        try:
+            done = self._started(command, cwd=cwd, env=environ, timeout=timeout, **feed)
+        except subprocess.TimeoutExpired as exc:
+            said = "".join(part if isinstance(part, str) else part.decode(errors="replace")
+                           for part in (exc.stdout, exc.stderr) if part)  # fmt: skip
+            self.journal.command(shown(argv), user, 124, said + f"\n(stopped after {timeout} s)", timeout or 0)
+            raise CommandError(argv, 124, said) from exc
+        self.journal.command(shown(argv), user, done.returncode, done.stdout + done.stderr, time.monotonic() - began)
         if done.returncode != 0:
             raise CommandError(argv, done.returncode, done.stdout + done.stderr)
-        return done.stdout
+        return str(done.stdout)
 
     def query(self, argv: list[str], *, user: str = "", cwd: Path | None = None) -> tuple[int, str]:
-        command, environ = self._spawn(argv, user, None)
-        done = subprocess.run(command, cwd=cwd, text=True, capture_output=True, check=False, env=environ)
+        try:
+            command, environ = self._spawn(argv, user, None)
+        # telemetry: expected — a user the install has not made yet, as a dry run on a new machine finds
+        except CommandError as exc:
+            self.journal.command(shown(argv), user, exc.code, exc.output, 0)
+            return exc.code, exc.output
+        began = time.monotonic()
+        done = self._started(command, cwd=cwd, env=environ, stdin=subprocess.DEVNULL)
+        self.journal.command(shown(argv), user, done.returncode, done.stdout + done.stderr, time.monotonic() - began)
         return done.returncode, done.stdout + done.stderr
 
     def runner(self, user: str, env: Mapping[str, str]) -> Runner:
         def run(argv: list[str], stdin: str | None) -> subprocess.CompletedProcess[str]:
-            self.say(f"  run: {' '.join(argv)[:160]} (as {user})")
-            # Without input of its own, a command reads nothing: never the owner's terminal.
             feed: dict[str, Any] = {"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}
             command, environ = self._spawn(argv, user, env)
-            done = subprocess.run(command, text=True, capture_output=True, check=False, env=environ, **feed)
+            began = time.monotonic()
+            done = self._started(command, env=environ, **feed)
+            # What these commands print is the shared services' keys and tokens: the log keeps only how they ended.
+            self.journal.command(shown(argv), user, done.returncode, "(output not kept: it holds keys)",
+                                 time.monotonic() - began)  # fmt: skip
             return subprocess.CompletedProcess(argv, done.returncode, done.stdout, done.stderr)
 
         return run
 
+    def background(self, argv: list[str], *, user: str, env: Mapping[str, str]) -> Pending:
+        command, environ = self._spawn(argv, user, env)
+        return Running(self.journal, argv, user, command, environ)
+
     def pipe(self, source: list[str], user: str, sink: list[str]) -> None:
-        self.say(f"  run: {' '.join(source)[:120]} (as {user}) | {' '.join(sink)[:120]}")
         made, made_env = self._spawn(source, user, None)
         taken, taken_env = self._spawn(sink, "", None)
+        began = time.monotonic()
         # The source's errors go to a file, not a pipe: a full pipe would stall it while the sink waits for its end.
         with tempfile.TemporaryFile() as errors:
             producer = subprocess.Popen(made, env=made_env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -218,6 +285,8 @@ class RealHost(Host):
                 code = producer.wait()
             errors.seek(0)
             said = (errors.read() + done.stdout + done.stderr).decode(errors="replace")
+        self.journal.command([*shown(source), "|", *shown(sink)], user, done.returncode or code, said,
+                             time.monotonic() - began)  # fmt: skip
         if done.returncode != 0:
             raise CommandError(sink, done.returncode, said)
         if code != 0:
@@ -235,7 +304,7 @@ class RealHost(Host):
         except BaseException:
             Path(tmp).unlink(missing_ok=True)
             raise
-        self.say(f"  wrote {path}")
+        self.say(f"wrote {path} ({mode:o}, {owner}:{group or owner})")
 
     def mkdir(self, path: Path, *, mode: int, owner: str = "root", group: str = "") -> None:
         path.mkdir(parents=True, exist_ok=True)
@@ -247,9 +316,12 @@ class RealHost(Host):
             shutil.rmtree(path)
         else:
             path.unlink(missing_ok=True)
+        self.say(f"removed {path}")
 
     def copy_tree(self, source: Path, dest: Path) -> None:
+        began = time.monotonic()
         shutil.copytree(source, dest, symlinks=True, ignore=shutil.ignore_patterns("__pycache__", ".git"))
+        self.say(f"copied {source} to {dest} in {time.monotonic() - began:.1f} s")
 
     def exists(self, path: Path) -> bool:
         return path.exists()
@@ -268,11 +340,20 @@ class RealHost(Host):
         return Account(name, entry.pw_uid, entry.pw_gid, Path(entry.pw_dir), (primary, *groups))
 
     def ask(self, prompt: str, *, secret: bool, hint: str, link: str) -> str:
+        self.journal.screen("")
         for line in (hint, link):
             if line:
-                self.say(f"  {line}")
+                self.journal.screen(line)
+        self.journal.line(f"asked: {prompt.strip()}")
         answer = getpass.getpass(prompt) if secret else input(prompt)
         return answer.strip()
+
+    def confirm(self, title: str, text: str, *, yes: str, no: str) -> bool:
+        self.journal.screen("")
+        self.journal.screen(f"{title}. {text}")
+        self.journal.line(f"asked: {title}")
+        answer = input(f"Press Enter once you have ({yes}), or type no ({no}): ")
+        return answer.strip().lower() not in ("n", "no")
 
 
 @dataclass
@@ -286,14 +367,15 @@ class DryHost(Host):
     answers: dict[str, tuple[int, str]] = field(default_factory=dict)
     actions: list[str] = field(default_factory=list)
     dry: bool = True
+    journal: Journal = field(default_factory=Journal)
 
     def _do(self, text: str) -> None:
         self.actions.append(text)
-        self.say(f"  would {text}")
+        self.say(f"would {text}")
 
     def run(
         self, argv: list[str], *, user: str = "", cwd: Path | None = None, stdin: str | None = None,
-        env: Mapping[str, str] | None = None,
+        env: Mapping[str, str] | None = None, timeout: float | None = None,
     ) -> str:  # fmt: skip
         self._do(f"run: {' '.join(argv)}" + (f" (as {user})" if user else ""))
         return self.answers.get(" ".join(argv), (0, ""))[1]
@@ -308,6 +390,10 @@ class DryHost(Host):
             return subprocess.CompletedProcess(argv, code, out, "")
 
         return run
+
+    def background(self, argv: list[str], *, user: str, env: Mapping[str, str]) -> Pending:
+        self._do(f"start in the background: {' '.join(argv)} (as {user})")
+        return Answered(self.answers.get(" ".join(argv), (0, "")))
 
     def pipe(self, source: list[str], user: str, sink: list[str]) -> None:
         self._do(f"run: {' '.join(source)} (as {user}) | {' '.join(sink)}")
@@ -338,3 +424,7 @@ class DryHost(Host):
     def ask(self, prompt: str, *, secret: bool, hint: str, link: str) -> str:
         self._do(f"ask the owner: {prompt.strip()}")
         return "<answer>"
+
+    def confirm(self, title: str, text: str, *, yes: str, no: str) -> bool:
+        self._do(f"ask the owner: {title}")
+        return False

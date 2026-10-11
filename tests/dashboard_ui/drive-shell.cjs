@@ -1,6 +1,6 @@
 'use strict';
 /* The shell: every page draws at 1440, 1024 and 390 with no sideways scroll; preferences, keyboard, hints, the More sheet. */
-const {drive, ready} = require('./lib.cjs');
+const {drive, ready, settle} = require('./lib.cjs');
 
 drive('shell', async t => {
   const PAGES = ['home', 'work', 'agents', 'spend', 'library', 'settings', 'reflect', 'guard'];
@@ -29,13 +29,13 @@ drive('shell', async t => {
   // keyboard: g then a letter
   await p.keyboard.press('g'); await p.keyboard.press('s'); await ready(p);
   t.check(await p.evaluate(() => location.hash) === '#spend', 'g s did not open Spend');
-  await p.click('#prefs-btn'); await p.click('[data-action="help"]'); await p.waitForTimeout(350);
+  await p.click('#prefs-btn'); await p.click('[data-action="help"]'); await settle(p);
   t.check((await p.textContent('#sheet-title')) === 'Keyboard shortcuts', 'no shortcuts sheet');
-  await p.keyboard.press('Escape'); await p.waitForTimeout(350);
+  await p.keyboard.press('Escape'); await settle(p);
   // every hint on Settings opens inside its column, with no sideways scroll
   await p.click('#sidenav [data-go="settings"]'); await ready(p);
   for (const hb of (await p.$$('.hint-btn')).slice(0, 30)) {
-    await hb.click(); await p.waitForTimeout(20);
+    await hb.click(); await settle(p);
     const [pl, pr, ml, mr] = await p.evaluate(() => { const pop = document.querySelector('.hint-pop:not([hidden])'), m = document.querySelector('#main').getBoundingClientRect(); const r = pop.getBoundingClientRect(); return [r.left, r.right, m.left, m.right]; });
     if (pl < ml || pr > mr) t.errors.push(`hint outside its column: ${pl}-${pr} vs ${ml}-${mr}`);
     await t.wide(p, 'hint open'); await p.keyboard.press('Escape');
@@ -47,7 +47,7 @@ drive('shell', async t => {
   t.check(!(await m.isVisible('#sidenav')), 'phone: sidebar shows');
   for (const pg of ['work', 'agents', 'spend', 'home']) { await m.click(`#bottomnav [data-go="${pg}"]`); await ready(m); await t.wide(m, '390 ' + pg); await t.shot(m, `${pg}-390.png`); }
   for (const pg of ['library', 'settings', 'reflect', 'guard']) {
-    await m.click('#bottomnav [data-go="more"]'); await m.waitForTimeout(350);
+    await m.click('#bottomnav [data-go="more"]'); await settle(m);
     await m.click(`#sheet [data-go="${pg}"]`); await ready(m); await t.wide(m, '390 ' + pg); await t.shot(m, `${pg}-390.png`);
   }
   await m.click('.hint-btn'); await t.wide(m, '390 hint');

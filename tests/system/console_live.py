@@ -23,7 +23,7 @@ from system_fakes import FACTORY_ORIGIN, FIXTURE, PASSING, PRODUCT_ORIGIN, ci_an
 
 from runtime.shared.paths import Places  # noqa: E402
 from runtime.system.console import serve  # noqa: E402
-from runtime.system.console_app import Console, Hosts  # noqa: E402
+from runtime.system.console_app import Choices, Console, Hosts  # noqa: E402
 from runtime.system.console_run import ConsoleDryHost, Run  # noqa: E402
 from runtime.system.host import Account, DryHost, Host  # noqa: E402
 from runtime.system.job import REPO_ROOT  # noqa: E402
@@ -61,7 +61,8 @@ def main() -> int:
         return True
 
     console = Console(Places.under(root / "machine"), owner, reader, Hosts(refuse_real, dry), open_for_owner,
-                      commit=None, repo=product)  # fmt: skip
+                      commit=None, repo=product, source=None, logs=root / "logs", log_group="",
+                      choices=Choices())  # fmt: skip
     server = serve(console, 10)
 
     def stop(*_: Any) -> None:

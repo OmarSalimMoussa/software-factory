@@ -19,14 +19,20 @@ Claude agents, holds the code to one standard set of checks, ships to staging, a
   the laptop.
 
 Set up the product's server first, from the owner's laptop: `python3 -m standard.server.setup --product <path>`
-([docs/server.md](docs/server.md)). Then install, reinstall or uninstall with the install console (owner only):
-`sudo python3 runtime/system/console.py --repo <path> [--commit <sha>]` opens a page in your browser. An install takes
-only a commit the factory's own CI passed: the console and the installer check it on GitHub with your signed-in `gh`,
-and nothing is tested on your machine. Both run from a sealed copy of that commit: root-owned, read-only, and removed
-when they end. The page shows whether the factory is installed and answering and whether CI passed on the commit, runs
-a dry run or the real install step by step, asks for each secret in place, and uninstalls only after showing what it
-removes. The command lines do the same: `sudo python3 runtime/system/install.py --commit <sha> --repo <path>` (add
-`--dry-run` to change nothing) and `sudo python3 runtime/system/uninstall.py`. The install copies the programs the
-product's scripts need (the setting `install.toolchain`) from your PATH, and the Python the product asks for from your
-uv, so the agents and the stack run the same tools you do.
+([docs/server.md](docs/server.md)). Then install the factory from its latest release, with your GitHub CLI signed in:
+
+```
+gh release download --repo OmarSalimMoussa/software-factory --pattern 'software-factory.pyz*' --clobber
+sha256sum -c software-factory.pyz.sha256 && sudo python3 software-factory.pyz --repo <your checkout of the product>
+```
+
+The same two lines update it. The release file is one Python file that the factory's CI publishes only for a commit on
+which every check passed. Run with sudo, it checks itself, unpacks into a sealed, read-only copy and opens the install
+console in your browser: a page that installs, reinstalls or uninstalls the factory as a few phases with a progress
+bar, and asks in place for each secret. `--terminal` installs in the terminal instead, and `--uninstall` removes the
+factory. Every command and its output goes to a log in `/var/log/software-factory/`. The install copies the programs
+the product's scripts need (the setting `install.toolchain`) from your PATH, and the Python the product asks for from
+your uv, so the agents and the stack run the same tools you do. From a checkout of the factory, `runtime/system/` runs
+the same steps for a commit whose CI passed.
+
 How to run it: [docs/operate.md](docs/operate.md). The shape a product must take: [docs/repo-shape.md](docs/repo-shape.md).

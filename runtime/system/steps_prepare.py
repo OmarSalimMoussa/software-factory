@@ -11,10 +11,11 @@ from runtime.shared.models import DEPRIORITIZED, RETIRED
 from runtime.shared.settings import SettingsError, _flatten, build
 from runtime.system import layout
 from runtime.system.host import Host
-from runtime.system.job import Install, github_name, refuse
+from runtime.system.job import Install, github_name, github_origin, refuse
 from runtime.warden import registry
 
-_MACHINE_TOOLS = ("git", "tar", "systemctl", "systemd-run", "runuser", "loginctl", "useradd", "nft", "tailscale")
+# What the owner sets up before an install; the packages step installs the rest (nftables among them).
+_MACHINE_TOOLS = ("git", "tar", "systemctl", "systemd-run", "runuser", "loginctl", "useradd", "tailscale")
 _OWNER_TOOLS = ("uv", "claude")
 # A session in any other state is working, waiting or between the two: reinstalling under it would lose its work.
 _RESTING = (DEPRIORITIZED, RETIRED)
@@ -39,17 +40,22 @@ def check_machine(ctx: Install) -> None:
     for tool in _OWNER_TOOLS:
         code, found = owner_tool(ctx, tool)
         if (code != 0 or not found) and not host.dry:
-            problems.append(f"{tool} is not on {owner}'s PATH")
-    for name, path in (("factory", ctx.factory), ("product", ctx.product)):
+            problems.append(f"{tool} is not installed for you ({owner})")
+    checkouts = {"product": ctx.product} if ctx.factory is None else {"factory": ctx.factory, "product": ctx.product}
+    for name, path in checkouts.items():
         code, out = host.query(["git", "-C", str(path), "remote", "get-url", "origin"], user=owner)
         if code != 0 and not host.dry:
-            problems.append(f"the {name} checkout {path} has no origin remote")
+            problems.append(f"{path} is not a clone of the {name}'s repository on GitHub")
         setattr(ctx, f"{name}_origin", out.strip())
+    if ctx.release is not None:
+        ctx.factory_origin = github_origin(str(ctx.release["repo"]))
     mine, theirs = github_name(ctx.factory_origin), github_name(ctx.product_origin)
-    if ctx.factory.resolve() == ctx.product.resolve() or (mine is not None and mine == theirs):
-        problems.append("--repo is the factory's own repo: the factory never works on itself")
+    if (ctx.factory is not None and ctx.factory.resolve() == ctx.product.resolve()) or (mine and mine == theirs):
+        problems.append("the product checkout you named is the factory's own repository, and the factory never works "
+                        "on itself")  # fmt: skip
     if problems:
-        raise refuse("; ".join(problems))
+        raise refuse(f"This computer is not ready for the factory: {'; '.join(problems)}. Fix that, then install "
+                     "again")  # fmt: skip
 
 
 def refuse_live_sessions(ctx: Install) -> None:
@@ -60,25 +66,31 @@ def refuse_live_sessions(ctx: Install) -> None:
     except PermissionError:
         if not ctx.host.dry:
             raise
-        ctx.host.say("  (a dry run as you cannot read the registry; the install checks it as root)")
+        ctx.host.say("(a dry run as you cannot read the registry; the install checks it as root)")
         return
     live = sorted(s.name for s in sessions.values() if s.state not in _RESTING)
     if live:
-        raise refuse(f"{len(live)} session(s) still working or waiting ({', '.join(live)}): pause the factory first")
+        raise refuse(f"Pause the factory on the dashboard first, then try again: {len(live)} of its agents are still "
+                     f"working or waiting ({', '.join(live)})")  # fmt: skip
 
 
 def sealed_copy(ctx: Install) -> None:
     """The commit is sealed before the first step (runtime/system/sealed.py); a dry run says what would be."""
     host = ctx.host
+    if ctx.release is not None:
+        host.say(f"{ctx.sha[:12]} is sealed from the release built {ctx.release['built']}, root-owned and read-only, "
+                 f"in {ctx.stage}; every step runs from it")  # fmt: skip
+        return
+    git = ["git", "-C", str(ctx.factory)]
     if ctx.stage is not None:
-        host.say(f"  {ctx.sha[:12]} is sealed, root-owned and read-only, in {ctx.stage}; every step runs from it")
+        ctx.subject = host.query([*git, "log", "-1", "--format=%s", ctx.sha, "--"], user=ctx.owner.name)[1].strip()
+        host.say(f"{ctx.sha[:12]} is sealed, root-owned and read-only, in {ctx.stage}; every step runs from it")
         return
     if not host.dry:
         raise refuse("this install does not run from a sealed copy of its commit: start it with install.py")
-    wanted = f"{ctx.commit}^{{commit}}"
-    out = host.query(["git", "-C", str(ctx.factory), "rev-parse", "--verify", wanted], user=ctx.owner.name)[1]
+    out = host.query([*git, "rev-parse", "--verify", f"{ctx.commit}^{{commit}}"], user=ctx.owner.name)[1]
     ctx.sha = out.strip() or f"<sha of {ctx.commit}>"
-    host.say(f"  would archive {ctx.sha[:12]} as {ctx.owner.name}, unpack it as root into a new folder in "
+    host.say(f"would archive {ctx.sha[:12]} as {ctx.owner.name}, unpack it as root into a new folder in "
              f"{layout.STAGE_ROOT}, make it read-only, and run every step from that copy")  # fmt: skip
 
 
@@ -90,12 +102,15 @@ def _saved_overrides(ctx: Install) -> dict[str, Any]:
     except PermissionError:
         if not ctx.host.dry:
             raise
-        ctx.host.say("  (a dry run as you cannot read the saved settings; the install reads them as root)")
+        ctx.host.say("(a dry run as you cannot read the saved settings; the install reads them as root)")
         return {}
     try:
         return _flatten(tomllib.loads(text))
     except tomllib.TOMLDecodeError as exc:
-        raise refuse(f"{ctx.places.overrides} is not TOML ({exc}): fix it by hand, then install again") from exc
+        raise refuse(
+            f"Your saved settings in {ctx.places.overrides} cannot be read ({exc}): fix the file by hand, "
+            "then install again"
+        ) from exc
 
 
 def _effective(defaults: dict[str, Any], overrides: dict[str, Any], key: str) -> Any:
@@ -114,9 +129,15 @@ def _tailnet_name(ctx: Install) -> str | None:
     try:
         name = json.loads(out)["Self"]["DNSName"] if code == 0 else ""
     except (ValueError, KeyError, TypeError) as exc:
-        raise refuse(f"tailscale status names no machine ({type(exc).__name__}): sign in to tailscale") from exc
+        raise refuse(
+            "Tailscale is not signed in on this computer, so the dashboard has no address: sign in to "
+            "Tailscale, then install again"
+        ) from exc
     if not isinstance(name, str) or not name.strip("."):
-        raise refuse("tailscale names no tailnet for this machine: sign in to tailscale, then install again")
+        raise refuse(
+            "Tailscale is not signed in on this computer, so the dashboard has no address: sign in to "
+            "Tailscale, then install again"
+        )
     return name.strip(".")
 
 
@@ -140,10 +161,13 @@ def settle_settings(ctx: Install) -> None:
         ctx.settings = build(defaults, overrides)
     except SettingsError as exc:
         problems = "; ".join(exc.problems)
-        raise refuse(f"the settings cannot be used: {problems} (set each with --set key=value)") from exc
+        raise refuse(
+            f"The settings cannot be used: {problems}. Set each with --set key=value, then install again"
+        ) from exc
     ctx.overrides = overrides
     if not str(ctx.settings.get_str("repo.path")).startswith(f"{layout.AGENT_HOME}/"):
-        raise refuse(f"repo.path must be inside {layout.AGENT_HOME}, the agent user's home")
+        raise refuse(f"The setting repo.path must be a folder inside {layout.AGENT_HOME}, the agents' home: set it "
+                     "with --set repo.path=..., then install again")  # fmt: skip
 
 
 def stop_factory(ctx: Install) -> None:
@@ -152,5 +176,5 @@ def stop_factory(ctx: Install) -> None:
     if running:
         ctx.host.run(["systemctl", "stop", *running])
     else:
-        ctx.host.say("  nothing is installed yet")
+        ctx.host.say("nothing is installed yet")
     refuse_live_sessions(ctx)

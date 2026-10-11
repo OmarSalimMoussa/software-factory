@@ -1,7 +1,9 @@
 """One install: what the owner asked for, and what the steps learn as they run.
 
 The steps fill it in order (the commit's sha, its sealed copy, the settled settings), and each later step asks
-for what it needs through a method that fails loudly when an earlier step did not run.
+for what it needs through a method that fails loudly when an earlier step did not run. The commit comes from the
+owner's checkout of the factory or from a release file; a release names its GitHub repository and holds the factory's
+history, so no checkout of the factory is needed.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ from typing import Any
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
+from runtime.system.background import Pending
 from runtime.system.host import Account, Host
 
 RULE = "install"
@@ -31,18 +34,26 @@ def github_name(url: str) -> str | None:
     return f"{found.group(1)}/{found.group(2)}".lower() if found else None
 
 
+def github_origin(repo: str) -> str:
+    """The address the factory's clone pushes to, for a repository named owner/name."""
+    return f"git@github.com:{repo}.git"
+
+
 @dataclass
 class Install:
     host: Host
     places: Places
-    factory: Path  # the owner's clone of the factory; the commit is sealed from it
+    factory: Path | None  # the owner's clone of the factory the commit is sealed from; None for a release
     product: Path  # the owner's checkout of the product (--repo)
     commit: str
     owner: Account
     changes: dict[str, Any]  # --set key=value, applied over the saved overrides
     healthchecks: bool
     sha: str = ""
+    subject: str = ""  # the commit's first line
     stage: Path | None = None  # the commit's sealed copy, which this install runs from
+    release: dict[str, Any] | None = None  # a release's manifest: its commit, branch and repository
+    bundle: Path | None = None  # the factory's history a release holds
     settings: Settings | None = None
     overrides: dict[str, Any] = field(default_factory=dict)
     first: bool = True  # no earlier install recorded
@@ -51,6 +62,18 @@ class Install:
     factory_origin: str = ""
     tools: dict[str, str] = field(default_factory=dict)  # the owner's uv and claude
     drilled: list[dict[str, object]] = field(default_factory=list)  # each drill's name, verdict and evidence
+    doing: str = ""  # what the running step does, in the owner's words
+    pending: dict[str, Pending] = field(default_factory=dict)  # commands left running for a later step
+
+    def await_pending(self, name: str) -> tuple[int, str]:
+        """The result of the command started for ``name``; a step that needs it calls this."""
+        if name not in self.pending:
+            raise refuse(f"nothing was started for {name} before this step")
+        return self.pending.pop(name).wait()
+
+    def cancel_pending(self) -> None:
+        for name in list(self.pending):
+            self.pending.pop(name).cancel()
 
     def tree(self) -> Path:
         """The factory's files at the commit; a dry run reads the copy it runs from."""

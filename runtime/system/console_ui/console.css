@@ -44,47 +44,47 @@
 .cf-switch input:checked+.sw::after{transform:translateX(14px)}
 .cf-switch input:focus-visible+.sw{outline:2px solid var(--accent);outline-offset:2px}
 
-/* a run */
+/* a run: its phases, a progress bar and the running phase's one line */
 .crun{overflow:hidden}
 .cr-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line)}
 .cr-h b{font-size:14px;overflow-wrap:anywhere;min-width:0}
-.crows{list-style:none;margin:0;padding:0}
-.crow{border-bottom:1px solid var(--line)}
-.crow:last-child{border-bottom:0}
-.crow summary{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:40px;padding:6px 18px;cursor:pointer;list-style:none;color:var(--faint)}
-.crow summary::-webkit-details-marker{display:none}
-.crow summary:hover{background:color-mix(in srgb,var(--sunken) 55%,var(--surface))}
-.crow[data-state="running"] summary{color:var(--fg);font-weight:600}
-.crow[data-state="done"] summary{color:var(--fg)}
-.crow[data-state="done"] .cmark{color:var(--good)}
-.crow[data-state="failed"] summary{color:var(--bad);font-weight:600}
+.cr-h .btn{margin-left:auto}
+.cprog{padding:14px 18px 4px;display:flex;flex-direction:column;gap:8px}
+.cbar{height:8px;border-radius:4px;background:var(--sunken);overflow:hidden}
+.cbar i{display:block;height:100%;width:0;background:var(--accent);border-radius:4px;transition:width .4s ease}
+.cdoing{font-size:13px;color:var(--muted);min-height:20px;overflow-wrap:anywhere}
+.cdoing:empty{display:none}
+.cphases{list-style:none;margin:0;padding:6px 0}
+.cphase{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:36px;padding:4px 18px;color:var(--faint)}
+.cphase[data-state="running"]{color:var(--fg);font-weight:600}
+.cphase[data-state="done"]{color:var(--fg)}
+.cphase[data-state="done"] .cmark{color:var(--good)}
+.cphase[data-state="failed"]{color:var(--bad);font-weight:600}
 .cmark{display:grid;place-items:center;width:20px;height:20px}
 .ct{overflow-wrap:anywhere}
 .cs{font-size:12px;color:var(--muted);font-weight:500}
-.cout{margin:0 18px 12px 48px;padding:10px 12px;background:var(--sunken);border-radius:8px;font:12px/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto}
-.cout:empty{display:none}
-.cgroup{padding:10px 18px;background:var(--sunken);font-size:11.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
-.cq-slot{padding:0 18px 14px 48px}
-#q-top{padding:14px 18px 0}
-.cq-slot:empty,#q-top:empty{display:none}
+#q-top{padding:10px 18px 4px}
+#q-top:empty{display:none}
 .cq{padding:14px 16px;display:flex;flex-direction:column;gap:10px;border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:0 0 0 3px var(--accent-soft)}
 .cq-t{display:flex;align-items:center;gap:8px;color:var(--accent)}
 .cq-t b{color:var(--fg);overflow-wrap:anywhere}
 .cq-x{margin:0;color:var(--muted)}
+.cqr{width:200px;height:200px;max-width:100%;border-radius:8px;align-self:flex-start;shape-rendering:crispEdges}
 .cbox{display:flex;flex-direction:column;gap:4px}
 .cbox-l{font-size:12px;font-weight:600;color:var(--muted)}
 .cbox-v{display:flex;align-items:flex-start;gap:8px}
 .cbox-v code{flex:1;min-width:0;padding:7px 10px;background:var(--sunken);border-radius:7px;font-size:12px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;max-height:160px;overflow:auto}
 .cq-a,.cq-links{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.cnotes{padding:10px 18px;font:12px/1.5 var(--mono);color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;border-top:1px solid var(--line)}
+.cnotes{padding:10px 18px;font-size:13px;color:var(--muted);white-space:pre-line;overflow-wrap:anywhere;border-top:1px solid var(--line)}
 .cnotes:empty{display:none}
 .cend{padding:14px 18px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
 .cend p{margin:0}
 .ce-h{display:flex;align-items:center;gap:8px;font-size:14px}
 .cend.good .ce-h .icon{color:var(--good)}
 .cend.bad .ce-h .icon{color:var(--bad)}
-.ce-d{color:var(--bad);overflow-wrap:anywhere}
+.ce-d{color:var(--bad);overflow-wrap:anywhere;white-space:pre-line}
 .ce-n{color:var(--muted)}
+.ce-l{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
 
 /* uninstall */
 .cun{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
@@ -93,8 +93,6 @@
 @media (max-width:760px){
   .solo .page{padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
   .cfacts,.csvc{grid-template-columns:minmax(0,1fr)}
-  .cout{margin-left:18px}
-  .cq-slot{padding-left:18px}
   .cf-foot .btn,.cun .btn{flex:1 1 100%}
   .cun p{flex-basis:100%}
 }

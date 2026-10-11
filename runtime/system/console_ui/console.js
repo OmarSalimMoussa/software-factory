@@ -1,6 +1,7 @@
 'use strict';
 /* The install console's page. It draws what the console sends and sends back what the owner does: every sentence comes
-   from the console. A run is redrawn in place as it moves, so an open fold or a half-typed answer is never lost. */
+   from the console. A run is its phases, a progress bar and the running phase's one line, never a command or its
+   output; it is redrawn in place as it moves, so a half-typed answer is never lost. */
 
 const POLL_MS = 800, IDLE_MS = 15000, TIMEOUT_MS = 10000;
 const $ = (s, el = document) => el.querySelector(s);
@@ -76,8 +77,8 @@ function renderForm(f) {
           ${c.value ? `<div class="cf-commit"><b class="mono">${esc(c.short)}</b> ${esc(c.subject)}<span class="help">${esc(c.note)}</span></div>` : ''}
           ${c.problem ? `<div class="cnote bad">${esc(c.problem)}</div>` : ''}<div class="cf-ci" id="f-ci" hidden></div></div>
         <div class="cf-row"><label class="cf-l" for="f-repo">${esc(f.repo.label)}</label><input class="cf-in mono" id="f-repo" autocomplete="off" spellcheck="false" value="${esc(f.repo.value)}"><span class="help">${esc(f.repo.hint)}</span></div>
-        <div class="cf-checks">${['healthchecks', 'keep'].map(k => `<label class="cf-check"><input type="checkbox" id="f-${k}"><span><b>${esc(f[k].label)}</b><span class="help">${esc(f[k].hint)}</span></span></label>`).join('')}</div>
-        <div class="cf-foot"><label class="cf-switch"><input type="checkbox" role="switch" id="f-dry"><span class="sw"></span><span><b>${esc(f.dry.label)}</b><span class="help">${esc(f.dry.hint)}</span></span></label>
+        <div class="cf-checks">${['healthchecks', 'keep'].map(k => `<label class="cf-check"><input type="checkbox" id="f-${k}"${f[k].checked ? ' checked' : ''}><span><b>${esc(f[k].label)}</b><span class="help">${esc(f[k].hint)}</span></span></label>`).join('')}</div>
+        <div class="cf-foot"><label class="cf-switch"><input type="checkbox" role="switch" id="f-dry"${f.dry.checked ? ' checked' : ''}><span class="sw"></span><span><b>${esc(f.dry.label)}</b><span class="help">${esc(f.dry.hint)}</span></span></label>
           <button class="btn primary" data-action="install" id="f-go"></button></div>
       </div>`;
     $('#f-dry').addEventListener('change', () => labelGo());
@@ -105,7 +106,7 @@ function renderUninstall(u) {
   }
 }
 
-/* ---------- a run: its rows, the question it waits on, and how it ended ---------- */
+/* ---------- a run: its phases, the question it waits on, and how it ended ---------- */
 const MARK = {waiting: () => '<span class="dot ring"></span>', running: () => '<span class="spin"></span>', done: () => icon('check', 'sm'), failed: () => icon('x-mark', 'sm')};
 function renderRun(run) {
   const sec = $('#run-sec');
@@ -114,45 +115,45 @@ function renderRun(run) {
   sec.hidden = false;
   if (S.runId !== run.id) {
     S.runId = run.id; S.qkey = null; S.ending = null;
-    $('#run').innerHTML = `<div class="cr-h"><b id="run-title"></b><span class="chip" id="run-chip"></span><span class="chip warn" id="run-badge"></span></div><div class="cq-slot" id="q-top"></div><ul class="crows" id="rows"></ul><div class="cnotes" id="notes"></div><div id="ending"></div>`;
+    $('#run').innerHTML = `<div class="cr-h"><b id="run-title"></b><span class="chip" id="run-chip"></span><span class="chip warn" id="run-badge"></span><button class="btn sm quiet" data-end="log" id="run-log" hidden></button></div>
+      <div class="cprog"><div class="cbar" role="progressbar" aria-labelledby="run-title" aria-valuemin="0" aria-valuemax="100"><i id="run-bar"></i></div><div class="cdoing" id="run-doing" aria-live="polite"></div></div>
+      <div id="q-top"></div><ol class="cphases" id="phases"></ol><div class="cnotes" id="notes"></div><div id="ending"></div>`;
   }
   $('#run-title').textContent = run.title;
   const chip = $('#run-chip'); chip.className = `chip ${run.chip.tone}`; chip.textContent = run.chip.text;
   const badge = $('#run-badge'); badge.textContent = run.badge; badge.hidden = !run.badge;
-  const ul = $('#rows');
-  run.rows.forEach((r, i) => {
-    let li = ul.querySelector(`[data-i="${i}"]`);
+  const logBtn = $('#run-log'); logBtn.hidden = !run.log; logBtn.innerHTML = run.log ? icon('document-text', 'sm') + esc(run.log) : '';
+  $('#run-bar').style.width = `${run.progress}%`; $('.cbar').setAttribute('aria-valuenow', run.progress);
+  if ($('#run-doing').textContent !== run.activity) $('#run-doing').textContent = run.activity;
+  const ol = $('#phases');
+  run.phases.forEach((ph, i) => {
+    let li = ol.querySelector(`[data-i="${i}"]`);
     if (!li) {
-      if (r.group && (i === 0 || run.rows[i - 1].group !== r.group)) ul.insertAdjacentHTML('beforeend', `<li class="cgroup">${esc(r.group)}</li>`);
-      ul.insertAdjacentHTML('beforeend', `<li class="crow" data-i="${i}"><details${run.open ? ' open' : ''}><summary><span class="cmark"></span><span class="ct"></span><span class="cs"></span></summary><pre class="cout"></pre></details><div class="cq-slot"></div></li>`);
-      li = ul.lastElementChild;
-      $('.ct', li).textContent = r.title;
+      ol.insertAdjacentHTML('beforeend', `<li class="cphase" data-i="${i}"><span class="cmark"></span><span class="ct"></span><span class="cs"></span></li>`);
+      li = ol.lastElementChild; $('.ct', li).textContent = ph.title;
     }
-    if (li.dataset.state !== r.state) {
-      if (r.state === 'failed') $('details', li).open = true;
-      li.dataset.state = r.state; $('.cmark', li).innerHTML = MARK[r.state](); $('.cs', li).textContent = r.state_text;
-    }
-    const out = $('.cout', li), text = r.lines.join('\n');
-    if (out.textContent !== text) out.textContent = text;
+    if (li.dataset.state !== ph.state) { li.dataset.state = ph.state; $('.cmark', li).innerHTML = MARK[ph.state](); $('.cs', li).textContent = ph.state_text; }
   });
   const notes = run.notes.join('\n');
   if ($('#notes').textContent !== notes) $('#notes').textContent = notes;
-  renderQuestion(run.question, ul);
+  renderQuestion(run.question);
   renderEnding(run.ending);
 }
 
-function renderQuestion(q, ul) {
+/* A QR code the console drew as one path, on a light ground whatever the theme, so any phone scans it. */
+const qrCode = c => `<svg class="cqr" viewBox="0 0 ${c.size} ${c.size}" role="img" aria-label="${esc(c.label)}"><rect width="${c.size}" height="${c.size}" fill="#fff"/><path fill="#000" d="${esc(c.path)}"/></svg>`;
+
+function renderQuestion(q) {
   const key = q && q.id !== S.answered ? q.id + '|' + q.note : null;
   if (key === S.qkey) return;
   S.qkey = key;
   $$('.cq').forEach(e => e.remove());
   if (!key) return;
-  const running = ul.querySelector('.crow[data-state="running"] .cq-slot') || $('#q-top');
   const field = q.field ? `<input id="q-in" class="cf-in" type="${q.field.type === 'password' ? 'password' : 'text'}" aria-labelledby="q-title" autocomplete="off" spellcheck="false">` : '';
   const links = q.links.filter(l => safeUrl(l.url)).map(l => `<a class="btn sm quiet" href="${esc(l.url)}" target="_blank" rel="noopener">${icon('arrow-top-right-on-square', 'sm')}${esc(l.label)}</a>`).join('');
-  running.innerHTML = `<div class="cq card" data-q="${esc(q.id)}" role="group" aria-labelledby="q-title">
+  $('#q-top').innerHTML = `<div class="cq card" data-q="${esc(q.id)}" role="group" aria-labelledby="q-title">
     <div class="cq-t">${icon('lock-closed', 'sm')}<b id="q-title">${esc(q.title)}</b></div>
-    ${q.text ? `<p class="cq-x">${esc(q.text)}</p>` : ''}
+    ${q.text ? `<p class="cq-x">${esc(q.text)}</p>` : ''}${q.qr ? qrCode(q.qr) : ''}
     ${q.boxes.map((b, j) => `<div class="cbox"><div class="cbox-l">${esc(b.label)}</div><div class="cbox-v"><code class="mono">${esc(b.value)}</code><button class="btn sm" data-copy="${j}">${esc(b.copy)}</button></div></div>`).join('')}
     ${field}${links ? `<div class="cq-links">${links}</div>` : ''}${q.note ? `<div class="cnote bad">${esc(q.note)}</div>` : ''}
     <div class="cq-a">${q.actions.map(a => `<button class="btn ${esc(a.tone)}" data-answer="${esc(a.id)}">${esc(a.label)}</button>`).join('')}</div></div>`;
@@ -163,7 +164,7 @@ async function answer(action) {
   const q = S.run && S.run.question; if (!q) return;
   const input = $('#q-in'), value = input ? input.value : '';
   if (input) input.value = '';
-  S.answered = q.id; renderQuestion(null, $('#rows'));
+  S.answered = q.id; renderQuestion(null);
   const r = await send('/api/answer', {id: q.id, action, value});
   if (!r.ok) { S.answered = null; S.qkey = null; }
   tick();
@@ -178,7 +179,7 @@ function renderEnding(e) {
   const links = e.links.filter(l => safeUrl(l.url)).map(l => `<a class="btn primary" href="${esc(l.url)}" target="_blank" rel="noopener">${icon('arrow-top-right-on-square', 'sm')}${esc(l.label)}</a>`).join('');
   el.innerHTML = `<div class="cend ${e.ok ? 'good' : 'bad'}"><div class="ce-h">${icon(e.ok ? 'check' : 'exclamation-triangle')}<b>${esc(e.headline)}</b></div>
     ${e.detail ? `<p class="ce-d">${esc(e.detail)}</p>` : ''}${e.next ? `<p class="ce-n">${esc(e.next)}</p>` : ''}
-    ${e.folder ? `<div class="cbox-v"><code class="mono">${esc(e.folder)}</code></div>` : ''}
+    ${e.log ? `<p class="ce-l">${esc(e.log)}</p>` : ''}
     <div class="cq-a">${links}${e.actions.map(a => `<button class="btn ${esc(a.tone)}" data-end="${esc(a.id)}">${esc(a.label)}</button>`).join('')}</div></div>`;
 }
 
@@ -192,7 +193,7 @@ async function look() { if ((await send('/api/uninstall', {confirm: false, repo:
 async function ended(id) {
   if (id === 'dismiss') { if ((await send('/api/dismiss', {})).ok) load(); }
   else if (id === 'uninstall') { if ((await send('/api/uninstall', {confirm: true, repo: ''})).ok) watch(); }
-  else if (id === 'logs') await send('/api/open', {what: 'logs'});
+  else if (id === 'logs' || id === 'log') await send('/api/open', {what: id});
 }
 async function closeConsole() {
   const r = await send('/api/close', {});

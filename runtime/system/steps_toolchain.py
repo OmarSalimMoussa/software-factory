@@ -8,15 +8,19 @@ finds in a folder every unit's PATH already holds stays where it is. The copy re
 
 The Pythons the product asks for (its .python-version, else its requires-python) come too: the owner's uv-managed
 ones, each copied whole into the toolchain's python/, where every unit's uv looks and never downloads another.
+
+A reinstall copies nothing when the plan and every file and folder it copies from are as they were at the last copy:
+their size, time and inode, kept beside the copy, say so.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shlex
 import tomllib
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from runtime.shared.paths import FACTORY_BIN
@@ -42,7 +46,7 @@ def _listing(ctx: Install, argv: list[str], folder: Path) -> list[str]:
     """The names of what ``argv`` lists in ``folder``, one path or name to a line."""
     code, out = ctx.host.query(argv, user=ctx.owner.name)
     if code != 0 and not ctx.host.dry:
-        raise refuse(f"{folder} cannot be listed: {out.strip()[-200:]}")
+        raise refuse(f"Your tools' folder {folder} cannot be read: check it is there, then install again")
     return sorted(Path(line.strip()).name for line in out.splitlines() if line.strip() and not line.endswith("/"))
 
 
@@ -61,21 +65,21 @@ def tool(ctx: Install, name: str, found: str, real: str) -> Tool | None:
     """What to copy of ``name``; None when every unit's PATH finds it already."""
     host, owner = ctx.host, ctx.owner.name
     if not real:
-        host.say(f"  {name}: what {owner}'s PATH finds (a dry run does not look)")
+        host.say(f"{name}: what {owner}'s PATH finds (a dry run does not look)")
         return Tool(name, "", ((f"<{name} on {owner}'s PATH>", name),), (name,))
     if {str(Path(found).parent), str(Path(real).parent)} & set(layout.SYSTEM_PATH):
-        host.say(f"  {name}: {found or real} is on every unit's PATH already; nothing to copy")
+        host.say(f"{name}: {found or real} is on every unit's PATH already; nothing to copy")
         return None
     bin_folder = Path(real).parent
     if bin_folder.name == "bin" and host.exists(bin_folder.parent / "lib"):
         programs = tuple(_listing(ctx, ["ls", "-1Ap", str(bin_folder)], bin_folder))
-        host.say(f"  {name}: the folder {bin_folder.parent}, with {', '.join(programs)}")
+        host.say(f"{name}: the folder {bin_folder.parent}, with {', '.join(programs)}")
         return Tool(name, str(bin_folder.parent), (), programs)
     beside = Path(found or real).parent
     # Files only: a link beside it (another tool's launcher) belongs to something else.
     siblings = _listing(ctx, ["find", str(beside), "-maxdepth", "1", "-type", "f", "-name", f"{name}*"], beside)
     programs = tuple(sorted({name, *siblings}))
-    host.say(f"  {name}: {', '.join(programs)} from {beside}")
+    host.say(f"{name}: {', '.join(programs)} from {beside}")
     return Tool(name, "", tuple((str(beside / p), p) for p in programs), programs)
 
 
@@ -94,9 +98,14 @@ def python_request(product: Path) -> str:
     try:
         declared = tomllib.loads(project.read_text(encoding="utf-8")).get("project", {}).get("requires-python", "")
     except tomllib.TOMLDecodeError as exc:
-        raise refuse(f"{project} is not TOML ({exc})") from exc
+        raise refuse(
+            f"The product's {project.name} cannot be read ({exc}): fix it in the product, then install again"
+        ) from exc
     if not isinstance(declared, str):
-        raise refuse(f"{project}: requires-python must be text")
+        raise refuse(
+            f"The product's {project.name} names its Python in a form uv does not read: fix it in the "
+            "product, then install again"
+        )
     return declared.strip()
 
 
@@ -106,26 +115,29 @@ def _json_line(out: str) -> object:
     try:
         return json.loads(line)
     except ValueError as exc:
-        raise refuse(f"uv listed its Pythons in a form this install cannot read: {out.strip()[-200:]}") from exc
+        raise refuse(
+            "Your uv lists its Pythons in a form this install cannot read: update uv, then install again"
+        ) from exc
 
 
-def pythons(ctx: Install) -> list[Path]:
+def pythons(ctx: Install, *, fetched: bool = False) -> list[Path]:
     """The owner's uv-managed Pythons that answer the product's request, to copy; none when a Python on every unit's
-    PATH answers it already. Refuses when the units could run none."""
+    PATH answers it already. When the owner's uv has none, it fetches one, as the owner would by hand; refuses when
+    the units could still run none."""
     host, owner, uv = ctx.host, ctx.owner.name, ctx.tool("uv")
     request = python_request(ctx.product)
     if not request:
-        host.say("  Python: the product asks for none")
+        host.say("Python: the product asks for none")
         return []
     code, listed = host.query([uv, "python", "list", request, "--only-installed", "--output-format", "json"],
                               user=owner)  # fmt: skip
     if host.dry and not listed:
-        host.say(f"  Python {request}: what {owner}'s uv has installed (a dry run does not look)")
+        host.say(f"Python {request}: what {owner}'s uv has installed (a dry run does not look)")
         return []
     dir_code, dir_out = host.query([uv, "python", "dir"], user=owner)
     managed = next((line.strip() for line in dir_out.splitlines() if line.startswith("/")), "")
     if code != 0 or dir_code != 0 or not managed:
-        raise refuse(f"{owner}'s uv cannot list its Pythons: {(listed + dir_out).strip()[-200:]}")
+        raise refuse("Your uv could not list its Pythons: update uv, then install again")
     found = _json_line(listed)
     entries = found if isinstance(found, list) else [found]
     copies: dict[str, Path] = {}
@@ -133,19 +145,42 @@ def pythons(ctx: Install) -> list[Path]:
     for entry in entries:
         key, path = (entry.get("key"), entry.get("path")) if isinstance(entry, dict) else (None, None)
         if not isinstance(key, str) or not _PYTHON_KEY.match(key) or not isinstance(path, str):
-            raise refuse(f"{owner}'s uv lists a Python this install cannot read: {json.dumps(entry)[:200]}")
+            host.say(f"uv listed a Python this install cannot read: {json.dumps(entry)[:200]}")
+            raise refuse("Your uv lists its Pythons in a form this install cannot read: update uv, then install again")
         if Path(path).is_relative_to(managed):
             copies[key] = Path(managed) / key
         elif str(Path(path).parent) in layout.SYSTEM_PATH:
             reachable.append(path)
     if copies:
-        host.say(f"  Python {request}: {', '.join(sorted(copies))} from {managed}")
+        host.say(f"Python {request}: {', '.join(sorted(copies))} from {managed}")
     elif reachable:
-        host.say(f"  Python {request}: {reachable[0]} is on every unit's PATH already; nothing to copy")
+        host.say(f"Python {request}: {reachable[0]} is on every unit's PATH already; nothing to copy")
+    elif not fetched and not host.dry:
+        host.run([uv, "python", "install", request], user=owner)
+        return pythons(ctx, fetched=True)
     else:
-        raise refuse(f"the product asks for Python {request}, which {owner}'s uv has not installed: run "
-                     f"`uv python install {shlex.quote(request)}` first, then install again")  # fmt: skip
+        raise refuse(f"The product asks for Python {request}, which your uv has not installed: run "
+                     f"uv python install {shlex.quote(request)}, then install again")  # fmt: skip
     return [copies[key] for key in sorted(copies)]
+
+
+def fingerprint(ctx: Install, tools: list[Tool], python_copies: list[Path]) -> str:
+    """What the copy would be made from: the plan, and each source's size, time and inode. "" when a source cannot be
+    looked at, so the copy is made again."""
+    sources = [each.prefix for each in tools if each.prefix] + [src for each in tools for src, _ in each.files]
+    # A program installed into a prefix (npm install -g) changes a folder inside it, never the prefix's own time.
+    inside = ("bin", "lib", "lib/node_modules")
+    sources += [f"{each.prefix}/{inner}" for each in tools if each.prefix for inner in inside
+                if ctx.host.exists(Path(each.prefix) / inner)]  # fmt: skip
+    sources += [str(path) for path in python_copies]
+    code, out = ctx.host.query(["stat", "-L", "-c", "%n %s %Y %i", *sources], user=ctx.owner.name)
+    if code != 0 or ctx.host.dry:
+        return ""
+    plan = {"tools": [asdict(each) for each in tools], "pythons": [str(p) for p in python_copies], "sources": out}
+    return hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()
+
+
+_FINGERPRINT = ".fingerprint"
 
 
 def _place(ctx: Install, tools: list[Tool], python_copies: list[Path]) -> None:
@@ -154,6 +189,10 @@ def _place(ctx: Install, tools: list[Tool], python_copies: list[Path]) -> None:
     for leftover in (fresh, old):
         if host.exists(leftover):
             host.remove(leftover)
+    made = fingerprint(ctx, tools, python_copies)
+    if made and host.exists(home / _FINGERPRINT) and host.read(home / _FINGERPRINT).strip() == made:
+        host.say(f"the toolchain in {home} is as its sources are: kept")
+        return
     host.mkdir(fresh / "bin", mode=0o755)
     python = fresh / layout.TOOLCHAIN_PYTHON.relative_to(home)
     host.mkdir(python, mode=0o755)
@@ -172,6 +211,8 @@ def _place(ctx: Install, tools: list[Tool], python_copies: list[Path]) -> None:
             links = {program: home / each.name / program for program in each.programs}
         for program, target in links.items():
             host.run(["ln", "-s", str(target), str(fresh / "bin" / program)])
+    if made:
+        host.write(fresh / _FINGERPRINT, made + "\n", mode=0o644)
     host.run(["chown", "-R", "-h", "root:root", str(fresh)])
     host.run(["chmod", "-R", "u=rwX,go=rX", str(fresh)])
     if host.exists(home):
@@ -185,12 +226,15 @@ def toolchain(ctx: Install) -> None:
     names = ctx.need_settings().get_list("install.toolchain")
     bad = [str(name) for name in names if not isinstance(name, str) or not _NAME.match(name)]
     if bad:
-        raise refuse(f"install.toolchain names {', '.join(bad)}: each must be a program's name")
+        raise refuse(
+            f"The setting install.toolchain names {', '.join(bad)}, which is not a program's name: fix the "
+            "setting, then install again"
+        )
     located = {name: locate(ctx, name) for name in names}
     missing = [name for name, where in located.items() if where is None]
     if missing:
-        raise refuse(f"{', '.join(missing)}: not on {ctx.owner.name}'s PATH; install each there, or take it out of "
-                     "install.toolchain")  # fmt: skip
+        raise refuse(f"The product needs {', '.join(missing)}, which you do not have installed: install each for "
+                     "yourself, or take it out of the setting install.toolchain, then install again")  # fmt: skip
     tools = []
     for name, where in located.items():
         planned = tool(ctx, name, *where) if where else None
@@ -206,5 +250,8 @@ def toolchain(ctx: Install) -> None:
                 problems.append(f"{owners[program]} and {each.name} both bring a program named {program}")
             owners.setdefault(program, each.name)
     if problems:
-        raise refuse("; ".join(problems))
+        raise refuse(
+            f"The product's tools cannot all be copied: {'; '.join(problems)}. Change the setting "
+            "install.toolchain, then install again"
+        )
     _place(ctx, tools, pythons(ctx))

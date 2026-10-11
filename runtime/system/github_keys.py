@@ -11,7 +11,7 @@ from pathlib import Path
 
 from runtime.system import steps_prepare
 from runtime.system.host import Host
-from runtime.system.job import Install
+from runtime.system.job import Install, github_name
 
 WARDEN_TITLE = "software-factory warden"
 READ_SECRET = "FACTORY_READ_KEY"
@@ -28,6 +28,23 @@ def owner_gh(host: Host, owner: str) -> str:
         return ""
     status, _ = host.query([found, "auth", "status", "--hostname", "github.com"], user=owner)
     return found if status == 0 else ""
+
+
+def default_branch(host: Host, owner: str, checkout: Path) -> str:
+    """The default branch of the GitHub repo ``checkout`` clones: what the checkout knows of it, else what GitHub says
+    with the owner's `gh`; "" when neither knows."""
+    git = ["git", "-C", str(checkout)]
+    code, out = host.query([*git, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], user=owner)
+    branch = out.strip().removeprefix("origin/")
+    if code == 0 and branch:
+        return branch
+    code, origin = host.query([*git, "remote", "get-url", "origin"], user=owner)
+    repo = github_name(origin) if code == 0 else None
+    gh = owner_gh(host, owner) if repo else ""
+    if not gh:
+        return ""
+    code, out = host.query([gh, "api", f"repos/{repo}", "--jq", ".default_branch"], user=owner)
+    return out.strip() if code == 0 else ""
 
 
 def put_deploy_key(ctx: Install, gh: str, repo: str, title: str, public: str, *, write: bool) -> str:

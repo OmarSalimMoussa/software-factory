@@ -4,19 +4,23 @@ hooks, the tailnet, starting it, and the record a finished install leaves."""
 from __future__ import annotations
 
 import json
+import re
 
 from runtime.shared.paths import AGENT_USER, MANAGED_SETTINGS, SCRATCH, SLICE, WARDEN_USER
 from runtime.system import layout, render
+from runtime.system.host import CommandError, Host
 from runtime.system.job import Install, refuse
 
 _HTTPS = 443
+_TAILSCALE_LINK = re.compile(r"https://login\.tailscale\.com/\S+")
 
 
 def managed_settings(ctx: Install) -> None:
     text = render.managed_settings(ctx.places, ctx.need_settings(), ctx.templates())
     host = ctx.host
     if ctx.first and host.exists(MANAGED_SETTINGS) and host.read(MANAGED_SETTINGS) != text:
-        raise refuse(f"{MANAGED_SETTINGS} holds someone else's settings: move it aside, then install again")
+        raise refuse(f"This computer already has Claude Code settings for every user, in {MANAGED_SETTINGS}, and the "
+                     "factory needs that file for its agents: move it aside, then install again")  # fmt: skip
     host.mkdir(MANAGED_SETTINGS.parent, mode=0o755)
     host.write(MANAGED_SETTINGS, text, mode=render.MANAGED.mode)
 
@@ -47,9 +51,13 @@ def firewall(ctx: Install) -> None:
     ctx.host.mkdir(layout.CONFIG, mode=0o755)
     text = render.artifact(render.FIREWALL, ctx.templates(), given)
     ctx.host.write(render.FIREWALL.dest, text, mode=render.FIREWALL.mode)
-    code, out = ctx.host.query(["nft", "-c", "-f", str(render.FIREWALL.dest)])
+    if ctx.host.dry:
+        ctx.host.say("would check the rules with nft before they load")  # a dry run wrote no file to check
+        return
+    code, _ = ctx.host.query(["nft", "-c", "-f", str(render.FIREWALL.dest)])
     if code != 0:
-        raise refuse(f"nft refuses the factory's firewall: {out.strip()[-300:]}")
+        raise refuse("This computer's firewall refuses the factory's rules: install again; if it stops here again, "
+                     "the log says why")  # fmt: skip
 
 
 def factory_command(ctx: Install) -> None:
@@ -73,10 +81,23 @@ def git_hooks(ctx: Install) -> None:
 
 
 def tailnet(ctx: Install) -> None:
-    """Only root may change what the tailnet serves, so no agent can reroute the owner's dashboard."""
-    port = ctx.need_settings().get_int("dashboard.port")
+    """Only root may change what the tailnet serves, so no agent can reroute the owner's dashboard. On a tailnet whose
+    HTTPS is off, tailscale waits for the owner to turn it on at a link it prints: past the wait, the owner is shown
+    that link."""
+    settings = ctx.need_settings()
+    port = settings.get_int("dashboard.port")
     ctx.host.run(["tailscale", "set", "--operator="])
-    ctx.host.run(["tailscale", "serve", "--bg", f"--https={_HTTPS}", f"http://127.0.0.1:{port}"])
+    serve = ["tailscale", "serve", "--yes", "--bg", f"--https={_HTTPS}", f"http://127.0.0.1:{port}"]
+    try:
+        ctx.host.run(serve, timeout=settings.get_int("install.tailnet_seconds"))
+    except CommandError as exc:
+        link = _TAILSCALE_LINK.search(exc.output)
+        if link is None:
+            raise
+        raise refuse(
+            f"Turn on HTTPS for your tailnet, so the dashboard gets its address: open {link.group(0)}, "
+            "approve it, then install again"
+        ) from exc
 
 
 def start(ctx: Install) -> None:
@@ -102,6 +123,18 @@ def record(ctx: Install, drills: list[dict[str, object]]) -> None:
     state, host = ctx.places.state, ctx.host
     host.write(ctx.places.install_hash, install_digest(ctx) + "\n", mode=0o600, owner=WARDEN_USER)
     # The owner's own checkout of the product too: the install console offers it for the next install.
-    body = {"commit": ctx.sha, "drills": drills, "managed_settings": str(MANAGED_SETTINGS), "product": str(ctx.product)}
+    body = {"commit": ctx.sha, "subject": ctx.subject, "drills": drills, "managed_settings": str(MANAGED_SETTINGS),
+            "product": str(ctx.product)}  # fmt: skip
     host.write(layout.install_record(state), json.dumps(body, indent=1) + "\n", mode=0o600, owner=WARDEN_USER)
-    host.say(f"The factory at {ctx.sha[:12]} is installed.")
+    host.say(f"the factory at {ctx.sha[:12]} is installed")
+
+
+def dashboard_address(host: Host) -> str:
+    """The dashboard on the tailnet, where `tailscale serve` publishes it; "" when tailscale names no machine."""
+    code, out = host.query(["tailscale", "status", "--json"])
+    try:
+        name = json.loads(out)["Self"]["DNSName"] if code == 0 else ""
+    # telemetry: surfaced — the owner is shown no address
+    except (ValueError, KeyError, TypeError):
+        return ""
+    return f"https://{name.strip('.')}/" if isinstance(name, str) and name.strip(".") else ""

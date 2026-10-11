@@ -1,9 +1,10 @@
 'use strict';
 /* Runs every dashboard drive, a few at a time, and prints each one's result. Exits non-zero if any drive found a problem.
-   Usage: node tests/dashboard_ui/run.cjs [drive names...] */
+   Usage: node tests/dashboard_ui/run.cjs [drive names...]; DRIVES_AT_ONCE sets how many run at once (3 unless set). */
 const path = require('path'), fs = require('fs'), {spawn} = require('child_process');
 
-const AT_ONCE = 3;
+const AT_ONCE = process.env.DRIVES_AT_ONCE === undefined ? 3 : Number(process.env.DRIVES_AT_ONCE);
+if (!Number.isInteger(AT_ONCE) || AT_ONCE < 1) throw new Error(`DRIVES_AT_ONCE must be a whole number, 1 or more: ${process.env.DRIVES_AT_ONCE}`);
 const all = fs.readdirSync(__dirname).filter(f => /^drive-.*\.cjs$/.test(f)).map(f => f.slice(6, -4)).sort();
 const want = process.argv.slice(2).length ? process.argv.slice(2) : all;
 const run = name => new Promise(resolve => {

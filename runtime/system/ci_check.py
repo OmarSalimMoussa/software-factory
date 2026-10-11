@@ -1,6 +1,6 @@
 """Whether the factory's own CI passed on a commit. An install takes only such a commit, so nothing is tested on the
-machine at install time: the installer and the console ask GitHub for the commit's check runs, with the owner's
-signed-in `gh`.
+machine at install time. A release file needs no question: CI builds one only after every check passed. For a commit
+of the owner's checkout, the installer and the console ask GitHub for its check runs, with the owner's signed-in `gh`.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ PASSED, RUNNING, FAILED, UNKNOWN = "passed", "running", "failed", "unknown"
 _GOOD = frozenset({"success", "skipped", "neutral"})
 # One check run to a line, tab-separated: gh prints a jq string as it is, page after page.
 CHECK_FIELDS = '.check_runs[] | [.name, .status, (.conclusion // ""), (.html_url // "")] | @tsv'
-NO_GH = "the install needs your `gh` signed in to github.com to check the factory's CI: run `gh auth login`, then retry"
+NO_GH = "the install needs your GitHub CLI signed in to check the factory's CI: run `gh auth login`, then install again"
 AGAIN = "Wait for the factory's CI to pass, or fix the commit and push it, then install that commit."
 
 
@@ -99,12 +99,15 @@ def passed(ctx: Install) -> None:
     """The install's step: a commit whose CI has not passed is refused before anything changes. A dry run says what it
     would check."""
     host, short = ctx.host, ctx.sha[:12]
+    if ctx.release is not None:
+        host.say(f"{short} is a release, which CI builds only after every check passed")
+        return
     if host.dry:
         repo = github_name(ctx.factory_origin) or "<the factory's GitHub repo>"
-        host.say(f"  would ask GitHub, with your gh, for every check run of the factory's CI on {short} in {repo}: "
+        host.say(f"would ask GitHub, with your gh, for every check run of the factory's CI on {short} in {repo}: "
                  "each must have passed")  # fmt: skip
         return
     found = verdict(host, ctx.owner.name, ctx.factory_origin, ctx.sha)
     if found.state != PASSED:
         raise refuse(found.refusal())
-    host.say(f"  the factory's CI passed on {short}: {', '.join(check.name for check in found.checks)}")
+    host.say(f"the factory's CI passed on {short}: {', '.join(check.name for check in found.checks)}")

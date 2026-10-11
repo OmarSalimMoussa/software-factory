@@ -293,6 +293,8 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         [
             ("install.drill", "Model the drills use"),
             ("install.drill_seconds", "Longest drill, seconds"),
+            ("install.drills_at_once", "Drill sessions at once"),
+            ("install.tailnet_seconds", "Seconds to publish the dashboard"),
             ("install.hook_timeout_seconds", "Seconds Claude Code waits for the guard"),
             ("install.healthchecks_grace_minutes", "Minutes a check-in may be late"),
             ("install.toolchain", "Programs the product's scripts need"),

@@ -5,46 +5,54 @@ authenticator app set up at install.
 
 ## Install, reinstall and uninstall
 
-An install takes only a commit the factory's own CI passed: GitHub holds at least one check run for it, and every one
-succeeded (or was skipped because it did not apply). So push the commit and wait for its CI first. The installer and
-the console check it with your `gh`, which must be signed in to github.com. Nothing is tested on this machine at
-install time.
-
-Use the install console, from your checkout of the factory:
+Install the factory, or update it, from its latest release. With your GitHub CLI (`gh`) signed in, in any folder:
 
 ```
-sudo python3 runtime/system/console.py --repo <your checkout of the product> [--commit <sha>]
+gh release download --repo OmarSalimMoussa/software-factory --pattern 'software-factory.pyz*' --clobber
+sha256sum -c software-factory.pyz.sha256 && sudo python3 software-factory.pyz --repo <your checkout of the product>
 ```
 
-It takes one commit, the newest on your checkout's default branch unless you name another with `--commit`, and seals
-it: root unpacks the commit into a new folder under `/var/lib/software-factory-stage/`, owned by root and read-only.
-The console and every step it runs read the factory only from that copy, with an environment the console writes out
-in full. So nothing in your checkout's working files or in your shell can change what an install does. The copy is
-removed when the console stops. The console opens a page in your browser and prints the page's link too. The link
-works once, in the browser that opens it.
+The first line downloads the release file and its checksum; the second checks the download, then runs it. The
+factory's CI publishes a release only for a commit on which every check passed, so nothing is tested on this
+computer. `python3 software-factory.pyz --version` says which commit a file holds; `--check` checks it against its
+own manifest. Neither needs sudo.
 
-- **This laptop** says whether the factory is installed, at which commit and since when, how the last drills did,
-  whether the warden, the dashboard, GlitchTip and Langfuse answer, and where the dashboard is on your tailnet.
-- **Install** (or **Reinstall**) installs that commit. Beside it, the page shows the commit's CI: passed, still
-  running or failed, with a link to each check that has not passed. The console refuses to install a commit whose CI
-  has not passed, and names each check to wait for or fix. Turn on **Dry run** to see every step on this machine
-  without changing anything; a dry run says what it would check of CI. Each step is a row; open it to read what it
-  did. A first install that fails takes back what it made, unless you chose to keep it: then the sealed copy it ran
-  from stays beside it after the console stops, for you to look at, and the uninstaller removes it.
-- **Questions** appear under the step that asks: the 6-digit code's secret, shown once with Copy, and your GitHub
-  token and the agents' Claude token, typed into password fields. With your `gh` signed in, the install puts the
-  GitHub keys in place itself; without it, the step's lines show each key to add by hand.
-- **When the drills fail**, Open the drill sessions' output opens the folder with each drill session's whole output.
-- **Uninstall** first shows what it would remove, changing nothing. Remove everything does it.
+Run with sudo, the file checks itself, unpacks the factory into a new sealed copy under
+`/var/lib/software-factory-stage/` (owned by root, read-only, removed when it ends) and opens the install console in
+your browser. It prints the page's link too; the link works once, in the browser that opens it.
+
+- **This laptop** says whether the factory is installed, at which commit and since when, how the last safety checks
+  did, whether the warden, the dashboard, GlitchTip and Langfuse answer, and where the dashboard is on your tailnet.
+- **Install** (or **Reinstall**) installs the release's commit. Turn on **Dry run** to go through every step on this
+  computer without changing anything.
+- **An install** shows a few phases with a progress bar and one line on what it is doing: checking this computer,
+  preparing it, fetching the shared services, connecting your accounts, setting up the factory, starting up, running
+  the safety checks and finishing. It never shows the commands it runs.
+- **Questions** appear as the install reaches them: the 6-digit code's secret as a QR code to scan, with its key to
+  type instead and a Copy button; your GitHub token and the agents' Claude token, typed into password fields. With
+  your `gh` signed in, the install puts the GitHub keys in place itself. When it is not, the install asks you to sign
+  in; if you choose to add the keys yourself, it shows each one with where it goes.
+- **The log** keeps every detail: each command, its output and how long each step took. **Show the log** opens it.
+  Each install and uninstall writes a new one in `/var/log/software-factory/`, readable by you and root.
+- **When it stops**, it says in one sentence what failed and what to do, and where the log is. A first install that
+  fails takes back what it made, unless you chose to keep it. Run it again after a fix: each step finishes what an
+  earlier run left.
+- **Uninstall** first shows what it would remove, changing nothing. Remove everything does it. The logs stay.
 
 One action runs at a time. Close on the page stops the console once no action runs. Ctrl-C in the terminal stops it
 at any time: it first lets a running action end, refusing any question the action still asks, and a second Ctrl-C
 stops at once.
 
-The command lines run the same steps, from a sealed copy in the same way:
-`sudo python3 runtime/system/install.py --commit <sha> --repo <path>`, with `--dry-run`, `--healthchecks`,
-`--keep-on-failure` (which keeps the sealed copy too) or `--set key=value`; and
-`sudo python3 runtime/system/uninstall.py [--repo <path>] [--dry-run]`.
+The same file runs in the terminal instead: `sudo python3 software-factory.pyz --terminal --repo <path>` prints each
+phase with a check mark, asks its questions in the terminal (the QR code too), and with `--verbose` prints every
+detail the log keeps. It takes `--healthchecks`, `--keep-on-failure` (which keeps the sealed copy too),
+`--dry-run` and `--set key=value`, as the console does. `sudo python3 software-factory.pyz --uninstall [--repo
+<path>] [--dry-run]` removes the factory.
+
+From your own checkout of the factory, the same programs run a commit whose CI passed: `sudo python3
+runtime/system/console.py --repo <path> [--commit <sha>]`, `sudo python3 runtime/system/install.py --commit <sha>
+--repo <path>` and `sudo python3 runtime/system/uninstall.py`. They check the commit's CI on GitHub with your `gh`
+first, and seal the commit from your checkout the same way.
 
 ## Start
 
@@ -138,8 +146,8 @@ To act on one:
 
 1. Pause the factory, then stop every agent.
 2. Change the factory's repo by hand: branch, test, merge, push. Wait for the factory's CI to pass on the commit.
-3. Reinstall from that commit with the install console (or `install.py --commit <sha> --repo <path>`). The installer
-   refuses while any factory session is live, and refuses a commit whose CI has not passed.
+3. Download that commit's release and run it, as in "Install, reinstall and uninstall" above (or reinstall from your
+   checkout). The installer refuses while any factory session is live.
 4. Run the server set-up again from that commit (`python3 -m standard.server.setup --product <path>`): a deploy
    refuses a build planned by another factory commit than the server runs.
 5. In the product, move `.github/factory-ref` to that commit, and copy in `templates/ci/` again if it changed.

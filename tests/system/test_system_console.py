@@ -11,10 +11,11 @@ import pytest
 from system_fakes import PASSING, SHA, ci_answers, ci_link, dry_job
 
 from runtime.system import console_page, install, layout, uninstall
-from runtime.system.console_app import Console, Hosts, Reply
+from runtime.system.console_app import Choices, Console, Hosts, Reply
 from runtime.system.console_run import ConsoleDryHost, Run
 from runtime.system.host import CommandError, DryHost, Host
 from runtime.system.job import REPO_ROOT
+from runtime.system.journal import Journal
 
 PORT = 4321
 HOST = f"127.0.0.1:{PORT}"
@@ -23,8 +24,8 @@ SECRET = "sk-ant-oat01-typed-into-the-page-7f7f"
 
 
 def _console(tmp_path: Path, real: Callable[[Run], Host] | None = None,
-             runs: list[tuple[str, str, str]] = PASSING) -> Console:  # fmt: skip
-    """The console offers SHA, whose CI ran ``runs``."""
+             runs: list[tuple[str, str, str]] = PASSING, opened: list[str] | None = None) -> Console:  # fmt: skip
+    """The console offers SHA, whose CI ran ``runs``; what it opens for the owner goes to ``opened``."""
     job = dry_job(tmp_path)
 
     def dry(run: Run) -> Host:
@@ -34,8 +35,14 @@ def _console(tmp_path: Path, real: Callable[[Run], Host] | None = None,
         **ci_answers(REPO_ROOT, SHA, runs),
         f"git -C {REPO_ROOT} log -1 --format=%H%n%h%n%s {SHA} --": (0, f"{SHA}\n{SHA[:7]}\nThe offered commit\n"),
     })  # fmt: skip
-    console = Console(job.places, job.owner, reader, Hosts(real or dry, dry), lambda target: True, commit=SHA,
-                      repo=job.product)  # fmt: skip
+
+    def opener(target: str) -> bool:
+        if opened is not None:
+            opened.append(target)
+        return True
+
+    console = Console(job.places, job.owner, reader, Hosts(real or dry, dry), opener, commit=SHA, repo=job.product,
+                      source=None, logs=tmp_path / "logs", log_group="", choices=Choices())  # fmt: skip
     console.port = PORT
     return console
 
@@ -107,7 +114,8 @@ def test_an_answer_reaches_the_step_that_asked_and_never_the_page_or_the_log(
 ) -> None:
     console = _console(tmp_path)
     cookie = _admit(console)
-    run = Run("install", "asking", True, ("Keep the secrets",), console.owner, "")
+    log = tmp_path / "asking.log"
+    run = Run("install", "asking", True, ("Connecting your accounts",), 1, console.owner, Journal(log, terminal=False))
     console.run = run
     host = ConsoleDryHost(run, {})
     got: list[str] = []
@@ -125,33 +133,38 @@ def test_an_answer_reaches_the_step_that_asked_and_never_the_page_or_the_log(
 
     assert got == [SECRET]
     shown = json.dumps(_run(console, cookie)) + json.dumps(console.page())
-    assert SECRET not in shown + caplog.text + capsys.readouterr().out
+    assert SECRET not in shown + caplog.text + capsys.readouterr().out + log.read_text(encoding="utf-8")
     assert _post(console, cookie, "/api/answer", answer).status == 409  # answered once: only the step holds it
 
 
 def _step(n: int, broken: bool) -> tuple[str, Callable[..., None]]:
     def act(ctx: Any) -> None:
-        ctx.host.say(f"  did {n}")
+        ctx.host.say(f"did {n}")
         if broken:
+            ctx.host.say("$ false")
             raise CommandError(["false"], 1, "it broke")
 
-    return f"Step {n}", act
+    return f"Doing {n}", act
 
 
 @pytest.mark.parametrize(
     ("first", "fails_at", "states", "ending"),
     [
-        (True, None, ["done"] * 5, "The factory at"),
-        (True, 4, ["done", "done", "done", "failed", "waiting", *["done"] * len(uninstall.STEPS)], "taken back"),
-        (False, 4, ["done", "done", "done", "failed", "waiting"], "Fix what it said"),  # a reinstall is never removed
+        (True, None, ["done", "done", "done"], "The factory at"),
+        (True, 4, ["done", "failed", "waiting", "done"], "taken back"),
+        (False, 4, ["done", "failed", "waiting"], "Fix what it said"),  # a reinstall is never removed
     ],
     ids=["finished", "first-install-taken-back", "reinstall-kept"],
 )
-def test_an_install_in_the_console_shows_each_step_in_order_and_a_failures_roll_back(
+def test_an_install_in_the_console_shows_its_phases_never_its_commands_and_a_failures_plain_sentence_and_log(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, first: bool, fails_at: int | None, states: list[str],
     ending: str,
 ) -> None:  # fmt: skip
-    monkeypatch.setattr(install, "STEPS", tuple(_step(n, n == fails_at) for n in range(1, 6)))
+    steps = [_step(n, n == fails_at) for n in range(1, 6)]
+    phases = (install.Phase("First", tuple(steps[:2])), install.Phase("Second", tuple(steps[2:4])),
+              install.Phase("Third", tuple(steps[4:])))  # fmt: skip
+    monkeypatch.setattr(install, "PHASES", phases)
+    monkeypatch.setattr(install, "STEPS", tuple(steps))
     monkeypatch.setattr(install, "FIRST_CHANGE", 3)  # these steps change the machine from the third on
     monkeypatch.setattr(console_page, "address", lambda host: None)
 
@@ -162,7 +175,8 @@ def test_an_install_in_the_console_shows_each_step_in_order_and_a_failures_roll_
             host.paths.add(layout.install_record(console.places.state))
         return host
 
-    console = _console(tmp_path, real)
+    opened: list[str] = []
+    console = _console(tmp_path, real, opened=opened)
     cookie = _admit(console)
     body = {"commit": SHA, "repo": str(console.repo), "healthchecks": False, "keep": False, "dry": False}
 
@@ -170,14 +184,22 @@ def test_an_install_in_the_console_shows_each_step_in_order_and_a_failures_roll_
     _until(lambda: _run(console, cookie)["ending"] is not None)
 
     run = _run(console, cookie)
-    rolled = [row for row in run["rows"] if row["group"]]
-    assert [row["title"] for row in run["rows"]] == [f"Step {n}" for n in range(1, 6)] + [r["title"] for r in rolled]
-    assert [row["title"] for row in rolled] == (list(uninstall.STEPS) if len(states) > 5 else [])
-    assert [row["state"] for row in run["rows"]] == states
-    assert [line for row in run["rows"][:5] for line in row["lines"]][: fails_at or 5] == [
-        f"  did {n}" for n in range(1, (fails_at or 5) + 1)
-    ]
+    rolled = [install.ROLL_BACK] if len(states) > 3 else []
+    assert [phase["title"] for phase in run["phases"]] == ["First", "Second", "Third", *rolled]
+    assert [phase["state"] for phase in run["phases"]] == states
     assert ending in run["ending"]["headline"] + run["ending"]["next"]
+    [log] = (tmp_path / "logs").iterdir()
+    kept = log.read_text(encoding="utf-8")
+    assert all(f"did {n}" in kept for n in range(1, (fails_at or 5) + 1))
+    assert "did " not in json.dumps(run) and "$ false" not in json.dumps(run)
+    if fails_at is None:
+        assert run["progress"] == 100 and [action["id"] for action in run["ending"]["actions"]] == ["dismiss"]
+        return
+    said = "The install could not finish doing 4: a command it ran failed. Run it again; if it stops here again, the "
+    assert run["ending"]["detail"] == said + "log says why."
+    assert run["ending"]["log"] == f"Every detail is in the log: {log}" and run["log"] == "Show the log"
+    assert [action["id"] for action in run["ending"]["actions"]] == ["log", "dismiss"]
+    assert _post(console, cookie, "/api/open", {"what": "log"}).status == 200 and opened == [str(log)]
 
 
 def test_uninstall_removes_only_after_the_owner_saw_what_it_removes(tmp_path: Path) -> None:
@@ -189,7 +211,7 @@ def test_uninstall_removes_only_after_the_owner_saw_what_it_removes(tmp_path: Pa
     _until(lambda: _run(console, cookie)["ending"] is not None)
     look = _run(console, cookie)
 
-    assert look["kind"] == "look" and [row["title"] for row in look["rows"]] == list(uninstall.STEPS)
+    assert look["kind"] == "look" and [phase["title"] for phase in look["phases"]] == list(uninstall.STEPS)
     assert [a["id"] for a in look["ending"]["actions"]] == ["uninstall", "dismiss"]
     assert _post(console, cookie, "/api/uninstall", {"confirm": True, "repo": ""}).status == 200
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 import hmac
 import json
 import logging
-import os
 import secrets
 import threading
 from collections.abc import Callable, Mapping
@@ -20,10 +19,11 @@ from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 from runtime.shared.paths import Places
-from runtime.system import ci_check, console_page, install, sealed, uninstall
+from runtime.system import ci_check, console_page, install, release, sealed, uninstall
 from runtime.system.console_run import Run
 from runtime.system.host import Account, Host
 from runtime.system.job import REPO_ROOT
+from runtime.system.journal import Journal
 
 log = logging.getLogger("factory.console")
 
@@ -32,9 +32,14 @@ UI = Path(__file__).resolve().parent / "console_ui"
 DASHBOARD_UI = REPO_ROOT / "runtime" / "dashboard" / "ui"
 
 
-def factory_checkout() -> Path:
-    """The owner's factory checkout: the one this console's sealed copy came from, when it runs from one."""
-    return Path(os.environ.get(sealed.CHECKOUT, str(REPO_ROOT)))
+@dataclass(frozen=True)
+class Choices:
+    """What the console was started with: the install form's starting choices and the settings each install saves."""
+
+    healthchecks: bool = False
+    keep: bool = False
+    dry: bool = False
+    changes: dict[str, Any] = field(default_factory=dict)
 
 
 FILES = {
@@ -73,10 +78,18 @@ class Hosts:
 
 
 class Console:
+    """``source`` is the sealed copy it runs from (None in a test); ``logs`` is where each action's log goes, readable
+    by ``log_group`` ("" leaves the folder's group alone)."""
+
     def __init__(self, places: Places, owner: Account, reader: Host, hosts: Hosts, opener: Callable[[str], bool], *,
-                 commit: str | None, repo: Path | None) -> None:  # fmt: skip
+                 commit: str | None, repo: Path | None, source: sealed.Staged | None, logs: Path, log_group: str,
+                 choices: Choices) -> None:  # fmt: skip
         self.places, self.owner, self.reader, self.hosts, self.opener = places, owner, reader, hosts, opener
-        self.commit, self.repo = commit, repo
+        self.commit, self.repo, self.source, self.choices = commit, repo, source, choices
+        self.logs, self.log_group = logs, log_group
+        self.release = release.read_manifest(source.release) if source and source.release else None
+        # The owner's factory checkout, for a console that runs from one: its commits and its CI.
+        self.checkout = source.checkout if source and source.checkout else REPO_ROOT
         self.port = 0  # set once the server is bound
         self.stopped = threading.Event()
         self.run: Run | None = None
@@ -187,10 +200,13 @@ class Console:
             "sub": "Install, reinstall or remove the factory on this laptop. Nothing reaches the server.",
             "close": "Close",
             "status_label": "This laptop",
-            "status": console_page.status(self.places, self.reader, self.owner, factory_checkout()),
+            "status": console_page.status(self.places, self.reader),
             "install": console_page.install_form(
-                self.reader, self.owner, factory_checkout(), self.commit, self.repo, record
-            ),  # fmt: skip
+                *self._offer(),
+                self.repo,
+                record,
+                {"healthchecks": self.choices.healthchecks, "keep": self.choices.keep, "dry": self.choices.dry},
+            ),
             "uninstall": {
                 "heading": "Uninstall",
                 "text": "Removes everything the installer made, so the next install starts from a clean machine. It "
@@ -200,6 +216,16 @@ class Console:
             "run": run.view() if run else None,
             "busy": self._busy(),
         }
+
+    def _offer(self) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        """The commit this console installs and its CI: a release's own, or a checkout's, asked of GitHub."""
+        if self.release is not None:
+            return console_page.release_offer(self.release), console_page.RELEASE_CI
+        offered = console_page.checkout_offer(self.reader, self.owner, self.checkout, self.commit)
+        return offered, console_page.checkout_ci(self.reader, self.owner, self.checkout, offered)
+
+    def _journal(self, kind: str) -> Journal:
+        return Journal.create(self.logs, kind, group=self.log_group, verbose=False, terminal=False)
 
     def _busy(self) -> bool:
         run = self.run
@@ -221,27 +247,28 @@ class Console:
             problems.append("Name your product checkout by its full path.")
         if not all(isinstance(flag, bool) for flag in flags.values()):
             problems.append("Each choice is on or off.")
-        staged = os.environ.get(sealed.SHA, "")
+        staged = self.source.sha if self.source else ""
         if isinstance(commit, str) and staged and not staged.startswith(commit.strip()) and commit.strip() != "":
             problems.append(f"This console runs {staged[:12]} and installs only that commit: to install another, "
                             "start the console with --commit <that commit>.")  # fmt: skip
         if problems or not isinstance(commit, str) or not isinstance(repo, str):
             return refused(400, " ".join(problems))
         dry, keep = flags["dry"] is True, flags["keep"] is True
-        if not dry:
-            origin = ci_check.origin(self.reader, self.owner.name, factory_checkout())
+        if not dry and self.release is None:
+            origin = ci_check.origin(self.reader, self.owner.name, self.checkout)
             found = ci_check.verdict(self.reader, self.owner.name, origin, commit.strip())
             if found.state != ci_check.PASSED:
                 return refused(409, console_page.sentence(found.refusal()))
         with self._lock:
             if why := self._refusal():
                 return refused(409, why)
-            steps = tuple(title for title, _ in install.STEPS)
-            run = Run("install", "", dry, steps, self.owner, "Taking back the failed install")
+            phases = tuple(phase.title for phase in install.PHASES)
+            run = Run("install", "", dry, phases, len(install.STEPS), self.owner, self._journal("install"))
             host = (self.hosts.dry if dry else self.hosts.real)(run)
-            ctx = install.job(host, self.places, self.owner, Path(repo.strip()), commit.strip(), {},
-                              flags["healthchecks"] is True)  # fmt: skip
-            run.title = f"{'Dry run: ' if dry else ''}{'Installing' if ctx.first else 'Reinstalling'} {commit.strip()}"
+            ctx = install.job(host, self.places, self.owner, Path(repo.strip()), commit.strip(),
+                              dict(self.choices.changes), flags["healthchecks"] is True)  # fmt: skip
+            verb = "Installing" if ctx.first else "Reinstalling"
+            run.title = f"{'Dry run: ' if dry else ''}{verb} the factory at {commit.strip()[:12]}"
 
             def act() -> dict[str, Any]:
                 problem = install.perform(ctx, keep=keep)
@@ -265,7 +292,8 @@ class Console:
             checkout = self._looked if confirm else (Path(repo) if repo else None)
             self._looked = checkout
             kind, title = ("uninstall", "Uninstalling") if confirm else ("look", "What Uninstall removes")
-            run = Run(kind, title, not confirm, uninstall.STEPS, self.owner, "")
+            run = Run(kind, title, not confirm, uninstall.STEPS, len(uninstall.STEPS), self.owner,
+                      self._journal("uninstall"))  # fmt: skip
             host = (self.hosts.real if confirm else self.hosts.dry)(run)
 
             def act() -> dict[str, Any]:
@@ -282,7 +310,8 @@ class Console:
                 ending, broke = act(), False
             except Exception as exc:
                 log.exception("console: the %s broke (%s)", run.kind, type(exc).__name__)
-                ending, broke = console_page.broken(run.kind, exc), True
+                run.journal.line(f"the console broke: {type(exc).__name__}: {exc}")
+                ending, broke = console_page.broken(run, exc), True
             run.finish(ending, broke=broke)
 
         self._worker = threading.Thread(target=work, name=f"console-{run.kind}", daemon=True)
@@ -300,12 +329,15 @@ class Console:
         return _json(200, {"ok": True}) if why is None else refused(409, why)
 
     def open_folder(self, data: dict[str, Any]) -> Reply:
+        """The run's log, or the folder a step named (the drill sessions' output), in the owner's desktop."""
         with self._lock:
-            folder = self.run.folder if self.run else None
-        if folder is None:
-            return refused(409, "No step named a folder to open.")
-        if not self.opener(str(folder)):
-            return refused(409, f"Your desktop session could not be found: open {folder} yourself.")
+            run = self.run
+        what = data.get("what")
+        target = (run.journal.path if what == "log" else run.folder if what == "logs" else None) if run else None
+        if target is None:
+            return refused(409, "There is nothing of that kind to open.")
+        if not self.opener(str(target)):
+            return refused(409, f"Your desktop session could not be found: open {target} yourself.")
         return _json(200, {"ok": True})
 
     def dismiss(self, data: dict[str, Any]) -> Reply:

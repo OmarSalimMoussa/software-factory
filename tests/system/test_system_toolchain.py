@@ -9,7 +9,7 @@ import pytest
 from system_fakes import dry_job
 
 from runtime.shared.protocol import Refused
-from runtime.system import install
+from runtime.system import install, steps_toolchain
 from runtime.system.host import DryHost
 from runtime.system.job import Install
 
@@ -130,9 +130,9 @@ def test_the_python_the_product_asks_for_is_copied_from_the_owners_uv(
 @pytest.mark.parametrize(
     ("case", "reason"),
     [
-        ("missing", "node: not on owner's PATH"),
+        ("missing", "The product needs node, which you do not have installed"),
         ("shadow", "node brings a program named factory, which would stand in for the factory's"),
-        ("python", "Python 3.14, which owner's uv has not installed: run `uv python install 3.14` first"),
+        ("python", "Python 3.14, which your uv has not installed: run uv python install 3.14, then install again"),
     ],
 )
 def test_a_tool_the_owner_lacks_or_one_that_shadows_the_factory_refuses_the_install(
@@ -151,3 +151,18 @@ def test_a_tool_the_owner_lacks_or_one_that_shadows_the_factory_refuses_the_inst
 
     with pytest.raises(Refused, match=reason):
         install.run(job)
+
+
+def test_a_python_the_owners_uv_lacks_is_fetched_with_it_once_before_the_install_refuses(tmp_path: Path) -> None:
+    job = dry_job(tmp_path)
+    _owners_tools(job, "nvm")
+    assert isinstance(job.host, DryHost)
+    job.host.dry = False  # decides like a real install; a dry host still changes nothing
+    job.tools["uv"] = uv = f"{job.owner.home}/.local/bin/uv"
+    (job.product / ".python-version").write_text("3.14\n")
+    _pythons(job, "3.14")
+
+    with pytest.raises(Refused, match="which your uv has not installed"):
+        steps_toolchain.pythons(job)
+
+    assert [a for a in job.host.actions if "python install" in a] == [f"run: {uv} python install 3.14 (as owner)"]

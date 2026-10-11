@@ -1,6 +1,7 @@
 # The factory's own CI: its tests, lint, format and types, and the dashboard's and the install console's browser
 # drives, on every push. An install takes only a commit on which every job here passed: nothing is tested on the
-# owner's machine.
+# owner's machine. On a push to the default branch, once every check passed, the last job publishes the release file
+# the owner installs from, so a release exists only for a commit that passed.
 name: ci
 
 on:
@@ -46,3 +47,39 @@ jobs:
           python3 --version
           "$CHROME" --version
           node tests/dashboard_ui/run.cjs
+
+  release:
+    needs: [test, drives]
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # One release at a time; a newer push waits, so the newest commit is the latest release.
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      # The whole history: the release carries it, for the warden's clone of the factory.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build the release file
+        env:
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          python3 runtime/system/release.py --commit "$GITHUB_SHA" --branch "$BRANCH" --repo "$GITHUB_REPOSITORY" \
+            --out dist/software-factory.pyz
+          python3 dist/software-factory.pyz --check
+      - name: Publish it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="build-${GITHUB_SHA::12}"
+          files=(dist/software-factory.pyz dist/software-factory.pyz.sha256)
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --clobber
+            gh release edit "$tag" --latest
+          else
+            gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --latest \
+              --title "software-factory ${GITHUB_SHA::12}" --notes "$(git log -1 --format=%s "$GITHUB_SHA")"
+          fi

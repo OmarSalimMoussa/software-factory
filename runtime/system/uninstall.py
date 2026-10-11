@@ -1,13 +1,14 @@
-"""Remove everything the installer made, as root, so the next install starts from a clean machine:
+"""Remove everything the installer made, as root, so the next install starts from a clean machine. The release file
+runs it (``sudo python3 software-factory.pyz --uninstall``); from the owner's clone of the factory it is
 
-    sudo python3 runtime/system/uninstall.py [--dry-run]
+    sudo python3 runtime/system/uninstall.py [--repo <product checkout>] [--dry-run] [--verbose]
 
 It refuses while any session is working or waiting. It stops and removes the factory's units, rules, firewall table,
 AppArmor profile, managed settings, commands and programs, and the sealed copies installs ran from; the warden's state
 (its secrets and the 6-digit code's secret included) and the laptop's shared services with their data; the four
 factory users with their homes (the agents' clone and the stack user's Docker data); and the factory's git hooks
-setting in the owner's checkout. It never removes packages, the owner's own files, or anything on the server or on
-GitHub: it prints what to remove there.
+setting in the owner's checkout. It never removes packages, the owner's own files, the install logs, or anything on
+the server or on GitHub: it says what to remove there. Like the installer, it shows a few phases and logs the rest.
 """
 
 from __future__ import annotations
@@ -26,10 +27,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from runtime.shared import paths, store  # noqa: E402 - the path line above must run first
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER, Places  # noqa: E402
 from runtime.shared.protocol import Refused  # noqa: E402
-from runtime.system import layout, steps_prepare  # noqa: E402
+from runtime.system import layout, sealed, steps_prepare  # noqa: E402
 from runtime.system.github_keys import WARDEN_TITLE  # noqa: E402
 from runtime.system.host import Account, CommandError, DryHost, Host, RealHost  # noqa: E402
 from runtime.system.job import REPO_ROOT, Install  # noqa: E402
+from runtime.system.journal import Journal  # noqa: E402
 
 PROGRAM = "uninstall.py"
 
@@ -42,9 +44,9 @@ HOOKS = str(paths.INSTALL / "checks" / "git-hooks")
 class LookingHost(DryHost):
     """A dry run that looks at this machine: it reads for real and changes nothing."""
 
-    def __init__(self) -> None:
-        super().__init__()
-        self.real = RealHost()
+    def __init__(self, journal: Journal | None = None) -> None:
+        super().__init__(journal=journal or Journal())
+        self.real = RealHost(self.journal)
 
     def exists(self, path: Path) -> bool:
         try:
@@ -60,16 +62,17 @@ class LookingHost(DryHost):
         return self.real.account(name)
 
     def query(self, argv: list[str], *, user: str = "", cwd: Path | None = None) -> tuple[int, str]:
-        return self.real.query(argv, user=user, cwd=cwd)
+        # Started without sudo, a dry run is the owner's own process: a command as the owner runs as it is.
+        mine = bool(user) and os.geteuid() != 0 and user == getpass.getuser()
+        return self.real.query(argv, user="" if mine else user, cwd=cwd)
 
 
 def _try(host: Host, argv: list[str]) -> None:
     """A change whose failure is no reason to stop: a unit already gone, a user with no processes."""
     if host.dry:
-        host.say(f"  would run: {' '.join(argv)}")
+        host.say(f"would run: {' '.join(argv)}")
         return
-    code, out = host.query(argv)
-    host.say(f"  ran: {' '.join(argv)}" + ("" if code == 0 else f" (exit {code}: {out.strip()[-160:]})"))
+    host.query(argv)
 
 
 def stop(host: Host) -> None:
@@ -103,12 +106,17 @@ def system_files(host: Host) -> None:
         if GUARD in host.read(MANAGED_SETTINGS):
             _remove(host, MANAGED_SETTINGS)
         else:
-            host.say(f"  kept {MANAGED_SETTINGS}: it is not the factory's")
+            host.say(f"kept {MANAGED_SETTINGS}: it is not the factory's")
+
+
+def _with_leftovers(path: Path) -> tuple[Path, ...]:
+    """``path`` and what a stopped install may have left half made beside it."""
+    return (path, *(path.with_name(f"{path.name}.{end}") for end in ("new", "old", "partial")))
 
 
 def programs(host: Host, dashboard_port: str) -> None:
-    for path in (paths.FACTORY_BIN, layout.CLAUDE_BIN.parent, paths.INSTALL, layout.TOOLS, layout.TOOLCHAIN,
-                 paths.RUN, layout.DRILLS):  # fmt: skip
+    for path in (paths.FACTORY_BIN, layout.CLAUDE_BIN.parent, *_with_leftovers(paths.INSTALL), layout.TOOLS,
+                 *_with_leftovers(layout.TOOLCHAIN), paths.RUN, layout.DRILLS):  # fmt: skip
         _remove(host, path)
     sealed_copies(host)
     code, served = host.query(["tailscale", "serve", "status"])
@@ -120,7 +128,7 @@ def sealed_copies(host: Host) -> None:
     """Every sealed copy, unless this runs from one (the console, or a first install taking itself back): that copy
     goes when its program ends."""
     if REPO_ROOT.is_relative_to(layout.STAGE_ROOT):
-        host.say(f"  kept {layout.STAGE_ROOT}: this runs from a sealed copy in it, which goes when it ends")
+        host.say(f"kept {layout.STAGE_ROOT}: this runs from a sealed copy in it, which goes when it ends")
         return
     _remove(host, layout.STAGE_ROOT)
 
@@ -134,7 +142,8 @@ def users(host: Host) -> None:
     for user in (AGENT_USER, layout.STACK_USER):
         if host.account(user) is not None:
             host.run(["userdel", "--remove", user])
-        _remove(host, Path("/home") / user)
+        for home in _with_leftovers(Path("/home") / user):
+            _remove(host, home)
     for user in (WARDEN_USER, DASHBOARD_USER):
         if host.account(user) is not None:
             host.run(["userdel", user])
@@ -146,7 +155,8 @@ def users(host: Host) -> None:
 
 def owner_checkout(host: Host, owner: str, repo: Path | None) -> None:
     if repo is None:
-        host.say("  no --repo given: run `git config --unset core.hooksPath` in your checkout if it names the factory")
+        host.tell("Your product checkout was not named, so it may still run the factory's git hooks: run git config "
+                  "--unset core.hooksPath in it.")  # fmt: skip
         return
     code, current = host.query(["git", "-C", str(repo), "config", "--get", "core.hooksPath"], user=owner)
     if code == 0 and current.strip() == HOOKS:
@@ -156,26 +166,25 @@ def owner_checkout(host: Host, owner: str, repo: Path | None) -> None:
 def _remove(host: Host, path: Path) -> None:
     if host.exists(path):
         host.remove(path)
-        if not host.dry:
-            host.say(f"  removed {path}")
 
 
 STEPS = (
-    "Stop the factory",
-    "Remove the units, rules, firewall, AppArmor profile and managed settings",
-    "Remove the factory's commands and programs",
-    "Remove the warden's state and the laptop's shared services",
-    "Remove the factory's users, their homes and groups",
-    "Take the factory's git hooks off your checkout",
+    "Stopping the factory",
+    "Removing its services, rules and firewall",
+    "Removing its programs",
+    "Removing its data and the shared services",
+    "Removing its users",
+    "Taking its git hooks off your checkout",
 )
 LEFT_FOR_YOU = (
     f"Left for you: on GitHub, the warden's deploy key on the product (titled '{WARDEN_TITLE}' or as you named it), "
-    "which the next install replaces; the server is untouched."
+    f"which the next install replaces. The server is untouched, and the install logs stay in {layout.LOGS}."
 )
 
 
-def remove_all(host: Host, places: Places, owner: str, repo: Path | None) -> None:
-    """Every removal, in order; the installer calls it too, to take back a first install that failed."""
+def remove_all(host: Host, places: Places, owner: str, repo: Path | None, *, phases: bool) -> None:
+    """Every removal, in order, each its own phase or, when the installer takes back a first install that failed,
+    each a step of its one phase."""
     port = dashboard_port(places)
     removals: tuple[Callable[[], None], ...] = (
         lambda: stop(host),
@@ -186,8 +195,12 @@ def remove_all(host: Host, places: Places, owner: str, repo: Path | None) -> Non
         lambda: owner_checkout(host, owner, repo),
     )
     for number, (title, removal) in enumerate(zip(STEPS, removals, strict=True), 1):
+        if phases:
+            host.phase(number, title)
         host.step(number, title)
         removal()
+    if phases:
+        host.done()
 
 
 def perform(host: Host, places: Places, owner: Account, repo: Path | None) -> str | None:
@@ -200,35 +213,52 @@ def perform(host: Host, places: Places, owner: Account, repo: Path | None) -> st
         except store.StoreError:
             if not host.dry:
                 raise
-            host.say("  (a dry run cannot read the sessions' registry; the uninstall checks it as root)")
-        remove_all(host, places, owner.name, repo.resolve() if repo else None)
+            host.say("(a dry run cannot read the sessions' registry; the uninstall checks it as root)")
+        remove_all(host, places, owner.name, repo.resolve() if repo else None, phases=True)
     except Refused as exc:
-        problem = f"refused: {exc.reason}"
+        problem = exc.reason[:1].upper() + exc.reason[1:]
     except CommandError as exc:
-        problem = str(exc)
+        host.say(str(exc))
+        problem = ("The uninstall could not finish: a command it ran failed. Run it again; if it stops here again, the "
+                   "log says why.")  # fmt: skip
     else:
         return None
-    host.fail(PROGRAM, problem)
+    host.fail(problem)
     return problem
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog=PROGRAM, description=__doc__.splitlines()[0])
     parser.add_argument("--repo", type=Path, help="your checkout of the product, to take the factory's hooks off it")
-    parser.add_argument("--dry-run", action="store_true", help="print every step; change nothing")
+    parser.add_argument("--dry-run", action="store_true", help="go through every step; change nothing")
+    parser.add_argument("--verbose", action="store_true", help="print every detail the log keeps")
     args = parser.parse_args(argv)
-    if not args.dry_run and (os.geteuid() != 0 or "SUDO_USER" not in os.environ):
-        print("uninstall.py: run it with sudo, as the owner (or add --dry-run)", file=sys.stderr)
+    root = os.geteuid() == 0 and "SUDO_USER" in os.environ
+    if not args.dry_run and not root:
+        print("Run it with sudo, as yourself (or add --dry-run).", file=sys.stderr)
         return 2
-    host: Host = LookingHost() if args.dry_run else RealHost()
     owner = RealHost().account(os.environ.get("SUDO_USER") or getpass.getuser())
     if owner is None:
-        print("uninstall.py: the owner's account cannot be read", file=sys.stderr)
+        print(f"{PROGRAM}: the owner's account cannot be read", file=sys.stderr)
         return 2
-    if perform(host, Places.system(), owner, args.repo) is not None:
-        return 1
-    host.say(f"The factory is removed from this machine. {LEFT_FOR_YOU}")
-    return 0
+    if root:
+        journal = Journal.create(layout.LOGS, "uninstall", group=owner.groups[0], verbose=args.verbose)
+    else:
+        journal = Journal(verbose=True)  # a dry run as the owner keeps no log: what it would do is its whole point
+    host: Host = LookingHost(journal) if args.dry_run else RealHost(journal)
+    journal.screen("Dry run: what Uninstall removes" if args.dry_run else "Removing the factory from this computer")
+    source = sealed.staged(os.environ)
+    try:
+        failed = perform(host, Places.system(), owner, args.repo) is not None
+    finally:
+        if source is not None:  # run from a release, from a sealed copy that goes now
+            sealed.finish(RealHost(journal), source.stage, kept=False)
+    if not failed:
+        journal.screen("Nothing changed." if args.dry_run else "The factory is removed from this computer.")
+        journal.screen(LEFT_FOR_YOU)
+    if journal.path:
+        journal.screen(journal.where())
+    return 1 if failed else 0
 
 
 def dashboard_port(places: Places) -> str:

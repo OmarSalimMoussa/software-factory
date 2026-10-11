@@ -2,7 +2,8 @@
 
 Each drill does the forbidden thing the way an agent would, and passes only on evidence that the right wall stopped
 it: a guard refusal must name the rule the drill is about, and a sandboxed command must be the exact one asked for,
-or the drill fails as inconclusive. The installer refuses to finish while any drill fails.
+or the drill fails as inconclusive. The installer refuses to finish while any drill fails. The drills that start a
+session run a few at a time, each session in its own unit; the guard and host drills run one after another first.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from __future__ import annotations
 import json
 import shlex
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -402,12 +404,24 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
 )
 
 
-def run_all(rig: Rig) -> list[Result]:
-    results = []
-    for drill in DRILLS:
-        try:
-            results.append(drill(rig))
-        # A drill that breaks has proved nothing: it fails, named, and the others still run.
-        except Exception as exc:  # noqa: BLE001
-            results.append(Result(drill.__name__, False, f"the drill broke: {type(exc).__name__}: {exc}"))
-    return results
+# Each starts at least one sandboxed session, which waits on a model: they run side by side.
+SESSIONS = frozenset({sandbox_runs, shell_write_other_worktree, secrets_unreadable, sockets_refused, hosts_refused,
+                      bubblewrap_missing, factory_in_sandbox, path_shadow, toolchain_answers})  # fmt: skip
+
+
+def _one(drill: Callable[[Rig], Result], rig: Rig) -> Result:
+    try:
+        return drill(rig)
+    # A drill that breaks has proved nothing: it fails, named, and the others still run.
+    except Exception as exc:  # noqa: BLE001
+        return Result(drill.__name__, False, f"the drill broke: {type(exc).__name__}: {exc}")
+
+
+def run_all(rig: Rig, at_once: int) -> list[Result]:
+    """Every drill's result, once each, in the order of DRILLS: the guard and host drills one after another, then the
+    session drills ``at_once`` at a time."""
+    done = {drill: _one(drill, rig) for drill in DRILLS if drill not in SESSIONS}
+    with ThreadPoolExecutor(max_workers=at_once, thread_name_prefix="drill") as pool:
+        started = {drill: pool.submit(_one, drill, rig) for drill in DRILLS if drill in SESSIONS}
+        done.update({drill: future.result() for drill, future in started.items()})
+    return [done[drill] for drill in DRILLS]

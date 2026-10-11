@@ -1,12 +1,13 @@
-"""The install console: install, reinstall and uninstall the factory from a page in your browser, as root:
+"""The install console: install, reinstall and uninstall the factory from a page in your browser, as root. The release
+file starts it (``sudo python3 software-factory.pyz``); from the owner's clone of the factory it is
 
     sudo python3 runtime/system/console.py [--commit <sha>] [--repo <product checkout>]
 
 It runs from a sealed, read-only copy of the commit it offers, removed when it stops. It serves one page on 127.0.0.1
 at a free port, opens it in your browser and prints its link. The link works once: its token becomes a cookie that
 only that browser holds. The page shows whether the factory's CI passed on the commit, runs the installer's and the
-uninstaller's own steps, one action at a time, and asks in place what the command line asks in the terminal. Ctrl-C
-or the page's Close stops it.
+uninstaller's own steps, one action at a time, as a few phases with a progress bar, and asks in place what the
+command line asks in the terminal; each action's every detail goes to its log. Ctrl-C or the page's Close stops it.
 """
 
 from __future__ import annotations
@@ -28,8 +29,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from runtime.shared.paths import Places  # noqa: E402 - the path line above must run first
 from runtime.shared.protocol import Refused  # noqa: E402
-from runtime.system import console_page, sealed  # noqa: E402
-from runtime.system.console_app import Console, Hosts, Reply, refused  # noqa: E402
+from runtime.system import console_page, install, layout, sealed  # noqa: E402
+from runtime.system.console_app import Choices, Console, Hosts, Reply, refused  # noqa: E402
 from runtime.system.console_run import ConsoleHost, ConsoleLookingHost  # noqa: E402
 from runtime.system.host import (  # noqa: E402
     Account,
@@ -48,7 +49,6 @@ POLICY = (
     "frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 )
 MAX_BODY = 64 * 1024  # a form or an answer; the page sends nothing larger
-_DISPLAY = ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY")
 
 
 # ---- HTTP --------------------------------------------------------------------------------------------------------
@@ -63,7 +63,7 @@ class _Handler(BaseHTTPRequestHandler):
             reply = self.server.console.handle(self.command, self.path, headers, body)
         except Exception as exc:
             log.exception("console: %s %s failed (%s)", self.command, urlsplit(self.path).path, type(exc).__name__)
-            reply = refused(500, f"The console failed ({type(exc).__name__}); its terminal has the details.")
+            reply = refused(500, f"The console failed ({type(exc).__name__}): start it again.")
         self._send(reply)
 
     def _send(self, reply: Reply) -> None:
@@ -124,8 +124,8 @@ def display(reader: Host, owner: Account, inherited: Mapping[str, str]) -> dict[
     """Where the owner's desktop session draws: their user manager's environment holds it; sudo may have kept it."""
     code, out = reader.query(["systemctl", "--user", "show-environment"], user=owner.name)
     found = dict(line.split("=", 1) for line in out.splitlines() if "=" in line) if code == 0 else {}
-    session = {key: found[key] for key in _DISPLAY if key in found}
-    return session or {key: inherited[key] for key in _DISPLAY if key in inherited}
+    session = {key: found[key] for key in sealed.DISPLAY if key in found}
+    return session or {key: inherited[key] for key in sealed.DISPLAY if key in inherited}
 
 
 def opener(owner: Account, drawn: Mapping[str, str]) -> Callable[[str], bool]:
@@ -147,6 +147,10 @@ def main(argv: list[str]) -> int:
         "--commit", help="the factory commit to offer; else the newest on your checkout's default branch"
     )
     parser.add_argument("--repo", type=Path, help="your checkout of the product; else the one the last install named")
+    parser.add_argument("--healthchecks", action="store_true", help="start with Healthchecks.io's checks chosen")
+    parser.add_argument("--keep-on-failure", action="store_true", help="start with keeping a failed install chosen")
+    parser.add_argument("--dry-run", action="store_true", help="start with the dry run chosen")
+    parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="a setting each install saves")
     args = parser.parse_args(argv)
     if os.geteuid() != 0 or "SUDO_USER" not in os.environ:
         print(f"{PROGRAM}: run it with sudo, as the owner", file=sys.stderr)
@@ -168,15 +172,19 @@ def main(argv: list[str]) -> int:
         except (Refused, CommandError) as exc:
             print(f"{PROGRAM}: {exc.reason if isinstance(exc, Refused) else exc}", file=sys.stderr)
             return 1
-        print(f"The console runs {sha[:12]} ({offered['subject']}), sealed read-only in {stage}", flush=True)
         sealed.exec_staged(sha, stage, "runtime/system/console.py", ["--commit", sha, *_without_commit(argv)],
-                           checkout=REPO_ROOT, display=_DISPLAY)  # fmt: skip
+                           checkout=REPO_ROOT, display=sealed.DISPLAY)  # fmt: skip
     console: Console | None = None
     try:
+        choices = Choices(args.healthchecks, args.keep_on_failure, args.dry_run, install.parse_changes(args.set))
         console = Console(Places.system(), owner, reader, Hosts(ConsoleHost, ConsoleLookingHost),
                           opener(owner, display(reader, owner, os.environ)), commit=args.commit,
-                          repo=args.repo.resolve() if args.repo else None)  # fmt: skip
+                          repo=args.repo.resolve() if args.repo else None, source=sealed.staged(os.environ),
+                          logs=layout.LOGS, log_group=owner.groups[0], choices=choices)  # fmt: skip
         return until_stopped(console)
+    except Refused as exc:
+        print(f"{PROGRAM}: {exc.reason}", file=sys.stderr)
+        return 2
     finally:
         sealed.finish(reader, Path(os.environ[sealed.STAGE]), kept=console is not None and console.kept)
 
