@@ -141,5 +141,5 @@ def test_up_names_the_service_that_did_not_turn_healthy(tmp_path: Path) -> None:
 
     assert calls[0] == [
         "docker", "compose", "-p", "factory-services", "--env-file", f"{tmp_path}/services.env",
-        "-f", f"{tmp_path}/compose.yml", "up", "-d", "--wait",
+        "-f", f"{tmp_path}/compose.yml", "up", "-d", "--wait", "--wait-timeout", "1200",
     ]  # fmt: skip

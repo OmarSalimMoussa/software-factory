@@ -119,6 +119,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 60
+      # The first start migrates its databases, slower still on rootless Docker: failures in this
+      # window do not count, so a first boot is never declared unhealthy halfway through.
+      start_period: 600s
     ports:
       # 3100, not 3000: a laptop's Next.js dev server usually owns 3000.
       - "127.0.0.1:3100:3000"
@@ -148,6 +151,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
+      # The first start migrates its databases, slower still on rootless Docker: failures in this
+      # window do not count, so a first boot is never declared unhealthy halfway through.
+      start_period: 600s
     networks:
       - langfuse
     deploy:
@@ -178,7 +184,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 1s
+      # The first start migrates its databases, slower still on rootless Docker: failures in this
+      # window do not count, so a first boot is never declared unhealthy halfway through.
+      start_period: 600s
     networks:
       - langfuse
     deploy:
@@ -313,6 +321,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+      # The first start migrates its databases, slower still on rootless Docker: failures in this
+      # window do not count, so a first boot is never declared unhealthy halfway through.
+      start_period: 600s
     ports:
       - "127.0.0.1:8200:8000"
     volumes:

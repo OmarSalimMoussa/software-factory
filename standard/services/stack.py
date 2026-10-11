@@ -22,6 +22,8 @@ from standard.services.provision import Run
 COMPOSE = Path(__file__).parent / "compose.yml"
 EDGE_CADDYFILE = Path(__file__).parent / "edge.Caddyfile"
 PROJECT = "factory-services"
+# A first start pulls every image and migrates every database before the stack answers healthy.
+WAIT_SECONDS = 1200
 ENV_FILE = "services.env"
 # The loopback ports the stack publishes; a server serves the same ones to its tailnet.
 PORTS = {"glitchtip": 8200, "langfuse": 3100, "minio": 9090, "pgweb": 8081, "postgres": 5434}
@@ -143,7 +145,7 @@ def unhealthy(run: Run, folder: Path, *, edge: bool) -> list[str]:
 
 
 def up(run: Run, folder: Path, *, edge: bool) -> None:
-    done = run([*compose_argv(folder, edge=edge), "up", "-d", "--wait"], None)
+    done = run([*compose_argv(folder, edge=edge), "up", "-d", "--wait", "--wait-timeout", str(WAIT_SECONDS)], None)
     if done.returncode == 0:
         return
     said = (done.stderr.strip() or done.stdout.strip()).splitlines()[-5:]
