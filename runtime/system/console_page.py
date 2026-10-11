@@ -79,23 +79,28 @@ def status(places: Places, host: Host) -> dict[str, Any]:
             "services": services, "address": address(host), "problem": problem}  # fmt: skip
 
 
+# What the status reads of the installed factory's published settings. The install may be an older release's, so
+# these keys alone are read: the rest of its settings may follow another schema.
+_STATUS_KEYS = ("watch.http_timeout_seconds", "dashboard.warden_seconds", "dashboard.port")
+
+
 def _services(places: Places) -> tuple[list[dict[str, Any]], str]:
     try:
-        settings = settings_module.build(store.read_json(places.state / "public" / "settings.json"), {})
+        values = settings_module.read_some(store.read_json(places.state / "public" / "settings.json"), _STATUS_KEYS)
     # telemetry: surfaced — the status draws why nothing was checked
     except (OSError, store.StoreError, settings_module.SettingsError) as exc:
         why = f"The warden's published settings cannot be read ({type(exc).__name__})"
         return [], f"{why}, so the warden, the dashboard and the shared services were not checked."
-    timeout = float(settings.get_int("watch.http_timeout_seconds"))
+    timeout = float(values["watch.http_timeout_seconds"])
     try:
-        Warden(places.owner_socket, lambda: float(settings.get_int("dashboard.warden_seconds"))).call(
+        Warden(places.owner_socket, lambda: float(values["dashboard.warden_seconds"])).call(
             "snapshot", {"want": ["factory"]}
         )
         warden = True
     # telemetry: surfaced — the status draws it as the warden not answering
     except WardenDown:
         warden = False
-    port = settings.get_int("dashboard.port")
+    port = values["dashboard.port"]
     found = {
         "The warden": warden,
         "The dashboard": _answers(f"http://127.0.0.1:{port}/", timeout, any_status=True),

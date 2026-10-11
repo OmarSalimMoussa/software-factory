@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import copy
 import tomllib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -297,6 +297,26 @@ def problems_for(key: str, value: Any, tree: Mapping[str, Any]) -> list[str]:
                 out.append(f"prices.{model}: each price must be a number from 0")
         return out
     return [f"{key} has an unknown kind {spec.kind}"]
+
+
+def read_some(tree: Any, keys: Sequence[str]) -> dict[str, Any]:
+    """``keys`` alone, each checked as a setting, from a settings tree another release may have written: an older
+    install's published settings lack the keys this release added, and hold ones it dropped. Raises SettingsError
+    listing every problem with the keys asked for."""
+    root: Mapping[str, Any] = tree if isinstance(tree, Mapping) else {}
+    found: dict[str, Any] = {}
+    problems: list[str] = []
+    for key in keys:
+        try:
+            value = _leaf(root, key)
+        except KeyError:
+            problems.append(f"{key} is missing")
+            continue
+        problems += problems_for(key, value, root)
+        found[key] = value
+    if problems:
+        raise SettingsError(problems)
+    return found
 
 
 class Settings:

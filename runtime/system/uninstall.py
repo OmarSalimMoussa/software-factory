@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import getpass
-import json
 import os
 import sys
 from collections.abc import Callable
@@ -24,6 +23,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from runtime.shared import paths, store  # noqa: E402 - the path line above must run first
+from runtime.shared import settings as settings_module  # noqa: E402
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER, Places  # noqa: E402
 from runtime.shared.protocol import Refused  # noqa: E402
 from runtime.system import layout, sealed, steps_prepare, steps_wire  # noqa: E402
@@ -305,9 +305,9 @@ def dashboard_port(places: Places) -> str | None:
     read (no install, or one that never published them)."""
     published = places.state / "public" / "settings.json"
     try:
-        return str(json.loads(published.read_text(encoding="utf-8"))["dashboard"]["port"])
+        return str(settings_module.read_some(store.read_json(published), ("dashboard.port",))["dashboard.port"])
     # telemetry: surfaced — the uninstall says it could not tell the dashboard's port, and takes nothing off the tailnet
-    except (OSError, ValueError, KeyError, TypeError):
+    except (OSError, store.StoreError, settings_module.SettingsError):
         return None
 
 

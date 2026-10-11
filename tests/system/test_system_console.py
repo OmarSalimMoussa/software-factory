@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 from system_fakes import PASSING, SHA, ci_answers, ci_link, dry_job
 
+from runtime.shared.paths import Places
 from runtime.system import console_page, install, layout, uninstall
 from runtime.system.console_app import Choices, Console, Hosts, Reply
 from runtime.system.console_run import ConsoleDryHost, Run
@@ -229,3 +230,34 @@ def test_the_console_shows_the_commits_ci_and_installs_it_only_once_ci_passed(tm
     assert console.run is None
     assert _post(console, cookie, "/api/install", {**body, "dry": True}).status == 200  # a dry run changes nothing
     console.stop()
+
+
+@pytest.mark.parametrize(
+    ("published", "checked"),
+    [
+        # An older release's settings: without the keys this one added, with one it dropped.
+        ({"factory": {"clone": "/x"}, "watch": {"http_timeout_seconds": 1},
+          "dashboard": {"warden_seconds": 1, "port": 8400}}, True),
+        ({"watch": {"http_timeout_seconds": 1}, "dashboard": {"warden_seconds": 1}}, False),  # no port to check
+        ({"watch": {"http_timeout_seconds": 0}, "dashboard": {"warden_seconds": 1, "port": 8400}}, False),
+    ],
+    ids=["older-release", "port-missing", "timeout-out-of-range"],
+)  # fmt: skip
+def test_the_status_checks_an_older_install_by_the_few_settings_it_reads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, published: dict[str, Any], checked: bool
+) -> None:
+    places = Places.under(tmp_path)
+    record = {"commit": SHA, "subject": "An older release", "drills": []}
+    layout.install_record(places.state).parent.mkdir(parents=True)
+    layout.install_record(places.state).write_text(json.dumps(record))
+    (places.state / "public").mkdir()
+    (places.state / "public" / "settings.json").write_text(json.dumps(published))
+    monkeypatch.setattr(console_page, "_answers", lambda url, timeout, any_status: False)  # nothing runs here
+
+    found = console_page.status(places, DryHost())
+
+    if checked:
+        assert found["problem"] == ""
+        assert [s["name"] for s in found["services"]] == ["The warden", "The dashboard", "GlitchTip", "Langfuse"]
+    else:
+        assert found["services"] == [] and "were not checked" in found["problem"]
