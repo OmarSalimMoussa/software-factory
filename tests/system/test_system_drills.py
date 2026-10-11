@@ -48,7 +48,7 @@ class FakeRig:
     def guard(self, tool: str, tool_input: dict[str, Any]) -> Ran:
         return self.guard_answer
 
-    def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None) -> Ran:
+    def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None, properties: tuple[str, ...] = ()) -> Ran:
         return Ran(0, _stream(self.ran or commands[-1], "touch: cannot touch: Read-only file system"))
 
     def exists(self, path: Path) -> bool:
@@ -138,7 +138,9 @@ def test_the_toolchain_drill_needs_every_program_and_the_products_python_from_th
     asked: list[str] = []
 
     class Session(FakeRig):
-        def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None) -> Ran:
+        def sandboxed(
+            self, *commands: str, extra: dict[str, Any] | None = None, properties: tuple[str, ...] = ()
+        ) -> Ran:
             asked.extend(commands)
             ran = [("uv --version", "uv 0.11.6", False), ("node --version", "v22.1.0", False)]
             return Ran(0, _runs(*ran, *([("uv python find 3.14", *find)] if find else [])))
@@ -187,7 +189,7 @@ class OneAnswer(FakeRig):
     result: str = ""
     error: bool = True
 
-    def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None) -> Ran:
+    def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None, properties: tuple[str, ...] = ()) -> Ran:
         use = {
             "type": "assistant",
             "message": {
@@ -231,3 +233,34 @@ def test_the_control_drill_needs_a_plain_command_to_run_in_the_sandbox(result: s
 )
 def test_a_refusal_drill_passes_only_on_an_answer_that_names_the_refusal(result: str, ok: bool) -> None:
     assert drills.sockets_refused(OneAnswer(result=result)).ok is ok
+
+
+@dataclass
+class Counted(OneAnswer):
+    """Runs nothing the first ``silent`` times it is asked, then answers as OneAnswer does."""
+
+    silent: int = 1
+    asks: list[tuple[str, ...]] = field(default_factory=list)
+
+    def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None, properties: tuple[str, ...] = ()) -> Ran:
+        self.asks.append(properties)
+        if len(self.asks) <= self.silent:
+            return Ran(124, "the drill ran past 180 s")
+        return super().sandboxed(*commands, extra=extra, properties=properties)
+
+
+@pytest.mark.parametrize(("silent", "ok", "asks"), [(1, True, 2), (2, False, 2)], ids=["second-try", "both-silent"])
+def test_a_session_that_ran_nothing_is_asked_once_more(silent: int, ok: bool, asks: int) -> None:
+    rig = Counted(result=drills.SANDBOX_MARK, error=False, silent=silent)
+
+    assert drills.sandbox_runs(rig).ok is ok
+    assert len(rig.asks) == asks
+
+
+def test_the_bubblewrap_drill_hides_bubblewrap_and_fails_when_the_command_still_runs() -> None:
+    rig = Counted(result="env:PATH -> set", error=False, silent=0)
+
+    result = drills.bubblewrap_missing(rig)
+
+    assert rig.asks == [(f"InaccessiblePaths={drills.layout.BWRAP}",)]
+    assert not result.ok and "without the sandbox" in result.evidence

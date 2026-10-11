@@ -143,7 +143,7 @@ def install_form(host: Host, owner: Account, factory: Path, commit: str | None, 
     verb = "Reinstall" if record else "Install"
     return {
         "heading": verb,
-        "commit": {"label": "Factory commit", **_commit(host, owner, factory, commit)},
+        "commit": {"label": "Factory commit", **commit_choice(host, owner, factory, commit)},
         "other": {"label": "Another commit", "placeholder": "A sha, or a branch of your factory checkout"},
         "repo": {"label": "Product checkout", "value": product,
                  "hint": "Your own checkout of the product the factory works on."},  # fmt: skip
@@ -157,7 +157,7 @@ def install_form(host: Host, owner: Account, factory: Path, commit: str | None, 
     }  # fmt: skip
 
 
-def _commit(host: Host, owner: Account, factory: Path, given: str | None) -> dict[str, Any]:
+def commit_choice(host: Host, owner: Account, factory: Path, given: str | None) -> dict[str, Any]:
     git = ["git", "-C", str(factory)]
     if given:
         ref, note = given, "The commit you named with --commit"

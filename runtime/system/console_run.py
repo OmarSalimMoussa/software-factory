@@ -14,14 +14,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from runtime.system.host import Account, CommandError, DeployKey, DryHost, Host, RealHost
+from runtime.system.host import Account, DryHost, Host, RealHost
 from runtime.system.job import refuse
 from runtime.system.uninstall import LookingHost
 
 WAITING, RUNNING, DONE, FAILED = "waiting", "running", "done", "failed"
 STATE_TEXT = {WAITING: "Waiting", RUNNING: "Running", DONE: "Done", FAILED: "Failed"}
-_GITHUB = "https://github.com"
-_SHOWN = 300  # how much of a command's output a refused GitHub call shows
 
 
 @dataclass
@@ -184,42 +182,12 @@ def code_question(secret: str, link: str) -> dict[str, Any]:
     }
 
 
-def _link(label: str, url: str) -> dict[str, str]:
-    return {"label": label, "url": url}
-
-
-def key_question(key: DeployKey, signed_in: bool, note: str) -> dict[str, Any]:
-    access = "with write access" if key.write else "read-only"
-    boxes = [_box(f"The public half: a deploy key on {key.repo}, {access}", key.public)]
-    links = [] if signed_in else [_link(f"{key.repo}'s deploy keys", f"{_GITHUB}/{key.repo}/settings/keys/new")]
-    add = _action("add", "Add it to GitHub", "")
-    if key.private:
-        title = f"The factory's read key, for {key.ci_repo}'s CI"
-        text = (
-            f"{key.why} Skip it when {key.ci_repo} already holds {key.secret} from an earlier install: it still works."
-        )
-        shown = f"The private half: {key.ci_repo}'s Actions secret {key.secret}. Shown once, now"
-        boxes.append(_box(shown, key.private))
-        if not signed_in:
-            links.append(_link(f"{key.ci_repo}'s secrets", f"{_GITHUB}/{key.ci_repo}/settings/secrets/actions/new"))
-        actions = [_action("skip", "Skip", "primary"), add if signed_in else _action("done", "I added both", "")]
-    else:
-        title, text = f"The warden's deploy key on {key.repo}", key.why
-        if signed_in:
-            actions = [{**add, "tone": "primary"}, _action("done", "I added it", "")]
-        else:
-            actions = [_action("done", "I added it", "primary")]
-    text += " Add it to GitHub uses your signed-in gh." if signed_in else " Your gh is not signed in: add it on GitHub."
-    return {"title": title, "text": text, "boxes": boxes, "field": None, "links": links, "actions": actions,
-            "note": note}  # fmt: skip
-
-
 # ---- the hosts a run uses ----------------------------------------------------------------------------------------
 
 
 class Paged(Host):
     """A host whose lines, steps and questions go to the page instead of the terminal. It comes first in a console
-    host's bases, so the host after it does every other thing."""
+    host's bases, so the host after it does every other thing. A key to add by hand stays the installer's own lines."""
 
     page: Run
 
@@ -240,38 +208,6 @@ class Paged(Host):
     def show_code(self, secret: str, link: str) -> None:
         self.page.ask(code_question(secret, link))
         self.page.line("  the 6-digit code's secret was shown")
-
-    def show_key(self, key: DeployKey) -> None:
-        owner = self.page.owner.name
-        signed_in = self.query(["gh", "auth", "status", "--hostname", "github.com"], user=owner)[0] == 0
-        note = ""
-        while True:
-            action, _ = self.page.ask(key_question(key, signed_in, note))
-            if action != "add":
-                self.page.line(f"  {'skipped' if action == 'skip' else 'you added'} the key {key.title} on {key.repo}")
-                return
-            try:
-                self._add_key(key, owner)
-            # telemetry: surfaced — the question shows what GitHub said, and the owner tries again or goes on
-            except CommandError as exc:
-                note = f"GitHub did not take it: {exc.output.strip()[-_SHOWN:]}"
-                continue
-            if not self.dry:
-                self.page.line(f"  added the key {key.title} to {key.repo} on GitHub")
-            return
-
-    def _add_key(self, key: DeployKey, owner: str) -> None:
-        """As the owner, with their gh: the deploy key, then the private half as the CI repo's secret."""
-        folder = self.scratch(owner)
-        public = folder / "key.pub"
-        self.write(public, key.public + "\n", mode=0o644, owner=owner, group=self.page.owner.groups[0])
-        try:
-            self.run(["gh", "repo", "deploy-key", "add", str(public), "--repo", key.repo, "--title", key.title,
-                      *(["--allow-write"] if key.write else [])], user=owner)  # fmt: skip
-        finally:
-            self.remove(folder)
-        if key.private:
-            self.run(["gh", "secret", "set", key.secret, "--repo", key.ci_repo], user=owner, stdin=key.private + "\n")
 
     def show_folder(self, label: str, folder: Path) -> None:
         self.page.folder = folder

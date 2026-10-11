@@ -9,6 +9,7 @@ from __future__ import annotations
 import hmac
 import json
 import logging
+import os
 import secrets
 import threading
 from collections.abc import Callable, Mapping
@@ -29,6 +30,13 @@ log = logging.getLogger("factory.console")
 COOKIE = "factory-console"
 UI = Path(__file__).resolve().parent / "console_ui"
 DASHBOARD_UI = REPO_ROOT / "runtime" / "dashboard" / "ui"
+
+
+def factory_checkout() -> Path:
+    """The owner's factory checkout: the one this console was archived from, when it runs from an archived commit."""
+    return Path(os.environ.get(install.CHECKOUT, str(REPO_ROOT)))
+
+
 FILES = {
     "/": (UI / "console.html", "text/html; charset=utf-8"),
     "/console.css": (UI / "console.css", "text/css; charset=utf-8"),
@@ -177,8 +185,10 @@ class Console:
             "sub": "Install, reinstall or remove the factory on this laptop. Nothing reaches the server.",
             "close": "Close",
             "status_label": "This laptop",
-            "status": console_page.status(self.places, self.reader, self.owner, REPO_ROOT),
-            "install": console_page.install_form(self.reader, self.owner, REPO_ROOT, self.commit, self.repo, record),
+            "status": console_page.status(self.places, self.reader, self.owner, factory_checkout()),
+            "install": console_page.install_form(
+                self.reader, self.owner, factory_checkout(), self.commit, self.repo, record
+            ),  # fmt: skip
             "uninstall": {
                 "heading": "Uninstall",
                 "text": "Removes everything the installer made, so the next install starts from a clean machine. It "
@@ -205,6 +215,10 @@ class Console:
             problems.append("Name your product checkout by its full path.")
         if not all(isinstance(flag, bool) for flag in flags.values()):
             problems.append("Each choice is on or off.")
+        staged = os.environ.get(install.SHA, "")
+        if isinstance(commit, str) and staged and not staged.startswith(commit.strip()) and commit.strip() != "":
+            problems.append(f"This console runs {staged[:12]} and installs only that commit: to install another, "
+                            "start the console with --commit <that commit>.")  # fmt: skip
         if problems or not isinstance(commit, str) or not isinstance(repo, str):
             return refused(400, " ".join(problems))
         dry, keep = flags["dry"] is True, flags["keep"] is True

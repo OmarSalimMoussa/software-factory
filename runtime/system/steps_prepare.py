@@ -64,6 +64,9 @@ def refuse_live_sessions(ctx: Install) -> None:
 
 def archive(ctx: Install) -> None:
     host, owner = ctx.host, ctx.owner.name
+    if ctx.stage is not None:
+        host.say(f"  {ctx.sha[:12]} is archived in {ctx.stage}, and this install runs from it")
+        return
     wanted = f"{ctx.commit}^{{commit}}"
     code, out = host.query(["git", "-C", str(ctx.factory), "rev-parse", "--verify", wanted], user=owner)
     if code != 0 and not host.dry:

@@ -26,9 +26,9 @@ from runtime.shared import paths, store  # noqa: E402 - the path line above must
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER, Places  # noqa: E402
 from runtime.shared.protocol import Refused  # noqa: E402
 from runtime.system import layout, steps_prepare  # noqa: E402
+from runtime.system.github_keys import WARDEN_TITLE  # noqa: E402
 from runtime.system.host import Account, CommandError, DryHost, Host, RealHost  # noqa: E402
 from runtime.system.job import REPO_ROOT, Install  # noqa: E402
-from runtime.system.steps_machine import DEPLOY_TITLE  # noqa: E402
 
 PROGRAM = "uninstall.py"
 
@@ -158,7 +158,7 @@ STEPS = (
     "Take the factory's git hooks off your checkout",
 )
 LEFT_FOR_YOU = (
-    f"Left for you: on GitHub, the warden's deploy key on the product (titled '{DEPLOY_TITLE}' or as you named it), "
+    f"Left for you: on GitHub, the warden's deploy key on the product (titled '{WARDEN_TITLE}' or as you named it), "
     "which the next install replaces; the server is untouched."
 )
 

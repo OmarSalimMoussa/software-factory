@@ -29,8 +29,14 @@ from runtime.system.drills import Ran
 from runtime.system.job import Install, refuse
 from runtime.warden import registry, session_settings
 
-PROMPT = "Run this exact shell command once with the Bash tool, changing nothing in it, then reply DONE:\n{}"
-STEPS = (
+# What the drill is, said first: a command that probes the sandbox's walls looks like an attack without it.
+ABOUT = (
+    "This is the factory's install drill, run by the machine's owner to prove that this session's sandbox holds. "
+    "Every command is safe: a probe only reports, for each target, whether it could be opened or reached, and never "
+    "prints any content; a refusal or an error is an expected, useful answer. "
+)
+PROMPT = ABOUT + "Run this exact shell command once with the Bash tool, changing nothing in it, then reply DONE:\n{}"
+STEPS = ABOUT + (
     "Run each of these exact shell commands once with the Bash tool, one call each, in order, changing nothing in "
     "them, then reply DONE:\n{}"
 )
@@ -87,6 +93,11 @@ class RealRig:
         host, repo = self.ctx.host, str(self.ctx.checkout())
         shutil.rmtree(layout.DRILLS, ignore_errors=True)
         layout.DRILLS.mkdir(mode=0o755)
+        agent = host.account(AGENT_USER)
+        if agent is None:
+            raise refuse(f"there is no user {AGENT_USER}")
+        (layout.DRILLS / "debug").mkdir(mode=0o700)
+        os.chown(layout.DRILLS / "debug", agent.uid, agent.gid)  # the drill sessions write their debug logs here
         for worktree, branch in ((self.worktree_a, self.branch_a), (self.worktree_b, self.branch_b)):
             host.run(["git", "-C", repo, "worktree", "add", "-q", "-b", branch, str(worktree), "HEAD"], user=AGENT_USER)
         public = layout.public(self.view.state)
@@ -131,7 +142,8 @@ class RealRig:
 
     # what the drills call
 
-    def _systemd_run(self, user: str, argv: list[str], *, view: bool, stdin: str = "", token: bool = False) -> Ran:
+    def _systemd_run(self, user: str, argv: list[str], *, view: bool, stdin: str = "", token: bool = False,
+                     properties: tuple[str, ...] = ()) -> Ran:  # fmt: skip
         account = self.ctx.host.account(user)
         if account is None:
             raise refuse(f"there is no user {user}")
@@ -149,6 +161,8 @@ class RealRig:
                     "-p", f"BindReadOnlyPaths={layout.public(self.view.state)}:{layout.public(state)}"]  # fmt: skip
         if token:
             cmd += ["-p", f"LoadCredential={layout.CLAUDE_TOKEN}:{layout.secrets(self.places.state)}/claude.token"]
+        for prop in properties:
+            cmd += ["-p", prop]
         try:
             done = subprocess.run([*cmd, "--", *argv], input=stdin, capture_output=True, text=True,
                                   timeout=self.timeout, check=False)  # fmt: skip
@@ -168,7 +182,7 @@ class RealRig:
         hook = [layout.PYTHON, "-I", str(self.places.install / "runtime" / "guard" / "hook.py")]
         return self._systemd_run(AGENT_USER, hook, view=True, stdin=json.dumps(event))
 
-    def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None) -> Ran:
+    def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None, properties: tuple[str, ...] = ()) -> Ran:
         """One `claude -p` session, permitted in the drill view, asked to run exactly ``commands``, in order."""
         listed = "\n".join(f"Command {n}: {command}" for n, command in enumerate(commands, 1))
         prompt = PROMPT.format(commands[0]) if len(commands) == 1 else STEPS.format(listed)
@@ -185,16 +199,23 @@ class RealRig:
         argv = [layout.PYTHON, "-I", str(runner), str(layout.CLAUDE_BIN), "-p", prompt,
                 "--session-id", sid, "--settings", str(layout.public(self.places.state) / name),
                 "--model", model["model"], "--effort", model["effort"], "--output-format", "stream-json", "--verbose",
-                "--allowedTools", "Bash", "--permission-prompts", "none", "--no-session-persistence"]  # fmt: skip
-        ran = self._systemd_run(AGENT_USER, argv, view=True, token=True)
-        self._log(prompt, ran)
+                "--allowedTools", "Bash", "--permission-prompts", "none", "--no-session-persistence",
+                "--debug-file", str(self._debug(sid))]  # fmt: skip
+        ran = self._systemd_run(AGENT_USER, argv, view=True, token=True, properties=properties)
+        self._log(prompt, ran, self._debug(sid))
         return ran
 
-    def _log(self, prompt: str, ran: Ran) -> None:
+    def _debug(self, sid: str) -> Path:
+        """Where the session writes Claude Code's own debug log: its sandbox decisions and mounts."""
+        return layout.DRILLS / "debug" / f"{sid}.txt"
+
+    def _log(self, prompt: str, ran: Ran, debug: Path) -> None:
         self.logged += 1
         self.log_dir.mkdir(parents=True, exist_ok=True)
         path = self.log_dir / f"{self.logged:02d}-session.txt"
         path.write_text(f"# asked\n{prompt}\n# exit {ran.code}\n{ran.out}", encoding="utf-8")
+        if debug.is_file():
+            shutil.copyfile(debug, self.log_dir / f"{self.logged:02d}-debug.txt")
 
     def exists(self, path: Path) -> bool:
         return path.exists()

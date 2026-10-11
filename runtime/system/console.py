@@ -26,9 +26,17 @@ from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from runtime.shared.paths import Places  # noqa: E402 - the path line above must run first
+from runtime.shared.protocol import Refused  # noqa: E402
+from runtime.system import console_page, install  # noqa: E402
 from runtime.system.console_app import Console, Hosts, Reply, refused  # noqa: E402
 from runtime.system.console_run import ConsoleHost, ConsoleLookingHost  # noqa: E402
-from runtime.system.host import Account, Host, RealHost, as_user  # noqa: E402
+from runtime.system.host import (  # noqa: E402
+    Account,
+    CommandError,  # noqa: E402
+    Host,
+    RealHost,
+    as_user,
+)
 from runtime.system.job import REPO_ROOT  # noqa: E402
 
 log = logging.getLogger("factory.console")
@@ -148,6 +156,19 @@ def main(argv: list[str]) -> int:
     if owner is None:
         print(f"{PROGRAM}: the owner's account cannot be read", file=sys.stderr)
         return 2
+    if install.STAGE not in os.environ:
+        # The whole console runs from the commit it offers, so the steps it runs are that commit's own.
+        offered = console_page.commit_choice(reader, owner, REPO_ROOT, args.commit)
+        if offered["problem"]:
+            print(f"{PROGRAM}: {offered['problem']}", file=sys.stderr)
+            return 1
+        try:
+            sha, stage = install.stage_commit(offered["value"], owner.name)
+        except (Refused, CommandError) as exc:
+            print(f"{PROGRAM}: {exc.reason if isinstance(exc, Refused) else exc}", file=sys.stderr)
+            return 1
+        print(f"The console runs {sha[:12]} ({offered['subject']}), archived in {stage}", flush=True)
+        install.exec_staged(sha, stage, "runtime/system/console.py", ["--commit", sha, *_without_commit(argv)])
     console = Console(Places.system(), owner, reader, Hosts(ConsoleHost, ConsoleLookingHost),
                       opener(owner, display(reader, owner, os.environ)), commit=args.commit,
                       repo=args.repo.resolve() if args.repo else None)  # fmt: skip
@@ -170,6 +191,19 @@ def main(argv: list[str]) -> int:
         server.shutdown()
         server.server_close()
     return 0
+
+
+def _without_commit(argv: list[str]) -> list[str]:
+    """``argv`` with its --commit (either spelling) taken out: the staged console is told the full sha instead."""
+    out, skip = [], False
+    for arg in argv:
+        if skip:
+            skip = False
+        elif arg == "--commit":
+            skip = True
+        elif not arg.startswith("--commit="):
+            out.append(arg)
+    return out
 
 
 if __name__ == "__main__":
