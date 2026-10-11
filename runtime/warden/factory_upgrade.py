@@ -34,8 +34,7 @@ def asked_path(places: Places) -> Path:
 
 
 def offer(places: Places) -> dict[str, Any]:
-    """The newest release ahead of the installed factory, or None; when GitHub was last asked; and why the last
-    asking failed, or None."""
+    """The newest release ahead of the installed factory, when GitHub was last asked, and why that failed."""
     raw = store.read_json_or(offer_path(places), {"available": None, "checked_at": None, "note": None})
     if not isinstance(raw, dict) or set(raw) != {"available", "checked_at", "note"}:
         raise store.StoreError(f"{offer_path(places)}: needs available, checked_at and note")
@@ -51,7 +50,6 @@ def asked(places: Places) -> dict[str, Any] | None:
 
 
 def poll(ctx: Context) -> None:
-    """The releases pass: once each install.release_check_hours, whether a newer factory is ready."""
     settings, places, now = ctx.settings(), ctx.places, ctx.clock.now()
     last, every = offer(places), settings.get_int("install.release_check_hours") * 3600
     if last["checked_at"] is not None and now - last["checked_at"] < every:
@@ -85,7 +83,6 @@ def _ahead(rel: releases.Releases, installed: str) -> dict[str, Any] | None:
 
 
 def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """The owner's Upgrade to the release the dashboard offered: pause, let every agent settle, start root's unit."""
     places = ctx.places
     commit = args.get("commit")
     available = offer(places)["available"]
@@ -149,7 +146,6 @@ def _start(ctx: Context, commit: str) -> str:
 
 
 def view(ctx: Context) -> dict[str, Any]:
-    """Everything the page draws the upgrade from."""
     places = ctx.places
     installed = upgrades.read_installed(places)
     before = asked(places)

@@ -40,8 +40,7 @@ class Answer:
     body: bytes
 
 
-# One GET of a URL with headers and a timeout; any HTTP answer is an Answer, redirects included (never followed).
-# Raises OSError when nothing answers.
+# Any HTTP answer is an Answer, a redirect included (never followed); raises OSError when nothing answers.
 Get = Callable[[str, dict[str, str], float], Answer]
 
 
@@ -67,7 +66,6 @@ def token_path(places: Places) -> Path:
 
 
 def tag(commit: str) -> str:
-    """The tag CI gives the release of ``commit``."""
     return f"build-{commit[:12]}"
 
 
@@ -109,19 +107,16 @@ class Releases:
         self._json(f"/repos/{self._repo}/actions/runs?per_page=1")
 
     def latest(self) -> Release:
-        """The newest release, as GitHub marks it."""
         return _release(self._json(f"/repos/{self._repo}/releases/latest"))
 
     def of_commit(self, commit: str) -> Release:
-        """The release CI made of ``commit``, by its tag."""
         found = _release(self._json(f"/repos/{self._repo}/releases/tags/{tag(commit)}"))
         if found.commit != commit:
             raise ReleaseError(f"the release {tag(commit)} is of {found.commit[:12]}, not {commit[:12]}")
         return found
 
     def changes(self, base: str, head: str) -> tuple[str, list[str]]:
-        """How ``head`` stands to ``base`` (ahead, behind, diverged or identical) and, ahead, the subjects of the
-        commits it adds, oldest first."""
+        """How ``head`` stands to ``base`` (ahead, behind...) and the subjects of the commits it adds, oldest first."""
         body = self._json(f"/repos/{self._repo}/compare/{base}...{head}")
         status = body.get("status")
         commits = body.get("commits")
@@ -169,7 +164,6 @@ class Releases:
         return parsed
 
     def _call(self, url: str, accept: str) -> Answer:
-        """A GET of GitHub's API with the token; a redirect is returned, never followed with it."""
         where = url.removeprefix(API).split("?")[0]
         headers = {**_HEADERS, "Accept": accept, "Authorization": f"Bearer {self._token}"}
         try:

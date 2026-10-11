@@ -29,11 +29,10 @@ CHECKING, DOWNLOADING, UPGRADING = "Checking the release", "Downloading the rele
 
 
 class Stop(Exception):
-    """The upgrade stops here; the message says why, in the owner's words."""
+    """Why the upgrade stops, in the owner's words."""
 
 
 def check(rel: releases.Releases, installed: str, commit: str) -> releases.Release:
-    """The release of ``commit``, once GitHub shows it is CI's, on the default branch and newer than ``installed``."""
     found = rel.of_commit(commit)
     branch = rel.default_branch()
     if not rel.ci_passed(commit, branch):
@@ -50,7 +49,6 @@ def check(rel: releases.Releases, installed: str, commit: str) -> releases.Relea
 
 
 def fetch(rel: releases.Releases, found: releases.Release, commit: str, folder: Path) -> Path:
-    """The release file, checked against its checksum and its manifest, in root's own ``folder``."""
     data = rel.download(found.assets[releases.ASSET])
     listed = rel.download(found.assets[releases.CHECKSUM]).decode(errors="replace").split()
     if not listed or hashlib.sha256(data).hexdigest() != listed[0]:
