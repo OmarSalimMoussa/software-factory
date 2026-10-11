@@ -19,7 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import files, format_check, formats, goal, reports, tasks, triage, turn
+from runtime.queue import files, format_check, formats, goal, intake, reports, tasks, triage, turn
 from runtime.queue.book import Queue
 from runtime.shared import models, store
 from runtime.shared.models import Probe
@@ -126,16 +126,17 @@ def _staging(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
     elif probe.counts and not memo["staging_red"]:
         memo["staging_red"] = True
         reflections.incident(ctx, f"Staging went red at {probe.at}; the orchestrator was told to revert or fix it.")
-        ctx.post_event(inbox.STAGING_RED, {
-            "probe": models.dump(probe),
-            "request": {
-                "inbox": "agents",
-                "severity": "severe",
-                "where": "staging",
-                "body": f"Staging's health check failed at {probe.at}: {probe.error}. Revert the change that broke "
-                        "it at once, or fix it forward.",
-            },
-        })  # fmt: skip
+        body = (f"Staging's health check failed at {probe.at}: {probe.error}. Revert the change that broke it at once, "
+                "or fix it forward.")  # fmt: skip
+        req = file_red(ctx, "staging", body)
+        ctx.post_event(inbox.STAGING_RED, {"probe": models.dump(probe), "request": req})
+
+
+def file_red(ctx: Context, where: str, body: str) -> str:
+    """The warden's own severe request for a red environment; its id, for the event that says so."""
+    queue = Queue.of(ctx)
+    with ctx.lock, queue.lock():
+        return intake.file_request(ctx, queue, "agents", "warden", "severe", where, body).id
 
 
 def _deployed(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:

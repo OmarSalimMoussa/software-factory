@@ -21,6 +21,8 @@ def world(tmp_path: Path) -> World:
     defaults = tomllib.loads((ROOT / "settings.toml").read_text())
     checkout = tmp_path / "checkout"
     checkout.mkdir()
+    (checkout / "queue").mkdir(mode=0o755)  # the warden's own folder in the checkout, where it files requests
+    (checkout / "queue").chmod(0o755)
     # The product's factory.toml names the health addresses the probes ask.
     shutil.copy(FACTORY_TOML, checkout / "factory.toml")
     settings = settings_mod.build(defaults, {"repo.path": str(checkout), "repo.github": "owner/name"})

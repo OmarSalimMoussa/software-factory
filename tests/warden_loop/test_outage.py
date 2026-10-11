@@ -28,7 +28,9 @@ def test_two_counted_failures_in_a_row_declare_one_outage(world: World, failure:
     probe_prod(world, failure, failure)
     current = outage.read(world.ctx.places)
     assert current is not None and current.stage == outage.DOWN
-    assert [kind for kind, _ in world.events] == [PROD_RED]
+    # The warden files the outage's severe request itself, and names it in the event.
+    assert [kind for kind, _ in world.events] == ["severe request", PROD_RED]
+    assert world.events[1][1]["request"] == world.events[0][1]["request"]
     probe_prod(world, healthy("a" * 40))
     assert outage.read(world.ctx.places) is None
 

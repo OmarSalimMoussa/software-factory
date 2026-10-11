@@ -104,10 +104,11 @@ def test_a_failed_errors_read_never_stops_the_loop_and_is_logged_once_a_run(
         for _ in range(2):
             events += tick(ticking, tmp_path)
             ticking.clock.t += period
-    assert len(reads) == 2 and inbox.LOOP_DUE in events  # read again at the next poll; the tick went on
+    assert len(reads) == 4 and inbox.LOOP_DUE in events  # read again at the next poll; the tick went on
     assert [r.getMessage() for r in caplog.records] == [
-        "warden: importing prod's errors failed (GlitchTip did not answer /api/0/organizations/notes/issues/ "
+        f"warden: importing {env}'s errors failed (GlitchTip did not answer /api/0/organizations/notes/issues/ "
         "(TimeoutError)); it runs again at the next poll"
+        for env in ("prod", "staging")
     ]
     assert "(TimeoutError)" in str(errors_import.note(ticking.ctx.places))
 

@@ -29,7 +29,8 @@ snapshot tool and take a screenshot of each (never naming a file; report its fil
 - The sign-in page loads. Signed in: every page the main navigation reaches loads and draws its content, plus the
   screens your brief names. Find each by what the navigation shows.
 - The console has no new errors; no request answers 5xx or an unexpected 4xx. `factory errors` and
-  `factory errors --where staging` show no issue first seen since the last push.
+  `factory errors --where staging` show no issue first seen since the time your brief gives: when prod began to
+  answer on this build.
 - Each page is ready in a reasonable time; report any page slower than three seconds, with the time.
 
 ## Read-only, without exception

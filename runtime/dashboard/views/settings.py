@@ -158,8 +158,9 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         "Errors and traces",
         "Applies as soon as you save.",
         [
-            ("errors.poll_minutes", "Read prod's new errors every, minutes"),
+            ("errors.poll_minutes", "Read prod's and staging's new errors every, minutes"),
             ("errors.max_pages", "Pages of errors one read covers"),
+            ("errors.severe_events", "Events that make an error severe"),
             ("reports.poll_minutes", "Ask for users' new reports every, minutes"),
             ("telemetry.max_items", "Errors or traces one answer lists"),
             ("telemetry.max_kib", "Largest errors or traces answer, KiB"),

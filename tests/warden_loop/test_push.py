@@ -165,7 +165,7 @@ def test_push_to_prod_runs_its_steps_and_asks_for_a_qa_prod_pass(world: World, b
     assert [step["state"] for step in op["steps"]] == [ops.DONE] * 5, op
     # A product may report a short build; its prod workflow checks out the full commit.
     assert world.github.dispatched == [world.github.full_sha(build)]
-    assert world.events == [(inbox.QA_PROD_DUE, {"sha": build, "kind": "push"})]
+    assert world.events == [(inbox.QA_PROD_DUE, {"sha": build, "kind": "push", "since": world.clock.iso()})]
     assert github_push.watching(world.ctx)
 
 

@@ -379,7 +379,8 @@ def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list
 
     def qa_prod() -> str:
         _watch_until(ctx, ctx.clock.now() + watch_s)
-        ctx.post_event(inbox.QA_PROD_DUE, {"sha": sha, "kind": kind})
+        # The tester looks for issues first seen since prod began to answer on this build.
+        ctx.post_event(inbox.QA_PROD_DUE, {"sha": sha, "kind": kind, "since": ctx.clock.iso()})
         return "the orchestrator starts it"
 
     return [

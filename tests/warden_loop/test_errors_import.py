@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
@@ -9,8 +10,10 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from loop_fakes import World
 
-from runtime.queue.book import Queue
+from runtime.queue import formats
+from runtime.queue.book import Queue, request_rel, task_rel
 from runtime.shared import store
+from runtime.shared.models import Task
 from runtime.warden import errors_import, telemetry
 from runtime.warden.telemetry import Reply
 
@@ -37,8 +40,6 @@ LAST = f'<{GLITCHTIP}/x>; rel="previous"; results="true"; cursor="c1", <{GLITCHT
 def asked(world: World, monkeypatch: pytest.MonkeyPatch) -> list[str]:
     """The server set-up ran and the product's queue is in place; GlitchTip answers two pages. The URLs it was asked."""
     store.write_json(telemetry.server_json(world.ctx.places), SERVER)
-    (world.checkout / "queue").mkdir(mode=0o755)
-    (world.checkout / "queue").chmod(0o755)
     pages = {
         "": ([issue(1, "prod-app"), issue(2, "staging-app")], FIRST),
         "c2": ([issue(3, "prod-web"), issue(4, "slot1-app")], LAST),
@@ -55,12 +56,43 @@ def asked(world: World, monkeypatch: pytest.MonkeyPatch) -> list[str]:
     return found
 
 
-def test_each_prod_issue_is_filed_once_across_polls(world: World, asked: list[str]) -> None:
+def test_each_prod_and_staging_issue_is_filed_once_across_polls(world: World, asked: list[str]) -> None:
     errors_import.poll(world.ctx)
     world.clock.t += world.ctx.settings().get_int("errors.poll_minutes") * 60
     errors_import.poll(world.ctx)
     requests, broken = Queue.of(world.ctx).requests()
-    assert not broken and len(asked) == 4  # both polls read both pages
-    assert sorted(r.where for r in requests) == ["prod-app:app.notes in show", "prod-web:app.notes in show"]
+    assert not broken and len(asked) == 8  # both polls read both pages, for each environment
+    assert sorted(r.where for r in requests) == [
+        "prod-app:app.notes in show",
+        "prod-web:app.notes in show",
+        "staging-app:app.notes in show",
+    ]  # a slot's issue is no environment's
     assert {(r.inbox, r.from_role, r.severity) for r in requests} == {("agents", "glitchtip", "normal")}
     assert all(url.startswith(f"{GLITCHTIP}/api/0/organizations/notes/issues/?") for url in asked)
+
+
+@pytest.mark.parametrize(
+    ("level", "count", "severity"),
+    [("error", "3", "normal"), ("fatal", "1", "severe"), ("error", "100", "severe"), (None, None, "normal")],
+)
+def test_a_fatal_or_frequent_issue_is_severe(level: str | None, count: str | None, severity: str) -> None:
+    found = telemetry.Issue("1", "prod-app", "x", "y", level, None, None, count, None)
+    assert errors_import.severity(found, 100) == severity
+
+
+def test_an_issue_seen_after_its_fix_reached_prod_is_filed_again(world: World, asked: list[str]) -> None:
+    errors_import.poll(world.ctx)
+    queue = Queue.of(world.ctx)
+    first = next(r for r in queue.requests()[0] if r.where.startswith("prod-app"))
+    task = Task(id="t-0001", title="Notes show", requests=[first.id], goal_item="G1", severity="major",
+                surfaces=["api"], status="promoted", created=first.at, body="Fix it.", run=1, slices=1)  # fmt: skip
+    with queue.lock():
+        joined = dataclasses.replace(first, outcome="task t-0001")
+        queue.write({task_rel(task.id): formats.dump_task(task), request_rel(first): formats.dump_request(joined)})
+        queue.log(task.id, "2026-10-09T10:30:00Z", "warden", "promoted", "on prod", to="promoted")
+
+    world.clock.t += world.ctx.settings().get_int("errors.poll_minutes") * 60
+    errors_import.poll(world.ctx)  # the issue was last seen at 11:00, after the fix reached prod at 10:30
+
+    again = [r for r in Queue.of(world.ctx).requests()[0] if r.where.startswith("prod-app")]
+    assert len(again) == 2 and "came back after its fix shipped" in again[-1].body

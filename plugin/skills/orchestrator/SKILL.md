@@ -38,7 +38,7 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 | `severe request` | Start intake on it at once (one subagent place is always kept for intake). Route its task next. |
 | `prod red`, `staging red` | As "When something is red" says. |
 | `triage due` | Start one `triage` subagent on the batch the event names (its request ids). When it hands back, `factory triage apply`; give each new task a light intake pass. |
-| `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed. |
+| `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed, giving it the event's `since`. |
 | `approved` | The warden starts it when a place frees. Fill the free proposal slot. |
 | `not-now`, `dropped`, `boosted`, `proposal-slot-free` | Fill the free proposal slots. |
 | `go` | Start the build. The warden ends the spec's designer itself. |
@@ -54,9 +54,9 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 ## A loop pass
 
 `factory tick` records the pass. The warden does its own part on its own timers: probes, the user-report pull, sweeps,
-and filing each new prod error-tracker issue as a request from `glitchtip`. Then: staging's health in `factory status`; staging's new issues
-from `factory errors --where staging`, by title and count only, each filed as a request; and when no implementer is
-live and nothing merged for a while, a regression walk of the scenarios that waited longest.
+and filing each new prod or staging error-tracker issue as a request from `glitchtip` (again when one comes back
+after its fix shipped). Then: staging's health in `factory status`; and when no implementer is live and nothing
+merged for a while, a regression walk of the scenarios that waited longest.
 
 ## Requests and triage
 
@@ -124,8 +124,9 @@ live and nothing merged for a while, a regression walk of the scenarios that wai
 
 ## When something is red
 
-- **Staging red:** your last push is the first suspect: revert it and push. Then file a severe request.
-- **Prod red** is a clear outage only when the warden says so. Its severe request goes to intake at once, and
+- **Staging red:** your last push is the first suspect: revert it and push. The warden filed the severe request.
+- **Prod red** is a clear outage only when the warden says so. The warden files its severe request, which goes to
+  intake at once, and
   `factory start implementer <task>` starts the one fix without an approval, at rung 1 or 2. The fix ships to
   staging like any other; the owner pushes it to prod.
 

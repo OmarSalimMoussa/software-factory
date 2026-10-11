@@ -52,18 +52,13 @@ def observe(ctx: Context, probe: Probe) -> None:
         outage = Outage(since=streak[0].at, stage=DOWN)
         _write(ctx.places, outage)
     reflections.incident(ctx, f"Prod went down at {outage.since}: {needed} health checks in a row failed.")
-    ctx.post_event(inbox.PROD_RED, {
-        "since": outage.since,
-        "probes": [models.dump(p) for p in streak],
-        "request": {
-            "inbox": "agents",
-            "severity": "severe",
-            "where": "prod",
-            "body": f"Prod's health check failed {needed} probes in a row since {outage.since}: {probe.error}. "
-                    "Prod cannot be fixed on prod: the fix ships to staging for the owner to push, or the owner "
-                    "pushes prod back. One run at rung 1 or 2 may start without the owner's approval.",
-        },
-    })  # fmt: skip
+    from runtime.warden import loop  # the loop feeds this module its probes
+
+    body = (f"Prod's health check failed {needed} probes in a row since {outage.since}: {probe.error}. Prod cannot be "
+            "fixed on prod: the fix ships to staging for the owner to push, or the owner pushes prod back. One run at "
+            "rung 1 or 2 may start without the owner's approval.")  # fmt: skip
+    req = loop.file_red(ctx, "prod", body)
+    ctx.post_event(inbox.PROD_RED, {"since": outage.since, "probes": [models.dump(p) for p in streak], "request": req})
 
 
 def bypass_allowed(ctx: Context) -> bool:

@@ -124,6 +124,7 @@ SCHEMA: dict[str, Spec] = {
     "checks.output_kib": Spec("int", 4, 1024),
     "errors.poll_minutes": Spec("int", 1, 120),  # contract: added by FB6, prod's GlitchTip issues become requests
     "errors.max_pages": Spec("int", 1, 50),
+    "errors.severe_events": Spec("int", 1, 1_000_000),
     "reports.poll_minutes": Spec("int", 1, 1440),
     "telemetry.max_items": Spec("int", 1, 200),  # contract: added by FB6, `factory errors` and `factory traces`
     "telemetry.max_kib": Spec("int", 4, 1024),
