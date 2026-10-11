@@ -3,7 +3,7 @@
 What the owner does, day to day. The dashboard is the one window; the code is the 6-digit code from the
 authenticator app set up at install.
 
-## Install, reinstall and uninstall
+## Install, upgrade and uninstall
 
 Install the factory, or update it, from its latest release. With your GitHub CLI (`gh`) signed in, in any folder:
 
@@ -23,8 +23,9 @@ your browser. It prints the page's link too; the link works once, in the browser
 
 - **This laptop** says whether the factory is installed, at which commit and since when, how the last safety checks
   did, whether the warden, the dashboard, GlitchTip and Langfuse answer, and where the dashboard is on your tailnet.
-- **Install** (or **Reinstall**) installs the release's commit. Turn on **Dry run** to go through every step on this
-  computer without changing anything.
+- **Install** installs the release's commit. On a laptop that has the factory, it says **Upgrade**, from which
+  commit, and what it keeps: your settings, accounts, keys and code, the Healthchecks.io checks, the agents' work and
+  the shared services. Turn on **Dry run** to go through every step on this computer without changing anything.
 - **An install** shows a few phases with a progress bar and one line on what it is doing: checking this computer,
   preparing it, fetching the shared services, connecting your accounts, setting up the factory, starting up, running
   the safety checks and finishing. It never shows the commands it runs.
@@ -151,15 +152,19 @@ is written to the warden's state on this machine, and only what reads that value
 The factory never changes itself. Read the Self-reflect page: misses, friction, discoveries, misroutes and incidents.
 To act on one:
 
-1. Pause the factory, then stop every agent.
-2. Change the factory's repo by hand: branch, test, merge, push. Wait for the factory's CI to pass on the commit.
-3. Download that commit's release and run it, as in "Install, reinstall and uninstall" above (or reinstall from your
-   checkout). The installer refuses while any factory session is live.
-4. In the product, move `.github/factory-ref` to that commit, and copy in `templates/ci/` again if it changed.
-5. Run the server set-up again from that commit (`python3 -m standard.server.setup --product <path>`). It refuses a
-   factory checkout at another commit than `.github/factory-ref` names. Older builds stay deployable, so pushing
-   prod back still works after the upgrade.
-6. Start the orchestrator again.
+1. Change the factory's repo by hand: branch, test, merge, push. The factory's CI publishes a release once every
+   check passes.
+2. Home shows **A newer factory is ready**, with what changed. **Upgrade**, with your 6-digit code, pauses the
+   factory, waits for every agent to settle, and installs the release as root, after checking on GitHub that CI made
+   it. The dashboard restarts on the way. The upgrade also commits the product's `.github/factory-ref` and CI
+   workflows for the new factory, and the warden pushes that commit itself.
+3. Run the server set-up again from a factory checkout at that commit (`python3 -m standard.server.setup --product
+   <path>`). It refuses a checkout at another commit than `.github/factory-ref` names. Older builds stay deployable.
+4. **Restart the factory** on Home: every agent comes back with its work.
+
+The dashboard looks for releases with a read-only GitHub token for the factory's repo, which the install asks for
+once. So the first upgrade to a factory that has this button is by hand, from the release file. An upgrade that needs an answer
+(a new token, a key to add) stops and says so: run the release file by hand to give it.
 
 ## When something is wrong
 
@@ -167,4 +172,4 @@ To act on one:
   prod, or push back. Stop the fix from the band if you prefer to handle it yourself.
 - **The warden unreachable:** the dashboard keeps its last known state, marked old, and refuses every change until
   the warden answers. Check its service on the laptop.
-- **Vitals red:** nothing starts until memory, CPU or power recover, or the install hash matches a reinstall.
+- **Vitals red:** nothing starts until memory, CPU or power recover, or the install hash matches an upgrade.

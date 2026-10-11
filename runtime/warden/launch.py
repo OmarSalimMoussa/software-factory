@@ -24,7 +24,7 @@ from typing import Any
 
 from runtime.shared import store
 from runtime.shared.models import WORKING, Session
-from runtime.shared.paths import AGENT_USER, Places
+from runtime.shared.paths import AGENT_USER, UPGRADE_UNIT, Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.system.layout import DAEMON_UNIT
@@ -34,7 +34,6 @@ from runtime.warden.context import Context, StackResult
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
 CHECK_UNIT = "software-check-run@{}.service"
-UPGRADE_UNIT = "software-upgrade@{}.service"  # contract: must mirror runtime/system/layout.py UPGRADE_RUN
 # A started session's registry id until the backstop sees it running under its name and takes the id Claude Code
 # gave it (`claude --bg` ignores --session-id). The guard finds an unbound session the same way, by name.
 PENDING = "pending-"

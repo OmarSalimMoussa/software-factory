@@ -28,7 +28,7 @@ sha256sum -c software-factory.pyz.sha256 && sudo python3 software-factory.pyz --
 
 The same two lines update it. The release file is one Python file that the factory's CI publishes only for a commit on
 which every check passed. Run with sudo, it checks itself, unpacks into a sealed, read-only copy and opens the install
-console in your browser: a page that installs, reinstalls or uninstalls the factory as a few phases with a progress
+console in your browser: a page that installs, upgrades or uninstalls the factory as a few phases with a progress
 bar, and asks in place for each secret. `--terminal` installs in the terminal instead, and `--uninstall` removes the
 factory. Every command and its output goes to a log in `/var/log/software-factory/`. The install runs on Debian or
 Ubuntu, and checks everything it needs before it changes anything. It copies the programs the product's scripts need
