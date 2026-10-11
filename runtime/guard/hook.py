@@ -55,6 +55,7 @@ def handle(raw: str, cgroup: str, places: Places, home: Path, now: datetime) -> 
         payload = json.loads(raw)
         if not isinstance(payload, dict):
             raise ValueError("the hook input is not an object")
+    # telemetry: surfaced — the session is refused with why, through `_refuse`
     except ValueError:
         return _refuse(places, {}, "guard", "the hook input could not be read; report this to the owner", now)
     event = payload.get("hook_event_name")
@@ -62,7 +63,7 @@ def handle(raw: str, cgroup: str, places: Places, home: Path, now: datetime) -> 
         return 0, "", report_subagent(payload, str(event), places)
     try:
         return _run(payload, event, places, home, now)
-    # Any failure, a broken rule module included, refuses a factory call; the reason names it.
+    # telemetry: surfaced — any failure, a broken rule module included, refuses the call naming the `failure`
     except Exception as exc:  # noqa: BLE001
         failure = f"the guard failed ({type(exc).__name__}: {exc})"
         if event == "SessionStart":
@@ -89,7 +90,7 @@ def report_subagent(payload: dict[str, object], event: str, places: Places) -> s
             sock.connect(str(places.socket))
             sock.sendall(request(verb, args))
             answer = json.loads(sock.makefile("rb").readline())
-    # Never raised: the subagent runs either way, and its factory calls are refused until the warden knows it.
+    # telemetry: surfaced — the session sees `was not sent`; its calls are refused until the warden knows it
     except Exception as exc:  # noqa: BLE001
         return f"factory guard: {verb} was not sent ({type(exc).__name__})"
     if not isinstance(answer, dict) or answer.get("ok") is not True:
@@ -129,7 +130,7 @@ def _run(payload: dict[str, object], event: object, places: Places, home: Path, 
 def out_of_time(raw: str) -> Outcome:
     try:
         payload = json.loads(raw)
-    # telemetry: surfaced — an unreadable input refuses like any other the guard cannot decide
+    # telemetry: surfaced — an unreadable input is refused like any other call, with the `one_line` below
     except ValueError:
         payload = {}
     if not isinstance(payload, dict) or payload.get("hook_event_name") not in (None, "PreToolUse"):
@@ -146,7 +147,7 @@ def _arm(places: Places) -> None:
         from runtime.guard.facts import read_settings
 
         seconds = read_settings(places).get_int("install.hook_timeout_seconds")
-    # telemetry: surfaced — the rules read the settings again and refuse the call, naming why
+    # telemetry: surfaced — the guard's first step reads the settings again and `refuses the call` naming why
     except Exception:  # noqa: BLE001
         return
     deadline.arm(seconds)
@@ -165,7 +166,7 @@ def main() -> int:
         _arm(places)
     try:
         code, out, err = handle(raw, cgroup, places, Path.home(), datetime.now(UTC))
-    # The time ran out while a refusal was being written: the call is refused all the same, unless it only reads.
+    # telemetry: surfaced — out of time while refusing: `out_of_time` refuses the call all the same
     except deadline.OutOfTime:
         code, out, err = out_of_time(raw)
     finally:

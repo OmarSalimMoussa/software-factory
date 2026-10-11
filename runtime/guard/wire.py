@@ -37,6 +37,7 @@ def send_refusal(path: Path, record: dict[str, str]) -> None:
             sock.setblocking(False)
             sock.sendto(line, str(path))
             return
+    # telemetry: expected — the refusal stands; a warden that is down misses one count line, and the dashboard says so
     except OSError as exc:
         if exc.errno != errno.EPROTOTYPE:
             return
@@ -46,5 +47,6 @@ def send_refusal(path: Path, record: dict[str, str]) -> None:
             sock.settimeout(deadline.spare())
             sock.connect(str(path))
             sock.sendall(line)
+    # telemetry: expected — the refusal stands; a warden that is down misses one count line, and the dashboard says so
     except OSError:
         return

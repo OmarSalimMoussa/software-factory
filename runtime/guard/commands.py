@@ -47,7 +47,7 @@ def is_way_out(call: Call) -> bool:
 def reads_only(command: str) -> bool:
     try:
         found = shell.invocations(command)
-    # An unreadable command is no way out; the shell rules refuse it with the reason.
+    # telemetry: expected — an unreadable command is no way out; the shell rules refuse it with the reason
     except shell.ShellError:
         return False
     return bool(found) and all(_reader(inv) for inv in found)
@@ -67,7 +67,7 @@ def check_bash(call: Call) -> Decision:
     command = str(call.tool_input.get("command", ""))
     try:
         found = shell.invocations(command)
-    # The refusal names the parse error to the agent.
+    # telemetry: surfaced — the `Refusal` names the parse error to the agent
     except shell.ShellError as exc:
         if call.off("unreadable-command"):
             return None

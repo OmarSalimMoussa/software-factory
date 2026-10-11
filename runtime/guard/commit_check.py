@@ -88,6 +88,7 @@ def turn_refusal(places: Places, merging: str) -> str:
     path = places.public_turn
     try:
         branch = json.loads(path.read_text(encoding="utf-8"))["branch"]
+    # telemetry: surfaced — no turn file: no task holds the turn, which `turn_refusal` says to the session
     except FileNotFoundError:
         return "commit-check: no task holds the merge turn; give one with `factory turn next`, then merge it"
     except (OSError, ValueError, KeyError, TypeError) as exc:
@@ -113,7 +114,7 @@ def _optional_git(*args: str) -> str:
 def _in_slice() -> bool:
     try:
         cgroup = Path("/proc/self/cgroup").read_text(encoding="utf-8")
-    # No cgroup file, no slice: a machine that runs no factory.
+    # telemetry: expected — no cgroup file, no slice: a machine that runs no factory
     except OSError:
         return False
     return any(f"/{SLICE}/" in line + "/" for line in cgroup.splitlines())

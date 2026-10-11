@@ -50,7 +50,7 @@ def resolve(payload: dict[str, Any], places: Places, now: datetime, home: Path) 
     """The call with the warden's published facts, or None for a session the warden registered as the owner's."""
     try:
         switches = read_switches(places)
-    # Every rule stays on; the dashboard's Guard page shows the unreadable switches.
+    # telemetry: expected — every rule stays on; the warden reports the unreadable switches on the Guard page
     except store.StoreError:
         switches = frozenset()
     call = Call(payload, places, read_settings(places), switches, read_sessions(places), now, home)
@@ -91,7 +91,7 @@ def _commits_only(call: Call) -> bool:
     """A command made only of staging, committing and the factory command."""
     try:
         found = shell.invocations(str(call.tool_input.get("command", "")))
-    # An unreadable command is not a commit; the refusal says what to run.
+    # telemetry: expected — an unreadable command is not a commit; the refusal says what to run
     except shell.ShellError:
         return False
     for inv in found:
@@ -170,7 +170,7 @@ def session_context(call: Call) -> str:
 def _read(path: Path, what: str) -> str:
     try:
         return path.read_text(encoding="utf-8").strip()
-    # The session is told in its context, and tells the owner.
+    # telemetry: surfaced — the session reads in its context that the file `what` names is unreadable
     except OSError as exc:
         return f"{what} ({path}) cannot be read ({type(exc).__name__}): tell the owner the factory's install is broken."
 

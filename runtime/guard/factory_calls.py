@@ -99,6 +99,7 @@ def plain_words(command: str) -> list[str] | None:
     lexer.commenters = ""
     try:
         words = list(lexer)
+    # telemetry: expected — words shlex cannot split are no plain words; the shell rules refuse them
     except ValueError:
         return None
     return None if any(set(w) <= set("();<>|&") for w in words) else words

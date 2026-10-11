@@ -125,7 +125,7 @@ def _brief(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision
         return None
     try:
         transcript.declared_items(str(call.tool_input.get("prompt", "")), call.settings.get_int("qa.max_items"))
-    # The refusal names what the brief lacks.
+    # telemetry: surfaced — the `Refusal` names what the brief lacks
     except transcript.BriefError as exc:
         return Refusal("tester-brief", str(exc))
     return None
@@ -140,7 +140,7 @@ def _running(call: Call, agent: transcript.AgentCall) -> bool:
     path = transcript.subagent_transcript(call.transcript, agent.agent_id) if agent.agent_id else None
     try:
         last = datetime.fromtimestamp(path.stat().st_mtime, tz=call.now.tzinfo) if path else agent.started
-    # A subagent that has written nothing yet counts from its start.
+    # telemetry: expected — a subagent that has written nothing yet counts from its start
     except OSError:
         last = agent.started
     quiet = (call.now - last).total_seconds()
@@ -151,7 +151,7 @@ def _running(call: Call, agent: transcript.AgentCall) -> bool:
         try:
             items = transcript.declared_items(agent.prompt, call.settings.get_int("qa.max_items"))
             budget = items * call.settings.get_int("qa.seconds_per_item")
-        # A tester started with no brief, while that rule was off, has no time budget.
+        # telemetry: expected — a tester started with no brief, while that rule was off, has no time budget
         except transcript.BriefError:
             budget = 0
     spent = (call.now - agent.started).total_seconds()
@@ -230,7 +230,7 @@ def _critic_rounds(call: Call, kind: str, calls: list[transcript.AgentCall]) -> 
 def _saves_spec(command: str) -> bool:
     try:
         found = shell.invocations(command)
-    # A command the guard could not read was refused, so it saved nothing.
+    # telemetry: expected — a command the guard could not read was refused, so it saved nothing
     except shell.ShellError:
         return False
     return any(inv.program == factory_calls.FACTORY and factory_calls.verb_of(inv.argv) == "spec.save" for inv in found)
@@ -288,6 +288,7 @@ def check_intake_time(call: Call) -> Decision:
         return None
     try:
         _, started = transcript.first_brief(transcript.subagent_transcript(call.transcript, call.agent_id))
+    # telemetry: surfaced — the `Refusal` tells the intake subagent its time cannot be read
     except transcript.BriefError as exc:
         return Refusal("intake-time", f"your time cannot be read ({exc}); write what you found, then hand back")
     limit = call.settings.get_int("intake.fast_lane_minutes")
@@ -303,7 +304,7 @@ def _time_left(call: Call) -> float | Refusal:
     try:
         brief, started = transcript.first_brief(path)
         items = transcript.declared_items(brief, call.settings.get_int("qa.max_items"))
-    # The refusal tells the tester to report what it has.
+    # telemetry: surfaced — the `Refusal` tells the tester to report what it has
     except transcript.BriefError as exc:
         return Refusal("tester-time", f"your time budget cannot be read ({exc}); report what you have")
     budget = float(items * call.settings.get_int("qa.seconds_per_item"))

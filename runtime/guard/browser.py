@@ -93,7 +93,7 @@ def _named(call: Call) -> list[str]:
     if call.tool in {"Bash", "Monitor"}:
         try:
             found = shell.invocations(str(call.tool_input.get("command", "")))
-        # The shell rules refuse a command the guard cannot read.
+        # telemetry: expected — an unreadable command has no words for this rule; the shell rules refuse it
         except shell.ShellError:
             return []
         return [word for inv in found for word in (*inv.argv, *inv.writes, *inv.reads)]

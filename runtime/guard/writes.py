@@ -125,6 +125,7 @@ def protected(call: Call, word: str, cwd: Path, *, removes: bool = False) -> Ref
     """
     try:
         prefixes = protected_paths(call.settings)
+    # telemetry: surfaced — the `Refusal` says every write is refused until the owner fixes the paths
     except UnknownProtectedPaths as exc:
         remedy = "every write is refused until the owner fixes it: file a request with `factory request new`"
         return Refusal("protected-paths", f"{exc}; {remedy}")

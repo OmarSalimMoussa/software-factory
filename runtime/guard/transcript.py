@@ -50,7 +50,7 @@ def entries(path: Path) -> Iterator[dict[str, Any]]:
         for line in lines:
             try:
                 entry = json.loads(line)
-            # A line still being written is skipped until it is whole
+            # telemetry: expected — a line still being written is skipped until it is whole
             except ValueError:
                 continue
             if isinstance(entry, dict):
@@ -63,7 +63,7 @@ def _when(entry: dict[str, Any]) -> datetime | None:
         return None
     try:
         return datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-    # An entry with no readable time is skipped by every caller
+    # telemetry: expected — an entry with no readable time is skipped by every caller
     except ValueError:
         return None
 
@@ -118,7 +118,7 @@ def subagent_ids(session_transcript: Path) -> dict[str, str]:
     for meta in folder.glob("agent-*.meta.json"):
         try:
             use = json.loads(meta.read_text(encoding="utf-8")).get("toolUseId")
-        # A record still being written names nobody yet
+        # telemetry: expected — a record still being written names nobody yet
         except (OSError, ValueError):
             continue
         if isinstance(use, str):

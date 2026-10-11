@@ -95,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         run(sys.stdin, sys.stdout, args.out or default_out(), datetime.now(UTC))
+    # telemetry: surfaced — the status line reads `plan limits unknown` with the failure's class
     except Exception as exc:  # noqa: BLE001 - a status line never fails the session; the line names the failure
         print(f"plan limits unknown ({type(exc).__name__})")
     return 0

@@ -98,6 +98,7 @@ def main(argv: list[str], owner_socket: Path, ask: Callable[[Path, Call], dict[s
          out: IO[str], err: IO[str]) -> int:  # fmt: skip
     try:
         return run(argv, lambda call: ask(owner_socket, call), stdin, out, err)
+    # telemetry: surfaced — the owner reads on `err` that the warden cannot be reached, and the exit says so
     except (OSError, ValueError) as exc:
         print(f"factory: the warden cannot be reached ({type(exc).__name__}); is it running?", file=err)
         return UNREACHABLE
