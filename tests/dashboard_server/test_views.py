@@ -9,7 +9,8 @@ from typing import Any
 
 import pytest
 from dashboard_rig import Rig
-from dashboard_seed import FIXTURES, STAGING, iso
+from dashboard_seed import STAGING
+from seed_kit import FIXTURES, iso
 
 from runtime.dashboard.views import ops
 from runtime.dashboard.views.words.settingwords import LABELS

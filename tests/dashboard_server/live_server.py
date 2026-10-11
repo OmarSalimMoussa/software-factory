@@ -27,8 +27,9 @@ from urllib.parse import parse_qsl, urlsplit
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE.parents[1]), str(HERE.parent), str(HERE)]
 
-from dashboard_seed import FIXTURES, iso, seed  # noqa: E402
+from dashboard_seed import seed  # noqa: E402
 from fake_warden import FakeWarden, GitHub  # noqa: E402
+from seed_kit import FIXTURES, iso  # noqa: E402
 
 from runtime.dashboard import server  # noqa: E402
 from runtime.dashboard.client import Warden  # noqa: E402
