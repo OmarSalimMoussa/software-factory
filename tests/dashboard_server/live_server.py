@@ -35,7 +35,7 @@ from runtime.dashboard.client import Warden  # noqa: E402
 from runtime.queue import formats, propose  # noqa: E402
 from runtime.shared import models, store  # noqa: E402
 from runtime.shared import settings as settings_module  # noqa: E402
-from runtime.warden import crashwatch, deploys, public, registry, settings_save  # noqa: E402
+from runtime.warden import crashwatch, deploys, ops, public, registry, settings_save  # noqa: E402
 from runtime.warden.context import Caller, Clock  # noqa: E402
 
 CODE = "123456"
@@ -90,7 +90,19 @@ class Live:
         self.warden: FakeWarden | None = None
         self.roots: list[Path] = []
         self.timers: list[threading.Timer] = []
+        self._launch = ops.launch
+        ops.launch = self.paced  # type: ignore[assignment]  # the drives set how long each step of an operation takes
         self.app = self.fresh()
+
+    def paced(self, ctx: Any, kind: str, steps: Any, result: dict[str, Any] | None = None) -> str:
+        """An operation whose every step takes at least the drive's op_ms, so a drive can reload the page while it
+        still runs, however fast or slow the machine."""
+        wait = self.switches.get("op_ms", 0) / 1000
+
+        def slow(act: Any) -> Any:
+            return lambda: (time.sleep(wait), act())[1]
+
+        return self._launch(ctx, kind, [(text, slow(act)) for text, act in steps], result)
 
     def remove(self, *_: Any) -> None:
         """The drive stops the server with SIGTERM: every seeded folder goes, once no stand-in still writes to it."""
@@ -103,7 +115,7 @@ class Live:
         raise SystemExit(0)
 
     def fresh(self) -> server.App:
-        """The seeded afternoon again, with the warden's own clone of the factory repo for settings saves."""
+        """The seeded afternoon again."""
         if self.warden is not None:
             self.warden.stop()
         self.switches = {"fail_part": [], "refuse": {}}

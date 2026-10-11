@@ -95,6 +95,8 @@ def end_children(ctx: Context, sessions: dict[str, Session], s: Session, why: st
 
 def after_retire(ctx: Context, retired: list[Session]) -> None:
     """Stop what still runs, and send an unfinished task back to Proposed next."""
+    if not retired:
+        return
     running = backstop.processes()
     for s in retired:
         if s.id in running:
