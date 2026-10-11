@@ -73,6 +73,7 @@ FIREWALL_TIMER = "software-firewall-refresh.timer"
 AGENT_RUN = "software-agent-run@.service"
 STACK_RUN = "software-stack-run@.service"
 CHECK_RUN = "software-check-run@.service"
+UPGRADE_RUN = "software-upgrade@.service"  # contract: must mirror runtime/warden/launch.py UPGRADE_UNIT
 SERVICES = (WARDEN_UNIT, DASHBOARD_UNIT, DAEMON_UNIT)
 # The laptop's shared services (the stack of standard/services/), run by the stack user; a reinstall leaves them up.
 SERVICES_UNIT = "software-services.service"

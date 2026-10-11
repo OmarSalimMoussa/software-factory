@@ -4,6 +4,7 @@
 PAGE.home = {
   url: () => '/api/home',
   render: env => `${part(env, 'outage', o => o ? outageBand(o) : '')}
+  ${part(env, 'upgrade', u => u ? upgradeBand(u) : '')}
   ${part(env, 'envs', envsHTML)}
   ${propsSection(env)}
   ${needsSection(env)}
@@ -13,7 +14,11 @@ PAGE.home = {
   ${orchestratorBox(env)}`,
   /* A settled card is the server's brief "Approved." moment, and a choosing slot is waiting on the orchestrator:
      look again soon, so the slot moves on without waiting a whole poll. */
-  soon: env => { const p = env.parts.proposals, kinds = p && p.ok ? p.data.slots.map(s => s.kind) : []; return kinds.includes('settled') ? 1600 : kinds.includes('choosing') ? 4000 : 0; }
+  soon: env => {
+    const p = env.parts.proposals, kinds = p && p.ok ? p.data.slots.map(s => s.kind) : [], u = env.parts.upgrade;
+    if (u && u.ok && u.data && ['preparing', 'running'].includes(u.data.state)) return 3000;  // an upgrade moves step by step
+    return kinds.includes('settled') ? 1600 : kinds.includes('choosing') ? 4000 : 0;
+  }
 };
 const homePart = name => { const env = UI.data['/api/home'], p = env && env.parts[name]; return p && p.ok ? p.data : null; };
 
@@ -29,6 +34,23 @@ function envCard(env) {
 const LAPTOP_TONE = {healthy: 'good', amber: 'warn', red: 'bad'};
 function laptopHTML(l) {
   return `<div class="card vitals-mini"><div class="env-top"><span class="env-name">Laptop</span><span class="chip ${LAPTOP_TONE[l.state] || ''}" style="margin-left:auto">${esc(l.label)}</span></div>${l.rows.map(r => `<div class="vrow"><span>${esc(r.label)}</span>${r.pct == null ? '<div class="meter unknown"></div>' : `<div class="meter"><i style="width:${r.pct}%"></i></div>`}<span class="num">${esc(r.value)}</span></div>`).join('')}</div>`;
+}
+
+/* ---------- the upgrade band: a newer factory, the upgrade under way, or how it ended ---------- */
+function upgradeBand(u) {
+  const acts = {
+    upgrade: () => `<button class="btn sm primary" data-action="upgrade-factory" data-commit="${esc(u.commit)}">${icon('arrow-up-circle', 'sm')}Upgrade</button>`,
+    resume: () => `<button class="btn sm" data-action="resume">${icon('play-circle', 'sm')}Restart the factory</button>`,
+  };
+  const busy = ['preparing', 'running'].includes(u.state);
+  const changes = u.changelog.length ? `<details class="u-log"><summary>What changed (${u.changelog.length})</summary><ul>${u.changelog.map(c => `<li>${esc(c)}</li>`).join('')}</ul></details>` : '';
+  const log = u.log ? `<div class="o-s muted">The log: <span class="mono">${esc(u.log)}</span></div>` : '';
+  return `<div class="card upgrade" data-state="${esc(u.state)}" role="status"><span class="ico">${icon(busy ? 'arrow-path' : 'arrow-up-circle')}</span><div style="min-width:0"><div class="o-t">${esc(u.title)}</div><div class="o-s">${esc(u.message)}</div>${log}${changes}</div><div class="o-a">${u.actions.map(a => acts[a] ? acts[a]() : '').join('')}</div></div>`;
+}
+function upgradeFactory(commit) {
+  const u = homePart('upgrade') || {changelog: []};
+  codeSheet('Upgrade the factory', `<div class="muted">The factory pauses, every agent keeps its work, and the new factory is installed. The dashboard restarts on the way; then you choose when to restart the factory.</div>${u.changelog.length ? `<ul class="changes">${u.changelog.map(c => `<li><span>${esc(c)}</span></li>`).join('')}</ul>` : ''}`, 'Upgrade',
+    (code, key) => post('/api/factory/upgrade', {commit, code}, key), {opTitle: 'Getting ready to upgrade', icon: 'arrow-up-circle'});
 }
 
 /* ---------- the outage band: decided by the warden's probes, never by an agent ---------- */

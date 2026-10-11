@@ -193,6 +193,9 @@ SCHEMA: dict[str, Spec] = {
     "install.hook_timeout_seconds": Spec("int", 2, 60, when="Next install"),
     "install.firewall_refresh_seconds": Spec("int", 10, 600, when="Next install"),
     "install.healthchecks_grace_minutes": Spec("int", 1, 120, when="Next install"),
+    "install.release_check_hours": Spec("int", 1, 168),
+    "install.upgrade_wait_minutes": Spec("int", 5, 240),
+    "install.upgrade_minutes": Spec("int", 10, 600, when="Next install"),
     # contract: added by FB7. The programs the product's scripts need, copied from the owner's PATH for the agents and
     # the stack.
     "install.toolchain": Spec("list", when="Next install"),

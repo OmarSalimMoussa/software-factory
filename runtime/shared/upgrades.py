@@ -27,23 +27,20 @@ def progress_path(places: Places) -> Path:
     return places.upgrade / "progress.json"
 
 
+_INSTALLED = ("commit", "owner", "product", "repo")
+
+
 def read_installed(places: Places) -> dict[str, str] | None:
-    """The last finished install: its commit, the owner's login and the owner's product checkout; None before one.
-    Raises StoreError when the record cannot be used."""
+    """The last finished install: its commit, the owner's login, the owner's product checkout and the factory's
+    repo (owner/name); None before one. Raises StoreError when the record cannot be used."""
     raw = store.read_json_or(installed_path(places), None)
     if raw is None:
         return None
-    if not isinstance(raw, dict) or not all(isinstance(raw.get(k), str) and raw[k] for k in ("commit", "owner",
-                                                                                              "product")):  # fmt: skip
-        raise store.StoreError(f"{installed_path(places)}: needs the commit, the owner and the product")
+    if not isinstance(raw, dict) or not all(isinstance(raw.get(k), str) and raw[k] for k in _INSTALLED):
+        raise store.StoreError(f"{installed_path(places)}: needs {', '.join(_INSTALLED)}")
     if not FULL_SHA.match(raw["commit"]):
         raise store.StoreError(f"{installed_path(places)}: the commit is not a full sha")
-    return {k: raw[k] for k in ("commit", "owner", "product")}
-
-
-def write_installed(places: Places, commit: str, owner: str, product: str) -> None:
-    places.upgrade.mkdir(mode=0o755, parents=True, exist_ok=True)
-    store.write_json(installed_path(places), {"commit": commit, "owner": owner, "product": product}, mode=0o644)
+    return {k: raw[k] for k in _INSTALLED}
 
 
 def read_progress(places: Places) -> dict[str, Any] | None:

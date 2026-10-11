@@ -7,7 +7,7 @@ import json
 import tomllib
 from typing import Any
 
-from runtime.shared.models import DEPRIORITIZED, RETIRED
+from runtime.shared.models import RESTING
 from runtime.shared.settings import SCHEMA, SettingsError, build, flatten
 from runtime.system import layout
 from runtime.system.host import Account, Host
@@ -17,8 +17,6 @@ from runtime.warden import registry
 # What the owner sets up before an install; the packages step installs the rest (nftables among them).
 _MACHINE_TOOLS = ("git", "tar", "systemctl", "systemd-run", "runuser", "loginctl", "useradd", "tailscale")
 _OWNER_TOOLS = ("uv", "claude")
-# A session in any other state is working, waiting or between the two: reinstalling under it would lose its work.
-_RESTING = (DEPRIORITIZED, RETIRED)
 
 
 # The shell's start-up files may print; only what follows this line is the lookup's answer.
@@ -87,7 +85,7 @@ def refuse_live_sessions(ctx: Install) -> None:
             raise
         ctx.host.say("(a dry run as you cannot read the registry; the install checks it as root)")
         return
-    live = sorted(s.name for s in sessions.values() if s.state not in _RESTING)
+    live = sorted(s.name for s in sessions.values() if s.state not in RESTING)
     if live:
         raise refuse(f"Pause the factory on the dashboard first, then try again: {len(live)} of its agents are still "
                      f"working or waiting ({', '.join(live)})")  # fmt: skip

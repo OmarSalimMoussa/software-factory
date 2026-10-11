@@ -27,6 +27,7 @@ WANTS = (
     "ci",
     "rules",
     "triage",
+    "upgrade",
 )
 SPARK_DAYS = 14
 _LAPTOP = {
@@ -261,6 +262,48 @@ def working(snap: Snap) -> list[dict[str, Any]]:
     ]
 
 
+_COMES_BACK = "The dashboard restarts during the upgrade. This page comes back on its own."
+
+
+def upgrade(snap: Snap) -> dict[str, Any] | None:
+    """A newer factory on offer, the upgrade under way, how it ended, or nothing; the words are all here."""
+    found = snap.get("upgrade")
+    asked, progress, op, paused = found["asked"], found["progress"], found["op"], found["paused"]
+    available = found["offer"]["available"]
+    resume = ["resume"] if paused else []
+    if asked is not None:
+        to = asked["to"][:7]
+        mine = progress if progress and progress["to"] == asked["to"] and progress["at"] >= asked["at"] else None
+        if mine is None and op is not None and op["state"] == "failed":
+            stopped = next((s["detail"] for s in op["steps"] if s["state"] == "failed"), "")
+            return {"state": "failed", "title": "The upgrade did not start", "message": stopped, "changelog": [],
+                    "log": None, "commit": None, "actions": resume}  # fmt: skip
+        if mine is None and op is not None and op["state"] in ("waiting", "running"):
+            step = next((s["text"] for s in op["steps"] if s["state"] == "running"), "")
+            return {"state": "preparing", "title": f"Getting ready to upgrade to {to}", "message": f"{step}. Every "
+                    "agent keeps its work.", "changelog": [], "log": None, "commit": None, "actions": []}  # fmt: skip
+        if mine is None or mine["state"] == "running":
+            step = mine["step"] if mine else "Starting"
+            return {"state": "running", "title": f"Upgrading the factory to {to}", "message": f"{step}. {_COMES_BACK}",
+                    "changelog": [], "log": None, "commit": None, "actions": []}  # fmt: skip
+        if mine["state"] == "failed":
+            again = ["upgrade"] if available else []
+            return {"state": "failed", "title": "The upgrade stopped", "message": mine["problem"], "changelog": [],
+                    "log": mine["log"] or None, "commit": available["commit"] if available else None,
+                    "actions": [*again, *resume]}  # fmt: skip
+        if paused:
+            return {"state": "done", "title": f"The factory is upgraded to {to}", "message": "Your agents are paused "
+                    "with their work kept. Restart the factory when you are ready.", "changelog": asked["changelog"],
+                    "log": None, "commit": None, "actions": resume}  # fmt: skip
+    if available is None:
+        return None
+    changes = len(available["changelog"])
+    return {"state": "available", "title": "A newer factory is ready",
+            "message": f"{plural(changes, 'change')} since yours, released {when(epoch(available['published']))}.",
+            "changelog": available["changelog"], "log": None, "commit": available["commit"],
+            "actions": ["upgrade"]}  # fmt: skip
+
+
 def wants(query: Query) -> dict[str, Any]:
     return {"want": list(WANTS), "days": SPARK_DAYS}
 
@@ -269,6 +312,7 @@ def parts(snap: Snap, query: Query) -> Parts:
     return {
         "envs": lambda: envs(snap),
         "outage": lambda: outage(snap),
+        "upgrade": lambda: upgrade(snap),
         "proposals": lambda: proposals.slots(snap),
         "needs": lambda: proposals.needs(snap),
         "tiles": lambda: tiles(snap),

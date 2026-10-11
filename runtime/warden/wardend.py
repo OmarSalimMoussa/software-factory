@@ -26,6 +26,7 @@ from runtime.shared.settings import Settings
 from runtime.warden import (
     cost,
     crashwatch,
+    factory_upgrade,
     gc,
     github,
     github_push,
@@ -91,6 +92,11 @@ def _ask_branch(ctx: Context) -> None:
     loop.run_once(ctx, "the branch ask", lambda: github_push.ask_branch(ctx))
 
 
+def _check_releases(ctx: Context) -> None:
+    # In its own thread: GitHub may be slow, and a failure is reported there, once while it lasts.
+    loop.run_once(ctx, "the release check", lambda: factory_upgrade.poll(ctx))
+
+
 def _pull_reports(ctx: Context) -> None:
     # In its own thread: a failure is reported there, once while it lasts, as a pass's is.
     loop.run_once(ctx, "the reports pull", lambda: reports.poll(ctx))
@@ -105,6 +111,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
         # It runs the product's scripts on a slot, for up to slots.verb_minutes: never inside the tick.
         ("reports", imports.Background(_pull_reports, imports.in_thread("reports")).run_pass),
         ("branch", imports.Background(_ask_branch, imports.in_thread("branch")).run_pass),
+        ("releases", imports.Background(_check_releases, imports.in_thread("releases")).run_pass),
         ("schedule", schedule.run_pass),
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),
         ("plan", watch.run_pass),

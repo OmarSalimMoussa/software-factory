@@ -34,6 +34,7 @@ from runtime.warden.context import Context, StackResult
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
 CHECK_UNIT = "software-check-run@{}.service"
+UPGRADE_UNIT = "software-upgrade@{}.service"  # contract: must mirror runtime/system/layout.py UPGRADE_RUN
 # A started session's registry id until the backstop sees it running under its name and takes the id Claude Code
 # gave it (`claude --bg` ignores --session-id). The guard finds an unbound session the same way, by name.
 PENDING = "pending-"
@@ -143,6 +144,13 @@ class Units:
         request_id = f"check-{uuid.uuid4().hex}"
         self._request(request_id, {"kind": "check", "checkout": checkout, "args": args})
         return self._wait(CHECK_UNIT.format(request_id), request_id)
+
+    def start_upgrade(self, commit: str) -> None:
+        """Start the owner's upgrade to the release of ``commit``, as root, and return at once: the install it runs
+        stops this warden."""
+        done = self.run(["start", "--no-block", UPGRADE_UNIT.format(commit)])
+        if done.returncode != 0:
+            raise LaunchError(f"the upgrade did not start: {done.stderr.strip()[-300:]}")
 
     def restart_daemon(self) -> None:
         """Restart the daemon that hosts every session: it loads the sign-in token again, and its sessions end."""

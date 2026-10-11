@@ -116,7 +116,7 @@ def _factory_token(ctx: Install) -> None:
 
 def check_factory_token(repo: str, token: str, timeout: float) -> None:
     """Raises ReleaseError unless ``token`` reads the factory repo and its CI runs, as an upgrade does."""
-    found = releases.Releases(repo, token, timeout)
+    found = releases.Releases(repo, token, timeout, releases.http_get)
     found.default_branch()
     found.can_read_runs()
 

@@ -19,6 +19,9 @@ WORKING, WAITING, DEPRIORITIZED, RETIRED = "working", "waiting", "deprioritized"
 BENCH_PENDING, REVIVING = "bench-pending", "reviving"
 STATES = (WORKING, WAITING, BENCH_PENDING, DEPRIORITIZED, REVIVING, RETIRED)
 HOLDS_SLOT = (WORKING, WAITING, BENCH_PENDING, REVIVING)
+# Settled: a session in any other state is working, waiting or between the two, and an install under it would lose
+# its work.
+RESTING = (DEPRIORITIZED, RETIRED)
 FINISHED, STOPPED, WITH_PARENT, CRASHED = "finished", "stopped", "with-parent", "crashed"
 RETIRE_KINDS = (FINISHED, STOPPED, WITH_PARENT, CRASHED)
 

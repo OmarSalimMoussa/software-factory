@@ -191,3 +191,60 @@ def test_spend_of_unknown_price_is_unknown_and_the_budget_says_it_stops_nothing(
     assert days[-1]["total"] == 0 and days[-1]["unknown"].endswith("of unknown price")
     tile = rig.parts("/api/home")["tiles"]["data"]["spend"]
     assert tile["today"] is None and tile["pct"] is None and "stops nothing" in tile["foot"]
+
+
+_OLD, _NEW = "a" * 40, "b" * 40
+
+
+@pytest.mark.parametrize(
+    ("asked", "progress", "paused", "state", "actions"),
+    [
+        (False, None, False, "available", ["upgrade"]),
+        (True, "running", True, "running", []),
+        (True, "failed", True, "failed", ["upgrade", "resume"]),
+        (True, "done", True, "done", ["resume"]),
+    ],
+    ids=["on-offer", "under-way", "stopped", "upgraded-and-paused"],
+)
+def test_home_says_where_an_upgrade_stands_and_offers_only_what_fits(
+    rig: Rig, asked: bool, progress: str | None, paused: bool, state: str, actions: list[str]
+) -> None:
+    changelog = ["The installer upgrades", "Faster checks"]
+    offer = {"commit": _NEW, "tag": f"build-{_NEW[:12]}", "published": "2026-10-09T13:00:00Z", "changelog": changelog}
+    store.write_json(
+        rig.places.state / "upgrade-offer.json",
+        {"available": None if progress == "done" else offer, "checked_at": rig.clock.now(), "note": None},
+    )
+    if asked:
+        store.write_json(
+            rig.places.state / "upgrade-asked.json",
+            {
+                "from": _OLD,
+                "to": _NEW,
+                "changelog": changelog,
+                "at": "2026-10-09T13:30:00Z",
+                "op": "op-20261009133000-0000abcd",
+            },
+        )
+    if progress:
+        rig.places.upgrade.mkdir(parents=True, exist_ok=True)
+        store.write_json(
+            rig.places.upgrade / "progress.json",
+            {
+                "from": _OLD,
+                "to": _NEW,
+                "state": progress,
+                "step": "Copying the factory into place",
+                "problem": "A command it ran failed." if progress == "failed" else "",
+                "log": "",
+                "at": "2026-10-09T13:40:00Z",
+            },
+        )
+    if paused:
+        store.write_json(rig.places.state / "paused.json", {"at": "x", "sessions": [], "op": "op-x"})
+
+    band = rig.parts("/api/home")["upgrade"]["data"]
+
+    assert (band["state"], band["actions"]) == (state, actions)
+    assert (band["commit"] == _NEW) is ("upgrade" in actions)
+    assert band["changelog"] == (changelog if state in ("available", "done") else [])

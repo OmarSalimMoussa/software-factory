@@ -47,6 +47,7 @@ class FakeLauncher:
         self.copy = False  # the next resume starts a copy instead
         self.messages: list[tuple[str, str]] = []
         self.restarts = 0
+        self.upgrades: list[str] = []
         self.on_restart: Callable[[], None] = lambda: None  # what else happens while the daemon restarts
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
@@ -77,6 +78,9 @@ class FakeLauncher:
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         self.stacks.append((slot, verb))
         return StackResult(0, "", "stack.log")
+
+    def start_upgrade(self, commit: str) -> None:
+        self.upgrades.append(commit)
 
     def restart_daemon(self) -> None:
         self.restarts += 1

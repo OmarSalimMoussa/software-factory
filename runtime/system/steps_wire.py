@@ -11,7 +11,7 @@ from runtime.shared import upgrades
 from runtime.shared.paths import AGENT_USER, MANAGED_SETTINGS, SCRATCH, SLICE, WARDEN_USER
 from runtime.system import layout, render
 from runtime.system.host import CommandError, Host
-from runtime.system.job import Install, refuse
+from runtime.system.job import Install, github_name, refuse
 
 _HTTPS = 443
 _TAILSCALE_LINK = re.compile(r"https://login\.tailscale\.com/\S+")
@@ -193,7 +193,9 @@ def record(ctx: Install, drills: list[dict[str, object]]) -> None:
     host.write(layout.install_record(state), json.dumps(body, indent=1) + "\n", mode=0o600, owner=WARDEN_USER)
     # Root's own record, which the dashboard's upgrade trusts where it would not trust the warden's folder.
     host.mkdir(ctx.places.upgrade, mode=0o755)
-    mine = {"commit": ctx.sha, "owner": ctx.owner.name, "product": str(ctx.product)}
+    # The factory's repo as the release file or the owner's checkout names it, never as the warden's settings do.
+    repo = str(ctx.release["repo"]) if ctx.release else github_name(ctx.factory_origin) or ""
+    mine = {"commit": ctx.sha, "owner": ctx.owner.name, "product": str(ctx.product), "repo": repo}
     host.write(upgrades.installed_path(ctx.places), json.dumps(mine, indent=1) + "\n", mode=0o644)
     host.say(f"the factory at {ctx.sha[:12]} is installed")
 

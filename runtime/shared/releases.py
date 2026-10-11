@@ -80,7 +80,7 @@ class Release:
 
 
 class Releases:
-    def __init__(self, repo: str, token: str, timeout: float, get: Get = http_get) -> None:
+    def __init__(self, repo: str, token: str, timeout: float, get: Get) -> None:
         owner, _, name = repo.partition("/")
         if not owner or not name or "/" in name:
             raise ReleaseError(f"factory.github must be owner/name, not {repo!r}")
@@ -88,7 +88,7 @@ class Releases:
         self._token, self._timeout, self._get = token, timeout, get
 
     @classmethod
-    def of(cls, places: Places, repo: str, timeout: float, get: Get = http_get) -> Releases:
+    def of(cls, places: Places, repo: str, timeout: float, get: Get) -> Releases:
         try:
             token = token_path(places).read_text(encoding="utf-8").strip()
         except OSError as exc:

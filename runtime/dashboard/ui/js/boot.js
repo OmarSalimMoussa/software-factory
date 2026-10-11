@@ -133,6 +133,7 @@ document.addEventListener('click', e => {
   else if (a === 'start-orch') act('/api/orchestrator/start', {}, {btn: t});
   else if (a === 'pause') pauseFactory();
   else if (a === 'resume') resumeFactory();
+  else if (a === 'upgrade-factory') upgradeFactory(t.dataset.commit);
   else if (a === 'review') reviewSettings();
   else if (a === 'discard') { UI.edits.clear(); render({keep: true}); toast('Changes discarded', 'x-mark'); }
   else if (a === 'change-repo') changeRepo();

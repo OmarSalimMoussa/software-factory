@@ -230,6 +230,8 @@ WRITES: list[tuple[re.Pattern[str], Write]] = [
        lambda a, s: "Paused. Every agent is benched with its work kept.", ["agents", "home", "shell"]),
     _w("factory/resume", "factory.resume", lambda b, r, s: {},
        lambda a, s: "Resuming. Every agent comes back in order.", ["agents", "home", "shell"]),
+    _w("factory/upgrade", "factory.upgrade", lambda b, r, s: {"commit": _text(b, "commit"), "code": b.get("code")},
+       lambda a, s: "Upgrading. The dashboard restarts on the way.", ["home", "shell"]),
     _w("settings", "settings.save", _settings_args, lambda a, s: "Saving.", ["settings"], wants=("settings",)),
     _w("settings/repo", "repo.change", lambda b, r, s: {"changes": {"repo.path": _text(b, "path")},
                                                          "code": b.get("code")},
