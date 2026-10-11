@@ -1,5 +1,7 @@
 """The laptop's vitals, read every tick: memory, CPU pressure, power, the install, the git hooks, the agent's Claude
 daemon and the firewall. Each reading is green, amber, red or unknown; unknown is treated as amber, never as fine.
+A reading this machine does not have (a kernel without CPU pressure) is missing: shown as such, and it blocks
+nothing. A machine with no battery listed, a desktop or a VM, is on mains power.
 
 The permits read vitals.json: red blocks every start; amber blocks all but severe work. Readers take the kernel's
 folders as arguments, so tests feed samples.
@@ -20,8 +22,8 @@ from runtime.shared.paths import AGENT_USER, SLICE, Places
 from runtime.shared.settings import Settings
 from runtime.warden.context import Context
 
-GREEN, AMBER, UNKNOWN, RED = "green", "amber", "unknown", "red"
-LEVELS = (GREEN, AMBER, UNKNOWN, RED)  # worst last
+GREEN, AMBER, UNKNOWN, RED, MISSING = "green", "amber", "unknown", "red", "missing"
+LEVELS = (GREEN, MISSING, AMBER, UNKNOWN, RED)  # worst last
 PROC = Path("/proc")
 POWER = Path("/sys/class/power_supply")
 _PRESSURE = re.compile(r"^(some|full)\s+avg10=([\d.]+)\s+avg60=([\d.]+)", re.MULTILINE)
@@ -36,7 +38,8 @@ class Reading:
 
 
 def worst(readings: list[Reading]) -> str:
-    return max((r.level for r in readings), key=LEVELS.index, default=GREEN)
+    """The machine's level: the worst reading's, where a missing one counts for nothing."""
+    return max((r.level for r in readings if r.level != MISSING), key=LEVELS.index, default=GREEN)
 
 
 def memory(meminfo: str, settings: Settings) -> Reading:
@@ -52,7 +55,10 @@ def memory(meminfo: str, settings: Settings) -> Reading:
     return Reading("memory", GREEN, value)
 
 
-def cpu(pressure: str, settings: Settings) -> Reading:
+def cpu(pressure: str | None, settings: Settings) -> Reading:
+    """``pressure`` is None when the kernel has no pressure file at all."""
+    if pressure is None:
+        return Reading("cpu", MISSING, "this kernel reports no CPU pressure")
     psi = {kind: float(avg60) for kind, _, avg60 in _PRESSURE.findall(pressure)}
     if "some" not in psi:
         return Reading("cpu", UNKNOWN, "cannot read the CPU pressure")
@@ -61,21 +67,26 @@ def cpu(pressure: str, settings: Settings) -> Reading:
 
 
 def power(supplies: Path, settings: Settings) -> Reading:
-    on_mains, battery, seen = False, None, False
+    on_mains, on_battery, battery = False, False, None
     try:
-        for supply in supplies.iterdir():
-            seen = True
+        listed = list(supplies.iterdir()) if supplies.exists() else []
+        for supply in listed:
+            # A mouse's or a headset's own battery says nothing about the machine's power.
+            if (supply / "scope").exists() and (supply / "scope").read_text().strip() == "Device":
+                continue
             kind = (supply / "type").read_text().strip()
             if kind == "Mains" and (supply / "online").read_text().strip() == "1":
                 on_mains = True
-            elif kind == "Battery" and (supply / "capacity").exists():
-                battery = int((supply / "capacity").read_text().strip())
+            elif kind == "Battery":
+                on_battery = True
+                if (supply / "capacity").exists():
+                    battery = int((supply / "capacity").read_text().strip())
     except (OSError, ValueError) as exc:
         return Reading("power", UNKNOWN, f"cannot read the power supplies: {type(exc).__name__}")
-    if not seen:
-        return Reading("power", UNKNOWN, "no power supply is listed")
     if on_mains:
         return Reading("power", GREEN, "on mains power")
+    if not on_battery:
+        return Reading("power", GREEN, "no battery is listed, so on mains power")
     if battery is None:
         return Reading("power", AMBER, "on battery")
     level = RED if battery < settings.get_int("vitals.battery_red") else AMBER
@@ -177,12 +188,17 @@ def _text(path: Path) -> str:
         return ""
 
 
+def _pressure(path: Path) -> str | None:
+    """The pressure file's text; None when the kernel has none, "" (unknown) when it cannot be read."""
+    return _text(path) if path.exists() else None
+
+
 def refresh(ctx: Context, proc: Path = PROC, supplies: Path = POWER) -> dict[str, Any]:
     """Read every vital and write vitals.json for the permits, the dashboard and the status."""
     settings = ctx.settings()
     readings = [
         memory(_text(proc / "meminfo"), settings),
-        cpu(_text(proc / "pressure" / "cpu"), settings),
+        cpu(_pressure(proc / "pressure" / "cpu"), settings),
         power(supplies, settings),
         install(ctx.places),
         hooks(ctx.places, Path(settings.get_str("repo.path")), settings.get_int("watch.tick_seconds")),

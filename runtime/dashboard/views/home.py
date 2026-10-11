@@ -97,7 +97,11 @@ def laptop(snap: Snap) -> dict[str, Any]:
             {
                 "label": "CPU",
                 "pct": round(float(cpu_pct.group(1))) if cpu_pct else None,
-                "value": f"{cpu_pct.group(1)}%" if cpu_pct else "unknown",
+                "value": f"{cpu_pct.group(1)}%"
+                if cpu_pct
+                else "not reported"
+                if cpu["level"] == "missing"
+                else "unknown",
             },
             {
                 "label": "Power",

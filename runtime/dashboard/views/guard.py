@@ -11,7 +11,7 @@ from runtime.dashboard.views.kit import Parts, Query, Snap
 from runtime.shared.models import RETIRED
 
 WANTS = ("settings", "vitals", "slots", "sessions", "queue", "refusals", "rules", "docker")
-_TONES = {"green": "good", "amber": "warn", "red": "bad", "unknown": ""}
+_TONES = {"green": "good", "amber": "warn", "red": "bad", "unknown": "", "missing": ""}
 _PERCENT = re.compile(r"(\d+(?:\.\d+)?)%")
 _GIB = 1024**3
 
@@ -35,7 +35,7 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
     out.append(
         {
             "label": "CPU pressure",
-            "value": f"{pct.group(1)}%" if pct else "unknown",
+            "value": f"{pct.group(1)}%" if pct else "not reported" if cpu and cpu["level"] == "missing" else "unknown",
             "pct": round(float(pct.group(1))) if pct else None,
             "tone": _TONES[cpu["level"] if cpu else "unknown"],
         }
