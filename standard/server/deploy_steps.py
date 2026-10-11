@@ -40,8 +40,10 @@ def http_get(url: str) -> tuple[int, bytes] | None:
     try:
         with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT_SECONDS) as response:
             return int(response.status), response.read(65536)
+    # telemetry: expected — an error status is an answer: the caller reads its status and body
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read(65536)
+    # telemetry: expected — nothing answers yet: the caller polls until its wait ends, then fails
     except (OSError, http.client.HTTPException):
         return None
 
@@ -173,6 +175,7 @@ def field(body: bytes, key: str) -> Any:
     """One key of a JSON object body, or None when the body is not one or lacks it."""
     try:
         found = json.loads(body)
+    # telemetry: expected — a body that is not JSON lacks the key; the caller reports the wrong answer
     except ValueError:
         return None
     return found.get(key) if isinstance(found, dict) else None

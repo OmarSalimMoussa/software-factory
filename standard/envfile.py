@@ -188,6 +188,7 @@ def _rendered(
             problems.append(f"[env.set] {key} is not in {template.name}; add it to the template")
         try:
             rendered[key] = render(fmt, placeholders)
+        # telemetry: surfaced — a value that cannot be filled is one of the env file's `problems`
         except (KeyError, IndexError, ValueError) as exc:
             problems.append(f"[env.set] {key}: cannot fill {fmt!r} ({type(exc).__name__}: {exc})")
     return rendered
@@ -196,6 +197,7 @@ def _rendered(
 def _template(path: Path, problems: list[str]) -> list[_Line]:
     try:
         text = path.read_text(encoding="utf-8")
+    # telemetry: surfaced — a template that cannot be read is one of the env file's `problems`
     except (OSError, UnicodeDecodeError) as exc:
         problems.append(f"{path}: cannot read the template ({type(exc).__name__}: {exc})")
         return []
@@ -239,8 +241,10 @@ def _existing(path: Path, problems: list[str]) -> dict[str, str] | None:
         return None
     try:
         text = path.read_text(encoding="utf-8")
+    # telemetry: expected — no env file yet: the first deploy writes one, so there is nothing to keep
     except FileNotFoundError:
         return None
+    # telemetry: surfaced — an env file that cannot be read is one of the `problems`
     except (OSError, UnicodeDecodeError) as exc:
         problems.append(f"{path}: cannot read the env file ({type(exc).__name__}: {exc})")
         return None

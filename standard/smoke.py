@@ -49,6 +49,7 @@ def health_problems(body: str, short: str) -> list[str]:
     """What a health answer lacks: JSON naming this commit, the smoke workspace and a whole-number ``busy``."""
     try:
         answer = json.loads(body)
+    # telemetry: surfaced — a body that is not JSON is what `health_problems` returns
     except ValueError:
         return [f"it is not JSON: {body[:200]!r}"]
     if not isinstance(answer, dict):
@@ -96,6 +97,7 @@ class Smoke:
         failure: SmokeError | None = None
         try:
             self._steps()
+        # telemetry: surfaced — the `failure` is raised again once the scratch stack is torn down
         except SmokeError as exc:
             failure = exc
             for service in exc.logs:
@@ -346,6 +348,7 @@ class Smoke:
                 self.link.unlink()
             if self.env_dir is not None:
                 shutil.rmtree(self.env_dir)
+        # telemetry: surfaced — a scratch file that cannot be removed is one of the teardown's `problems`
         except OSError as exc:
             problems.append(f"the scratch env file could not be removed: {exc}")
         return problems

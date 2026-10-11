@@ -44,8 +44,10 @@ def run_hook(argv: list[str], cwd: Path, env: dict[str, str]) -> subprocess.Comp
             timeout=provision.TIMEOUT_SECONDS,
             check=False,
         )
+    # telemetry: surfaced — a hook that runs too long comes back as a failed `CompletedProcess`
     except subprocess.TimeoutExpired:
         return subprocess.CompletedProcess(argv, 124, "", f"timed out after {provision.TIMEOUT_SECONDS} s")
+    # telemetry: surfaced — a hook that cannot start comes back as a failed `CompletedProcess`
     except OSError as exc:
         return subprocess.CompletedProcess(argv, 126, "", f"cannot run it: {exc}")
 

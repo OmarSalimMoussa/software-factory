@@ -293,6 +293,7 @@ def dockerfile(path: Path) -> Dockerfile:
         if word == "ARG" and not froms:
             try:
                 words = shlex.split(rest)
+            # telemetry: surfaced — an ARG line that cannot be read is one of the Dockerfile's `problems`
             except ValueError as exc:
                 problems.append(f"line {number}: ARG cannot be read: {exc}")
                 continue

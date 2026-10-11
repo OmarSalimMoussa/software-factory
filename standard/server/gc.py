@@ -33,6 +33,7 @@ def last_failure(log: Path) -> str | None:
     """What the last sweep said when it failed; None when it passed or never ran. Every deploy repeats it."""
     try:
         lines = log.read_text(encoding="utf-8").splitlines()
+    # telemetry: expected — no log yet: the sweep never ran, so no failure is there to repeat
     except FileNotFoundError:
         return None
     last = lines[-1] if lines else ""
@@ -73,7 +74,7 @@ def sweep(run: Run, *, log: Path, root: Path, now: Callable[[], datetime]) -> in
         _ok(run, ["docker", "image", "prune", "--force"], "pruning dangling images")
         images_after, cache_after = _images(run), _cache(run)
     except _Failed as exc:
-        # The server has no mail, so the log is where a failed sweep shows.
+        # telemetry: surfaced — the server has no mail: a failed sweep goes to the log through `write`
         write(f"FAILED at {exc}")
         return 1
     free = shutil.disk_usage(root).free / 1e9

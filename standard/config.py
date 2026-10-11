@@ -219,6 +219,7 @@ class _Reader(Fields):
     def placeholders(self, where: str, value: str) -> None:
         try:
             fields = [f for _, f, _, _ in string.Formatter().parse(value) if f is not None]
+        # telemetry: surfaced — a value that is no format string is a problem through `fail`; the load raises them
         except ValueError as exc:
             self.fail(where, f"is not a format string ({exc}); write a literal brace as {{{{ or }}}}")
             return

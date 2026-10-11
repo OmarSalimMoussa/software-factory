@@ -84,8 +84,10 @@ def real_run(argv: list[str], stdin: str | None = None) -> subprocess.CompletedP
     feed: dict[str, Any] = {"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}
     try:
         return subprocess.run(argv, capture_output=True, text=True, timeout=TIMEOUT_SECONDS, check=False, **feed)
+    # telemetry: surfaced — a command that runs too long comes back as a failed `CompletedProcess`
     except subprocess.TimeoutExpired:
         return subprocess.CompletedProcess(argv, 124, "", f"timed out after {TIMEOUT_SECONDS} s")
+    # telemetry: surfaced — a program that cannot start comes back as a failed `CompletedProcess`
     except OSError as exc:
         return subprocess.CompletedProcess(argv, 127, "", f"cannot start {argv[0]}: {exc}")
 

@@ -36,6 +36,7 @@ def prod_problem(config: Config, get: Get) -> str:
     url = f"https://{prod.domain}{config.deploy.health}"
     try:
         answer = json.loads(get(url, None))
+    # telemetry: surfaced — a prod that does not answer with JSON is what `prod_problem` returns
     except (OSError, ValueError) as exc:
         return f"{url} did not answer with JSON ({type(exc).__name__})"
     workspace = answer.get("workspace") if isinstance(answer, dict) else None

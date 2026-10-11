@@ -80,6 +80,7 @@ def scalar(text: str, number: int) -> Any:
     if text.startswith(("0x", "0o")):
         try:
             return int(text, 0)
+        # telemetry: expected — a 0x or 0o word that is no number is a string in YAML, as it reads
         except ValueError:
             return text
     if _FLOAT_RE.match(text):

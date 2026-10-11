@@ -222,6 +222,7 @@ def _bases(repo: Path, config: Config, source: _Source, problems: list[str]) -> 
     """The product images the Dockerfile builds FROM, by image name."""
     try:
         parsed = compose_mod.dockerfile(repo / source.dockerfile)
+    # telemetry: surfaced — the Dockerfile's problems join the build plan's `problems`
     except ComposeError as exc:
         problems += [f"{source.where}: {source.dockerfile} {p}" for p in exc.problems]
         return []

@@ -56,11 +56,13 @@ def main(argv: list[str], paths: Paths | None = None, tools: Tools | None = None
     paths, tools = paths or Paths(), tools or Tools()
     try:
         args = parse_args(argv)
+    # telemetry: surfaced — the refusal is printed with the `USAGE` for CI to show, and the deploy exits 2
     except Refused as exc:
         print(f"factory-deploy: refused: {exc}\n{USAGE}", flush=True)
         return 2
     try:
         config = config_mod.parse(paths.product_toml)
+    # telemetry: surfaced — the reason is printed for CI to show (`print`), and the deploy exits 1
     except ConfigError as exc:
         print(f"factory-deploy: the server's copy of factory.toml is unusable ({exc}): run the server set-up again")
         return 1
@@ -69,10 +71,13 @@ def main(argv: list[str], paths: Paths | None = None, tools: Tools | None = None
     log(f"deploy {args.workspace} {args.short}" + (f" {args.mode}" if args.mode else ""))
     try:
         return _Deploy(config, args, paths, tools, log, root).run(stdin or sys.stdin)
+    # telemetry: surfaced — the failure goes to the deploy's `log`, which CI shows and the server keeps
     except (DeployError, ProvisionError, OSError) as exc:
         log(f"failed: {exc}")
+    # telemetry: surfaced — each problem goes to the deploy's `log`, which CI shows and the server keeps
     except EnvError as exc:
         log("failed:\n" + "\n".join(f"  {problem}" for problem in exc.problems))
+    # telemetry: surfaced — each problem goes to the deploy's `log`, which CI shows and the server keeps
     except (ConfigError, ComposeError) as exc:
         log(f"failed: {exc.path}:\n" + "\n".join(f"  {problem}" for problem in exc.problems))
     return 1
@@ -307,6 +312,7 @@ def _lock(path: Path, log: Log) -> Iterator[None]:
     with path.open("a") as handle:
         try:
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        # telemetry: expected — another deploy holds the lock: this one says so in its log and waits its turn
         except BlockingIOError:
             log("another deploy is running on this server; waiting for it to end")
             fcntl.flock(handle, fcntl.LOCK_EX)

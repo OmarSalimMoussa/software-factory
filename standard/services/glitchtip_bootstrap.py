@@ -134,6 +134,7 @@ def answer(stdout: str) -> dict[str, Any] | str:
         if line.startswith(RESULT):
             try:
                 found = json.loads(line[len(RESULT) :])
+            # telemetry: surfaced — a result line that is not JSON is the reason `answer` returns
             except ValueError:
                 return "GlitchTip's result line is not JSON"
             if isinstance(found, dict):
