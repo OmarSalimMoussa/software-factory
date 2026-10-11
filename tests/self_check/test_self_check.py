@@ -1,9 +1,8 @@
 """The factory meets the standard checks it holds every product to.
 
-Every check in the catalog is gated here (it must pass on the factory's own tree), waits in NOT_YET (it applies but
-still fails, until the slice named beside it lands), or sits in NOT_APPLICABLE (it fits only a product, for the reason
-beside it). A check the catalog gains is gated at once. These tests carry the `self_check` marker: a plain run leaves
-them out, and CI runs them as their own step, which the release waits for.
+Every check in the catalog is gated here (it must pass on the factory's own tree), or sits in NOT_APPLICABLE (it fits
+only a product, for the reason beside it). A check the catalog gains is gated at once. These tests carry the
+`self_check` marker: a plain run leaves them out, and CI runs them as their own step, which the release waits for.
 """
 
 from __future__ import annotations
@@ -28,17 +27,7 @@ NOT_APPLICABLE = {
     "tests": "runs a product's tests through its test map; the factory's CI runs its own pytest directly",
     "image-sources": "checks the images a product builds; the factory builds none",
 }
-# Each waits for its values, written by the slice of work that also clears what the check then finds.
-NOT_YET = {
-    "network-door": "slice 7: each outside service reached through one owner",
-    "computation-owners": "slice 7: the dashboard's pages compute nothing the server can",
-    "js-import-rules": "slice 7: the import rules the dashboard's pages keep",
-    "vocabulary-homes": "slice 7: one home for the words for tasks, sessions and verdicts",
-    "quiet-modules": "slice 7: the modules that must never log above info",
-    "pinned-config": "slice 7: the config values that must not drift",
-    "generated-current": "slice 7: any generated file, checked against its generator",
-}
-GATED = [check_id for check_id in catalog.IDS if check_id not in NOT_APPLICABLE and check_id not in NOT_YET]
+GATED = [check_id for check_id in catalog.IDS if check_id not in NOT_APPLICABLE]
 # These compare a change with the commit it started from, so over the whole tree (--all) they have nothing to compare.
 RATCHETS = ("comment-budgets", "history-narrative", "complexity-ratchet", "count-claims")
 
@@ -60,10 +49,8 @@ def base_of_this_push() -> str:
 
 
 def test_each_listed_check_is_in_the_catalog_once_with_its_reason() -> None:
-    listed = [*NOT_APPLICABLE, *NOT_YET]
-    assert sorted(set(listed) - set(catalog.IDS)) == []
-    assert sorted(set(NOT_APPLICABLE) & set(NOT_YET)) == []
-    assert [check_id for check_id, why in {**NOT_APPLICABLE, **NOT_YET}.items() if not why.strip()] == []
+    assert sorted(set(NOT_APPLICABLE) - set(catalog.IDS)) == []
+    assert [check_id for check_id, why in NOT_APPLICABLE.items() if not why.strip()] == []
     assert sorted(set(RATCHETS) - set(GATED)) == []
 
 
@@ -85,11 +72,3 @@ def test_this_push_holds_each_ratchet(check_id: str) -> None:
     out = io.StringIO()
     status = cli.run(["--since", base_of_this_push(), "--only", check_id], ROOT, None, out)
     assert status == 0, out.getvalue()
-
-
-@pytest.mark.parametrize("check_id", sorted(NOT_YET))
-def test_a_check_not_yet_gated_still_fails(check_id: str) -> None:
-    status, output = factory_check(check_id)
-    if status == 0:
-        pytest.fail(f"{check_id} passes now: move it from NOT_YET to the gated set\n{output}")
-    assert status == 1 and cli.COULD_NOT_RUN not in output, f"{check_id} reached no verdict (exit {status})\n{output}"

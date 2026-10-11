@@ -1,0 +1,19 @@
+# The modules that reach verdicts on purpose, or whose output is another program's protocol: what goes wrong there
+# is a workflow failure the caller is shown, never a fault for the journal or GlitchTip.
+loud = [
+  '\blog(ger)?\.(warning|error|exception|critical)\(',
+  '\blogging\.(warning|error|exception|critical)\(',
+]
+remedy = "refuse with the reason the caller is shown, and log nothing above info"
+
+[modules]
+"runtime/guard/" = "the guard's refusals are verdicts it reaches on purpose; the session reads each one in its call's result"
+"runtime/queue/statuses.py" = "a move the queue refuses is a verdict on what an agent asked, told in its answer"
+"runtime/queue/formats.py" = "a queue file that breaks the format is the writer's to fix, told in the refusal"
+"runtime/queue/intake.py" = "a request it cannot take is told to whoever filed it"
+"runtime/qa/findings.py" = "a finding refused for its form is told to the tester that filed it"
+"runtime/qa/verbs.py" = "QA's gates refuse on purpose and say why to the session that asked"
+"runtime/dashboard/views/writes.py" = "the owner's input it refuses is drawn on the page beside the control"
+"runtime/slots/slot_api.py" = "its stdout is MCP, and a request it cannot send is the tool's error result"
+"plugin/hooks/statusline.py" = "its stdout is the status line; a reading it cannot make shows there as unknown"
+"plugin/hooks/rulebook_loader.py" = "its stdout is the context Claude Code reads; it never writes anything else"

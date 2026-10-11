@@ -1,0 +1,29 @@
+# Config the factory sets on purpose, which a tool's upgrade or a quick edit could undo without anyone noticing.
+
+[[pins]]
+file = "pyproject.toml"
+format = "toml"
+path = ["tool", "mypy", "strict"]
+value = true
+reason = "every module is typed in full; a looser mode lets an untyped call hide a wrong value"
+
+[[pins]]
+file = "pyproject.toml"
+format = "toml"
+path = ["tool", "pytest", "ini_options", "addopts"]
+value = "-q -m 'not self_check'"
+reason = "a plain test run leaves out the self-check: its repo-wide checks run in CI only, so working stays fast"
+
+[[pins]]
+file = "package.json"
+format = "json"
+path = ["devDependencies", "typescript"]
+value = "6.0.3"
+reason = "the error-telemetry scan calls TypeScript's JavaScript API, which 7, the native port, may not keep"
+
+[[pins]]
+file = ".github/workflows/ci.yml"
+format = "yaml"
+path = ["jobs", "self-check", "steps", "0", "with", "fetch-depth"]
+value = 0
+reason = "the ratchets compare a push with the commit it started from, so the self-check needs the whole history"

@@ -1,0 +1,10 @@
+# Audited: the factory commits two generated files, each a lock its tool writes from what the repo asks for.
+print_commands = []
+
+[[check_commands]]
+name = "uv.lock from pyproject.toml"
+command = ["uv", "lock", "--check", "--offline"]
+
+[[check_commands]]
+name = "package-lock.json from package.json"
+command = ["npm", "ci", "--dry-run", "--ignore-scripts"]
