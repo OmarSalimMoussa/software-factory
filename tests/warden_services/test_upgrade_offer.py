@@ -204,3 +204,24 @@ def test_a_new_install_asks_again_at_once_and_is_never_offered_itself(
     factory_upgrade.poll(ctx)
 
     assert len(calls) == asked + 1 and factory_upgrade.offer(ctx.places)["available"] is None
+
+
+@pytest.mark.parametrize(
+    ("now", "shown"),
+    [(OLD, True), (NEW, True), ("c" * 40, False)],
+    ids=["still-on-the-factory-it-left", "on-the-factory-it-asked-for", "on-one-installed-by-hand-since"],
+)
+def test_an_upgrade_that_stopped_is_shown_until_an_install_by_hand_replaces_it(
+    ctx: Context, monkeypatch: pytest.MonkeyPatch, now: str, shown: bool
+) -> None:
+    _installed(ctx.places)
+    monkeypatch.setattr(releases, "http_get", _github([]))
+    factory_upgrade.poll(ctx)
+    ops.join(factory_upgrade.start(ctx, {"commit": NEW}, None)["op"], 10)
+    upgrades.write_progress(ctx.places, OLD, NEW, upgrades.FAILED, "", "settings: repo.path must be set")
+
+    record = json.loads(upgrades.installed_path(ctx.places).read_text())
+    upgrades.installed_path(ctx.places).write_text(json.dumps({**record, "commit": now}))
+    view = factory_upgrade.view(ctx)
+
+    assert (view["asked"] is not None, view["progress"] is not None) == (shown, shown)
