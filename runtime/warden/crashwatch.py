@@ -5,8 +5,10 @@ restart an orchestrator whose loop went silent.
 A finished implementer or designer is retired at once, its process stopped and its slot reaped, though a background
 session stays alive when idle: its place and slot are free for the next run. Only working and waiting sessions are
 watched: a deprioritized one has no process by design, and a bench-pending or reviving one is in the warden's own
-hands. A crashed session is resumed up to watch.resume_tries
-times, then retired as crashed; the orchestrator is always resumed (the same session) and never retired by the watch.
+hands. A crashed session is resumed up to watch.resume_tries times within the crash window, each resume after a
+longer wait, then retired as crashed; the orchestrator is always resumed (the same session) and never retired by the
+watch. Nothing resumes until the agent's Claude daemon is up and settled, and sessions that ended with the daemon (a
+reboot, a daemon restart) come back without counting as crashed.
 While the owner's switch of Claude accounts runs, its daemon restart is no crash: the switch brings its sessions back.
 While the vitals find Claude sessions with no record the warden reads, no session counts as crashed.
 """
@@ -15,7 +17,9 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from pathlib import Path
 
+from runtime.queue import formats
 from runtime.shared import store
 from runtime.shared.models import (
     BENCH_PENDING,
@@ -107,12 +111,34 @@ def _finished(ctx: Context, s: Session) -> bool:
         return False
 
 
+def _daemon_path(ctx: Context) -> Path:
+    return ctx.places.state / "daemon-seen.json"
+
+
+def _daemon_seen(ctx: Context) -> float | None:
+    """When the daemon the last sessions pass saw had started; None before the first pass that saw one."""
+    found = store.read_json_or(_daemon_path(ctx), None)
+    return (
+        float(found["started"]) if isinstance(found, dict) and isinstance(found.get("started"), int | float) else None
+    )
+
+
 def watch(ctx: Context) -> None:
     # Sessions the warden cannot see would all look crashed: it resumes and retires none until it sees them again.
     if permits.switching(ctx) is not None or vitals.blind(ctx.places):
         return
-    settings = ctx.settings()
+    settings, now = ctx.settings(), ctx.clock.now()
     tries, grace = settings.get_int("watch.resume_tries"), settings.get_int("watch.start_grace_seconds")
+    window, backoff = (
+        settings.get_int("watch.crash_window_minutes") * 60,
+        settings.get_int("watch.resume_backoff_seconds"),
+    )
+    daemon = backstop.daemon_started()
+    # No session can come back until the daemon that hosts it is up and has had a moment to be ready (a boot starts
+    # the warden first). Sessions found gone just after the daemon started again ended with it: no crash of theirs.
+    hosting = daemon is not None and now - daemon >= settings.get_int("watch.daemon_settle_seconds")
+    seen = _daemon_seen(ctx)
+    restarted = hosting and seen is not None and seen != daemon
     watched = [s.id for s in lifecycle.read(ctx).values() if s.state in (WORKING, WAITING) and not s.parent]
     for sid in watched:
         retired: list[Session] = []
@@ -125,30 +151,53 @@ def watch(ctx: Context) -> None:
             if s.role != ORCH and _finished(ctx, s):
                 why = "finished: its task moved past its part"
                 retired = lifecycle.retire(ctx, registry.subtree(sessions, sid), s, FINISHED, WARDEN, why)
-            elif sid in backstop.processes():
+            elif sid in backstop.processes() or not hosting:
                 continue
             elif sid.startswith(launch.PENDING):
                 if _age(ctx, s.since) < grace:
                     continue
                 why = f"its session never appeared within {grace} s of its start"
                 retired = lifecycle.retire(ctx, registry.subtree(sessions, sid), s, CRASHED, WARDEN, why)
-            elif s.role == ORCH or s.resume_tries < tries:
-                s.resume_tries += 1  # never reset by a resume, so a session that keeps dying is retired
-                registry.write(ctx.places, sessions)
-                try:
-                    launch.resume(ctx, s, RESTARTED + (_owed(ctx) if s.role == ORCH else ""))
-                except LaunchError as exc:
-                    log.warning("resume %d of crashed session %s failed (%s)", s.resume_tries, sid, type(exc).__name__)
-                if s.role == ORCH:
-                    reflections.incident(ctx, "The orchestrator's process ended; the warden resumed it.")
+            elif restarted:
+                _resume(ctx, s, counted=False)
                 continue
             else:
-                why = f"its process ended and {tries} resumes did not keep it running"
+                last = formats.epoch(s.crashed_at) if s.crashed_at else None
+                if last is not None and now - last > window:
+                    s.resume_tries = 0  # its last crash was long ago: this one counts afresh
+                if (
+                    last is not None
+                    and s.resume_tries
+                    and now < last + min(backoff * 2 ** (s.resume_tries - 1), window)
+                ):
+                    continue  # backing off: the last resume did not hold
+                if s.role == ORCH or s.resume_tries < tries:
+                    s.resume_tries += 1  # a resume never resets it: one that keeps dying is retired
+                    s.crashed_at = ctx.clock.iso()
+                    registry.write(ctx.places, sessions)
+                    _resume(ctx, s, counted=True)
+                    if s.role == ORCH and s.resume_tries == tries:
+                        reflections.incident(ctx, f"The orchestrator's process ended {tries} times within "
+                                                  f"{window // 60} min; the warden keeps resuming it, waiting longer "
+                                                  "each time. Check its Claude account's sign-in.")  # fmt: skip
+                    continue
+                why = f"its process ended and {tries} resumes within {window // 60} min did not keep it running"
                 retired = lifecycle.retire(ctx, registry.subtree(sessions, sid), s, CRASHED, WARDEN, why)
             registry.write(ctx.places, sessions)
         lifecycle.after_retire(ctx, retired)
         if retired[0].retired == CRASHED:
             ctx.post_event(inbox.CRASHED, {"session": sid, "name": retired[0].name, "task": retired[0].task})
+    if hosting and daemon != seen:
+        store.write_json(_daemon_path(ctx), {"started": daemon})
+
+
+def _resume(ctx: Context, s: Session, *, counted: bool) -> None:
+    try:
+        launch.resume(ctx, s, RESTARTED + (_owed(ctx) if s.role == ORCH else ""))
+    except LaunchError as exc:
+        log.warning("resume of session %s after its process ended failed (%s)", s.id, type(exc).__name__)
+    if s.role == ORCH and counted:
+        reflections.incident(ctx, "The orchestrator's process ended; the warden resumed it.")
 
 
 def _owed(ctx: Context) -> str:

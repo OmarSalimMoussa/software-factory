@@ -76,7 +76,8 @@ class Session:
     retired_by: str = ""
     note: str = ""
     ended: str = ""
-    resume_tries: int = 0
+    resume_tries: int = 0  # resumes after crashes within the crash window
+    crashed_at: str = ""  # when the crash watch last resumed it
     merge_turn: bool = False
     rung: int | None = None
     chat_link: str = ""

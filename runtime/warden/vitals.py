@@ -10,7 +10,6 @@ folders as arguments, so tests feed samples.
 from __future__ import annotations
 
 import hashlib
-import pwd
 import re
 import subprocess
 from dataclasses import asdict, dataclass
@@ -20,7 +19,7 @@ from typing import Any
 from runtime.shared import store
 from runtime.shared.paths import AGENT_USER, SLICE, Places
 from runtime.shared.settings import Settings
-from runtime.warden import backstop
+from runtime.warden import backstop, launch
 from runtime.warden.context import Context
 
 GREEN, AMBER, UNKNOWN, RED, MISSING = "green", "amber", "unknown", "red", "missing"
@@ -202,13 +201,6 @@ def blind(places: Places) -> bool:
     return any(r.get("level") == RED for r in found)
 
 
-def _agent_uid() -> int | None:
-    try:
-        return pwd.getpwnam(AGENT_USER).pw_uid
-    except KeyError:
-        return None
-
-
 def _text(path: Path) -> str:
     try:
         return path.read_text()
@@ -230,8 +222,8 @@ def refresh(ctx: Context, proc: Path = PROC, supplies: Path = POWER) -> dict[str
         power(supplies, settings),
         install(ctx.places),
         hooks(ctx.places, Path(settings.get_str("repo.path")), settings.get_int("watch.tick_seconds")),
-        daemon(proc, _agent_uid()),
-        records(proc, _agent_uid(), settings.get_int("watch.start_grace_seconds")),
+        daemon(proc, launch.agent_uid()),
+        records(proc, launch.agent_uid(), settings.get_int("watch.start_grace_seconds")),
         firewall(ctx.places.firewall_stamp, ctx.clock.now(), settings),
     ]
     snapshot = {"at": ctx.clock.iso(), "level": worst(readings), "readings": [asdict(r) for r in readings]}

@@ -60,6 +60,7 @@ def test_a_crashed_session_is_resumed_then_retired_but_the_orchestrator_never(wo
     for _ in range(tries + 2):
         world.procs.clear()  # each resume dies again at once
         crashwatch.watch(world.ctx())
+        world.clock.at += 4 * world.settings.get_int("watch.resume_backoff_seconds")  # past each wait between them
     crashed = world.session("5e550001")
     assert (crashed.state, crashed.retired, crashed.retired_by) == (RETIRED, CRASHED, "warden")
     assert world.launcher.resumed.count("5e550001") == tries
@@ -119,3 +120,54 @@ def test_while_sessions_run_unseen_the_crash_watch_resumes_and_retires_none(worl
         crashwatch.watch(world.ctx())
 
     assert world.session("5e550001").state == WORKING and world.launcher.resumed == []
+
+
+def test_sessions_that_ended_with_their_daemon_come_back_without_counting_as_crashed(world: World) -> None:
+    world.queue.add("t-0001", status="building")
+    world.seat("5e550001", task="t-0001")
+    crashwatch.watch(world.ctx())  # a crash: the first resume counts
+    for _ in range(3):  # then the machine reboots three times, each a new daemon, and the session is gone each time
+        world.procs.clear()
+        world.clock.at += 3600
+        world.daemon = world.clock.now() - 60
+        crashwatch.watch(world.ctx())
+
+    s = world.session("5e550001")
+    assert (s.state, s.resume_tries, world.launcher.resumed.count("5e550001")) == (WORKING, 1, 4)
+
+
+@pytest.mark.parametrize("daemon", [None, 1.0], ids=["not-running", "just-started"])
+def test_nothing_resumes_until_the_daemon_is_up_and_settled(world: World, daemon: float | None) -> None:
+    world.queue.add("t-0001", status="building")
+    world.seat("5e550001", task="t-0001")
+    world.daemon = None if daemon is None else world.clock.now() - daemon
+
+    crashwatch.watch(world.ctx())
+
+    assert world.launcher.resumed == [] and world.session("5e550001").resume_tries == 0
+    world.daemon = world.clock.now() - 3600
+    crashwatch.watch(world.ctx())
+    assert world.launcher.resumed == ["5e550001"]
+
+
+def test_a_crash_waits_longer_each_time_and_one_long_after_the_last_counts_afresh(world: World) -> None:
+    world.queue.add("t-0001", status="building")
+    world.seat("5e550001", task="t-0001")
+    backoff = world.settings.get_int("watch.resume_backoff_seconds")
+
+    def crash() -> None:  # each resume dies again at once
+        world.procs.clear()
+        crashwatch.watch(world.ctx())
+
+    crash()
+    crash()  # it died again at once: the next resume waits
+    assert world.launcher.resumed == ["5e550001"]
+
+    world.clock.at += backoff
+    crash()
+    assert world.launcher.resumed == ["5e550001"] * 2 and world.session("5e550001").resume_tries == 2
+
+    world.clock.at += world.settings.get_int("watch.crash_window_minutes") * 60 + 1
+    crash()  # two crashes are the limit, but this one comes long after them
+    s = world.session("5e550001")
+    assert (s.state, s.resume_tries, world.launcher.resumed.count("5e550001")) == (WORKING, 1, 3)

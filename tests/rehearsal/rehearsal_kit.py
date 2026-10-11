@@ -350,6 +350,8 @@ def build(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Rehearsal:
     stack = Stack()
     monkeypatch.setattr(launch, "agent_home", lambda: agent_home)
     monkeypatch.setattr(backstop, "PROC", kernel.proc)
+    daemon = clock.now() - 86400  # the agent's Claude daemon has run since the day before
+    monkeypatch.setattr(backstop, "daemon_started", lambda: daemon)
     monkeypatch.setattr(qa_browser, "runs_root", lambda: agent_home / qa_browser.RUNS)
     monkeypatch.setattr(health, "http_get", stack.http_get)
 

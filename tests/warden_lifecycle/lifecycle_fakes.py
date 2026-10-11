@@ -118,6 +118,7 @@ class World:
     queue: Queue
     procs: dict[str, Proc]
     events: list[tuple[str, dict[str, Any]]]
+    daemon: float | None = None  # when the agent's Claude daemon started; set a day before the clock's start
 
     def ctx(self, role: str = "orchestrator", kind: str = "agent", session: str = "") -> Context:
         caller = Caller(kind=kind, role=role, session=session)

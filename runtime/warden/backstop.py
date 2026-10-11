@@ -72,6 +72,27 @@ def processes() -> dict[str, Proc]:
     return read_processes(sessions_folder(), PROC)
 
 
+def daemon_started() -> float | None:
+    """When the agent's Claude daemon, which hosts every background session, started, in seconds since the epoch;
+    None while it is not running."""
+    uid = launch.agent_uid()
+    if uid is None:
+        return None
+    boot = next(int(line.split()[1]) for line in (PROC / "stat").read_text().splitlines() if line.startswith("btime "))
+    ticks, found = os.sysconf("SC_CLK_TCK"), []
+    for entry in (e for e in PROC.iterdir() if e.name.isdigit()):
+        try:
+            if entry.stat().st_uid != uid:
+                continue
+            argv = (entry / "cmdline").read_bytes().split(b"\0")
+        except OSError:  # the process ended while it was read
+            continue
+        started = _started(PROC, int(entry.name))
+        if argv[0].endswith(b"claude") and argv[1:3] == [b"daemon", b"run"] and started.isdigit():
+            found.append(boot + int(started) / ticks)
+    return min(found) if found else None
+
+
 def sessions_folder() -> Path:
     return launch.agent_home() / ".claude" / "sessions"
 

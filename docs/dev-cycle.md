@@ -68,3 +68,7 @@ session is told to pause, commits its work, and comes back later with its full c
 Stop, or a crash retires a session, and a retired session never comes back: its task returns to Proposed, and a new
 session starts from its branch. The warden sees a session finish from its task's status (an implementer's task
 checked, a designer's spec gone to build): it stops the session, empties its slot and frees its place.
+
+A session whose process ends is resumed, each time after a longer wait, and retired as crashed only after
+`watch.resume_tries` resumes within `watch.crash_window_minutes`. Nothing resumes until the agent's Claude daemon is
+up, and sessions that ended with it (a reboot, a daemon restart) come back without counting as crashed.

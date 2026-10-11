@@ -29,5 +29,7 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> World:
     monkeypatch.setattr(permits, "read_task", built.queue.read)
     monkeypatch.setattr(permits, "move_task", built.queue.move)
     monkeypatch.setattr(backstop, "processes", lambda: dict(built.procs))
+    built.daemon = built.clock.now() - 86400
+    monkeypatch.setattr(backstop, "daemon_started", lambda: built.daemon)
     monkeypatch.setattr(launch, "agent_home", lambda: tmp_path / "agent")
     return built

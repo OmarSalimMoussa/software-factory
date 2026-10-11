@@ -62,6 +62,13 @@ def agent_home() -> Path:
     return Path(pwd.getpwnam(AGENT_USER).pw_dir)
 
 
+def agent_uid() -> int | None:
+    try:
+        return pwd.getpwnam(AGENT_USER).pw_uid
+    except KeyError:  # an install not finished: there is no agent user to look for
+        return None
+
+
 def _carried(launch: dict[str, Any]) -> list[str]:
     """What a session runs under. A resume passes all of it again: Claude Code promises none of it carries over, and
     a session resumed without its --settings would run outside the sandbox."""
