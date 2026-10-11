@@ -9,7 +9,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from standard.config import Config, parse_text
+from standard.config import parse_text
+from standard.config_records import Config
 
 FACTORY_TOML = """
 [product]

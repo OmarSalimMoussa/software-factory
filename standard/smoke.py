@@ -25,7 +25,7 @@ from typing import Any
 
 from standard import config as settings
 from standard import envfile, environment, probe, yaml_subset
-from standard.config import Config, Expect
+from standard.config_records import Config, Expect
 from standard.probe import Result, Run, State
 from standard.services import provision, stack
 from standard.services.provision import POSTGRES

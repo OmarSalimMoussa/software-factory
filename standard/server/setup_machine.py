@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from standard.config import Config
+from standard.config_records import Config
 from standard.services.provision import Run
 
 # The factory checkout the set-up runs from: its pyproject.toml says which Python the factory needs.

@@ -20,7 +20,8 @@ from standard import compose as compose_mod
 from standard import config as config_mod
 from standard import plan as plan_mod
 from standard.compose import Compose, ComposeError
-from standard.config import FACTORY_REF, FACTORY_REF_LINE, Config, ConfigError
+from standard.config import FACTORY_REF, FACTORY_REF_LINE, ConfigError
+from standard.config_records import Config
 
 ID = "deploy-shape"
 RULE = "The product builds, smoke-tests and deploys the standard way, as factory.toml describes"

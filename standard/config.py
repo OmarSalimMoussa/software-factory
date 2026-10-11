@@ -10,9 +10,27 @@ from __future__ import annotations
 import re
 import string
 import tomllib
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from standard.config_records import (
+    Build,
+    Config,
+    Deploy,
+    Edge,
+    Endpoint,
+    Env,
+    Expect,
+    ExtraImage,
+    Product,
+    Release,
+    Route,
+    Server,
+    Services,
+    Smoke,
+    Workspace,
+)
+from standard.toml_fields import Fields
 
 FILE = "factory.toml"
 # One line, owner/name@<40-character sha>: the factory commit the product's CI plans and checks with.
@@ -43,148 +61,6 @@ class ConfigError(Exception):
         self.path = path
         self.problems = problems
         super().__init__(f"{path}: " + "; ".join(problems))
-
-
-@dataclass(frozen=True, slots=True)
-class Product:
-    name: str
-    registry: str
-
-
-@dataclass(frozen=True, slots=True)
-class ExtraImage:
-    name: str
-    dockerfile: str
-    context: str
-
-
-@dataclass(frozen=True, slots=True)
-class Build:
-    commit_arg: str
-    tag_arg: str
-    extra_images: tuple[ExtraImage, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class Endpoint:
-    service: str
-    port: int
-
-
-@dataclass(frozen=True, slots=True)
-class Expect:
-    service: str
-    port: int
-    path: str
-    status: int
-
-
-@dataclass(frozen=True, slots=True)
-class Smoke:
-    timeout_seconds: int
-    health: Endpoint
-    expect: tuple[Expect, ...]
-    check: str  # "" when the product has no smoke check of its own
-
-
-@dataclass(frozen=True, slots=True)
-class Services:
-    owner_email: str
-    errors: tuple[str, ...]
-    errors_public_path: str  # "" when browsers do not report through the product's own origin
-
-
-@dataclass(frozen=True, slots=True)
-class Env:
-    file: str
-    template: str
-    set: tuple[tuple[str, str], ...]  # (key, format string), in file order
-
-
-@dataclass(frozen=True, slots=True)
-class Server:
-    host: str
-    host_key: str
-    admin: str
-    tailnet: str
-    acme_email: str
-
-
-@dataclass(frozen=True, slots=True)
-class Workspace:
-    name: str
-    domain: str
-    port: int
-    after_deploy: tuple[str, ...]
-
-    @property
-    def origin(self) -> str:
-        return f"https://{self.domain}"
-
-
-@dataclass(frozen=True, slots=True)
-class Deploy:
-    health: str
-    answer_seconds: int
-    drain_minutes: int
-    files: tuple[str, ...]
-    keep_images: int
-
-
-@dataclass(frozen=True, slots=True)
-class Route:
-    host: str
-    redirect: str
-
-
-@dataclass(frozen=True, slots=True)
-class Edge:
-    blocked_paths: tuple[str, ...]
-    routes: tuple[Route, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class Release:
-    kind: str
-    when_changed: tuple[str, ...]
-    package: str
-    live: bool
-
-
-@dataclass(frozen=True, slots=True)
-class Config:
-    product: Product
-    build: Build
-    smoke: Smoke
-    services: Services
-    env: Env
-    server: Server
-    workspaces: tuple[Workspace, ...]  # staging, then prod
-    deploy: Deploy
-    edge: Edge
-    releases: tuple[Release, ...]
-    raw: dict[str, Any]  # the parsed file, for comparing two copies
-
-    def workspace(self, name: str) -> Workspace:
-        for ws in self.workspaces:
-            if ws.name == name:
-                return ws
-        raise KeyError(name)
-
-    def image(self, image: str, tag: str) -> str:
-        return f"{self.product.registry}/{self.product.name}-{image}:{tag}"
-
-    def project(self, workspace: str) -> str:
-        """The compose project of a workspace (``prod``) or a laptop slot (``slot2``)."""
-        return f"{self.product.name}-{workspace}"
-
-    def hooks(self) -> tuple[str, ...]:
-        """Every script factory.toml names: each is protected like factory.toml itself."""
-        found = [self.smoke.check] if self.smoke.check else []
-        for ws in self.workspaces:
-            found += ws.after_deploy
-        found += [r.package for r in self.releases]
-        return tuple(dict.fromkeys(found))
 
 
 def render(template: str, values: dict[str, str]) -> str:
@@ -218,103 +94,8 @@ def parse_text(text: str, path: Path = Path(FILE)) -> Config:
     return config
 
 
-class _Reader:
+class _Reader(Fields):
     """Walks the parsed file, collecting every problem rather than stopping at the first."""
-
-    def __init__(self) -> None:
-        self.problems: list[str] = []
-
-    def fail(self, where: str, what: str) -> None:
-        self.problems.append(f"{where}: {what}")
-
-    def table(
-        self, data: dict[str, Any], key: str, where: str, keys: tuple[str, ...], optional: tuple[str, ...] = ()
-    ) -> dict[str, Any]:
-        here = f"{where}.{key}" if where else f"[{key}]"
-        value = data.get(key)
-        if not isinstance(value, dict):
-            self.fail(here, "missing" if value is None else "must be a table")
-            return {}
-        self.known(value, here, keys + optional)
-        for name in keys:
-            if name not in value:
-                self.fail(f"{here}.{name}", "missing")
-        return value
-
-    def known(self, value: dict[str, Any], where: str, keys: tuple[str, ...]) -> None:
-        for name in value:
-            if name not in keys:
-                self.fail(f"{where}.{name}", f"unknown key (allowed: {', '.join(keys)})")
-
-    def text(
-        self, t: dict[str, Any], key: str, where: str, pattern: re.Pattern[str] | None = None, what: str = ""
-    ) -> str:
-        value = t.get(key)
-        if key not in t:
-            return ""
-        if not isinstance(value, str) or not value:
-            self.fail(f"{where}.{key}", "must be a non-empty string")
-            return ""
-        if pattern is not None and not pattern.fullmatch(value):
-            self.fail(f"{where}.{key}", f"{value!r} is not {what or 'well formed'}")
-        return value
-
-    def number(self, t: dict[str, Any], key: str, where: str, low: int, high: int) -> int:
-        value = t.get(key)
-        if key not in t:
-            return 0
-        if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
-            self.fail(f"{where}.{key}", f"must be a whole number from {low} to {high}")
-            return 0
-        return value
-
-    def flag(self, t: dict[str, Any], key: str, where: str) -> bool:
-        value = t.get(key)
-        if key in t and not isinstance(value, bool):
-            self.fail(f"{where}.{key}", "must be true or false")
-        return value is True
-
-    def texts(
-        self, t: dict[str, Any], key: str, where: str, check: Any = None, empty_ok: bool = True
-    ) -> tuple[str, ...]:
-        value = t.get(key)
-        if key not in t:
-            return ()
-        if not isinstance(value, list) or not all(isinstance(v, str) and v for v in value):
-            self.fail(f"{where}.{key}", "must be a list of non-empty strings")
-            return ()
-        if not value and not empty_ok:
-            self.fail(f"{where}.{key}", "must name at least one")
-        if len(set(value)) != len(value):
-            self.fail(f"{where}.{key}", "names something twice")
-        if check is not None:
-            for item in value:
-                check(f"{where}.{key}", item)
-        return tuple(value)
-
-    def rel_path(self, where: str, value: str) -> None:
-        parts = Path(value).parts
-        if value.startswith(("/", "~")) or ".." in parts:
-            self.fail(where, f"{value!r} must be a path inside the repo, relative to its top")
-
-    def path_key(self, t: dict[str, Any], key: str, where: str, optional: bool = False) -> str:
-        if optional and t.get(key, "") == "":
-            if key in t and not isinstance(t[key], str):
-                self.fail(f"{where}.{key}", "must be a string")
-            return ""
-        value = self.text(t, key, where)
-        if value:
-            self.rel_path(f"{where}.{key}", value)
-        return value
-
-    def items(self, t: dict[str, Any], key: str, where: str) -> list[tuple[str, dict[str, Any]]]:
-        value = t.get(key)
-        if key not in t:
-            return []
-        if not isinstance(value, list) or not all(isinstance(v, dict) for v in value):
-            self.fail(f"{where}.{key}", "must be a list of tables")
-            return []
-        return [(f"{where}.{key}[{n}]", item) for n, item in enumerate(value)]
 
     def config(self, data: dict[str, Any]) -> Config | None:
         self.known(
@@ -374,16 +155,6 @@ class _Reader:
             self.text(item, "service", where) or self._missing(item, "service", where),
             self.number(item, "port", where, 1, 65535) or self._missing_int(item, "port", where),
         )
-
-    def _missing(self, t: dict[str, Any], key: str, where: str) -> str:
-        if key not in t:
-            self.fail(f"{where}.{key}", "missing")
-        return ""
-
-    def _missing_int(self, t: dict[str, Any], key: str, where: str) -> int:
-        if key not in t:
-            self.fail(f"{where}.{key}", "missing")
-        return 0
 
     def smoke(self, data: dict[str, Any]) -> Smoke:
         t = self.table(data, "smoke", "", ("timeout_seconds", "health", "expect"), optional=("check",))

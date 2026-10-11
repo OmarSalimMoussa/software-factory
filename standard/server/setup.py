@@ -25,7 +25,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from standard.config import FACTORY_REF, FACTORY_REF_LINE, FILE, Config, ConfigError, load
+from standard.config import FACTORY_REF, FACTORY_REF_LINE, FILE, ConfigError, load
+from standard.config_records import Config
 from standard.server import heartbeat as heartbeat_mod
 from standard.server import setup_machine as machine
 from standard.server.setup_machine import FACTORY, Host, SetupError, ensure_dirs, ensure_file, remote_text

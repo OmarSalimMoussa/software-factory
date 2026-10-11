@@ -14,7 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from standard.config import Config
+from standard.config_records import Config
 from standard.services.provision import Run, checked
 
 SHORT = 8

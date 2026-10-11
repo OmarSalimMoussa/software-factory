@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Literal
 
 from standard import yaml_subset
-from standard.config import Config
+from standard.config_records import Config
 from standard.envfile import parse_values
 from standard.services.provision import Run
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from standard import config as settings
+from standard.config_records import Config
 from standard.release import STORE_SECRETS, ReleaseError, release_all
 
 FIXTURE = Path(__file__).resolve().parents[2] / "testdata" / "fixture-product" / "factory.toml"
@@ -13,7 +14,7 @@ SHA = "0123456789abcdef0123456789abcdef01234567"
 SECRETS = {secret: f"value-of-{name}" for name, secret in STORE_SECRETS}
 
 
-def with_release(live: bool) -> settings.Config:
+def with_release(live: bool) -> Config:
     release = f"""
 [[release]]
 kind = "chrome-web-store"
@@ -43,7 +44,7 @@ class Runner:
         return [Path(argv[0]).name for argv, _ in self.calls]
 
 
-def release(config: settings.Config, runner: Runner, released: str, environ: Mapping[str, str]) -> list[str]:
+def release(config: Config, runner: Runner, released: str, environ: Mapping[str, str]) -> list[str]:
     said: list[str] = []
     ok = release_all(
         config,

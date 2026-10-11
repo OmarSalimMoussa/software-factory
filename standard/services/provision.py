@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from standard.config import Config
+from standard.config_records import Config
 from standard.envfile import parse_values
 from standard.services import glitchtip_bootstrap as glitchtip
 

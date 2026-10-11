@@ -18,7 +18,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from standard.config import Config, render
+from standard.config import render
+from standard.config_records import Config
 
 SERVICE_BLOCK = "# Written by the factory for this workspace at every deploy; do not edit."
 SERVER_MARKER = "# server:"

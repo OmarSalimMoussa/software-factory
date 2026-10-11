@@ -28,7 +28,8 @@ from standard import compose as compose_mod
 from standard import config as config_mod
 from standard import environment
 from standard.compose import Compose, ComposeError
-from standard.config import Config, ConfigError
+from standard.config import ConfigError
+from standard.config_records import Config
 
 DEPLOY_IMAGE = "deploy"
 SHORT = 8

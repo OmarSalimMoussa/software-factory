@@ -30,7 +30,8 @@ from standard import config as config_mod
 from standard import envfile, environment
 from standard import plan as plan_mod
 from standard.compose import ComposeError
-from standard.config import Config, ConfigError
+from standard.config import ConfigError
+from standard.config_records import Config
 from standard.envfile import EnvError, atomic_write
 from standard.plan import DEPLOY_IMAGE, PlanError
 from standard.server import deploy_steps as steps

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from standard.config import Config
+from standard.config_records import Config
 from standard.envfile import atomic_write
 from standard.services.provision import Run, checked
 

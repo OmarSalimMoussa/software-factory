@@ -11,6 +11,7 @@ import pytest
 
 from standard import config as settings
 from standard import yaml_subset
+from standard.config_records import Config
 from standard.probe import Result
 from standard.services import stack
 from standard.smoke import Smoke, SmokeError
@@ -43,9 +44,7 @@ def label(argv: list[str]) -> str:
 class Docker:
     """A fake docker for the fixture product: every call recorded, each answered as the scenario says."""
 
-    def __init__(
-        self, config: settings.Config, repo: Path, *, fail: str, state: object, commit: str, taken: bool
-    ) -> None:
+    def __init__(self, config: Config, repo: Path, *, fail: str, state: object, commit: str, taken: bool) -> None:
         self.config, self.repo, self.fail, self.state, self.commit = config, repo, fail, state, commit
         self.taken = taken  # a container named factory-postgres runs before the test starts
         self.calls: list[list[str]] = []

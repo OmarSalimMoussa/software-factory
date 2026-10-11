@@ -16,6 +16,7 @@ from runtime.system import layout
 from runtime.system.host import CommandError
 from runtime.system.job import Install, refuse
 from standard import config as product_config
+from standard.config_records import Config
 from standard.services import provision, stack
 
 # What a server's edge reads; the laptop runs no edge.
@@ -23,7 +24,7 @@ _SERVER_ONLY = frozenset({stack.EDGE_CADDYFILE.name})
 _IMAGES = "the shared services' images"
 
 
-def _config(ctx: Install) -> product_config.Config:
+def _config(ctx: Install) -> Config:
     try:
         return product_config.load(ctx.product)
     except product_config.ConfigError as exc:

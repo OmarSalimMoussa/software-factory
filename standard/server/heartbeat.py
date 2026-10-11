@@ -14,7 +14,8 @@ import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 
-from standard.config import Config, ConfigError, parse
+from standard.config import ConfigError, parse
+from standard.config_records import Config
 
 PRODUCT_TOML = Path("/etc/software-factory/product.toml")
 PING_FILE = Path("/etc/software-factory/heartbeat-ping")

@@ -9,7 +9,8 @@ from typing import Literal
 import pytest
 
 from standard import yaml_subset
-from standard.config import Config, parse_text
+from standard.config import parse_text
+from standard.config_records import Config
 from standard.services import stack
 
 FACTORY_TOML = """

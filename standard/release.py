@@ -18,7 +18,7 @@ from pathlib import Path
 
 from standard import config as settings
 from standard import environment
-from standard.config import Config, Release
+from standard.config_records import Config, Release
 
 # The chrome-web-store upload's own variable, then the repo secret the workflow hands it in.
 STORE_SECRETS = (
