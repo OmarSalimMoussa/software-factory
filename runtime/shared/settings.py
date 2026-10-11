@@ -162,8 +162,8 @@ SCHEMA: dict[str, Spec] = {
     "gc.prune_hour": Spec("int", 0, 23),
     "gc.images_keep_days": Spec("int", 1, 90),
     "gc.docker_budget_gib": Spec("int", 5, 2000),
-    # contract: added by 1B-3. The warden's own clone of the factory repo, where each settings save is committed.
-    "factory.clone": Spec("str", when="Next warden start"),
+    # The factory's own repo on GitHub (owner/name), which it never works on; the installer sets it.
+    "factory.github": Spec("str", when="Next install"),
     "factory.command_seconds": Spec("int", 10, 900),  # contract: added by 1B-3
     # contract: added by builder 3, read by the installer only.
     "install.drill": Spec("model", when="Next install"),

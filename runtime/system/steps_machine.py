@@ -12,7 +12,7 @@ from pathlib import Path
 
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER, queue_dir
 from runtime.shared.settings import overrides_toml
-from runtime.system import github_keys, layout, render, steps_wire
+from runtime.system import layout, render, steps_wire
 from runtime.system.host import CommandError, Host
 from runtime.system.job import Install, refuse
 
@@ -251,54 +251,6 @@ def agent_checkout(ctx: Install) -> None:
     if code == 0 and kind.strip() and kind.strip() != "directory":
         raise refuse(f"{queue} is a {kind.strip()}, not a folder: remove it, then install again")
     ctx.host.mkdir(queue, mode=0o755, owner=WARDEN_USER)
-
-
-def warden_clone(ctx: Install) -> None:
-    """The warden's own clone of the factory, where each settings save is committed and pushed (plan R9), on the
-    factory's default branch with its upstream set, as the owner's git identity. A release brings the factory's
-    history with it; otherwise it comes from the owner's checkout."""
-    host, owner = ctx.host, ctx.owner.name
-    clone = Path(ctx.need_settings().get_str("factory.clone"))
-    if ctx.release is not None and ctx.bundle is not None:
-        _clone(ctx, ctx.bundle, clone, ctx.factory_origin, WARDEN_USER, str(ctx.release["branch"]))
-    elif ctx.factory is not None:
-        branch = github_keys.default_branch(host, owner, ctx.factory)
-        if not branch and not host.dry:
-            raise refuse("The factory's default branch cannot be found: sign in to the GitHub CLI (gh auth login), "
-                         "then install again")  # fmt: skip
-        _clone_checkout(ctx, ctx.factory, clone, ctx.factory_origin, WARDEN_USER, branch or "<default branch>")
-    else:
-        raise refuse("this install names neither a release nor a checkout of the factory to clone")
-    yours = ctx.factory or ctx.product
-    for key, what in (("user.name", "Your name"), ("user.email", "Your email address")):
-        value = host.query(["git", "-C", str(yours), "config", key], user=owner)[1].strip()
-        if not value and not host.dry:
-            value = host.ask(f"{what}, for the factory's record of your settings: ", secret=False, link="",
-                             hint="The warden commits each settings change you save under your name, and git does "
-                                  "not know it yet.")  # fmt: skip
-            if not value:
-                raise refuse(f"The warden commits your settings changes under your name: install again and give "
-                             f"{what.lower()} when asked")  # fmt: skip
-        host.run(["git", "-C", str(clone), "config", key, value or f"<{key}>"], user=WARDEN_USER)
-    _known_hosts(ctx)
-
-
-def _known_hosts(ctx: Install) -> None:
-    """github.com's host keys for the warden's pushes, taken from the owner's own known_hosts when it has them."""
-    host = ctx.host
-    mine = ctx.owner.home / ".ssh" / "known_hosts"
-    lines = host.query(["ssh-keygen", "-F", "github.com", "-f", str(mine)], user=ctx.owner.name)[1]
-    keys = [line for line in lines.splitlines() if line.strip() and not line.startswith("#")]
-    if not keys:
-        keys = [line for line in host.query(["ssh-keyscan", "-t", "ed25519,ecdsa,rsa", "github.com"])[1].splitlines()
-                if line.strip() and not line.startswith("#")]  # fmt: skip
-        host.say("github.com's host keys came from ssh-keyscan: compare them with GitHub's published ones")
-    if not keys and not host.dry:
-        raise refuse("GitHub could not be reached to read its host keys: check this computer's internet connection, "
-                     "then install again")  # fmt: skip
-    ssh = ctx.places.state / ".ssh"
-    host.mkdir(ssh, mode=0o700, owner=WARDEN_USER)
-    host.write(ssh / "known_hosts", "\n".join(keys) + "\n", mode=0o644, owner=WARDEN_USER)
 
 
 def _subordinate_ids(ctx: Install) -> None:

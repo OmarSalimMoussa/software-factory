@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from settings_text import set_line
 
 from runtime.cli import factory as cli
 from runtime.qa import qa_browser
@@ -293,7 +294,7 @@ class Rehearsal:
 def _settings_text(repo: Path) -> str:
     text = (ROOT / "settings.toml").read_text()
     for key, value in {"repo.path": str(repo), "repo.github": GITHUB}.items():
-        text = settings_save.set_line(text, key, value)
+        text = set_line(text, key, value)
     return text
 
 

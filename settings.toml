@@ -180,8 +180,8 @@ prune_hour = 3
 images_keep_days = 7
 docker_budget_gib = 60
 
-[factory]               # the warden's own clone of the factory repo; the installer sets it
-clone = ""
+[factory]
+github = ""             # owner/name of the factory's own repo on GitHub, which it never works on; the installer sets it
 command_seconds = 120   # how long the warden waits for one of its own commands (git, systemctl)
 
 [install]               # read by the installer: a change takes effect at the next install

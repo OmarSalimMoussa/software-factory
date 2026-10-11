@@ -47,7 +47,7 @@ def staged(environ: Mapping[str, str]) -> Staged | None:
 
 
 def release_folder(stage: Path) -> Path:
-    """Beside a stage made from a release: its manifest and the factory's history, which no step copies."""
+    """Beside a stage made from a release: its manifest, which no step copies."""
     return stage.with_name(stage.name + ".release")
 
 

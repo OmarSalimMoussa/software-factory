@@ -107,7 +107,6 @@ PHASES: tuple[Phase, ...] = (
     Phase("Setting up the factory", (
         ("Copying the factory into place", steps_machine.place),
         ("Giving the agents their copy of the product", steps_machine.agent_checkout),
-        ("Giving the warden its copy of the factory", steps_machine.warden_clone),
         ("Installing Claude Code for the agents", steps_machine.claude_binary),
         ("Copying your tools for the agents", steps_toolchain.toolchain),
         ("Letting the agents' sandbox run", steps_machine.apparmor),
@@ -159,7 +158,6 @@ def job(host: Host, places: Places, owner: Account, repo: Path, commit: str, cha
         ctx.stage, ctx.sha = source.stage, source.sha
     if source is not None and source.release is not None:
         ctx.release = release.read_manifest(source.release)
-        ctx.bundle = source.release / release.BUNDLE
         ctx.subject = str(ctx.release["subject"])
     # Known before any step runs: only a first install is ever taken back.
     ctx.first = not host.exists(layout.install_record(places.state))

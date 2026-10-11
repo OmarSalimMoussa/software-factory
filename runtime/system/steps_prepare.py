@@ -8,7 +8,7 @@ import tomllib
 from typing import Any
 
 from runtime.shared.models import DEPRIORITIZED, RETIRED
-from runtime.shared.settings import SettingsError, _flatten, build
+from runtime.shared.settings import SCHEMA, SettingsError, _flatten, build
 from runtime.system import layout
 from runtime.system.host import Host
 from runtime.system.job import Install, github_name, github_origin, refuse
@@ -144,11 +144,15 @@ def _tailnet_name(ctx: Install) -> str | None:
 def settle_settings(ctx: Install) -> None:
     """The commit's defaults, the owner's saved overrides and --set, plus what only the install knows; checked."""
     defaults = tomllib.loads((ctx.tree() / "settings.toml").read_text(encoding="utf-8"))
-    overrides = {**_saved_overrides(ctx), **ctx.changes}
+    saved = _saved_overrides(ctx)
+    gone = sorted(key for key in saved if key not in SCHEMA)
+    if gone:
+        ctx.host.tell(f"Dropped your saved {', '.join(gone)}: this release has no such setting.")
+    overrides = {**{key: value for key, value in saved.items() if key not in gone}, **ctx.changes}
     derived = {
         "repo.path": str(layout.AGENT_HOME / ctx.product.name),
         "repo.github": github_name(ctx.product_origin) or "",
-        "factory.clone": str(ctx.places.state / "factory-repo"),
+        "factory.github": github_name(ctx.factory_origin) or "",
     }
     for key, value in derived.items():
         if not _effective(defaults, overrides, key) and value:

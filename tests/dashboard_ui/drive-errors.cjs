@@ -116,7 +116,7 @@ drive('errors', async t => {
   t.check(await until(o, () => document.querySelector('.steps li')), 'no steps before the reload');
   await o.reload(); await ready(o);
   await o.waitForFunction(() => document.querySelector('#sheet-title').textContent === 'Saving settings' && document.querySelector('.steps li'), null, {timeout: 4000}).catch(() => t.errors.push('the operation did not come back after a reload'));
-  await o.waitForFunction(() => document.querySelector('#toasts').textContent.includes('Saved as'), null, {timeout: 9000}).catch(() => t.errors.push('the operation did not finish after a reload'));
+  await o.waitForFunction(() => document.querySelector('#toasts').textContent.includes('The new values are in effect.'), null, {timeout: 9000}).catch(() => t.errors.push('the operation did not finish after a reload'));
   await settle(o);
   await t.srv.set({op_fail: true, op_ms: 400});
   await o.click('#top-promote'); await settle(o); await t.code(o);

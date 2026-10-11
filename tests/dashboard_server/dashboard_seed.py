@@ -16,12 +16,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from settings_text import set_line
+
 from runtime.queue import formats, records
 from runtime.shared import claude_accounts, models, store, totp
 from runtime.shared import settings as settings_module
 from runtime.shared.models import CostRecord, Request, Session, Task
 from runtime.shared.paths import Places
-from runtime.warden import deploys, messages, public, settings_save
+from runtime.warden import deploys, messages, public
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "testdata" / "dashboard-fixtures"
@@ -106,7 +108,7 @@ def defaults_text(repo: Path) -> str:
         "repo.path": str(repo),
         "repo.github": "acme/acme-app",
     }.items():
-        text = settings_save.set_line(text, key, value)
+        text = set_line(text, key, value)
     prices = "".join(
         f'"{m}" = {{ input = {i}, output = {o}, cache_read = 0, cache_write = 0 }}\n' for m, (i, o) in PRICES.items()
     )

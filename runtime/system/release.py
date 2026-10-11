@@ -4,9 +4,8 @@ factory's CI passed. CI builds it, after every check passed, with
     python3 runtime/system/release.py --commit <sha> --branch <default branch> --repo <owner/name> --out <file>
 
 which also writes the file's SHA-256 beside it. The file holds the factory's files at the commit (what git archive
-gives), the factory's history up to the commit as a git bundle (the warden's clone is made from it), and release.json:
-the commit, its subject, the build time, and a SHA-256 of the files and one of the bundle. Run with sudo, it checks
-those hashes, unpacks the files into a new sealed stage, and runs the install console from there; ``--terminal`` runs
+gives) and release.json: the commit, its subject, the build time, and a SHA-256 of the files. Run with sudo, it checks
+that hash, unpacks the files into a new sealed stage, and runs the install console from there; ``--terminal`` runs
 the terminal installer and ``--uninstall`` the uninstaller instead. ``--version`` and ``--check`` need no sudo.
 """
 
@@ -22,7 +21,6 @@ import secrets
 import subprocess
 import sys
 import tarfile
-import tempfile
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -35,7 +33,7 @@ if __name__ == "__main__":
 from runtime.system import layout, sealed  # noqa: E402 - the path line above must run first
 
 NAME = "software-factory.pyz"
-MANIFEST, BUNDLE, TREE, MAIN = "release.json", "factory.bundle", "factory/", "__main__.py"
+MANIFEST, TREE, MAIN = "release.json", "factory/", "__main__.py"
 FILE, EXEC, LINK = "file", "exec", "link"
 _MODES = {FILE: 0o100644, EXEC: 0o100755, LINK: 0o120777}
 # Every member's time: two builds of one commit then differ only in release.json's build time.
@@ -100,25 +98,10 @@ def _archived(checkout: Path, sha: str) -> list[Entry]:
     return entries
 
 
-def _bundle(checkout: Path, sha: str, branch: str) -> bytes:
-    """The history up to ``sha`` as ``branch``, its HEAD, made in a scratch repository that borrows the checkout's
-    objects: the checkout itself is never changed."""
-    common = Path(_git(checkout, "rev-parse", "--path-format=absolute", "--git-common-dir").decode().strip())
-    with tempfile.TemporaryDirectory() as scratch:
-        repo = Path(scratch) / "bundle.git"
-        _git(Path(scratch), "init", "--quiet", "--bare", str(repo))
-        (repo / "objects" / "info" / "alternates").write_text(f"{common / 'objects'}\n", encoding="utf-8")
-        _git(repo, "update-ref", f"refs/heads/{branch}", sha)
-        _git(repo, "symbolic-ref", "HEAD", f"refs/heads/{branch}")
-        _git(repo, "bundle", "create", "--quiet", str(Path(scratch) / BUNDLE), branch, "HEAD")
-        return (Path(scratch) / BUNDLE).read_bytes()
-
-
 def build(checkout: Path, commit: str, branch: str, repo: str, out: Path) -> dict[str, Any]:
     """Write the release of ``commit`` to ``out`` and its SHA-256 beside it; its manifest."""
     sha = _git(checkout, "rev-parse", "--verify", f"{commit}^{{commit}}").decode().strip()
     entries = _archived(checkout, sha)
-    bundle = _bundle(checkout, sha, branch)
     manifest = {
         "commit": sha,
         "subject": _git(checkout, "log", "-1", "--format=%s", sha).decode().strip(),
@@ -126,7 +109,6 @@ def build(checkout: Path, commit: str, branch: str, repo: str, out: Path) -> dic
         "branch": branch,
         "repo": repo,
         "tree_sha256": tree_digest(entries),
-        "bundle_sha256": hashlib.sha256(bundle).hexdigest(),
     }
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("wb") as fh:
@@ -134,7 +116,6 @@ def build(checkout: Path, commit: str, branch: str, repo: str, out: Path) -> dic
         with zipfile.ZipFile(fh, "w", zipfile.ZIP_DEFLATED) as zf:
             _add(zf, MAIN, LAUNCHER.encode(), FILE)
             _add(zf, MANIFEST, (json.dumps(manifest, indent=1) + "\n").encode(), FILE)
-            _add(zf, BUNDLE, bundle, FILE)
             for entry in sorted(entries, key=lambda each: each.path):
                 _add(zf, TREE + entry.path, entry.data, entry.kind)
     out.chmod(0o755)
@@ -167,7 +148,7 @@ class Archive:
             self.manifest: dict[str, Any] = json.loads(self._zip.read(MANIFEST))
         except (zipfile.BadZipFile, KeyError, ValueError) as exc:
             raise ReleaseError(f"it is not a release of the factory ({type(exc).__name__})") from exc
-        wanted = ("commit", "subject", "built", "branch", "repo", "tree_sha256", "bundle_sha256")
+        wanted = ("commit", "subject", "built", "branch", "repo", "tree_sha256")
         missing = [key for key in wanted if not isinstance(self.manifest.get(key), str)]
         if missing:
             raise ReleaseError(f"its manifest lacks {', '.join(missing)}")
@@ -197,7 +178,7 @@ class Archive:
         """Every way the file differs from what its manifest says it holds; empty when it is whole."""
         problems = []
         names = {info.filename for info in self._zip.infolist() if not info.is_dir()}
-        known = {MAIN, MANIFEST, BUNDLE}
+        known = {MAIN, MANIFEST}
         odd = sorted(n for n in names if n not in known and not (n.startswith(TREE) and _safe(n[len(TREE) :])))
         if odd:
             problems.append(f"it holds files no release holds: {', '.join(odd[:5])}")
@@ -209,9 +190,6 @@ class Archive:
             problems.append(f"a link points outside the factory: {links[0].path}")
         if tree_digest(entries) != self.manifest["tree_sha256"]:
             problems.append("its files do not match its manifest")
-        bundle = self._zip.read(BUNDLE) if BUNDLE in names else b""
-        if hashlib.sha256(bundle).hexdigest() != self.manifest["bundle_sha256"]:
-            problems.append("the factory's history in it does not match its manifest")
         return problems
 
     def unpack(self, stage: Path) -> None:
@@ -232,11 +210,10 @@ class Archive:
             os.chmod(folder, 0o555)
 
     def keep(self, folder: Path) -> None:
-        """The manifest and the bundle, read-only, in ``folder``: what the install reads beside the files."""
+        """The manifest, read-only, in ``folder``: what the install reads beside the files."""
         folder.mkdir(mode=0o755)
-        for name in (MANIFEST, BUNDLE):
-            (folder / name).write_bytes(self._zip.read(name))
-            os.chmod(folder / name, 0o444)
+        (folder / MANIFEST).write_bytes(self._zip.read(MANIFEST))
+        os.chmod(folder / MANIFEST, 0o444)
         os.chmod(folder, 0o555)
 
 

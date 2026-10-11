@@ -34,7 +34,7 @@ def operation(answer: dict[str, Any]) -> dict[str, Any]:
     sha = op["result"].get("commit") or op["result"].get("sha")
     if op["state"] == "done":
         result["message"] = {
-            "settings": f"Saved as {str(sha)[:7]} in the factory repo.",
+            "settings": "Saved. The new values are in effect.",
             "repo": "The factory works on the new repo.",
             "push": f"Prod runs {str(sha)[:7]}.",
             "push back": f"Prod runs {str(sha)[:7]} again.",

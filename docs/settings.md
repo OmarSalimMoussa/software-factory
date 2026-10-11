@@ -8,9 +8,10 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 - **The owner's values** are saved from the dashboard's Settings page, with the 6-digit code. Nothing changes until
   Save. Each save is checked first: the type, the range, and for a model, the allowed list. A bad value is refused
   with the reason, and nothing is written.
-- **A save** is applied at once, kept in the warden's state, and committed to `settings.toml` in the factory's repo,
-  so the repo stays the record. No agent and no operation stops. A reinstall folds the saved values in.
-- **Every change is audited** by its commit. Reset to default puts one key back.
+- **A save** is applied at once and kept in the warden's state, on this machine only: the factory never writes its
+  own repo, so one owner's values never become another's defaults. No agent and no operation stops. A reinstall
+  keeps the saved values, and drops one for a setting the new release no longer has.
+- **Every change is audited** with its old and new value. Reset to default puts one key back.
 
 ## The groups
 

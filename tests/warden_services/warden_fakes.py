@@ -4,9 +4,10 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from settings_text import set_line
+
 from runtime.shared import totp
 from runtime.shared.paths import Places
-from runtime.warden import settings_save
 from runtime.warden.context import Caller, Clock, StackResult
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -73,7 +74,7 @@ def defaults_text(**extra: Any) -> str:
     """The repo's own settings.toml, with the values the installer fills in."""
     text = (ROOT / "settings.toml").read_text()
     for key, value in {**REPO, **extra}.items():
-        text = settings_save.set_line(text, key, value)
+        text = set_line(text, key, value)
     return text
 
 

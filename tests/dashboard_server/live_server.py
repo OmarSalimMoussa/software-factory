@@ -15,7 +15,6 @@ import hashlib
 import json
 import shutil
 import signal
-import subprocess
 import sys
 import tempfile
 import threading
@@ -26,7 +25,7 @@ from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 HERE = Path(__file__).resolve().parent
-sys.path[:0] = [str(HERE.parents[1]), str(HERE)]
+sys.path[:0] = [str(HERE.parents[1]), str(HERE.parent), str(HERE)]
 
 from dashboard_seed import FIXTURES, iso, seed  # noqa: E402
 from fake_warden import FakeWarden, GitHub  # noqa: E402
@@ -44,7 +43,6 @@ START = 1_791_554_520.0  # 2026-10-09 14:02:00 UTC
 ORCHESTRATOR = Caller(kind="agent", session="orchestrator", role="orchestrator")
 WARDEN = Caller(kind="warden", role="warden")
 REFILL_SECONDS = 4.0  # the stand-in thinks this long, so the page shows the place choosing first
-GIT_ID = ["-c", "user.name=owner", "-c", "user.email=owner@invalid"]
 
 
 class Running(Clock):
@@ -84,10 +82,6 @@ class Deploys(GitHub):
         return super().run(run_id)
 
 
-def _git(*argv: str) -> None:
-    subprocess.run(["git", *argv], check=True, capture_output=True)
-
-
 class Live:
     def __init__(self) -> None:
         self.clock = Running()
@@ -120,17 +114,6 @@ class Live:
         self.places, self.repo = places, root / "repo"
         for folder in ("plugin", "procedures", "rules"):
             shutil.copytree(HERE.parents[1] / folder, places.install / folder)
-        origin, clone = root / "factory.git", root / "factory"
-        _git("init", "--quiet", "--bare", str(origin))
-        _git("clone", "--quiet", str(origin), str(clone))
-        text = settings_save.set_line(places.defaults.read_text(), "factory.clone", str(clone))
-        places.defaults.write_text(text)
-        (clone / "settings.toml").write_text(text)
-        _git("-C", str(clone), "add", "settings.toml")
-        _git("-C", str(clone), *GIT_ID, "commit", "--quiet", "-m", "Settings")
-        _git("-C", str(clone), "push", "--quiet", "origin", "HEAD")
-        _git("-C", str(clone), "config", "user.name", "owner")
-        _git("-C", str(clone), "config", "user.email", "owner@invalid")
         self._publish()
         settings_save.render_plugin(places, self._settings())
         self.warden = FakeWarden(places, self.clock, accept=CODE, github=Deploys(self), on_event=self.on_event)

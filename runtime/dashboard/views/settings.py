@@ -15,7 +15,7 @@ from runtime.shared.models import RETIRED
 from runtime.shared.settings import SCHEMA, Settings
 
 WANTS = ("settings", "sessions", "slots", "accounts")
-_EDITED_ELSEWHERE = {"models.allowed", "models.efforts", "prices", "factory.clone", "intake.weights"}
+_EDITED_ELSEWHERE = {"models.allowed", "models.efforts", "prices", "factory.github", "intake.weights"}
 _ROLE_KEYS = {
     "implementer": None,
     "orchestrator": "orchestrator",
@@ -298,7 +298,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         "Factory",
         "Set by the installer, except how long the warden waits for its own commands.",
         [
-            ("factory.clone", "The warden's clone of the factory repo"),
+            ("factory.github", "The factory's own repo, which it never works on"),
             ("factory.command_seconds", "Seconds the warden waits for its own commands"),
         ],
     ),

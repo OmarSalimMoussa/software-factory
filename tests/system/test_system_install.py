@@ -8,7 +8,16 @@ from system_fakes import dry_job, settings
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
-from runtime.system import ci_check, install, layout, steps_machine, steps_secrets, steps_services, steps_wire
+from runtime.system import (
+    ci_check,
+    install,
+    layout,
+    steps_machine,
+    steps_prepare,
+    steps_secrets,
+    steps_services,
+    steps_wire,
+)
 from runtime.system.host import DryHost, RealHost
 from runtime.system.job import Install
 from runtime.system.journal import Journal
@@ -156,7 +165,7 @@ def test_root_never_opens_a_repository_the_owner_owns(tmp_path: Path) -> None:
     theirs = (f" {job.product}", f" {job.factory}")
     reads = [action.split(" | ")[0] for action in job.host.actions if action.startswith("run: git")]
     reads = [read for read in reads if any(f"{path} " in f"{read} " for path in theirs)]
-    assert sum("bundle create" in read for read in reads) == 2
+    assert sum("bundle create" in read for read in reads) == 1  # the product's; the factory is read as files only
     assert all(read.endswith(f"(as {job.owner.name})") for read in reads)
 
 
@@ -261,3 +270,18 @@ def test_only_a_failed_first_install_is_taken_back(
     job.first, job.reached = first, reached
 
     assert install.rolls_back(job, keep=keep) is rolled
+
+
+def test_a_saved_value_for_a_setting_the_release_no_longer_has_is_dropped_and_the_rest_kept(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    job.host.files[job.places.overrides] = '[factory]\nclone = "/var/lib/old"\n\n[caps]\nimplementers = 2\n'
+    steps_prepare.check_machine(job)
+
+    steps_prepare.settle_settings(job)
+
+    assert job.settings is not None and job.settings.get_int("caps.implementers") == 2
+    assert "factory.clone" not in job.settings.overrides and job.settings.get_str("factory.github")
+    assert "Dropped your saved factory.clone: this release has no such setting." in capsys.readouterr().out

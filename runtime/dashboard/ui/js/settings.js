@@ -19,7 +19,7 @@ const curOf = r => UI.edits.has(r.key) ? UI.edits.get(r.key).value : r.saved;
 const showVal = (r, v) => r.control === 'model' ? `${v.model} · ${v.effort}` : r.control === 'list' ? v.join(', ') : String(v);
 function pSettings(env) {
   const d = partData(env, 'settings');
-  const head = `<div class="page-h">${ph('Settings', 'Defaults live in settings.toml in the factory repo. Nothing changes until you save. Saving needs your 6-digit code, commits the new settings to the factory repo, and reloads only the part of the factory that reads them; no agent is stopped. Every change is listed under Recent changes.')}</div>`;
+  const head = `<div class="page-h">${ph('Settings', 'Defaults come with the factory you installed. Nothing changes until you save. Saving needs your 6-digit code, keeps your values on this computer, and reloads only the part of the factory that reads them; no agent is stopped. Every change is listed under Recent changes.')}</div>`;
   if (!d) return head + acctSection(env) + part(env, 'settings', () => '');
   return `${head}${acctSection(env)}
     <div class="card repo-card"><div style="flex:1;min-width:0"><div class="label">Repo</div><div class="repo-path">${esc(d.repo.path)}</div></div><button class="btn" data-action="change-repo" data-write>Change repo</button></div>

@@ -58,7 +58,7 @@ def _changed(path: Path, member: str, data: bytes) -> None:
     ("member", "data"),
     [(None, b""), ("factory/README.md", b"changed\n"), ("factory/extra.txt", b"new\n"), ("factory.bundle", b"junk"),
      ("__main__.py", b"print('mine')\n")],
-    ids=["whole", "a-changed-file", "an-added-file", "changed-history", "changed-start"],
+    ids=["whole", "a-changed-file", "an-added-file", "an-added-member", "changed-start"],
 )  # fmt: skip
 def test_the_release_file_checks_its_own_hashes_and_refuses_a_changed_file(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], member: str | None, data: bytes
@@ -126,7 +126,7 @@ def test_the_release_file_runs_nothing_without_sudo(
     assert "sudo" in capsys.readouterr().err and not (tmp_path / "stages").exists()
 
 
-def test_a_stage_from_a_release_is_read_only_and_carries_the_factorys_history(tmp_path: Path) -> None:
+def test_a_stage_from_a_release_is_read_only_and_carries_its_manifest(tmp_path: Path) -> None:
     out, made = _built(tmp_path)
 
     stage = release.seal(release.Archive.load(out), tmp_path / "stages")
@@ -138,6 +138,3 @@ def test_a_stage_from_a_release_is_read_only_and_carries_the_factorys_history(tm
     assert os.readlink(stage / "bin" / "again") == "run" and stat.S_IMODE(stage.stat().st_mode) == 0o555
     folder = sealed.release_folder(stage)
     assert release.read_manifest(folder) == made
-    clone = tmp_path / "clone"
-    subprocess.run(["git", "clone", "-q", str(folder / release.BUNDLE), str(clone)], check=True, capture_output=True)
-    assert (_git(clone, "rev-parse", "HEAD"), _git(clone, "branch", "--show-current")) == (made["commit"], "main")

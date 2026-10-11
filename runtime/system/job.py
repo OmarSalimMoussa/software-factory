@@ -53,7 +53,6 @@ class Install:
     subject: str = ""  # the commit's first line
     stage: Path | None = None  # the commit's sealed copy, which this install runs from
     release: dict[str, Any] | None = None  # a release's manifest: its commit, branch and repository
-    bundle: Path | None = None  # the factory's history a release holds
     settings: Settings | None = None
     overrides: dict[str, Any] = field(default_factory=dict)
     first: bool = True  # no earlier install recorded

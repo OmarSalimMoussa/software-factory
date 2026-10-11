@@ -1,10 +1,10 @@
 """The owner's coded changes to the factory's tuning: settings, the product repo, and the guard's rule switches.
 
 A save is checked whole before anything is written; a value that fails is refused with every reason. Then, as one
-operation the dashboard follows: the overrides are written to the warden's state and take effect at once; whatever
-reads the changed values is refreshed (the published settings, the subagents' launchers for a model or effort, the
-slice for a budget); and settings.toml in the warden's own clone of the factory repo is committed and pushed, so
-the repo stays the record. Every save and switch is audited.
+operation the dashboard follows: the overrides are written to the warden's state and take effect at once, and
+whatever reads the changed values is refreshed (the published settings, the subagents' launchers for a model or
+effort, the slice for a budget). The owner's values stay on this machine: the defaults are the installed release's,
+and the warden never writes the factory repo. Every save and switch is audited with its values.
 """
 
 from __future__ import annotations
@@ -17,7 +17,6 @@ import re
 import shutil
 import subprocess
 import threading
-import tomllib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -35,7 +34,7 @@ from runtime.warden.verbs import OWNER
 log = logging.getLogger("factory.warden")
 
 # Set by the installer; the dashboard shows them read-only.
-READ_ONLY = frozenset({"models.allowed", "prices", "factory.clone"})
+READ_ONLY = frozenset({"models.allowed", "prices", "factory.github"})
 REPO_KEYS = ("repo.path", "repo.default_branch", "repo.github", "repo.protected_paths")
 _save_lock = threading.Lock()
 # owner/name at the end of any git remote URL: git@host:owner/name.git, https://host/owner/name, ssh://...
@@ -74,102 +73,6 @@ def _changes(args: dict[str, Any], current: Settings) -> dict[str, Any]:
     if base is not None and base != overrides_version(current.overrides):
         raise Refused("stale", "the settings changed since you opened them; review the new values, then save again")
     return changes
-
-
-# ---- settings.toml in the warden's clone ---------------------------------------------------------------------
-
-
-def _value_end(line: str, start: int) -> int:
-    """Where a TOML value ends on its line: at the first # outside a string."""
-    quote, i = "", start
-    while i < len(line):
-        char = line[i]
-        if quote:
-            if char == "\\" and quote == '"':
-                i += 1
-            elif char == quote:
-                quote = ""
-        elif char in "\"'":
-            quote = char
-        elif char == "#":
-            return i
-        i += 1
-    return len(line)
-
-
-def set_line(text: str, key: str, value: Any) -> str:
-    """``text`` with the one line holding ``key`` set to ``value``, keeping the line's comment where it was."""
-    group, _, name = key.partition(".")
-    section = ""
-    lines = text.split("\n")
-    for index, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith("[") and "]" in stripped:
-            section = stripped[1 : stripped.index("]")].strip()
-            continue
-        match = re.match(rf"^\s*{re.escape(name)}\s*=\s*", line)
-        if section != group or match is None:
-            continue
-        end = _value_end(line, match.end())
-        new = settings_module.toml_value(value)
-        comment = line[end:]
-        if comment:
-            new = new.ljust(max(end - match.end(), len(new) + 1))
-        lines[index] = line[: match.end()] + new + comment
-        return "\n".join(lines)
-    raise KeyError(f"settings.toml has no line for {key}")
-
-
-def _leaf(tree: Mapping[str, Any], key: str) -> Any:
-    node: Any = tree
-    for part in key.split("."):
-        node = node[part]
-    return node
-
-
-def _git(clone: Path, args: list[str], timeout: int) -> str:
-    try:
-        done = subprocess.run(["git", "-C", str(clone), *args], capture_output=True, text=True, timeout=timeout,
-                              check=False)  # fmt: skip
-    except subprocess.TimeoutExpired as exc:
-        raise ops.StepError(f"git {args[0]} took longer than {timeout} s") from exc
-    if done.returncode != 0:
-        last = (done.stderr.strip().splitlines() or ["no message"])[-1]
-        raise ops.StepError(f"git {args[0]} failed: {last[:200]}")
-    return done.stdout.strip()
-
-
-def clone_of(settings: Settings) -> Path:
-    """The warden's clone of the factory repo; an empty or relative setting would point git at the wrong repo."""
-    clone = Path(settings.get_str("factory.clone"))
-    if not clone.is_absolute() or not (clone / ".git").exists():
-        raise ops.StepError("factory.clone is not the warden's clone of the factory repo; reinstall to set it")
-    return clone
-
-
-def commit_settings(clone: Path, values: Mapping[str, Any], changed: list[str], timeout: int) -> str:
-    """Write ``values`` into the clone's settings.toml, commit and push; returns the commit the repo now holds."""
-    _git(clone, ["checkout", "--", "settings.toml"], timeout)
-    try:
-        _git(clone, ["pull", "--rebase", "--quiet"], timeout)
-    except ops.StepError:
-        subprocess.run(["git", "-C", str(clone), "rebase", "--abort"], capture_output=True, check=False)
-        raise
-    path = clone / "settings.toml"
-    text = path.read_text()
-    new = text
-    for key in sorted(values):
-        new = set_line(new, key, values[key])
-    tree = tomllib.loads(new)
-    wrong = [key for key in values if _leaf(tree, key) != values[key]]
-    if wrong:
-        raise ops.StepError(f"settings.toml would not hold {', '.join(wrong)} as saved")
-    if new != text:
-        store.write_text(path, new)
-        _git(clone, ["add", "settings.toml"], timeout)
-        _git(clone, ["commit", "--quiet", "-m", "Settings: " + ", ".join(changed)], timeout)
-    _git(clone, ["push", "--quiet"], timeout)
-    return _git(clone, ["rev-parse", "HEAD"], timeout)
 
 
 # ---- what reads the changed values ------------------------------------------------------------------------------
@@ -238,9 +141,7 @@ def _audit(ctx: Context, record: dict[str, Any]) -> None:
     store.append_jsonl(ctx.places.audit, {"at": ctx.clock.iso(), "by": ctx.caller.role, **record})
 
 
-def _steps(ctx: Context, changes: dict[str, Any], result: dict[str, Any], commit: bool) -> list[ops.Step]:
-    """The save's steps; with ``commit`` false (the repo's own values, which never enter the factory repo) the audit
-    is written with the values instead of with the commit."""
+def _steps(ctx: Context, changes: dict[str, Any]) -> list[ops.Step]:
     keys = sorted(changes)
     before = ctx.settings()
     saved: dict[str, Settings] = {}
@@ -251,8 +152,7 @@ def _steps(ctx: Context, changes: dict[str, Any], result: dict[str, Any], commit
             store.write_text(ctx.places.overrides, settings_module.overrides_toml(new.overrides), mode=0o600)
             public.write_settings(ctx.places, new)
         saved["new"] = new
-        if not commit:
-            _audit(ctx, {"changes": _diff(before, new, keys), "commit": None})
+        _audit(ctx, {"changes": _diff(before, new, keys)})
         return f"{len(keys)} {'value' if len(keys) == 1 else 'values'} in effect"
 
     def launchers() -> str:
@@ -263,26 +163,11 @@ def _steps(ctx: Context, changes: dict[str, Any], result: dict[str, Any], commit
         apply_slice(saved["new"])
         return "within a minute"
 
-    def record() -> str:
-        new = saved["new"]
-        # The product's own values (its path, its hosts) never enter the factory repo.
-        values = {key: new[key] for key in {*new.overrides, *keys} if key not in READ_ONLY and key not in REPO_KEYS}
-        try:
-            sha = commit_settings(clone_of(new), values, keys, new.get_int("factory.command_seconds"))
-        except Exception as exc:
-            _audit(ctx, {"changes": _diff(before, new, keys), "commit": None, "error": type(exc).__name__})
-            raise
-        result["commit"] = sha
-        _audit(ctx, {"changes": _diff(before, new, keys), "commit": sha})
-        return sha[:12]
-
     steps: list[ops.Step] = [("Save the new values", save_values)]
     if any(key.startswith("models.") for key in keys):
         steps.append(("Update the subagents' models", launchers))
     if any(key.startswith("budget.slice_") for key in keys):
         steps.append(("Resize the factory's slice", resize))
-    if commit:
-        steps.append(("Commit settings.toml to the factory repo", record))
     return steps
 
 
@@ -301,8 +186,7 @@ def save(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     if repo:
         raise Refused("settings", "the repo's values change only with Change repo")
     _checked(current, changes)
-    result: dict[str, Any] = {}
-    return {"op": ops.launch(ctx, "settings", _steps(ctx, changes, result, commit=True), result)}
+    return {"op": ops.launch(ctx, "settings", _steps(ctx, changes), {})}
 
 
 def _owner_name(remote: str) -> str:
@@ -324,20 +208,16 @@ def change_repo(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
     path = Path(new.get_str("repo.path"))
     if not path.is_absolute():
         raise Refused("repo", "repo.path must be an absolute path to the factory's checkout of the product")
-    try:
-        clone = clone_of(new)
-        own = _owner_name(_git(clone, ["remote", "get-url", "origin"], new.get_int("factory.command_seconds")))
-    except ops.StepError as exc:
-        raise Refused("repo", f"the factory cannot tell its own repo ({exc.detail})") from exc
-    for place in (ctx.places.install, clone):
-        if path == place or place in path.parents:
-            raise Refused("repo", "the factory never works on itself")
+    own = new.get_str("factory.github").lower()
+    if not own:
+        raise Refused("repo", "the factory cannot tell its own repo: reinstall, so factory.github names it")
+    if path == ctx.places.install or ctx.places.install in path.parents:
+        raise Refused("repo", "the factory never works on itself")
     code, out = ctx.launcher.agent_command(["git", "remote", "get-url", "origin"], str(path))
     if code != 0:
         raise Refused("repo", f"{path} is not a git checkout with an origin remote")
     if own in (_owner_name(out), _owner_name(new.get_str("repo.github"))):
         raise Refused("repo", "the factory never works on its own repo")
-    result: dict[str, Any] = {}
 
     def shape() -> str:
         code, out = ctx.launcher.run_check(str(path), ["--only", "repo-shape"])
@@ -345,8 +225,8 @@ def change_repo(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
             raise Refused("repo-shape", (out.strip().splitlines() or ["the repo-shape check failed"])[-1][:300])
         return "the standard shape"
 
-    steps = [("Check the repo's shape", shape), *_steps(ctx, changes, result, commit=False)]
-    return {"op": ops.launch(ctx, "repo", steps, result)}
+    steps = [("Check the repo's shape", shape), *_steps(ctx, changes)]
+    return {"op": ops.launch(ctx, "repo", steps, {})}
 
 
 # ---- guard rule switches ----------------------------------------------------------------------------------------
