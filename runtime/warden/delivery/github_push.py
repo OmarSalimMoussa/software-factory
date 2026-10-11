@@ -197,8 +197,9 @@ class Git:
     def run(self, *argv: str) -> str:
         done = self._exec(list(argv), cwd=self.mirror)
         if done.returncode != 0:
-            last = (done.stderr.strip().splitlines() or [f"exit {done.returncode}"])[-1]
-            raise Refused("push-failed", f"git {_verb(list(argv))} failed: {last[:300]}")
+            lines = done.stderr.strip().splitlines()
+            said = next((line for line in lines if line.startswith(("fatal:", "error:"))), lines[-1] if lines else "")
+            raise Refused("push-failed", f"git {_verb(list(argv))} failed: {(said or f'exit {done.returncode}')[:300]}")
         return done.stdout
 
     def is_ancestor(self, older: str, newer: str) -> bool:

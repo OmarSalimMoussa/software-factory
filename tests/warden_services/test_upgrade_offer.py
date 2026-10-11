@@ -187,3 +187,21 @@ def test_the_units_last_word_marks_a_killed_upgrade_stopped(tmp_path: Path, monk
     assert upgrade_runner.ended(places, NEW) == 0
     said = upgrades.read_progress(places)
     assert said is not None and said["state"] == upgrades.FAILED and "(timeout)" in said["problem"]
+
+
+def test_a_new_install_asks_again_at_once_and_is_never_offered_itself(
+    ctx: Context, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _installed(ctx.places)
+    calls: list[str] = []
+    monkeypatch.setattr(releases, "http_get", _github(calls))
+    factory_upgrade.poll(ctx)
+    assert factory_upgrade.view(ctx)["offer"]["available"]["commit"] == NEW
+
+    record = json.loads(upgrades.installed_path(ctx.places).read_text())
+    upgrades.installed_path(ctx.places).write_text(json.dumps({**record, "commit": NEW}))
+    assert factory_upgrade.view(ctx)["offer"]["available"] is None
+    asked = len(calls)
+    factory_upgrade.poll(ctx)
+
+    assert len(calls) == asked + 1 and factory_upgrade.offer(ctx.places)["available"] is None

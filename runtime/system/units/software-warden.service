@@ -10,8 +10,10 @@ Type=notify
 NotifyAccess=main
 User=@warden_user@
 Group=@warden_user@
-# Lets new slot env files take the slots' group, so the stack user's runs can read them.
-SupplementaryGroups=@slots_group@
+# The slots' group lets new slot env files take it, so the stack user's runs can read them. The agent's group: git
+# asks access(2) whether the agents' checkout is a repository before it pushes from it, and access(2) ignores the
+# capability below for anyone but root. The agent's files are its group's to read already.
+SupplementaryGroups=@slots_group@ @agent_user@
 ExecStart=@python@ -I @install@/runtime/system/runners/start.py runtime.warden.wardend
 ExecStopPost=@python@ -I @install@/runtime/system/pause_checks.py stop
 Restart=always

@@ -237,8 +237,11 @@ def test_home_says_where_an_upgrade_stands_and_offers_only_what_fits(
     offer = {"commit": _NEW, "tag": f"build-{_NEW[:12]}", "published": "2026-10-09T13:00:00Z", "changelog": changelog}
     store.write_json(
         rig.places.state / "upgrade-offer.json",
-        {"available": None if progress == "done" else offer, "checked_at": rig.clock.now(), "note": None},
+        {"available": None if progress == "done" else offer, "checked_at": rig.clock.now(), "note": None, "base": _OLD},
     )
+    installed = {"commit": _OLD, "owner": "o", "product": "/home/o/shop", "repo": "acme/software-factory"}
+    rig.places.upgrade.mkdir(parents=True, exist_ok=True)
+    store.write_json(rig.places.upgrade / "installed.json", installed)
     if asked:
         store.write_json(
             rig.places.state / "upgrade-asked.json",

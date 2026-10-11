@@ -16,6 +16,7 @@ from runtime.warden import inbox, upgrade
 from runtime.warden.context import Caller
 from runtime.warden.delivery import deploys, prod_push
 from runtime.warden.health import errors_import, probes
+from runtime.warden.owner import factory_upgrade
 
 FULL = "f" * 40
 
@@ -66,3 +67,12 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
     approval = approvals.current(places, merged.id)
     assert approval is not None and approval.routed == 2
     assert upgrade.migrate(ctx) == []  # once brought over, nothing changes
+
+
+def test_a_release_offer_that_names_no_install_is_asked_for_again(world: World) -> None:
+    path = factory_upgrade.offer_path(world.places)
+    store.write_json(path, {"available": None, "checked_at": 1.0, "note": None})
+    ctx = dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden"))
+
+    assert "the release offer, asked again" in upgrade.migrate(ctx)
+    assert not path.exists() and upgrade.migrate(ctx) == []
