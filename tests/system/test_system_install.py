@@ -115,7 +115,6 @@ def _session(state: str) -> Session:
         task="t-1",
         parent="",
         worktree="/w",
-        slot=1,
         state=state,
         started="2026-10-09T00:00:00Z",
         started_by="o",

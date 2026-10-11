@@ -135,7 +135,6 @@ class World:
             task,
             "",
             worktree,
-            None,
             "working",
             "2026-10-09T12:00:00Z",
             "orchestrator",

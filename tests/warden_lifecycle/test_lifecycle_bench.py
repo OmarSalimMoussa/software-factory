@@ -7,6 +7,7 @@ from lifecycle_fakes import World
 
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, STOPPED, WAITING, WORKING
 from runtime.shared.protocol import Refused
+from runtime.slots import leases
 from runtime.warden import crashwatch, lifecycle, ops
 
 
@@ -62,7 +63,9 @@ def test_a_bench_takes_a_waiting_session_first_and_never_a_merge_turn(world: Wor
 
 def test_a_benched_session_settles_after_its_grace_and_revives_with_its_id(world: World) -> None:
     world.queue.add("t-0001", goal_item="G2", status="building")
-    world.seat("5e550001", task="t-0001", slot=2)
+    benched_name = world.seat("5e550001", task="t-0001").name
+    leases.claim(world.ctx(), "someone-else", "/w/x")  # slot 1
+    assert leases.claim(world.ctx(), benched_name, "/w/b") == 2
     world.run("5e550001")
     world.approve("t-0002", severity="severe")
     lifecycle.bench(world.ctx(), {"session": "5e550001", "for": "t-0002"}, None)
@@ -71,12 +74,13 @@ def test_a_benched_session_settles_after_its_grace_and_revives_with_its_id(world
     world.later(world.settings.get_int("watch.bench_grace_seconds"))
     crashwatch.watch_sessions(world.ctx())
     benched = world.session("5e550001")
-    assert (benched.state, benched.slot) == (DEPRIORITIZED, None)
-    assert world.launcher.stopped == ["5e550001"] and world.launcher.stacks == [(2, ["down"])] and world.slots == [2]
+    assert benched.state == DEPRIORITIZED and leases.held_by(world.places, world.settings, benched_name) is None
+    assert world.launcher.stopped == ["5e550001"] and world.launcher.stacks == [(2, ["empty"]), (2, [leases.SWEEP])]
     assert world.queue.tasks["t-0001"].status == "deprioritized"
     lifecycle.revive(world.ctx(), {"session": "5e550001"}, None)
     back = world.session("5e550001")
-    assert (back.state, back.slot, world.launcher.resumed) == (WORKING, 2, ["5e550001"])
+    lease = leases.held_by(world.places, world.settings, benched_name)
+    assert (back.state, lease and lease.slot, world.launcher.resumed) == (WORKING, 2, ["5e550001"])
     assert world.queue.tasks["t-0001"].status == "building"
 
 

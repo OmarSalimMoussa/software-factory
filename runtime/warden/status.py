@@ -14,8 +14,10 @@ from runtime.warden.context import Context
 
 def status(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     sessions = registry.live(registry.read(ctx.places).values())
-    rows = [{k: getattr(s, k) for k in ("id", "name", "role", "state", "task", "doing", "slot", "model")}
-            for s in sorted(sessions, key=lambda s: s.started)]  # fmt: skip
+    held = {lease.holder: lease.slot for n in leases.numbers(ctx.places, ctx.settings())
+            if (lease := leases.read(ctx.places, n)) is not None}  # fmt: skip
+    rows = [{**{k: getattr(s, k) for k in ("id", "name", "role", "state", "task", "doing", "model")},
+             "slot": held.get(s.name)} for s in sorted(sessions, key=lambda s: s.started)]  # fmt: skip
     until = codes.locked_until(ctx.places, ctx.clock.now())
     # Each environment's last probe, None before the first: what "on staging" is checked against.
     health = {env: next((models.dump(p) for p in probes.recent(ctx.places, env, 1)), None) for env in probes.ENVS}

@@ -55,7 +55,7 @@ def _session(sid: str, name: str, worktree: Path, *, role: str = "implementer", 
              state: str = WORKING, agent_id: str = "") -> Session:  # fmt: skip
     return Session(
         id=sid, name=name, role=role, family="qa" if parent else "impl", model="drill", effort="low", task="drill",
-        parent=parent, worktree=str(worktree), slot=None, state=state, started=_now(), started_by="installer",
+        parent=parent, worktree=str(worktree), state=state, started=_now(), started_by="installer",
         retired="finished" if state == RETIRED else "", agent_id=agent_id,
     )  # fmt: skip
 

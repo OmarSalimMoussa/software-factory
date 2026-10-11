@@ -54,7 +54,7 @@ def started(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str,
         now = ctx.clock.iso()
         sessions[agent_id] = Session(
             id=agent_id, name=f"{parent.name}.{kind}-{agent_id[:6]}", role=kind, family=family_of(kind, parent.family),
-            model=model, effort=effort, task=parent.task, parent=parent.id, worktree=parent.worktree, slot=parent.slot,
+            model=model, effort=effort, task=parent.task, parent=parent.id, worktree=parent.worktree,
             state=WORKING, started=now, started_by=parent.id, agent_id=agent_id, since=now,
         )  # fmt: skip
         registry.write(ctx.places, sessions)

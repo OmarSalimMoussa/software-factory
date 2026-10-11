@@ -245,7 +245,7 @@ def start_session(
     place = session_settings.worktrees(repo) / worktree if worktree else repo
     options = _options(ctx, request_id, fields["role"], fields["model"], fields["effort"], place)
     now = ctx.clock.iso()
-    s = Session(id=request_id, parent="", worktree=str(place), slot=None, state=WORKING, started=now, since=now,
+    s = Session(id=request_id, parent="", worktree=str(place), state=WORKING, started=now, since=now,
                 note="started", **fields)  # fmt: skip
     sessions[request_id] = s
     registry.write(ctx.places, sessions)

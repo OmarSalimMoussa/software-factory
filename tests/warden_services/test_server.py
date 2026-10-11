@@ -22,7 +22,7 @@ CLAUDE, SHELL, CLI = 400, 500, 600
 
 def session(sid: str, state: str = WORKING) -> Session:
     return Session(id=sid, name=f"impl-{sid}", role="implementer", family="impl", model="m", effort="high",
-                   task="t-0001", parent="", worktree="/w/" + sid, slot=1, state=state, started="2026-10-09T10:00:00Z",
+                   task="t-0001", parent="", worktree="/w/" + sid, state=state, started="2026-10-09T10:00:00Z",
                    started_by="orchestrator")  # fmt: skip
 
 

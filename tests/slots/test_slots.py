@@ -82,7 +82,7 @@ def test_the_orchestrator_frees_only_a_finished_sessions_slot(world: World) -> N
     registry.write(world.places, sessions)
     world.launcher.stack = lambda n, verb: StackResult(0, "", "/log")
     assert slot(world.ctx(), {"op": "free", "slot": 1}, None)["released"] is True
-    assert world.launcher.stacks == [(1, ["empty"])] and leases.read(world.places, 1) is None
+    assert world.launcher.stacks == [(1, ["empty"]), (1, [leases.SWEEP])] and leases.read(world.places, 1) is None
 
 
 def test_one_tester_holds_a_slots_desktop_until_it_hands_back_or_its_parent_takes_it_down(world: World) -> None:

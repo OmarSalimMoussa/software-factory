@@ -107,6 +107,7 @@ push_wait_minutes = 30     # a push to prod that has not answered on the new bui
 resume_tries = 2        # a crashed session is retired after this many failed resumes
 bench_grace_seconds = 60  # time a pushed-out session gets to commit before it pauses
 start_grace_seconds = 120  # a started session that has not appeared by then is retired as crashed
+reap_retry_minutes = 10  # a reap that could not empty a retired session's slot is tried again after this
 message_seconds = 10    # how long the warden holds the owner's message out to a session before letting go
 loop_minutes = 30
 orchestrator_silent_minutes = 40

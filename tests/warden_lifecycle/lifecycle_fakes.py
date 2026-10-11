@@ -118,7 +118,6 @@ class World:
     queue: Queue
     procs: dict[str, Proc]
     events: list[tuple[str, dict[str, Any]]]
-    slots: list[int]
 
     def ctx(self, role: str = "orchestrator", kind: str = "agent", session: str = "") -> Context:
         caller = Caller(kind=kind, role=role, session=session)
@@ -131,7 +130,7 @@ class World:
     def seat(self, sid: str, role: str = "implementer", task: str = "", **fields: Any) -> Session:
         sessions = registry.read(self.places)
         base: dict[str, Any] = dict(name=f"{role}-{sid}", family="impl", model="m", effort="high", task=task,
-                                    parent="", worktree="", slot=None, state=WORKING,
+                                    parent="", worktree=f"/w/{sid}", state=WORKING,
                                     started="2026-10-09T11:00:00Z", started_by="orchestrator",
                                     since="2026-10-09T11:00:00Z")  # fmt: skip
         session = Session(id=sid, role=role, **{**base, **fields})

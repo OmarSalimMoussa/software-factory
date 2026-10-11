@@ -109,7 +109,7 @@ def test_the_repo_never_changes_to_the_factorys_own_or_under_live_sessions(
         launcher.commands[("git", "remote", "get-url")] = (0, "https://github.com/Depot/Factory\n")
     else:
         live = Session(id="s1", name="impl-s1", role="implementer", family="impl", model="m", effort="high",
-                       task="t-1", parent="", worktree="/w", slot=1, state=DEPRIORITIZED,
+                       task="t-1", parent="", worktree="/w", state=DEPRIORITIZED,
                        started="2026-10-09T10:00:00Z", started_by="orchestrator")  # fmt: skip
         registry.write(ctx.places, {"s1": live})
         launcher.commands[("git", "remote", "get-url")] = (0, "git@github.com:depot/other.git\n")

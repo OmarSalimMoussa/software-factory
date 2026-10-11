@@ -333,7 +333,7 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
     with ctx.lock:
         sessions = read(ctx)
         s = sessions[sid]
-        s.slot, s.resume_tries = slot, 0
+        s.resume_tries = 0
         move(ctx, s, WORKING, by, "revived")
         registry.write(ctx.places, sessions)
     if s.task and permits.read_task(ctx, s.task).status == "deprioritized":

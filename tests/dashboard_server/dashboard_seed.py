@@ -291,7 +291,6 @@ def _sessions(now: float) -> list[Session]:
         "qa-sec-1": "t-0017",
         "cr-ux": "t-0014",
     }
-    slots = {"impl-sign-in-loop": 1, "impl-retry-upload": 2, "impl-staging-down": 3}
     roles = {"implementer, small": "implementer", "implementer, large": "implementer"}
     out = []
 
@@ -314,7 +313,6 @@ def _sessions(now: float) -> list[Session]:
                 task=tasks.get(node["id"], ""),
                 parent=parent,
                 worktree=f"/srv/wt/{node['id']}",
-                slot=slots.get(node["id"]),
                 state=state,
                 started=iso(now - minutes * 60),
                 started_by="orchestrator",
@@ -350,7 +348,6 @@ def _sessions(now: float) -> list[Session]:
                 task=h["task"] or "",
                 parent="",
                 worktree=f"/srv/wt/{h['id']}",
-                slot=None,
                 state="retired",
                 started=iso(min(started, ended - 60)),
                 started_by="orchestrator",

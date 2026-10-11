@@ -14,7 +14,7 @@ from runtime.shared.models import (
     WAITING,
     WORKING,
 )
-from runtime.warden import backstop, crashwatch, lifecycle
+from runtime.warden import backstop, crashwatch, lifecycle, permits
 from runtime.warden.backstop import Proc
 
 NOW = "2026-10-09T12:00:00Z"
@@ -66,11 +66,23 @@ def test_a_crashed_session_is_resumed_then_retired_but_the_orchestrator_never(wo
     assert world.queue.tasks["t-0001"].status == "proposed"
 
 
-def test_a_session_whose_task_moved_past_its_part_is_retired_as_finished(world: World) -> None:
-    world.queue.add("t-0001", status="checked")
-    world.seat("5e550001", task="t-0001")
+@pytest.mark.parametrize(
+    ("role", "status"),
+    [("implementer", "checked"), ("implementer", "promoted"), ("designer", "building")],
+    ids=["implementer-checked", "implementer-on-prod", "designer-after-go"],
+)
+@pytest.mark.parametrize("alive", [True, False], ids=["idle-process", "process-gone"])
+def test_a_session_whose_task_moved_past_its_part_is_retired_as_finished_and_stopped(
+    world: World, role: str, status: str, alive: bool
+) -> None:
+    world.queue.add("t-0001", status=status)
+    world.seat("5e550001", role=role, task="t-0001")
+    if alive:
+        world.run("5e550001")  # a background session stays alive when idle
     crashwatch.watch(world.ctx())
     assert (world.session("5e550001").retired, world.launcher.resumed) == (FINISHED, [])
+    assert world.launcher.stopped == (["5e550001"] if alive else [])
+    assert not permits.cap_full(world.settings, lifecycle.read(world.ctx()).values(), role)  # its place is free
 
 
 def test_a_silent_orchestrator_is_restarted_as_the_same_session(world: World) -> None:

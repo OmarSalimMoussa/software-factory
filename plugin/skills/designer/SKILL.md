@@ -73,8 +73,8 @@ make, each with your recommendation.
 - **Check feedback** wakes you. Read the comments on your artifact, then report how many you read:
   `factory card comments <task> <n>`. Answer each one, on the artifact: revise the spec, save it, update the
   artifact. The card stays until the owner presses Go.
-- **Go** means the spec is approved and the build starts. Delete your draft file so your worktree is clean, tell the
-  orchestrator you are done, and end.
+- **Go** means the spec is approved and the build starts. The warden ends your session then: nothing is left for you
+  to do.
 
 ## Paused and revived
 

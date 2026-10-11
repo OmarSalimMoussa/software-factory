@@ -18,7 +18,7 @@ PRICE = {"input": 15.0, "output": 75.0, "cache_read": 1.5, "cache_write": 18.75}
 
 def session(sid: str, **fields: Any) -> Session:
     base: dict[str, Any] = dict(id=sid, name=f"impl-{sid}", role="implementer", family="impl", model=OPUS,
-                                effort="high", task="t-0007", parent="", worktree="/srv/checkout/wt-" + sid, slot=1,
+                                effort="high", task="t-0007", parent="", worktree="/srv/checkout/wt-" + sid,
                                 state=WORKING, started="2026-10-09T10:00:00Z", started_by="orchestrator")  # fmt: skip
     return Session(**{**base, **fields})
 
@@ -89,7 +89,7 @@ def test_a_subagent_call_is_charged_by_its_kind(
 ) -> None:
     sessions = {"s1": session("s1")}
     if row is not None:
-        sessions["a1"] = session("a1", parent="s1", agent_id="abc", slot=None, worktree="", model=OPUS, **row)
+        sessions["a1"] = session("a1", parent="s1", agent_id="abc", worktree="", model=OPUS, **row)
     registry.write(ctx.places, sessions)
     folder = root / "-srv-checkout-wt-s1" / "s1" / "subagents"
     folder.mkdir(parents=True)

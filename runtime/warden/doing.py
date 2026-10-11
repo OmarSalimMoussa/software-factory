@@ -16,6 +16,7 @@ from runtime.shared.models import Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
+from runtime.slots import leases
 
 MAX_TEXT = 60
 FACTS = ("slice", "slices", "qa_round", "critic_round", "verdict")
@@ -52,10 +53,11 @@ def clean(text: str) -> str:
     return line
 
 
-def sentence(settings: Settings, session: Session, known: dict[str, Any]) -> str:
+def sentence(settings: Settings, session: Session, known: dict[str, Any], slot: int | None) -> str:
+    """``slot``: the one the session's lease holds, or None."""
     parts: list[str] = []
-    if session.slot is not None:
-        parts.append(f"Slot {session.slot}")
+    if slot is not None:
+        parts.append(f"Slot {slot}")
     if known.get("slice") and known.get("slices"):
         parts.append(f"slice {known['slice']} of {known['slices']}")
     if known.get("critic_round"):
@@ -76,4 +78,5 @@ def _rounds(settings: Settings, session: Session, kind: str) -> int:
 
 def describe(places: Places, settings: Settings, session: Session) -> str:
     """The sentence the dashboard shows for ``session``."""
-    return sentence(settings, session, facts(places, session.id))
+    lease = leases.held_by(places, settings, session.name)
+    return sentence(settings, session, facts(places, session.id), lease.slot if lease else None)

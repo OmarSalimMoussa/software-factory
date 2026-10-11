@@ -144,6 +144,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("watch.resume_tries", "Resumes to try before a crashed agent retires"),
             ("watch.bench_grace_seconds", "Seconds a pushed-out agent gets to commit"),
             ("watch.start_grace_seconds", "Seconds a starting agent gets to appear"),
+            ("watch.reap_retry_minutes", "Try a failed clean-up again after, minutes"),
             ("watch.orchestrator_silent_minutes", "Restart a silent orchestrator after, minutes"),
             ("watch.orchestrator_busy_silent_minutes", "Restart a busy, silent orchestrator after, minutes"),
             ("watch.refusals_to_notify", "Refusals in a row that file an incident"),

@@ -13,7 +13,7 @@ from runtime.warden.verbs import IMPL
 
 def _session(sid: str) -> Session:
     return Session(id=sid, name=f"impl-{sid}", role=IMPL, family="impl", model="m", effort="high", task="t-1",
-                   parent="", worktree=f"/w/{sid}", slot=1, state=WORKING, started="2026-10-09T00:00:00+00:00",
+                   parent="", worktree=f"/w/{sid}", state=WORKING, started="2026-10-09T00:00:00+00:00",
                    started_by="orch", since="2026-10-09T00:00:00+00:00")  # fmt: skip
 
 

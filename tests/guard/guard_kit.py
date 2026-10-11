@@ -79,7 +79,7 @@ class Kit:
         rows = store.read_json_or(path, {})
         rows[sid] = {
             "name": f"{role}-a", "role": role, "family": "impl", "task": "t-0001", "parent": parent,
-            "worktree": str(worktree if worktree is not None else self.worktree), "slot": 1, "state": state,
+            "worktree": str(worktree if worktree is not None else self.worktree), "state": state,
             "agent_id": agent_id, "retired": retired or ("stopped" if state == "retired" else ""),
             "extensions": extensions or {},
         }  # fmt: skip

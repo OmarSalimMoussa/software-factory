@@ -68,7 +68,6 @@ class Session:
     task: str
     parent: str
     worktree: str
-    slot: int | None
     state: str
     started: str
     started_by: str

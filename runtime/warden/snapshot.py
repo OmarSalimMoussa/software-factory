@@ -211,12 +211,15 @@ def _settings(ctx: Context, args: dict[str, Any]) -> Any:
 
 def _sessions(ctx: Context, args: dict[str, Any]) -> Any:
     current = ctx.settings()
+    held = {lease.holder: lease.slot for n in leases.numbers(ctx.places, current)
+            if (lease := leases.read(ctx.places, n)) is not None}  # fmt: skip
     found = {}
     for sid, s in registry.read(ctx.places).items():
         row = models.dump(s)
+        row["slot"] = held.get(s.name) if s.state != RETIRED and not s.parent else None
         try:
             row["facts"] = doing.facts(ctx.places, sid)
-            row["sentence"] = doing.sentence(current, s, row["facts"]) if s.state != RETIRED else s.doing
+            row["sentence"] = doing.sentence(current, s, row["facts"], row["slot"]) if s.state != RETIRED else s.doing
         # telemetry: surfaced — the agent's sentence draws as unknown; the rest of the tree still draws
         except store.StoreError:
             row["facts"], row["sentence"] = {}, None

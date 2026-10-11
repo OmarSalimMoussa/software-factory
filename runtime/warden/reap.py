@@ -1,8 +1,9 @@
 """Reaping: removing what a retired session and its slot made, as soon as it retires, so nothing waits to be cleaned.
 
-Only a retired session is reaped; anything else is refused. Its slot is emptied only while the slot's lease still
-names it (so a slot another session claimed is never touched): the product's ``scripts/dev empty``, then every
-Docker object labelled with the slot, both through the stack unit, then the lease goes. Its worktree is removed as
+Only a retired session is reaped; anything else is refused. The slot whose lease names it is emptied (so a slot
+another session claimed is never touched): the product's ``scripts/dev empty``, then every Docker object labelled
+with the slot, both through the stack unit, then the lease goes. A reap that failed is tried again after
+watch.reap_retry_minutes. Its worktree is removed as
 the agent user only when git calls it clean and no live session works in it; a dirty one is held, with git's reason,
 for the next session on the same task. Its branch goes once merged. QA evidence ages out in the nightly gc.
 """
@@ -14,6 +15,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from runtime.queue import formats
 from runtime.shared import store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.paths import Places
@@ -24,10 +26,6 @@ from runtime.warden.context import Context
 from runtime.warden.verbs import ORCH
 
 log = logging.getLogger("factory.warden")
-
-# The stack unit's own verb, beside the product's scripts/dev verbs: remove every container, volume, network and
-# image labelled with the request's slot, and every container still on one of its networks.
-SWEEP_SLOT = "factory-sweep-slot"
 
 
 def _reaped_path(places: Places) -> Path:
@@ -63,19 +61,16 @@ def release_held(places: Places, task: str) -> None:
         store.write_json(_held_path(places), held, mode=0o600)
 
 
-def _empty_slot(ctx: Context, session: Session, slot: int) -> str:
-    lease = leases.read(ctx.places, slot)
+def _empty_slot(ctx: Context, session: Session) -> dict[str, str]:
+    """The slot whose lease names the session, emptied; nothing when it holds none (released, or never claimed)."""
+    lease = leases.held_by(ctx.places, ctx.settings(), session.name)
     if lease is None:
-        return "left alone: the slot was released before the reap"
-    if lease.holder not in (session.id, session.name):
-        return "left alone: another session holds the slot"
-    for verb in (["empty"], [SWEEP_SLOT]):
-        done = ctx.launcher.run_stack(slot, verb, session.id)
-        if done.exit != 0:
-            log.warning("warden: reaping session %s, slot %d %s exited %d", session.id, slot, verb[0], done.exit)
-            return f"failed: {verb[0]} exited {done.exit}; see {done.log}"
-    leases.release(ctx, slot)
-    return "emptied"
+        return {}
+    failed = leases.empty(ctx, lease.slot, session.id)
+    if failed:
+        log.warning("warden: reaping session %s, slot %d: %s", session.id, lease.slot, failed)
+        return {"slot": f"failed: {failed}"}
+    return {"slot": "emptied"}
 
 
 def _remove_worktree(ctx: Context, session: Session, live: list[Session]) -> dict[str, str]:
@@ -115,14 +110,19 @@ def reap(ctx: Context, session_id: str) -> dict[str, str]:
     outcome: dict[str, str] = {}
     # A subagent shares its parent's worktree and slot; the orchestrator's worktree is the main checkout.
     if not session.parent:
-        if session.slot is not None:
-            outcome["slot"] = _empty_slot(ctx, session, session.slot)
+        outcome.update(_empty_slot(ctx, session))
         if session.worktree and session.role != ORCH:
             outcome.update(_remove_worktree(ctx, session, live))
     done = reaped(ctx.places)
     done[session_id] = {"at": ctx.clock.iso(), **outcome}
     store.write_json(_reaped_path(ctx.places), done, mode=0o600)
     return outcome
+
+
+def _retry_due(ctx: Context, record: dict[str, str], retry: int) -> bool:
+    """A reap that left something undone (its slot, or the whole reap) runs again once ``retry`` seconds passed."""
+    failed = "failed" in record or str(record.get("slot", "")).startswith("failed")
+    return failed and ctx.clock.now() - formats.epoch(record["at"]) >= retry
 
 
 class Reaper:
@@ -136,7 +136,9 @@ class Reaper:
             return
         sessions = registry.read(ctx.places)
         done = reaped(ctx.places)
-        due = sorted(sid for sid, s in sessions.items() if s.state == RETIRED and sid not in done)
+        retry = ctx.settings().get_int("watch.reap_retry_minutes") * 60
+        due = sorted(sid for sid, s in sessions.items()
+                     if s.state == RETIRED and (sid not in done or _retry_due(ctx, done[sid], retry)))  # fmt: skip
         if due:
             self._thread = threading.Thread(target=self._reap_all, args=(ctx, due), name="reap", daemon=True)
             self._thread.start()

@@ -83,14 +83,13 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
             timeout_seconds=settings.get_int("slots.api_timeout_seconds"),
             max_kib=settings.get_int("slots.api_max_kib"),
         )
+    if op == "release":
+        failed = leases.empty(ctx, n, session.id)
+        return ok(slot=n, released=not failed, **({"failed": failed} if failed else {}))
     verb = _verb(op, args)
     if op == "desktop":
         _desktop_lease(ctx, n, verb)
     result = ctx.launcher.run_stack(n, verb, session.id)
-    if op == "release":
-        if result.exit != 0:
-            return ok(slot=n, exit=result.exit, tail=result.tail, released=False)
-        leases.release(ctx, n)
     return _answer(n, result)
 
 
@@ -126,8 +125,6 @@ def _verb(op: object, args: dict[str, Any]) -> list[str]:
         return ["up", *_words(args.get("services", []), "services")]
     if op == "down":
         return ["down"]
-    if op == "release":
-        return ["empty"]
     if op == "sign-in":
         return ["sign-in", _email(args.get("email"))]
     if op == "seed":
@@ -179,7 +176,5 @@ def _free(ctx: Context, session: Session, n: object) -> dict[str, Any]:
     holder = registry.by_name(registry.read(ctx.places).values(), lease.holder)
     if holder is not None:
         raise Refused("slot", f"slot {n} is held by {lease.holder}, which is {holder.state}; it releases its own slot")
-    result = ctx.launcher.run_stack(n, ["empty"], session.id)
-    if result.exit == 0:
-        leases.release(ctx, n)
-    return ok(slot=n, exit=result.exit, tail=result.tail, released=result.exit == 0)
+    failed = leases.empty(ctx, n, session.id)
+    return ok(slot=n, released=not failed, **({"failed": failed} if failed else {}))

@@ -60,7 +60,6 @@ class SessionView:
     task: str
     parent: str
     worktree: str
-    slot: int | None
     state: str
     agent_id: str
     retired: str

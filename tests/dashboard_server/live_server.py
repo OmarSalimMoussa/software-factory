@@ -246,7 +246,7 @@ class Live:
         sessions = registry.read(self.places)
         sessions["run-t-0031"] = models.Session(
             id="run-t-0031", name="run-t-0031", role="implementer", family="impl", model="claude-sonnet-5-5",
-            effort="high", task="t-0031", parent="", worktree="/srv/wt/run-t-0031", slot=None, state="working",
+            effort="high", task="t-0031", parent="", worktree="/srv/wt/run-t-0031", state="working",
             started=iso(now - 170), started_by="warden", rung=1, since=iso(now - 170))  # fmt: skip
         registry.write(self.places, sessions)
         outage = {"since": iso(now - 120), "stage": "fixing", "task": "t-0031", "session": "run-t-0031",

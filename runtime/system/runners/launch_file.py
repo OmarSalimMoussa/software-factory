@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.shared.settings import Settings
+from runtime.slots import leases
 from runtime.system import layout
 from runtime.warden import launch, session_settings
 
@@ -33,7 +34,7 @@ CHECK_FLAGS = frozenset({"--all", "--only", "--since"})
 _CHECK_WORD = re.compile(r"^[a-z0-9][a-z0-9,-]{0,511}$")
 # The verbs of the product's scripts/dev (factory spec, "scripts/dev"; plan R24 for reports).
 DEV_VERBS = frozenset({"up", "down", "empty", "health", "sign-in", "seed", "desktop", "test", "reports", "verbs"})
-SWEEP, PRUNE, DISK = "factory-sweep-slot", "factory-prune", "factory-disk"
+SWEEP, PRUNE, DISK = leases.SWEEP, "factory-prune", "factory-disk"
 OWN_VERBS = frozenset({SWEEP, PRUNE, DISK})
 # What every session runs under, start or resume, as launch._carried passes it: flag, then its value.
 _CARRIED = (("--remote-control", "name"), ("--model", "model"), ("--effort", "effort"), ("--agent", "agent"),

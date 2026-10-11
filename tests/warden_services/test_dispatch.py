@@ -153,10 +153,10 @@ def test_a_subagent_acts_in_its_parents_role_but_only_on_the_verbs_that_name_its
 ) -> None:
     impl = Caller(kind="agent", session="s-impl", role=IMPL)
     sessions = {
-        "s-impl": Session("s-impl", "impl-a", IMPL, "impl", "m", "high", "t-0001", "", "/w", None, WORKING,
+        "s-impl": Session("s-impl", "impl-a", IMPL, "impl", "m", "high", "t-0001", "", "/w", WORKING,
                           "2026-10-09T12:00:00Z", "orchestrator"),
         "a1234567890abc": Session("a1234567890abc", "impl-a.tester", kind, "impl", "m", "high", "t-0001", "s-impl",
-                                  "/w", None, WORKING, "2026-10-09T12:00:00Z", "s-impl"),
+                                  "/w", WORKING, "2026-10-09T12:00:00Z", "s-impl"),
     }  # fmt: skip
     registry.write(doors.places, sessions)
     answer = dispatcher.answer(impl, AGENT_SOCKET, protocol.request(verb, {}, agent_id="a1234567890abc"))

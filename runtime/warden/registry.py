@@ -12,12 +12,18 @@ from runtime.shared import models, store
 from runtime.shared.models import HOLDS_SLOT, RETIRED, Session
 from runtime.shared.paths import Places
 
+# contract: rows written before a slot's lease file became the one record of its holder carry a slot of their own.
+# Dropped on read, so the warden's first write at its start leaves none; this line goes in the release after.
+_DROPPED = ("slot",)
+
 
 def read(places: Places) -> dict[str, Session]:
     raw = store.read_json_or(places.registry, {})
     if not isinstance(raw, dict):
         raise store.StoreError(f"{places.registry}: not an object")
-    return {sid: models.load(Session, row) for sid, row in raw.items()}
+    rows = {sid: {k: v for k, v in row.items() if k not in _DROPPED} if isinstance(row, dict) else row
+            for sid, row in raw.items()}  # fmt: skip
+    return {sid: models.load(Session, row) for sid, row in rows.items()}
 
 
 def write(places: Places, sessions: dict[str, Session]) -> None:
@@ -25,8 +31,8 @@ def write(places: Places, sessions: dict[str, Session]) -> None:
     # The guard reads only what it needs, from public/: no task text, no chat links.
     # contract: extensions added, so the guard's round limits count what the owner or orchestrator extended.
     public = {
-        sid: {k: getattr(s, k) for k in ("name", "role", "family", "task", "parent", "worktree", "slot", "state",
-                                        "agent_id", "retired", "extensions")}
+        sid: {k: getattr(s, k) for k in ("name", "role", "family", "task", "parent", "worktree", "state", "agent_id",
+                                        "retired", "extensions")}
         for sid, s in sessions.items()
     }  # fmt: skip
     store.write_json(places.state / "public" / "sessions.json", public)

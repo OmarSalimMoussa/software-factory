@@ -12,7 +12,7 @@ from rehearsal_kit import Rehearsal, build, git
 from runtime.queue.book import Queue
 from runtime.queue.format_check import check_queue
 from runtime.shared.models import FINISHED, RETIRED, WORKING
-from runtime.warden import checks, deploys, loop, registry
+from runtime.warden import checks, crashwatch, deploys, loop, registry
 
 TASK = "t-0001"
 PICTURE = (
@@ -149,8 +149,11 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
     assert [e["at"] for e in log] == sorted(e["at"] for e in log)
     assert git(r.github, "rev-parse", "master") == merge
 
+    # Its task is past its part: the next session watch retires the implementer, though its process is alive.
+    crashwatch.watch_sessions(r.warden())
     sessions = registry.read(r.places)
-    assert sessions[impl].state == WORKING and sessions[impl].task == TASK
+    assert (sessions[impl].state, sessions[impl].retired, sessions[impl].task) == (RETIRED, FINISHED, TASK)
+    assert r.systemd.stops == [impl[:8]]
     tested = sorted((s.role, s.state, s.retired) for s in sessions.values() if s.parent == impl)
     assert tested == [(t, RETIRED, FINISHED) for t in testers]
     assert sessions[orch].state == WORKING

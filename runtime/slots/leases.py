@@ -1,8 +1,10 @@
 """Who holds which stack slot (factory spec, "Slots and stacks").
 
 A lease is a small file in the slot's folder in the warden's state: ``checkout``, ``holder``, ``since`` and
-``note``, one ``key=value`` line each. It has no expiry, and no agent can take another's. Slot 0 is the main
-checkout's and never leased; slots 1 to ``slots.count`` are claimed one per implementer, under one lock.
+``note``, one ``key=value`` line each. It is the one record of who holds a slot: the holder is a session's name. It
+has no expiry, and no agent can take another's. Slot 0 is the main checkout's and never leased; slots 1 to
+``slots.count`` are claimed one per implementer, under one lock. ``empty`` is the one way a slot is given up: the
+holder's release, the orchestrator's free, a bench and a reap all use it.
 """
 
 from __future__ import annotations
@@ -17,6 +19,9 @@ from runtime.shared.settings import Settings
 from runtime.warden.context import Context
 
 KEYS = ("checkout", "holder", "since", "note")
+# The stack unit's own verb, beside the product's scripts/dev verbs: remove every container, volume, network and
+# image labelled with the request's slot, and every container still on one of its networks.
+SWEEP = "factory-sweep-slot"
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +84,17 @@ def claim(ctx: Context, holder: str, checkout: str, note: str = "") -> int:
 def release(ctx: Context, n: int) -> None:
     with store.locked(ctx.places.slots / ".lock"):
         _path(ctx.places, n).unlink(missing_ok=True)
+
+
+def empty(ctx: Context, n: int, session: str) -> str:
+    """Give slot ``n`` up: the product's ``scripts/dev empty``, then every Docker object labelled with the slot, then
+    the lease goes. "" when it is free; else what failed, with the lease kept so a later try finishes it."""
+    for verb in (["empty"], [SWEEP]):
+        done = ctx.launcher.run_stack(n, verb, session)
+        if done.exit != 0:
+            return f"{verb[0]} exited {done.exit}; see {done.log}"
+    release(ctx, n)
+    return ""
 
 
 def port(settings: Settings, n: int) -> int:

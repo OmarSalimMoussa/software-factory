@@ -4,8 +4,8 @@ table with Claude Code's session records, the slot's running stack, the shared s
 and GitHub's API.
 
 systemctl is the one fake with logic: a session start passes the agent-run unit's own check of its request and is
-recorded (no claude ever runs), while a command or a stack request runs the real unit runner, which runs git or the
-product's own scripts/dev. A check request passes the check-run unit's own check of its request and passes: the
+recorded (no claude ever runs), and so is a `claude stop`, while a command or a stack request runs the real unit
+runner, which runs git or the product's own scripts/dev. A check request passes the check-run unit's own check of its request and passes: the
 checks themselves are tests/checks' to prove. Anything else the warden asks a unit to run fails the rehearsal before
 it runs.
 """
@@ -123,6 +123,7 @@ class Systemd:
     bin: Path  # where the rehearsal's docker is, first on the units' PATH
     sessions: list[dict[str, Any]] = field(default_factory=list)
     checks: list[dict[str, Any]] = field(default_factory=list)
+    stops: list[str] = field(default_factory=list)  # each `claude stop` the warden asked for, by short id
 
     def __call__(self, argv: list[str]) -> subprocess.CompletedProcess[str]:
         wait = argv[:1] == ["--wait"]
@@ -135,10 +136,16 @@ class Systemd:
             launch_file.session_argv(raw, self.places.state)
             self.sessions.append(raw)
             return subprocess.CompletedProcess(argv, 0, "", "")
-        if raw["kind"] == "command":
-            assert raw["argv"][0] == "git", f"the warden asked a unit to run {raw['argv']}"
         runs = self.places.state / "runs"
         runs.mkdir(parents=True, exist_ok=True)
+        if raw["kind"] == "command" and raw["argv"][:2] == ["claude", "stop"]:
+            launch_file.command_argv(raw, self.agent_home, self.places.state)
+            self.stops.append(raw["argv"][2])
+            (runs / f"{request_id}.log").write_text("")
+            (runs / f"{request_id}.exit").write_text("0\n")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        if raw["kind"] == "command":
+            assert raw["argv"][0] == "git", f"the warden asked a unit to run {raw['argv']}"
         if raw["kind"] == "check":
             launch_file.check_parts(raw, self.agent_home)
             self.checks.append(raw)
