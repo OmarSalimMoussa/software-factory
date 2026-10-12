@@ -265,12 +265,15 @@ class Overlapping(FakeRig):
 
     running: int = 0
     most: int = 0
+    beside_config: list[int] = field(default_factory=list)  # how many ran while the config probe did
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None, properties: tuple[str, ...] = ()) -> Ran:
         with self.lock:
             self.running += 1
             self.most = max(self.most, self.running)
+            if any(".mcp.json" in command for command in commands):
+                self.beside_config.append(self.running - 1)
         time.sleep(0.05)
         with self.lock:
             self.running -= 1
@@ -285,6 +288,7 @@ def test_session_drills_run_side_by_side_and_every_drill_reports_once_in_order()
     named = {drill: drill(FakeRig()).name for drill in roster.DRILLS}
     assert [r.name for r in results] == [named[drill] for drill in roster.DRILLS]
     assert rig.most == 3
+    assert rig.beside_config == [0]  # its probe shares the drill worktree with no other session
 
 
 def test_the_install_refuses_to_finish_while_a_drill_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

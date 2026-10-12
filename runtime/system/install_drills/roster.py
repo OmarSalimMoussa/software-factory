@@ -43,7 +43,9 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
 SESSIONS = frozenset({drills.sandbox_runs, drills.shell_write_other_worktree, drills.secrets_unreadable,
                       drills.sockets_refused, drills.hosts_refused, drills.bubblewrap_missing,
                       drills.factory_in_sandbox, drills.path_shadow, drills.toolchain_answers,
-                      drills.background_session, drills.claude_config_by_shell})  # fmt: skip
+                      drills.background_session})  # fmt: skip
+# Alone, last: each sandboxed command mounts over the shared drill worktree's missing config files, then removes them.
+LAST = (drills.claude_config_by_shell,)
 
 
 def _one(drill: Callable[[Rig], Result], rig: Rig) -> Result:
@@ -56,9 +58,10 @@ def _one(drill: Callable[[Rig], Result], rig: Rig) -> Result:
 
 def run_all(rig: Rig, at_once: int) -> list[Result]:
     """Every drill's result, once each, in the order of DRILLS: the guard and host drills one after another, then the
-    session drills ``at_once`` at a time."""
-    done = {drill: _one(drill, rig) for drill in DRILLS if drill not in SESSIONS}
+    session drills ``at_once`` at a time, then the LAST ones alone."""
+    done = {drill: _one(drill, rig) for drill in DRILLS if drill not in SESSIONS and drill not in LAST}
     with ThreadPoolExecutor(max_workers=at_once, thread_name_prefix="drill") as pool:
         started = {drill: pool.submit(_one, drill, rig) for drill in DRILLS if drill in SESSIONS}
         done.update({drill: future.result() for drill, future in started.items()})
+    done.update({drill: _one(drill, rig) for drill in LAST})
     return [done[drill] for drill in DRILLS]
