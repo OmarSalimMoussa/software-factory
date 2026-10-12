@@ -5,13 +5,17 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import shlex
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from runtime.cli import accounts, factory
 from runtime.cli.factory import Call, CliError, build
 from runtime.guard.factory_calls import verb_of
+from runtime.shared.paths import stored_signin
 from runtime.warden.verbs import VERBS
 
 FILE = "/home/agent/wt/picture.svg"
@@ -177,3 +181,25 @@ def test_every_command_asks_for_the_verb_the_guard_reads_it_as(line: str) -> Non
     argv = shlex.split(line)
     call = build(argv, lambda path: b"text")
     assert verb_of(["factory", *argv]) == call.verb and call.verb in VERBS
+
+
+@pytest.mark.parametrize("route", ["its-own-name", "a-link", "a-second-name"])
+def test_the_factory_command_never_reads_the_stored_sign_in_however_it_is_named(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, route: str
+) -> None:
+    home = tmp_path / "home"
+    signin = stored_signin(home)
+    signin.parent.mkdir(parents=True)
+    signin.write_text('{"claudeAiOauth": {"accessToken": "sk-ant-oat01-secret"}}')
+    monkeypatch.setattr(factory.pwd, "getpwuid", lambda uid: SimpleNamespace(pw_dir=str(home)))
+    named = {"its-own-name": signin, "a-link": tmp_path / "link.md", "a-second-name": tmp_path / "second.md"}[route]
+    if route == "a-link":
+        named.symlink_to(signin)
+    elif route == "a-second-name":
+        os.link(signin, named)
+    body = tmp_path / "body.md"
+    body.write_text("a request")
+
+    with pytest.raises(CliError, match="never reads"):
+        factory.read_file(str(named))
+    assert factory.read_file(str(body)) == b"a request"

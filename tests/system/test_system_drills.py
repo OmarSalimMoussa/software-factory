@@ -411,6 +411,7 @@ def test_the_session_drill_needs_the_launch_line_the_record_an_answer_and_the_st
     ("target", "said"),
     [
         ("file:{here}/present", "opened"),
+        ("file:/dev/null", "empty"),
         ("file:{here}/absent", "ENOENT"),
         ("dir:{here}", "listed"),
         ("write:{here}/present", "written"),
@@ -420,12 +421,23 @@ def test_the_session_drill_needs_the_launch_line_the_record_an_answer_and_the_st
         ("env:DRILL_PROBE_UNSET", "unset"),
         ("ftp:{here}", "unknown kind"),
     ],
-    ids=["file", "file-missing", "dir", "write", "unix-missing", "tcp-unreadable", "env-set", "env-unset", "unknown"],
+    ids=[
+        "file",
+        "file-masked",
+        "file-missing",
+        "dir",
+        "write",
+        "unix-missing",
+        "tcp-unreadable",
+        "env-set",
+        "env-unset",
+        "unknown",
+    ],
 )
 def test_the_probe_names_what_each_target_did(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target: str, said: str
 ) -> None:
-    (tmp_path / "present").write_text("")
+    (tmp_path / "present").write_text("a secret\n")
     monkeypatch.setenv("DRILL_PROBE_SET", "1")
     monkeypatch.delenv("DRILL_PROBE_UNSET", raising=False)
 

@@ -4,9 +4,10 @@
     drill_probe.py --seconds N file:/path dir:/path write:/path unix:/path tcp:host:port env:NAME get:http://... ...
 
 Each line reads ``<target> -> <outcome>``: opened, listed, written, connected or set when the wall let it through (a
-write opens the file to append and writes nothing); the errno's
-name (EACCES, EPERM, ECONNREFUSED, ENOENT...) or unset when it did not. A ``get`` is the one target meant to get
-through: it answers with the HTTP status. Stdlib only, so it runs inside any sandbox.
+write opens the file to append and writes nothing); the errno's name (EACCES, EPERM, ECONNREFUSED, ENOENT...), unset,
+or empty when it did not: Claude Code's sandbox hides a file it denies by mounting /dev/null over it, which opens.
+A ``get`` is the one target meant to get through: it answers with the HTTP status. Stdlib only, so it runs inside any
+sandbox.
 """
 
 from __future__ import annotations
@@ -39,8 +40,8 @@ def _get(url: str, seconds: float) -> str:
 
 
 def _opened(path: str, _: float) -> str:
-    with open(path, "rb"):
-        return "opened"
+    with open(path, "rb") as handle:
+        return "opened" if handle.read(1) else "empty"
 
 
 def _listed(path: str, _: float) -> str:

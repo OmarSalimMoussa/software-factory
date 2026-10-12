@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import pwd
 import socket
 import sys
 from collections.abc import Callable
@@ -24,7 +26,7 @@ from typing import IO, Any
 from runtime.cli import commands
 from runtime.shared import protocol
 from runtime.shared.models import SEVERITIES
-from runtime.shared.paths import Places
+from runtime.shared.paths import Places, stored_signin
 
 LOCAL = ("qa-browser", "slot-api")
 UNREACHABLE = 3
@@ -226,7 +228,19 @@ _CALLS: dict[str, Callable[[argparse.Namespace, Callable[[str], bytes]], Call]] 
 
 
 def read_file(path: str) -> bytes:
-    return Path(path).read_bytes()
+    """A file the agent names, never Claude Code's stored sign-in, however it is reached. The guard lets only the
+    session's own files through, but this runs outside the sandbox, and a link swapped in after the guard looked
+    would be followed: so the file actually opened is the one compared."""
+    with open(path, "rb") as handle:
+        opened = os.fstat(handle.fileno())
+        try:
+            signin = os.stat(stored_signin(Path(pwd.getpwuid(os.getuid()).pw_dir)))
+        # telemetry: expected — a home with no stored sign-in has none to guard
+        except FileNotFoundError:
+            signin = None
+        if signin is not None and (opened.st_dev, opened.st_ino) == (signin.st_dev, signin.st_ino):
+            raise CliError("the factory command never reads Claude Code's sign-in")
+        return handle.read()
 
 
 def ask(path: Path, call: Call) -> dict[str, Any]:
