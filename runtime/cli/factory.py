@@ -188,10 +188,25 @@ def _qa_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
         raise CliError(f"factory qa {ns.what} --head <sha> …")
     if ns.what == "result":
         return Call("qa.result", {"head": ns.head})
+    if ns.what in ("step", "step-result"):
+        return _step_call(ns)
     if not (ns.severity and ns.where and ns.body):
-        raise CliError(f"factory qa finding --head <sha> --severity {'|'.join(SEVERITIES)} --where '…' --body <file>")
-    args = {"head": ns.head, "severity": ns.severity, "where": ns.where}
+        raise CliError(f"factory qa finding --head <sha> --severity {'|'.join(SEVERITIES)} --where '…' "
+                       "[--step <item>:<n>] --body <file>")  # fmt: skip
+    args = {"head": ns.head, "severity": ns.severity, "where": ns.where, **({"step": ns.step} if ns.step else {})}
     return Call("qa.finding", args, read_file(ns.body))
+
+
+def _step_call(ns: argparse.Namespace) -> Call:
+    """`qa step <item> <n>` and `qa step-result <item> <n> <result> --got '…'`."""
+    result = ns.what == "step-result"
+    if len(ns.words) != (3 if result else 2) or not ns.words[1].isdigit() or (result and not ns.got):
+        usage = "<item> <n> pass|fail|blocked --got '<what you saw>'" if result else "<item> <n>"
+        raise CliError(f"factory qa {ns.what} --head <sha> {usage}")
+    args: dict[str, Any] = {"head": ns.head, "item": ns.words[0], "step": int(ns.words[1])}
+    if result:
+        args |= {"result": ns.words[2], "got": ns.got}
+    return Call("qa.step-result" if result else "qa.step", args)
 
 
 _CALLS: dict[str, Callable[[argparse.Namespace, Callable[[str], bytes]], Call]] = {

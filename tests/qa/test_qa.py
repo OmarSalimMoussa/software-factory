@@ -5,14 +5,15 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import re
 from pathlib import Path
 
 import pytest
 from queue_kit import World
 
-from runtime.qa import plan, qa_browser
+from runtime.qa import findings, plan, qa_browser, steps
 from runtime.qa import verbs as qa
-from runtime.qa.scenarios import parse
+from runtime.qa.scenarios import Step, parse
 from runtime.shared.protocol import Refused
 from runtime.slots import health, leases
 from runtime.warden.context import StackResult
@@ -47,16 +48,25 @@ def test_surfaces_toml_names_only_surfaces() -> None:
 @pytest.mark.parametrize(
     ("text", "problem"),
     [
-        ("---\nprotects: web/a\nneeds: nothing\nruns: web\n---\n# A\n" + "".join(f"{n}. x\n" for n in range(1, 8)),
+        ("---\nprotects: web/a\nneeds: nothing\nruns: in-turn\n---\n# A\n" + "".join(f"{n}. x\n" for n in range(1, 8)),
          "7 steps"),
-        ("---\nprotects: web/a\nneeds: nothing\n---\n# A\n1. x\n", "exactly protects"),
-        ("---\nprotects: web/a\nneeds: nothing, sign-in\nruns: web\n---\n# A\n1. x\n", "nothing beside"),
+        ("---\nprotects: web/a\nneeds: nothing\n---\n# A\n1. x\n", "not protects, needs and runs"),
+        ("---\nprotects: web/a\nneeds: nothing, sign-in\nruns: in-turn\n---\n# A\n1. x\n", "nothing beside"),
         ("---\nprotects: web/a\nneeds: nothing\nruns: phone\n---\n# A\n1. x\n", "runs 'phone'"),
     ],
 )  # fmt: skip
 def test_a_scenario_keeps_the_standard_format(text: str, problem: str) -> None:
     scenario, problems = parse("a", text, 6)
     assert scenario is None and any(problem in p for p in problems)
+
+
+def test_a_scenarios_steps_carry_their_names_and_the_first_thing_each_expects() -> None:
+    text = ("---\nprotects: web/a\nneeds: nothing\nruns: in-turn\n---\n# A\n1. **Open the cart.** Go to /cart.\n"
+            "   Expect: the cart shows\n2. Pay.\n   - Expected: a receipt\n   Expect: not this one\n"
+            "3. **Leave** it.\n")  # fmt: skip
+    scenario, problems = parse("a", text, 6)
+    assert problems == [] and scenario is not None
+    assert scenario.steps == (Step("Open the cart", "the cart shows"), Step("", "a receipt"), Step("Leave", ""))
 
 
 @pytest.fixture
@@ -181,3 +191,38 @@ def test_a_clean_verdict_carries_to_the_next_head_unless_its_surfaces_changed(
     with pytest.raises(Refused) as refused:
         qa.qa_clean(impl, {}, None)
     assert f"no result from {', '.join(rerun)}" in refused.value.reason
+
+
+def test_a_testers_steps_are_kept_in_order_and_a_result_needs_its_start(ready_world: World) -> None:
+    qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
+    ctx = ready_world.ctx("implementer", IMPL_ID, "ag-fn")
+    ended = {"head": HEAD[:9], "item": "cart", "step": 2, "result": "fail", "got": "the total\nstayed"}
+    with pytest.raises(Refused, match="start step 2 of cart first"):
+        qa.qa_step_result(ctx, ended, None)
+    qa.qa_step(ctx, {"head": HEAD[:9], "item": "cart", "step": 2}, None)
+    qa.qa_step_result(ctx, ended, None)
+    qa.qa_finding(ctx, {"head": HEAD[:9], "severity": "major", "where": "/cart", "step": "cart:2"}, b"It breaks.")
+
+    marks = steps.of_agent(ready_world.ctx(), IMPL_ID, "ag-fn")
+    assert [(m["item"], m["step"], m.get("result"), m.get("got")) for m in marks] == [
+        ("cart", 2, None, None), ("cart", 2, "fail", "the total stayed")]  # fmt: skip
+    assert [f["step"] for f in findings.of_agent(ready_world.ctx(), "t-0001", "ag-fn")] == ["cart:2"]
+
+
+@pytest.mark.parametrize(
+    ("verb", "args", "says"),
+    [
+        ("step", {"item": "Cart page", "step": 1}, "name the item as your brief does"),
+        ("step", {"item": "cart", "step": 7}, "from 1 to 6"),
+        ("step-result", {"item": "cart", "step": 1, "result": "ok", "got": "it showed"}, "pass, fail, blocked"),
+        ("step-result", {"item": "cart", "step": 1, "result": "pass", "got": " "}, "--got"),
+        ("finding", {"severity": "minor", "where": "/cart", "step": "cart"}, "<item>:<n>"),
+    ],
+)
+def test_a_step_mark_names_its_item_and_step_and_a_result_says_what_was_seen(
+    ready_world: World, verb: str, args: dict[str, object], says: str
+) -> None:
+    qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
+    send = {"step": qa.qa_step, "step-result": qa.qa_step_result, "finding": qa.qa_finding}[verb]
+    with pytest.raises(Refused, match=re.escape(says)):
+        send(ready_world.ctx("implementer", IMPL_ID, "ag-fn"), {"head": HEAD[:9], **args}, b"It breaks.")

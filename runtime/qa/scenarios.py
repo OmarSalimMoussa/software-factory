@@ -1,23 +1,34 @@
-"""The standard format of a product's standing QA scenarios, in its qa/scenarios/ (factory spec, "Briefs").
+"""The standard format of a product's standing QA scenarios, in its qa/scenarios/: the one reader, which the
+qa-scenarios check and the replay both use.
 
-Each scenario opens with three labels: ``protects`` (the paths whose change it guards), ``needs`` (what a tester
-sets up first) and ``runs`` (``web``, or ``desktop`` for steps outside the web UI), then at most ``qa.max_steps``
-numbered steps, so one scenario fits one tester's time for an item.
+A scenario opens with three labels as front matter. ``protects`` names the files or folders whose change could break
+it, each of which exists. ``needs`` lists what must be set up first: ``nothing``, ``seed <name>``, ``person <role>``
+(someone the tester signs in as) or ``session setup`` (a step the starting session runs). ``runs`` says where:
+``in-turn`` (on the default branch, in turn), ``desktop`` (on the slot's remote desktop) or ``waiting`` (never run
+until what it needs exists). Then at most ``qa.max_steps`` numbered steps, so one scenario fits one tester's time
+for an item; a waiting scenario may hold more. A step may open with a short bold name (``1. **Search.** …``) and
+holds what it expects on a line of its own (``Expect: …`` or ``Expected: …``); the replay shows both.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
 from dataclasses import dataclass
-from pathlib import Path
 
 FOLDER = "qa/scenarios"
 LABELS = ("protects", "needs", "runs")
-RUNS = ("web", "desktop")
-NEED = re.compile(r"^(nothing|sign-in|seed [a-z0-9-]+|[a-z][a-z0-9 -]{0,40})$")
-STEP = re.compile(r"^\d+\. ", re.M)
+RUNS = ("in-turn", "desktop", "waiting")
+NEEDS = re.compile(r"^(nothing|session setup|seed [a-z0-9-]+|person [a-z0-9-]+( [a-z0-9-]+)*)$")
 _FRONT = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+_STEP = re.compile(r"^\d+\. (.*)$")
+_NAME = re.compile(r"^\*\*([^*]{1,40}?)[.:]?\*\*\s*")
+_EXPECT = re.compile(r"^\s*(?:-\s*)?Expect(?:ed)?:\s*(.+)$")
+
+
+@dataclass(frozen=True, slots=True)
+class Step:
+    name: str  # the step's short bold name; "" when it has none
+    expected: str  # what it expects; "" when it says nothing it expects
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,57 +37,72 @@ class Scenario:
     protects: tuple[str, ...]
     needs: tuple[str, ...]
     runs: str
-    steps: int
+    steps: tuple[Step, ...]
 
-    def touches(self, paths: Iterable[str]) -> bool:
-        return any(path == p or path.startswith(p.rstrip("/") + "/") for path in paths for p in self.protects)
+
+def steps_of(text: str) -> tuple[Step, ...]:
+    """Every numbered step, in order, with its name and the first thing it expects."""
+    found: list[Step] = []
+    for line in text.splitlines():
+        step = _STEP.match(line)
+        if step:
+            named = _NAME.match(step.group(1))
+            found.append(Step(named.group(1).strip() if named else "", ""))
+            continue
+        said = _EXPECT.match(line)
+        if said and found and not found[-1].expected:
+            found[-1] = Step(found[-1].name, said.group(1).strip())
+    return tuple(found)
+
+
+def front(text: str) -> dict[str, str] | None:
+    """The front matter's labels, or None when the file opens with none."""
+    match = _FRONT.match(text)
+    if match is None:
+        return None
+    return {
+        key.strip(): value.strip() for key, _, value in (line.partition(":") for line in match.group(1).split("\n"))
+    }
+
+
+def problems(rel: str, text: str, exists: set[str] | None, max_steps: int) -> list[str]:
+    """Every way the file breaks the format; ``exists`` answers whether a protected path is there (None: unknown)."""
+    meta = front(text)
+    if meta is None:
+        return [f"{rel}: no front matter (protects, needs, runs) above the title"]
+    if set(meta) != set(LABELS):
+        return [f"{rel}: front matter has {sorted(meta)}, not protects, needs and runs"]
+    out = [] if meta["protects"].split() else [f"{rel}: protects names no path"]
+    if exists is not None:
+        out += [
+            f"{rel}: protects {path}, which does not exist"
+            for path in meta["protects"].split()
+            if path.strip("/") in ("", ".") or path not in exists
+        ]
+    needs = [need.strip() for need in meta["needs"].split(",")]
+    out += [
+        f"{rel}: needs {need!r} is not one of: nothing, seed <name>, person <role>, session setup"
+        for need in needs
+        if not NEEDS.match(need)
+    ]
+    if "nothing" in needs and len(needs) > 1:
+        out.append(f"{rel}: needs lists nothing beside other needs")
+    if meta["runs"] not in RUNS:
+        out.append(f"{rel}: runs {meta['runs']!r} is not one of {', '.join(RUNS)}")
+    count = len(steps_of(text))
+    if not count:
+        out.append(f"{rel}: no numbered steps")
+    elif count > max_steps and meta["runs"] != "waiting":
+        out.append(f"{rel}: {count} steps; split it, {max_steps} at most")
+    return out
 
 
 def parse(name: str, text: str, max_steps: int) -> tuple[Scenario | None, list[str]]:
-    """One scenario from its file's text, or None with every problem."""
-    rel = f"{FOLDER}/{name}.md"
-    match = _FRONT.match(text)
-    if not match:
-        return None, [f"{rel}: no front matter (protects, needs, runs) above the title"]
-    pairs = [line.partition(":") for line in match.group(1).split("\n")]
-    meta = {key.strip(): value.strip() for key, sep, value in pairs if sep}
-    problems: list[str] = []
-    if sorted(meta) != sorted(LABELS) or len(pairs) != len(LABELS):
-        return None, [f"{rel}: front matter is exactly protects, needs and runs"]
-    protects = tuple(meta["protects"].split())
-    needs = tuple(n.strip() for n in meta["needs"].split(","))
-    if not protects:
-        problems.append(f"{rel}: protects names no path")
-    problems += [
-        f"{rel}: needs '{n}' is not nothing, sign-in, seed <name> or a short phrase" for n in needs if not NEED.match(n)
-    ]
-    if "nothing" in needs and len(needs) > 1:
-        problems.append(f"{rel}: needs lists nothing beside other needs")
-    if meta["runs"] not in RUNS:
-        problems.append(f"{rel}: runs '{meta['runs']}' is not one of {', '.join(RUNS)}")
-    steps = len(STEP.findall(text))
-    if not steps:
-        problems.append(f"{rel}: no numbered steps")
-    elif steps > max_steps:
-        problems.append(f"{rel}: {steps} steps; split it, {max_steps} at most")
-    if problems:
-        return None, problems
-    return Scenario(name, protects, needs, meta["runs"], steps), []
-
-
-def load(root: Path, max_steps: int) -> tuple[list[Scenario], list[str]]:
-    """Every scenario under the checkout's qa/scenarios/, and every problem, including a protected path that is
-    not there."""
-    scenarios: list[Scenario] = []
-    problems: list[str] = []
-    for path in sorted((root / FOLDER).glob("*.md")):
-        if path.name == "README.md":
-            continue
-        found, wrong = parse(path.stem, path.read_text(encoding="utf-8"), max_steps)
-        problems += wrong
-        if found is not None:
-            missing = [p for p in found.protects if not (root / p).exists()]
-            problems += [f"{FOLDER}/{path.name}: protects {p}, which does not exist" for p in missing]
-            if not missing:
-                scenarios.append(found)
-    return scenarios, problems
+    """One scenario from its file's text, or None with every problem; whether its protected paths exist is the
+    check's to say, from the checkout."""
+    found = problems(f"{FOLDER}/{name}.md", text, None, max_steps)
+    meta = front(text)
+    if found or meta is None:
+        return None, found
+    needs = tuple(need.strip() for need in meta["needs"].split(","))
+    return Scenario(name, tuple(meta["protects"].split()), needs, meta["runs"], steps_of(text)), []

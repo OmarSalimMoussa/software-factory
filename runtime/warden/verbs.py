@@ -90,6 +90,9 @@ VERBS: dict[str, Verb] = {
     # contract: a tester's verdict on the head, for qa-clean, counted from the findings it recorded
     "qa.result": _v("runtime.qa.verbs:qa_result", IMPL, kinds=VERDICTS),
     "qa.finding": _v("runtime.qa.verbs:qa_finding", IMPL, kinds=VERDICTS),
+    # contract: where a tester's step starts and what it saw at its end, for the run's replay
+    "qa.step": _v("runtime.qa.verbs:qa_step", IMPL, kinds=VERDICTS),
+    "qa.step-result": _v("runtime.qa.verbs:qa_step_result", IMPL, kinds=VERDICTS),
     "qa.waive": _v("runtime.qa.verbs:qa_waive", ORCH),
     "cause": _v("runtime.queue.verbs:cause_try", IMPL),
     # the owner, from the dashboard or their own terminal

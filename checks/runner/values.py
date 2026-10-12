@@ -101,7 +101,6 @@ def load(root: Path, name: str, schema: Schema) -> dict[str, Any]:
     return data
 
 
-# The ceiling budgets several checks share: a stanza pins units over the standard ceiling with a
-# limit and the grounds for it.
+# The ceiling budgets several checks share: each pin lifts one unit over the standard ceiling, with its limit and why.
 PIN = {"limit": int, "reason": str}
 CEILING_STANZA = {"pins": {str: PIN}}

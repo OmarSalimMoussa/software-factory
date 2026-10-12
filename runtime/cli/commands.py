@@ -90,13 +90,17 @@ def _tasks(sub: Any) -> None:
 
 
 def _qa(sub: Any) -> None:
-    qa = sub.add_parser("qa", help="qa plan | finding --head … --severity … --where … --body <file> | result --head … "
-                                   "| waive <task> <finding> --why …")  # fmt: skip
-    qa.add_argument("what", choices=["plan", "finding", "result", "waive"])
+    said = ("qa plan | step --head … <item> <n> | step-result --head … <item> <n> pass|fail|blocked --got … | "
+            "finding --head … --severity … --where … [--step <item>:<n>] --body <file> | result --head … | "
+            "waive <task> <finding> --why …")  # fmt: skip
+    qa = sub.add_parser("qa", help=said)
+    qa.add_argument("what", choices=["plan", "step", "step-result", "finding", "result", "waive"])
     qa.add_argument("words", nargs="*")
     qa.add_argument("--head", default="")
     qa.add_argument("--severity", default="")
     qa.add_argument("--where", default="")
+    qa.add_argument("--step", default="")
+    qa.add_argument("--got", default="")
     qa.add_argument("--body")
     qa.add_argument("--why", default="")
     ready = sub.add_parser("qa-ready")

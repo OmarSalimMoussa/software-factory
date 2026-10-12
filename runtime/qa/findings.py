@@ -1,9 +1,10 @@
 """A tester's findings, one record each, and the orchestrator's waiver of one the implementer disputes.
 
-A tester records each finding as it finds it (`factory qa finding`), on the head it tests: its severity, where, and
-its own words. Its verdict (`factory qa result`) is counted from those records, never typed. qa-clean counts the
-open blockers and majors each required tester found on the final head; one the orchestrator waived (`factory qa
-waive`, with why) no longer counts. Each task keeps its findings and waivers in the warden's state.
+A tester records each finding as it finds it (`factory qa finding`), on the head it tests: its severity, where, its
+own words, and the step it is on when it has one (``item:n``), which the replay shows beside that step. Its verdict
+(`factory qa result`) is counted from those records, never typed. qa-clean counts the open blockers and majors each
+required tester found on the final head; one the orchestrator waived (`factory qa waive`, with why) no longer
+counts. Each task keeps its findings and waivers in the warden's state.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from runtime.qa.steps import ITEM
 from runtime.queue import formats, intake
 from runtime.shared import store
 from runtime.shared.models import OPEN_SEVERITIES, SEVERITIES
@@ -39,13 +41,18 @@ def add(
         raise Refused("qa-finding", f"--severity is one of {', '.join(SEVERITIES)}")
     if not isinstance(where, str) or not where.strip():
         raise Refused("qa-finding", "--where names the screen, endpoint or step it is on")
+    step = args.get("step")
+    item, _, number = step.partition(":") if isinstance(step, str) else ("", "", "")
+    if step is not None and not (ITEM.match(item) and number.isdigit()):
+        raise Refused("qa-finding", "--step names the item and the step's number: <item>:<n>")
     text = intake.body_text(data, "finding", ctx.settings().get_int("queue.max_upload_kib"))
     with ctx.lock:
         found = sum(1 for r in _records(ctx, task_id) if "finding" in r)
         finding = f"f-{found + 1}"
         store.append_jsonl(_path(ctx, task_id), {"finding": finding, "head": head, "tester": tester, "agent": agent,
                                                   "severity": severity, "where": formats.one_line(where),
-                                                  "text": text.strip(), "at": ctx.clock.iso()})  # fmt: skip
+                                                  "text": text.strip(), "at": ctx.clock.iso(),
+                                                  **({"step": step} if step is not None else {})})  # fmt: skip
     return finding
 
 
@@ -72,6 +79,11 @@ def counts(ctx: Context, task_id: str, head: str, **who: str) -> dict[str, int]:
         ):
             found[r["severity"]] += 1
     return found
+
+
+def of_agent(ctx: Context, task_id: str, agent: str) -> list[dict[str, Any]]:
+    """Every finding one tester recorded on the task, waived or not."""
+    return [r for r in _records(ctx, task_id) if "finding" in r and r.get("agent") == agent]
 
 
 def open_count(ctx: Context, task_id: str, head: str, tester: str) -> int:

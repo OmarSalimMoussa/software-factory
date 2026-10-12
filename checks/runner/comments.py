@@ -31,9 +31,8 @@ _LICENSE_MARKERS = (
 )
 
 
-# One file's text is asked for its tree and its TS scan several times per gate
-# pass; a small cache holds the last few files only (a whole repo's ASTs would
-# run to hundreds of megabytes). Callers only read what these return.
+# One file's text is asked for its tree and its TS scan several times per gate pass; a small cache holds the last few
+# files only (a whole repo's ASTs would run to hundreds of megabytes). Callers only read what these return.
 _PER_FILE_CACHE = 8
 
 

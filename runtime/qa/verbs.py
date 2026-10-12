@@ -1,4 +1,5 @@
-"""The QA verbs (factory spec, "QA"): `factory qa plan`, `qa-ready`, `ready-check`, `qa result` and `qa-clean`.
+"""The QA verbs (factory spec, "QA"): `factory qa plan`, `qa-ready`, `ready-check`, `qa step`, `qa step-result`,
+`qa result` and `qa-clean`.
 
 The warden reads the branch with git as the agent, through the agent's own unit, and reads surfaces.toml from the
 default branch, which only the owner changes, never from the worktree. A ready record names the full head the slot
@@ -11,7 +12,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from runtime.qa import evidence, findings, plan, qa_browser
+from runtime.qa import evidence, findings, plan, qa_browser, steps
 from runtime.queue import tasks
 from runtime.queue.formats import SHA
 from runtime.queue.statuses import IMPL
@@ -194,6 +195,18 @@ def qa_finding(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[s
     session, tester, full = _tester_on_head(ctx, args, "qa-finding")
     finding = findings.add(ctx, session.task, full, tester.role, ctx.caller.agent_id, args, data)
     return ok(finding=finding, head=full)
+
+
+def qa_step(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
+    """A tester marks the start of one numbered step of an item, on the head it tests."""
+    session, tester, full = _tester_on_head(ctx, args, "qa-step")
+    return ok(**steps.start(ctx, session.id, full, tester.role, ctx.caller.agent_id, args))
+
+
+def qa_step_result(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
+    """A tester records what it saw at the end of a step it started: pass, fail or blocked, in a few words."""
+    session, tester, full = _tester_on_head(ctx, args, "qa-step-result")
+    return ok(**steps.end(ctx, session.id, full, tester.role, ctx.caller.agent_id, args))
 
 
 def qa_waive(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
