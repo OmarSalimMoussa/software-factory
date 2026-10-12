@@ -36,7 +36,7 @@ def _git(state: dict[str, str]) -> object:
 @pytest.fixture
 def git(world: World) -> dict[str, str]:
     state = {"commit": "c1" * 20, "tree": "t1" * 20, "branch": "impl-a", "dirty": "", "log": ""}
-    world.launcher.git = _git(state)  # type: ignore[assignment]
+    world.launcher.git = _git(state)  # type: ignore[assignment]  # the fake launcher's git answers from `state`
     return state
 
 

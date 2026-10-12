@@ -193,4 +193,4 @@ def test_the_install_has_the_agent_user_trust_its_checkout(tmp_path: Path) -> No
     trusting = (
         f"{layout.PYTHON} -I {job.places.install}/runtime/system/runners/trust.py {layout.AGENT_HOME}/.claude.json"
     )
-    assert f"run: {trusting} {job.checkout()} (as software-agent)" in job.host.actions  # type: ignore[attr-defined]
+    assert f"run: {trusting} {job.checkout()} (as software-agent)" in job.host.actions  # type: ignore[attr-defined]  # a dry host

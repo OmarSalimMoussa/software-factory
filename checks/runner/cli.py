@@ -94,7 +94,7 @@ def run_one(check_id: str, repo: Repo) -> list[str]:
     except ValuesError as exc:
         return exc.problems
     # telemetry: surfaced — a check that breaks fails with `COULD_NOT_RUN` and why, never hiding the others
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - one check that breaks must not stop the others
         return [f"{COULD_NOT_RUN}: {type(exc).__name__}: {exc}"]
 
 

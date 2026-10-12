@@ -14,9 +14,9 @@ from pathlib import Path
 # `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.shared import environment, settings  # noqa: E402 - the path line above must run first
-from runtime.shared.paths import Places  # noqa: E402
-from runtime.system import healthchecks  # noqa: E402
+from runtime.shared import environment, settings
+from runtime.shared.paths import Places
+from runtime.system import healthchecks
 
 PAUSING = ("pre", "stop")
 # What systemd sets SERVICE_RESULT to when the service ended cleanly: a stop it was asked for. A crash reads

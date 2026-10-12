@@ -8,7 +8,7 @@ import pytest
 # The queue's test kit builds the same world: a checkout, settings and fakes.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "queue"))
 
-from queue_kit import World, make_world  # noqa: E402
+from queue_kit import World, make_world
 
 
 @pytest.fixture

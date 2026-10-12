@@ -24,23 +24,25 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
-HERE = Path(__file__).resolve().parent
-sys.path[:0] = [str(HERE.parents[1]), str(HERE.parent), str(HERE)]
+# The drives run this file by its path: its own folder, the tests' and the repo's root go first on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from dashboard_seed import seed  # noqa: E402
-from fake_warden import FakeWarden, GitHub  # noqa: E402
-from seed_kit import FIXTURES, iso  # noqa: E402
+from dashboard_seed import seed
+from fake_warden import FakeWarden, GitHub
+from seed_kit import FIXTURES, iso
 
-from runtime.dashboard import server  # noqa: E402
-from runtime.dashboard.client import Warden  # noqa: E402
-from runtime.queue import formats, propose  # noqa: E402
-from runtime.shared import models, store  # noqa: E402
-from runtime.shared import settings as settings_module  # noqa: E402
-from runtime.warden import public  # noqa: E402
-from runtime.warden.context import Caller, Clock  # noqa: E402
-from runtime.warden.delivery import deploys  # noqa: E402
-from runtime.warden.owner import ops, settings_save  # noqa: E402
-from runtime.warden.sessions import crashwatch, registry  # noqa: E402
+from runtime.dashboard import server
+from runtime.dashboard.client import Warden
+from runtime.queue import formats, propose
+from runtime.shared import models, store
+from runtime.shared import settings as settings_module
+from runtime.warden import public
+from runtime.warden.context import Caller, Clock
+from runtime.warden.delivery import deploys
+from runtime.warden.owner import ops, settings_save
+from runtime.warden.sessions import crashwatch, registry
 
 CODE = "123456"
 START = 1_791_554_520.0  # 2026-10-09 14:02:00 UTC
@@ -129,7 +131,7 @@ class Live:
         places = seed(root, self.clock.now())
         self.places, self.repo = places, root / "repo"
         for folder in ("plugin", "procedures", "rules"):
-            shutil.copytree(HERE.parents[1] / folder, places.install / folder)
+            shutil.copytree(Path(__file__).resolve().parents[2] / folder, places.install / folder)
         self._publish()
         settings_save.render_plugin(places, self._settings())
         self.warden = FakeWarden(places, self.clock, accept=CODE, github=Deploys(self), on_event=self.on_event)
@@ -259,7 +261,7 @@ class Handler(server._Handler):
     def _test(self, answer: Any) -> None:
         self._send(server._json(200, answer))
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         if self.path == "/__calls":
             self._test(self.live.calls)
             return
@@ -288,7 +290,7 @@ class Handler(server._Handler):
             envelope["api"] = sw["api"]
         return server._json(reply.status, envelope)
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         if self.path in ("/__reset", "/__switch"):
             if self.path == "/__reset":

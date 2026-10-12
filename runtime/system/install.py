@@ -23,13 +23,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+# Run by its path, which puts no folder of the factory's on sys.path: its root goes first, for the imports below.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.shared import environment, store, upgrades  # noqa: E402 - the path line above must run first
-from runtime.shared.paths import Places  # noqa: E402
-from runtime.shared.protocol import Refused  # noqa: E402
+from runtime.shared import environment, store, upgrades
+from runtime.shared.paths import Places
+from runtime.shared.protocol import Refused
 from runtime.system import ci_check, healthchecks, layout, release, sealed
-from runtime.system.host import Account, CommandError, Host  # noqa: E402
+from runtime.system.host import Account, CommandError, Host
 from runtime.system.install_drills import drills
 from runtime.system.install_steps import (
     steps_machine,
@@ -39,11 +40,11 @@ from runtime.system.install_steps import (
     steps_toolchain,
     steps_wire,
 )
-from runtime.system.job import REPO_ROOT, Install, refuse  # noqa: E402
-from runtime.system.journal import Journal  # noqa: E402
-from runtime.system.real_host import RealHost  # noqa: E402
-from runtime.system.unattended import UnattendedHost  # noqa: E402
-from runtime.system.uninstall import LookingHost  # noqa: E402
+from runtime.system.job import REPO_ROOT, Install, refuse
+from runtime.system.journal import Journal
+from runtime.system.real_host import RealHost
+from runtime.system.unattended import UnattendedHost
+from runtime.system.uninstall import LookingHost
 
 PROGRAM = "install.py"
 

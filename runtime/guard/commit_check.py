@@ -19,9 +19,9 @@ from pathlib import Path
 # `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.guard.facts import read_settings  # noqa: E402 - the path line above must run first
-from runtime.guard.writes import is_protected, protected_paths  # noqa: E402
-from runtime.shared.paths import INSTALL, SLICE, Places  # noqa: E402
+from runtime.guard.facts import read_settings
+from runtime.guard.writes import is_protected, protected_paths
+from runtime.shared.paths import INSTALL, SLICE, Places
 
 
 class HookError(Exception):

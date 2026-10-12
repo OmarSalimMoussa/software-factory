@@ -157,7 +157,7 @@ class Reporter(logging.Handler):
             )
             self._send(request, self.timeout)
         # Logging here would come straight back to this handler, so the one line goes to stderr instead.
-        except Exception as exc:  # noqa: BLE001 -- reporting an error must never raise one
+        except Exception as exc:  # noqa: BLE001 - reporting an error must never raise one
             if not self.failing:
                 print(f"error-reports: an error could not be sent to GlitchTip ({type(exc).__name__}); "
                       "later ones stay quiet until a send works", file=sys.stderr, flush=True)  # fmt: skip

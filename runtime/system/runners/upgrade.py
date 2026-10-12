@@ -20,12 +20,13 @@ import tomllib
 import traceback
 from pathlib import Path
 
+# `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from runtime.shared import environment, releases, store, upgrades  # noqa: E402 - the path line above must run first
-from runtime.shared import settings as settings_module  # noqa: E402
-from runtime.shared.paths import Places  # noqa: E402
-from runtime.system import layout, release  # noqa: E402
+from runtime.shared import environment, releases, store, upgrades
+from runtime.shared import settings as settings_module
+from runtime.shared.paths import Places
+from runtime.system import layout, release
 
 CHECKING, DOWNLOADING, UPGRADING = "Checking the release", "Downloading the release", "Upgrading"
 
@@ -123,7 +124,7 @@ def main(argv: list[str]) -> int:
         return ended(places, commit)
     try:
         return upgrade(places, commit)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - whatever stops an upgrade is recorded where the dashboard shows it
         said = str(exc) if isinstance(exc, Stop) else f"The upgrade stopped: {exc}. Upgrade again, or by hand."
         print(f"upgrade: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
         if not isinstance(exc, Stop | releases.ReleaseError):

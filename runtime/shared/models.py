@@ -8,9 +8,12 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
+T = TypeVar("T", bound="DataclassInstance")
 
 # Lifecycle (factory spec, "Agent lifecycle"): working and waiting hold a cap slot; deprioritized keeps its full
 # context; retired is final and can never be resumed.
@@ -55,9 +58,9 @@ def dump(record: Any) -> dict[str, Any]:
 def load(cls: type[T], raw: object) -> T:
     if not isinstance(raw, dict):
         raise RecordError(f"{cls.__name__}: not an object")
-    names = {f.name for f in dataclasses.fields(cls)}  # type: ignore[arg-type]
-    needed = {f.name for f in dataclasses.fields(cls) if f.default is dataclasses.MISSING  # type: ignore[arg-type]
-              and f.default_factory is dataclasses.MISSING}  # fmt: skip
+    names = {f.name for f in dataclasses.fields(cls)}
+    needed = {f.name for f in dataclasses.fields(cls)
+              if f.default is dataclasses.MISSING and f.default_factory is dataclasses.MISSING}  # fmt: skip
     missing, unknown = needed - raw.keys(), raw.keys() - names
     if missing or unknown:
         raise RecordError(f"{cls.__name__}: missing {sorted(missing)}, unknown {sorted(unknown)}")

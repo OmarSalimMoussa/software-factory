@@ -17,10 +17,10 @@ from pathlib import Path
 # `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from runtime.shared import environment  # noqa: E402 - the path line above must run first
-from runtime.shared.paths import CHECK_TOOLS  # noqa: E402
-from runtime.system import layout  # noqa: E402
-from runtime.system.runners import launch_file as lf  # noqa: E402
+from runtime.shared import environment
+from runtime.shared.paths import CHECK_TOOLS
+from runtime.system import layout
+from runtime.system.runners import launch_file as lf
 
 INSTALL = Path(__file__).resolve().parents[3]
 # Under the tools' Python in isolated mode: the install's root comes in as the first argument.

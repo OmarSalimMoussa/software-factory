@@ -16,17 +16,18 @@ import threading
 from pathlib import Path
 from typing import Any
 
-HERE = Path(__file__).resolve().parent
-sys.path[:0] = [str(HERE.parents[1]), str(HERE)]
+# The drive runs this file by its path: its own folder and the repo's root go first on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from system_fakes import FACTORY_ORIGIN, FIXTURE, PASSING, PRODUCT_ORIGIN, ci_answers  # noqa: E402
+from system_fakes import FACTORY_ORIGIN, FIXTURE, PASSING, PRODUCT_ORIGIN, ci_answers
 
-from runtime.shared.paths import Places  # noqa: E402
-from runtime.system.console import serve  # noqa: E402
-from runtime.system.host import Account, DryHost, Host  # noqa: E402
-from runtime.system.install_console.console_app import Choices, Console, Hosts  # noqa: E402
-from runtime.system.install_console.console_run import ConsoleDryHost, Run  # noqa: E402
-from runtime.system.job import REPO_ROOT  # noqa: E402
+from runtime.shared.paths import Places
+from runtime.system.console import serve
+from runtime.system.host import Account, DryHost, Host
+from runtime.system.install_console.console_app import Choices, Console, Hosts
+from runtime.system.install_console.console_run import ConsoleDryHost, Run
+from runtime.system.job import REPO_ROOT
 
 NEWEST = "0123456789abcdef0123456789abcdef01234567"
 

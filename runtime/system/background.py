@@ -35,7 +35,7 @@ class Running(Pending):
     def __init__(self, journal: Journal, argv: list[str], user: str, command: list[str], env: dict[str, str]) -> None:
         self.journal, self.argv, self.user = journal, argv, user
         # A file, not a pipe, kept open until the command is waited for: a full pipe would stall it.
-        self.output = tempfile.TemporaryFile()  # noqa: SIM115
+        self.output = tempfile.TemporaryFile()  # noqa: SIM115 - it stays open past this call, until the wait
         self.began = time.monotonic()
         self.process = subprocess.Popen(command, env=env, stdin=subprocess.DEVNULL, stdout=self.output,
                                         stderr=subprocess.STDOUT, start_new_session=True)  # fmt: skip

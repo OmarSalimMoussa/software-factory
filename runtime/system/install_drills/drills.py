@@ -362,7 +362,7 @@ def _one(drill: Callable[[Rig], Result], rig: Rig) -> Result:
     try:
         return drill(rig)
     # telemetry: surfaced — a drill that breaks proved nothing: its `Result` fails, named, and the rest run
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - a drill that breaks fails alone, and the rest still run
         return Result(drill.__name__, False, f"the drill broke: {type(exc).__name__}: {exc}")
 
 

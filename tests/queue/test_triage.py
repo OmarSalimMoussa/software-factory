@@ -3,6 +3,8 @@ not at all."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 from queue_kit import World, plan
 
@@ -62,7 +64,7 @@ def test_a_plan_is_applied_whole(world: World) -> None:
         lambda a, b: plan(batch=[a, b], new_tasks=[_new(a)], joins={b: "t-0099"}),  # no such task
     ],
 )
-def test_a_broken_plan_writes_nothing(world: World, broken) -> None:  # type: ignore[no-untyped-def]
+def test_a_broken_plan_writes_nothing(world: World, broken: Callable[[str, str], bytes]) -> None:
     a, b = world.request(), world.request()
     with pytest.raises(Refused) as refused:
         triage.apply(world.ctx(), broken(a.id, b.id))

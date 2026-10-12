@@ -309,10 +309,10 @@ class _Handler(BaseHTTPRequestHandler):
             )
         self._send(reply)
 
-    def do_GET(self) -> None:  # noqa: N802 -- the name http.server calls
+    def do_GET(self) -> None:  # the name http.server calls
         self._guarded(lambda: self.server.app.get(self.path, {k.lower(): v for k, v in self.headers.items()}))
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         def answer() -> Reply:
             size = int(self.headers.get("Content-Length") or 0)
             limit = self.server.app.settings().get_int("queue.max_upload_kib") * 1024

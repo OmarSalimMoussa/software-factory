@@ -105,8 +105,9 @@ def released(ctx: Context, task_id: str) -> None:
 
 def next_turn(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """`factory turn next`: the turn goes to the first qa-clean task, in the one order, whose after tasks landed."""
-    if holder(ctx.places) is not None:
-        raise Refused("one-turn", f"{holder(ctx.places)['task']} holds the merge turn; wait for its merge")  # type: ignore[index]
+    held = holder(ctx.places)
+    if held is not None:
+        raise Refused("one-turn", f"{held['task']} holds the merge turn; wait for its merge")
     queue = Queue.of(ctx)
     found, _ = queue.tasks()
     by_id = {t.id: t for t in found}

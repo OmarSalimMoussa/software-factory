@@ -94,7 +94,7 @@ def test_a_reap_that_could_not_empty_the_slot_is_tried_again_after_its_wait(
     assert reap.reaped(ctx.places)["s1"]["slot"].startswith("failed") and held.exists()
     pass_()  # within the wait: not tried again
     assert sum(1 for c in launcher.calls if c[0] == "stack") == 1
-    ctx.clock.t += ctx.settings().get_int("watch.reap_retry_minutes") * 60  # type: ignore[attr-defined]
+    ctx.clock.t += ctx.settings().get_int("watch.reap_retry_minutes") * 60  # type: ignore[attr-defined]  # the fake clock
     del launcher.stack["empty"]
     pass_()
     assert reap.reaped(ctx.places)["s1"]["slot"] == "emptied" and not held.exists()

@@ -42,7 +42,7 @@ def run(ctx: Context, timed: Timed, state: dict[str, Any], work: Callable[[], st
     state["polled"] = now
     try:
         found = work()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - one import that fails must not stop the warden's loop
         why = str(exc) if isinstance(exc, timed.told) else type(exc).__name__
         if not state["failing"]:
             log.warning("warden: %s failed (%s); it runs again at the next poll", timed.doing, why,

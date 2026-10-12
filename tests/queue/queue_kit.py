@@ -88,7 +88,7 @@ class World:
             caller,
             self.clock,
             self.launcher,
-            None,  # type: ignore[arg-type]
+            None,  # type: ignore[arg-type]  # the queue never asks GitHub
             lambda kind, data: self.events.append((kind, data)),
         )
 

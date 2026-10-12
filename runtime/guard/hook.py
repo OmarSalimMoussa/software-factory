@@ -20,8 +20,8 @@ from pathlib import Path
 # `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.guard import deadline, wire  # noqa: E402 - the path line above must run first
-from runtime.shared.paths import SLICE, Places  # noqa: E402
+from runtime.guard import deadline, wire
+from runtime.shared.paths import SLICE, Places
 
 _INPUT_LIMIT = 4_000_000
 _DETAIL_LIMIT = 2000
@@ -64,7 +64,7 @@ def handle(raw: str, cgroup: str, places: Places, home: Path, now: datetime) -> 
     try:
         return _run(payload, event, places, home, now)
     # telemetry: surfaced — any failure, a broken rule module included, refuses the call naming the `failure`
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - a guard that breaks refuses the call, never lets it through
         return _failed(places, payload, event, f"the guard failed ({type(exc).__name__}: {exc})", now)
 
 
@@ -95,7 +95,7 @@ def report_subagent(payload: dict[str, object], event: str, places: Places) -> s
             sock.sendall(request(verb, args))
             answer = json.loads(sock.makefile("rb").readline())
     # telemetry: surfaced — the session sees `was not sent`; its calls are refused until the warden knows it
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - a hook that cannot reach the warden says so and lets the session go on
         return f"factory guard: {verb} was not sent ({type(exc).__name__})"
     if not isinstance(answer, dict) or answer.get("ok") is not True:
         rule = answer.get("refused", "?") if isinstance(answer, dict) else "?"
@@ -152,7 +152,7 @@ def _arm(places: Places) -> None:
 
         seconds = read_settings(places).get_int("install.hook_timeout_seconds")
     # telemetry: surfaced — the guard's first step reads the settings again and `refuses the call` naming why
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 - unreadable settings arm nothing; the guard's first step refuses on them
         return
     deadline.arm(seconds)
 

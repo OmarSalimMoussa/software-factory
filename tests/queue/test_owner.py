@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Callable
 
 import pytest
 from queue_kit import PICTURE, World
@@ -36,7 +37,9 @@ def test_a_reorder_from_a_stale_page_is_refused(world: World) -> None:
         (lambda w, t: owner.approve(w.owner(), t), "approved"),
     ],
 )
-def test_each_proposal_decision_posts_its_event(world: World, decide, event: str) -> None:  # type: ignore[no-untyped-def]
+def test_each_proposal_decision_posts_its_event(
+    world: World, decide: Callable[[World, str], object], event: str
+) -> None:
     task = world.task()
     propose(world.ctx(), task.id, 1, "why", "", PICTURE, "")
     decide(world, task.id)

@@ -37,7 +37,8 @@ def ago(text: str) -> float:
         return 60.0
     if text == "yesterday":
         return 30 * 3600.0
-    n = int(re.match(r"\d+", text).group(0)) if re.match(r"\d+", text) else 1  # type: ignore[union-attr]
+    count = re.match(r"\d+", text)
+    n = int(count.group(0)) if count else 1
     return n * {"min": 60, "h": 3600, "days": 86400}[text.split()[1]]
 
 

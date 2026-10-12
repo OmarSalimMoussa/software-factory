@@ -11,11 +11,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from runtime.shared.paths import ERRORS, SERVICES  # noqa: E402 - the path line above must run first
-from runtime.system.errors import instance  # noqa: E402
-from standard.services import provision, stack  # noqa: E402
+from runtime.shared.paths import ERRORS, SERVICES
+from runtime.system.errors import instance
+from standard.services import provision, stack
 
 
 def main(argv: list[str]) -> int:

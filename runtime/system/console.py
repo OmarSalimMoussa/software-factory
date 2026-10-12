@@ -25,18 +25,19 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+# Run by its path, which puts no folder of the factory's on sys.path: its root goes first, for the imports below.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.shared import environment  # noqa: E402 - the path line above must run first
-from runtime.shared.paths import Places  # noqa: E402
-from runtime.shared.protocol import Refused  # noqa: E402
+from runtime.shared import environment
+from runtime.shared.paths import Places
+from runtime.shared.protocol import Refused
 from runtime.system import install, layout, sealed
-from runtime.system.host import Account, CommandError, Host, as_user  # noqa: E402
-from runtime.system.install_console import console_page  # noqa: E402
-from runtime.system.install_console.console_app import Choices, Console, Hosts, Reply, refused  # noqa: E402
-from runtime.system.install_console.console_run import ConsoleHost, ConsoleLookingHost  # noqa: E402
-from runtime.system.job import REPO_ROOT  # noqa: E402
-from runtime.system.real_host import RealHost  # noqa: E402
+from runtime.system.host import Account, CommandError, Host, as_user
+from runtime.system.install_console import console_page
+from runtime.system.install_console.console_app import Choices, Console, Hosts, Reply, refused
+from runtime.system.install_console.console_run import ConsoleHost, ConsoleLookingHost
+from runtime.system.job import REPO_ROOT
+from runtime.system.real_host import RealHost
 
 log = logging.getLogger("factory.console")
 
@@ -78,10 +79,10 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(reply.body)
 
-    def do_GET(self) -> None:  # noqa: N802 -- the name http.server calls
+    def do_GET(self) -> None:  # the name http.server calls
         self._answer(b"")
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         try:
             size = int(self.headers.get("Content-Length") or 0)
         # telemetry: surfaced — a length that is no number is `refused` below as no change the console takes

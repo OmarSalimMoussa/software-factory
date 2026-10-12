@@ -20,19 +20,20 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+# Run by its path, which puts no folder of the factory's on sys.path: its root goes first, for the imports below.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.shared import environment, paths, store  # noqa: E402 - the path line above must run first
-from runtime.shared import settings as settings_module  # noqa: E402
-from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER, Places  # noqa: E402
-from runtime.shared.protocol import Refused  # noqa: E402
-from runtime.system import layout, sealed  # noqa: E402
-from runtime.system.github_keys import WARDEN_TITLE  # noqa: E402
-from runtime.system.host import Account, CommandError, DryHost, Host  # noqa: E402
+from runtime.shared import environment, paths, store
+from runtime.shared import settings as settings_module
+from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER, Places
+from runtime.shared.protocol import Refused
+from runtime.system import layout, sealed
+from runtime.system.github_keys import WARDEN_TITLE
+from runtime.system.host import Account, CommandError, DryHost, Host
 from runtime.system.install_steps import steps_prepare, steps_wire
-from runtime.system.job import REPO_ROOT, Install  # noqa: E402
-from runtime.system.journal import Journal  # noqa: E402
-from runtime.system.real_host import RealHost  # noqa: E402
+from runtime.system.job import REPO_ROOT, Install
+from runtime.system.journal import Journal
+from runtime.system.real_host import RealHost
 
 PROGRAM = "uninstall.py"
 

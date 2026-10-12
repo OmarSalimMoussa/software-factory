@@ -18,17 +18,18 @@ import subprocess
 import sys
 from pathlib import Path
 
+# `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from runtime.shared import environment  # noqa: E402 - the path line above must run first
-from runtime.shared.paths import Places  # noqa: E402
-from runtime.shared.settings import Settings  # noqa: E402
-from runtime.slots import leases  # noqa: E402
-from runtime.system import layout  # noqa: E402
-from runtime.system.runners import launch_file as lf  # noqa: E402
-from standard import config as product_config  # noqa: E402
-from standard import envfile  # noqa: E402
-from standard.services import provision, stack  # noqa: E402
+from runtime.shared import environment
+from runtime.shared.paths import Places
+from runtime.shared.settings import Settings
+from runtime.slots import leases
+from runtime.system import layout
+from runtime.system.runners import launch_file as lf
+from standard import config as product_config
+from standard import envfile
+from standard.services import provision, stack
 
 SLOT_LABEL = "software.slot"
 EMPTY = "empty"

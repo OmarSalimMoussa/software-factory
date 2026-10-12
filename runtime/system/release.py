@@ -30,8 +30,8 @@ from typing import Any
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.shared import environment  # noqa: E402 - the path line above must run first
-from runtime.system import layout, sealed  # noqa: E402
+from runtime.shared import environment
+from runtime.system import layout, sealed
 
 NAME = "software-factory.pyz"
 MANIFEST, TREE, MAIN = "release.json", "factory/", "__main__.py"
@@ -43,12 +43,11 @@ _STAMP = (1980, 1, 1, 0, 0, 0)
 LAUNCHER = """import os
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "factory"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "factory"))
 
-from runtime.system import release  # noqa: E402
+from runtime.system import release
 
-sys.exit(release.launch(HERE, sys.argv[1:]))
+sys.exit(release.launch(os.path.dirname(os.path.abspath(__file__)), sys.argv[1:]))
 """
 
 

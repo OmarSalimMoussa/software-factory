@@ -28,7 +28,7 @@ def _errno(exc: OSError) -> str:
 
 def _get(url: str, seconds: float) -> str:
     try:
-        with urllib.request.urlopen(url, timeout=seconds) as answer:  # noqa: S310 -- the drill's own loopback URL
+        with urllib.request.urlopen(url, timeout=seconds) as answer:
             return f"answered {answer.status}"
     # telemetry: expected — an error status is an answer, the outcome this probe reports
     except urllib.error.HTTPError as exc:

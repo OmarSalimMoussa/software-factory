@@ -10,6 +10,7 @@ import importlib
 import sys
 from pathlib import Path
 
+# `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 SERVICES = frozenset({"runtime.warden.wardend", "runtime.dashboard.server"})
