@@ -2,9 +2,9 @@
 the run at these marks and words each step from them: its name and what it expects from the scenario file, what the
 tester got from its result.
 
-`factory qa step <item> <n>` marks a step's start; `factory qa step-result <item> <n> pass|fail|blocked --got '…'`
-its end. A result for a step the tester never started is refused, so every result has a start. An implementer's
-session keeps its testers' marks in the warden's state.
+`factory qa step --step <item>:<n>` marks a step's start; `factory qa step-result --step <item>:<n> --result
+pass|fail|blocked --got '…'` its end. A result for a step the tester never started is refused, so every result has a
+start. An implementer's session keeps its testers' marks in the warden's state.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def end(ctx: Context, session_id: str, head: str, tester: str, agent: str, args:
             for r in store.read_jsonl(path(ctx, session_id))
         )
         if not started:
-            raise Refused("qa-step-result", f"start step {step} of {item} first: factory qa step {item} {step}")
+            raise Refused("qa-step-result", f"start step {step} of {item} first: factory qa step --step {item}:{step}")
         record = {
             "item": item,
             "step": step,

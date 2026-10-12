@@ -91,8 +91,8 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["slot", "desktop", "up", "tester-1@example.com"],
         ["qa", "plan"],
         ["qa", "result", "--head", "abc1234"],
-        ["qa", "step", "--head", "abc1234", "sign-in", "2"],
-        ["qa", "step-result", "--head", "abc1234", "sign-in", "2", "fail", "--got", "the form stayed"],
+        ["qa", "step", "--head", "abc1234", "--step", "sign-in:2"],
+        ["qa", "step-result", "--head", "abc1234", "--step", "sign-in:2", "--result", "fail", "--got", "no form"],
         ["qa", "finding", "--head", "abc1234", "--severity", "major", "--where", "/cart", "--body", FILE],
         ["qa", "waive", "t-0001", "f-2", "--why", "the spec asks for it"],
         ["qa-ready", "abc1234", "--slices", "abc1234", "def5678"],
@@ -109,6 +109,16 @@ def test_every_command_asks_for_a_verb_the_warden_and_the_guard_know(argv: list[
 def test_task_facts_arrive_typed() -> None:
     call = _build(["queue", "task", "facts", "t-0001", "--surfaces", "ui,", "api", "--slices", "2", "--after", "t-2"])
     assert call.args == {"task": "t-0001", "surfaces": ["ui", "api"], "slices": 2, "after": ["t-2"]}
+
+
+def test_a_step_mark_names_its_step_as_a_finding_does() -> None:
+    call = _build(
+        ["qa", "step-result", "--head", "abc1234", "--step", "cart:2", "--result", "fail", "--got", "no total"]
+    )
+    assert call.args == {"head": "abc1234", "item": "cart", "step": 2, "result": "fail", "got": "no total"}
+    # Words after an option are lost to Python 3.12's argparse, which the factory runs on: the step is an option.
+    with pytest.raises(CliError, match="--step <item>:<n>"):
+        _build(["qa", "step", "cart", "2", "--head", "abc1234"])
 
 
 def test_propose_none_names_no_task() -> None:
@@ -174,7 +184,7 @@ def test_the_owners_account_commands_send_the_token_as_bytes_and_follow_a_switch
         "queue task status t-0001 approved", "queue task facts t-0001 --slices 2", "turn next", "check",
         "qa finding --head abc --severity major --where /notes --step notes:2 --body f.md", "qa result --head abc",
         "qa plan",
-        "qa step --head abc notes 2", "qa step-result --head abc notes 2 pass --got 'the note showed'",
+        "qa step --head abc --step notes:2", "qa step-result --head abc --step notes:2 --result pass --got 'shown'",
         "qa waive t-0001 f-1 --why 'not a bug'", "qa-ready abc", "qa-clean", "ready-check", "triage plan --body p.json",
         "triage apply", "inbox", "inbox --wait", "tick", "status", "push", "reflect --kind miss 'it missed'",
         "slot claim", "slot up", "propose t-0001 --picture p.svg --why now", "spec save t-0001 s.md --slices 2",

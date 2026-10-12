@@ -198,14 +198,16 @@ def _qa_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
 
 
 def _step_call(ns: argparse.Namespace) -> Call:
-    """`qa step <item> <n>` and `qa step-result <item> <n> <result> --got '…'`."""
+    """`qa step --step <item>:<n>` and `qa step-result --step <item>:<n> --result <result> --got '…'`, the step named
+    as a finding names it. Options only: Python 3.12's argparse drops words that follow an option here."""
     result = ns.what == "step-result"
-    if len(ns.words) != (3 if result else 2) or not ns.words[1].isdigit() or (result and not ns.got):
-        usage = "<item> <n> pass|fail|blocked --got '<what you saw>'" if result else "<item> <n>"
-        raise CliError(f"factory qa {ns.what} --head <sha> {usage}")
-    args: dict[str, Any] = {"head": ns.head, "item": ns.words[0], "step": int(ns.words[1])}
+    item, _, number = ns.step.partition(":")
+    if ns.words or not (item and number.isdigit()) or (result and not (ns.result and ns.got)):
+        usage = " --result pass|fail|blocked --got '<what you saw>'" if result else ""
+        raise CliError(f"factory qa {ns.what} --head <sha> --step <item>:<n>{usage}")
+    args: dict[str, Any] = {"head": ns.head, "item": item, "step": int(number)}
     if result:
-        args |= {"result": ns.words[2], "got": ns.got}
+        args |= {"result": ns.result, "got": ns.got}
     return Call("qa.step-result" if result else "qa.step", args)
 
 
