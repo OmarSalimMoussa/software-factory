@@ -27,7 +27,7 @@ from typing import Any
 from runtime.shared import store
 from runtime.shared.models import RETIRED, WORKING, Session
 from runtime.shared.paths import AGENT_USER, SLICE, Places
-from runtime.system import layout
+from runtime.system import layout, render
 from runtime.system.install_drills.evidence import Ran
 from runtime.system.job import Install, refuse
 from runtime.warden.owner import messages
@@ -189,6 +189,10 @@ class RealRig:
 
     def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran:
         return self._systemd_run(user, argv, view=view)
+
+    def as_daemon(self, argv: list[str]) -> Ran:
+        unit = (layout.UNITS_DIR / layout.DAEMON_UNIT).read_text(encoding="utf-8")
+        return self._systemd_run(AGENT_USER, argv, view=False, properties=render.walls(unit))
 
     def guard(self, tool: str, tool_input: dict[str, Any]) -> Ran:
         event = {

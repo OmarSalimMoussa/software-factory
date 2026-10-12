@@ -198,6 +198,7 @@ SCHEMA: dict[str, Spec] = {
     # contract: added by builder 3, read by the installer only.
     "install.drill": Spec("model", when="Next install"),
     "install.drill_seconds": Spec("int", 30, 900, when="Next install"),
+    "install.browser_check_seconds": Spec("int", 10, 600, when="Next install"),
     "install.drills_at_once": Spec("int", 1, 8, when="Next install"),
     "install.tailnet_seconds": Spec("int", 10, 600, when="Next install"),
     "install.hook_timeout_seconds": Spec("int", 2, 60, when="Next install"),

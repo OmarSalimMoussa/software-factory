@@ -31,7 +31,7 @@ from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.system import ci_check, healthchecks, layout, release, sealed
 from runtime.system.host import Account, CommandError, Host
-from runtime.system.install_drills import drills
+from runtime.system.install_drills import roster
 from runtime.system.install_steps import (
     steps_machine,
     steps_prepare,
@@ -51,13 +51,13 @@ PROGRAM = "install.py"
 
 def run_drills(ctx: Install) -> None:
     if ctx.host.dry:
-        for drill in drills.DRILLS:
+        for drill in roster.DRILLS:
             ctx.host.say(f"would drill: {drill.__name__}")
         return
     from runtime.system.install_drills import drill_rig
 
     with drill_rig.opened(ctx) as rig:
-        results = drills.run_all(rig, ctx.need_settings().get_int("install.drills_at_once"))
+        results = roster.run_all(rig, ctx.need_settings().get_int("install.drills_at_once"))
     for result in results:
         ctx.host.say(f"{'pass' if result.ok else 'FAIL'}: {result.name}: {result.evidence}")
     ctx.drilled = [{"name": r.name, "ok": r.ok, "evidence": r.evidence} for r in results]

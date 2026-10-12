@@ -47,6 +47,10 @@ class Rig(Protocol):
     finished_agent: str  # a finished intake subagent in the drill session's transcript
 
     def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran: ...
+    def as_daemon(self, argv: list[str]) -> Ran:
+        """``argv`` as the agent user, inside the walls the installed agents' daemon unit puts round its sessions."""
+        ...
+
     def guard(self, tool: str, tool_input: dict[str, Any]) -> Ran: ...
     def sandboxed(
         self, *commands: str, extra: dict[str, Any] | None = None, properties: tuple[str, ...] = ()

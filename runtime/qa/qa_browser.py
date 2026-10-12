@@ -122,6 +122,10 @@ def prepare(role: str, session_id: str, root: Path, settings: Settings, now: dat
     return config
 
 
+def published(places: Places) -> Settings:
+    return settings_module.build(store.read_json(places.state / "public" / "settings.json"), {})
+
+
 def server_command(config: Path) -> list[str]:
     return ["npx", "-y", PLAYWRIGHT_MCP, "--config", str(config), "--init-script", str(RECORDER)]
 
@@ -163,7 +167,7 @@ def main(argv: list[str], places: Places, sign_in: Callable[[str], dict[str, Any
         session_id = environment.claude_session_id()  # Claude Code names the session it starts this server for
         if not session_id:
             raise BrowserError("Claude Code gave no session id (CLAUDE_CODE_SESSION_ID)")
-        settings = settings_module.build(store.read_json(places.state / "public" / "settings.json"), {})
+        settings = published(places)
         config = prepare(argv[0], session_id, Path.home() / RUNS, settings, datetime.now(UTC))
     except (BrowserError, settings_module.SettingsError, store.StoreError, OSError) as exc:
         print(f"factory qa-browser: no browser: {type(exc).__name__}: {exc}", file=sys.stderr)

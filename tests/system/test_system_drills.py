@@ -12,10 +12,11 @@ from typing import Any
 import pytest
 from system_fakes import dry_job, settings
 
-from runtime.shared.paths import WARDEN_USER, Places
+from runtime.qa import browser_check
+from runtime.shared.paths import FACTORY_BIN, WARDEN_USER, Places
 from runtime.shared.protocol import Refused
-from runtime.system import drill_probe, install
-from runtime.system.install_drills import drills
+from runtime.system import drill_probe, install, layout, render
+from runtime.system.install_drills import browser_drill, drills, roster
 from runtime.system.install_drills.evidence import Ran, Result
 
 
@@ -52,6 +53,9 @@ class FakeRig:
     recorded: str | None = "tag"  # "tag": the name the drill gave it
     stops: bool = True
     said: str = "Ready"  # what the session answers
+    # What the browser check printed inside the daemon's walls, and each command run there.
+    browser: Ran = Ran(0, "npx: installed 1 package\nthe browser opened a page\n")
+    walled: list[list[str]] = field(default_factory=list)
     _session: dict[str, str] = field(default_factory=dict)
 
     def real_session(self, name: str, prompt: str) -> Ran:
@@ -72,6 +76,10 @@ class FakeRig:
 
     def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran:
         return Ran(1, "")
+
+    def as_daemon(self, argv: list[str]) -> Ran:
+        self.walled.append(argv)
+        return self.browser
 
     def guard(self, tool: str, tool_input: dict[str, Any]) -> Ran:
         return self.guard_answer
@@ -212,9 +220,9 @@ def test_a_drill_that_breaks_fails_by_name_and_the_rest_still_run() -> None:
         def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran:
             raise OSError("systemd-run is gone")
 
-    results = drills.run_all(Broken(), 4)
+    results = roster.run_all(Broken(), 4)
 
-    assert len(results) == len(drills.DRILLS)
+    assert len(results) == len(roster.DRILLS)
     assert next(r for r in results if r.name == "docker_denied").evidence.startswith("the drill broke: OSError")
 
 
@@ -239,10 +247,10 @@ class Overlapping(FakeRig):
 def test_session_drills_run_side_by_side_and_every_drill_reports_once_in_order() -> None:
     rig = Overlapping()
 
-    results = drills.run_all(rig, 3)
+    results = roster.run_all(rig, 3)
 
-    named = {drill: drill(FakeRig()).name for drill in drills.DRILLS}
-    assert [r.name for r in results] == [named[drill] for drill in drills.DRILLS]
+    named = {drill: drill(FakeRig()).name for drill in roster.DRILLS}
+    assert [r.name for r in results] == [named[drill] for drill in roster.DRILLS]
     assert rig.most == 3
 
 
@@ -254,7 +262,7 @@ def test_the_install_refuses_to_finish_while_a_drill_fails(tmp_path: Path, monke
         yield FakeRig()
 
     monkeypatch.setattr(drill_rig, "opened", opened)
-    monkeypatch.setattr(drills, "run_all", lambda rig, at_once: [Result("a", True, "held"),
+    monkeypatch.setattr(roster, "run_all", lambda rig, at_once: [Result("a", True, "held"),
                                                                   Result("b", False, "breached")])  # fmt: skip
     job = dry_job(tmp_path)
     job.host.dry, job.settings = False, settings()
@@ -363,6 +371,40 @@ def test_the_bubblewrap_drill_hides_bubblewrap_and_fails_when_the_command_still_
 )
 def test_the_check_drill_fails_on_any_way_out_of_the_checkout(check: dict[str, str], ok: bool) -> None:
     assert drills.check_walled_in(FakeRig(check=check)).ok is ok
+
+
+@pytest.mark.parametrize(
+    ("browser", "ok"),
+    [
+        (Ran(0, "npx: installed 1 package\nthe browser opened a page\n"), True),
+        (Ran(1, "no browser: browser_navigate failed: Chromium distribution 'chrome' is not found\n"), False),
+        (Ran(0, "npx: installed 1 package\n"), False),
+    ],
+    ids=["opened", "no-browser", "no-verdict"],
+)
+def test_the_browser_drill_passes_only_on_the_checks_opened_page_inside_the_daemons_walls(
+    browser: Ran, ok: bool
+) -> None:
+    rig = FakeRig(browser=browser)
+
+    result = browser_drill.tester_browser(rig)
+
+    assert result.ok is ok
+    assert rig.walled == [[str(FACTORY_BIN), "qa-browser", browser_check.FLAG, "qa-ui-function"]]
+
+
+def test_a_drill_inside_the_daemons_walls_takes_every_wall_and_nothing_it_runs() -> None:
+    unit = (Path(render.__file__).parent / "units" / layout.DAEMON_UNIT).read_text()
+
+    found = render.walls(unit)
+
+    keys = {line.partition("=")[0] for line in found}
+    assert {"ProtectHome", "BindPaths", "TemporaryFileSystem", "NoNewPrivileges", "ProtectSystem", "Slice"} <= keys
+    assert not keys & {"ExecStart", "ExecStartPre", "User", "LoadCredential", "Restart", "Type", "Description"}
+    assert "BindPaths=/run/user/@agent_uid@" in found and all(not line.startswith("#") for line in found)
+    # A setting the drill has not sorted would change how its command runs (its output, its folder): it stops.
+    with pytest.raises(render.RenderError, match="StandardOutput"):
+        render.walls(unit.replace("[Service]\n", "[Service]\nStandardOutput=journal\n"))
 
 
 @pytest.mark.parametrize(

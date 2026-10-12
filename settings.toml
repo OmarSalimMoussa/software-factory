@@ -231,6 +231,7 @@ warden_threads = 16     # requests the warden answers at once, on each of its so
 [install]               # read by the installer: a change takes effect at the next install
 drill = { model = "claude-haiku-5-5", effort = "low" }  # the model the drills drive a sandboxed command with
 drill_seconds = 180     # the longest one drill may run
+browser_check_seconds = 120  # how long the drill's check of a tester's browser waits on it; under drill_seconds
 drills_at_once = 4      # drill sessions run side by side, each in its own unit; the guard and host drills run alone
 tailnet_seconds = 60    # how long publishing the dashboard on the tailnet may wait before the owner is shown why
 hook_timeout_seconds = 10  # how long Claude Code waits for the guard, which decides within half of it or refuses

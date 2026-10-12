@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import shlex
 import uuid
-from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from runtime.shared import claude_accounts
@@ -347,54 +345,3 @@ def check_walled_in(rig: Rig) -> Result:
     found = outcomes(ran.out)
     ok = len(found) == len(targets) + 1 and not breaches(ran.out)
     return Result(name, ok, "; ".join(f"{t} -> {o}" for t, o in found.items()) or f"{checkout}: {first_line(ran.out)}")
-
-
-DRILLS: tuple[Callable[[Rig], Result], ...] = (
-    sandbox_runs,
-    docker_denied,
-    shell_write_other_worktree,
-    edit_other_worktree,
-    secrets_unreadable,
-    sockets_refused,
-    hosts_refused,
-    backstop_stops_claude,
-    background_session,
-    bubblewrap_missing,
-    factory_alone,
-    finished_subagent,
-    other_branch,
-    factory_in_sandbox,
-    path_shadow,
-    toolchain_answers,
-    stack_not_root,
-    shared_services_answer,
-    factory_errors_walled_off,
-    stack_off_tailnet,
-    dashboard_unreachable,
-    warden_runs_commands,
-    check_walled_in,
-)
-
-
-# Each starts at least one sandboxed session, which waits on a model: they run side by side.
-SESSIONS = frozenset({sandbox_runs, shell_write_other_worktree, secrets_unreadable, sockets_refused, hosts_refused,
-                      bubblewrap_missing, factory_in_sandbox, path_shadow, toolchain_answers,
-                      background_session})  # fmt: skip
-
-
-def _one(drill: Callable[[Rig], Result], rig: Rig) -> Result:
-    try:
-        return drill(rig)
-    # telemetry: surfaced — a drill that breaks proved nothing: its `Result` fails, named, and the rest run
-    except Exception as exc:  # noqa: BLE001 - a drill that breaks fails alone, and the rest still run
-        return Result(drill.__name__, False, f"the drill broke: {type(exc).__name__}: {exc}")
-
-
-def run_all(rig: Rig, at_once: int) -> list[Result]:
-    """Every drill's result, once each, in the order of DRILLS: the guard and host drills one after another, then the
-    session drills ``at_once`` at a time."""
-    done = {drill: _one(drill, rig) for drill in DRILLS if drill not in SESSIONS}
-    with ThreadPoolExecutor(max_workers=at_once, thread_name_prefix="drill") as pool:
-        started = {drill: pool.submit(_one, drill, rig) for drill in DRILLS if drill in SESSIONS}
-        done.update({drill: future.result() for drill, future in started.items()})
-    return [done[drill] for drill in DRILLS]

@@ -72,6 +72,8 @@ def test_the_orchestrators_worktree_is_the_main_checkout(tmp_path: Path) -> None
         ("factory snapshot", "factory-verbs"),
         ("factory push abc1234", "factory-verbs"),
         ("factory no-such-verb", "factory-verbs"),
+        # The factory command runs outside the sandbox: a browser it started would too. Only the install checks it.
+        ("factory qa-browser --check qa-ux", "factory-verbs"),
         ("factory request new --from implementer --where {home}/.claude/.credentials.json", "factory-alone"),
         ("factory status", None),
         ("factory qa plan", None),

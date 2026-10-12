@@ -158,3 +158,28 @@ def managed_settings(places: Places, settings: Settings, source: Path) -> str:
     except ValueError as exc:
         raise RenderError(f"the managed settings do not parse: {exc}") from exc
     return text
+
+
+# How a service is walled in, which a drill copies onto its own command; and what it runs, as whom, which it leaves.
+_WALLS = frozenset({"Slice", "Environment", "UMask", "TemporaryFileSystem", "BindReadOnlyPaths", "BindPaths",
+                    "ProtectHome", "InaccessiblePaths", "NoNewPrivileges", "ProtectSystem", "ProtectKernelModules",
+                    "RestrictSUIDSGID", "RestrictRealtime", "LockPersonality"})  # fmt: skip
+_RUNS = frozenset({"Type", "ExecStart", "ExecStartPre", "Restart", "RestartSec", "KillMode", "LoadCredential", "User",
+                   "Group"})  # fmt: skip
+
+
+def walls(unit: str) -> tuple[str, ...]:
+    """How a rendered unit walls in what it runs: its [Service] settings in _WALLS; one in neither list raises."""
+    section, found = "", []
+    for line in unit.splitlines():
+        text = line.strip()
+        key, equals, _ = text.partition("=")
+        if text.startswith("["):
+            section = text
+        elif section != "[Service]" or not equals or text.startswith("#") or key in _RUNS:
+            continue
+        elif key not in _WALLS:
+            raise RenderError(f"{key}= is neither a wall a drill copies nor what the unit runs: sort it in render.py")
+        else:
+            found.append(text)
+    return tuple(found)
