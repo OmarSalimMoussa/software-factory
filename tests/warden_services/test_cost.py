@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -105,3 +106,9 @@ def test_a_subagent_call_is_charged_by_its_kind(
     assert (record["session"], record["subagent"], record["role"], record["family"], record["task"]) == (
         "s1", "abc", role, family, task,
     )  # fmt: skip
+
+
+def test_every_model_the_factory_allows_out_of_the_box_has_a_price_so_no_call_costs_unknown() -> None:
+    shipped = tomllib.loads((Path(__file__).resolve().parents[2] / "settings.toml").read_text())
+
+    assert set(shipped["prices"]) == set(shipped["models"]["allowed"])

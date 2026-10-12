@@ -51,7 +51,10 @@ def defaults_text(repo: Path) -> str:
     prices = "".join(
         f'"{m}" = {{ input = {i}, output = {o}, cache_read = 0, cache_write = 0 }}\n' for m, (i, o) in PRICES.items()
     )
-    return text.replace("[prices]", "[prices]\n" + prices.rstrip("\n"), 1)
+    # The seed's own prices stand in for the shipped ones: the table runs from its header to the next blank line.
+    head, header, rest = text.partition("[prices]")
+    comment, _, after = rest.partition("\n")
+    return head + header + comment + "\n" + prices + after[after.index("\n\n") :]
 
 
 def _seed_queue(repo: Path, now: float) -> list[models.Task]:
