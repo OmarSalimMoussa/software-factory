@@ -292,14 +292,14 @@ function renderShell() {
 /* ---------- router: pages, history, the back link ---------- */
 const pageName = id => (UI.pages.find(p => p[0] === id) || [id, id])[1];
 const viewLabel = () => UI.page === 'work' && PAGE.work.tabLabel() ? `${pageName('work')} › ${PAGE.work.tabLabel()}` : pageName(UI.page);
-const viewOf = () => ({page: UI.page, workTab: UI.workTab, reqInbox: UI.reqInbox, reqOut: UI.reqOut, scroll: $('#main').scrollTop, back: UI.back || null, label: viewLabel()});
+const viewOf = () => ({page: UI.page, workTab: UI.workTab, reqInbox: UI.reqInbox, reqOut: UI.reqOut, scroll: $('#main').scrollTop, back: UI.back || null, replay: UI.replay || null, label: viewLabel()});
 function go(page, opts = {}) {
   if (page === 'more') { openMore(); return; }
   if (!PAGE[page]) return;
   closePops();
   const from = viewOf();
   // telemetry: expected — without the history API the page keeps no back steps, and `UI.hist` says so
-  try { history.replaceState(from, '', '#' + UI.page); history.pushState({page, back: opts.back ? from : null}, '', '#' + page); UI.hist = true; } catch (e) { UI.hist = false; }
+  try { history.replaceState(from, '', '#' + UI.page); history.pushState({page, back: opts.back ? from : null, replay: UI.replay || null}, '', '#' + page); UI.hist = true; } catch (e) { UI.hist = false; }
   UI.back = opts.back ? from : null;
   UI.page = page; renderShell(); render(); $('#main').scrollTop = 0; $('#page').focus({preventScroll: true});
   loadPage();
@@ -307,7 +307,7 @@ function go(page, opts = {}) {
 function restoreView(v) {
   closeSheet(); closePops();
   UI.page = v.page; if (v.workTab) Object.assign(UI, {workTab: v.workTab, reqInbox: v.reqInbox, reqOut: v.reqOut});
-  UI.back = v.back || null;
+  UI.back = v.back || null; if (v.replay) UI.replay = v.replay;
   renderShell(); render(); $('#main').scrollTop = v.scroll || 0;
   if (!UI.data[PAGE[UI.page].url()]) UI.pendingScroll = v.scroll || 0;
   loadPage();

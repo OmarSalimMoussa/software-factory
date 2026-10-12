@@ -79,7 +79,8 @@
      "state": "pass",
      "tone": "good",
      "note": null,
-     "shots": []
+     "shots": [],
+     "replay": null
     }
    ],
    "empty": "Testers start once every slice is built."

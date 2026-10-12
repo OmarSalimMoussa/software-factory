@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.dashboard.views import proposals
+from runtime.dashboard.views import proposals, replay
 from runtime.dashboard.views.kit import (
     PartError,
     Parts,
@@ -33,7 +33,8 @@ def spec_id(task_id: str) -> str:
 
 
 def _latest_round(snap: Snap, task_id: str) -> tuple[str, list[str], dict[str, dict[str, Any]], list[str]]:
-    """The head of the last ready record, its testers, each tester's last result on it, and its evidence files."""
+    """The head of the last ready record, its testers, each tester's last result on it, and its screenshots: the
+    pictures at the top of each run, never its replay's frames."""
     qa = snap.get("qa").get(task_id, {"ready": [], "results": [], "evidence": []})
     if not qa["ready"]:
         return "", [], {}, []
@@ -44,7 +45,8 @@ def _latest_round(snap: Snap, task_id: str) -> tuple[str, list[str], dict[str, d
     for entry in qa["evidence"]:
         if entry["head"] == head:
             base = f"/api/evidence/{task_id}/{head[:12]}/{entry['tester']}/{entry['run']}"
-            files += [(entry["tester"], f"{base}/{f}") for f in entry["files"] if f.lower().endswith(_IMAGE)]
+            shots = [f for f in entry["files"] if "/" not in f and f.lower().endswith(_IMAGE)]
+            files += [(entry["tester"], f"{base}/{f}") for f in shots]
     return head, list(last["testers"]), results, [f"{t}\t{u}" for t, u in files]
 
 
@@ -56,6 +58,7 @@ def testers(snap: Snap, task: dict[str, Any]) -> dict[str, Any]:
     settings = snap.settings
     # The testers a round needs are the warden's, from the task and its diff, recorded when QA was readied.
     head, names, results, files = _latest_round(snap, task["id"])
+    runs = replay.tester_runs(task["id"], head, snap.get("qa")[task["id"]]["evidence"]) if head else {}
     worker = taskwords.worker(snap, task["id"])
     live = {
         s["role"]
@@ -81,6 +84,7 @@ def testers(snap: Snap, task: dict[str, Any]) -> dict[str, Any]:
                 "tone": tone,
                 "note": note,
                 "shots": _shots(files, name),
+                "replay": runs.get(name),
             }
         )
     if not head:

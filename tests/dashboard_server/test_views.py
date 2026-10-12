@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 from dashboard_rig import Rig
 from dashboard_seed import STAGING
+from seed_agents import REPLAY_URL
 from seed_kit import FIXTURES, iso
 
 from runtime.dashboard.views import agents, ops
@@ -107,6 +108,7 @@ PAGES = [
     ("/api/reflect", ["reflect.json"]),
     ("/api/guard", ["guard.json"]),
     ("/api/push", ["push.json"]),
+    (REPLAY_URL, ["replay.json"]),
 ]
 
 
@@ -359,3 +361,21 @@ def test_settings_shows_the_factory_and_check_now_says_what_github_has(
         "newer": newer,
         "button": "Check now",
     }
+
+
+@pytest.mark.parametrize(
+    ("replay", "says"),
+    [
+        (None, "The replay is being made. It shows here once it is ready."),
+        ({"version": 1, "error": "the transcript is gone"}, "This run has no replay: the transcript is gone."),
+    ],
+    ids=["not-built-yet", "failed"],
+)
+def test_a_replay_not_built_says_why_in_its_place(rig: Rig, replay: dict[str, Any] | None, says: str) -> None:
+    built = rig.places.evidence / "t-0017" / "eeeeeeeeeeee" / "qa-ui-function" / "20261009T120000Z-abc123" / "replay"
+    (built / "replay.json").unlink()
+    if replay is not None:
+        (built / "replay.json").write_text(json.dumps(replay))
+    data = rig.parts(REPLAY_URL)["replay"]["data"]
+    assert (data["title"], data["says"]) == ("Sign-in sends people back to the sign-in page", says)
+    assert "rows" not in data

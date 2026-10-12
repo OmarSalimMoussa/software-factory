@@ -16,6 +16,7 @@ from runtime.dashboard.views import (
     library,
     push,
     reflect,
+    replay,
     search,
     settings,
     shell,
@@ -54,6 +55,7 @@ PAGES: list[tuple[re.Pattern[str], Page, dict[str, str]]] = [
     (re.compile(r"^/api/guard$"), _page(guard), {}),
     (re.compile(r"^/api/search$"), _page(search), {}),
     (re.compile(r"^/api/push$"), _page(push), {}),
+    (re.compile(r"^/api/replay$"), _page(replay), {}),
 ]
 OP = re.compile(r"^/api/ops/(op-[0-9]{14}-[0-9a-f]{8})$")
 

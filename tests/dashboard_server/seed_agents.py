@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from seed_kit import FIXTURES, MODELS, fixture, fixture_time, iso
+from seed_replay import seed_replay
 
 from runtime.shared import store
 from runtime.shared.models import CostRecord, Session, Task
@@ -16,6 +17,8 @@ from runtime.shared.paths import Places
 from runtime.warden.owner import messages
 
 COSTS: dict[str, float] = {}  # each agent's cost as the fixtures show it, filled as the agents are written
+REPLAYED = ("t-0017", "qa-ui-function")  # the one run whose replay is built
+REPLAY_URL = "/api/replay?task=t-0017&head=eeeeeeeeeeee&tester=qa-ui-function&run=20261009T120000Z-abc123"
 
 
 def _usd(text: str) -> float:
@@ -222,6 +225,8 @@ def seed_evidence(places: Places, now: float) -> None:
             folder.mkdir(parents=True)
             source = FIXTURES / "pictures" / f"evidence-{task}-{shot}.svg"
             (folder / f"{shot}.svg").write_bytes(source.read_bytes())
+            if (task, tester) == REPLAYED:
+                seed_replay(folder)
             store.append_jsonl(
                 places.evidence / "index.jsonl",
                 {

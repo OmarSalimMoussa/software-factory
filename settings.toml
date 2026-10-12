@@ -67,11 +67,26 @@ browser_answer_seconds = 120  # the longest the browser wrapper waits for the br
 long_wait_seconds = 4.0     # a wait longer than this shows only its end
 wait_tail_seconds = 2.5     # the end a long wait shows
 navigation_tail_seconds = 1.5  # a page change shows this long before it arrived: it may have queued behind a wait
+freeze_ms = 120         # before a click or a keystroke the replay pauses this early, three frames, so the picture shows it undone
 secret_seconds = 15     # after a sign-in link or the desktop's password is typed, the picture is hidden this long
 recorder_before_seconds = 0.05  # the page recorder's line for a call may come this early: the clocks differ a little
 recorder_after_seconds = 0.3    # and this late: a click lands after its call is sent, and its line is written after
 desktop_view_share = 0.3  # a field taking more of the screen than this is a desktop's live view, which takes all keys
 read_part_share = 0.6   # an element a tester's script looked up is a part of the page when it takes less than this
+card_ms = 1800          # a step's title card
+fade_ms = 400           # a bubble or a tag fading out; shorter than between_ms
+between_ms = 600        # the pause between two actions
+char_ms = 50            # a thought types out a character this often
+read_ms = 2400          # a thought stays this long once typed
+glide_ms = 1500         # the cursor gliding to a click
+before_ms = 400         # a tag shows this long before the screen moves
+after_ms = 1000         # the screen rests this long after it moved
+miss_ms = 2800          # a failed action's tag stays this long
+type_char_ms = 120      # typed text shows a character this often
+type_lead_ms = 300      # the typing tag shows empty this long before the first character
+type_rest_ms = 600      # and stays this long after the last, before it says what was typed
+pill_ms = 2000          # an action with nothing to play shows its tag this long
+shot_ms = 1800          # a screenshot's flash and tag
 
 [intake]                # see the intake spec
 batch_size = 100

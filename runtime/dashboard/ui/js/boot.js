@@ -81,6 +81,8 @@ document.addEventListener('click', e => {
   if (d.action === 'prefs') { const m = $('#prefs-menu'), open = m.hidden; closePops(); m.hidden = !open; t.setAttribute('aria-expanded', String(open)); return; }
   if (d.themeSet) { if (close) closeSheet(); setTheme(d.themeSet); if (sheetOpen() && $('#sheet-title').textContent === 'More') openMore(); return; }
   if (d.origin) { const box = document.getElementById('origin-' + d.origin), open = box.hidden; box.hidden = !open; t.setAttribute('aria-expanded', String(open)); if (open && !box.innerHTML) box.innerHTML = builtFromHTML(UI.origins[d.origin], d.origin); return; }
+  if (d.rp !== undefined) { replayClick(t); return; }
+  if (d.replay) { openReplay(d.replay); return; }
   if (d.go) { const back = !!t.closest('#page, #sheet') && !t.closest('.more-grid'); if (d.tab) { UI.workTab = d.tab; UI.reqPages = 1; } closeSheet(); go(d.go, {back}); return; }
   if (d.libOpen) { openInLibrary(d.libOpen); return; }
   if (d.gs !== undefined) { pickGs(+d.gs); return; }
@@ -146,6 +148,7 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'gq') gsInput(t.value);
+  else if (t.dataset.rpSeek !== undefined) replaySeek(t.value);
   else if (t.dataset.answer) UI.answers[t.dataset.answer] = t.value;
   else if (t.dataset.msg) UI.drafts[t.dataset.msg] = t.value;
   else if (t.dataset.acct) UI.acct[t.dataset.acct] = t.value;
@@ -162,7 +165,7 @@ document.addEventListener('focusout', () => setTimeout(flushDirty, 0));
 document.addEventListener('keydown', e => {
   const ae = document.activeElement;
   if (ae.id === 'gq') { if (gsKey(e)) return; }
-  if (e.key === 'Escape') { if (UI.device) return; if (anyPop()) closePops(); else if (sheetStack.length) sheetBack(); else closeSheet(); return; }
+  if (e.key === 'Escape') { if (UI.device || replayEscape()) return; if (anyPop()) closePops(); else if (sheetStack.length) sheetBack(); else closeSheet(); return; }
   if (ae.dataset.split && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); resizePane(ae, (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 64 : 16)); return; }
   const menu = ae && ae.closest && ae.closest('.dd-menu');
   if (menu && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); const opts = $$('button', menu), i = opts.indexOf(ae); opts[(i + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length].focus(); return; }

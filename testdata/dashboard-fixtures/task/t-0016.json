@@ -79,7 +79,8 @@
      "state": "pass",
      "tone": "good",
      "note": null,
-     "shots": []
+     "shots": [],
+     "replay": null
     }
    ],
    "empty": "A small backend fix runs no testers."

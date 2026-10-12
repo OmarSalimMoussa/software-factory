@@ -62,7 +62,7 @@ function boostTask(id, on, btn, close) {
 /* ---------- the task panel ---------- */
 const BIG = /^[≈$\d]/;
 const kvBox = k => `<div><div class="l">${esc(k.label)}</div>${BIG.test(String(k.value)) ? `<div class="big">${esc(k.value)}</div>` : `<div style="font-weight:650;margin-top:4px">${esc(k.value)}</div>`}</div>`;
-const testerCard = x => `<div class="tester"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(x.name)}</b><span class="chip ${x.tone}">${esc(x.state)}</span></div><div class="faint" style="font-size:12px">${esc(x.model)}${x.note ? ' · ' + esc(x.note) : ''}</div>${x.shots.length ? `<div class="shots">${x.shots.map(u => picture(u, x.name + ' evidence')).join('')}</div>` : ''}</div>`;
+const testerCard = x => `<div class="tester"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(x.name)}</b><span class="chip ${x.tone}">${esc(x.state)}</span></div><div class="faint" style="font-size:12px">${esc(x.model)}${x.note ? ' · ' + esc(x.note) : ''}</div>${x.shots.length ? `<div class="shots">${x.shots.map(u => picture(u, x.name + ' evidence')).join('')}</div>` : ''}${x.replay ? `<button class="btn sm" style="align-self:flex-start" data-replay="${esc(x.replay)}">${icon('play-circle', 'sm')}Replay</button>` : ''}</div>`;
 function taskBody(t) {
   const p = t.proposal;
   return `${p ? `<div class="mock">${picture(p.picture, 'Sketch: now and after')}</div><div><div class="label">Why now</div><div style="margin-top:4px">${esc(p.why)}</div></div>` : ''}

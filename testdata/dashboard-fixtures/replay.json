@@ -1,0 +1,283 @@
+{
+ "replay": {
+  "title": "Sign-in sends people back to the sign-in page",
+  "sub": "qa-ui-function · Oct 9, 11:40",
+  "state": "ready",
+  "summary": {
+   "text": "1 of 2 failed",
+   "tone": "bad"
+  },
+  "frames": [
+   {
+    "t": 0.0,
+    "url": "/api/evidence/t-0017/eeeeeeeeeeee/qa-ui-function/20261009T120000Z-abc123/replay/frames/000001.jpg",
+    "w": 1280,
+    "h": 800
+   },
+   {
+    "t": 4.1,
+    "url": "/api/evidence/t-0017/eeeeeeeeeeee/qa-ui-function/20261009T120000Z-abc123/replay/frames/000002.jpg",
+    "w": 1280,
+    "h": 800
+   },
+   {
+    "t": 7.4,
+    "url": "/api/evidence/t-0017/eeeeeeeeeeee/qa-ui-function/20261009T120000Z-abc123/replay/frames/000003.jpg",
+    "w": 1280,
+    "h": 800
+   }
+  ],
+  "hidden": [
+   [
+    8.6,
+    9.2
+   ]
+  ],
+  "hidden_says": "A sign-in link was on screen here, so this part is hidden.",
+  "seconds": 9.4,
+  "pace": {
+   "freeze": 120,
+   "card": 1800,
+   "fade": 400,
+   "between": 600,
+   "char": 50,
+   "read": 2400,
+   "glide": 1500,
+   "before": 400,
+   "after": 1000,
+   "miss": 2800,
+   "type_char": 120,
+   "type_lead": 300,
+   "type_rest": 600,
+   "pill": 2000,
+   "shot": 1800
+  },
+  "rows": [
+   {
+    "key": "sign-in",
+    "name": "sign-in",
+    "icon": "x-circle",
+    "tone": "bad",
+    "note": "Failed at step 2",
+    "severity": {
+     "text": "Major",
+     "tone": "warn"
+    },
+    "first": 1,
+    "steps": [
+     {
+      "n": 1,
+      "label": "Open the sign-in page",
+      "icon": "check-circle",
+      "tone": "good",
+      "card": "Step 1 of 2 · Open the sign-in page",
+      "head": "Step 1 · Open the sign-in page",
+      "expected": "The sign-in form shows",
+      "got": "The form showed",
+      "hint": null,
+      "still": "/api/evidence/t-0017/eeeeeeeeeeee/qa-ui-function/20261009T120000Z-abc123/replay/frames/000001.jpg",
+      "rough": false,
+      "beats": [
+       {
+        "k": "think",
+        "icon": "chat-bubble-left-right",
+        "bad": false,
+        "log": "I'll open the sign-in page first.",
+        "say": "I'll open the sign-in page first."
+       },
+       {
+        "k": "go",
+        "icon": "globe-alt",
+        "bad": false,
+        "log": "Opened app.example.test/sign-in",
+        "say": "Opened app.example.test/sign-in",
+        "t": 0.5,
+        "seg": [
+         0.5,
+         1.5
+        ]
+       },
+       {
+        "k": "read",
+        "icon": "eye",
+        "bad": false,
+        "log": "Read “Sign in”",
+        "say": "Read “Sign in”",
+        "t": 1.6,
+        "seg": [
+         1.6,
+         2.2
+        ],
+        "outer": [
+         31.25,
+         22.5,
+         37.5,
+         42.5
+        ],
+        "inner": [
+         [
+          33.59,
+          26.25,
+          10.94,
+          5.0
+         ]
+        ]
+       }
+      ]
+     },
+     {
+      "n": 2,
+      "label": "Sign in with a test address",
+      "icon": "x-circle",
+      "tone": "bad",
+      "card": "Step 2 of 2 · Sign in with a test address",
+      "head": "Step 2 · Sign in with a test address",
+      "expected": "The home page greets the tester",
+      "got": "The page stayed on the form",
+      "hint": "Major finding: Continue does nothing on the first click",
+      "still": "/api/evidence/t-0017/eeeeeeeeeeee/qa-ui-function/20261009T120000Z-abc123/replay/frames/000002.jpg",
+      "rough": false,
+      "beats": [
+       {
+        "k": "think",
+        "icon": "chat-bubble-left-right",
+        "bad": false,
+        "log": "Now I'll type the address and continue.",
+        "say": "Now I'll type the address and continue."
+       },
+       {
+        "k": "type",
+        "icon": "bars-3-bottom-left",
+        "bad": false,
+        "log": "Typed “friend@example.test”",
+        "say": "Typed “friend@example.test”",
+        "keys": [
+         "Typing “”",
+         "Typing “f”",
+         "Typing “fr”",
+         "Typing “fri”",
+         "Typing “frie”",
+         "Typing “frien”",
+         "Typing “friend”",
+         "Typing “friend@”",
+         "Typing “friend@e”",
+         "Typing “friend@ex”",
+         "Typing “friend@exa”",
+         "Typing “friend@exam”",
+         "Typing “friend@examp”",
+         "Typing “friend@exampl”",
+         "Typing “friend@example”",
+         "Typing “friend@example.”",
+         "Typing “friend@example.t”",
+         "Typing “friend@example.te”",
+         "Typing “friend@example.tes”",
+         "Typing “friend@example.test”"
+        ],
+        "t": 3.0,
+        "seg": [
+         3.0,
+         4.3
+        ],
+        "x": 50.0,
+        "y": 41.25,
+        "down": 3.2
+       },
+       {
+        "k": "click",
+        "icon": "cursor-arrow-rays",
+        "bad": false,
+        "log": "Clicked “Continue”",
+        "say": "Clicked “Continue”",
+        "t": 5.0,
+        "seg": [
+         5.0,
+         7.6
+        ],
+        "x": 50.0,
+        "y": 52.5,
+        "down": 6.9
+       },
+       {
+        "k": "miss",
+        "icon": "exclamation-triangle",
+        "bad": true,
+        "log": "Didn't work: gave up after 5 s",
+        "say": "Didn't work: gave up after 5 s",
+        "t": 7.7,
+        "seg": [
+         7.7,
+         8.1
+        ]
+       },
+       {
+        "k": "shot",
+        "icon": "camera",
+        "bad": false,
+        "log": "Took a screenshot",
+        "say": "Took a screenshot",
+        "t": 8.3,
+        "seg": [
+         8.3,
+         8.3
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "key": "profile",
+    "name": "profile",
+    "icon": "check-circle",
+    "tone": "good",
+    "note": "Passed",
+    "severity": null,
+    "first": 0,
+    "steps": [
+     {
+      "n": 1,
+      "label": "Open the profile",
+      "icon": "check-circle",
+      "tone": "good",
+      "card": "Step 1 of 2 · Open the profile",
+      "head": "Step 1 · Open the profile",
+      "expected": "The profile shows",
+      "got": "It showed",
+      "hint": null,
+      "still": "/api/evidence/t-0017/eeeeeeeeeeee/qa-ui-function/20261009T120000Z-abc123/replay/frames/000003.jpg",
+      "rough": false,
+      "beats": [
+       {
+        "k": "wait",
+        "icon": "clock",
+        "bad": false,
+        "log": "Waited for “Profile”",
+        "say": "Waited for “Profile”",
+        "t": 8.4,
+        "seg": [
+         8.4,
+         9.4
+        ]
+       }
+      ]
+     },
+     {
+      "n": 2,
+      "label": "Change the name",
+      "icon": "minus-circle",
+      "tone": "muted",
+      "card": "Step 2 of 2 · Change the name",
+      "head": "Step 2 · Change the name: didn't run",
+      "expected": "The new name shows",
+      "got": "Didn't run",
+      "hint": null,
+      "still": null,
+      "rough": false,
+      "beats": []
+     }
+    ]
+   }
+  ],
+  "empty": null
+ }
+}
