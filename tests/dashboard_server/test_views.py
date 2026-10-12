@@ -12,8 +12,9 @@ from dashboard_rig import Rig
 from dashboard_seed import STAGING
 from seed_kit import FIXTURES, iso
 
-from runtime.dashboard.views import agents, ops, task
+from runtime.dashboard.views import agents, ops
 from runtime.dashboard.views.kit import Snap
+from runtime.dashboard.views.task import qa_line
 from runtime.dashboard.views.words.settingwords import LABELS
 from runtime.shared import models, store
 from runtime.shared.models import OPEN_SEVERITIES
@@ -153,7 +154,7 @@ _CLEAN = {f"{severity}s": 0 for severity in OPEN_SEVERITIES}
 def test_a_fixs_qa_line_carries_its_tone_and_each_screenshot_its_verdicts(
     names: list[str], results: dict[str, dict[str, Any]], tone: str | None, shots: list[str]
 ) -> None:
-    line = task.qa_line(names, results, [f"{name}\t/api/picture/qa/{name}.png" for name in names])
+    line = qa_line(names, results, [f"{name}\t/api/picture/qa/{name}.png" for name in names])
 
     assert (line["tone"], [shot["tone"] for shot in line["shots"]]) == (tone, shots)
 
