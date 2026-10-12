@@ -51,13 +51,14 @@ def test_every_call_of_a_retired_session_is_refused(tmp_path: Path, tool: str, t
     assert kit.rule(tool, tool_input) == "retired"
 
 
-def test_every_call_of_a_stopped_subagent_is_refused_and_its_siblings_run_on(tmp_path: Path) -> None:
+def test_a_stopped_subagent_may_only_hand_back_and_its_siblings_run_on(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer")
     kit.session("implementer", sid="sub-1", state="retired", agent_id=TESTER_ID, parent=SID)
     kit.subagent(TESTER_ID, [])
     stopped = {"agent_id": TESTER_ID, "agent_type": "Explore"}
     assert kit.rule("Read", {"file_path": "/w/app.py"}, **stopped) == "stopped-subagent"
+    assert kit.rule("SubagentHandback", {"message": "2 of 3"}, **stopped) is None
     sibling = {"agent_id": "a9999999999999", "agent_type": "Explore"}
     assert kit.rule("Read", {"file_path": "/w/app.py"}, **sibling) is None
 

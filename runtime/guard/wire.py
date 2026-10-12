@@ -12,7 +12,9 @@ from runtime.guard import deadline
 
 # The text before every refusal, which Claude Code hands back as the call's result: transcripts are read for it.
 REFUSED = "Refused by the factory guard"
-READ_TOOLS = frozenset({"Read", "Grep", "Glob", "LS", "ToolSearch", "TaskOutput", "TodoWrite", "SubagentHandback"})
+# How a background subagent hands its report to its parent: a rule that stops a subagent still lets this through.
+HANDBACK = "SubagentHandback"
+READ_TOOLS = frozenset({"Read", "Grep", "Glob", "LS", "ToolSearch", "TaskOutput", "TodoWrite", HANDBACK})
 PARENTS = frozenset({"main", "orchestrator"})
 
 

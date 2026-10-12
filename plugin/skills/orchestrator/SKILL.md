@@ -125,7 +125,8 @@ merged for a while, a regression walk of the scenarios that waited longest.
    failure becomes a request. A saved check with no failure moves the task to `checked` by itself.
 5. **Ship.** `factory push` has the warden push the newest commit that is safe to ship: its tree passed, and every
    merge it adds passed its check (or was reverted). CI deploys staging. Staging regressing after your push: revert,
-   `factory check`, push again at once (`procedures/ops/revert.md`). Prod moves only when the owner pushes it.
+   `factory check`, push again at once (`${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md`). Prod moves only when
+   the owner pushes it.
 
 ## When something is red
 

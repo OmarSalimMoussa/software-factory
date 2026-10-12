@@ -6,7 +6,7 @@ from __future__ import annotations
 RULES: dict[str, str] = {
     "unpermitted": "anything but reading and reporting, in a session the warden never started",
     "retired": "every call from a retired session",
-    "stopped-subagent": "every call from a subagent the owner stopped",
+    "stopped-subagent": "every call but its hand-back from a subagent the owner stopped",
     "bench-pending": "anything but staging, committing and the factory command, in a session being paused",
     "raw-starts": "running `claude`, except to list agents, read logs or print its version",
     "leave-slice": "sudo, systemd-run, at, crontab, su, systemctl --user, docker, podman, ssh, xdg-open, gio and kin",

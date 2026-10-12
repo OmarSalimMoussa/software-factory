@@ -55,7 +55,8 @@ Write in your own words, with no person in them: never copy a user's words, name
 
 ## The verdict
 
-Your last message, for the orchestrator: five lines, plain words, no code, file names, lines or stack traces.
+Hand it back to the orchestrator with the SubagentHandback tool: five lines, plain words, no code, file names,
+lines or stack traces.
 
 ```
 <request or task id>: <the task it filed or joins, and the rung the facts point to>

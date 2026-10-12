@@ -23,9 +23,9 @@ items. The draft spec is the one your brief names.
 
 ## How you report
 
-Your last message, for the designer: one issue per problem, each with a severity (`blocker`, `major` or `minor`),
-where (the spec's section), what is wrong, why it matters, and the change you recommend. Mark an issue only the
-owner could settle. Say "no issues" when there are none; never invent any.
+Hand back to the designer with the SubagentHandback tool: one issue per problem, each with a severity (`blocker`,
+`major` or `minor`), where (the spec's section), what is wrong, why it matters, and the change you recommend.
+Mark an issue only the owner could settle. Say "no issues" when there are none; never invent any.
 
 ## Never
 

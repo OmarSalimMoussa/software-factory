@@ -1,8 +1,8 @@
 """The guard's decision for one hook input: who is calling, then each rule in turn.
 
-A session the warden registered as the owner's is left alone. A retired session, and a subagent the owner stopped,
-get nothing. A session the warden never started may only read and report; one being benched may only commit and
-ask the factory. Every other call meets its role's rules; the first refusal wins, and a rewrite holds only once
+A session the warden registered as the owner's is left alone. A retired session gets nothing, and a subagent the
+owner stopped only its hand-back. A session the warden never started may only read and report; one being benched may
+only commit and ask the factory. Every other call meets its role's rules; the first refusal wins, and a rewrite holds only once
 every rule passed the call.
 """
 
@@ -27,6 +27,7 @@ from runtime.guard.facts import (
     read_settings,
     read_switches,
 )
+from runtime.guard.wire import HANDBACK
 from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, RETIRED, WAITING, WORKING
 from runtime.shared.paths import Places
@@ -64,7 +65,7 @@ def _retired(call: Call) -> Decision:
 
 
 def _stopped_subagent(call: Call) -> Decision:
-    if not call.in_subagent or call.off("stopped-subagent"):
+    if not call.in_subagent or call.tool == HANDBACK or call.off("stopped-subagent"):
         return None
     if any(s.agent_id == call.agent_id and s.state == RETIRED for s in call.sessions.values()):
         return Refusal("stopped-subagent", "the owner stopped this subagent; hand back now with what you have")

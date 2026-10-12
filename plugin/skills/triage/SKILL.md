@@ -40,8 +40,8 @@ goal rank, requests, users and age: do not rank the tasks yourself.
 
 Write the plan as one JSON object to a file under `.factory/` with the Write tool, then save it in a call of its
 own: `factory triage plan --body <that file>`. It checks the plan's shape and refuses one off it, with the reason:
-fix it and save again. Your last message then says, in three lines: the count of requests, new tasks, joins, noise
-and parked; and each request from the owner's inbox that came out noise or parked, with its
+fix it and save again. Then hand back with the SubagentHandback tool, in three lines: the count of requests, new
+tasks, joins, noise and parked; and each request from the owner's inbox that came out noise or parked, with its
 reason, so the orchestrator tells the owner.
 
 ```json

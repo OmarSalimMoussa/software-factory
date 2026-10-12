@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Use when the orchestrator starts you on a batch of waiting requests - to cluster them, give every request exactly one outcome (a new task, joins a task, noise or parked), and hand back one plan that the factory checks and applies, without writing anything yourself.
+description: Use when the orchestrator starts you on a batch of waiting requests - to cluster them, give every request exactly one outcome (a new task, joins a task, noise or parked), and save one plan that the factory checks and applies, without changing the queue yourself.
 # The warden renders model and effort from settings (models.triage) before any session reads this file.
 model: "{{model}}"
 effort: "{{effort}}"

@@ -24,7 +24,7 @@ from runtime.guard.facts import (
     read_ready,
     read_vitals_level,
 )
-from runtime.guard.wire import REFUSED
+from runtime.guard.wire import HANDBACK, REFUSED
 from runtime.shared.models import RETIRED, WITH_PARENT
 from runtime.shared.settings import model_role
 from runtime.shared.settings_schema import SCHEMA
@@ -261,7 +261,7 @@ def check_tester_time(call: Call) -> Decision:
     """A tester's own calls: refused once its time per scenario is spent, or its desktop time once it drives the
     remote desktop; shell and browser waits cut to the time left. Its hand-back always goes: that is how it reports."""
     tester = call.in_subagent and call.agent_type.startswith(TESTER)
-    if not tester or call.tool == "SubagentHandback" or call.off("tester-time"):
+    if not tester or call.tool == HANDBACK or call.off("tester-time"):
         return None
     left = _time_left(call)
     if isinstance(left, Refusal):
@@ -282,7 +282,7 @@ def check_intake_time(call: Call) -> Decision:
     """Intake's own calls once intake.fast_lane_minutes passed since its brief: only a plain `factory` call (it writes
     what it found with one) and its hand-back still go. A model cannot tell how long it has worked."""
     intake = call.in_subagent and call.agent_type == INTAKE
-    if not intake or call.tool == "SubagentHandback" or call.off("intake-time"):
+    if not intake or call.tool == HANDBACK or call.off("intake-time"):
         return None
     if call.tool == "Bash" and factory_calls.plain_words(str(call.tool_input.get("command", ""))) is not None:
         return None
