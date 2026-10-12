@@ -131,24 +131,29 @@ def protected(call: Call, word: str, cwd: Path, *, removes: bool = False) -> Ref
         return Refusal("protected-paths", f"{exc}; {remedy}")
     candidates = [word] + ([word.split("=", 1)[1]] if "=" in word else [])
     for candidate in filter(None, candidates):
-        path = resolve(candidate, cwd, call.home)
-        for root in factory_roots(call):
-            if inside(path, root) or (removes and inside(root, path)):
-                return Refusal("protected-paths", f"{root} is the factory's own; only the owner changes it")
-        for root in product_roots(call):
-            if inside(path, root):
-                found = _refuse_product(PurePosixPath(os.path.relpath(path, root)), prefixes, removes)
-            elif removes and inside(root, path):
-                found = Refusal("protected-paths", f"{root} is a checkout of the product; the warden removes those")
-            else:
-                continue
-            if found is not None:
-                return found
-        written = PurePosixPath(os.path.normpath(candidate))
-        if not candidate.startswith(("/", "~")) and written.parts[:1] != ("..",):
-            found = _refuse_product(written, prefixes, removes=False)
-            if found is not None:
-                return found
+        found = _refuses(call, candidate, cwd, prefixes, removes)
+        if found is not None:
+            return found
+    return None
+
+
+def _refuses(call: Call, candidate: str, cwd: Path, prefixes: tuple[str, ...], removes: bool) -> Refusal | None:
+    path = resolve(candidate, cwd, call.home)
+    for root in factory_roots(call):
+        if inside(path, root) or (removes and inside(root, path)):
+            return Refusal("protected-paths", f"{root} is the factory's own; only the owner changes it")
+    for root in product_roots(call):
+        if inside(path, root):
+            found = _refuse_product(PurePosixPath(os.path.relpath(path, root)), prefixes, removes)
+        elif removes and inside(root, path):
+            found = Refusal("protected-paths", f"{root} is a checkout of the product; the warden removes those")
+        else:
+            continue
+        if found is not None:
+            return found
+    written = PurePosixPath(os.path.normpath(candidate))
+    if not candidate.startswith(("/", "~")) and written.parts[:1] != ("..",):
+        return _refuse_product(written, prefixes, removes=False)
     return None
 
 

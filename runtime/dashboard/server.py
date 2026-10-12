@@ -95,27 +95,28 @@ class App:
         path, query = split.path, dict(parse_qsl(split.query))
         try:
             auth.check_host(headers, self.settings().get_list("dashboard.hosts"), write=False)
-            if not path.startswith("/api/"):
-                return self._static(path)
-            refused = self._device(headers)
-            if refused is not None:
-                return refused
-            image = pictures.fetch(self.warden, path)
-            if image is not None:
-                return Reply(
-                    image.status, image.body, {"Content-Type": image.media, "Content-Security-Policy": pictures.POLICY}
-                )
-            if found := routes.OP.match(path):
-                return self._op(found.group(1))
-            page = routes.find(path, query)
-            if page is None:
-                return _json(404, {"ok": False, "error": "There is no such page."})
-            return self._page(target, *page)
+            return self._api(target, path, query, headers) if path.startswith("/api/") else self._static(path)
         # telemetry: surfaced — the browser is answered with `_json` saying why access was refused
         except auth.Denied as exc:
             return _json(exc.status, {"ok": False, "refused": "access", "reason": str(exc)})
         except WardenDown:
             return self._away(target)
+
+    def _api(self, target: str, path: str, query: dict[str, str], headers: Mapping[str, str]) -> Reply:
+        refused = self._device(headers)
+        if refused is not None:
+            return refused
+        image = pictures.fetch(self.warden, path)
+        if image is not None:
+            return Reply(
+                image.status, image.body, {"Content-Type": image.media, "Content-Security-Policy": pictures.POLICY}
+            )
+        if found := routes.OP.match(path):
+            return self._op(found.group(1))
+        page = routes.find(path, query)
+        if page is None:
+            return _json(404, {"ok": False, "error": "There is no such page."})
+        return self._page(target, *page)
 
     def _device(self, headers: Mapping[str, str]) -> Reply | None:
         """None when the device is admitted, else the answer saying why not. A device the warden never confirmed is

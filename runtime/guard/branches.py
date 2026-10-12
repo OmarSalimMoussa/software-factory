@@ -9,6 +9,7 @@ warden's: it adds them and reaps them.
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 from runtime.guard import deadline, shell
@@ -84,27 +85,36 @@ def _short_ref(ref: str) -> str:
 
 def named_refs(sub: str, rest: list[str]) -> list[str]:
     """The refs other than HEAD that a git command creates, moves or deletes; `tag:` marks a tag."""
-    words = _positionals(sub, rest)
-    flags = set(rest)
-    if sub == "update-ref":
-        return [_short_ref(words[0])] if words else ["(unnamed)"]
-    if sub == "branch":
-        if not words or _BRANCH_READS & flags or any(f.startswith("--format") for f in flags):
-            return []
-        return words if {"-d", "-D", "--delete", "-m", "-M", "--move", "-c", "-C", "--copy"} & flags else words[:1]
     if sub in _CREATES:
         return [rest[i + 1] for i, a in enumerate(rest[:-1]) if a in _CREATES[sub]]
-    if sub == "fetch":
-        return [_short_ref(a.lstrip("+").rsplit(":", 1)[1]) for a in words if ":" in a and a.rsplit(":", 1)[1]]
-    if sub == "rebase" and len(words) >= 2:
-        return [words[1]]
-    if sub == "tag" and words and not (_TAG_READS & flags):
-        return [f"tag:{w}" for w in (words if {"-d", "--delete"} & flags else words[:1])]
-    if sub == "symbolic-ref" and len(words) >= 2:
-        return [_short_ref(words[1])]
-    if sub == "stash" and words[:1] == ["branch"] and len(words) >= 2:
-        return [words[1]]
-    return []
+    named = _NAMED.get(sub)
+    return named(_positionals(sub, rest), set(rest)) if named else []
+
+
+def _branch_refs(words: list[str], flags: set[str]) -> list[str]:
+    if not words or _BRANCH_READS & flags or any(f.startswith("--format") for f in flags):
+        return []
+    return words if {"-d", "-D", "--delete", "-m", "-M", "--move", "-c", "-C", "--copy"} & flags else words[:1]
+
+
+def _tag_refs(words: list[str], flags: set[str]) -> list[str]:
+    if not words or _TAG_READS & flags:
+        return []
+    return [f"tag:{w}" for w in (words if {"-d", "--delete"} & flags else words[:1])]
+
+
+# Per git command other than checkout and switch: the refs it names, from its positional words and its flags.
+_NAMED: dict[str, Callable[[list[str], set[str]], list[str]]] = {
+    "update-ref": lambda words, _: [_short_ref(words[0])] if words else ["(unnamed)"],
+    "branch": _branch_refs,
+    "fetch": lambda words, _: [
+        _short_ref(a.lstrip("+").rsplit(":", 1)[1]) for a in words if ":" in a and a.rsplit(":", 1)[1]
+    ],
+    "rebase": lambda words, _: words[1:2],
+    "tag": _tag_refs,
+    "symbolic-ref": lambda words, _: [_short_ref(w) for w in words[1:2]],
+    "stash": lambda words, _: words[1:2] if words[:1] == ["branch"] else [],
+}
 
 
 def _switches_to(directory: Path, sub: str, rest: list[str]) -> str | None:
@@ -142,10 +152,18 @@ def check(call: Call, inv: shell.Invocation, cwd: Path) -> Decision:
     directory = _directory(args, cwd, call.home)
     refs = named_refs(sub, rest)
     moves = sub in _MOVERS and not (_ENDS & set(rest))
-    switch = _switches_to(directory, sub, rest) if directory else None
-    if directory is None and (refs or moves or sub in _CREATES):
-        return Refusal("own-branch", "name your checkout with -C or cd, never --git-dir or --work-tree")
-    if directory is None or not (refs or moves or switch):
+    if directory is None:
+        if refs or moves or sub in _CREATES:
+            return Refusal("own-branch", "name your checkout with -C or cd, never --git-dir or --work-tree")
+        return None
+    return _off_own_branch(call, sub, directory, refs, moves, _switches_to(directory, sub, rest))
+
+
+def _off_own_branch(
+    call: Call, sub: str, directory: Path, refs: list[str], moves: bool, switch: str | None
+) -> Decision:
+    """The refusal when git SUB in DIRECTORY would change a branch other than the caller's own."""
+    if not (refs or moves or switch):
         return None
     own = own_branch(call)
     other = [r for r in refs if r != own]

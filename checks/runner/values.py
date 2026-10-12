@@ -46,32 +46,41 @@ def _kind(schema: Schema) -> str:
 def problems(schema: Schema, value: Any, where: str) -> list[str]:
     """Why ``value`` does not fit ``schema``; empty when it does."""
     if schema is PATTERN:
-        if not isinstance(value, str):
-            return [f"{where} must be {_kind(schema)}"]
-        try:
-            re.compile(value)
-        # telemetry: surfaced — a pattern that does not compile is one of the values file's `problems`
-        except re.error as exc:
-            return [f"{where} does not compile as a regular expression: {exc}"]
-        return []
+        return _pattern_problems(value, where)
     if isinstance(schema, list):
         if not isinstance(value, list):
             return [f"{where} must be a list"]
         return [p for n, item in enumerate(value) for p in problems(schema[0], item, f"{where}[{n}]")]
     if isinstance(schema, dict):
-        if not isinstance(value, dict):
-            return [f"{where} must be a table"]
-        if set(schema) == {str}:
-            return [p for key, item in value.items() for p in problems(schema[str], item, f"{where}.{key}")]
-        out = [f"{where} is missing {key}" for key in schema if key not in value]
-        out += [f"{where}.{key} is not a known value" for key in value if key not in schema]
-        return out + [
-            p for key, item in value.items() if key in schema for p in problems(schema[key], item, f"{where}.{key}")
-        ]
+        return _table_problems(schema, value, where)
     if schema is int or schema is float:
         ok = isinstance(value, int if schema is int else int | float) and not isinstance(value, bool)
-        return [] if ok else [f"{where} must be {_kind(schema)}"]
-    return [] if isinstance(value, schema) else [f"{where} must be {_kind(schema)}"]
+    else:
+        ok = isinstance(value, schema)
+    return [] if ok else [f"{where} must be {_kind(schema)}"]
+
+
+def _pattern_problems(value: Any, where: str) -> list[str]:
+    if not isinstance(value, str):
+        return [f"{where} must be {_kind(PATTERN)}"]
+    try:
+        re.compile(value)
+    # telemetry: surfaced — a pattern that does not compile is one of the values file's `problems`
+    except re.error as exc:
+        return [f"{where} does not compile as a regular expression: {exc}"]
+    return []
+
+
+def _table_problems(schema: dict[Any, Schema], value: Any, where: str) -> list[str]:
+    if not isinstance(value, dict):
+        return [f"{where} must be a table"]
+    if set(schema) == {str}:
+        return [p for key, item in value.items() for p in problems(schema[str], item, f"{where}.{key}")]
+    out = [f"{where} is missing {key}" for key in schema if key not in value]
+    out += [f"{where}.{key} is not a known value" for key in value if key not in schema]
+    return out + [
+        p for key, item in value.items() if key in schema for p in problems(schema[key], item, f"{where}.{key}")
+    ]
 
 
 def load(root: Path, name: str, schema: Schema) -> dict[str, Any]:

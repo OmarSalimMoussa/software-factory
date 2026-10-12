@@ -67,10 +67,8 @@ def path_like(token: str) -> str | None:
     head, _, rest = token.partition("/")
     if "." in head and not head.startswith("."):
         return None  # a dotted first segment reads as a host name
-    if head in _MIME and "/" not in rest:
-        return None  # a media type
-    if head.isdigit() or (len(head) == 1 and head.isupper()):
-        return None  # a formula or a placeholder
+    if (head in _MIME and "/" not in rest) or head.isdigit() or (len(head) == 1 and head.isupper()):
+        return None  # a media type, a formula or a placeholder
     return token
 
 

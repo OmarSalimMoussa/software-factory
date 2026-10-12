@@ -142,51 +142,63 @@ def _blocks(lines: list[str], inline: Callable[[str], str]) -> str:
         nxt = lines[i + 1] if i + 1 < len(lines) else ""
         if not line.strip():
             i += 1
-        elif fence := _FENCE.match(line):
-            end = next((j for j in range(i + 1, len(lines)) if lines[j].strip().startswith(fence.group(1))), len(lines))
-            code = "\n".join(lines[i + 1 : end])
-            out.append(f"<pre><code>{html.escape(code, quote=True)}</code></pre>")
-            i = end + 1
+            continue
+        if fence := _FENCE.match(line):
+            block, i = _fenced(lines, i, fence.group(1))
         elif heading := _HEADING.match(line):
             level = min(len(heading.group(1)), 4)
-            out.append(f"<h{level}>{inline(heading.group(2))}</h{level}>")
-            i += 1
+            block, i = f"<h{level}>{inline(heading.group(2))}</h{level}>", i + 1
         elif _RULE.match(line):
-            out.append("<hr>")
-            i += 1
+            block, i = "<hr>", i + 1
         elif line.lstrip().startswith(">"):
-            end = i
-            while end < len(lines) and lines[end].lstrip().startswith(">"):
-                end += 1
-            quoted = [re.sub(r"^\s*>\s?", "", x) for x in lines[i:end]]
-            out.append(f"<blockquote>{_blocks(quoted, inline)}</blockquote>")
-            i = end
+            block, i = _quote(lines, i, inline)
         elif "|" in line and _SEPARATOR.match(nxt):
             end = i + 2
             while end < len(lines) and "|" in lines[end] and lines[end].strip():
                 end += 1
-            out.append(_table(lines[i:end], inline))
-            i = end
+            block, i = _table(lines[i:end], inline), end
         elif _ITEM.match(line):
-            items: list[tuple[int, bool, str]] = []
-            while i < len(lines) and (item := _ITEM.match(lines[i])):
-                items.append((len(item.group(1).expandtabs(4)), item.group(2)[0].isdigit(), item.group(3)))
-                i += 1
-                while i < len(lines) and lines[i].strip() and not _ITEM.match(lines[i]) and lines[i].startswith(" "):
-                    items[-1] = (items[-1][0], items[-1][1], items[-1][2] + " " + lines[i].strip())
-                    i += 1
-            out.append(_list(items, inline))
+            block, i = _items(lines, i, inline)
         else:
-            end = i + 1
-            while (
-                end < len(lines)
-                and lines[end].strip()
-                and not _starts_block(lines[end], lines[end + 1] if end + 1 < len(lines) else "")
-            ):
-                end += 1
-            out.append(f"<p>{inline(' '.join(x.strip() for x in lines[i:end]))}</p>")
-            i = end
+            block, i = _paragraph(lines, i, inline)
+        out.append(block)
     return "".join(out)
+
+
+def _fenced(lines: list[str], i: int, fence: str) -> tuple[str, int]:
+    end = next((j for j in range(i + 1, len(lines)) if lines[j].strip().startswith(fence)), len(lines))
+    code = "\n".join(lines[i + 1 : end])
+    return f"<pre><code>{html.escape(code, quote=True)}</code></pre>", end + 1
+
+
+def _quote(lines: list[str], i: int, inline: Callable[[str], str]) -> tuple[str, int]:
+    end = i
+    while end < len(lines) and lines[end].lstrip().startswith(">"):
+        end += 1
+    quoted = [re.sub(r"^\s*>\s?", "", x) for x in lines[i:end]]
+    return f"<blockquote>{_blocks(quoted, inline)}</blockquote>", end
+
+
+def _items(lines: list[str], i: int, inline: Callable[[str], str]) -> tuple[str, int]:
+    items: list[tuple[int, bool, str]] = []
+    while i < len(lines) and (item := _ITEM.match(lines[i])):
+        items.append((len(item.group(1).expandtabs(4)), item.group(2)[0].isdigit(), item.group(3)))
+        i += 1
+        while i < len(lines) and lines[i].strip() and not _ITEM.match(lines[i]) and lines[i].startswith(" "):
+            items[-1] = (items[-1][0], items[-1][1], items[-1][2] + " " + lines[i].strip())
+            i += 1
+    return _list(items, inline), i
+
+
+def _paragraph(lines: list[str], i: int, inline: Callable[[str], str]) -> tuple[str, int]:
+    end = i + 1
+    while (
+        end < len(lines)
+        and lines[end].strip()
+        and not _starts_block(lines[end], lines[end + 1] if end + 1 < len(lines) else "")
+    ):
+        end += 1
+    return f"<p>{inline(' '.join(x.strip() for x in lines[i:end]))}</p>", end
 
 
 def render(source: str, known: Collection[str] = (), own: str = "") -> str:

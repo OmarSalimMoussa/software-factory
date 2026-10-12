@@ -8,6 +8,7 @@ fails the page loudly.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from runtime.dashboard.views import accounts
@@ -49,20 +50,24 @@ def control(key: str) -> str:
 
 def shown(key: str, value: Any) -> Any:
     """A value as its row shows it: model names by their labels, tables as one line."""
-    kind = SCHEMA[key].kind
-    if kind == "model":
-        return {"model": model_label(value["model"]), "effort": value["effort"]}
     if key == "models.allowed":
         return [model_label(m) for m in value]
-    if kind == "list":
-        return [str(v) for v in value]
-    if kind == "prices":
-        if not value:
-            return "No prices set: every call's cost is unknown, so the daily budget stops nothing"
-        return " · ".join(f"{model_label(m)} ${p['input']:g} in, ${p['output']:g} out" for m, p in value.items())
-    if kind == "weights":
-        return " · ".join(f"{name} {weight:g}" for name, weight in value.items())
-    return value
+    show = _SHOWN.get(SCHEMA[key].kind)
+    return value if show is None else show(value)
+
+
+def _prices(value: dict[str, Any]) -> str:
+    if not value:
+        return "No prices set: every call's cost is unknown, so the daily budget stops nothing"
+    return " · ".join(f"{model_label(m)} ${p['input']:g} in, ${p['output']:g} out" for m, p in value.items())
+
+
+_SHOWN: dict[str, Callable[[Any], Any]] = {
+    "model": lambda value: {"model": model_label(value["model"]), "effort": value["effort"]},
+    "list": lambda value: [str(v) for v in value],
+    "prices": _prices,
+    "weights": lambda value: " · ".join(f"{name} {weight:g}" for name, weight in value.items()),
+}
 
 
 def _default(settings: Settings, key: str) -> Any:

@@ -17,6 +17,7 @@ import ast
 import functools
 import io
 import tokenize
+from dataclasses import dataclass
 
 TS_SUFFIXES = (".ts", ".tsx", ".js", ".mjs")
 _DOCSTRING_HOLDERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
@@ -95,6 +96,117 @@ def _ends_expression(ch: str) -> bool:
     return ch.isalnum() or ch in ("_", "$", ")", "]")
 
 
+@dataclass
+class _Frame:
+    """One open construct: a string (and its quote), a template, a `${…}` (and its brace depth) or a regex (and
+    whether it is inside a `[…]` class)."""
+
+    kind: str  # str | tmpl | interp | regex
+    quote: str = ""
+    depth: int = 0
+    in_class: bool = False
+
+
+class _TsScan:
+    """The state machine `_scan_ts` runs: each step reads one character and says how far to move on."""
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.line = 1
+        self.submode = "normal"  # normal | line_comment | block_comment
+        self.frames: list[_Frame] = []
+        self.escaped = False
+        self.last_code_char = ""
+        self.comment_lines: set[int] = set()
+        self.code_lines: set[int] = set()
+
+    def run(self) -> tuple[frozenset[int], frozenset[int]]:
+        i = 0
+        while i < len(self.text):
+            i += self._step(self.text[i], self.text[i + 1 : i + 2])
+        return frozenset(self.comment_lines), frozenset(self.code_lines)
+
+    def _mark_code(self, ch: str) -> None:
+        if not ch.isspace():
+            self.code_lines.add(self.line)
+            self.last_code_char = ch
+
+    def _step(self, ch: str, nxt: str) -> int:
+        """How far to move past CH; 0 reads it again in the state this step leaves."""
+        top = self.frames[-1] if self.frames else None
+        kind = top.kind if top else "code"
+        if kind == "regex" and ch == "\n":
+            # Can't span a physical line: bail, drop the frame and reprocess this character as ordinary code.
+            self.frames.pop()
+            return 0
+        if kind in ("str", "tmpl") and self.escaped:
+            self.escaped = False
+            if ch == "\n":
+                self.line += 1
+            return 1
+        if ch == "\n":
+            self.line += 1
+            if self.submode == "line_comment":
+                self.submode = "normal"
+            return 1
+        if self.submode != "normal":
+            return self._comment(ch, nxt)
+        if top is not None and kind != "interp":
+            return self._regex(top, ch, nxt) if kind == "regex" else self._string(top, ch, nxt)
+        return self._code(top, ch, nxt)
+
+    def _comment(self, ch: str, nxt: str) -> int:
+        self.comment_lines.add(self.line)
+        if self.submode == "block_comment" and ch == "*" and nxt == "/":
+            self.submode = "normal"
+            return 2
+        return 1
+
+    def _string(self, top: _Frame, ch: str, nxt: str) -> int:
+        self._mark_code(ch)
+        if ch == "\\":
+            self.escaped = True
+        elif (top.kind == "str" and ch == top.quote) or (top.kind == "tmpl" and ch == "`"):
+            self.frames.pop()
+        elif top.kind == "tmpl" and ch == "$" and nxt == "{":
+            self.frames.append(_Frame("interp"))
+            return 2
+        return 1
+
+    def _regex(self, top: _Frame, ch: str, nxt: str) -> int:
+        self._mark_code(ch)
+        if ch == "\\" and nxt and nxt != "\n":
+            return 2  # an escaped char, including \/ and \] — never a delimiter
+        if ch == "[":
+            top.in_class = True
+        elif ch == "]" and top.in_class:
+            top.in_class = False
+        elif ch == "/" and not top.in_class:
+            self.frames.pop()
+            self.last_code_char = ")"  # a regex literal ends an expression
+        return 1
+
+    def _code(self, interp: _Frame | None, ch: str, nxt: str) -> int:
+        """Genuinely top-level code, or code inside the `${…}` INTERP."""
+        if ch == "/" and nxt in ("/", "*"):
+            self.submode = "line_comment" if nxt == "/" else "block_comment"
+            self.comment_lines.add(self.line)
+            return 2
+        if ch == "/" and not _ends_expression(self.last_code_char):
+            self.frames.append(_Frame("regex"))
+            self.code_lines.add(self.line)
+            return 1
+        if ch in ("'", '"', "`"):
+            self.frames.append(_Frame("tmpl") if ch == "`" else _Frame("str", quote=ch))
+        elif interp is not None and ch == "}" and interp.depth == 0:
+            self.frames.pop()  # the `}` that closes the `${`
+            return 1
+        elif interp is not None and ch in ("{", "}"):
+            interp.depth += 1 if ch == "{" else -1
+        self._mark_code(ch)
+        return 1
+
+
 @functools.lru_cache(maxsize=_PER_FILE_CACHE)
 def _scan_ts(text: str) -> tuple[frozenset[int], frozenset[int]]:
     """Character-level state machine over TS/JS source. Returns (comment_line_numbers, code_line_numbers); a line can
@@ -102,152 +214,7 @@ def _scan_ts(text: str) -> tuple[frozenset[int], frozenset[int]]:
     regex literals (`_ends_expression` decides `/` vs division; `[...]` classes do not end one early; one cannot span
     a physical line, so a stray newline mid-body bails back to ordinary code) are opaque: a `//` or `/*` inside is
     text."""
-    comment_lines: set[int] = set()
-    code_lines: set[int] = set()
-    n = len(text)
-    i = 0
-    line = 1
-    submode = "normal"  # normal | line_comment | block_comment
-    # ("str", quote) | ("tmpl", None) | ("interp", depth) | ("regex", in_class)
-    frames: list[tuple[str, object]] = []
-    escaped = False
-    last_code_char = ""
-
-    def _mark_code(ch: str) -> None:
-        nonlocal last_code_char
-        if not ch.isspace():
-            code_lines.add(line)
-            last_code_char = ch
-
-    while i < n:
-        ch = text[i]
-        nxt = text[i + 1] if i + 1 < n else ""
-        top = frames[-1] if frames else None
-        top_kind = top[0] if top else "code"
-
-        if top_kind == "regex" and ch == "\n":
-            # Can't span a physical line: bail, drop the frame and reprocess this character as ordinary code.
-            frames.pop()
-            continue
-
-        if top_kind in ("str", "tmpl") and escaped:
-            escaped = False
-            if ch == "\n":
-                line += 1
-            i += 1
-            continue
-
-        if ch == "\n":
-            line += 1
-            i += 1
-            if submode == "line_comment":
-                submode = "normal"
-            continue
-
-        if submode == "line_comment":
-            comment_lines.add(line)
-            i += 1
-            continue
-
-        if submode == "block_comment":
-            comment_lines.add(line)
-            if ch == "*" and nxt == "/":
-                submode = "normal"
-                i += 2
-            else:
-                i += 1
-            continue
-
-        if top_kind in ("str", "tmpl"):
-            _mark_code(ch)
-            if ch == "\\":
-                escaped = True
-                i += 1
-                continue
-            if top_kind == "str" and ch == top[1]:  # type: ignore[index]
-                frames.pop()
-                i += 1
-                continue
-            if top_kind == "tmpl" and ch == "`":
-                frames.pop()
-                i += 1
-                continue
-            if top_kind == "tmpl" and ch == "$" and nxt == "{":
-                frames.append(("interp", 0))
-                i += 2
-                continue
-            i += 1
-            continue
-
-        if top_kind == "regex":
-            in_class = top[1]  # type: ignore[index]
-            _mark_code(ch)
-            if ch == "\\" and i + 1 < n and text[i + 1] != "\n":
-                i += 2  # an escaped char, including \/ and \] — never a delimiter
-                continue
-            if ch == "[":
-                frames[-1] = ("regex", True)
-                i += 1
-                continue
-            if ch == "]" and in_class:
-                frames[-1] = ("regex", False)
-                i += 1
-                continue
-            if ch == "/" and not in_class:
-                frames.pop()
-                last_code_char = ")"  # a regex literal ends an expression
-                i += 1
-                continue
-            i += 1
-            continue
-
-        # top_kind == "code": genuinely top-level, or inside a ${...}
-        if ch == "/" and nxt == "/":
-            submode = "line_comment"
-            comment_lines.add(line)
-            i += 2
-            continue
-        if ch == "/" and nxt == "*":
-            submode = "block_comment"
-            comment_lines.add(line)
-            i += 2
-            continue
-        if ch == "/" and not _ends_expression(last_code_char):
-            frames.append(("regex", False))
-            code_lines.add(line)
-            i += 1
-            continue
-        if ch in ("'", '"'):
-            frames.append(("str", ch))
-            _mark_code(ch)
-            i += 1
-            continue
-        if ch == "`":
-            frames.append(("tmpl", None))
-            _mark_code(ch)
-            i += 1
-            continue
-        if top_kind == "interp":
-            depth = top[1]  # type: ignore[index]
-            assert isinstance(depth, int)
-            if ch == "{":
-                frames[-1] = ("interp", depth + 1)
-                _mark_code(ch)
-                i += 1
-                continue
-            if ch == "}":
-                if depth == 0:
-                    frames.pop()
-                    i += 1
-                    continue
-                frames[-1] = ("interp", depth - 1)
-                _mark_code(ch)
-                i += 1
-                continue
-        _mark_code(ch)
-        i += 1
-
-    return frozenset(comment_lines), frozenset(code_lines)
+    return _TsScan(text).run()
 
 
 def ts_comment_lines(text: str) -> set[int]:

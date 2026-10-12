@@ -134,15 +134,19 @@ class Registry:
         if name.startswith("Dockerfile"):
             return "dockerfile" if scope.classify(f"{path}.sh") == "source" else None
         if "." not in name:
-            shebang = _SHEBANG.match(first_line)
-            if shebang is None:
-                return None
-            language: Language = "python" if shebang["python"] else "shell"
-            suffix = ".py" if language == "python" else ".sh"
-            return language if scope.classify(path + suffix) == "source" else None
+            return _by_shebang(path, first_line)
         if scope.classify(path) != "source" or path.endswith(".d.ts"):
             return None
         return _SUFFIXES.get(path[path.rfind(".") :])
+
+
+def _by_shebang(path: str, first_line: str) -> Language | None:
+    shebang = _SHEBANG.match(first_line)
+    if shebang is None:
+        return None
+    language: Language = "python" if shebang["python"] else "shell"
+    suffix = ".py" if language == "python" else ".sh"
+    return language if scope.classify(path + suffix) == "source" else None
 
 
 def _problems(values: dict[str, Any]) -> list[str]:

@@ -64,6 +64,11 @@ def check_verb(call: Call, inv: shell.Invocation) -> Decision:
         return Refusal("queue-status", "only the orchestrator sets a task's status; tell it what changed")
     if call.off("factory-verbs"):
         return None
+    return _not_theirs(call, verb, inv)
+
+
+def _not_theirs(call: Call, verb: str, inv: shell.Invocation) -> Decision:
+    """The refusal when ``factory <verb>`` is not this caller's to run."""
     entry = VERBS.get(verb)
     actor = f"a subagent of the {call.role}" if call.in_subagent else f"the {call.role}"
     if entry is None or entry.owner_socket or call.role not in entry.roles:

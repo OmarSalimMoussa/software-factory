@@ -65,12 +65,16 @@ def handle(raw: str, cgroup: str, places: Places, home: Path, now: datetime) -> 
         return _run(payload, event, places, home, now)
     # telemetry: surfaced — any failure, a broken rule module included, refuses the call naming the `failure`
     except Exception as exc:  # noqa: BLE001
-        failure = f"the guard failed ({type(exc).__name__}: {exc})"
-        if event == "SessionStart":
-            return 0, _context(f"{failure}; tell the owner before you do anything."), ""
-        if event != "PreToolUse" or wire.simple_way_out(payload):
-            return 0, "", ""
-        return _refuse(places, payload, "guard", f"{failure}, so this call is refused; report it to the owner", now)
+        return _failed(places, payload, event, f"the guard failed ({type(exc).__name__}: {exc})", now)
+
+
+def _failed(places: Places, payload: dict[str, object], event: object, failure: str, now: datetime) -> Outcome:
+    """What a call gets when the guard itself failed on it: a session told at its start, a tool call refused."""
+    if event == "SessionStart":
+        return 0, _context(f"{failure}; tell the owner before you do anything."), ""
+    if event != "PreToolUse" or wire.simple_way_out(payload):
+        return 0, "", ""
+    return _refuse(places, payload, "guard", f"{failure}, so this call is refused; report it to the owner", now)
 
 
 _SUBAGENT_VERBS = {"SubagentStart": "subagent.start", "SubagentStop": "subagent.end"}

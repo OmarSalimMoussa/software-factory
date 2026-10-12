@@ -83,69 +83,38 @@ def build(argv: list[str], read_file: Callable[[str], bytes]) -> Call:
 
 
 def _call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
-    cmd = ns.cmd
-    simple = {"tick": "tick", "status": "status", "qa-clean": "qa-clean", "ready-check": "ready-check"}
-    if cmd in simple:
-        return Call(simple[cmd], {})
-    if cmd == "start":
-        if ns.role == "orchestrator":
-            return Call("start", {"role": ns.role})
-        return Call("start", {"role": ns.role, "task": ns.target, "note": ns.note, "outage": ns.outage})
-    if cmd == "stop":
-        return Call(cmd, {"session": ns.session, **({"why": ns.why} if ns.why else {})})
-    if cmd == "resume":
-        return Call("resume", {"session": ns.session, "message": ns.message})
-    if cmd == "extend":
-        return Call("extend", {"session": ns.session, "limit": ns.limit})
-    if cmd == "doing":
-        return Call("doing", {"text": ns.text})
-    if cmd == "inbox":
-        return Call("inbox.wait" if ns.wait else "inbox", {})
-    if cmd == "push":
-        return Call("push", {"sha": ns.sha} if ns.sha else {})
-    if cmd == "promote":
-        return Call("promote", {"back": ns.back})
-    if cmd == "reflect":
-        return Call("reflect", {"kind": ns.kind, "text": ns.text})
-    if cmd == "settings":
-        return Call("settings.show", {})
-    if cmd in ("errors", "traces"):
-        return _telemetry_call(ns)
-    if cmd == "request":
-        args = {"severity": ns.severity, "where": ns.where, **({"from": ns.sender} if ns.sender else {})}
-        return Call("request.new", args, read_file(ns.body))
-    if cmd == "triage":
-        if ns.what == "plan" and not ns.body:
-            raise CliError("factory triage plan --body <plan.json>")
-        return Call(f"triage.{ns.what}", {}, read_file(ns.body) if ns.body else None)
-    if cmd == "queue":
-        return _queue_call(ns, read_file)
-    if cmd == "route":
-        return Call("route", {"task": ns.task})
-    if cmd == "propose":
-        return _propose_call(ns, read_file)
-    if cmd == "spec":
-        return Call("spec.save", {"task": ns.task, "slices": ns.slices}, read_file(ns.file))
-    if cmd == "card":
-        return Call("card.comments", {"task": ns.task, "count": ns.count})
-    if cmd == "needs-owner":
-        args = {k: getattr(ns, k) for k in ("task", "brief", "ask", "question") if getattr(ns, k)}
-        return Call("needs-owner", args, read_file(ns.picture))
-    if cmd == "turn":
-        return Call("turn.next", {})
-    if cmd == "cause":
-        return Call("cause", {"tried": ns.tried})
-    if cmd == "slot":
-        return _slot_call(ns)
-    if cmd == "qa":
-        return _qa_call(ns, read_file)
-    if cmd == "qa-ready":
-        return Call("qa-ready", {"head": ns.head, **({"slices": _words(ns.slices)} if ns.slices else {})})
-    if cmd == "check":
-        if ns.list:
-            return Call("check", {"list": True})
-        return Call("check", {"all": ns.all, **({"only": _words([ns.only])} if ns.only else {})})
-    raise CliError(f"factory {cmd} has no request")
+    make = _CALLS.get(ns.cmd)
+    if make is None:
+        raise CliError(f"factory {ns.cmd} has no request")
+    return make(ns, read_file)
+
+
+def _start_call(ns: argparse.Namespace, _: Callable[[str], bytes]) -> Call:
+    if ns.role == "orchestrator":
+        return Call("start", {"role": ns.role})
+    return Call("start", {"role": ns.role, "task": ns.target, "note": ns.note, "outage": ns.outage})
+
+
+def _request_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
+    args = {"severity": ns.severity, "where": ns.where, **({"from": ns.sender} if ns.sender else {})}
+    return Call("request.new", args, read_file(ns.body))
+
+
+def _triage_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
+    if ns.what == "plan" and not ns.body:
+        raise CliError("factory triage plan --body <plan.json>")
+    return Call(f"triage.{ns.what}", {}, read_file(ns.body) if ns.body else None)
+
+
+def _needs_owner_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
+    args = {k: getattr(ns, k) for k in ("task", "brief", "ask", "question") if getattr(ns, k)}
+    return Call("needs-owner", args, read_file(ns.picture))
+
+
+def _check_call(ns: argparse.Namespace, _: Callable[[str], bytes]) -> Call:
+    if ns.list:
+        return Call("check", {"list": True})
+    return Call("check", {"all": ns.all, **({"only": _words([ns.only])} if ns.only else {})})
 
 
 def _queue_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
@@ -221,6 +190,39 @@ def _qa_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
         raise CliError(f"factory qa finding --head <sha> --severity {'|'.join(SEVERITIES)} --where '…' --body <file>")
     args = {"head": ns.head, "severity": ns.severity, "where": ns.where}
     return Call("qa.finding", args, read_file(ns.body))
+
+
+_CALLS: dict[str, Callable[[argparse.Namespace, Callable[[str], bytes]], Call]] = {
+    **{cmd: lambda ns, _: Call(ns.cmd, {}) for cmd in ("tick", "status", "qa-clean", "ready-check")},
+    "start": _start_call,
+    "stop": lambda ns, _: Call("stop", {"session": ns.session, **({"why": ns.why} if ns.why else {})}),
+    "resume": lambda ns, _: Call("resume", {"session": ns.session, "message": ns.message}),
+    "extend": lambda ns, _: Call("extend", {"session": ns.session, "limit": ns.limit}),
+    "doing": lambda ns, _: Call("doing", {"text": ns.text}),
+    "inbox": lambda ns, _: Call("inbox.wait" if ns.wait else "inbox", {}),
+    "push": lambda ns, _: Call("push", {"sha": ns.sha} if ns.sha else {}),
+    "promote": lambda ns, _: Call("promote", {"back": ns.back}),
+    "reflect": lambda ns, _: Call("reflect", {"kind": ns.kind, "text": ns.text}),
+    "settings": lambda ns, _: Call("settings.show", {}),
+    "errors": lambda ns, _: _telemetry_call(ns),
+    "traces": lambda ns, _: _telemetry_call(ns),
+    "request": _request_call,
+    "triage": _triage_call,
+    "queue": _queue_call,
+    "route": lambda ns, _: Call("route", {"task": ns.task}),
+    "propose": _propose_call,
+    "spec": lambda ns, read: Call("spec.save", {"task": ns.task, "slices": ns.slices}, read(ns.file)),
+    "card": lambda ns, _: Call("card.comments", {"task": ns.task, "count": ns.count}),
+    "needs-owner": _needs_owner_call,
+    "turn": lambda ns, _: Call("turn.next", {}),
+    "cause": lambda ns, _: Call("cause", {"tried": ns.tried}),
+    "slot": lambda ns, _: _slot_call(ns),
+    "qa": _qa_call,
+    "qa-ready": lambda ns, _: Call(
+        "qa-ready", {"head": ns.head, **({"slices": _words(ns.slices)} if ns.slices else {})}
+    ),
+    "check": _check_call,
+}
 
 
 def read_file(path: str) -> bytes:
