@@ -150,10 +150,21 @@ def test_a_booting_process_must_make_its_boot_call(make_repo: MakeRepo) -> None:
     assert "app/main.py boots the app process but never calls boot_telemetry('worker')" in problem
 
 
-def test_a_ts_file_with_no_typescript_to_load_fails_loudly(make_repo: MakeRepo) -> None:
+@pytest.mark.parametrize(
+    ("typescript_from", "expected"),
+    [
+        ("", "typescript_from in check-values/error-telemetry.toml names no folder"),
+        # The pinned version, not the newest: `npm install typescript` would rewrite the folder's package.json.
+        ("tools", "install the version its package.json pins (npm ci there)"),
+    ],
+    ids=["no-folder", "not-installed"],
+)
+def test_a_ts_file_with_no_typescript_to_load_fails_loudly(
+    make_repo: MakeRepo, typescript_from: str, expected: str
+) -> None:
     root = make_repo({"app/page.ts": "export const x = 1;\n"})
-    (problem,) = check(root)
-    assert "typescript_from in check-values/error-telemetry.toml names no folder" in problem
+    (problem,) = check(root, typescript_from=typescript_from)
+    assert expected in problem
 
 
 def test_values_missing_a_key_are_refused(make_repo: MakeRepo) -> None:

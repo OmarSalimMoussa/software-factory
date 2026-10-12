@@ -8,4 +8,5 @@ the factory. One rule of the rulebook that no check reads is held here too: ever
 and says why.
 
 CI runs these tests on every push, and no release is published unless they pass. A plain local test run leaves them
-out.
+out. To run them by hand, install the pinned TypeScript once with `npm ci`, then run
+`uv run --frozen --extra dev pytest -m self_check`.

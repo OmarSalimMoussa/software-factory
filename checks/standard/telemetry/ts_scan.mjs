@@ -14,7 +14,7 @@ function loadTs(toolchain) {
     return require('typescript');
   } catch (err) {
     process.stderr.write(`typescript is not installed under ${toolchain} (${err.message.split('\n')[0]}); ` +
-      'install it there (npm install typescript)\n');
+      'install the version its package.json pins (npm ci there)\n');
     process.exit(3);
   }
 }
