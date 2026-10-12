@@ -10,6 +10,8 @@ from guard_kit import NOW, TESTER_ID, Kit, entry
 
 from runtime.guard.facts import Rewrite
 
+EXPLORE = {"subagent_type": "Explore", "prompt": "p"}
+
 
 @pytest.fixture
 def kit(tmp_path: Path) -> Kit:
@@ -213,3 +215,23 @@ def test_the_orchestrator_writes_no_product_code_and_commits_only_to_finish_a_me
     if finishing:
         (kit.repo / ".git" / finishing).write_text("abc\n")
     assert kit.bash(command, cwd=str(kit.repo)) == rule
+
+
+@pytest.mark.parametrize(
+    ("role", "tool", "tool_input", "rule"),
+    [
+        ("implementer", "EnterWorktree", {"name": "elsewhere"}, "worktree-tools"),
+        ("orchestrator", "EnterWorktree", {"path": "{repo}/.claude/worktrees/impl-b"}, "worktree-tools"),
+        ("implementer", "ExitWorktree", {"action": "keep"}, "worktree-tools"),
+        ("implementer", "Agent", {**EXPLORE, "isolation": "worktree"}, "worktree-tools"),
+        ("implementer", "Agent", EXPLORE, None),
+    ],
+    ids=["enter-new", "enter-another", "exit", "isolated-subagent", "plain-subagent"],
+)
+def test_a_session_never_makes_or_leaves_a_worktree_of_its_own(
+    tmp_path: Path, role: str, tool: str, tool_input: dict[str, str], rule: str | None
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session(role, worktree=kit.repo if role == "orchestrator" else None)
+    filled = {k: v.format(repo=kit.repo) for k, v in tool_input.items()}
+    assert kit.rule(tool, filled) == rule

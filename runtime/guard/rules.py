@@ -37,6 +37,7 @@ RULES: dict[str, str] = {
     "qa-browser": "code run inside the browser server; a browser call that names a file",
     "qa-evidence": "a path or address into the factory's state, the testers' evidence or sign-ins, or the dashboard",
     "banned-tools": "workflows and remote triggers",
+    "worktree-tools": "entering or leaving a worktree with Claude Code's own tools, or starting an isolated subagent",
     "schedules": "any schedule kept by an agent: the warden drives the loop",
     "unreadable-command": "a command the guard cannot read, or one naming what runs through a variable, alias or pipe",
     "agent-id": "an agent-written --agent-id: only the guard names a subagent on its factory calls",

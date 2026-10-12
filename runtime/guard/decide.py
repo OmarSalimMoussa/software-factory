@@ -2,8 +2,8 @@
 
 A session the warden registered as the owner's is left alone. A retired session gets nothing, and a subagent the
 owner stopped only its hand-back. A session the warden never started may only read and report; one being benched may
-only commit and ask the factory. Every other call meets its role's rules; the first refusal wins, and a rewrite holds only once
-every rule passed the call.
+only commit and ask the factory. Every other call meets its role's rules; the first refusal wins, and a rewrite holds
+only once every rule passed the call.
 """
 
 from __future__ import annotations
@@ -42,6 +42,8 @@ BENCH_NOTE = (
     "you come back with your full context"
 )
 _BANNED_TOOLS = frozenset({"Workflow", "RemoteTrigger"})
+# Claude Code's own worktrees hold branches own-branch never sees, and a subagent's starts from the default branch.
+_WORKTREE_TOOLS = frozenset({"EnterWorktree", "ExitWorktree"})
 _SCHEDULE_TOOLS = frozenset({"CronCreate", "ScheduleWakeup"})
 _SCHEDULE_SKILLS = frozenset({"loop", "schedule"})
 _INBOX_WAIT = re.compile(r"(?:^|\s)factory inbox --wait(?!\S)")
@@ -104,9 +106,12 @@ def _commits_only(call: Call) -> bool:
 
 
 def _tool(call: Call) -> Decision:
-    """Banned tools, schedules, and the path of an edit."""
+    """Banned tools, schedules, Claude Code's own worktree tools, and the path of an edit."""
     if call.tool in _BANNED_TOOLS and not call.off("banned-tools"):
         return Refusal("banned-tools", f"{call.tool} starts work the factory cannot count or stop; ask your parent")
+    isolated = call.tool == "Agent" and bool(call.tool_input.get("isolation"))
+    if (call.tool in _WORKTREE_TOOLS or isolated) and not call.off("worktree-tools"):
+        return Refusal("worktree-tools", "the warden makes every worktree; stay in yours, and start subagents in it")
     skill = str(call.tool_input.get("skill", "")) if call.tool == "Skill" else ""
     if (call.tool in _SCHEDULE_TOOLS or skill in _SCHEDULE_SKILLS) and not call.off("schedules"):
         return Refusal("schedules", "the warden drives the loop and wakes you; keep no schedule of your own")

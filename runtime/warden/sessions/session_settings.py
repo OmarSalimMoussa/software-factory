@@ -67,6 +67,9 @@ def render(settings: Settings, places: Places, role: str, worktree: Path, agent_
             "filesystem": filesystem,
         },
         "permissions": {"deny": [f"Read(/{credentials})"]},  # "//" starts an absolute path in a permission rule
+        # Claude Code's own isolation would refuse the orchestrator every write in the main checkout, its .factory/
+        # too; the guard and the sandbox wall each session in. A misspelt value is dropped unread: a test pins it.
+        "worktree": {"bgIsolation": "none"},
     }
     if role == ORCHESTRATOR:
         script = places.plugin / "hooks" / "statusline.py"
