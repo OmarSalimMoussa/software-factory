@@ -67,6 +67,10 @@ class Rig(Protocol):
         """Each live session the agent's ~/.claude/sessions records, as the backstop reads it: its id to its name."""
         ...
 
+    def session_said(self, session_id: str) -> str:
+        """What the session said first, from its transcript; empty before it said anything."""
+        ...
+
     def stop_session(self, short_id: str) -> Ran: ...
     def warden_check(self, probe: list[str]) -> tuple[Path, Ran]:
         """A check the warden runs, through the check-run unit, on a scratch checkout in the agent's home whose

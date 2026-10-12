@@ -16,10 +16,10 @@ from system_fakes import dry_job, settings
 
 from runtime.dashboard.server import UI
 from runtime.shared import upgrades
-from runtime.shared.paths import Places
+from runtime.shared.paths import Places, stored_signin
 from runtime.system import layout
 from runtime.system.install_steps import steps_machine
-from runtime.system.runners import errors_run, record_exit, services_run, trust, upgrading
+from runtime.system.runners import errors_run, record_exit, services_run, trust, upgrading, with_token
 from runtime.system.runners import launch_file as lf
 from runtime.system.runners.stack_run import size_bytes
 from standard.services import provision
@@ -278,3 +278,32 @@ def test_the_dashboards_stand_in_says_the_factory_is_upgrading_on_every_page_unt
     assert (api[0], json.loads(api[1])["warden"]) == (503, {"ok": False, "since": None, "note": sentence})
     assert write[0] == 503
     assert css == (200, (UI / "app.css").read_bytes())
+
+
+def test_the_daemon_is_signed_in_by_its_stored_sign_in_which_only_it_reads_and_no_token_in_its_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home, loaded = tmp_path / "agent", tmp_path / "credentials"
+    loaded.mkdir()
+    (loaded / layout.CLAUDE_TOKEN).write_text("sk-ant-oat01-test\n")
+    signin = stored_signin(home)
+    signin.parent.mkdir(parents=True)
+    signin.write_text(json.dumps({"mcpOAuth": {"kept": True}}))
+    monkeypatch.setattr(with_token.layout, "AGENT_HOME", home)
+    monkeypatch.setattr(with_token.environment, "credentials_folder", lambda: str(loaded))
+    started: list[tuple[str, list[str], dict[str, str]]] = []
+    monkeypatch.setattr(with_token.os, "execve", lambda path, argv, env: started.append((path, argv, env)))
+
+    with_token.main(["/usr/local/libexec/software-factory/claude", "daemon", "run"])
+
+    held = json.loads(signin.read_text())
+    assert held["mcpOAuth"] == {"kept": True}
+    assert {k: held["claudeAiOauth"][k] for k in ("accessToken", "refreshToken", "scopes")} == {
+        "accessToken": "sk-ant-oat01-test",
+        "refreshToken": None,
+        "scopes": ["user:inference"],
+    }
+    assert oct(signin.stat().st_mode & 0o777) == "0o600"
+    [(path, argv, env)] = started
+    assert argv == [path, "daemon", "run"]
+    assert lf.TOKEN_FD not in env and not any("sk-ant-oat01-test" in value for value in env.values())

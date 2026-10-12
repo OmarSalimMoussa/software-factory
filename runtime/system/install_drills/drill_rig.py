@@ -30,8 +30,10 @@ from runtime.shared.paths import AGENT_USER, SLICE, Places
 from runtime.system import layout
 from runtime.system.install_drills.evidence import Ran
 from runtime.system.job import Install, refuse
+from runtime.warden.owner import messages
 from runtime.warden.sessions import backstop, registry, session_settings
 from runtime.warden.sessions.launch import LaunchError, Units
+from runtime.warden.spend import cost
 
 # What the drill is, said first: a command that probes the sandbox's walls looks like an attack without it.
 ABOUT = (
@@ -338,6 +340,20 @@ class RealRig:
     def session_records(self) -> dict[str, str]:
         found = backstop.read_processes(layout.AGENT_HOME / ".claude" / "sessions", backstop.PROC)
         return {sid: proc.name for sid, proc in found.items()}
+
+    def session_said(self, session_id: str) -> str:
+        path = cost.transcript_of([layout.AGENT_HOME / ".claude" / "projects"], "", session_id)
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines() if path else []
+        for line in lines:
+            try:
+                record = json.loads(line)
+            # telemetry: expected — the last line is still being written
+            except ValueError:
+                continue
+            content = record.get("message", {}).get("content") if record.get("type") == "assistant" else None
+            if isinstance(content, list) and messages.words(content).strip():
+                return messages.words(content).strip()
+        return ""
 
     def stop_session(self, short_id: str) -> Ran:
         try:

@@ -34,6 +34,13 @@ WARDEN_USER = "software-warden"
 AGENT_USER = "software-agent"
 DASHBOARD_USER = "software-dashboard"  # contract: added by 1B-3, the one other user owner.sock answers
 SLICE = "software-factory.slice"
+
+
+def stored_signin(home: Path) -> Path:
+    """Claude Code's stored sign-in for the user whose home is ``home``: what its daemon hands its sessions."""
+    return home / ".claude" / ".credentials.json"
+
+
 # contract: added by FB5. The stack user's own folder of slots: each slot's env file and provisioning state, which
 # the stack user's runs write and the warden reads only to redact.
 STACK_SLOTS = Path("/home/software-stack/slots")

@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.shared import store
-from runtime.shared.paths import Places
+from runtime.shared.paths import Places, stored_signin
 from runtime.shared.settings import Settings
 
 ORCHESTRATOR = "orchestrator"
@@ -45,7 +45,7 @@ def _siblings(folder: Path, worktree: Path) -> list[str]:
 def render(settings: Settings, places: Places, role: str, worktree: Path, agent_home: Path) -> dict[str, Any]:
     repo = Path(settings.get_str("repo.path"))
     others = worktrees(repo)
-    credentials = agent_home / ".claude" / ".credentials.json"
+    credentials = stored_signin(agent_home)
     caches = [str(agent_home / cache) for cache in settings.get_list("sandbox.writable_caches")]
     filesystem: dict[str, list[str]] = {"allowWrite": [str(worktree), *caches]}
     if role == ORCHESTRATOR:

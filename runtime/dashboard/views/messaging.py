@@ -19,6 +19,8 @@ _NOTES = {
 }
 _SUBAGENT_CHAT = "A subagent runs inside its parent's session: open the parent's chat."
 _BENCHED_CHAT = "On the bench: no chat until it comes back."
+# Claude Code's Remote Control, which makes the link, refuses a token from `claude setup-token`.
+_NO_LINK = "Open chat needs a full claude.ai sign-in, which the agents do not have: message it here."
 
 
 def _at(stamp: str) -> str:
@@ -74,7 +76,7 @@ def chat(row: dict[str, Any]) -> tuple[str | None, str | None]:
     if not row["chat_link"]:
         if row["state"] == RETIRED:
             return None, "This session ended before its chat link appeared."
-        return None, "The chat link appears a few seconds after the session starts."
+        return None, _NO_LINK
     return str(row["chat_link"]), None
 
 

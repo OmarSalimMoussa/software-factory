@@ -22,7 +22,12 @@ THREAD = [
 @pytest.mark.parametrize(
     ("session", "label", "chat_note", "thread"),
     [
-        ("impl-sign-in-loop", "Send", "The chat link appears a few seconds after the session starts.", THREAD),
+        (
+            "impl-sign-in-loop",
+            "Send",
+            "Open chat needs a full claude.ai sign-in, which the agents do not have: message it here.",
+            THREAD,
+        ),
         ("impl-project-names", "Bring back with this message", "On the bench: no chat until it comes back.", []),
         ("qa-ui-1", None, "A subagent runs inside its parent's session: open the parent's chat.", []),
         ("h1", None, "This session ended before its chat link appeared.", []),

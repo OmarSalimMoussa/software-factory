@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from runtime.shared import claude_accounts
-from runtime.shared.paths import AGENT_USER, WARDEN_USER
+from runtime.shared.paths import AGENT_USER, WARDEN_USER, stored_signin
 from runtime.system import layout
 from runtime.system.errors import instance
 from runtime.system.install_drills.evidence import (
@@ -39,7 +39,7 @@ from standard.services import stack
 UNREACHABLE = "cannot be reached"  # how the factory command says it found no warden
 SANDBOX_MARK = "software-drill-sandbox-ok"
 _POLL_S = 1.0
-SESSION_PROMPT = "This is a drill. Reply with the one word ready, and do nothing else."
+SESSION_PROMPT, SESSION_REPLY = "This is a drill. Reply with the one word ready, and do nothing else.", "ready"
 
 
 def sandbox_runs(rig: Rig) -> Result:
@@ -87,7 +87,7 @@ def secrets_unreadable(rig: Rig) -> Result:
                f"file:{rig.places.totp_secret}", f"file:{rig.places.services / stack.ENV_FILE}",
                f"file:{rig.places.reflections}", f"file:{state / 'reflections.json'}"]  # fmt: skip
     plain = rig.as_user(AGENT_USER, probe_command(rig, *targets))
-    inside = sandboxed_probe(rig, name, f"file:{layout.AGENT_HOME}/.claude/.credentials.json",
+    inside = sandboxed_probe(rig, name, f"file:{stored_signin(layout.AGENT_HOME)}",
                               "env:CLAUDE_CODE_OAUTH_TOKEN")  # fmt: skip
     breached = breaches(plain.out)
     ok = not breached and len(outcomes(plain.out)) == len(targets) and inside.ok
@@ -107,9 +107,9 @@ def hosts_refused(rig: Rig) -> Result:
 
 def background_session(rig: Rig) -> Result:
     """A real background session, started as the warden starts one: `claude --bg` names it, its record in the
-    agent's ~/.claude/sessions names it, and `claude stop` ends it. Each is Claude Code's own, which the warden reads
-    and no version promises to keep."""
-    name = "a background session starts, is recorded by its name, and stops, as the warden reads them"
+    agent's ~/.claude/sessions names it, it answers (so the daemon signed it in), and `claude stop` ends it. Each is
+    Claude Code's own, which the warden reads and no version promises to keep."""
+    name = "a background session starts, is recorded by its name, answers, and stops, as the warden reads them"
     tag = f"drill-session-{uuid.uuid4().hex[:8]}"
     ran = rig.real_session(tag, SESSION_PROMPT)
     started = BACKGROUNDED.search(ran.out)
@@ -126,6 +126,8 @@ def background_session(rig: Rig) -> Result:
         rig.stop_session(short)
         return Result(name, False, f"no record in the agent's ~/.claude/sessions names session {short}")
     [(sid, named)] = found.items()
+    while not (said := rig.session_said(sid)) and rig.now() - begun <= limit:
+        rig.wait(_POLL_S)
     stopped = rig.stop_session(short)
     while sid in rig.session_records() and rig.now() - begun <= limit:
         rig.wait(_POLL_S)
@@ -133,7 +135,9 @@ def background_session(rig: Rig) -> Result:
         return Result(name, False, f"claude stop {short} left it running: {first_line(stopped.out)}")
     if named != tag:
         return Result(name, False, f"its record names it {named!r}, not {tag}: the warden binds a start by its name")
-    return Result(name, True, f"started {short}, recorded as {tag}, stopped")
+    if SESSION_REPLY not in said.lower():
+        return Result(name, False, f"it never answered as asked: {first_line(said) or 'it said nothing'}")
+    return Result(name, True, f"started {short}, recorded as {tag}, answered {first_line(said)!r}, stopped")
 
 
 def backstop_stops_claude(rig: Rig) -> Result:
@@ -337,7 +341,7 @@ def warden_runs_commands(rig: Rig) -> Result:
 def check_walled_in(rig: Rig) -> Result:
     """The product code a check runs (here its deps verb) is walled into its checkout by the check-run unit."""
     name = "a check's product code reads no sign-in or other worktree, and cannot change the shared git folder"
-    targets = [f"file:{layout.AGENT_HOME}/.claude/.credentials.json", f"dir:{rig.worktree_b}",
+    targets = [f"file:{stored_signin(layout.AGENT_HOME)}", f"dir:{rig.worktree_b}",
                "env:CREDENTIALS_DIRECTORY", "env:CLAUDE_CODE_OAUTH_TOKEN"]  # fmt: skip
     checkout, ran = rig.warden_check(probe_command(rig, *targets, f"write:{Path('.git') / 'config'}"))
     found = outcomes(ran.out)

@@ -51,6 +51,7 @@ class FakeRig:
     launched: str = "backgrounded · 5e55abcd\n"
     recorded: str | None = "tag"  # "tag": the name the drill gave it
     stops: bool = True
+    said: str = "Ready"  # what the session answers
     _session: dict[str, str] = field(default_factory=dict)
 
     def real_session(self, name: str, prompt: str) -> Ran:
@@ -60,6 +61,9 @@ class FakeRig:
 
     def session_records(self) -> dict[str, str]:
         return dict(self._session)
+
+    def session_said(self, session_id: str) -> str:
+        return self.said
 
     def stop_session(self, short_id: str) -> Ran:
         if self.stops:
@@ -390,11 +394,12 @@ def test_the_stack_drill_needs_both_the_user_and_a_container_walled_off(plain: s
         ({"launched": "Started a session\n"}, False, "printed no 'backgrounded · <id>' line"),
         ({"recorded": None}, False, "no record in the agent's ~/.claude/sessions names session 5e55abcd"),
         ({"recorded": "another-name"}, False, "its record names it 'another-name'"),
+        ({"said": "Not logged in · Please run /login"}, False, "it never answered as asked: Not logged in"),
         ({"stops": False}, False, "claude stop 5e55abcd left it running"),
     ],
-    ids=["whole", "launch-line-changed", "no-record", "name-not-recorded", "stop-fails"],
+    ids=["whole", "launch-line-changed", "no-record", "name-not-recorded", "not-signed-in", "stop-fails"],
 )
-def test_the_session_drill_needs_the_launch_line_the_record_and_the_stop_the_warden_reads(
+def test_the_session_drill_needs_the_launch_line_the_record_an_answer_and_the_stop_the_warden_reads(
     rig: dict[str, Any], ok: bool, says: str
 ) -> None:
     result = drills.background_session(FakeRig(**rig))

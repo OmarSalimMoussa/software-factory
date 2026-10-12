@@ -118,6 +118,11 @@ def thread(ctx: Context, s: Session) -> list[dict[str, Any]]:
     return found[-settings.get_int("dashboard.thread_messages") :]
 
 
+def words(content: list[Any]) -> str:
+    """The text an assistant record's content says, its tool calls and thinking left out."""
+    return "\n\n".join(c["text"] for c in content if isinstance(c, dict) and c.get("type") == "text")
+
+
 def _add(found: list[dict[str, Any]], record: dict[str, Any]) -> None:
     """One transcript record into the thread: the owner's message starts an entry, and the agent's words after it,
     until the next prompt, are its replies."""
@@ -131,6 +136,6 @@ def _add(found: list[dict[str, Any]], record: dict[str, Any]) -> None:
             found[-1]["closed"] = True
         return
     if record["type"] == "assistant" and found and not found[-1].get("closed") and isinstance(content, list):
-        words = "\n\n".join(c["text"] for c in content if isinstance(c, dict) and c.get("type") == "text")
-        if words.strip():
-            found[-1]["replies"].append({"at": at, "text": words})
+        said = words(content)
+        if said.strip():
+            found[-1]["replies"].append({"at": at, "text": said})

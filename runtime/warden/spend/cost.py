@@ -52,11 +52,16 @@ def family_of(kind: str, parent_family: str) -> str:
 
 def transcript(roots: Sequence[Path], session: Session) -> Path | None:
     """A session's transcript under the first root that holds it."""
+    return transcript_of(roots, session.worktree, session.id)
+
+
+def transcript_of(roots: Sequence[Path], worktree: str, session_id: str) -> Path | None:
+    """The transcript of session ``session_id``, which ran in ``worktree`` ("" when unknown)."""
     for root in roots:
-        direct = root / _SLUG.sub("-", session.worktree) / f"{session.id}.jsonl"
+        direct = root / _SLUG.sub("-", worktree) / f"{session_id}.jsonl"
         if direct.is_file():
             return direct
-        found = next(iter(sorted(root.glob(f"*/{session.id}.jsonl"))), None)
+        found = next(iter(sorted(root.glob(f"*/{session_id}.jsonl"))), None)
         if found is not None:
             return found
     return None

@@ -192,18 +192,23 @@ def checkout_for(session: str, settings: Settings, sessions: dict[str, Any]) -> 
     return path
 
 
+def unit_token(credentials: str | None) -> str:
+    """The sign-in token systemd loaded for the unit into the folder ``credentials``."""
+    if not credentials:
+        raise BadRequest("the unit loaded no sign-in token")
+    try:
+        return (Path(credentials) / layout.CLAUDE_TOKEN).read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise BadRequest(f"the sign-in token cannot be read ({type(exc).__name__})") from exc
+
+
 def claude_env(inherited: dict[str, str], credentials: str | None) -> tuple[dict[str, str], tuple[int, ...]]:
     """The unit's environment for claude, and the descriptors to pass it: a pipe holding the sign-in token systemd
     loaded for the unit. Claude Code reads the pipe to its end, so the token is in no environment and no descriptor
     a shell it starts could read. Never the token in the environment with CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: that also
     runs every command sandboxed, the excluded `factory` too, which then cannot reach the warden. ``inherited`` is the
     unit's own environment, handed on; ``credentials`` the folder systemd loaded the token into."""
-    if not credentials:
-        raise BadRequest("the unit loaded no sign-in token")
-    try:
-        token = (Path(credentials) / layout.CLAUDE_TOKEN).read_text(encoding="utf-8").strip()
-    except OSError as exc:
-        raise BadRequest(f"the sign-in token cannot be read ({type(exc).__name__})") from exc
+    token = unit_token(credentials)
     read, write = os.pipe()
     with os.fdopen(write, "w", encoding="utf-8") as pipe:
         pipe.write(token + "\n")  # far below a pipe's buffer, so the write never waits for a reader
