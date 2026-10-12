@@ -54,23 +54,8 @@ def defaults_text(repo: Path) -> str:
     return text.replace("[prices]", "[prices]\n" + prices.rstrip("\n"), 1)
 
 
-def seed(root: Path, now: float = T0) -> Places:
-    """Write the afternoon under ``root``; the warden's Places for it."""
-    places = Places.under(root)
-    repo = root / "repo"
-    (repo / "queue").mkdir(parents=True, exist_ok=True)
-    places.install.mkdir(parents=True, exist_ok=True)
-    places.defaults.write_text(defaults_text(repo))
-    places.state.mkdir(parents=True, exist_ok=True)
-    places.totp_secret.write_text(totp.new_secret())
-    # Rows per page as the UI's drives page them, the implementers' cap raised from its default, and an estimate as
-    # soon as a rung has one landed run.
-    store.write_text(
-        places.overrides,
-        "[caps]\nimplementers = 4\n\n[dashboard]\npage_size = 25\n\n[routing]\n" "estimate_min_runs = 1\n",
-    )
-    settings = settings_module.load(places.defaults, places.overrides)
-    public.write_settings(places, settings)
+def _seed_queue(repo: Path, now: float) -> list[models.Task]:
+    """The product's queue: its tasks with their logs, requests, specs and checks, and two files someone broke."""
     (repo / "GOAL.md").write_text(GOAL)
     tasks, logs = seed_tasks(repo, now)
     requests = seed_requests(tasks, now)
@@ -101,16 +86,11 @@ def seed(root: Path, now: float = T0) -> Places:
     seed_checks(repo, now)
     write(repo / "queue" / "tasks" / "t-0026.md", "---\nid: t-0026\n---\n# A task file someone broke\n")
     write(repo / "queue" / "requests" / "users" / "r-2026-10-07-0032.md", "not a request\n")
-    sessions = seed_sessions(now)
-    store.write_text(places.history, history_lines(sessions))
-    store.write_json(places.registry, {s.id: models.dump(s) for s in sessions})
-    store.write_json(places.state / "doing" / "impl-sign-in-loop.json", {"qa_round": 2})
-    for n, holder in ((1, "impl-sign-in-loop"), (2, "impl-retry-upload"), (3, "impl-staging-down")):
-        store.write_text(
-            places.slot(n) / "lease",
-            f"holder={holder}\nsince={iso(now)}\n" "note=building\n",
-        )
-    store.write_json(places.proposals, {"open": ["t-0027", "t-0024", "t-0025"], "approved": []})
+    return tasks
+
+
+def _seed_cards(places: Places, tasks: list[models.Task], now: float) -> None:
+    """The owner's three cards, two of them with their pictures."""
     cards = []
     for n, (kind, task_id, ask) in enumerate(
         (
@@ -142,8 +122,10 @@ def seed(root: Path, now: float = T0) -> Places:
             )
         )
     store.write_json(places.cards, [models.dump(c) for c in cards])
-    for record in seed_cost(sessions, tasks, now):
-        store.append_jsonl(places.cost, models.dump(record))
+
+
+def _seed_health(places: Places, now: float) -> None:
+    """Prod's and staging's probes and deploys, the plan's limits, the vitals, the disk and the last triage."""
     for minute in range(200, 0, -1):
         for env, commit in (("staging", STAGING), ("prod", PROD)):
             ok = not (env == "staging" and minute == 193)
@@ -188,6 +170,40 @@ def seed(root: Path, now: float = T0) -> Places:
             "parked": 13,
         },
     )
+
+
+def seed(root: Path, now: float = T0) -> Places:
+    """Write the afternoon under ``root``; the warden's Places for it."""
+    places = Places.under(root)
+    repo = root / "repo"
+    (repo / "queue").mkdir(parents=True, exist_ok=True)
+    places.install.mkdir(parents=True, exist_ok=True)
+    places.defaults.write_text(defaults_text(repo))
+    places.state.mkdir(parents=True, exist_ok=True)
+    places.totp_secret.write_text(totp.new_secret())
+    # Rows per page as the UI's drives page them, the implementers' cap raised from its default, and an estimate as
+    # soon as a rung has one landed run.
+    store.write_text(
+        places.overrides,
+        "[caps]\nimplementers = 4\n\n[dashboard]\npage_size = 25\n\n[routing]\n" "estimate_min_runs = 1\n",
+    )
+    settings = settings_module.load(places.defaults, places.overrides)
+    public.write_settings(places, settings)
+    tasks = _seed_queue(repo, now)
+    sessions = seed_sessions(now)
+    store.write_text(places.history, history_lines(sessions))
+    store.write_json(places.registry, {s.id: models.dump(s) for s in sessions})
+    store.write_json(places.state / "doing" / "impl-sign-in-loop.json", {"qa_round": 2})
+    for n, holder in ((1, "impl-sign-in-loop"), (2, "impl-retry-upload"), (3, "impl-staging-down")):
+        store.write_text(
+            places.slot(n) / "lease",
+            f"holder={holder}\nsince={iso(now)}\n" "note=building\n",
+        )
+    store.write_json(places.proposals, {"open": ["t-0027", "t-0024", "t-0025"], "approved": []})
+    _seed_cards(places, tasks, now)
+    for record in seed_cost(sessions, tasks, now):
+        store.append_jsonl(places.cost, models.dump(record))
+    _seed_health(places, now)
     entries = []
     for e in fixture("reflect.json")["reflect"]["entries"]:
         at = iso(fixture_time(e["when"], now))

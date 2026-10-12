@@ -57,28 +57,7 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
     r.dashboard("orchestrator.start", {"idempotency_key": "start-orchestrator-1"})
     orch = r.run_started("orchestrator")
 
-    # The owner files a request from their own terminal.
-    said = tmp_path / "said.md"
-    said.write_text("A note I just added shows at the bottom of the list; I expected it at the top.\n")
-    filed = r.owner(["request", "new", "--severity", "normal", "--where", "the list of notes", "--body", str(said)])
-    assert filed["inbox"] == "owner"
-
-    # The orchestrator applies triage's plan, routes the task and proposes it with its picture.
-    plan = {
-        "batch": [filed["request"]],
-        "new_tasks": [{
-            "title": "New notes show at the bottom of the list", "body": "The page draws the oldest note first.",
-            "goal_item": "G1", "severity": "major", "surfaces": ["ui"], "slices": 1, "owner_class": "none",
-            "cause": "web/app.js:4 draws the notes in the order the server sent them",
-            "requests": [filed["request"]], "after": [],
-        }],
-        "joins": {}, "noise": {}, "parked": {},
-    }  # fmt: skip
-    applied = r.session(orch, ["triage", "apply", "--body", r.body(r.repo, "plan.json", json.dumps(plan).encode())])
-    assert applied["new"] == [TASK]
-    assert r.session(orch, ["route", TASK])["rung"] == 1
-    picture = r.body(r.repo, "picture.svg", PICTURE)
-    r.session(orch, ["propose", TASK, "--picture", picture, "--why", "G1 is the goal's first item"])
+    _filed_and_proposed(r, tmp_path, orch)
 
     # The owner approves it on the dashboard.
     r.dashboard("proposal.approve", {"task": TASK, "idempotency_key": "approve-t-0001"})
@@ -89,48 +68,9 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
     worktree = Path(registry.read(r.places)[impl].worktree)
     branch = git(worktree, "rev-parse", "--abbrev-ref", "HEAD")
 
-    # The implementer builds its one slice, brings its slot up at the head and readies QA.
-    app = worktree / "web" / "app.js"
-    app.write_text(app.read_text().replace("...notes.map(", "...[...notes].reverse().map("))
-    git(worktree, "commit", "-q", "-am", "Draw the newest note first")
-    head = git(worktree, "rev-parse", "HEAD")
-    r.session(impl, ["slot", "claim"])
-    assert r.session(impl, ["slot", "up"])["exit"] == 0
-    r.stack.serving = head
-    testers = [t["tester"] for t in r.session(impl, ["qa", "plan"])["testers"]]
-    assert testers == ["qa-ui-function", "qa-ux", "qa-visual"]
-    r.session(impl, ["qa-ready", head, "--slices", head])
+    testers = _built_and_tested(r, impl, worktree)
 
-    # Each required tester starts (the guard's hook registers it), reports on the head and hands back.
-    for n, tester in enumerate(testers):
-        agent = f"a{n}7f3c9e1d2b4a6"
-        r.hook(impl, "subagent.start", {"agent_id": agent, "kind": tester})
-        r.session(impl, ["ready-check"], agent_id=agent)
-        note = r.body(worktree, f"finding-{n}.md", b"The empty list says nothing about how to add a note.\n")
-        finding = ["qa", "finding", "--head", head, "--severity", "minor", "--where", "/notes", "--body", note]
-        r.session(impl, finding, agent_id=agent)
-        assert r.session(impl, ["qa", "result", "--head", head], agent_id=agent)["minors"] == 1
-        r.hook(impl, "subagent.end", {"agent_id": agent})
-    r.session(impl, ["qa-clean"])
-
-    # The orchestrator gives the merge turn, and the warden tells the implementer; it rebases and its check passes.
-    assert r.session(orch, ["turn", "next"])["task"] == TASK
-    assert registry.read(r.places)[impl].merge_turn
-    assert [m["session"] for m in r.systemd.messages] == [impl]
-    git(worktree, "rebase", "-q", "master")
-    assert r.session(impl, ["check"])["passed"]
-
-    # The orchestrator merges; the warden finds the merge. The passing check of master marks the task checked, and
-    # the push ships the newest checked commit.
-    git(r.repo, "merge", "-q", "--no-ff", branch, "-m", f"Merge {branch}: new notes show first")
-    merge = git(r.repo, "rev-parse", "HEAD")
-    assert checks.passed(r.places, git(r.repo, "rev-parse", "HEAD^{tree}"))
-    turn.find_merge(r.warden())
-    assert not registry.read(r.places)[impl].merge_turn
-    report = r.body(r.repo, "check.md", REPORT.encode())
-    assert r.session(orch, ["queue", "check", merge, "--body", report])["checked"] == TASK
-    pushed = r.session(orch, ["push"])
-    assert (pushed["sha"], pushed["commits"]) == (merge, 2)
+    merge = _merged_and_pushed(r, orch, impl, worktree, branch)
 
     # The warden's tick sees staging answer on the pushed commit, and logs it; prod still runs the first build.
     proc, power = kernel(tmp_path)
@@ -166,3 +106,77 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
 
     assert [verb for verb, answer in r.answers if not answer["ok"]] == []
     assert not any(format_check.check(Queue.of(r.warden()).blobs()).values())
+
+
+def _filed_and_proposed(r: Rehearsal, tmp_path: Path, orch: str) -> None:
+    # The owner files a request from their own terminal.
+    said = tmp_path / "said.md"
+    said.write_text("A note I just added shows at the bottom of the list; I expected it at the top.\n")
+    filed = r.owner(["request", "new", "--severity", "normal", "--where", "the list of notes", "--body", str(said)])
+    assert filed["inbox"] == "owner"
+
+    # The orchestrator applies triage's plan, routes the task and proposes it with its picture.
+    plan = {
+        "batch": [filed["request"]],
+        "new_tasks": [{
+            "title": "New notes show at the bottom of the list", "body": "The page draws the oldest note first.",
+            "goal_item": "G1", "severity": "major", "surfaces": ["ui"], "slices": 1, "owner_class": "none",
+            "cause": "web/app.js:4 draws the notes in the order the server sent them",
+            "requests": [filed["request"]], "after": [],
+        }],
+        "joins": {}, "noise": {}, "parked": {},
+    }  # fmt: skip
+    applied = r.session(orch, ["triage", "apply", "--body", r.body(r.repo, "plan.json", json.dumps(plan).encode())])
+    assert applied["new"] == [TASK]
+    assert r.session(orch, ["route", TASK])["rung"] == 1
+    picture = r.body(r.repo, "picture.svg", PICTURE)
+    r.session(orch, ["propose", TASK, "--picture", picture, "--why", "G1 is the goal's first item"])
+
+
+def _built_and_tested(r: Rehearsal, impl: str, worktree: Path) -> list[str]:
+    # The implementer builds its one slice, brings its slot up at the head and readies QA.
+    app = worktree / "web" / "app.js"
+    app.write_text(app.read_text().replace("...notes.map(", "...[...notes].reverse().map("))
+    git(worktree, "commit", "-q", "-am", "Draw the newest note first")
+    head = git(worktree, "rev-parse", "HEAD")
+    r.session(impl, ["slot", "claim"])
+    assert r.session(impl, ["slot", "up"])["exit"] == 0
+    r.stack.serving = head
+    testers = [t["tester"] for t in r.session(impl, ["qa", "plan"])["testers"]]
+    assert testers == ["qa-ui-function", "qa-ux", "qa-visual"]
+    r.session(impl, ["qa-ready", head, "--slices", head])
+
+    # Each required tester starts (the guard's hook registers it), reports on the head and hands back.
+    for n, tester in enumerate(testers):
+        agent = f"a{n}7f3c9e1d2b4a6"
+        r.hook(impl, "subagent.start", {"agent_id": agent, "kind": tester})
+        r.session(impl, ["ready-check"], agent_id=agent)
+        note = r.body(worktree, f"finding-{n}.md", b"The empty list says nothing about how to add a note.\n")
+        finding = ["qa", "finding", "--head", head, "--severity", "minor", "--where", "/notes", "--body", note]
+        r.session(impl, finding, agent_id=agent)
+        assert r.session(impl, ["qa", "result", "--head", head], agent_id=agent)["minors"] == 1
+        r.hook(impl, "subagent.end", {"agent_id": agent})
+    r.session(impl, ["qa-clean"])
+    return testers
+
+
+def _merged_and_pushed(r: Rehearsal, orch: str, impl: str, worktree: Path, branch: str) -> str:
+    # The orchestrator gives the merge turn, and the warden tells the implementer; it rebases and its check passes.
+    assert r.session(orch, ["turn", "next"])["task"] == TASK
+    assert registry.read(r.places)[impl].merge_turn
+    assert [m["session"] for m in r.systemd.messages] == [impl]
+    git(worktree, "rebase", "-q", "master")
+    assert r.session(impl, ["check"])["passed"]
+
+    # The orchestrator merges; the warden finds the merge. The passing check of master marks the task checked, and
+    # the push ships the newest checked commit.
+    git(r.repo, "merge", "-q", "--no-ff", branch, "-m", f"Merge {branch}: new notes show first")
+    merge = git(r.repo, "rev-parse", "HEAD")
+    assert checks.passed(r.places, git(r.repo, "rev-parse", "HEAD^{tree}"))
+    turn.find_merge(r.warden())
+    assert not registry.read(r.places)[impl].merge_turn
+    report = r.body(r.repo, "check.md", REPORT.encode())
+    assert r.session(orch, ["queue", "check", merge, "--body", report])["checked"] == TASK
+    pushed = r.session(orch, ["push"])
+    assert (pushed["sha"], pushed["commits"]) == (merge, 2)
+    return merge

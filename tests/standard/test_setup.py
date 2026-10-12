@@ -63,20 +63,26 @@ class Server:
             return self.script(argv, argv[4], argv[6:], stdin)
         if argv[:2] == ["docker", "compose"]:
             return self.compose(argv)
-        found = self.users(argv)
+        found = self.users(argv) or self.network(argv) or self.edge(argv)
         if found is not None:
             return found
+        raise AssertionError(f"the set-up sent a command the server does not know: {argv}")
+
+    def network(self, argv: list[str]) -> subprocess.CompletedProcess[str] | None:
         if argv[:3] == ["docker", "network", "inspect"]:
             joined = self.networks.get(argv[-1])
             return _cp(argv, 1, "", "no such network") if joined is None else _cp(argv, 0, " ".join(joined) + " \n")
         if argv[:3] == ["docker", "network", "connect"]:
             self.networks[argv[3]].append(argv[4])
             return _cp(argv)
+        return None
+
+    def edge(self, argv: list[str]) -> subprocess.CompletedProcess[str] | None:
         if argv[:3] == ["docker", "exec", "factory-edge"] or argv[:5] == ["sudo", "-n", "tailscale", "serve", "--bg"]:
             return _cp(argv)
         if argv == ["sudo", "-n", "tailscale", "serve", "status", "--json"]:
             return _cp(argv, 0, json.dumps(self.served))
-        raise AssertionError(f"the set-up sent a command the server does not know: {argv}")
+        return None
 
     def script(
         self, argv: list[str], script: str, args: list[str], stdin: str | None

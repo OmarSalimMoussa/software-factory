@@ -30,15 +30,17 @@ def label(argv: list[str]) -> str:
         return f"compose {rest[0]}" + (f" {rest[-1]}" if rest[0] == "logs" else "")
     if argv[:3] == ["docker", "run", "--rm"]:
         return "probe " + urlsplit(argv[-2]).path
-    if argv[:3] == ["docker", "run", "-d"]:
-        return "start postgres"
+    named = next((name for prefix, name in _NAMED if argv[: len(prefix)] == prefix), None)
+    if named is not None:
+        return named
     if argv[:2] in (["docker", "network"], ["docker", "container"]):
         return " ".join(argv[1:4])
     if argv[:2] == ["docker", "exec"]:
         return argv[3]
-    if argv[:2] == ["docker", "rm"]:
-        return "remove postgres"
     return argv[1] if argv[0] == "docker" else "check"
+
+
+_NAMED = ((["docker", "run", "-d"], "start postgres"), (["docker", "rm"], "remove postgres"))
 
 
 class Docker:
@@ -59,6 +61,17 @@ class Docker:
         step = label(argv)
         if step == self.fail:
             return Result(1, "", f"{step} broke")
+        found = self.set_up(step, argv) or self.running(step, argv)
+        if found is not None:
+            return found
+        if step == "check":
+            assert env is not None
+            self.check_env = env
+            self.env_text = Path(env["FACTORY_ENV_FILE"]).read_text()
+        return Result(0, "", "")
+
+    def set_up(self, step: str, argv: list[str]) -> Result | None:
+        """The answers before the stack runs: its config, the scratch Postgres and the networks."""
         if step == "compose config":
             self.linked_at_config = (self.repo / self.config.env.file).is_symlink()
             image = self.config.image("app", SHORT)
@@ -70,6 +83,10 @@ class Docker:
         if step.startswith("network inspect"):
             made = ["docker", "network", "create", argv[3]] in self.calls
             return Result(0 if made else 1, "", "")
+        return None
+
+    def running(self, step: str, argv: list[str]) -> Result | None:
+        """The answers while the stack runs: its containers, their state and the probes."""
         # The product's check recreates the app's container, as a check that restarts a service does: a new id.
         recreated = any(label(call) == "check" for call in self.calls)
         if step == "compose ps":
@@ -80,11 +97,7 @@ class Docker:
             return Result(0, json.dumps([self.state]), "")
         if step.startswith("probe "):
             return Result(0, self.answer(step.removeprefix("probe ")), "")
-        if step == "check":
-            assert env is not None
-            self.check_env = env
-            self.env_text = Path(env["FACTORY_ENV_FILE"]).read_text()
-        return Result(0, "", "")
+        return None
 
     def answer(self, path: str) -> str:
         if path == self.config.deploy.health:

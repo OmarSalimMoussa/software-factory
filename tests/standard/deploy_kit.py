@@ -123,34 +123,43 @@ class FakeDocker:
 
     def __call__(self, argv: list[str], stdin: str | None = None) -> subprocess.CompletedProcess[str]:
         self.calls.append((argv, stdin))
-        verb = argv[1:3]
-        if verb == ["network", "ls"]:
-            return ok("\n".join(self.networks) + "\n")
-        if verb == ["network", "create"]:
-            self.networks[argv[3]] = set()
-        if verb == ["network", "inspect"]:
-            joined = {f"id-{name}": {"Name": name} for name in sorted(self.networks[argv[3]])}
-            return ok(json.dumps(joined) + "\n")
-        if verb == ["network", "connect"]:
-            self.networks[argv[3]].add(argv[4])
-        if verb == ["network", "disconnect"]:
-            self.networks[argv[3]].discard(argv[4])
-        if verb == ["network", "rm"]:
-            del self.networks[argv[3]]
-        if argv[1] == "create":
-            return ok("container-1\n")
+        if argv[1] == "network":
+            return self.network(argv)
+        if argv[1:4] == ["exec", "-i", "factory-glitchtip"]:
+            return ok("noise from Django\n" + self.glitchtip(stdin or ""))
         if argv[1] == "cp":
             assert self.deploy_files is not None
             shutil.copytree(self.deploy_files, argv[3])
-        if argv[1:4] == ["exec", "-i", "factory-glitchtip"]:
-            return ok("noise from Django\n" + self.glitchtip(stdin or ""))
-        if argv[1] == "ps":
-            return ok("\n".join(self.in_use) + "\n")
-        if argv[1] == "images":
-            return ok("".join(f"{ref}\tsha256:{n}\n" for n, ref in enumerate(self.images)))
-        if verb == ["image", "rm"]:
+        elif argv[1:3] == ["image", "rm"]:
             self.images.remove(argv[3])
+        return ok(self.listed(argv[1]))
+
+    def network(self, argv: list[str]) -> subprocess.CompletedProcess[str]:
+        verb = argv[2]
+        if verb == "ls":
+            return ok("\n".join(self.networks) + "\n")
+        if verb == "inspect":
+            joined = {f"id-{name}": {"Name": name} for name in sorted(self.networks[argv[3]])}
+            return ok(json.dumps(joined) + "\n")
+        if verb == "create":
+            self.networks[argv[3]] = set()
+        elif verb == "connect":
+            self.networks[argv[3]].add(argv[4])
+        elif verb == "disconnect":
+            self.networks[argv[3]].discard(argv[4])
+        elif verb == "rm":
+            del self.networks[argv[3]]
         return ok()
+
+    def listed(self, verb: str) -> str:
+        """What docker create, ps and images print; nothing for the other commands."""
+        if verb == "create":
+            return "container-1\n"
+        if verb == "ps":
+            return "\n".join(self.in_use) + "\n"
+        if verb == "images":
+            return "".join(f"{ref}\tsha256:{n}\n" for n, ref in enumerate(self.images))
+        return ""
 
     def glitchtip(self, script: str) -> str:
         line = next(text for text in script.splitlines() if text.startswith("PARAMS = json.loads("))

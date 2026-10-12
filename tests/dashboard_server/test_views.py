@@ -29,33 +29,39 @@ def _pick(mine: dict[str, Any], candidates: list[Any]) -> Any:
 def shape(mine: Any, theirs: Any, where: str = "") -> list[str]:
     if mine is None or theirs is None:
         return []
-    if isinstance(theirs, bool) or isinstance(mine, bool):
-        return [] if isinstance(mine, bool) and isinstance(theirs, bool) else [f"{where}: {mine!r} vs {theirs!r}"]
-    if isinstance(theirs, int | float):
-        return [] if isinstance(mine, int | float) else [f"{where}: want a number, got {mine!r}"]
-    if isinstance(theirs, str):
-        return [] if isinstance(mine, str) else [f"{where}: want text, got {mine!r}"]
+    if isinstance(theirs, bool | int | float | str) or isinstance(mine, bool):
+        return _scalar_shape(mine, theirs, where)
     if isinstance(theirs, list):
-        if not isinstance(mine, list):
-            return [f"{where}: want a list"]
-        candidates = [t for t in theirs if not (isinstance(t, dict) and t.get("broken"))]
-        if len({type(t) for t in candidates}) > 1:  # a tuple, such as ["tasks", "Tasks", 14]: position by position
-            return [e for i, (m, t) in enumerate(zip(mine, theirs, strict=False)) for e in shape(m, t, f"{where}[{i}]")]
-        errors: list[str] = []
-        for i, row in enumerate(mine):
-            if isinstance(row, dict) and row.get("broken"):
-                errors += [] if set(row) == BROKEN else [f"{where}[{i}]: a broken row is {sorted(BROKEN)}"]
-            elif candidates:
-                errors += shape(
-                    row, _pick(row, candidates) if isinstance(row, dict) else candidates[0], f"{where}[{i}]"
-                )
-        return errors
+        return _list_shape(mine, theirs, where)
     if not isinstance(mine, dict):
         return [f"{where}: want an object"]
     want = {k for k in theirs if not k.startswith("_")}
     if set(mine) != want:
         return [f"{where}: missing {sorted(want - set(mine))}, extra {sorted(set(mine) - want)}"]
     return [e for k in want for e in shape(mine[k], theirs[k], f"{where}.{k}")]
+
+
+def _scalar_shape(mine: Any, theirs: Any, where: str) -> list[str]:
+    if isinstance(theirs, bool) or isinstance(mine, bool):
+        return [] if isinstance(mine, bool) and isinstance(theirs, bool) else [f"{where}: {mine!r} vs {theirs!r}"]
+    if isinstance(theirs, int | float):
+        return [] if isinstance(mine, int | float) else [f"{where}: want a number, got {mine!r}"]
+    return [] if isinstance(mine, str) else [f"{where}: want text, got {mine!r}"]
+
+
+def _list_shape(mine: Any, theirs: list[Any], where: str) -> list[str]:
+    if not isinstance(mine, list):
+        return [f"{where}: want a list"]
+    candidates = [t for t in theirs if not (isinstance(t, dict) and t.get("broken"))]
+    if len({type(t) for t in candidates}) > 1:  # a tuple, such as ["tasks", "Tasks", 14]: position by position
+        return [e for i, (m, t) in enumerate(zip(mine, theirs, strict=False)) for e in shape(m, t, f"{where}[{i}]")]
+    errors: list[str] = []
+    for i, row in enumerate(mine):
+        if isinstance(row, dict) and row.get("broken"):
+            errors += [] if set(row) == BROKEN else [f"{where}[{i}]: a broken row is {sorted(BROKEN)}"]
+        elif candidates:
+            errors += shape(row, _pick(row, candidates) if isinstance(row, dict) else candidates[0], f"{where}[{i}]")
+    return errors
 
 
 def _fixture(name: str) -> dict[str, Any]:
