@@ -238,3 +238,23 @@ def test_an_upgrade_that_stopped_is_shown_until_an_install_by_hand_replaces_it(
     view = factory_upgrade.view(ctx)
 
     assert (view["asked"] is not None, view["progress"] is not None) == (shown, shown)
+
+
+def test_an_upgrade_that_stopped_asks_github_again_at_once_for_a_release_that_replaced_it(
+    ctx: Context, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _installed(ctx.places)
+    calls: list[str] = []
+    monkeypatch.setattr(releases, "http_get", _github(calls))
+    upgrades.write_progress(ctx.places, OLD, NEW, upgrades.FAILED, "", "The downloaded release file is not the release")
+    failed_at = datetime.fromisoformat(upgrades.read_progress(ctx.places)["at"]).timestamp()
+    ctx.clock.t = failed_at - 60
+    factory_upgrade.poll(ctx)
+    asked = len(calls)
+
+    ctx.clock.t = failed_at + 1
+    factory_upgrade.poll(ctx)
+    again = len(calls)
+    factory_upgrade.poll(ctx)  # once for each failure, then once each check period again
+
+    assert (asked, again, len(calls)) == (2, 4, 4)
