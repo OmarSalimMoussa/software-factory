@@ -93,12 +93,12 @@ PHASES: tuple[Phase, ...] = (
         ("Stopping the running factory", steps_prepare.stop_factory),
         ("Making the factory's folders", steps_machine.state_tree),
     )),
-    # Downloading the shared services takes longest on a first install, so it starts here and runs in the background
+    # Downloading the services takes longest on a first install, so it starts here and runs in the background
     # while the owner answers the questions and the factory is set up.
-    Phase("Fetching the shared services", (
-        ("Setting up the shared services' own Docker", steps_machine.rootless_docker),
-        ("Placing the shared services", steps_services.place),
-        ("Downloading the shared services", steps_services.pull),
+    Phase("Fetching the services", (
+        ("Setting up the services' own Docker", steps_machine.rootless_docker),
+        ("Placing the services", steps_services.place),
+        ("Downloading the services", steps_services.pull),
     )),
     Phase("Connecting your accounts", (
         ("Setting up your keys and accounts", steps_secrets.secrets),
@@ -121,8 +121,8 @@ PHASES: tuple[Phase, ...] = (
         ("Publishing the dashboard on your tailnet", steps_wire.tailnet),
     )),
     Phase("Starting up", (
-        ("Starting the shared services", steps_services.start),
-        ("Connecting the shared services", steps_services.keys),
+        ("Starting the services", steps_services.start),
+        ("Connecting the services", steps_services.keys),
         ("Starting the factory", steps_wire.start),
     )),
     Phase("Running the safety checks", (

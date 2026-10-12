@@ -67,7 +67,7 @@ def _useradd(name: str, ctx: Install) -> list[str]:
         return ["useradd", "--create-home", "--home-dir", str(layout.AGENT_HOME), "--shell", "/bin/bash",
                 "--user-group", name]  # fmt: skip
     # A regular user gets subordinate ids, which rootless Docker maps a container's users to.
-    return ["useradd", "--create-home", "--home-dir", str(layout.STACK_HOME), *nologin, name]
+    return ["useradd", "--create-home", "--home-dir", str(layout.DOCKER_USERS[name]), *nologin, name]
 
 
 def users(ctx: Install) -> None:
@@ -83,14 +83,14 @@ def users(ctx: Install) -> None:
     host.run(["chmod", "0750", str(layout.AGENT_HOME)])
     host.mkdir(layout.AGENT_HOME / ".claude", mode=0o700, owner=AGENT_USER)
     _agent_caches(ctx)
-    for name in (AGENT_USER, layout.STACK_USER):
+    for name in (AGENT_USER, *layout.DOCKER_USERS):
         host.run(["loginctl", "enable-linger", name])
 
 
 def _accounts(ctx: Install) -> None:
     """Each factory user made, or kept with its home checked and its privileged groups taken away."""
     host = ctx.host
-    homes = {AGENT_USER: layout.AGENT_HOME, layout.STACK_USER: layout.STACK_HOME}
+    homes = {AGENT_USER: layout.AGENT_HOME, **layout.DOCKER_USERS}
     for name in layout.USERS:
         account = host.account(name)
         if account is None:
@@ -327,13 +327,13 @@ def github_host_keys(ctx: Install) -> None:
     host.write(path, "".join(f"github.com {key}\n" for key in keys), mode=0o644, owner=WARDEN_USER)
 
 
-def _subordinate_ids(ctx: Install) -> None:
-    """Give the stack user the subordinate ids rootless Docker maps a container's users to, past every range already
+def _subordinate_ids(ctx: Install, user: str) -> None:
+    """Give a Docker user the subordinate ids rootless Docker maps a container's users to, past every range already
     given, when useradd gave it none."""
-    host, stack = ctx.host, layout.STACK_USER
+    host = ctx.host
     flags = []
     for table, flag in (("/etc/subuid", "--add-subuids"), ("/etc/subgid", "--add-subgids")):
-        if host.query(["grep", "-q", f"^{stack}:", table])[0] == 0:
+        if host.query(["grep", "-q", f"^{user}:", table])[0] == 0:
             continue
         ends = [_SUBORDINATE_START]
         for line in host.read(Path(table)).splitlines():
@@ -343,7 +343,7 @@ def _subordinate_ids(ctx: Install) -> None:
         start = max(ends)
         flags += [flag, f"{start}-{start + _SUBORDINATE_COUNT - 1}"]
     if flags:
-        host.run(["usermod", *flags, stack])
+        host.run(["usermod", *flags, user])
 
 
 def _stack_wall(ctx: Install) -> None:
@@ -363,17 +363,19 @@ def _stack_wall(ctx: Install) -> None:
 
 
 def rootless_docker(ctx: Install) -> None:
-    """The stack user's own Docker daemon: a container's root is that user on the host, never root."""
-    host, stack = ctx.host, layout.STACK_USER
-    if not host.dry:
-        _subordinate_ids(ctx)
+    """Each Docker user's own Docker daemon, the stack user's walled off the tailnet first: a container's root is that
+    user on the host, never root."""
+    host = ctx.host
     if host.query(["which", layout.ROOTLESS_SETUP])[0] != 0 and not host.dry:
         raise refuse("Docker's rootless extras are missing on this computer: install Docker from Docker's own "
                      "packages (docker-ce and docker-ce-rootless-extras), then install again")  # fmt: skip
     _stack_wall(ctx)
-    host.run(["systemctl", "start", f"user@{ctx.uid(stack)}.service"])
-    if host.exists(layout.STACK_HOME / ".config" / "systemd" / "user" / "docker.service"):
-        host.say("rootless Docker is already set up")
-    else:
-        host.run([layout.ROOTLESS_SETUP, "install"], user=stack)
-    host.run(["systemctl", "--user", "enable", "--now", "docker.service"], user=stack)
+    for user, home in layout.DOCKER_USERS.items():
+        if not host.dry:
+            _subordinate_ids(ctx, user)
+        host.run(["systemctl", "start", f"user@{ctx.uid(user)}.service"])
+        if host.exists(home / ".config" / "systemd" / "user" / "docker.service"):
+            host.say(f"{user}'s rootless Docker is already set up")
+        else:
+            host.run([layout.ROOTLESS_SETUP, "install"], user=user)
+        host.run(["systemctl", "--user", "enable", "--now", "docker.service"], user=user)

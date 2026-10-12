@@ -112,6 +112,25 @@ def test_the_shared_services_are_downloaded_early_and_started_and_keyed_before_t
         assert action in job.host.actions
 
 
+def test_the_factorys_own_glitchtip_gets_an_account_a_docker_and_a_unit_of_its_own(tmp_path: Path) -> None:
+    job = dry_job(tmp_path)
+
+    install.run(job)
+
+    assert isinstance(job.host, DryHost)
+    acts, user, root = job.host.actions, layout.ERRORS_USER, tmp_path / "root"
+    assert f"run: useradd --create-home --home-dir /home/{user} --shell /usr/sbin/nologin --user-group {user}" in acts
+    assert f"run: {layout.ROOTLESS_SETUP} install (as {user})" in acts
+    assert f"run: loginctl enable-linger {user}" in acts
+    assert f"write: {root}/errors/errors.env (640, root:{user})" in acts
+    pulled = next(
+        n for n, a in enumerate(acts) if a.startswith("start in the background:") and a.endswith(f"(as {user})")
+    )
+    started = acts.index(f"run: systemctl reload-or-restart {layout.ERRORS_UNIT}")
+    assert "factory-errors" in acts[pulled] and pulled < started
+    assert f"run: systemctl enable {layout.ERRORS_UNIT}" in acts
+
+
 def _session(state: str) -> Session:
     return Session(
         id="s1",

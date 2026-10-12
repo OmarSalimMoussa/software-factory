@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 from system_fakes import dry_job, settings
 
-from runtime.shared.paths import Places
+from runtime.shared.paths import WARDEN_USER, Places
 from runtime.shared.protocol import Refused
 from runtime.system import drill_probe, install
 from runtime.system.install_drills import drills
@@ -425,3 +425,26 @@ def test_the_probe_names_what_each_target_did(
     monkeypatch.delenv("DRILL_PROBE_UNSET", raising=False)
 
     assert drill_probe.probe(target.format(here=tmp_path), 1) == said
+
+
+@pytest.mark.parametrize(
+    ("warden", "others", "its_docker", "ok"),
+    [
+        ("answered 200", "ECONNREFUSED", 1, True),
+        ("answered 200", "connected", 1, False),
+        ("ECONNREFUSED", "ECONNREFUSED", 1, False),
+        ("answered 200", "ECONNREFUSED", 0, False),
+    ],
+    ids=["walled-off", "a-wall-lets-one-through", "the-warden-gets-no-answer", "the-stack-users-docker-runs-it"],
+)
+def test_the_factorys_own_glitchtip_answers_the_warden_and_no_user_that_runs_agent_code(
+    warden: str, others: str, its_docker: int, ok: bool
+) -> None:
+    class Walls(FakeRig):
+        def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran:
+            if argv[:2] == ["docker", "inspect"]:
+                return Ran(its_docker, "")
+            said = warden if user == WARDEN_USER else others
+            return Ran(0, "".join(f"{t} -> {said}\n" for t in argv[4:]))
+
+    assert drills.factory_errors_walled_off(Walls()).ok is ok

@@ -1,0 +1,39 @@
+# The factory's own GlitchTip, where the warden's and the dashboard's errors go, run by its own user on that user's
+# rootless Docker: no user that runs agent code holds that Docker. It starts and stops apart from the shared services.
+# Active while it is up; a stop keeps the containers.
+[Unit]
+Description=software factory: the factory's own GlitchTip
+Wants=network-online.target user@@errors_uid@.service
+After=network-online.target user@@errors_uid@.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=@errors_user@
+Group=@errors_user@
+Slice=@slice@
+Environment=XDG_RUNTIME_DIR=/run/user/@errors_uid@
+Environment=DOCKER_HOST=unix://@errors_socket@
+Environment=PATH=@path@
+Environment=@uv_env@
+ExecStart=@python@ -I @install@/runtime/system/runners/errors_run.py up
+ExecReload=@python@ -I @install@/runtime/system/runners/errors_run.py up
+ExecStop=@python@ -I @install@/runtime/system/runners/errors_run.py stop
+# After a boot the stack user's Docker may still be starting: try again rather than stay down.
+Restart=on-failure
+RestartSec=@restart_seconds@
+UMask=0027
+TemporaryFileSystem=@state@:ro
+ProtectHome=tmpfs
+BindPaths=@errors_home@
+# ProtectHome=tmpfs also hides /run/user: the user's runtime folder (its sockets) is bound back in.
+BindPaths=/run/user/@errors_uid@
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectKernelModules=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

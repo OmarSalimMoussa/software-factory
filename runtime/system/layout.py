@@ -13,15 +13,20 @@ from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER
 from standard.services import stack
 
 STACK_USER = "software-stack"
+# The factory's own GlitchTip runs on this user's rootless Docker alone: no user that runs agent code reaches it.
+ERRORS_USER = "software-errors"
 # The group that reads the warden's slot folders (each verb's FACTORY_SLOT_DIR): the stack user's runs; units add it.
 SLOTS_GROUP = "software-slots"
-USERS = (WARDEN_USER, AGENT_USER, STACK_USER, DASHBOARD_USER)
+USERS = (WARDEN_USER, AGENT_USER, STACK_USER, DASHBOARD_USER, ERRORS_USER)
 # A factory user in any of these could reach root, Docker, the journal or a disk: the installer refuses.
 PRIVILEGED_GROUPS = frozenset(
     {"root", "sudo", "admin", "wheel", "adm", "docker", "systemd-journal", "lxd", "libvirt", "disk", "shadow", "kvm"}
 )
 AGENT_HOME = Path("/home") / AGENT_USER
 STACK_HOME = Path("/home") / STACK_USER
+ERRORS_HOME = Path("/home") / ERRORS_USER
+# Each user whose own rootless Docker runs a stack, with its home.
+DOCKER_USERS = {STACK_USER: STACK_HOME, ERRORS_USER: ERRORS_HOME}
 
 PYTHON = "/usr/bin/python3"
 # The factory command. Sessions type the bare word alone, which is the one text the sandbox lets out.
@@ -77,6 +82,8 @@ UPGRADE_RUN = paths.UPGRADE_UNIT.format("")
 SERVICES = (WARDEN_UNIT, DASHBOARD_UNIT, DAEMON_UNIT)
 # The laptop's shared services (the stack of standard/services/), run by the stack user; a reinstall leaves them up.
 SERVICES_UNIT = "software-services.service"
+# The factory's own GlitchTip, run by its own user; a reinstall leaves it up.
+ERRORS_UNIT = "software-errors.service"
 
 PACKAGES = ("bubblewrap", "socat", "uidmap", "nftables", "apparmor-utils")
 ROOTLESS_SETUP = "dockerd-rootless-setuptool.sh"
@@ -101,7 +108,7 @@ OWNER_SERVER_KEYS = Path(".config") / "software-factory" / SERVER_KEYS
 
 
 def rootless_socket(uid: int | str) -> str:
-    """The stack user's own Docker socket, which its rootless daemon opens in its runtime folder."""
+    """A user's own Docker socket, which its rootless daemon opens in its runtime folder."""
     return f"/run/user/{uid}/docker.sock"
 
 

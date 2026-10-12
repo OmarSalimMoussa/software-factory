@@ -11,11 +11,14 @@ The stack user, `software-stack`, runs the services on its own rootless Docker, 
 stack, starts it and enables it, so it comes back after a restart. A reinstall leaves it running and applies a changed
 stack; the data stays.
 
+The factory's own GlitchTip runs apart, on the rootless Docker of a user of its own, `software-errors`, as the service
+`software-errors.service`. It starts and stops on its own, whatever the shared services are doing.
+
 - Is it up? `systemctl status software-services.service`. When it is not, its log names each service that did not
   become healthy.
 - Restart it: `sudo systemctl restart software-services.service`. A stop keeps the containers and their data.
-- At every install, a drill checks that GlitchTip, Langfuse and the factory's own GlitchTip answer the stack user
-  on the addresses below.
+- At every install, one drill checks that GlitchTip and Langfuse answer the stack user on the addresses below, and
+  another that the factory's own GlitchTip answers the warden and neither the agent user nor the stack user.
 
 ## Where to open them
 
@@ -30,8 +33,9 @@ Every address is on the laptop's loopback, so nothing outside the laptop reaches
 | MinIO: Langfuse's files | http://127.0.0.1:9090 | Used by Langfuse; you never open it |
 | The factory's own GlitchTip | http://127.0.0.1:8210 | The same email and `ERRORS_OWNER_PASSWORD` |
 
-The passwords are in `/var/lib/software-factory-services/services.env`, and the factory's own GlitchTip's in
-`/var/lib/software-factory-errors/errors.env`. Only root and the stack user can read them:
+The passwords are in `/var/lib/software-factory-services/services.env`, which only root and the stack user can read,
+and the factory's own GlitchTip's in `/var/lib/software-factory-errors/errors.env`, which only root and the errors user
+can read:
 
 ```sh
 sudo grep PASSWORD /var/lib/software-factory-services/services.env /var/lib/software-factory-errors/errors.env
@@ -68,9 +72,10 @@ database user and its network, and removes its env file. The slot's GlitchTip pr
 ## The factory's own errors
 
 The warden's and the dashboard's own errors go to the factory's own GlitchTip, a second GlitchTip apart from the
-shared one: its project `factory`, in the environment `factory`, named by the installed commit. No slot joins its
-network, and no product's GlitchTip ever stands in for it: the installer refuses an address that is the product's.
-`factory errors` reads only the product's GlitchTip, so an agent never sees the factory's own errors.
+shared one: its project `factory`, in the environment `factory`, named by the installed commit. Its user's Docker is
+no one else's, the firewall keeps the agent user and the stack user off its port, and no slot joins its network. The
+installer saves no address for it but its own. `factory errors` reads only the product's GlitchTip, so an agent never
+sees the factory's own errors.
 
 The installer sets it up. Without its address, the warden and the dashboard do not start, and their logs say why.
 

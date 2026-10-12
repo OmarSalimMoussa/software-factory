@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -11,9 +12,10 @@ from system_fakes import dry_job, settings
 
 from runtime.system import layout
 from runtime.system.install_steps import steps_machine
+from runtime.system.runners import errors_run, record_exit, services_run, trust
 from runtime.system.runners import launch_file as lf
-from runtime.system.runners import record_exit, trust
 from runtime.system.runners.stack_run import size_bytes
+from standard.services import provision
 
 STATE = Path("/var/lib/software-factory")
 HOME = Path("/home/software-agent")
@@ -194,3 +196,33 @@ def test_the_install_has_the_agent_user_trust_its_checkout(tmp_path: Path) -> No
         f"{layout.PYTHON} -I {job.places.install}/runtime/system/runners/trust.py {layout.AGENT_HOME}/.claude.json"
     )
     assert f"run: {trusting} {job.checkout()} (as software-agent)" in job.host.actions  # type: ignore[attr-defined]  # a dry host
+
+
+@pytest.mark.parametrize(("verb", "code", "status"), [("up", 0, 0), ("up", 1, 1), ("stop", 0, 0), ("stop", 1, 1)])
+def test_the_factorys_own_glitchtip_starts_and_stops_on_its_own_and_says_when_it_did_not(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], verb: str, code: int, status: int
+) -> None:
+    ran: list[list[str]] = []
+
+    def run(argv: list[str], stdin: str | None = None) -> subprocess.CompletedProcess[str]:
+        ran.append(argv)
+        return subprocess.CompletedProcess(argv, code, "", "glitchtip is unhealthy")
+
+    monkeypatch.setattr(provision, "real_run", run)
+
+    assert errors_run.main([verb]) == status
+    assert ran and all(argv[:4] == ["docker", "compose", "-p", "factory-errors"] for argv in ran)
+    if status:
+        assert "the factory's own GlitchTip" in capsys.readouterr().out
+
+
+def test_stopping_the_shared_services_leaves_the_factorys_own_glitchtip_running(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ran: list[list[str]] = []
+    monkeypatch.setattr(
+        provision, "real_run", lambda argv, stdin=None: ran.append(argv) or subprocess.CompletedProcess(argv, 0, "", "")
+    )
+
+    assert services_run.main(["stop"]) == 0
+    assert ran and not any("factory-errors" in argv for argv in ran)

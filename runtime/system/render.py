@@ -16,6 +16,7 @@ from runtime.shared import error_reports
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER, Places
 from runtime.shared.settings import Settings
 from runtime.system import layout
+from runtime.system.errors import instance
 
 HERE = Path(__file__).resolve().parent
 TOKEN = re.compile(r"@([a-z_]+)@")
@@ -47,6 +48,7 @@ UNIT_FILES = (
     Artifact(f"units/{layout.CHECK_RUN}", layout.UNITS_DIR / layout.CHECK_RUN, 0o644),
     Artifact(f"units/{layout.UPGRADE_RUN}", layout.UNITS_DIR / layout.UPGRADE_RUN, 0o644),
     Artifact(f"units/{layout.SERVICES_UNIT}", layout.UNITS_DIR / layout.SERVICES_UNIT, 0o644),
+    Artifact(f"units/{layout.ERRORS_UNIT}", layout.UNITS_DIR / layout.ERRORS_UNIT, 0o644),
     Artifact("units/system-sleep.sh", layout.SLEEP_HOOK, 0o755),
 )
 POLKIT = Artifact("polkit/50-software-factory.rules", layout.POLKIT_RULE, 0o644)
@@ -69,7 +71,7 @@ def render(text: str, values: Mapping[str, str]) -> str:
     return TOKEN.sub(lambda found: values[found.group(1)], text)
 
 
-def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str) -> dict[str, str]:
+def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str, errors_uid: str) -> dict[str, str]:
     """Every value a unit, rule or firewall template may name. The users' ids are the machine's, so a unit never
     uses %U or %h: in a system unit those name root, whatever its User= says."""
     return {
@@ -95,6 +97,11 @@ def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str
         "agent_uid": agent_uid,
         "stack_uid": stack_uid,
         "stack_socket": layout.rootless_socket(stack_uid),
+        "errors_user": layout.ERRORS_USER,
+        "errors_home": str(layout.ERRORS_HOME),
+        "errors_uid": errors_uid,
+        "errors_socket": layout.rootless_socket(errors_uid),
+        "errors_port": str(instance.PORT),
         "path": layout.UNIT_PATH,
         "uv_env": " ".join(f"{key}={value}" for key, value in layout.UV_ENV.items()),
         "slice": SLICE,

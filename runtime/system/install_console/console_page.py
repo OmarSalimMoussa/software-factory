@@ -89,7 +89,7 @@ def _services(places: Places) -> tuple[list[dict[str, Any]], str]:
     # telemetry: surfaced — the status draws `why` nothing was checked
     except (OSError, store.StoreError, settings_module.SettingsError) as exc:
         why = f"The warden's published settings cannot be read ({type(exc).__name__})"
-        return [], f"{why}, so the warden, the dashboard and the shared services were not checked."
+        return [], f"{why}, so the warden, the dashboard and the services were not checked."
     timeout = float(values["watch.http_timeout_seconds"])
     try:
         Warden(places.owner_socket, lambda: float(values["dashboard.warden_seconds"])).call(
@@ -192,7 +192,7 @@ def kept(places: Places, watched: bool) -> list[str]:
         "The 6-digit code on your phone",
         *(["The Healthchecks.io checks"] if watched else []),
         "The agents' copy of the product, its queue and their paused work",
-        "The shared services and their data",
+        "The shared services, the factory's own GlitchTip and their data",
     ]
 
 

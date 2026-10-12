@@ -4,9 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from runtime.shared.paths import MANAGED_SETTINGS
+from runtime.shared import paths
+from runtime.shared.paths import MANAGED_SETTINGS, Places
 from runtime.system import layout, sealed, uninstall
-from runtime.system.host import DryHost
+from runtime.system.host import Account, DryHost
 
 
 @pytest.mark.parametrize(
@@ -46,3 +47,17 @@ def test_the_uninstall_removes_every_sealed_copy_but_the_one_it_runs_from(
         # A copy an earlier failed install kept goes; the one this runs from goes when it ends.
         gone = {action.removeprefix("remove: ") for action in host.actions if action.startswith("remove: ")}
         assert gone == {str(stale), str(sealed.release_folder(stale))}
+
+
+def test_the_uninstall_takes_the_factorys_own_glitchtip_away_with_its_account_and_its_data(tmp_path: Path) -> None:
+    host = DryHost(dry=False)
+    for uid, user in ((1002, layout.STACK_USER), (1003, layout.ERRORS_USER)):
+        host.users[user] = Account(user, uid, uid, Path("/home") / user, (user,), "")
+    host.paths.add(paths.ERRORS)
+
+    uninstall.state(host, Places.under(tmp_path))
+    uninstall.users(host)
+
+    assert f"remove: {paths.ERRORS}" in host.actions
+    assert f"run: userdel --remove {layout.ERRORS_USER}" in host.actions
+    assert layout.ERRORS_UNIT in uninstall.UNITS

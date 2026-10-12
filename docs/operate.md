@@ -22,12 +22,14 @@ Run with sudo, the file checks itself, unpacks the factory into a new sealed cop
 your browser. It prints the page's link too; the link works once, in the browser that opens it.
 
 - **This laptop** says whether the factory is installed, at which commit and since when, how the last safety checks
-  did, whether the warden, the dashboard, GlitchTip and Langfuse answer, and where the dashboard is on your tailnet.
+  did, whether the warden, the dashboard, GlitchTip, Langfuse and the factory's own GlitchTip answer, and where the
+  dashboard is on your tailnet.
 - **Install** installs the release's commit. On a laptop that has the factory, it says **Upgrade**, from which
-  commit, and what it keeps: your settings, accounts, keys and code, the Healthchecks.io checks, the agents' work and
-  the shared services. Turn on **Dry run** to go through every step on this computer without changing anything.
+  commit, and what it keeps: your settings, accounts, keys and code, the Healthchecks.io checks, the agents' work, the
+  shared services and the factory's own GlitchTip. Turn on **Dry run** to go through every step on this computer
+  without changing anything.
 - **An install** shows a few phases with a progress bar and one line on what it is doing: checking this computer,
-  preparing it, fetching the shared services, connecting your accounts, setting up the factory, starting up, running
+  preparing it, fetching the services, connecting your accounts, setting up the factory, starting up, running
   the safety checks and finishing. It never shows the commands it runs.
 - **Questions** appear as the install reaches them: the 6-digit code's secret as a QR code to scan, with its key to
   type instead and a Copy button; your GitHub token and the agents' Claude token, typed into password fields. With
@@ -93,8 +95,8 @@ with a tree that passed `factory check`.
 Every product gets a database, traces (Langfuse) and errors (GlitchTip) from the factory: on the server for staging
 and prod ([server.md](server.md)), and on the laptop for the stack slots ([laptop-services.md](laptop-services.md)).
 Each new prod error arrives once as a request in the agents' inbox, for triage beside your feedback. Agents read
-errors and traces with `factory errors` and `factory traces`; the factory's own failures report to the laptop's
-GlitchTip too.
+errors and traces with `factory errors` and `factory traces`. The factory's own failures report to a GlitchTip of its
+own on the laptop, which no agent reaches ([laptop-services.md](laptop-services.md)).
 
 ## The product's tools
 

@@ -5,10 +5,11 @@ runs it (``sudo python3 software-factory.pyz --uninstall``); from the owner's cl
 
 It refuses while any session is working or waiting. It stops and removes the factory's units, rules, firewall table,
 AppArmor profile, managed settings, commands and programs, and the sealed copies installs ran from; the warden's state
-(its secrets and the 6-digit code's secret included) and the laptop's shared services with their data; the four
-factory users with their homes (the agents' clone and the stack user's Docker data); and the factory's git hooks
-setting in the owner's checkout. It never removes packages, the owner's own files, the install logs, or anything on
-the server or on GitHub: it says what to remove there. Like the installer, it shows a few phases and logs the rest.
+(its secrets and the 6-digit code's secret included), the laptop's shared services and the factory's own GlitchTip
+with their data; the factory's users with their homes (the agents' clone and each Docker user's Docker data); and the
+factory's git hooks setting in the owner's checkout. It never removes packages, the owner's own files, the install
+logs, or anything on the server or on GitHub: it says what to remove there. Like the installer, it shows a few phases
+and logs the rest.
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ UNITS = (
     layout.FIREWALL_REFRESH,
     layout.FIREWALL_UNIT,
     layout.SERVICES_UNIT,
+    layout.ERRORS_UNIT,
 )
 TEMPLATES = (layout.AGENT_RUN, layout.STACK_RUN, layout.CHECK_RUN, layout.UPGRADE_RUN)
 GUARD = "/opt/software-factory/runtime/guard/hook.py"  # the installed guard, named in the factory's managed settings
@@ -89,7 +91,7 @@ def stop(host: Host) -> None:
     instances = [f"{unit.removesuffix('.service')}*" for unit in TEMPLATES]
     _try(host, ["systemctl", "stop", *UNITS, *instances])
     _try(host, ["systemctl", "disable", *UNITS])
-    for user in (layout.STACK_USER, AGENT_USER):
+    for user in (*layout.DOCKER_USERS, AGENT_USER):
         account = host.account(user)
         if account is None:
             continue
@@ -183,7 +185,7 @@ def state(host: Host, places: Places) -> None:
 
 
 def users(host: Host) -> None:
-    for user in (AGENT_USER, layout.STACK_USER):
+    for user in (AGENT_USER, *layout.DOCKER_USERS):
         if host.account(user) is not None:
             host.run(["userdel", "--remove", user])
         for home in _with_leftovers(Path("/home") / user):
@@ -216,7 +218,7 @@ STEPS = (
     "Stopping the factory",
     "Removing its services, rules and firewall",
     "Removing its programs",
-    "Removing its data and the shared services",
+    "Removing its data and its services",
     "Removing its users",
     "Taking its git hooks off your checkout",
 )

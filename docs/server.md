@@ -68,7 +68,7 @@ If one fails, the set-up stops before it changes anything and says what to do.
   `/srv/<product>/<workspace>/` for each workspace's stack, env file and deploy records. The admin user owns them.
 - **The shared services.** Their compose file, the edge's settings and their own `services.env`, in
   `/srv/factory/services/`. The set-up brings them up and waits until every one is healthy. Then it creates
-  GlitchTip's organization, your GlitchTip user, a read-only token and a project for the factory's own errors.
+  GlitchTip's organization, your GlitchTip user and a read-only token.
 - **Prod's heartbeat.** Every five minutes, as the admin user, the server asks prod's public health address and
   checks it answers as `prod`. Then it checks in with Healthchecks.io, or tells it at once that prod failed. When
   the check-ins stop, Healthchecks.io tells you, even when the server is down. Give the check's ping address once,

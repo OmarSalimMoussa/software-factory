@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from runtime.shared import claude_accounts
-from runtime.shared.paths import AGENT_USER
+from runtime.shared.paths import AGENT_USER, WARDEN_USER
 from runtime.system import layout
 from runtime.system.errors import instance
 from runtime.system.install_drills.evidence import (
@@ -282,13 +282,32 @@ def stack_off_tailnet(rig: Rig) -> Result:
 
 def shared_services_answer(rig: Rig) -> Result:
     """The stack user's Docker publishes GlitchTip and Langfuse on the loopback, where the slots' stacks and the
-    warden reach them, and the factory's own GlitchTip, where the warden and the dashboard send their errors."""
-    targets = [f"get:{layout.GLITCHTIP_HEALTH}", f"get:{layout.LANGFUSE_HEALTH}", f"get:{instance.HEALTH}"]
+    warden reach them."""
+    targets = [f"get:{layout.GLITCHTIP_HEALTH}", f"get:{layout.LANGFUSE_HEALTH}"]
     ran = rig.as_user(layout.STACK_USER, probe_command(rig, *targets))
     found = outcomes(ran.out)
     ok = len(found) == len(targets) and set(found.values()) == {"answered 200"}
     evidence = "; ".join(f"{target} -> {outcome}" for target, outcome in found.items()) or first_line(ran.out)
-    return Result("GlitchTip, Langfuse and the factory's own GlitchTip answer on the loopback", ok, evidence)
+    return Result("GlitchTip and Langfuse answer the stack user on the loopback", ok, evidence)
+
+
+def factory_errors_walled_off(rig: Rig) -> Result:
+    """The factory's own GlitchTip answers the warden, which sends it the factory's errors. Neither user that runs
+    agent code reaches its port or reads its settings, and the stack user's Docker does not run it."""
+    name = "the factory's own GlitchTip answers the warden, and no user that runs agent code reaches it"
+    warden = outcomes(rig.as_user(WARDEN_USER, probe_command(rig, f"get:{instance.HEALTH}")).out)
+    targets = [f"tcp:127.0.0.1:{instance.PORT}", f"file:{rig.places.errors / instance.ENV_FILE}"]
+    others = {user: rig.as_user(user, probe_command(rig, *targets)).out for user in (AGENT_USER, layout.STACK_USER)}
+    inspect = rig.as_user(layout.STACK_USER, ["docker", "inspect", "--format", "{{.Name}}", instance.CONTAINER])
+    walled = all(len(outcomes(out)) == len(targets) and not breaches(out) for out in others.values())
+    ok = set(warden.values()) == {"answered 200"} and walled and inspect.code != 0
+    said = "; ".join(
+        f"as {user}: {', '.join(outcomes(out).values()) or first_line(out)}" for user, out in others.items()
+    )
+    runs = "runs it" if inspect.code == 0 else "does not run it"
+    return Result(
+        name, ok, f"as the warden: {', '.join(warden.values()) or 'nothing'}; {said}; the stack user's Docker {runs}"
+    )
 
 
 def dashboard_unreachable(rig: Rig) -> Result:
@@ -345,6 +364,7 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
     toolchain_answers,
     stack_not_root,
     shared_services_answer,
+    factory_errors_walled_off,
     stack_off_tailnet,
     dashboard_unreachable,
     warden_runs_commands,

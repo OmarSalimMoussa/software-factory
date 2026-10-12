@@ -1,4 +1,5 @@
-"""The factory's own GlitchTip: its settings, its set-up, and the product's GlitchTip it is never mistaken for."""
+"""The factory's own GlitchTip: its own account and settings, its set-up, and the product's GlitchTip it is never
+mistaken for."""
 
 from __future__ import annotations
 
@@ -6,19 +7,20 @@ import ast
 import json
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
-from system_fakes import FIXTURE, dry_job
+from system_fakes import dry_job
 
 from runtime.shared import error_reports
 from runtime.shared.protocol import Refused
-from runtime.system import layout
+from runtime.system import install, layout
 from runtime.system.errors import instance
 from runtime.system.host import Account, DryHost
 from runtime.system.install_steps import steps_services
 from runtime.system.job import Install
 from runtime.warden.health import telemetry
-from standard import config
+from standard import yaml_subset
 from standard.services import glitchtip_bootstrap as glitchtip
 from standard.services import provision, stack
 
@@ -31,6 +33,19 @@ def test_its_secrets_are_made_once_and_kept_and_a_blank_one_is_refused() -> None
     assert (first["ERRORS_DOMAIN"], first["ERRORS_PORT"]) == ("http://127.0.0.1:8210", "8210")
     with pytest.raises(instance.ErrorsError, match="ERRORS_SECRET_KEY empty"):
         instance.generate_env("owner@example.com", {**first, "ERRORS_SECRET_KEY": ""})
+
+
+def test_it_runs_the_images_the_shared_glitchtip_pins_and_names_none_of_its_own() -> None:
+    shared = yaml_subset.load(stack.COMPOSE.read_text())["services"]
+    own = yaml_subset.load(instance.COMPOSE.read_text())["services"]
+    made = instance.generate_env("owner@example.com", {})
+
+    assert {key: made[key] for key in ("ERRORS_GLITCHTIP_IMAGE", "ERRORS_POSTGRES_IMAGE", "ERRORS_VALKEY_IMAGE")} == {
+        "ERRORS_GLITCHTIP_IMAGE": shared["glitchtip"]["image"],
+        "ERRORS_POSTGRES_IMAGE": shared["glitchtip-postgres"]["image"],
+        "ERRORS_VALKEY_IMAGE": shared["glitchtip-valkey"]["image"],
+    }
+    assert all(service["image"].startswith("${ERRORS_") for service in own.values())
 
 
 def test_its_project_address_comes_from_its_own_container_once_the_owner_and_organization_are_made() -> None:
@@ -51,18 +66,19 @@ def test_its_project_address_comes_from_its_own_container_once_the_owner_and_org
 
 
 @pytest.mark.parametrize(
-    ("address", "products"),
+    ("address", "own"),
     [
-        ("http://k@127.0.0.1:8210/1", False),
-        ("http://k@127.0.0.1:8200/1", True),
-        ("http://k@localhost:8200/1", True),
-        ("http://k@factory-glitchtip:8000/1", True),
-        ("https://k@notes-box.example.ts.net:8200/1", True),
+        ("http://k@127.0.0.1:8210/1", True),
+        ("http://k@127.0.0.1:8200/1", False),
+        ("http://k@localhost:8210/1", False),
+        ("http://k@[::1]:8200/1", False),
+        ("http://k@factory-glitchtip:8000/1", False),
+        ("https://k@notes-box.example.ts.net:8200/1", False),
     ],
-    ids=["its-own", "the-laptops-shared", "the-shared-by-name", "the-shared-inside-docker", "the-servers"],
+    ids=["its-own", "the-laptops-shared", "by-another-name", "the-shared-on-ipv6", "inside-docker", "the-servers"],
 )
-def test_a_products_glitchtip_is_never_taken_for_the_factorys(address: str, products: bool) -> None:
-    assert instance.products_glitchtip(address, config.load(FIXTURE)) is products
+def test_only_its_own_address_is_taken_for_the_factorys(address: str, own: bool) -> None:
+    assert instance.is_own(address) is own
 
 
 def _keying_job(tmp_path: Path, answers: dict[str, dict[str, object]]) -> Install:
@@ -70,8 +86,9 @@ def _keying_job(tmp_path: Path, answers: dict[str, dict[str, object]]) -> Instal
     job = dry_job(tmp_path)
     assert isinstance(job.host, DryHost)
     job.host.dry = False  # decides like a real install; a dry host still changes nothing
-    stack_home = tmp_path / "home" / layout.STACK_USER
-    job.host.users[layout.STACK_USER] = Account(layout.STACK_USER, 1002, 1002, stack_home, (layout.STACK_USER,), "")
+    for uid, user in ((1002, layout.STACK_USER), (1003, layout.ERRORS_USER)):
+        home = tmp_path / "home" / user
+        job.host.users[user] = Account(user, uid, uid, home, (user,), "")
     job.places.services.mkdir(parents=True)
     (job.places.services / stack.ENV_FILE).write_text("".join(f"{k}=v-{k}\n" for k in provision.SERVICE_KEYS))
     errors_env = job.places.errors / instance.ENV_FILE
@@ -84,9 +101,9 @@ def _keying_job(tmp_path: Path, answers: dict[str, dict[str, object]]) -> Instal
 @pytest.mark.parametrize(
     ("given", "refused"),
     [("http://k@127.0.0.1:8210/1", False), ("http://k@127.0.0.1:8200/1", True)],
-    ids=["its-own-is-saved", "the-products-is-refused"],
+    ids=["its-own-is-saved", "any-other-is-refused"],
 )
-def test_the_install_saves_the_factorys_own_address_and_refuses_the_products(
+def test_the_install_saves_the_factorys_own_address_and_refuses_any_other(
     tmp_path: Path, given: str, refused: bool
 ) -> None:
     said = {"token": "read-token", "dsns": {"factory": given}}
@@ -94,12 +111,26 @@ def test_the_install_saves_the_factorys_own_address_and_refuses_the_products(
     saved = f"write: {error_reports.dsn_path(job.places)} "
 
     if refused:
-        with pytest.raises(Refused, match="which is the product's GlitchTip"):
+        with pytest.raises(Refused, match="127.0.0.1:8200 as its address, not its own http://127.0.0.1:8210"):
             steps_services.keys(job)
         assert not any(action.startswith(saved) for action in job.host.actions)
     else:
         steps_services.keys(job)
         assert any(action.startswith(saved) for action in job.host.actions)
+
+
+def test_each_glitchtip_is_set_up_by_the_account_whose_docker_runs_it(tmp_path: Path) -> None:
+    said = {"token": "read-token", "dsns": {"factory": "http://k@127.0.0.1:8210/1"}}
+    job = _keying_job(tmp_path, {provision.GLITCHTIP: said, instance.CONTAINER: said})
+    assert isinstance(job.host, DryHost)
+
+    steps_services.keys(job)
+    ran = [action for action in job.host.actions if action.startswith("run: docker exec -i ")]
+
+    assert {action.split()[4]: action.rsplit("(as ", 1)[1] for action in ran} == {
+        provision.GLITCHTIP: f"{layout.STACK_USER})",
+        instance.CONTAINER: f"{layout.ERRORS_USER})",
+    }
 
 
 def test_factory_errors_reads_only_the_shared_glitchtip_and_never_the_factorys_own(
@@ -122,3 +153,31 @@ def test_factory_errors_reads_only_the_shared_glitchtip_and_never_the_factorys_o
     assert (read.url, read.token) == (layout.GLITCHTIP_URL, "shared-token")
     assert all("own-token" not in text for text in written.values())
     assert [path for path, text in written.items() if "own-key" in text] == [error_reports.dsn_path(job.places)]
+
+
+def test_a_reinstall_keeps_its_secrets_and_only_its_own_account_reads_them(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    errors_env = job.places.errors / instance.ENV_FILE
+    job.host.files[errors_env] = instance.render_env(instance.generate_env("owner@example.com", {}))
+    before = stack.parse_env(job.host.files[errors_env], str(errors_env))
+    written: dict[Path, tuple[str, dict[str, Any]]] = {}
+    real_write = job.host.write
+
+    def keep(path: Path, text: str, **how: Any) -> None:
+        written[path] = (text, how)
+        real_write(path, text, **how)
+
+    monkeypatch.setattr(job.host, "write", keep)
+
+    install.run(job)
+    text, how = written[errors_env]
+
+    after = stack.parse_env(text, str(errors_env))
+    assert {key: after[key] for key in before if "PASSWORD" in key or "SECRET" in key} == {
+        key: before[key] for key in before if "PASSWORD" in key or "SECRET" in key
+    }
+    assert (how["mode"], how["group"]) == (0o640, layout.ERRORS_USER)
+    assert f"make: {job.places.errors}/ (750, root:{layout.ERRORS_USER})" in job.host.actions

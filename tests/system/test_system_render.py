@@ -11,11 +11,11 @@ from runtime.system import layout, render
 
 HERE = render.HERE
 PLACES = Places.system()
-AGENT_UID, STACK_UID = "1001", "1002"
+AGENT_UID, STACK_UID, ERRORS_UID = "1001", "1002", "1003"
 
 
 def _values(**changes: object) -> dict[str, str]:
-    return render.values(PLACES, settings(**changes), agent_uid=AGENT_UID, stack_uid=STACK_UID)
+    return render.values(PLACES, settings(**changes), agent_uid=AGENT_UID, stack_uid=STACK_UID, errors_uid=ERRORS_UID)
 
 
 def _unit(name: str, **changes: object) -> str:
@@ -54,6 +54,7 @@ def test_every_unit_renders_whole() -> None:
          "runners/stack_run.py /var/lib/software-factory %i"),
         ("software-agent-daemon.service", "software-agent", AGENT_UID, "runners/with_token.py"),
         ("software-services.service", "software-stack", STACK_UID, "runners/services_run.py up"),
+        ("software-errors.service", "software-errors", ERRORS_UID, "runners/errors_run.py up"),
     ],
 )  # fmt: skip
 def test_agent_and_stack_units_fix_their_user_home_and_slice(name: str, user: str, uid: str, runner: str) -> None:
@@ -74,7 +75,7 @@ def test_agent_and_stack_units_fix_their_user_home_and_slice(name: str, user: st
     # uv finds the product's Python among the toolchain's copies, and never downloads one.
     uv = "UV_PYTHON_INSTALL_DIR=/opt/software-factory-toolchain/python UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy"
     assert f"Environment={uv}" in lines
-    if user == "software-stack":
+    if user in ("software-stack", "software-errors"):
         assert f"Environment=DOCKER_HOST=unix:///run/user/{uid}/docker.sock" in lines
 
 
@@ -132,10 +133,11 @@ def test_a_template_naming_an_unknown_value_fails_loudly(tmp_path: Path) -> None
         render.render("User=@nobody_gave_this@\n", _values())
 
 
-def test_neither_user_that_runs_agent_code_reaches_the_dashboard_or_the_tailnet() -> None:
+def test_neither_user_that_runs_agent_code_reaches_the_dashboard_the_factorys_glitchtip_or_the_tailnet() -> None:
     text = render.artifact(render.FIREWALL, HERE, _values(**{"dashboard.port": 8400}))
     for user in ("software-agent", "software-stack"):
         assert f'meta skuid "{user}" tcp dport 8400 reject with tcp reset' in text
+        assert f'meta skuid "{user}" tcp dport 8210 reject with tcp reset' in text
         assert f'meta skuid "{user}" ip daddr 100.64.0.0/10 meta l4proto tcp reject with tcp reset' in text
         assert f'meta skuid "{user}" ip6 daddr fd7a:115c:a1e0::/48 meta l4proto tcp reject with tcp reset' in text
 

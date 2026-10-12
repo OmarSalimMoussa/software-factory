@@ -6,9 +6,12 @@ import urllib.request
 from pathlib import Path
 
 import pytest
+from warden_fakes import defaults_text
 
-from runtime.shared import error_reports
+from runtime.dashboard import server
+from runtime.shared import error_reports, settings
 from runtime.shared.paths import Places
+from runtime.warden import public, wardend
 
 DSN = "http://abc123@127.0.0.1:8200/7"
 
@@ -98,6 +101,23 @@ def test_without_the_dsn_the_service_refuses_to_start_naming_the_file(tmp_path: 
         f"{tmp_path}/state/secrets/factory-dsn is missing: the address of the factory's own GlitchTip, which the "
         "install writes. Install the factory again."
     )
+
+
+@pytest.mark.parametrize("service", ["warden", "dashboard"])
+def test_without_the_dsn_the_warden_and_the_dashboard_do_not_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, service: str
+) -> None:
+    places = Places.under(tmp_path)
+    places.install.mkdir(parents=True)
+    places.defaults.write_text(defaults_text())
+    places.state.mkdir(parents=True)
+    public.write_settings(places, settings.load(places.defaults, places.overrides))
+    monkeypatch.setattr(Places, "system", staticmethod(lambda: places))
+    main = wardend.main if service == "warden" else server.main
+
+    with caplog.at_level(logging.CRITICAL):
+        assert main() == 2
+    assert f"{service}: it does not start without the factory's own GlitchTip" in caplog.text
 
 
 @pytest.mark.parametrize(
