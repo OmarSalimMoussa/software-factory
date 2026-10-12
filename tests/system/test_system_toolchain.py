@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from system_fakes import dry_job, lookup
+from system_fakes import dry_job, found_at, lookup
 
 from runtime.shared.protocol import Refused
 from runtime.system import install
@@ -21,7 +21,7 @@ KEY = "cpython-3.14.4-linux-x86_64-gnu"
 def _on_path(job: Install, name: str, found: str, real: str = "") -> None:
     assert isinstance(job.host, DryHost)
     # The shell's start-up files print before the lookup answers.
-    job.host.answers[lookup(name)] = (0, f"Now using node v22\n{steps_prepare.LOOKUP_MARK}\n{found}\n")
+    job.host.answers[lookup(name)] = (0, f"Now using node v22\n{found_at(found)}")
     job.host.answers[f"readlink -f {found}"] = (0, real or found)
 
 
@@ -172,3 +172,26 @@ def test_a_python_the_owners_uv_lacks_is_fetched_with_it_once_before_the_install
         steps_toolchain.pythons(job)
 
     assert [a for a in job.host.actions if "python install" in a] == [f"run: {uv} python install 3.14 (as owner)"]
+
+
+UV = "/home/owner/.local/bin/uv"
+# What the dashboard's upgrade reads: with no terminal, the shell's warnings follow its answer.
+NO_TERMINAL = (
+    "bash: cannot set terminal process group (3177913): Inappropriate ioctl for device\n"
+    "bash: no job control in this shell\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("code", "answer", "found"),
+    [(0, found_at(UV), UV), (1, steps_prepare.LOOKUP_MARK + "\n", "")],
+    ids=["found", "not-found"],
+)
+def test_a_shell_with_no_terminal_never_has_its_job_control_warning_read_as_the_tool(
+    tmp_path: Path, code: int, answer: str, found: str
+) -> None:
+    job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    job.host.answers[lookup("uv")] = (code, answer + NO_TERMINAL)
+
+    assert steps_prepare.login_path(job.host, job.owner, "uv") == (code, found)

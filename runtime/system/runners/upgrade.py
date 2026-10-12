@@ -103,14 +103,18 @@ def upgrade(places: Places, commit: str) -> int:
 
 
 def ended(places: Places, commit: str) -> int:
-    """The unit's last word, however it ended (a timeout's kill included): an upgrade still running stopped."""
+    """The unit's last word, however it ended (a timeout's kill included): an upgrade still running stopped, and the
+    factory's services run again, so the dashboard says how it ended. The factory stays paused."""
     said = upgrades.read_progress(places)
     if said is not None and said["to"] == commit and said["state"] == upgrades.RUNNING:
         result = environment.systemd_result()
         why = f" ({result})" if result is not None else ""
         problem = f"The upgrade stopped before it finished{why}. Its log in {layout.LOGS} says more; upgrade again."
         upgrades.write_progress(places, said["from"], commit, upgrades.FAILED, "", problem, said["log"])
-    return 0
+    started = subprocess.run(["systemctl", "start", "--no-block", *layout.SERVICES], check=False)
+    if started.returncode != 0:
+        print(f"upgrade: the factory's services did not start again (exit {started.returncode})", file=sys.stderr)
+    return started.returncode
 
 
 def main(argv: list[str]) -> int:

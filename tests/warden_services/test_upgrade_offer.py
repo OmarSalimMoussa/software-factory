@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from warden_fakes import OWNER_CALLER, FakeLauncher
 from runtime.shared import network, releases, upgrades
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
+from runtime.system import layout
 from runtime.system.runners import upgrade as upgrade_runner
 from runtime.warden.context import Context
 from runtime.warden.dispatch import Doors
@@ -179,14 +181,24 @@ def test_an_upgrade_quiet_for_longer_than_one_may_run_reads_as_stopped(
     factory_upgrade.start(ctx, {"commit": NEW}, None)
 
 
-def test_the_units_last_word_marks_a_killed_upgrade_stopped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_units_last_word_marks_a_killed_upgrade_stopped_and_brings_the_dashboard_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     places = Places.under(tmp_path)
     upgrades.write_progress(places, OLD, NEW, upgrades.RUNNING, "Downloading the release")
     monkeypatch.setenv("SERVICE_RESULT", "timeout")
+    ran: list[list[str]] = []
+
+    def run(argv: list[str], check: bool) -> subprocess.CompletedProcess[str]:
+        ran.append(argv)
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(upgrade_runner.subprocess, "run", run)
 
     assert upgrade_runner.ended(places, NEW) == 0
     said = upgrades.read_progress(places)
     assert said is not None and said["state"] == upgrades.FAILED and "(timeout)" in said["problem"]
+    assert ran == [["systemctl", "start", "--no-block", *layout.SERVICES]]
 
 
 def test_a_new_install_asks_again_at_once_and_is_never_offered_itself(
