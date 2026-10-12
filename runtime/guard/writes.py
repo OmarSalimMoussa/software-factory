@@ -4,6 +4,10 @@ session's own worktree (`own-worktree`).
 
 A shell command is read for its redirects and for the files a program that changes files names; an edit tool for its
 path. A product path counts from the top of the product's checkout or of any worktree of it, and as written.
+
+Claude Code's project config is protected too: a session started in the checkout loads it, and its settings' hooks
+run outside the sandbox. Claude Code's own sandbox keeps a shell command off it; this keeps the edit tools and
+commits off it.
 """
 
 from __future__ import annotations
@@ -18,10 +22,12 @@ from runtime.shared.paths import MANAGED_SETTINGS
 from runtime.shared.settings import Settings
 from standard import config as product_config
 
+CLAUDE_CONFIG = (".claude/settings.json", ".claude/settings.local.json", ".claude/agents/", ".claude/skills/",
+                 ".claude/commands/", ".mcp.json")  # fmt: skip
 # The paths only a person changes in every product: the goal and its pictures, git's own folder (config, hooks, refs
 # and the pass record `factory check` keeps there), the surfaces that decide which testers a change needs, the
-# workflows that reach staging and prod, the factory commit CI checks with, and factory.toml. Every script
-# factory.toml names is protected too, and a product adds its own paths in repo.protected_paths.
+# workflows that reach staging and prod, the factory commit CI checks with, factory.toml, and Claude Code's project
+# config. Every script factory.toml names is protected too, and a product adds its own paths in repo.protected_paths.
 ALWAYS_PROTECTED = (
     "GOAL.md",
     "goal/",
@@ -30,6 +36,7 @@ ALWAYS_PROTECTED = (
     ".github/workflows/",
     ".github/factory-ref",
     product_config.FILE,
+    *CLAUDE_CONFIG,
 )
 QUEUE = "queue"
 EDIT_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})

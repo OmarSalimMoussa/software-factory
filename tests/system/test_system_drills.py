@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -138,16 +138,38 @@ def test_the_warden_command_drill_needs_the_output_and_the_exit_of_a_real_unit_r
 
 
 @pytest.mark.parametrize(
+    ("drill", "rule"),
+    [(drills.edit_other_worktree, "own-worktree"), (drills.claude_config_by_tool, "protected-paths")],
+    ids=["edit-other-worktree", "claude-config"],
+)
+@pytest.mark.parametrize(
     ("answer", "ok"),
     [
-        (Ran(2, "Refused by the factory guard (own-worktree): edit only inside your own worktree"), True),
-        # Refused, but by another rule: that proves nothing about own-worktree.
+        (Ran(2, "Refused by the factory guard ({rule}): not yours to write"), True),
+        # Refused, but by another rule: that proves nothing about this one.
         (Ran(2, "Refused by the factory guard (unpermitted): this session holds no permit"), False),
         (Ran(0, ""), False),
     ],
 )
-def test_a_guard_drill_passes_only_on_its_own_rule(answer: Ran, ok: bool) -> None:
-    assert drills.edit_other_worktree(FakeRig(guard_answer=answer)).ok is ok
+def test_a_guard_drill_passes_only_on_its_own_rule(
+    drill: Callable[[FakeRig], Result], rule: str, answer: Ran, ok: bool
+) -> None:
+    assert drill(FakeRig(guard_answer=Ran(answer.code, answer.out.format(rule=rule)))).ok is ok
+
+
+@pytest.mark.parametrize(
+    ("result", "ok"),
+    [
+        ("write:/w/a/.claude/settings.json -> EACCES\nwrite:/w/a/.claude/skills -> EACCES", True),
+        ("write:/w/a/.claude/settings.json -> EACCES\nwrite:/w/a/.claude/skills -> written", False),
+        ("Exit code 1", False),  # a sandbox that runs nothing proves nothing
+    ],
+    ids=["walled", "one-written", "bare-failure"],
+)
+def test_the_config_drill_fails_when_a_shell_writes_any_piece_of_claude_codes_project_config(
+    result: str, ok: bool
+) -> None:
+    assert drills.claude_config_by_shell(OneAnswer(result=result)).ok is ok
 
 
 @pytest.mark.parametrize(

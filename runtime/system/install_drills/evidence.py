@@ -161,8 +161,8 @@ def probe_command(rig: Rig, *targets: str) -> list[str]:
             *targets]  # fmt: skip
 
 
-def sandboxed_probe(rig: Rig, name: str, *targets: str) -> Result:
-    command = " ".join(probe_command(rig, *targets))
+def sandboxed_probe(rig: Rig, name: str, *targets: str, first: str = "") -> Result:
+    command = " && ".join(part for part in (first, " ".join(probe_command(rig, *targets))) if part)
     ran = asked(rig, command)
     run = exact_run(ran, command)
     if run is None:

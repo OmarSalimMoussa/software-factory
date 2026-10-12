@@ -14,6 +14,8 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
     drills.docker_denied,
     drills.shell_write_other_worktree,
     drills.edit_other_worktree,
+    drills.claude_config_by_tool,
+    drills.claude_config_by_shell,
     drills.secrets_unreadable,
     drills.sockets_refused,
     drills.hosts_refused,
@@ -41,7 +43,7 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
 SESSIONS = frozenset({drills.sandbox_runs, drills.shell_write_other_worktree, drills.secrets_unreadable,
                       drills.sockets_refused, drills.hosts_refused, drills.bubblewrap_missing,
                       drills.factory_in_sandbox, drills.path_shadow, drills.toolchain_answers,
-                      drills.background_session})  # fmt: skip
+                      drills.background_session, drills.claude_config_by_shell})  # fmt: skip
 
 
 def _one(drill: Callable[[Rig], Result], rig: Rig) -> Result:

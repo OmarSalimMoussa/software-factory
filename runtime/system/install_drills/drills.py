@@ -4,6 +4,7 @@ Each drill does the forbidden thing the way an agent would, and passes only on e
 it: a guard refusal must name the rule the drill is about, and a sandboxed command must be the exact one asked for,
 or the drill fails as inconclusive. The installer refuses to finish while any drill fails. The drills that start a
 session run a few at a time, each session in its own unit; the guard and host drills run one after another first.
+The config drill makes .claude/ first, then writes each piece as a file: a folder a session could make would take one.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import shlex
 import uuid
 from pathlib import Path
 
+from runtime.guard import writes
 from runtime.shared import claude_accounts
 from runtime.shared.paths import AGENT_USER, WARDEN_USER, stored_signin
 from runtime.system import layout
@@ -74,6 +76,19 @@ def edit_other_worktree(rig: Rig) -> Result:
     ran = rig.guard("Edit", {"file_path": target, "old_string": "a", "new_string": "b"})
     return Result("an edit in another worktree is refused (own-worktree)", refused_by(ran, "own-worktree"),
                   first_line(ran.out))  # fmt: skip
+
+
+def claude_config_by_tool(rig: Rig) -> Result:
+    target = str(rig.worktree_a / ".claude" / "settings.json")
+    ran = rig.guard("Write", {"file_path": target, "content": "{}"})
+    return Result("a tool cannot write Claude Code's project settings in its worktree (protected-paths)",
+                  refused_by(ran, "protected-paths"), first_line(ran.out))  # fmt: skip
+
+
+def claude_config_by_shell(rig: Rig) -> Result:
+    targets = [f"write:{rig.worktree_a / path.rstrip('/')}" for path in writes.CLAUDE_CONFIG]
+    return sandboxed_probe(rig, "a shell command cannot write Claude Code's project config in its worktree",
+                           *targets, first=f"mkdir -p {rig.worktree_a / '.claude'}")  # fmt: skip
 
 
 def secrets_unreadable(rig: Rig) -> Result:
