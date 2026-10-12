@@ -122,7 +122,6 @@ def _clashes(rendered: dict[str, str], services: dict[str, str]) -> list[str]:
 
 
 def _unset_on_a_server(line: _Line, value: str) -> list[str]:
-    """Why a key the template marks for a server workspace to set by hand is not set yet; empty when it is."""
     if value == "":
         return [f"{line.key} is empty; a server workspace sets it by hand: {line.server_why}"]
     if value == line.value:
@@ -178,8 +177,7 @@ def _value(
 
 
 def _kept_or_made(line: _Line, current: str | None, defaults: dict[str, str] | None, fresh: bool) -> tuple[str, str]:
-    """A template key's value when neither [env.set] nor the services set it: the one held, unless the template's
-    default changed under it; else one generated, or the template's own."""
+    """A key neither [env.set] nor the services set: held unless its default changed, else generated or the default."""
     if current is not None and defaults is not None and current == defaults.get(line.key) != line.value:
         made = generate(line.value)
         return (line.value if made is None else made), f"updated {line.key}: the template's default changed"

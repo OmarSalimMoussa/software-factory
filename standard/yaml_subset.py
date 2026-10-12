@@ -279,8 +279,6 @@ class _Parser:
         return found
 
     def _below(self, indent: int) -> Any:
-        """The value of an entry with nothing after it on its line: a deeper block, a sequence at its own indent, or
-        none."""
         nxt = self.peek()
         if nxt is not None and nxt[0] > indent:
             return self.block(nxt[0])

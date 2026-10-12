@@ -120,8 +120,7 @@ def images(repo: Path, config: Config, compose: Compose, short: str) -> tuple[Im
 
 
 def _derivation_problems(source: _Source, by_name: dict[str, _Source]) -> list[str]:
-    """Why an image's FROM breaks the one rule: it derives from one other product image at most, never itself, and
-    only from one that derives from none."""
+    """Why an image's FROM breaks the rule: one product image at most, never itself, and one that derives from none."""
     problems = []
     if len(source.bases) > 1:
         problems.append(f"{source.dockerfile}: builds FROM {', '.join(source.bases)}; an image derives from one "

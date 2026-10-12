@@ -65,7 +65,8 @@ def handle(raw: str, cgroup: str, places: Places, home: Path, now: datetime) -> 
         return _run(payload, event, places, home, now)
     # telemetry: surfaced — any failure, a broken rule module included, refuses the call naming the `failure`
     except Exception as exc:  # noqa: BLE001 - a guard that breaks refuses the call, never lets it through
-        return _failed(places, payload, event, f"the guard failed ({type(exc).__name__}: {exc})", now)
+        failure = f"the guard failed ({type(exc).__name__}: {exc})"
+        return _failed(places, payload, event, failure, now)
 
 
 def _failed(places: Places, payload: dict[str, object], event: object, failure: str, now: datetime) -> Outcome:
