@@ -37,16 +37,28 @@ def tracked_files(root: Path) -> tuple[str, ...]:
 
 
 def moved_from(root: Path, base: str) -> dict[str, str]:
+    """Each file the branch moved, or took out of another, with the file it came from."""
     listed = git(root, "diff", "--find-renames", "--find-copies", "--name-status", "-z", base, "HEAD").split("\0")
     found: dict[str, str] = {}
     at = 0
     while at < len(listed) - 1:
-        if listed[at][:1] in ("R", "C"):
-            found[listed[at + 2]] = listed[at + 1]
-            at += 3
-        else:
-            at += 2
+        kind, source, made = listed[at][:1], listed[at + 1], listed[at + 2] if at + 2 < len(listed) else ""
+        if kind == "R" or (kind == "C" and _taken_out(root, base, source, made)):
+            found[made] = source
+        at += 3 if kind in ("R", "C") else 2
     return found
+
+
+def _lines(root: Path, revision: str) -> int:
+    done = subprocess.run(["git", "show", revision], cwd=root, capture_output=True, check=False)
+    return done.stdout.count(b"\n") if done.returncode == 0 else 0
+
+
+def _taken_out(root: Path, base: str, source: str, copy: str) -> bool:
+    """Whether the branch took ``copy`` out of ``source``, which lost at least half as many lines as the copy holds. A
+    copy that leaves its source whole is new code, measured from nothing."""
+    lost = _lines(root, f"{base}:{source}") - _lines(root, f"HEAD:{source}")
+    return 2 * lost >= _lines(root, f"HEAD:{copy}")
 
 
 @dataclass
@@ -74,7 +86,7 @@ class Repo:
 
     def before(self, rel: str) -> str | None:
         """``rel`` as it stood where the branch left the default branch, or the file git finds the branch moved it, or
-        mostly copied it, from: a split never reads as new debt. None when it was in neither."""
+        took it out of, from: a split never reads as new debt. None when it was in neither."""
         if self.base is None:
             return None
         with self._lock:

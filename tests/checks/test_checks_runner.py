@@ -163,3 +163,22 @@ def test_a_ratchet_compares_a_file_the_branch_moved_with_the_file_it_came_from(
 
     assert bool(problems) is fails
     assert not fails or problems[0].startswith("count-claims: docs/moved/a.md has 2, over the 1 it has on the default")
+
+
+@pytest.mark.parametrize(("extracted", "fails"), [(True, False), (False, True)], ids=["taken-out", "copied-whole"])
+def test_a_ratchet_compares_a_copy_with_its_source_only_when_the_branch_took_it_out_of_it(
+    make_repo: MakeRepo, extracted: bool, fails: bool
+) -> None:
+    claims = "We keep all three of them.\n" + "".join(f"Line {n} of the page says what it says.\n" for n in range(20))
+    rest = "".join(f"Another line, {n}, stays.\n" for n in range(5))
+    root = make_repo({"docs/a.md": claims + rest})
+    base = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, text=True).stdout
+    subprocess.run(["git", "checkout", "-q", "-b", "work"], cwd=root, check=True)
+    (root / "docs" / "b.md").write_text(claims)
+    (root / "docs" / "a.md").write_text(rest if extracted else claims + rest + "And one line more.\n")
+    commit_all(root, "work")
+
+    problems = count_claims.run(Repo.open(root, ("docs/a.md", "docs/b.md"), base.strip()), {})
+
+    assert bool(problems) is fails
+    assert not fails or problems[0].startswith("count-claims: docs/b.md has 1, over the 0 it has on the default")
