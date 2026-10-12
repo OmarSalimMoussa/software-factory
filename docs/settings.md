@@ -19,10 +19,11 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | --- | --- |
 | `repo` | The product's checkout, default branch, GitHub name and the paths only the owner changes |
 | `models` | The allowed models and efforts, and the model and effort of every role |
-| `caps` | Implementers, designers and subagents at once |
+| `caps` | Implementers, designers and subagents at once, and the browsers and remote desktops testers run at once |
 | `subagents` | Which subagent kinds each role may start |
 | `rounds` | QA rounds, critic rounds, check runs, and how far one extension goes |
-| `qa` | Time per item, items per brief, desktop time, widths, evidence days |
+| `qa` | Time per item, items per brief, desktop time, widths, evidence days, the desktop tester's screen, how a wait reloads and how long it may last |
+| `replay` | How a tester's run is replayed for the owner: the builder's timings, how long the picture stays hidden after a sign-in link is typed, and the player's pace |
 | `intake` | Batch size and wait, the fast lane's time, the score's weights |
 | `routing` | Slices per rung, open proposals at once, the estimate's window, tries to confirm a cause |
 | `slots` | How many, the first port, the output lines an agent sees |
@@ -53,6 +54,7 @@ that wrote there could act outside its sandbox.
 | Setting | Takes effect |
 | --- | --- |
 | Caps, rounds, QA, vitals, watch, errors, reports, telemetry, intake and routing values, but those below | At once: every guard call and warden pass reads them fresh |
+| The replay's timings, and the QA browser's screen and waits | At the next replay built, and at the next tester's start; the player's pace at the next page load |
 | A session's or a subagent's model and effort | At its next start |
 | The slice budget | Within a minute |
 | The slot count | At the next slot claim |

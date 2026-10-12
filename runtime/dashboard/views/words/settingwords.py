@@ -38,6 +38,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("caps.implementers", "Implementers at once"),
             ("caps.designers", "Designers at once"),
             ("caps.browsers_at_once", "Browser testers on the machine at once"),
+            ("caps.desktops_at_once", "Desktop testers on the machine at once"),
             ("caps.subagents_at_once", "Subagents at once"),
         ],
     ),

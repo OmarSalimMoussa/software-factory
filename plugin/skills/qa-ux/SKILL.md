@@ -27,6 +27,10 @@ Work in your own browser: the `qa-browser` tools, a private browser that starts 
 address from your brief and sign in as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/sign-in.md` says. With no
 `qa-browser` tools, report "no browser" as your whole result.
 
+Mark each step you walk, and name it on each finding, as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/steps.md` says: the
+owner watches your run as a replay of those steps. To wait for the page to show something, call `browser_wait_until`
+with the words and a ceiling inside the item's time. One call does the whole wait; never poll.
+
 Before each flow, write down the customer's goal in one sentence. Walk it end to end, count the steps, and note
 every hesitation, dead end and surprise, with screenshots (never naming a file; report each one's file name, never a
 path). Walk each flow once more at phone width (`${CLAUDE_PLUGIN_ROOT}/../procedures/qa/phone-width.md`): a phone has

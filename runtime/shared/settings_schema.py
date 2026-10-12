@@ -46,6 +46,7 @@ SCHEMA: dict[str, Spec] = {
     "caps.designers": Spec("int", 1, 4),
     "caps.subagents_at_once": Spec("int", 1, 8),
     "caps.browsers_at_once": Spec("int", 1, 16),
+    "caps.desktops_at_once": Spec("int", 1, 16),
     "subagents.browser_personas": Spec("list"),
     "subagents.orchestrator": Spec("list"),
     "subagents.designer": Spec("list"),

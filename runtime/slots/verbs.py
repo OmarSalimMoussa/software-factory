@@ -102,8 +102,8 @@ def _desktops(ctx: Context) -> dict[str, str]:
 
 
 def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> None:
-    """A tester's `desktop up` takes the slot's desktop while no other live tester holds it; its parent's `desktop
-    down` frees it."""
+    """A tester's `desktop up` takes the slot's desktop while no other live tester holds it, and while fewer than
+    caps.desktops_at_once desktops are up on the machine; its parent's `desktop down` frees it."""
     agent = ctx.caller.agent_id
     if agent and verb[1] != "up":
         raise Refused("slot", "a tester opens the desktop; its implementer takes it down")
@@ -112,9 +112,15 @@ def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> None:
         if not agent:
             held.pop(str(n), None)
         else:
-            holder = registry.read(ctx.places).get(held.get(str(n), ""))
+            sessions = registry.read(ctx.places)
+            holder = sessions.get(held.get(str(n), ""))
             if holder is not None and holder.id != agent and holder.state != RETIRED:
                 raise Refused("desktop", f"slot {n}'s desktop is {holder.name}'s until it hands back; test what "
+                                         "needs no desktop first, then try again")  # fmt: skip
+            up = [s for slot, s in held.items() if slot != str(n) and s in sessions and sessions[s].state != RETIRED]
+            cap = ctx.settings().get_int("caps.desktops_at_once")
+            if len(up) >= cap:
+                raise Refused("desktop", f"{len(up)} desktops are up on this machine, its cap of {cap}; test what "
                                          "needs no desktop first, then try again")  # fmt: skip
             held[str(n)] = agent
         store.write_json(public.desktops_path(ctx.places), held)

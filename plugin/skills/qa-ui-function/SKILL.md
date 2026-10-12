@@ -26,6 +26,10 @@ in every state, and you prove each finding with a screenshot.
 - Your browser is your own: the `qa-browser` tools, a private browser that starts and ends with you. Open the
   slot's address from your brief and sign in as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/sign-in.md` says. With no
   `qa-browser` tools, report "no browser" as your whole result.
+- Mark each step you walk, and name it on each finding, as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/steps.md` says:
+  the owner watches your run as a replay of those steps.
+- To wait for the page to show something, call `browser_wait_until` with the words and a ceiling inside the item's
+  time. One call does the whole wait; never poll.
 - Read the page with the snapshot tool and act on the refs it gives. Measure with the page-script tool: sizes, the
   focused element, `scrollWidth` against `innerWidth`.
 - Take a screenshot at the end of each item and for each finding, never naming a file, and give its file name in

@@ -43,7 +43,8 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 - **Your slot:** rebuild only what changed (`factory slot up <service>`). Prepare what your testers need: seeds
   (`factory slot seed load <name>`) and any setup a scenario names. A tester that needs a service stopped asks you.
 - **New behaviour gets a standing scenario** in `qa/scenarios/`, or an update to the one that covers it: three labels
-  (`protects`, `needs`, `runs`) and at most six steps.
+  (`protects`, `needs`, `runs`) and at most `qa.max_steps` steps, each opening with a short bold name and holding an
+  `Expect:` line: the owner's replay shows both.
 
 ## 3. QA rounds
 
@@ -54,7 +55,9 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
    tester, never drop one. A change with no required tester goes straight to `factory qa-clean`.
 3. **All at once.** Start every required tester together with the Agent tool, `subagent_type` set to its kind and
    no model of your own. One tester at a time uses the slot's remote desktop.
-4. **The brief:** one line `Scenarios and checks: N` (N from 1 to `qa.max_items`, the items you list); the time each
+4. **The brief:** one line `Scenarios and checks: N` (N from 1 to `qa.max_items`, the items you list, each by the
+   name testers mark it with: a scenario by its file name without `.md`, a check by a short name of words joined
+   by dashes); the time each
    item gets (`qa.seconds_per_item`, from `factory settings show`); your slot's address; the widths to test
    (`qa.widths`); what changed and why, with file paths; the spec's checks; the scenarios to walk (round 1 walks
    each scenario your branch adds or changes, cold); the test address each tester signs in as; and every finding

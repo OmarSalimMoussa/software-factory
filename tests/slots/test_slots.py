@@ -100,3 +100,23 @@ def test_one_tester_holds_a_slots_desktop_until_it_hands_back_or_its_parent_take
     slot(world.ctx("implementer", "s-1", "agent-qa-3"), up, None)  # its parent took it down
     assert [verb[:2] for _, verb in world.launcher.stacks] == [["desktop", "up"], ["desktop", "up"],
                                                                 ["desktop", "down"], ["desktop", "up"]]  # fmt: skip
+
+
+def test_the_machine_runs_at_most_its_cap_of_desktops_and_a_finished_testers_counts_for_nothing(world: World) -> None:
+    world.with_settings(slots__count=3, caps__desktops_at_once=2)
+    for n in (1, 2, 3):
+        _implementer(world, n)
+        world.session(f"agent-qa-{n}", "qa-ux", f"impl-t-000{n}.qa", f"t-000{n}", f"/wt/impl-t-000{n}",
+                      agent_id=f"agent-qa-{n}")  # fmt: skip
+        slot(world.ctx("implementer", f"s-{n}"), {"op": "claim"}, None)
+    up = {"op": "desktop", "desktop": ["up", "tester-1@example.com"]}
+    slot(world.ctx("implementer", "s-1", "agent-qa-1"), up, None)
+    slot(world.ctx("implementer", "s-2", "agent-qa-2"), up, None)
+    with pytest.raises(Refused, match="2 desktops are up on this machine, its cap of 2"):
+        slot(world.ctx("implementer", "s-3", "agent-qa-3"), up, None)
+
+    sessions = registry.read(world.places)
+    sessions["agent-qa-1"].state = RETIRED
+    registry.write(world.places, sessions)
+    slot(world.ctx("implementer", "s-3", "agent-qa-3"), up, None)
+    assert [n for n, _ in world.launcher.stacks] == [1, 2, 3]

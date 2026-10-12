@@ -26,6 +26,10 @@ Work in your own browser: the `qa-browser` tools, a private browser that starts 
 address from your brief and sign in as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/sign-in.md` says. With no
 `qa-browser` tools, report "no browser" as your whole result.
 
+Mark each step you walk, and name it on each finding, as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/steps.md` says: the
+owner watches your run as a replay of those steps. To wait for the page to show something, call `browser_wait_until`
+with the words and a ceiling inside the item's time. One call does the whole wait; never poll.
+
 Screenshot every changed screen in every state, in the light and the dark theme, at each width your brief lists
 (never naming a file). Resize with the resize tool, then read `window.innerWidth` to prove the width took. At phone
 width, run the edge check in `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/phone-width.md` on each screen. Screenshot a
