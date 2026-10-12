@@ -69,8 +69,7 @@ def poll(ctx: Context) -> None:
     try:
         installed = upgrades.read_installed(places)
         base = installed["commit"] if installed else None
-        # A new install asks again at once: what was on offer may be the very release it installed.
-        if base == last["base"] and last["checked_at"] is not None and now - last["checked_at"] < every:
+        if _asked_lately(places, last, base, now, every):
             return
         if installed is None:
             note = "Upgrade once by hand from a release file; the dashboard offers every upgrade after that."
@@ -85,6 +84,15 @@ def poll(ctx: Context) -> None:
             log.warning("warden: the release check failed (%s)", type(exc).__name__)
     record = {"available": available, "checked_at": now, "note": note, "base": base}
     store.write_json(offer_path(places), record, mode=0o600)
+
+
+def _asked_lately(places: Places, last: dict[str, Any], base: str | None, now: float, every: int) -> bool:
+    """Asked within the period, for this install, and no upgrade failed since. A new install asks again at once (what
+    was on offer may be the very release it installed), and so does a failure: a newer release may replace the one."""
+    if base != last["base"] or last["checked_at"] is None or now - last["checked_at"] >= every:
+        return False
+    progress = upgrades.read_progress(places)
+    return progress is None or progress["state"] != upgrades.FAILED or _epoch(progress["at"]) <= last["checked_at"]
 
 
 def _ahead(rel: releases.Releases, installed: str) -> dict[str, Any] | None:
