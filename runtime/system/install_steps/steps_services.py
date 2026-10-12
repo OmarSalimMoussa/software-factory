@@ -1,9 +1,10 @@
-"""The steps for the laptop's shared services: their files, starting them as the stack user, and the GlitchTip keys
-the warden and the dashboard keep from them.
+"""The steps for the laptop's shared services and the factory's own GlitchTip: their files, starting them as the stack
+user, the shared GlitchTip's read token and Langfuse's keys for the warden, and the factory's own GlitchTip's address
+for the warden and the dashboard.
 
 The stack user's rootless Docker runs them, so the files are root's and the stack user only reads them. The secrets
-in services.env are made once and kept at every reinstall: the databases were created with them. Their images, the
-largest download of a first install, are pulled in the background from as soon as Docker runs until they start.
+in services.env and errors.env are made once and kept at every reinstall: the databases were created with them. The
+images, the largest download of a first install, are pulled in the background from as soon as Docker runs.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import json
 from runtime.shared import error_reports
 from runtime.shared.paths import DASHBOARD_USER, WARDEN_USER
 from runtime.system import layout
+from runtime.system.errors import instance
 from runtime.system.host import CommandError
 from runtime.system.job import Install, refuse
 from standard import config as product_config
@@ -66,6 +68,25 @@ def place(ctx: Install) -> None:
         raise refuse(f"The shared services' settings in {env} cannot be kept: {exc}. Then install again") from exc
     host.write(env, stack.render_env(values), mode=0o640, group=group)
     host.say("kept the secrets services.env held" if existing else "made services.env's secrets")
+    _place_errors(ctx, config)
+
+
+def _place_errors(ctx: Install, config: Config) -> None:
+    host, folder, group = ctx.host, ctx.places.errors, layout.STACK_USER
+    host.mkdir(folder, mode=0o750, group=group)
+    compose = folder / "compose.yml"
+    host.run(["cp", str(ctx.tree() / "runtime" / "system" / "errors" / "compose.yml"), str(compose)])
+    host.run(["chown", f"root:{group}", str(compose)])
+    host.run(["chmod", "0640", str(compose)])
+    env = folder / instance.ENV_FILE
+    try:
+        existing = stack.parse_env(host.read(env), str(env)) if host.exists(env) else {}
+        values = instance.generate_env(config.services.owner_email, existing)
+    except (stack.StackError, instance.ErrorsError) as exc:
+        raise refuse(f"The factory's own GlitchTip's settings in {env} cannot be kept ({exc}): fix the file by hand, "
+                     "keeping its secrets, then install again") from exc  # fmt: skip
+    host.write(env, instance.render_env(values), mode=0o640, group=group)
+    host.say("kept the secrets errors.env held" if existing else "made errors.env's secrets")
 
 
 def _pull_argv(ctx: Install) -> list[str]:
@@ -93,27 +114,35 @@ def start(ctx: Install) -> None:
 
 
 def keys(ctx: Install) -> None:
-    """GlitchTip's organization, the owner's account, a read-only token and the factory's own project, made as the
-    stack user (each step finds what an earlier install made). The token and Langfuse's project keys are the
-    warden's, for reading a slot's errors and traces; the project's DSN is the warden's and the dashboard's, where
-    their own errors go."""
+    """The shared GlitchTip's organization, the owner's account and a read-only token, and the factory's own
+    GlitchTip's organization, owner and project, made as the stack user (each step finds what an earlier install
+    made). The token and Langfuse's project keys are the warden's, for reading a slot's errors and traces; the factory
+    project's DSN is the warden's and the dashboard's, where their own errors go, and is never a product's GlitchTip."""
     host, config = ctx.host, _config(ctx)
     public_key, secret_key = "LANGFUSE_INIT_PROJECT_PUBLIC_KEY", "LANGFUSE_INIT_PROJECT_SECRET_KEY"
     if host.dry:
-        host.say(f"would make GlitchTip's {config.product.name} organization, a read token and the factory's own "
-                 f"project, as {layout.STACK_USER}")  # fmt: skip
-        found = {"token": "<token>", "factory_dsn": "<dsn>"}
+        host.say(f"would make the shared GlitchTip's {config.product.name} organization and a read token, and the "
+                 f"factory's own GlitchTip's project, as {layout.STACK_USER}")  # fmt: skip
+        found, factory_dsn = {"token": "<token>"}, "<dsn>"
         services = {public_key: "<public key>", secret_key: "<secret key>"}
     else:
         run = host.runner(layout.STACK_USER, _docker_env(ctx))
+        errors_env = ctx.places.errors / instance.ENV_FILE
         try:
             services = provision.read_services_env(ctx.places.services / stack.ENV_FILE)
             found = provision.bootstrap(config, services, run)
-            error_reports.parse_dsn(found["factory_dsn"])
-        except (provision.ProvisionError, error_reports.DsnError) as exc:
+            password = stack.parse_env(host.read(errors_env), str(errors_env))["ERRORS_OWNER_PASSWORD"]
+            factory_dsn = instance.dsn(run, config.services.owner_email, password)
+            error_reports.parse_dsn(factory_dsn)
+        except (provision.ProvisionError, instance.ErrorsError, stack.StackError, KeyError,
+                error_reports.DsnError) as exc:  # fmt: skip
             host.say(f"GlitchTip could not be set up: {exc}")
-            raise refuse("GlitchTip, where the factory's errors go, could not be set up: install again; if it stops "
-                         "here again, the log says why") from exc  # fmt: skip
+            raise refuse("GlitchTip, the shared one or the factory's own, could not be set up: install again; if it "
+                         "stops here again, the log says why") from exc  # fmt: skip
+        if instance.products_glitchtip(factory_dsn, config):
+            raise refuse(f"The factory's own GlitchTip gave {factory_dsn.rpartition('@')[2]} as its address, which is "
+                         f"the product's GlitchTip: put ERRORS_DOMAIN in {errors_env} back to {instance.URL}, then "
+                         "install again")  # fmt: skip
     folder = layout.secrets(ctx.places.state)
     keys = {
         layout.LAPTOP_GLITCHTIP: {"url": layout.GLITCHTIP_URL, "org": config.product.name, "token": found["token"]},
@@ -122,5 +151,5 @@ def keys(ctx: Install) -> None:
     }  # fmt: skip
     for name, body in keys.items():
         host.write(folder / name, json.dumps(body, indent=1) + "\n", mode=0o600, owner=WARDEN_USER)
-    host.write(error_reports.dsn_path(ctx.places), found["factory_dsn"] + "\n", mode=0o640, owner=WARDEN_USER,
+    host.write(error_reports.dsn_path(ctx.places), factory_dsn + "\n", mode=0o640, owner=WARDEN_USER,
                group=DASHBOARD_USER)  # fmt: skip

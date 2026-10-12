@@ -229,10 +229,10 @@ def shared_services(job: Job) -> None:
         host.change("reload the edge's settings", reload)
     _reconnect(job)
     if host.dry_run:
-        print("   would make sure of GlitchTip's organization, owner, read-only token and factory project")
+        print("   would make sure of GlitchTip's organization, owner and read-only token")
         return
     job.token = provision.bootstrap(job.config, job.services, host.run)["token"]
-    print("   found: GlitchTip's organization, owner, read-only token and factory project in place")
+    print("   found: GlitchTip's organization, owner and read-only token in place")
 
 
 def _reconnect(job: Job) -> None:

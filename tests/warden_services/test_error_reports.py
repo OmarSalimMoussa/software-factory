@@ -90,16 +90,14 @@ def test_a_failed_send_never_raises_and_says_so_once_per_streak(
     ]
 
 
-def test_without_the_dsn_nothing_is_sent_and_the_service_says_so(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    with caplog.at_level(logging.WARNING, logger="factory.errors"):
-        assert error_reports.install(Places.under(tmp_path), timeout=3) is None
+def test_without_the_dsn_the_service_refuses_to_start_naming_the_file(tmp_path: Path) -> None:
+    with pytest.raises(error_reports.DsnError) as refused:
+        error_reports.install(Places.under(tmp_path), timeout=3)
 
-    assert [r.getMessage() for r in caplog.records if r.name == "factory.errors"] == [
-        f"the factory's own errors are not reported: {tmp_path}/state/secrets/factory-dsn is missing "
-        "(the install writes it)"
-    ]
+    assert str(refused.value) == (
+        f"{tmp_path}/state/secrets/factory-dsn is missing: the address of the factory's own GlitchTip, which the "
+        "install writes. Install the factory again."
+    )
 
 
 @pytest.mark.parametrize(

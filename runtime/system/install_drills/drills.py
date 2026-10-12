@@ -17,6 +17,7 @@ from pathlib import Path
 from runtime.shared import claude_accounts
 from runtime.shared.paths import AGENT_USER
 from runtime.system import layout
+from runtime.system.errors import instance
 from runtime.system.install_drills.evidence import (
     Result,
     Rig,
@@ -281,14 +282,13 @@ def stack_off_tailnet(rig: Rig) -> Result:
 
 def shared_services_answer(rig: Rig) -> Result:
     """The stack user's Docker publishes GlitchTip and Langfuse on the loopback, where the slots' stacks and the
-    warden reach them."""
-    ran = rig.as_user(
-        layout.STACK_USER, probe_command(rig, f"get:{layout.GLITCHTIP_HEALTH}", f"get:{layout.LANGFUSE_HEALTH}")
-    )
+    warden reach them, and the factory's own GlitchTip, where the warden and the dashboard send their errors."""
+    targets = [f"get:{layout.GLITCHTIP_HEALTH}", f"get:{layout.LANGFUSE_HEALTH}", f"get:{instance.HEALTH}"]
+    ran = rig.as_user(layout.STACK_USER, probe_command(rig, *targets))
     found = outcomes(ran.out)
-    ok = len(found) == 2 and set(found.values()) == {"answered 200"}
+    ok = len(found) == len(targets) and set(found.values()) == {"answered 200"}
     evidence = "; ".join(f"{target} -> {outcome}" for target, outcome in found.items()) or first_line(ran.out)
-    return Result("GlitchTip and Langfuse answer the stack user on the loopback", ok, evidence)
+    return Result("GlitchTip, Langfuse and the factory's own GlitchTip answer on the loopback", ok, evidence)
 
 
 def dashboard_unreachable(rig: Rig) -> Result:

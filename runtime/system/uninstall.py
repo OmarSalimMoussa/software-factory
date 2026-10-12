@@ -178,6 +178,7 @@ def sealed_copies(host: Host) -> None:
 def state(host: Host, places: Places) -> None:
     _remove(host, places.state)
     _remove(host, paths.SERVICES)
+    _remove(host, paths.ERRORS)
 
 
 def users(host: Host) -> None:

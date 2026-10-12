@@ -14,7 +14,8 @@ stack; the data stays.
 - Is it up? `systemctl status software-services.service`. When it is not, its log names each service that did not
   become healthy.
 - Restart it: `sudo systemctl restart software-services.service`. A stop keeps the containers and their data.
-- At every install, a drill checks that GlitchTip and Langfuse answer the stack user on the addresses below.
+- At every install, a drill checks that GlitchTip, Langfuse and the factory's own GlitchTip answer the stack user
+  on the addresses below.
 
 ## Where to open them
 
@@ -27,11 +28,13 @@ Every address is on the laptop's loopback, so nothing outside the laptop reaches
 | pgweb: the databases | http://127.0.0.1:8081 | Nothing: it opens as the databases' administrator |
 | Postgres | 127.0.0.1:5434 | The user `postgres` and `POSTGRES_PASSWORD` |
 | MinIO: Langfuse's files | http://127.0.0.1:9090 | Used by Langfuse; you never open it |
+| The factory's own GlitchTip | http://127.0.0.1:8210 | The same email and `ERRORS_OWNER_PASSWORD` |
 
-The passwords are in `/var/lib/software-factory-services/services.env`, which only root and the stack user can read:
+The passwords are in `/var/lib/software-factory-services/services.env`, and the factory's own GlitchTip's in
+`/var/lib/software-factory-errors/errors.env`. Only root and the stack user can read them:
 
 ```sh
-sudo grep PASSWORD /var/lib/software-factory-services/services.env
+sudo grep PASSWORD /var/lib/software-factory-services/services.env /var/lib/software-factory-errors/errors.env
 ```
 
 The first install makes them. Every reinstall keeps them, because the databases were made with them.
@@ -64,9 +67,12 @@ database user and its network, and removes its env file. The slot's GlitchTip pr
 
 ## The factory's own errors
 
-The warden's and the dashboard's own errors go to the GlitchTip project `factory`, in the environment `factory`,
-named by the installed commit. The installer sets this up. Without it, each service says once, when it starts, that
-its errors are not reported.
+The warden's and the dashboard's own errors go to the factory's own GlitchTip, a second GlitchTip apart from the
+shared one: its project `factory`, in the environment `factory`, named by the installed commit. No slot joins its
+network, and no product's GlitchTip ever stands in for it: the installer refuses an address that is the product's.
+`factory errors` reads only the product's GlitchTip, so an agent never sees the factory's own errors.
+
+The installer sets it up. Without its address, the warden and the dashboard do not start, and their logs say why.
 
 ## The keys the warden holds
 
@@ -76,7 +82,8 @@ The installer keeps these in the warden's secrets folder:
   `factory errors --where slot <n>`. Only the warden reads it.
 - `laptop-langfuse.json`: this Langfuse's address and the product project's keys, for
   `factory traces --where slot <n>`. Only the warden reads it.
-- `factory-dsn`: where the factory's own errors go. Only the warden and the dashboard read it.
+- `factory-dsn`: the address of the factory's own GlitchTip, where the factory's own errors go. Only the warden
+  and the dashboard read it.
 - `server.json`: the server's GlitchTip and Langfuse keys, copied from `~/.config/software-factory/server.json`,
   which the server set-up writes. Only the warden reads it. Until the server set-up has run, the installer says so
   and the warden imports no server errors.

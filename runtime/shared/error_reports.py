@@ -1,9 +1,10 @@
-"""The factory's own errors, sent to the laptop's GlitchTip (project ``factory``) in Sentry's envelope format.
+"""The factory's own errors, sent in Sentry's envelope format to the factory's own GlitchTip: an instance apart from
+the one the products' slots report to (runtime/system/errors/).
 
-The warden and the dashboard call ``install`` once at start. When the install has saved the project's address (the
-``factory-dsn`` secret), every log record at ERROR or above also goes there as one event; when it has not, the
-service says so once and sends nothing. Sending never raises into the code that logged: a failed send prints one
-line to stderr, and the sends after it stay quiet until one works again. Stdlib only.
+The warden and the dashboard call ``install`` once at start, and refuse to start without the project's address (the
+``factory-dsn`` secret the install writes): every log record at ERROR or above goes there as one event. Sending
+never raises into the code that logged: a failed send prints one line to stderr, and the sends after it stay quiet
+until one works again. Stdlib only.
 """
 
 from __future__ import annotations
@@ -167,14 +168,14 @@ class Reporter(logging.Handler):
         self.failing = False
 
 
-def install(places: Places, *, timeout: float, send: Send = send_event) -> Reporter | None:
-    """Report every error the service logs, when the install has saved the factory's DSN; else say so once."""
+def install(places: Places, *, timeout: float, send: Send = send_event) -> Reporter:
+    """Report every error the service logs. Raises DsnError when the install's DSN is missing or unusable."""
     path = dsn_path(places)
     try:
         text = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        log.warning("the factory's own errors are not reported: %s is missing (the install writes it)", path)
-        return None
+    except FileNotFoundError as exc:
+        raise DsnError(f"{path} is missing: the address of the factory's own GlitchTip, which the install writes. "
+                       "Install the factory again.") from exc  # fmt: skip
     dsn = parse_dsn(text)
     commit = places.install / "COMMIT"
     release = commit.read_text(encoding="utf-8").strip()

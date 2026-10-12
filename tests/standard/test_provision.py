@@ -82,3 +82,12 @@ def test_drop_removes_the_database_role_and_network_and_forgets_the_password(tmp
     assert sql == 'DROP DATABASE IF EXISTS "notes_slot2" WITH (FORCE);\nDROP ROLE IF EXISTS "notes_slot2";\n'
     assert docker.networks == {}
     assert not (tmp_path / "notes_slot2.password").exists()
+
+
+def test_the_shared_glitchtip_is_set_up_with_no_project_of_the_factorys_own() -> None:
+    docker = FakeDocker()
+
+    assert provision.bootstrap(config(), SERVICES, docker) == {"token": "read-token"}
+
+    sent = [params for params in docker.glitchtip_params if params["action"] == "bootstrap"]
+    assert len(sent) == 1 and "factory_project" not in sent[0] and sent[0]["org"] == config().product.name

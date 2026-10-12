@@ -131,7 +131,11 @@ def main() -> int:
     places = Places.system()
     settings = FreshSettings(places)
     current = settings()
-    error_reports.install(places, timeout=current.get_int("watch.http_timeout_seconds"))
+    try:
+        error_reports.install(places, timeout=current.get_int("watch.http_timeout_seconds"))
+    except (error_reports.DsnError, OSError) as exc:
+        log.critical("warden: it does not start without the factory's own GlitchTip: %s", exc)
+        return 2
     clock = Clock()
     owner, agent_home = _owner(places), launch.agent_home()
     doors = Doors(places, settings, clock, launch.Units(places, settings),

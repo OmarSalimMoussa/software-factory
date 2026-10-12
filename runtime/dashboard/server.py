@@ -363,7 +363,11 @@ def main() -> int:
     places = Places.system()
     settings = PublicSettings(places)
     current = settings()
-    error_reports.install(places, timeout=current.get_int("watch.http_timeout_seconds"))
+    try:
+        error_reports.install(places, timeout=current.get_int("watch.http_timeout_seconds"))
+    except (error_reports.DsnError, OSError) as exc:
+        log.critical("dashboard: it does not start without the factory's own GlitchTip: %s", exc)
+        return 2
     warden = Warden(places.owner_socket, lambda: float(settings().get_int("dashboard.warden_seconds")))
     app = App(settings, warden, time.time)
     server = serve(

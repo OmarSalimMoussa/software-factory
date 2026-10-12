@@ -8,6 +8,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from standard.config import parse_text
 from standard.config_records import Config
@@ -118,6 +119,7 @@ class FakeDocker:
     in_use: list[str] = field(default_factory=list)
     calls: list[tuple[list[str], str | None]] = field(default_factory=list)
     project_ids: dict[str, int] = field(default_factory=dict)
+    glitchtip_params: list[dict[str, Any]] = field(default_factory=list)
 
     def __call__(self, argv: list[str], stdin: str | None = None) -> subprocess.CompletedProcess[str]:
         self.calls.append((argv, stdin))
@@ -153,8 +155,9 @@ class FakeDocker:
     def glitchtip(self, script: str) -> str:
         line = next(text for text in script.splitlines() if text.startswith("PARAMS = json.loads("))
         params = json.loads(ast.literal_eval(line[len("PARAMS = json.loads(") : -1]))
+        self.glitchtip_params.append(params)
         if params["action"] == "bootstrap":
-            return 'FACTORY-RESULT {"token": "read-token", "factory_dsn": "https://fkey@box:8200/1"}\n'
+            return 'FACTORY-RESULT {"token": "read-token"}\n'
         dsns = {}
         for name, slug in params["projects"].items():
             number = self.project_ids.setdefault(slug, len(self.project_ids) + 2)

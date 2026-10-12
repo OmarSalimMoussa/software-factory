@@ -40,6 +40,8 @@ STACK_SLOTS = Path("/home/software-stack/slots")
 # contract: added by FB5. The laptop's shared services: their compose file and services.env, root's, read by the stack
 # user. Not in the state folder, whose 0700 the stack user's Docker could not pass to bind a file from it.
 SERVICES = Path("/var/lib/software-factory-services")
+# The factory's own GlitchTip, apart from the shared services: its compose file and errors.env.
+ERRORS = Path("/var/lib/software-factory-errors")
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +51,7 @@ class Places:
     run: Path
     stack_slots: Path = STACK_SLOTS
     services: Path = SERVICES
+    errors: Path = ERRORS
     firewall: Path = FIREWALL
     upgrade: Path = UPGRADE
 
@@ -65,6 +68,7 @@ class Places:
             root / "run",
             root / "stack-slots",
             root / "services",
+            root / "errors",
             root / "firewall",
             root / "upgrade",
         )

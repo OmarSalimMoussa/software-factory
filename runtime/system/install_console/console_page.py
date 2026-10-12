@@ -14,6 +14,7 @@ from runtime.shared import network, store
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import Places
 from runtime.system import ci_check, github_keys, healthchecks, install, layout, uninstall
+from runtime.system.errors import instance
 from runtime.system.host import Account, Host
 from runtime.system.install_console.console_run import FAILED, Run
 from runtime.system.install_steps import steps_wire
@@ -104,6 +105,7 @@ def _services(places: Places) -> tuple[list[dict[str, Any]], str]:
         "The dashboard": _answers(f"http://127.0.0.1:{port}/", timeout, any_status=True),
         "GlitchTip": _answers(layout.GLITCHTIP_HEALTH, timeout, any_status=False),
         "Langfuse": _answers(layout.LANGFUSE_HEALTH, timeout, any_status=False),
+        "The factory's own GlitchTip": _answers(instance.HEALTH, timeout, any_status=False),
     }
     return [{"name": name, "ok": ok, "text": "Answers" if ok else "Does not answer"} for name, ok in found.items()], ""
 

@@ -136,7 +136,7 @@ def make_job(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     (factory / "standard" / "config.py").write_text("print('the factory')\n")
     key = tmp_path / "ci.pub"
     key.write_text(KEY + "\n")
-    bootstrap = {"token": "read-token", "factory_dsn": "http://k@factory-glitchtip:8000/1"}
+    bootstrap = {"token": "read-token"}
     monkeypatch.setattr(provision, "bootstrap", lambda config, services, run: bootstrap)
 
     def make(server: Server, *, dirty: str = "", fresh: bool = False, ref: str = "a" * 40) -> setup_steps.Job:

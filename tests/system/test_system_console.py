@@ -269,7 +269,13 @@ def test_the_status_checks_an_older_install_by_the_few_settings_it_reads(
 
     if checked:
         assert found["problem"] == ""
-        assert [s["name"] for s in found["services"]] == ["The warden", "The dashboard", "GlitchTip", "Langfuse"]
+        assert [s["name"] for s in found["services"]] == [
+            "The warden",
+            "The dashboard",
+            "GlitchTip",
+            "Langfuse",
+            "The factory's own GlitchTip",
+        ]
     else:
         assert found["services"] == [] and "were not checked" in found["problem"]
 

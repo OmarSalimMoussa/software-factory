@@ -31,7 +31,6 @@ SHARED = (POSTGRES, LANGFUSE, GLITCHTIP)
 # The telemetry network reaches only traces and errors: what a product runs for others (its agents' containers) joins
 # it instead of the services network, so it never has a route to the database.
 TELEMETRY = (LANGFUSE, GLITCHTIP)
-FACTORY_PROJECT = "factory"
 LANGFUSE_HOST = "http://factory-langfuse:3000"
 GLITCHTIP_INGEST = "factory-glitchtip:8000"
 SERVICE_KEYS = (
@@ -55,7 +54,10 @@ PSQL = [
     *("docker", "exec", "-i", POSTGRES, "psql", "-U", "postgres", "-d", "postgres", "-X", "-q"),
     *("-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=terse"),
 ]
-SHELL = ["docker", "exec", "-i", GLITCHTIP, "./manage.py", "shell"]
+
+
+def shell(container: str) -> list[str]:
+    return ["docker", "exec", "-i", container, "./manage.py", "shell"]
 
 
 class ProvisionError(Exception):
@@ -146,15 +148,15 @@ def ensure_network(run: Run, name: str, present: set[str]) -> bool:
 
 
 def bootstrap(config: Config, services: dict[str, str], run: Run) -> dict[str, str]:
-    """The host's GlitchTip organization, owner, team, read-only token and the factory's own project."""
+    """The host's GlitchTip organization, owner, team and read-only token. No project of the factory's own lives
+    here: the factory reports to its own GlitchTip on the laptop."""
     params = glitchtip.bootstrap_params(
-        config.product.name, config.services.owner_email, services["GLITCHTIP_OWNER_PASSWORD"], FACTORY_PROJECT
+        config.product.name, config.services.owner_email, services["GLITCHTIP_OWNER_PASSWORD"]
     )
-    found = _glitchtip(run, params)
-    token, dsn = found.get("token"), found.get("factory_dsn")
-    if not isinstance(token, str) or not token or not isinstance(dsn, str) or not dsn:
-        raise ProvisionError(f"GlitchTip's answer lacks a token or the {FACTORY_PROJECT!r} project's DSN")
-    return {"token": token, "factory_dsn": dsn}
+    token = glitchtip_call(run, GLITCHTIP, params).get("token")
+    if not isinstance(token, str) or not token:
+        raise ProvisionError("GlitchTip's answer lacks the read-only token")
+    return {"token": token}
 
 
 def workspace(
@@ -173,7 +175,7 @@ def workspace(
     password = _password(state, name)
     checked(run, PSQL, _create_sql(name, password))
     slugs = {errors: f"{workspace}-{errors}" for errors in config.services.errors}
-    dsns = _glitchtip(run, glitchtip.workspace_params(config.product.name, slugs)).get("dsns")
+    dsns = glitchtip_call(run, GLITCHTIP, glitchtip.workspace_params(config.product.name, slugs)).get("dsns")
     if not isinstance(dsns, dict) or set(dsns) != set(slugs) or not all(isinstance(v, str) for v in dsns.values()):
         raise ProvisionError(f"GlitchTip's answer lacks a DSN for some of {', '.join(slugs)}")
     public = urlsplit(origin)
@@ -237,13 +239,14 @@ def drop(config: Config, services: dict[str, str], run: Run, *, workspace: str, 
         checked(run, ["docker", "network", "rm", net])
 
 
-def _glitchtip(run: Run, params: dict[str, Any]) -> dict[str, Any]:
-    done = run(SHELL, glitchtip.script(params))
+def glitchtip_call(run: Run, container: str, params: dict[str, Any]) -> dict[str, Any]:
+    """One action of the bootstrap script, run in the GlitchTip ``container``: its answer, or ProvisionError."""
+    done = run(shell(container), glitchtip.script(params))
     found = glitchtip.answer(done.stdout)
     if isinstance(found, str):
-        raise ProvisionError(f"GlitchTip ({GLITCHTIP}) refused: {found} (exit {done.returncode}: {tail(done.stderr)})")
+        raise ProvisionError(f"GlitchTip ({container}) refused: {found} (exit {done.returncode}: {tail(done.stderr)})")
     if done.returncode != 0:
-        raise ProvisionError(f"GlitchTip ({GLITCHTIP}) failed after answering (exit {done.returncode})")
+        raise ProvisionError(f"GlitchTip ({container}) failed after answering (exit {done.returncode})")
     return found
 
 

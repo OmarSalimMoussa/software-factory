@@ -84,7 +84,7 @@ def bootstrap():
         for scope in PARAMS["scopes"]:
             setattr(token.scopes, scope, True)
         token.save(update_fields=["scopes"])
-    return {"token": token.token, "factory_dsn": project_dsn(org, team, PARAMS["factory_project"])}
+    return {"token": token.token}
 
 
 def workspace():
@@ -109,7 +109,7 @@ def script(params: dict[str, Any]) -> str:
     return head + _BODY
 
 
-def bootstrap_params(org: str, owner_email: str, owner_password: str, factory_project: str) -> dict[str, Any]:
+def bootstrap_params(org: str, owner_email: str, owner_password: str) -> dict[str, Any]:
     return {
         "action": "bootstrap",
         "org": org,
@@ -117,7 +117,6 @@ def bootstrap_params(org: str, owner_email: str, owner_password: str, factory_pr
         "owner_password": owner_password,
         "token_label": TOKEN_LABEL,
         "scopes": list(READ_SCOPES),
-        "factory_project": factory_project,
     }
 
 
