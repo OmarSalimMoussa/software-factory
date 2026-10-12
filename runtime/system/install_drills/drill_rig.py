@@ -223,7 +223,10 @@ class RealRig:
                 "--model", model["model"], "--effort", model["effort"], "--output-format", "stream-json", "--verbose",
                 "--allowedTools", "Bash", "--permission-prompts", "none", "--no-session-persistence",
                 "--debug-file", str(self._debug(sid))]  # fmt: skip
-        ran = self._systemd_run(AGENT_USER, argv, view=True, token=True, properties=properties)
+        # SRT_DEBUG: Claude Code's sandbox names every mount it makes, on stderr, so a drill's log shows the walls.
+        ran = self._systemd_run(
+            AGENT_USER, argv, view=True, token=True, properties=(*properties, "Environment=SRT_DEBUG=1")
+        )
         self._log(prompt, ran, self._debug(sid))
         return ran
 

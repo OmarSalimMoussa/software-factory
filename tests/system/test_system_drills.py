@@ -207,20 +207,31 @@ def _runs(*runs: tuple[str, str, bool]) -> str:
 COPY = "/opt/software-factory-toolchain/python/cpython-3.14.4-linux-x86_64-gnu/bin/python3.14"
 
 
+ELSEWHERE = "/home/software-agent/.local/share/uv/python/cpython-3.14.4-linux-x86_64-gnu/bin/python3.14"
+
+
 @pytest.mark.parametrize(
-    ("find", "ok"),
+    ("find", "venv_of", "ok"),
     [
-        ((COPY, False), True),
-        (("error: No interpreter found for Python 3.14 in managed installations or search path", True), False),
+        ((COPY, False), None, True),
+        (("error: No interpreter found for Python 3.14 in managed installations or search path", True), None, False),
         # Found where no unit's uv should look: the toolchain's copy was not what answered.
-        (("/home/software-agent/.local/share/uv/python/cpython-3.14.4-linux-x86_64-gnu/bin/python3.14", False), False),
-        (None, False),  # the model never ran it: inconclusive
+        ((ELSEWHERE, False), None, False),
+        # A checkout's virtual environment answers first: its python is a link to the one it was made with.
+        (("VENV", False), COPY, True),
+        (("VENV", False), ELSEWHERE, False),
+        (None, None, False),  # the model never ran it: inconclusive
     ],
 )  # fmt: skip
 def test_the_toolchain_drill_needs_every_program_and_the_products_python_from_the_copy(
-    tmp_path: Path, find: tuple[str, bool] | None, ok: bool
+    tmp_path: Path, find: tuple[str, bool] | None, venv_of: str | None, ok: bool
 ) -> None:
     (tmp_path / ".python-version").write_text("3.14\n")
+    if find and venv_of:
+        venv = tmp_path / ".venv" / "bin" / "python3"
+        venv.parent.mkdir(parents=True)
+        venv.symlink_to(venv_of)
+        find = (str(venv), find[1])
     asked: list[str] = []
 
     class Session(FakeRig):

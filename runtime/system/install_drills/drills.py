@@ -9,6 +9,7 @@ The config drill makes .claude/ first, then writes each piece as a file: a folde
 
 from __future__ import annotations
 
+import os
 import shlex
 import uuid
 from pathlib import Path
@@ -260,8 +261,9 @@ def toolchain_answers(rig: Rig) -> Result:
         return Result(name, False, f"inconclusive: the drill session did not run every command as asked; {did(ran)}")
     failed = [f"{command}: {brief(run.result)}" for command, run in done if run.error]
     found = next((first_line(run.result) for command, run in done if command == find and not run.error), "")
-    if found and not (found.startswith(f"{layout.TOOLCHAIN_PYTHON}/") or str(Path(found).parent) in layout.SYSTEM_PATH):
-        failed.append(f"{find} found {found}, not the toolchain's copy")
+    real = os.path.realpath(found) if found else ""
+    if found and not (real.startswith(f"{layout.TOOLCHAIN_PYTHON}/") or str(Path(real).parent) in layout.SYSTEM_PATH):
+        failed.append(f"{find} found {found}, which is {real}, not the toolchain's copy")
     evidence = "; ".join(failed or [f"{command}: {first_line(run.result)}" for command, run in done])
     return Result(name, not failed, evidence)
 
