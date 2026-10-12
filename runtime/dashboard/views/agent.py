@@ -36,9 +36,9 @@ def panel(snap: Snap, row: dict[str, Any]) -> dict[str, Any]:
     kids = [k for k in words.kids(rows, row) if in_tree(snap, k)]
     life = None
     if row["state"] == DEPRIORITIZED:
-        life = {"kind": "depri", "text": _DEPRI}
+        life = {"icon": "clock", "text": _DEPRI}
     elif row["state"] == RETIRED:
-        life = {"kind": "retired", "text": _RETIRED}
+        life = {"icon": "lock-closed", "text": _RETIRED}
     actions: list[str] = []
     if row["state"] != RETIRED:
         orchestrator = row["role"] == "orchestrator"

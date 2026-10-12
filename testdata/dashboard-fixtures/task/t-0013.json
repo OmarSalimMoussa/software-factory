@@ -90,23 +90,26 @@
    "cause": "invoice page: the Approve label changed width on hover",
    "fix": "A fixed-width label, checked at three widths.",
    "qa": {
-    "kind": "ui",
+    "tone": null,
     "note": null,
     "shots": [
      {
       "tester": "qa-ui-function",
       "url": "/api/evidence/t-0013/page.svg",
-      "verdict": "pass"
+      "verdict": "pass",
+      "tone": "good"
      },
      {
       "tester": "qa-visual",
       "url": "/api/evidence/t-0013/button.svg",
-      "verdict": "pass"
+      "verdict": "pass",
+      "tone": "good"
      },
      {
       "tester": "qa-ux",
       "url": "/api/evidence/t-0013/phone.svg",
-      "verdict": "pass"
+      "verdict": "pass",
+      "tone": "good"
      }
     ]
    }

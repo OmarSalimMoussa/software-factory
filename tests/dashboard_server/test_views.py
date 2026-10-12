@@ -12,9 +12,11 @@ from dashboard_rig import Rig
 from dashboard_seed import STAGING
 from seed_kit import FIXTURES, iso
 
-from runtime.dashboard.views import ops
+from runtime.dashboard.views import agents, ops, task
+from runtime.dashboard.views.kit import Snap
 from runtime.dashboard.views.words.settingwords import LABELS
 from runtime.shared import models, store
+from runtime.shared.models import OPEN_SEVERITIES
 from runtime.shared.settings_schema import SCHEMA
 from runtime.warden.delivery import deploys
 
@@ -120,6 +122,40 @@ def test_a_file_found_by_search_carries_the_look_of_its_kind(rig: Rig) -> None:
     found = rig.parts("/api/search?q=upload")["search"]["data"]
     tasks = next(group["items"] for group in found["groups"] if group["label"] == "Tasks")
     assert tasks[0]["icon"] == {"kind": "ktile", "key": "queue-list", "tone": "info"}
+
+
+@pytest.mark.parametrize(
+    ("paused", "icon"), [("2026-10-09T00:00:00Z", "pause-circle"), (None, "stop-circle")], ids=["paused", "stopped"]
+)
+def test_the_agents_banner_carries_the_icon_of_the_factorys_state(paused: str | None, icon: str) -> None:
+    snap = Snap(0.0, {"factory": {"paused": paused}, "sessions": {}}, {})
+
+    assert agents.banner(snap)["icon"] == icon
+
+
+@pytest.mark.parametrize(("agent", "icon"), [("impl-project-names", "clock"), ("qa-sec-1", "lock-closed")])
+def test_an_agent_out_of_the_work_says_so_with_its_icon(rig: Rig, agent: str, icon: str) -> None:
+    assert rig.parts(f"/api/agent/{agent}")["agent"]["data"]["life_note"]["icon"] == icon
+
+
+_CLEAN = {f"{severity}s": 0 for severity in OPEN_SEVERITIES}
+
+
+@pytest.mark.parametrize(
+    ("names", "results", "tone", "shots"),
+    [
+        ([], {}, None, []),
+        (["qa-backend"], {"qa-backend": _CLEAN}, "good", []),
+        (["qa-visual", "qa-ux"], {"qa-visual": _CLEAN, "qa-ux": {**_CLEAN, "majors": 1}}, None, ["good", "bad"]),
+    ],
+    ids=["untested", "backend-tested", "screenshots"],
+)
+def test_a_fixs_qa_line_carries_its_tone_and_each_screenshot_its_verdicts(
+    names: list[str], results: dict[str, dict[str, Any]], tone: str | None, shots: list[str]
+) -> None:
+    line = task.qa_line(names, results, [f"{name}\t/api/picture/qa/{name}.png" for name in names])
+
+    assert (line["tone"], [shot["tone"] for shot in line["shots"]]) == (tone, shots)
 
 
 @pytest.mark.parametrize(

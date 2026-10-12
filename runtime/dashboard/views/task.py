@@ -111,15 +111,7 @@ def built_from(snap: Snap, task: dict[str, Any]) -> dict[str, Any] | None:
         }
     n = taskwords.rung(task, snap.settings)
     _, names, results, files = _latest_round(snap, task["id"])
-    qa: dict[str, Any]
-    if not names:
-        qa = {"kind": "none", "note": "No testers: a small backend fix is covered by its own tests.", "shots": []}
-    elif set(names) & set(UI_TESTERS):
-        shots = [{"tester": t, "url": u, "verdict": _verdict(results.get(t))} for t in names for u in _shots(files, t)]
-        qa = {"kind": "ui", "note": None, "shots": shots}
-    else:
-        said = ", ".join(f"{t} {_verdict(results.get(t))}" for t in names)
-        qa = {"kind": "backend", "note": said, "shots": []}
+    qa = qa_line(names, results, files)
     body = task["body"].split("\n", 1)[1] if task["body"].startswith("#") else task["body"]
     return {
         "kind": "fix",
@@ -128,6 +120,21 @@ def built_from(snap: Snap, task: dict[str, Any]) -> dict[str, Any] | None:
         "fix": first_line(body, 300),
         "qa": qa,
     }
+
+
+def qa_line(names: list[str], results: dict[str, dict[str, Any]], files: list[str]) -> dict[str, Any]:
+    """What a fix's testers found on its last round: each UI tester's screenshots with their verdicts, or one line."""
+    if not names:
+        return {"tone": None, "note": "No testers: a small backend fix is covered by its own tests.", "shots": []}
+    if set(names) & set(UI_TESTERS):
+        shots = [_shot(t, u, _verdict(results.get(t))) for t in names for u in _shots(files, t)]
+        return {"tone": None, "note": None, "shots": shots}
+    said = ", ".join(f"{t} {_verdict(results.get(t))}" for t in names)
+    return {"tone": "good", "note": said, "shots": []}
+
+
+def _shot(tester: str, url: str, verdict: str) -> dict[str, Any]:
+    return {"tester": tester, "url": url, "verdict": verdict, "tone": "good" if verdict == "pass" else "bad"}
 
 
 def _verdict(result: dict[str, Any] | None) -> str:

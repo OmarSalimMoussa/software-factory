@@ -90,7 +90,7 @@
    "cause": "the invoice list ran one query per item",
    "fix": "One joined query for the whole page.",
    "qa": {
-    "kind": "backend",
+    "tone": "good",
     "note": "qa-backend timed it: 200 items in 240 ms, down from 4.1 s.",
     "shots": []
    }

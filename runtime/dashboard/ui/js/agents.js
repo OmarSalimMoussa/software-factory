@@ -21,7 +21,7 @@ function pAgents(env) {
 const capCard = c => `<div class="card cap"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="label">${esc(c.label)}</span><span class="big" style="font-size:24px">${c.value}<small> / ${c.max}</small></span></div><div class="slots">${Array.from({length: Math.max(c.max, c.value)}, (_, i) => `<i class="${i < c.value ? 'on' : ''}"></i>`).join('')}</div><div class="faint" style="font-size:12px;min-height:16px">${c.note ? icon('clock', 'sm') + ' ' + esc(c.note) : ''}</div></div>`;
 function bannerHTML(b) {
   const btn = {start: '<button class="btn primary" data-action="start-orch" data-write>Start the orchestrator</button>', resume: `<button class="btn primary" data-action="resume" data-write>${icon('play-circle', 'sm')}Resume the factory</button>`}[b.action] || '';
-  return `<div class="ro-banner"><span class="ico">${icon(b.kind === 'paused' ? 'pause-circle' : 'stop-circle')}</span><div style="flex:1;min-width:0"><b>${esc(b.text)}</b> <span class="muted">${esc(b.sub)}</span></div>${btn}</div>`;
+  return `<div class="ro-banner"><span class="ico">${icon(b.icon)}</span><div style="flex:1;min-width:0"><b>${esc(b.text)}</b> <span class="muted">${esc(b.sub)}</span></div>${btn}</div>`;
 }
 function node(a) {
   if (a.broken) return `<div class="node"><div class="node-card broken" role="status">${icon('exclamation-triangle', 'sm')}<div style="min-width:0"><div class="nname">This agent could not be read.</div><div class="nsub">${esc(a.id)} · ${esc(a.error)}</div></div></div></div>`;
@@ -43,7 +43,7 @@ function histRow(h) {
 /* ---------- panels: an agent, a History record (read-only) ---------- */
 const onlyPart = env => Object.values(env.parts)[0];
 function agentBody(a) {
-  const life = a.life_note ? `<div class="ro-banner"><span class="ico">${icon(a.life_note.kind === 'depri' ? 'clock' : 'lock-closed')}</span><div>${esc(a.life_note.text)}</div></div>` : '';
+  const life = a.life_note ? `<div class="ro-banner"><span class="ico">${icon(a.life_note.icon)}</span><div>${esc(a.life_note.text)}</div></div>` : '';
   return `<div style="display:flex;gap:10px;align-items:center">${ava(a.family, a.initials)}<div><b>${esc(a.role)}</b><div class="muted">${esc(a.doing)}</div></div></div>
     <div class="kv">${a.kv.map(kvBox).join('')}</div>
     ${life}

@@ -90,7 +90,7 @@
    "cause": "billing/credits.py: a refund never reversed its credit line",
    "fix": "Reverse the credit line when a refund lands, with a test for each kind of refund.",
    "qa": {
-    "kind": "none",
+    "tone": null,
     "note": "No testers: a small backend fix is covered by its own tests.",
     "shots": []
    }

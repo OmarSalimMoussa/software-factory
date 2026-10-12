@@ -27,7 +27,7 @@
      "cause": "billing/credits.py: a refund never reversed its credit line",
      "fix": "Reverse the credit line when a refund lands, with a test for each kind of refund.",
      "qa": {
-      "kind": "none",
+      "tone": null,
       "note": "No testers: a small backend fix is covered by its own tests.",
       "shots": []
      }
@@ -46,7 +46,7 @@
      "cause": "the invoice list ran one query per item",
      "fix": "One joined query for the whole page.",
      "qa": {
-      "kind": "backend",
+      "tone": "good",
       "note": "qa-backend timed it: 200 items in 240 ms, down from 4.1 s.",
       "shots": []
      }
@@ -65,23 +65,26 @@
      "cause": "invoice page: the Approve label changed width on hover",
      "fix": "A fixed-width label, checked at three widths.",
      "qa": {
-      "kind": "ui",
+      "tone": null,
       "note": null,
       "shots": [
        {
         "tester": "qa-ui-function",
         "url": "/api/evidence/t-0013/page.svg",
-        "verdict": "pass"
+        "verdict": "pass",
+        "tone": "good"
        },
        {
         "tester": "qa-visual",
         "url": "/api/evidence/t-0013/button.svg",
-        "verdict": "pass"
+        "verdict": "pass",
+        "tone": "good"
        },
        {
         "tester": "qa-ux",
         "url": "/api/evidence/t-0013/phone.svg",
-        "verdict": "pass"
+        "verdict": "pass",
+        "tone": "good"
        }
       ]
      }

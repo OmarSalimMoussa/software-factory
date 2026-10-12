@@ -5,10 +5,12 @@
 name = "words and tones for a state"
 scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
 suffixes = [".js"]
-when = [["\\.(state|level|status|tone|marker) === '[a-z_-]+' \\?"]]
+when = [["\\.(state|level|status|tone|marker|kind|verdict) === '[a-z_-]+' \\?"]]
 code_only = false
 remedy = "the server sends the word, the tone or the icon with the state; the page draws it"
-owners = {}
+
+[computations.owners]
+"runtime/dashboard/ui/js/boot.js" = "search draws the look the server chose for each result (a tile, an avatar or an icon), and 'all' marks the see-all row the page adds itself"
 
 [[computations]]
 name = "lists of states"

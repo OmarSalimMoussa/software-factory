@@ -6,7 +6,7 @@
   "role": "tester",
   "doing": "Passed",
   "life_note": {
-   "kind": "retired",
+   "icon": "lock-closed",
    "text": "Retired. It can never be resumed. It moves to History in a few minutes."
   },
   "kv": [

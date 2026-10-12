@@ -6,7 +6,7 @@
   "role": "implementer, small",
   "doing": "Pushed out for “Staging is down” · comes back first",
   "life_note": {
-   "kind": "depri",
+   "icon": "clock",
    "text": "Deprioritized. It holds no slot, keeps its full context, and comes back first when a slot frees."
   },
   "kv": [

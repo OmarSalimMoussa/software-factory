@@ -143,14 +143,14 @@ def banner(snap: Snap) -> dict[str, Any] | None:
     state = factory_state(snap)
     if state == "paused":
         return {
-            "kind": "paused",
+            "icon": "pause-circle",
             "text": "The factory is paused.",
             "sub": "Every agent is benched with its work kept. Resume brings them back in order.",
             "action": "resume",
         }
     if state == "stopped":
         return {
-            "kind": "stopped",
+            "icon": "stop-circle",
             "text": "The factory is stopped.",
             "sub": "Nothing new starts until you start the orchestrator.",
             "action": "start",
