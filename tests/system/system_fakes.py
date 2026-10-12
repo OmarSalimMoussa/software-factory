@@ -51,7 +51,12 @@ def ci_link(number: int) -> str:
 
 def lookup(name: str) -> str:
     """The command that asks the owner's login shell, started as at a terminal, where it finds ``name``."""
-    return f"/bin/bash -lic echo '{steps_prepare.LOOKUP_MARK}'; command -v {name}"
+    return f"/bin/bash -lic echo '{steps_prepare.LOOKUP_MARK}'; command -v {name} && echo '{steps_prepare.LOOKUP_END}'"
+
+
+def found_at(path: str) -> str:
+    """What that shell prints when it finds the tool at ``path``."""
+    return f"{steps_prepare.LOOKUP_MARK}\n{path}\n{steps_prepare.LOOKUP_END}\n"
 
 
 def ci_answers(checkout: Path, sha: str, runs: list[tuple[str, str, str]]) -> dict[str, tuple[int, str]]:
@@ -60,7 +65,7 @@ def ci_answers(checkout: Path, sha: str, runs: list[tuple[str, str, str]]) -> di
     lines = "".join(f"{name}\t{status}\t{end}\t{ci_link(n)}\n" for n, (name, status, end) in enumerate(runs))
     checks = f"repos/acme/software-factory/commits/{sha}/check-runs?per_page=100"
     return {
-        lookup("gh"): (0, GH + "\n"),
+        lookup("gh"): (0, found_at(GH)),
         f"readlink -f {GH}": (0, GH + "\n"),
         f"{GH} auth status --hostname github.com": (0, ""),
         f"git -C {checkout} remote get-url origin": (0, FACTORY_ORIGIN + "\n"),

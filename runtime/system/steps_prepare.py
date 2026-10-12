@@ -21,15 +21,19 @@ _MACHINE_TOOLS = ("git", "tar", "systemctl", "systemd-run", "runuser", "loginctl
 _OWNER_TOOLS = ("uv", "claude")
 
 
-# The shell's start-up files may print; only what follows this line is the lookup's answer.
+# The shell's start-up files may print before its answer, and with no terminal (the dashboard's upgrade) it warns
+# about job control after it: only what lies between these two lines is the answer.
 LOOKUP_MARK = "--- the factory looks up a tool ---"
+LOOKUP_END = "--- the factory found it ---"
 
 
 def login_path(host: Host, account: Account, name: str) -> tuple[int, str]:
     """Where ``account``'s own shell finds ``name`` when started as at a terminal: a login shell that reads its rc files
     too, where nvm, mise and fnm put their tools on PATH. "" when it finds none; the shell's exit code beside it."""
-    code, out = host.query([account.shell, "-lic", f"echo '{LOOKUP_MARK}'; command -v {name}"], user=account.name)
-    answer = out.rpartition(LOOKUP_MARK)[2].split()
+    lookup = f"echo '{LOOKUP_MARK}'; command -v {name} && echo '{LOOKUP_END}'"
+    code, out = host.query([account.shell, "-lic", lookup], user=account.name)
+    found, end, _ = out.rpartition(LOOKUP_MARK)[2].partition(LOOKUP_END)
+    answer = found.split() if end else []
     return code, answer[-1] if answer else ""
 
 
