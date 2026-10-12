@@ -71,6 +71,8 @@ DRILLS = Path("/run/software-drills")
 
 WARDEN_UNIT = "software-warden.service"
 DASHBOARD_UNIT = "software-dashboard.service"
+# The dashboard's stand-in while the dashboard's upgrade runs; starting the dashboard stops it.
+UPGRADING_UNIT = "software-upgrading.service"
 DAEMON_UNIT = "software-agent-daemon.service"
 FIREWALL_UNIT = "software-firewall.service"
 FIREWALL_REFRESH = "software-firewall-refresh.service"

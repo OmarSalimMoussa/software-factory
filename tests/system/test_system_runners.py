@@ -1,18 +1,25 @@
 from __future__ import annotations
 
+import html
+import http.client
 import json
 import os
 import subprocess
 import sys
+import threading
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
 import pytest
 from system_fakes import dry_job, settings
 
+from runtime.dashboard.server import UI
+from runtime.shared import upgrades
+from runtime.shared.paths import Places
 from runtime.system import layout
 from runtime.system.install_steps import steps_machine
-from runtime.system.runners import errors_run, record_exit, services_run, trust
+from runtime.system.runners import errors_run, record_exit, services_run, trust, upgrading
 from runtime.system.runners import launch_file as lf
 from runtime.system.runners.stack_run import size_bytes
 from standard.services import provision
@@ -226,3 +233,48 @@ def test_stopping_the_shared_services_leaves_the_factorys_own_glitchtip_running(
 
     assert services_run.main(["stop"]) == 0
     assert ran and not any("factory-errors" in argv for argv in ran)
+
+
+def _ask(server: ThreadingHTTPServer, path: str, method: str = "GET") -> tuple[int, bytes]:
+    host, port = server.server_address[:2]
+    connection = http.client.HTTPConnection(str(host), int(port), timeout=5)
+    connection.request(method, path, body=b"{}" if method == "POST" else None)
+    reply = connection.getresponse()
+    return reply.status, reply.read()
+
+
+@pytest.mark.parametrize(
+    ("progress", "said"),
+    [
+        (
+            (upgrades.RUNNING, "Proving the agents' walls hold"),
+            "The factory is upgrading: proving the agents' walls hold.",
+        ),
+        ((upgrades.FAILED, ""), "The factory is upgrading."),
+        (None, "The factory is upgrading."),
+    ],
+    ids=["at-a-step", "its-record-says-it-ended", "no-record-yet"],
+)
+def test_the_dashboards_stand_in_says_the_factory_is_upgrading_on_every_page_until_the_dashboard_is_back(
+    tmp_path: Path, progress: tuple[str, str] | None, said: str
+) -> None:
+    places = Places.under(tmp_path)
+    if progress is not None:
+        upgrades.write_progress(places, "a" * 40, "b" * 40, *progress)
+    server = upgrading.serve(places, 0, 7)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        page = _ask(server, "/tasks/t-0001")
+        api = _ask(server, "/api/home")
+        write = _ask(server, "/api/factory/upgrade", "POST")
+        css = _ask(server, "/app.css")
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    sentence = f"{said} This page comes back by itself when it is done."
+    assert page[0] == 503 and html.escape(sentence) in page[1].decode()
+    assert '<meta http-equiv="refresh" content="7">' in page[1].decode()
+    assert (api[0], json.loads(api[1])["warden"]) == (503, {"ok": False, "since": None, "note": sentence})
+    assert write[0] == 503
+    assert css == (200, (UI / "app.css").read_bytes())

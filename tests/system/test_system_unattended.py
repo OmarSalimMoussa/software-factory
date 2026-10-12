@@ -13,8 +13,10 @@ from runtime.shared import store, upgrades
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import overrides_toml
+from runtime.system import layout
 from runtime.system.host import DeployKey, DryHost
 from runtime.system.install_steps import steps_prepare, steps_secrets
+from runtime.system.job import REPO_ROOT
 from runtime.system.journal import Journal
 from runtime.system.unattended import UnattendedHost
 
@@ -161,3 +163,26 @@ def test_an_upgrade_without_a_signed_in_github_cli_keeps_the_keys_and_asks_nothi
     steps_secrets.secrets(job)
 
     assert [a for a in host.actions if a.startswith(("ask the owner: ", "write: "))] == []
+
+
+@pytest.mark.parametrize("unattended", [True, False], ids=["the-dashboards-upgrade", "an-install-by-hand"])
+def test_only_the_dashboards_upgrade_puts_the_stand_in_in_the_dashboards_place(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, unattended: bool
+) -> None:
+    job = dry_job(tmp_path)
+    job.unattended, job.settings = unattended, settings()
+    host = job.host
+    assert isinstance(host, DryHost)
+    host.paths |= {layout.UNITS_DIR / unit for unit in layout.SERVICES}
+    written: dict[Path, str] = {}
+    monkeypatch.setattr(host, "write", lambda path, text, **how: written.__setitem__(path, text))
+
+    steps_prepare.stop_factory(job)
+
+    runs = [a for a in host.actions if a.startswith("run: systemctl")]
+    stopped = f"run: systemctl stop {' '.join(layout.SERVICES)}"
+    started = ["run: systemctl daemon-reload", f"run: systemctl start {layout.UPGRADING_UNIT}"]
+    assert runs == ([*started, stopped] if unattended else [stopped])
+    # It runs from this release's sealed copy: the factory installed now may have no stand-in of its own.
+    unit = written.get(layout.UNITS_DIR / layout.UPGRADING_UNIT, "")
+    assert (f"{REPO_ROOT}/runtime/system/runners/upgrading.py" in unit) is unattended

@@ -15,7 +15,7 @@ async function gsFetch(q) {
   catch (e) {
     if (UI.gs.q !== q) return;
     UI.gs.error = e instanceof ApiDown ? "Can't reach the warden, so search waits until it answers." : e instanceof ApiFailed ? `Search failed: ${e.message}` : 'Search failed.';
-    if (e instanceof ApiDown) wardenDown(e.since); else if (e instanceof NeedsDevice) askDevice();
+    if (e instanceof ApiDown) wardenDown(e.since, e.note); else if (e instanceof NeedsDevice) askDevice();
     drawGs(); return;
   }
   if (!env || UI.gs.q !== q) return;

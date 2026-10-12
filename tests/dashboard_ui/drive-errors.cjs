@@ -48,6 +48,13 @@ drive('errors', async t => {
   await p.route('**/api/**', route => route.abort()); await p.evaluate(() => poll()); await settle(p);
   t.check(/^Can't reach the warden since \d\d:\d\d$/.test(await p.textContent('#live-text')), 'a lost connection is not shown: ' + await p.textContent('#live-text'));
   await p.unroute('**/api/**'); await p.evaluate(() => poll()); await settle(p);
+  // the dashboard's stand-in holds its address while the factory upgrades: the warden toast says its sentence instead
+  const upgrading = 'The factory is upgrading: starting the services. This page comes back by itself when it is done.';
+  const standIn = {ok: false, warden: {ok: false, since: null, note: upgrading}, error: upgrading, reason: upgrading};
+  await p.route('**/api/**', route => route.fulfill({status: 503, contentType: 'application/json', body: JSON.stringify(standIn)}));
+  await p.evaluate(() => poll()); await settle(p);
+  t.check((await p.textContent('.toast.alert[data-key="warden"]')) === upgrading, 'the upgrade is not said: ' + await toastText(p));
+  await p.unroute('**/api/**'); await p.evaluate(() => poll()); await settle(p);
   // a 500 on one page: an error toast with Retry; once fixed, Retry draws it; the same failure again counts up
   await t.srv.set({fail_path: '/api/spend'});
   await p.click('#sidenav [data-go="spend"]'); await settle(p);

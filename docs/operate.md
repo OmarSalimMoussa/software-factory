@@ -158,7 +158,8 @@ To act on one:
    check passes.
 2. Home shows **A newer factory is ready**, with what changed. **Upgrade**, with your 6-digit code, pauses the
    factory, waits for every agent to settle, and installs the release as root, after checking on GitHub that CI made
-   it. The dashboard restarts on the way. The upgrade also commits the product's `.github/factory-ref` and CI
+   it. While the dashboard is away, its address shows a page that says the factory is upgrading and comes back by
+   itself. The upgrade also commits the product's `.github/factory-ref` and CI
    workflows for the new factory, and the warden pushes that commit itself.
 3. Run the server set-up again from a factory checkout at that commit (`python3 -m standard.server.setup --product
    <path>`). It refuses a checkout at another commit than `.github/factory-ref` names. Older builds stay deployable.

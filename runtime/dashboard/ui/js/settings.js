@@ -112,7 +112,7 @@ async function addAccount(btn) {
   catch (e) {
     if (e instanceof NeedsDevice) askDevice();
     else if (e instanceof TimedOut) say('No answer came in time, so it may have been added: check the list before you try again.', true);
-    else if (e instanceof ApiDown) { wardenDown(e.since); say('The warden did not answer, so nothing changed. Try again.', true); }
+    else if (e instanceof ApiDown) { wardenDown(e.since, e.note); say('The warden did not answer, so nothing changed. Try again.', true); }
     else say(`That failed: ${e.message} Nothing changed.`, true);
     return;
   } finally { if (btn.isConnected) btn.disabled = false; }

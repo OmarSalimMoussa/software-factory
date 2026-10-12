@@ -41,6 +41,7 @@ PROGRAM = "uninstall.py"
 UNITS = (
     layout.WARDEN_UNIT,
     layout.DASHBOARD_UNIT,
+    layout.UPGRADING_UNIT,
     layout.DAEMON_UNIT,
     layout.FIREWALL_TIMER,
     layout.FIREWALL_REFRESH,

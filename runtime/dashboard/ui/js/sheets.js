@@ -149,7 +149,7 @@ async function runOp(id, title, quiet) {
   for (;;) {
     let env;
     try { env = await fetchEnv('op:' + id, '/api/ops/' + encodeURIComponent(id)); }
-    catch (e) { if (e instanceof ApiDown) { wardenDown(e.since); await sleep(2000); continue; } forgetOp(id); loadFailed(e, title, null); return; }
+    catch (e) { if (e instanceof ApiDown) { wardenDown(e.since, e.note); await sleep(2000); continue; } forgetOp(id); loadFailed(e, title, null); return; }
     if (!env) { await sleep(700); continue; }
     const p = env.parts.op;
     if (!p.ok) { forgetOp(id); alertToast('op:' + id, `${title}: ${p.error}`); return; }

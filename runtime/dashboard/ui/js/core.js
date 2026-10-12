@@ -52,7 +52,7 @@ function safeHtml(html, allow = SAFE) {
 const boldOnly = html => safeHtml(html, {B: []});
 
 /* ---------- the API client ---------- */
-class ApiDown extends Error { constructor(since) { super('The warden did not answer.'); this.since = since || null; } }
+class ApiDown extends Error { constructor(since, note) { super('The warden did not answer.'); this.since = since || null; this.note = note || null; } }
 class NeedsDevice extends Error {}
 class Halted extends Error {}
 class ApiFailed extends Error {}
@@ -69,7 +69,7 @@ async function request(method, url, body) {
   let data = null;
   // telemetry: surfaced — a body that is not JSON leaves `data` null, and the lines below say what the status means
   try { data = await res.json(); } catch (e) { data = null; }
-  if ([502, 503, 504].includes(res.status)) throw new ApiDown(data && data.warden ? data.warden.since : null);
+  if ([502, 503, 504].includes(res.status)) throw new ApiDown(data && data.warden ? data.warden.since : null, data && data.warden ? data.warden.note : null);
   if (data && data.ok === false && (data.refused || data.reason)) return data;
   if (!res.ok) throw new ApiFailed((data && (data.reason || data.error)) || `The server answered ${res.status}.`);
   if (data == null) throw new ApiFailed('The answer could not be read.');
@@ -79,7 +79,7 @@ function envOk(env) {
   if (!env || typeof env !== 'object' || !env.parts) throw new ApiFailed('The answer could not be read.');
   if (env.api !== UI_API) { factoryUpdated(); throw new Halted(); }
   if (typeof env.timeout_ms === 'number') TIMEOUT_MS = env.timeout_ms;
-  if (env.warden && env.warden.ok === false) wardenDown(env.warden.since);
+  if (env.warden && env.warden.ok === false) wardenDown(env.warden.since, env.warden.note);
   else { wardenUp(); UI.lastOk = Date.now(); }
   return env;
 }
@@ -97,7 +97,7 @@ const post = (url, body, key) => request('POST', url, {...body, idempotency_key:
 function loadFailed(e, what, retry) {
   if (e instanceof Halted) return;
   if (e instanceof NeedsDevice) { askDevice(); return; }
-  if (e instanceof ApiDown) { wardenDown(e.since); return; }
+  if (e instanceof ApiDown) { wardenDown(e.since, e.note); return; }
   if (e instanceof ApiFailed) { alertToast('load:' + what, `${what} could not be loaded: ${e.message}`, {retry}); return; }
   alertToast('bug:' + what, `${what} could not be drawn.`, {retry});
   throw e;
@@ -113,7 +113,7 @@ async function act(url, body = {}, opts = {}) {
   catch (e) {
     if (e instanceof NeedsDevice) askDevice();
     else if (e instanceof TimedOut) alertToast('write:' + url, 'No answer came in time, so it may have gone through. Retrying is safe: it is never done twice.', {retry: () => act(url, body, {...opts, key})});
-    else if (e instanceof ApiDown) { wardenDown(e.since); alertToast('write:' + url, 'That did not go through: the warden did not answer. Nothing changed.', {retry: () => act(url, body, {...opts, key})}); }
+    else if (e instanceof ApiDown) { wardenDown(e.since, e.note); alertToast('write:' + url, 'That did not go through: the warden did not answer. Nothing changed.', {retry: () => act(url, body, {...opts, key})}); }
     else alertToast('write:' + url, `That did not go through: ${e.message}`, {retry: () => act(url, body, {...opts, key})});
     return null;
   } finally { if (btn && btn.isConnected) { btn.disabled = was; btn.removeAttribute('aria-busy'); } }
@@ -137,7 +137,7 @@ function refreshParts(names) {
 }
 
 /* ---------- state ---------- */
-const UI = {page: null, shell: null, pages: [], data: {}, back: null, hist: false, lastOk: 0, down: null, fails: 0, halted: false, device: false,
+const UI = {page: null, shell: null, pages: [], data: {}, back: null, hist: false, lastOk: 0, down: null, downSaid: null, fails: 0, halted: false, device: false,
   workTab: 'tasks', reqInbox: 'all', reqOut: 'all', reqPages: 1, histPages: 1, sliceKey: 'family', spendRange: 14, slicePages: 1, reflectKind: 'all', reflectPages: 1,
   agentsClosed: new Set(), gPending: false, gs: {q: '', at: 0}, edits: new Map(), failed: new Set(), dirty: false, pendingScroll: null, sigs: {}};
 const PAGE = {};
@@ -172,16 +172,16 @@ function toastAction(btn) {
 }
 
 /* ---------- the warden's reachability, the live indicator, old data ---------- */
-function wardenDown(since) {
-  if (!UI.down) {
-    UI.down = since || hhmm(new Date()); UI.fails = 0;
-    alertToast('warden', `Can't reach the warden since ${UI.down}. The page shows what it last knew; actions wait until it answers.`, {persistent: true});
-  }
+/* A note is the server's own sentence for why, as the dashboard's stand-in says while the factory upgrades. */
+function wardenDown(since, note) {
+  if (!UI.down) { UI.down = since || hhmm(new Date()); UI.fails = 0; }
+  const said = note || `Can't reach the warden since ${UI.down}. The page shows what it last knew; actions wait until it answers.`;
+  if (said !== UI.downSaid) { dismissToast('warden'); UI.downSaid = said; alertToast('warden', said, {persistent: true}); }
   UI.fails++; drawLive(); markWrites();
 }
 function wardenUp() {
   if (!UI.down) return;
-  UI.down = null; UI.fails = 0; dismissToast('warden'); dismissToast('writes-off'); toast('The warden answers again.'); drawLive(); markWrites();
+  UI.down = null; UI.downSaid = null; UI.fails = 0; dismissToast('warden'); dismissToast('writes-off'); toast('The warden answers again.'); drawLive(); markWrites();
 }
 function factoryUpdated() {
   if (UI.halted) return;

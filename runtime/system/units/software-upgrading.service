@@ -1,0 +1,34 @@
+# The dashboard's stand-in while the dashboard's upgrade replaces the factory: it holds the dashboard's address and
+# says the factory is upgrading, so a reload finds a page, not nothing. Starting either one stops the other, and the
+# stop runs first, so the dashboard always finds its port free.
+[Unit]
+Description=software factory: the dashboard's stand-in while the factory upgrades
+Conflicts=@dashboard_unit@
+Before=@dashboard_unit@
+
+[Service]
+Type=simple
+User=@dashboard_user@
+Group=@dashboard_user@
+ExecStart=@python@ -I @install@/runtime/system/runners/upgrading.py @dashboard_port@ @dashboard_refresh@
+# Of the warden's state it sees nothing: it reads only root's progress record and the dashboard's stylesheet.
+TemporaryFileSystem=@state@:ro
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+UMask=0077
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native

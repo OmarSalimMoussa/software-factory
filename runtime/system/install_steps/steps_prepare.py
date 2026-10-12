@@ -14,6 +14,7 @@ from runtime.shared.settings import SettingsError, build, flatten
 from runtime.shared.settings_schema import AT_INSTALL, SCHEMA
 from runtime.system import layout
 from runtime.system.host import Account, Host
+from runtime.system.install_steps import steps_wire
 from runtime.system.job import Install, github_name, github_origin, refuse
 from runtime.warden.sessions import registry
 
@@ -226,8 +227,11 @@ def _as_last_installed(ctx: Install, overrides: dict[str, Any]) -> None:
 
 
 def stop_factory(ctx: Install) -> None:
-    """Stop the warden, the dashboard and the agents' daemon, then check the registry again with the warden down."""
+    """Stop the warden, the dashboard and the agents' daemon, then check the registry again with the warden down. The
+    dashboard's upgrade puts the dashboard's stand-in in its place, so the page says what is happening."""
     running = [unit for unit in layout.SERVICES if ctx.host.exists(layout.UNITS_DIR / unit)]
+    if running and ctx.unattended:
+        steps_wire.stand_in(ctx)
     if running:
         ctx.host.run(["systemctl", "stop", *running])
     else:

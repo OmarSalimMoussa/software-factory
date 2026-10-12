@@ -47,6 +47,16 @@ def units(ctx: Install) -> None:
     ctx.host.run(["systemctl", "daemon-reload"])
 
 
+def stand_in(ctx: Install) -> None:
+    """Start the dashboard's stand-in, which stops the dashboard. It runs from the sealed copy of this release, which
+    the factory installed now may predate; the units step points it at the install."""
+    item = next(a for a in render.UNIT_FILES if a.dest.name == layout.UPGRADING_UNIT)
+    values = {**given(ctx), "install": str(ctx.tree())}
+    ctx.host.write(item.dest, render.artifact(item, ctx.templates(), values), mode=item.mode)
+    ctx.host.run(["systemctl", "daemon-reload"])
+    ctx.host.run(["systemctl", "start", layout.UPGRADING_UNIT])
+
+
 def polkit(ctx: Install) -> None:
     text = render.artifact(render.POLKIT, ctx.templates(), given(ctx))
     ctx.host.write(render.POLKIT.dest, text, mode=render.POLKIT.mode)

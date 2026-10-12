@@ -39,6 +39,7 @@ dist_to_src = {}
 "runtime/system/runners/start.py" = "a systemd unit's command: its stderr and exit status go to the journal"
 "runtime/system/runners/trust.py" = "an install step run as the agent user: its stderr and exit status reach the install"
 "runtime/system/runners/upgrade.py" = "root's upgrade unit: its stderr and exit status go to the journal and its log"
+"runtime/system/runners/upgrading.py" = "a systemd unit's command: its stderr and exit status go to the journal"
 "runtime/system/runners/with_token.py" = "a systemd unit's command: its stderr and exit status go to the journal"
 "standard/deploy_image.py" = "a CI step: its stderr and exit status reach the CI run"
 "standard/plan.py" = "a CI step: its stderr and exit status reach the CI run"

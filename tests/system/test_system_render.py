@@ -178,3 +178,15 @@ def test_the_one_unit_the_warden_starts_as_root_is_the_upgrade_to_a_full_commit(
     assert {"User=root", "ExecStart=/usr/bin/python3 -I /opt/software-factory/runtime/system/runners/upgrade.py %i",
             "TimeoutStartSec=90min"} <= set(unit)  # fmt: skip
     assert not any(line.startswith("Slice=") for line in unit)
+
+
+def test_the_dashboards_stand_in_holds_its_port_never_starts_alone_and_gives_way_to_the_dashboard() -> None:
+    lines = _unit(layout.UPGRADING_UNIT).splitlines()
+
+    assert {
+        "Conflicts=software-dashboard.service",
+        "Before=software-dashboard.service",
+        "User=software-dashboard",
+    } <= set(lines)
+    assert "ExecStart=/usr/bin/python3 -I /opt/software-factory/runtime/system/runners/upgrading.py 8300 15" in lines
+    assert not any(line.startswith("WantedBy=") for line in lines)

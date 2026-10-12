@@ -42,6 +42,7 @@ UNIT_FILES = (
     Artifact(f"units/{layout.FIREWALL_TIMER}", layout.UNITS_DIR / layout.FIREWALL_TIMER, 0o644),
     Artifact(f"units/{layout.WARDEN_UNIT}", layout.UNITS_DIR / layout.WARDEN_UNIT, 0o644),
     Artifact(f"units/{layout.DASHBOARD_UNIT}", layout.UNITS_DIR / layout.DASHBOARD_UNIT, 0o644),
+    Artifact(f"units/{layout.UPGRADING_UNIT}", layout.UNITS_DIR / layout.UPGRADING_UNIT, 0o644),
     Artifact(f"units/{layout.DAEMON_UNIT}", layout.UNITS_DIR / layout.DAEMON_UNIT, 0o644),
     Artifact(f"units/{layout.AGENT_RUN}", layout.UNITS_DIR / layout.AGENT_RUN, 0o644),
     Artifact(f"units/{layout.STACK_RUN}", layout.UNITS_DIR / layout.STACK_RUN, 0o644),
@@ -106,6 +107,7 @@ def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str
         "uv_env": " ".join(f"{key}={value}" for key, value in layout.UV_ENV.items()),
         "slice": SLICE,
         "warden_unit": layout.WARDEN_UNIT,
+        "dashboard_unit": layout.DASHBOARD_UNIT,
         "daemon_unit": layout.DAEMON_UNIT,
         "firewall_unit": layout.FIREWALL_UNIT,
         "nft_file": str(layout.NFT_FILE),
@@ -120,6 +122,7 @@ def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str
         "restart_seconds": str(settings.get_int("watch.tick_seconds")),
         "upgrade_minutes": f"{settings.get_int('install.upgrade_minutes')}min",
         "dashboard_port": str(settings.get_int("dashboard.port")),
+        "dashboard_refresh": str(settings.get_int("dashboard.refresh_seconds")),
     }
 
 
