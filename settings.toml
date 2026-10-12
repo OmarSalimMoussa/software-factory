@@ -132,10 +132,11 @@ plan_amber_percent = 80
 plan_red_percent = 95
 
 [prices]                # dollars per million tokens, per allowed model; a model without one costs "unknown"
-# Anthropic's API list prices (claude.com/pricing), cache writes at the 5-minute rate; Haiku's for prompts to 100k tokens
-claude-opus-5-5 = { input = 4, output = 20, cache_read = 0.2, cache_write = 5 }
-claude-sonnet-5-5 = { input = 2, output = 10, cache_read = 0.1, cache_write = 2.5 }
-claude-haiku-5-5 = { input = 0.1, output = 0.5, cache_read = 0.01, cache_write = 0.125 }
+# Anthropic's API list prices (claude.com/pricing). Cache writes at the 1-hour rate, the cache Claude Code writes;
+# Haiku's prices are for prompts up to 100k tokens, and fast mode costs more: both read low here.
+claude-opus-5-5 = { input = 4, output = 20, cache_read = 0.2, cache_write = 8 }
+claude-sonnet-5-5 = { input = 2, output = 10, cache_read = 0.1, cache_write = 4 }
+claude-haiku-5-5 = { input = 0.1, output = 0.5, cache_read = 0.01, cache_write = 0.2 }
 
 [checks]                # `factory check`, which the warden runs in its own unit
 run_minutes = 30        # the longest one check may run before it is stopped
