@@ -17,6 +17,7 @@ import socket
 import sys
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 
 BREACHES = frozenset({"opened", "listed", "written", "connected", "set"})
 
@@ -37,38 +38,59 @@ def _get(url: str, seconds: float) -> str:
         return _errno(exc.reason) if isinstance(exc.reason, OSError) else type(exc).__name__
 
 
+def _opened(path: str, _: float) -> str:
+    with open(path, "rb"):
+        return "opened"
+
+
+def _listed(path: str, _: float) -> str:
+    os.listdir(path)
+    return "listed"
+
+
+def _written(path: str, _: float) -> str:
+    with open(path, "ab"):
+        return "written"
+
+
+def _unix(path: str, seconds: float) -> str:
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        sock.settimeout(seconds)
+        sock.connect(path)
+        return "connected"
+
+
+def _tcp(address: str, seconds: float) -> str:
+    host, _, port = address.rpartition(":")
+    with socket.create_connection((host, int(port)), timeout=seconds):
+        return "connected"
+
+
+# Each kind of target, `<kind>:<rest>`: how to try it, from its rest and the seconds it may take.
+_KINDS: dict[str, Callable[[str, float], str]] = {
+    "file": _opened,
+    "dir": _listed,
+    "write": _written,
+    "get": _get,
+    "unix": _unix,
+    "tcp": _tcp,
+    "env": lambda name, _: "set" if os.environ.get(name) else "unset",
+}
+
+
 def probe(target: str, seconds: float) -> str:
     kind, _, rest = target.partition(":")
+    reach = _KINDS.get(kind)
+    if reach is None:
+        return "unknown kind"
     try:
-        if kind == "file":
-            with open(rest, "rb"):
-                return "opened"
-        if kind == "dir":
-            os.listdir(rest)
-            return "listed"
-        if kind == "write":
-            with open(rest, "ab"):
-                return "written"
-        if kind == "get":
-            return _get(rest, seconds)
-        if kind == "unix":
-            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-                sock.settimeout(seconds)
-                sock.connect(rest)
-                return "connected"
-        if kind == "tcp":
-            host, _, port = rest.rpartition(":")
-            with socket.create_connection((host, int(port)), timeout=seconds):
-                return "connected"
-        if kind == "env":
-            return "set" if os.environ.get(rest) else "unset"
+        return reach(rest, seconds)
     # telemetry: expected — a refusal by the wall is the outcome this probe reports
     except OSError as exc:
         return _errno(exc)
     # telemetry: surfaced — a target it cannot read comes back from `probe` as such, and the drill fails
     except ValueError:
         return "unreadable target"
-    return "unknown kind"
 
 
 def main(argv: list[str]) -> int:

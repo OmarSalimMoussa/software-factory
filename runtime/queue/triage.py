@@ -246,6 +246,22 @@ def _new_task(
     return task
 
 
+def _new_tasks(
+    queue: Queue, made: list[Task | None], requests: Mapping[str, Request], boosted: Mapping[str, str], now: str
+) -> list[Task]:
+    """The plan's new tasks, numbered on from the queue's next id and queued; each request they take names its task."""
+    first = int(queue.next_task_id()[2:])
+    made_tasks: list[Task] = []
+    for n, draft in enumerate(t for t in made if t is not None):
+        task = dataclasses.replace(statuses.move(draft, "queued", "triage", statuses.ORCH), id=f"t-{first + n:04d}")
+        if any(r in boosted for r in task.requests):
+            task.boosted_at = now
+        for rid in task.requests:
+            requests[rid].outcome = f"task {task.id}"
+        made_tasks.append(task)
+    return made_tasks
+
+
 def _changes(
     ctx: Context,
     queue: Queue,
@@ -261,15 +277,7 @@ def _changes(
     now: str,
 ) -> tuple[dict[str, str], list[Task]]:
     changes: dict[str, str] = {}
-    first = int(queue.next_task_id()[2:])
-    made_tasks: list[Task] = []
-    for n, draft in enumerate(t for t in made if t is not None):
-        task = dataclasses.replace(statuses.move(draft, "queued", "triage", statuses.ORCH), id=f"t-{first + n:04d}")
-        if any(r in boosted for r in task.requests):
-            task.boosted_at = now
-        for rid in task.requests:
-            requests[rid].outcome = f"task {task.id}"
-        made_tasks.append(task)
+    made_tasks = _new_tasks(queue, made, requests, boosted, now)
     joined: dict[str, Task] = {}
     for rid, target in joins.items():
         task = joined.setdefault(target, dataclasses.replace(existing[target]))

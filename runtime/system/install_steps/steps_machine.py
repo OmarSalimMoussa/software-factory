@@ -74,6 +74,22 @@ def users(ctx: Install) -> None:
     host = ctx.host
     if host.query(["getent", "group", layout.SLOTS_GROUP])[0] != 0:
         host.run(["groupadd", "--system", layout.SLOTS_GROUP])
+    _accounts(ctx)
+    # The stack user's rootless Docker reads a slot's checkout, in the agent's home, for bind mounts and build
+    # contexts. The daemon runs with the account's own groups, never a unit's, so the membership is the account's.
+    stack = host.account(layout.STACK_USER)
+    if stack is None or AGENT_USER not in stack.groups:
+        host.run(["gpasswd", "-a", layout.STACK_USER, AGENT_USER])
+    host.run(["chmod", "0750", str(layout.AGENT_HOME)])
+    host.mkdir(layout.AGENT_HOME / ".claude", mode=0o700, owner=AGENT_USER)
+    _agent_caches(ctx)
+    for name in (AGENT_USER, layout.STACK_USER):
+        host.run(["loginctl", "enable-linger", name])
+
+
+def _accounts(ctx: Install) -> None:
+    """Each factory user made, or kept with its home checked and its privileged groups taken away."""
+    host = ctx.host
     homes = {AGENT_USER: layout.AGENT_HOME, layout.STACK_USER: layout.STACK_HOME}
     for name in layout.USERS:
         account = host.account(name)
@@ -88,23 +104,17 @@ def users(ctx: Install) -> None:
                 host.run(["gpasswd", "--delete", name, group])
         if name in homes:
             host.run(["passwd", "--lock", name])
-    # The stack user's rootless Docker reads a slot's checkout, in the agent's home, for bind mounts and build
-    # contexts. The daemon runs with the account's own groups, never a unit's, so the membership is the account's.
-    stack = host.account(layout.STACK_USER)
-    if stack is None or AGENT_USER not in stack.groups:
-        host.run(["gpasswd", "-a", layout.STACK_USER, AGENT_USER])
-    host.run(["chmod", "0750", str(layout.AGENT_HOME)])
-    host.mkdir(layout.AGENT_HOME / ".claude", mode=0o700, owner=AGENT_USER)
-    # A session cannot make its tools' caches itself: it may write in each one, never in the home around it. Every
-    # folder on the way is the agent's too, so a tool run outside the sandbox can still add its own beside them.
+
+
+def _agent_caches(ctx: Install) -> None:
+    """A session cannot make its tools' caches itself: it may write in each one, never in the home around it. Every
+    folder on the way is the agent's too, so a tool run outside the sandbox can still add its own beside them."""
     folders: dict[Path, None] = {}
     for cache in ctx.need_settings().get_list("sandbox.writable_caches"):
         parts = Path(cache).parts
         folders.update({layout.AGENT_HOME.joinpath(*parts[: n + 1]): None for n in range(len(parts))})
     for folder in folders:
-        host.mkdir(folder, mode=0o700, owner=AGENT_USER)
-    for name in (AGENT_USER, layout.STACK_USER):
-        host.run(["loginctl", "enable-linger", name])
+        ctx.host.mkdir(folder, mode=0o700, owner=AGENT_USER)
 
 
 def owner_group(ctx: Install) -> str:

@@ -14,7 +14,7 @@ from system_fakes import dry_job, settings
 
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.system import install
+from runtime.system import drill_probe, install
 from runtime.system.install_drills import drills
 from runtime.system.install_drills.evidence import Ran, Result
 
@@ -400,3 +400,28 @@ def test_the_session_drill_needs_the_launch_line_the_record_and_the_stop_the_war
     result = drills.background_session(FakeRig(**rig))
 
     assert result.ok is ok and says in result.evidence
+
+
+@pytest.mark.parametrize(
+    ("target", "said"),
+    [
+        ("file:{here}/present", "opened"),
+        ("file:{here}/absent", "ENOENT"),
+        ("dir:{here}", "listed"),
+        ("write:{here}/present", "written"),
+        ("unix:{here}/absent.sock", "ENOENT"),
+        ("tcp:127.0.0.1:port", "unreadable target"),
+        ("env:DRILL_PROBE_SET", "set"),
+        ("env:DRILL_PROBE_UNSET", "unset"),
+        ("ftp:{here}", "unknown kind"),
+    ],
+    ids=["file", "file-missing", "dir", "write", "unix-missing", "tcp-unreadable", "env-set", "env-unset", "unknown"],
+)
+def test_the_probe_names_what_each_target_did(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target: str, said: str
+) -> None:
+    (tmp_path / "present").write_text("")
+    monkeypatch.setenv("DRILL_PROBE_SET", "1")
+    monkeypatch.delenv("DRILL_PROBE_UNSET", raising=False)
+
+    assert drill_probe.probe(target.format(here=tmp_path), 1) == said

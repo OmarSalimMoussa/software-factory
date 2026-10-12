@@ -60,23 +60,43 @@ def check(blobs: Mapping[str, bytes]) -> dict[str, list[str]]:
     specs: list[tuple[str, Spec]] = []
     for rel, raw in blobs.items():
         parsed, problems[rel] = _parse(rel, raw)
-        stem = rel.rsplit("/", 1)[-1].removesuffix(".md")
+        problems[rel] += _misplaced(rel, parsed, requests)
         if isinstance(parsed, Request):
-            if rel.split("/")[:2] != ["requests", parsed.inbox] or stem != parsed.id:
-                problems[rel].append(f"a request {parsed.id} from {parsed.inbox} lives in requests/{parsed.inbox}/")
-            if parsed.id in requests:
-                problems[rel].append(f"{parsed.id} is also {requests[parsed.id][0]}")
             requests[parsed.id] = (rel, parsed)
         elif isinstance(parsed, Task):
-            if stem != parsed.id:
-                problems[rel].append(f"task {parsed.id} lives in tasks/{parsed.id}.md")
             tasks[parsed.id] = (rel, parsed)
         elif isinstance(parsed, Spec):
-            if stem != parsed.task:
-                problems[rel].append(f"the spec of {parsed.task} lives in specs/{parsed.task}.md")
             specs.append((rel, parsed))
-        elif isinstance(parsed, CheckRecord) and stem != parsed.id:
-            problems[rel].append(f"check {parsed.id} lives in checks/{parsed.id}.md")
+    _unlinked(problems, requests, tasks, specs)
+    return problems
+
+
+def _misplaced(rel: str, parsed: object, requests: Mapping[str, tuple[str, Request]]) -> list[str]:
+    """Why a file is not where its id puts it, or takes a request id an earlier file holds."""
+    stem = rel.rsplit("/", 1)[-1].removesuffix(".md")
+    if isinstance(parsed, Request):
+        out = []
+        if rel.split("/")[:2] != ["requests", parsed.inbox] or stem != parsed.id:
+            out.append(f"a request {parsed.id} from {parsed.inbox} lives in requests/{parsed.inbox}/")
+        if parsed.id in requests:
+            out.append(f"{parsed.id} is also {requests[parsed.id][0]}")
+        return out
+    if isinstance(parsed, Task) and stem != parsed.id:
+        return [f"task {parsed.id} lives in tasks/{parsed.id}.md"]
+    if isinstance(parsed, Spec) and stem != parsed.task:
+        return [f"the spec of {parsed.task} lives in specs/{parsed.task}.md"]
+    if isinstance(parsed, CheckRecord) and stem != parsed.id:
+        return [f"check {parsed.id} lives in checks/{parsed.id}.md"]
+    return []
+
+
+def _unlinked(
+    problems: dict[str, list[str]],
+    requests: Mapping[str, tuple[str, Request]],
+    tasks: Mapping[str, tuple[str, Task]],
+    specs: list[tuple[str, Spec]],
+) -> None:
+    """Adds to ``problems`` each link between requests, tasks and specs that names a file missing or not linked back."""
     for task_id, (rel, task) in tasks.items():
         for rid in task.requests:
             if rid not in requests:
@@ -91,7 +111,6 @@ def check(blobs: Mapping[str, bytes]) -> dict[str, list[str]]:
     for rel, spec in specs:
         if spec.task not in tasks:
             problems[rel].append(f"task {spec.task} does not exist")
-    return problems
 
 
 # The queue's stamps at the last sweep, by the warden's state folder.

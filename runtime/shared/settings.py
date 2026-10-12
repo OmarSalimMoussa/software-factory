@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import copy
 import tomllib
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -87,47 +87,70 @@ def problems_for(key: str, value: Any, tree: Mapping[str, Any]) -> list[str]:
     spec = SCHEMA.get(key)
     if spec is None:
         return [f"{key} is not a setting"]
-    allowed = tree.get("models", {}).get("allowed", [])
-    efforts = tree.get("models", {}).get("efforts", [])
-    if spec.kind == "int" and (isinstance(value, bool) or not isinstance(value, int)):
-        return [f"{key} must be a whole number"]
-    if spec.kind == "float" and (isinstance(value, bool) or not isinstance(value, int | float)):
-        return [f"{key} must be a number"]
-    if spec.kind in ("int", "float"):
-        if spec.low is not None and value < spec.low or spec.high is not None and value > spec.high:
-            return [f"{key} must be from {spec.low:g} to {spec.high:g}"]
-        return []
-    if spec.kind == "str":
-        if not isinstance(value, str) or spec.required and not value.strip():
-            return [f"{key} must be set"]
-        return []
-    if spec.kind == "list":
-        return _list_problems(key, spec, value)
-    if spec.kind == "size":
-        return [] if _size_ok(value) else [f"{key} must be a size such as 12G"]
-    if spec.kind == "model":
-        if not isinstance(value, Mapping) or set(value) != {"model", "effort"}:
-            return [f"{key} must name a model and an effort"]
-        out = [] if value["model"] in allowed else [f"{key}: {value['model']} is not an allowed model"]
-        return out + ([] if value["effort"] in efforts else [f"{key}: {value['effort']} is not an effort"])
-    if spec.kind == "weights":
-        if not isinstance(value, Mapping) or set(value) != set(_WEIGHT_KEYS):
-            return [f"{key} must weigh {', '.join(_WEIGHT_KEYS)}"]
-        bad = [k for k, w in value.items() if isinstance(w, bool) or not isinstance(w, int | float) or w < 0]
-        return [f"{key}.{k} must be a number from 0" for k in bad]
-    if spec.kind == "prices":
-        if not isinstance(value, Mapping):
-            return ["prices must be a table of models"]
-        out = []
-        for model, price in value.items():
-            if model not in allowed:
-                out.append(f"prices: {model} is not an allowed model")
-            elif not isinstance(price, Mapping) or set(price) != set(_PRICE_KEYS):
-                out.append(f"prices.{model} must set {', '.join(_PRICE_KEYS)}")
-            elif any(isinstance(p, bool) or not isinstance(p, int | float) or p < 0 for p in price.values()):
-                out.append(f"prices.{model}: each price must be a number from 0")
-        return out
-    return [f"{key} has an unknown kind {spec.kind}"]
+    check = _KINDS.get(spec.kind)
+    if check is None:
+        return [f"{key} has an unknown kind {spec.kind}"]
+    return check(key, spec, value, tree)
+
+
+def _models(tree: Mapping[str, Any], name: str) -> Any:
+    """``models.<name>`` (the allowed models, or the efforts) as the tree being checked holds it."""
+    return tree.get("models", {}).get(name, [])
+
+
+def _number_problems(key: str, spec: Spec, value: Any, _: Mapping[str, Any]) -> list[str]:
+    whole = spec.kind == "int"
+    if isinstance(value, bool) or not isinstance(value, int if whole else int | float):
+        return [f"{key} must be a whole number" if whole else f"{key} must be a number"]
+    if spec.low is not None and value < spec.low or spec.high is not None and value > spec.high:
+        return [f"{key} must be from {spec.low:g} to {spec.high:g}"]
+    return []
+
+
+def _text_problems(key: str, spec: Spec, value: Any, _: Mapping[str, Any]) -> list[str]:
+    return [f"{key} must be set"] if not isinstance(value, str) or spec.required and not value.strip() else []
+
+
+def _model_problems(key: str, _: Spec, value: Any, tree: Mapping[str, Any]) -> list[str]:
+    if not isinstance(value, Mapping) or set(value) != {"model", "effort"}:
+        return [f"{key} must name a model and an effort"]
+    out = [] if value["model"] in _models(tree, "allowed") else [f"{key}: {value['model']} is not an allowed model"]
+    return out + ([] if value["effort"] in _models(tree, "efforts") else [f"{key}: {value['effort']} is not an effort"])
+
+
+def _weights_problems(key: str, _: Spec, value: Any, __: Mapping[str, Any]) -> list[str]:
+    if not isinstance(value, Mapping) or set(value) != set(_WEIGHT_KEYS):
+        return [f"{key} must weigh {', '.join(_WEIGHT_KEYS)}"]
+    bad = [k for k, w in value.items() if isinstance(w, bool) or not isinstance(w, int | float) or w < 0]
+    return [f"{key}.{k} must be a number from 0" for k in bad]
+
+
+def _prices_problems(_: str, __: Spec, value: Any, tree: Mapping[str, Any]) -> list[str]:
+    if not isinstance(value, Mapping):
+        return ["prices must be a table of models"]
+    allowed = _models(tree, "allowed")
+    out = []
+    for model, price in value.items():
+        if model not in allowed:
+            out.append(f"prices: {model} is not an allowed model")
+        elif not isinstance(price, Mapping) or set(price) != set(_PRICE_KEYS):
+            out.append(f"prices.{model} must set {', '.join(_PRICE_KEYS)}")
+        elif any(isinstance(p, bool) or not isinstance(p, int | float) or p < 0 for p in price.values()):
+            out.append(f"prices.{model}: each price must be a number from 0")
+    return out
+
+
+# Each kind of setting's check: (key, spec, value, the whole tree) to the problems with the value.
+_KINDS: dict[str, Callable[[str, Spec, Any, Mapping[str, Any]], list[str]]] = {
+    "int": _number_problems,
+    "float": _number_problems,
+    "str": _text_problems,
+    "list": lambda key, spec, value, _: _list_problems(key, spec, value),
+    "size": lambda key, _, value, __: [] if _size_ok(value) else [f"{key} must be a size such as 12G"],
+    "model": _model_problems,
+    "weights": _weights_problems,
+    "prices": _prices_problems,
+}
 
 
 def read_some(tree: Any, keys: Sequence[str]) -> dict[str, Any]:

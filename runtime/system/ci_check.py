@@ -79,6 +79,11 @@ def verdict(host: Host, owner: Account, factory_origin: str, sha: str) -> Verdic
     code, out = host.query(asked, user=owner.name)
     if code != 0:
         return _unknown(f"gh could not read the factory's CI on {short}: {out.strip()[-300:]}")
+    return _judged(out, short)
+
+
+def _judged(out: str, short: str) -> Verdict:
+    """The verdict on gh's check runs, one tab-separated line each."""
     checks = []
     for line in filter(str.strip, out.splitlines()):
         fields = line.split("\t")

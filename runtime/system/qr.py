@@ -121,11 +121,20 @@ class _Grid:
         for i in range(self.size):
             self.put(6, i, i % 2 == 0)
             self.put(i, 6, i % 2 == 0)
+        self._finders()
+        self._alignments(version)
+        self.format_bits(0)
+        if version >= 7:
+            self._version_bits(version)
+
+    def _finders(self) -> None:
         for x, y in ((3, 3), (self.size - 4, 3), (3, self.size - 4)):
             for dy in range(-4, 5):
                 for dx in range(-4, 5):
                     if 0 <= x + dx < self.size and 0 <= y + dy < self.size:
                         self.put(x + dx, y + dy, max(abs(dx), abs(dy)) not in (2, 4))
+
+    def _alignments(self, version: int) -> None:
         positions = _alignment_positions(version)
         last = len(positions) - 1
         for i, x in enumerate(positions):
@@ -134,16 +143,16 @@ class _Grid:
                     for dy in range(-2, 3):
                         for dx in range(-2, 3):
                             self.put(x + dx, y + dy, max(abs(dx), abs(dy)) != 1)
-        self.format_bits(0)
-        if version >= 7:
-            remainder = version
-            for _ in range(12):
-                remainder = (remainder << 1) ^ ((remainder >> 11) * 0x1F25)
-            bits = version << 12 | remainder
-            for i in range(18):
-                a, b, dark = self.size - 11 + i % 3, i // 3, (bits >> i) & 1 == 1
-                self.put(a, b, dark)
-                self.put(b, a, dark)
+
+    def _version_bits(self, version: int) -> None:
+        remainder = version
+        for _ in range(12):
+            remainder = (remainder << 1) ^ ((remainder >> 11) * 0x1F25)
+        bits = version << 12 | remainder
+        for i in range(18):
+            a, b, dark = self.size - 11 + i % 3, i // 3, (bits >> i) & 1 == 1
+            self.put(a, b, dark)
+            self.put(b, a, dark)
 
     def put(self, x: int, y: int, dark: bool) -> None:
         self.dark[y][x] = dark

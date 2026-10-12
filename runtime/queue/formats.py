@@ -179,13 +179,7 @@ def request_problems(req: Request) -> list[str]:
     problems = [] if REQUEST_ID.match(req.id) else [f"id {req.id!r} is not r-YYYY-MM-DD-NNNN"]
     if req.inbox not in INBOXES:
         problems.append(f"inbox {req.inbox!r} is not one of {', '.join(INBOXES)}")
-    if req.inbox == "owner":
-        sender_ok = req.from_role == "owner"
-    elif req.inbox == "users":
-        sender_ok = bool(USER.match(req.from_role))
-    else:
-        sender_ok = bool(ROLE.match(req.from_role)) and not req.from_role.startswith(("owner", "user"))
-    if not sender_ok:
+    if not _may_file(req):
         problems.append(f"from {req.from_role!r} cannot file in the {req.inbox} inbox")
     if not ISO.match(req.at):
         problems.append(f"at {req.at!r} is not a UTC time")
@@ -202,6 +196,16 @@ def request_problems(req: Request) -> list[str]:
     if not req.body:
         problems.append("the body is empty")
     return problems
+
+
+def _may_file(req: Request) -> bool:
+    """Whether the request's sender may file in its inbox: the owner in the owner's, a user in the users', an agent's
+    role in its own."""
+    if req.inbox == "owner":
+        return req.from_role == "owner"
+    if req.inbox == "users":
+        return bool(USER.match(req.from_role))
+    return bool(ROLE.match(req.from_role)) and not req.from_role.startswith(("owner", "user"))
 
 
 def dump_request(req: Request) -> str:
@@ -292,6 +296,27 @@ def task_problems(task: Task) -> list[str]:
     if not task.requests:
         problems.append("a task links at least one request")
     problems += [f"request {r!r} is not a request id" for r in task.requests if not REQUEST_ID.match(r)]
+    problems += _fact_problems(task)
+    if "\n" in task.why or "\n" in task.cause:
+        problems.append("why and cause are one line each")
+    if task.picture and not PICTURE.match(task.picture):
+        problems.append(f"picture {task.picture!r} is not pictures/<name>.svg or .png")
+    problems += [f"after {a!r} is not a task id" for a in task.after if not TASK_ID.match(a)]
+    _opt_iso(task.boosted_at, "boosted_at", problems)
+    if not ISO.match(task.created):
+        problems.append(f"created {task.created!r} is not a UTC time")
+    # Routing reads these facts, so a task is not routed without them (routing spec, "What enforces it").
+    routed = task.status not in ("queued", "parked", "closed")
+    if routed and (not task.surfaces or task.slices is None or task.run is None):
+        problems.append(f"a {task.status} task has its surfaces, slices and run")
+    if task.status == "proposed" and not (task.why and task.picture):
+        problems.append("a proposed task carries its why and its picture")
+    return problems
+
+
+def _fact_problems(task: Task) -> list[str]:
+    """What is wrong with the facts routing reads: severity, goal item, surfaces, status, owner class and rung."""
+    problems = []
     if task.severity not in TASK_SEVERITIES:
         problems.append(f"severity {task.severity!r} is not one of {', '.join(TASK_SEVERITIES)}")
     if task.goal_item and not GOAL_ITEM.match(task.goal_item):
@@ -307,20 +332,6 @@ def task_problems(task: Task) -> list[str]:
         problems.append(f"owner_class {task.owner_class!r} is not one of {', '.join(OWNER_CLASSES)}")
     if task.run is not None and task.run not in RUNGS:
         problems.append(f"run {task.run} is not a rung from 0 to 4")
-    if "\n" in task.why or "\n" in task.cause:
-        problems.append("why and cause are one line each")
-    if task.picture and not PICTURE.match(task.picture):
-        problems.append(f"picture {task.picture!r} is not pictures/<name>.svg or .png")
-    problems += [f"after {a!r} is not a task id" for a in task.after if not TASK_ID.match(a)]
-    _opt_iso(task.boosted_at, "boosted_at", problems)
-    if not ISO.match(task.created):
-        problems.append(f"created {task.created!r} is not a UTC time")
-    # Routing reads these facts, so a task is not routed without them (routing spec, "What enforces it").
-    routed = task.status not in ("queued", "parked", "closed")
-    if routed and (not task.surfaces or task.slices is None or task.run is None):
-        problems.append(f"a {task.status} task has its surfaces, slices and run")
-    if task.status == "proposed" and not (task.why and task.picture):
-        problems.append("a proposed task carries its why and its picture")
     return problems
 
 

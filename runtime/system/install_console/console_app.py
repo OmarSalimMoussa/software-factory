@@ -119,15 +119,17 @@ class Console:
             return refused(403, "This address is not the console's.", api=api)
         admitted = self._admitted(headers.get("cookie", ""))
         if method == "GET" and split.path == "/open":
-            if admitted:  # the browser the link admitted may open it again; to any other, a used link is void
-                return Reply(303, b"", {"Location": "/"})
-            return self._open(dict(parse_qsl(split.query)).get("token", ""))
+            return self._open(dict(parse_qsl(split.query)).get("token", ""), admitted=admitted)
         if not admitted:
             return refused(403, "Open the link the console printed in its terminal.", api=api)
         if method == "GET":
             return self._get(split.path)
         if method != "POST" or not api:
             return refused(405, "The console takes no such request.", api=api)
+        return self._change(split.path, headers, body)
+
+    def _change(self, path: str, headers: Mapping[str, str], body: bytes) -> Reply:
+        """A change: one JSON object, from the console's own page."""
         if headers.get("origin") != f"http://127.0.0.1:{self.port}":
             return refused(403, "A change must come from the console's own page.")
         if headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
@@ -139,9 +141,11 @@ class Console:
             data = None
         if not isinstance(data, dict):
             return refused(400, "A change is one JSON object.")
-        return self._post(split.path, data)
+        return self._post(path, data)
 
-    def _open(self, token: str) -> Reply:
+    def _open(self, token: str, *, admitted: bool) -> Reply:
+        if admitted:  # the browser the link admitted may open it again; to any other, a used link is void
+            return Reply(303, b"", {"Location": "/"})
         with self._lock:
             good = self._token is not None and hmac.compare_digest(token.encode(), self._token.encode())
             if good:
@@ -243,17 +247,7 @@ class Console:
     def start_install(self, data: dict[str, Any]) -> Reply:
         commit, repo = data.get("commit"), data.get("repo")
         flags = {name: data.get(name) for name in ("healthchecks", "keep", "dry")}
-        problems = []
-        if not isinstance(commit, str) or not commit.strip():
-            problems.append("Name the factory commit to install.")
-        if not isinstance(repo, str) or not Path(repo.strip()).is_absolute():
-            problems.append("Name your product checkout by its full path.")
-        if not all(isinstance(flag, bool) for flag in flags.values()):
-            problems.append("Each choice is on or off.")
-        staged = self.source.sha if self.source else ""
-        if isinstance(commit, str) and staged and not staged.startswith(commit.strip()) and commit.strip() != "":
-            problems.append(f"This console runs {staged[:12]} and installs only that commit: to install another, "
-                            "start the console with --commit <that commit>.")  # fmt: skip
+        problems = self._install_problems(commit, repo, flags)
         if problems or not isinstance(commit, str) or not isinstance(repo, str):
             return refused(400, " ".join(problems))
         dry, keep = flags["dry"] is True, flags["keep"] is True
@@ -281,6 +275,20 @@ class Console:
 
             self._start(run, act)
         return _json(200, {"ok": True})
+
+    def _install_problems(self, commit: object, repo: object, flags: dict[str, object]) -> list[str]:
+        problems = []
+        if not isinstance(commit, str) or not commit.strip():
+            problems.append("Name the factory commit to install.")
+        if not isinstance(repo, str) or not Path(repo.strip()).is_absolute():
+            problems.append("Name your product checkout by its full path.")
+        if not all(isinstance(flag, bool) for flag in flags.values()):
+            problems.append("Each choice is on or off.")
+        staged = self.source.sha if self.source else ""
+        if isinstance(commit, str) and staged and not staged.startswith(commit.strip()) and commit.strip() != "":
+            problems.append(f"This console runs {staged[:12]} and installs only that commit: to install another, "
+                            "start the console with --commit <that commit>.")  # fmt: skip
+        return problems
 
     def start_uninstall(self, data: dict[str, Any]) -> Reply:
         """First a look, changing nothing; then, confirmed, the uninstall of what that look showed."""

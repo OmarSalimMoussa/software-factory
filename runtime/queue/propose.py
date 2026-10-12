@@ -17,6 +17,7 @@ from runtime.queue.formats import one_line
 from runtime.shared import store
 from runtime.shared.models import RETIRED, STOPPED, Session
 from runtime.shared.protocol import Refused
+from runtime.shared.settings import Settings
 from runtime.warden.context import Context
 from runtime.warden.sessions import lifecycle, registry
 
@@ -25,12 +26,7 @@ def propose(
     ctx: Context, task_id: str, run: object, why: str, reason: str, picture: bytes | None, brief: str
 ) -> dict[str, Any]:
     settings = ctx.settings()
-    if len(brief.encode()) > settings.get_int("queue.max_upload_kib") * 1024:
-        raise Refused("brief", "the brief is too long; put the detail in the task")
-    if run is not None and (isinstance(run, bool) or not isinstance(run, int) or run not in range(1, 5)):
-        raise Refused("run", "a proposal runs at rung 1 to 4; a rung-0 task closes with a reason instead")
-    if not why.strip() or "\n" in why.strip():
-        raise Refused("why", "a proposal says in one line why now: --why '…'")
+    run = _asked_rung(settings, run, why, brief)
     data, kind = pictures.clean(picture, settings.get_int("queue.max_upload_kib"))
     queue = Queue.of(ctx)
     with ctx.lock, queue.lock():
@@ -82,6 +78,17 @@ def propose(
     # A run moved up a rung is done at the old one: its session stops (its branch stays) so it cannot work on.
     lifecycle.after_retire(ctx, stopped)
     return {"task": moved.id, "place": place, "run": run, "route": planned}
+
+
+def _asked_rung(settings: Settings, run: object, why: str, brief: str) -> int | None:
+    """The rung a proposal asks for, if any; refuses one whose brief, rung or why cannot be taken as given."""
+    if len(brief.encode()) > settings.get_int("queue.max_upload_kib") * 1024:
+        raise Refused("brief", "the brief is too long; put the detail in the task")
+    if run is not None and (isinstance(run, bool) or not isinstance(run, int) or run not in range(1, 5)):
+        raise Refused("run", "a proposal runs at rung 1 to 4; a rung-0 task closes with a reason instead")
+    if not why.strip() or "\n" in why.strip():
+        raise Refused("why", "a proposal says in one line why now: --why '…'")
+    return run if isinstance(run, int) else None
 
 
 def _stop_runs(ctx: Context, task_id: str, run: int) -> list[Session]:

@@ -89,12 +89,7 @@ def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     if not isinstance(asked, str) or not SHA.match(asked):
         raise Refused("qa-ready", "qa-ready names the head: qa-ready <head>")
     task = tasks.read(ctx, session.task)
-    if slices is None:
-        slices = _slice_commits(ctx, session, asked, task.slices)
-    if not isinstance(slices, list) or not slices or not all(isinstance(s, str) and SHA.match(s) for s in slices):
-        raise Refused("qa-ready", "each slice is a commit sha")
-    if task.slices and len(slices) != task.slices:
-        raise Refused("qa-ready", f"{task.id} has {task.slices} slices; name one commit for each, not {len(slices)}")
+    slices = _ready_slices(ctx, session, asked, task, slices)
     head = _head(ctx, session)
     if not head.startswith(asked):
         raise Refused("qa-ready", f"{asked[:9]} is not your branch's head ({head[:9]}): commit, then ask again")
@@ -123,6 +118,17 @@ def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     if task.status == "building":
         tasks.move(ctx, task.id, "qa", "qa-ready", IMPL, f"ready for QA at {head[:9]}", branch=branch)
     return ok(head=head, slot=lease.slot, testers=[{"tester": t, "why": why} for t, why in testers.items()])
+
+
+def _ready_slices(ctx: Context, session: Session, asked: str, task: Task, slices: Any) -> list[str]:
+    """The commits qa-ready names, or the slices' own on the branch when it names none: one for each slice."""
+    if slices is None:
+        slices = _slice_commits(ctx, session, asked, task.slices)
+    if not isinstance(slices, list) or not slices or not all(isinstance(s, str) and SHA.match(s) for s in slices):
+        raise Refused("qa-ready", "each slice is a commit sha")
+    if task.slices and len(slices) != task.slices:
+        raise Refused("qa-ready", f"{task.id} has {task.slices} slices; name one commit for each, not {len(slices)}")
+    return slices
 
 
 def _slice_commits(ctx: Context, session: Session, head: str, count: int | None) -> list[str]:

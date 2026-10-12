@@ -163,18 +163,7 @@ def pythons(ctx: Install, *, fetched: bool = False) -> list[Path]:
     if code != 0 or dir_code != 0 or not managed:
         raise refuse("Your uv could not list its Pythons: update uv, then install again")
     found = _json_line(listed)
-    entries = found if isinstance(found, list) else [found]
-    copies: dict[str, Path] = {}
-    reachable = []
-    for entry in entries:
-        key, path = (entry.get("key"), entry.get("path")) if isinstance(entry, dict) else (None, None)
-        if not isinstance(key, str) or not _PYTHON_KEY.match(key) or not isinstance(path, str):
-            host.say(f"uv listed a Python this install cannot read: {json.dumps(entry)[:200]}")
-            raise refuse("Your uv lists its Pythons in a form this install cannot read: update uv, then install again")
-        if Path(path).is_relative_to(managed):
-            copies[key] = Path(managed) / key
-        elif str(Path(path).parent) in layout.SYSTEM_PATH:
-            reachable.append(path)
+    copies, reachable = _listed_pythons(ctx, found if isinstance(found, list) else [found], managed)
     if copies:
         host.say(f"Python {request}: {', '.join(sorted(copies))} from {managed}")
     elif reachable:
@@ -186,6 +175,22 @@ def pythons(ctx: Install, *, fetched: bool = False) -> list[Path]:
         raise refuse(f"The product asks for Python {request}, which your uv has not installed: run "
                      f"uv python install {shlex.quote(request)}, then install again")  # fmt: skip
     return [copies[key] for key in sorted(copies)]
+
+
+def _listed_pythons(ctx: Install, entries: list[object], managed: str) -> tuple[dict[str, Path], list[str]]:
+    """The Pythons uv listed: those in its own folder to copy, by key, and those on every unit's PATH already."""
+    copies: dict[str, Path] = {}
+    reachable = []
+    for entry in entries:
+        key, path = (entry.get("key"), entry.get("path")) if isinstance(entry, dict) else (None, None)
+        if not isinstance(key, str) or not _PYTHON_KEY.match(key) or not isinstance(path, str):
+            ctx.host.say(f"uv listed a Python this install cannot read: {json.dumps(entry)[:200]}")
+            raise refuse("Your uv lists its Pythons in a form this install cannot read: update uv, then install again")
+        if Path(path).is_relative_to(managed):
+            copies[key] = Path(managed) / key
+        elif str(Path(path).parent) in layout.SYSTEM_PATH:
+            reachable.append(path)
+    return copies, reachable
 
 
 def fingerprint(ctx: Install, tools: list[Tool], python_copies: list[Path]) -> str:
@@ -224,17 +229,7 @@ def _place(ctx: Install, tools: list[Tool], python_copies: list[Path]) -> None:
         # cp -a, not copy_tree, which leaves out __pycache__: the read-only copy can never write its bytecode again.
         host.run(["cp", "-a", str(each_python), str(python / each_python.name)])
     for each in tools:
-        copy = fresh / each.name
-        if each.prefix:
-            host.copy_tree(Path(each.prefix), copy)
-            links = {program: home / each.name / "bin" / program for program in each.programs}
-        else:
-            host.mkdir(copy, mode=0o755)
-            for source, program in each.files:
-                host.run(["install", "-m", "0755", "-o", "root", "-g", "root", source, str(copy / program)])
-            links = {program: home / each.name / program for program in each.programs}
-        for program, target in links.items():
-            host.run(["ln", "-s", str(target), str(fresh / "bin" / program)])
+        _copy_tool(ctx, each, fresh, home)
     if made:
         host.write(fresh / _FINGERPRINT, made + "\n", mode=0o644)
     host.run(["chown", "-R", "-h", "root:root", str(fresh)])
@@ -244,6 +239,21 @@ def _place(ctx: Install, tools: list[Tool], python_copies: list[Path]) -> None:
     host.run(["mv", str(fresh), str(home)])
     if host.exists(old):
         host.remove(old)
+
+
+def _copy_tool(ctx: Install, each: Tool, fresh: Path, home: Path) -> None:
+    """One tool copied into the FRESH toolchain, with its programs linked into its bin as they will be under HOME."""
+    host, copy = ctx.host, fresh / each.name
+    if each.prefix:
+        host.copy_tree(Path(each.prefix), copy)
+        links = {program: home / each.name / "bin" / program for program in each.programs}
+    else:
+        host.mkdir(copy, mode=0o755)
+        for source, program in each.files:
+            host.run(["install", "-m", "0755", "-o", "root", "-g", "root", source, str(copy / program)])
+        links = {program: home / each.name / program for program in each.programs}
+    for program, target in links.items():
+        host.run(["ln", "-s", str(target), str(fresh / "bin" / program)])
 
 
 def toolchain(ctx: Install) -> None:

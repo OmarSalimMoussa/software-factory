@@ -129,20 +129,28 @@ def _verb(op: object, args: dict[str, Any]) -> list[str]:
     if op == "sign-in":
         return ["sign-in", _email(args.get("email"))]
     if op == "seed":
-        words = _words(args.get("seed", []), "seed words")
-        if words[:1] == ["save"] and len(words) == 3 or words == ["check"]:
-            return ["seed", *words]
-        if words[:1] == ["load"] and len(words) == 2:
-            return ["seed", *words, *(["--as", _email(args["as"])] if args.get("as") else [])]
-        raise Refused("args", "seed save <id> <name> | seed load <name> [--as <email>] | seed check")
+        return _seed_verb(args)
     if op == "desktop":
-        words = _words(args.get("desktop", []), "desktop words")
-        if words == ["down"]:
-            return ["desktop", "down"]
-        if words[:1] == ["up"] and len(words) == 2:
-            return ["desktop", "up", _email(words[1])]
-        raise Refused("args", "desktop up <email> | desktop down")
+        return _desktop_verb(args)
     raise Refused("args", f"{op!r} is not a slot verb: claim, up, down, release, free, list, sign-in, seed, desktop")
+
+
+def _seed_verb(args: dict[str, Any]) -> list[str]:
+    words = _words(args.get("seed", []), "seed words")
+    if words[:1] == ["save"] and len(words) == 3 or words == ["check"]:
+        return ["seed", *words]
+    if words[:1] == ["load"] and len(words) == 2:
+        return ["seed", *words, *(["--as", _email(args["as"])] if args.get("as") else [])]
+    raise Refused("args", "seed save <id> <name> | seed load <name> [--as <email>] | seed check")
+
+
+def _desktop_verb(args: dict[str, Any]) -> list[str]:
+    words = _words(args.get("desktop", []), "desktop words")
+    if words == ["down"]:
+        return ["desktop", "down"]
+    if words[:1] == ["up"] and len(words) == 2:
+        return ["desktop", "up", _email(words[1])]
+    raise Refused("args", "desktop up <email> | desktop down")
 
 
 def _list(ctx: Context, session: Session) -> list[dict[str, Any]]:

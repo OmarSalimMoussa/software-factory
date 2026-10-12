@@ -100,14 +100,9 @@ def pull(ctx: Context, run: Runner) -> dict[str, Any]:
     if VERB not in verbs.split():
         return {"filed": [], "erased": [], "unreadable": [], "supported": False}
     cursor_path = ctx.places.state / "reports-cursor.json"
-    cursor = store.read_json_or(cursor_path, {"since": ""})
-    if not isinstance(cursor, dict) or not isinstance(cursor.get("since"), str):
-        raise store.StoreError(f"{cursor_path}: no since")
-    # Every erasure seen, by report id, with when: a report named here is never filed, nor erased again.
+    cursor = _cursor(cursor_path)
     erased_path = ctx.places.state / "reports-erased.json"
-    erased = store.read_json_or(erased_path, {})
-    if not isinstance(erased, dict) or not all(isinstance(v, str) for v in erased.values()):
-        raise store.StoreError(f"{erased_path}: not an object of times")
+    erased = _erased(erased_path)
     code, out = run([VERB, "--since", cursor["since"]] if cursor["since"] else [VERB])
     if code != 0:
         raise Refused("reports", f"scripts/dev reports exited {code}")
@@ -141,6 +136,21 @@ def pull(ctx: Context, run: Runner) -> dict[str, Any]:
         store.write_json(cursor_path, cursor, mode=0o600)
         store.write_json(erased_path, erased, mode=0o600)
     return {"filed": filed, "erased": newly_erased, "unreadable": unreadable, "supported": True}
+
+
+def _cursor(path: Path) -> dict[str, str]:
+    cursor = store.read_json_or(path, {"since": ""})
+    if not isinstance(cursor, dict) or not isinstance(cursor.get("since"), str):
+        raise store.StoreError(f"{path}: no since")
+    return cursor
+
+
+def _erased(path: Path) -> dict[str, str]:
+    """Every erasure seen, by report id, with when: a report named here is never filed, nor erased again."""
+    erased = store.read_json_or(path, {})
+    if not isinstance(erased, dict) or not all(isinstance(v, str) for v in erased.values()):
+        raise store.StoreError(f"{path}: not an object of times")
+    return erased
 
 
 def _timer_path(ctx: Context) -> Path:
