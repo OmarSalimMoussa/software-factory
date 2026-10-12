@@ -9,6 +9,7 @@ restart, or a background wait whose answer was lost, nothing is missed.
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 from collections.abc import Callable
@@ -54,6 +55,7 @@ KINDS = frozenset(
         *OWNER_DECISIONS,
     }
 )
+_USERS_WORDS = {SEVERE_REQUEST: frozenset({"where"})}
 
 # One condition for every inbox in the process: a waiter re-reads its own file when woken.
 _posted = threading.Condition()
@@ -137,10 +139,25 @@ def acknowledge(places: Places, clock: Clock) -> None:
             _write_cursor(places, clock, cursor["handed"], cursor["handed"])
 
 
+def _plain(value: Any) -> bool:
+    scalar = (str, int, float, bool, type(None))
+    return isinstance(value, scalar) or (isinstance(value, list) and all(isinstance(v, scalar) for v in value))
+
+
+def _line(event: dict[str, Any]) -> str:
+    """An event as `factory inbox` prints it: its time, kind, and the ids and words the orchestrator acts on as JSON.
+    A user's words and whole records (a probe's) stay out: the queue and `factory status` show those."""
+    withheld = _USERS_WORDS.get(event["kind"], frozenset())
+    shown = {k: v for k, v in event["data"].items() if k not in withheld and _plain(v)}
+    head = f"{event['at']} {event['kind']}"
+    # ASCII only: JSON escapes a newline, but would leave U+2028, which splits a line for many readers.
+    return f"{head} {json.dumps(shown, separators=(',', ':'))}" if shown else head
+
+
 def _answer(events: list[dict[str, Any]]) -> dict[str, Any]:
     if not events:
         return ok(events=[], message="nothing new")
-    return ok(events=events, message="\n".join(f"{e['at']} {e['kind']}" for e in events))
+    return ok(events=events, message="\n".join(_line(e) for e in events))
 
 
 def read(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
