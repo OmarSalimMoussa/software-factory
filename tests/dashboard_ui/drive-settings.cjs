@@ -9,6 +9,10 @@ drive('settings', async t => {
   t.check(await p.$('[data-row="models.intake"] [data-ddbtn]') && await p.$('[data-row="caps.designers"] .stepper') && await p.$('[data-row="budget.slice_memory_high"] input.txt')
     && await p.$('[data-row="sandbox.allowed_domains"] .listed') && await p.$('[data-row="prices"] .ro'), 'a control kind is missing');
   t.check(!(await p.$('[data-row="prices"] .reset, [data-row="prices"] [data-default]')), 'a read-only row can be changed');
+  // the factory card: its version and last check, and Check now answers in a toast, whatever GitHub said
+  t.check((await p.textContent('.card:has([data-action="check-factory"])')).includes('Factory'), 'no Factory card');
+  await p.click('[data-action="check-factory"]');
+  t.check(await until(p, () => document.querySelector('#toasts').textContent.includes('Asking GitHub for a newer factory')), 'Check now said nothing');
   await p.click('[data-row="models.intake"] [data-ddbtn]'); await p.click('[data-ddopt][data-ddkind="model"][data-ddkey="models.intake"][data-v="Haiku 5.5"]');
   await p.click('[data-step="1"][data-key="caps.designers"]');
   t.check((await bar()).includes('2 changes'), 'savebar: ' + await bar());

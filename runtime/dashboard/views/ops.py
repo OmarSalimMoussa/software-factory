@@ -15,6 +15,7 @@ _TITLES = {
     "pause": "Pausing the factory",
     "account": "Switching the Claude account",
     "message": "Sending your message",
+    "release check": "Checking for a newer factory",
 }
 _REFRESH = {
     "settings": ["settings", "shell"],
@@ -24,6 +25,7 @@ _REFRESH = {
     "pause": ["agents", "home", "shell"],
     "account": ["settings", "agents", "shell"],
     "message": ["agent", "home"],
+    "release check": ["settings", "home", "shell"],
 }
 
 # The sheet's row class and mark for a step in each state: an icon, or the page's own spinner or empty ring.
@@ -51,6 +53,9 @@ def operation(answer: dict[str, Any]) -> dict[str, Any]:
             "pause": "Paused. Every agent is benched with its work kept.",
             "account": f"The agents now use {op['result'].get('name')}.",
             "message": "Sent. It reads your message as soon as its current turn ends.",
+            "release check": "A newer factory is ready: Home has the upgrade."
+            if op["result"].get("newer")
+            else "This is the newest factory.",
         }.get(op["kind"], "Done.")
     return {
         "id": op["id"],

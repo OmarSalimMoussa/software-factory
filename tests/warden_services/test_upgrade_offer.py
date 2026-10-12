@@ -258,3 +258,30 @@ def test_an_upgrade_that_stopped_asks_github_again_at_once_for_a_release_that_re
     factory_upgrade.poll(ctx)  # once for each failure, then once each check period again
 
     assert (asked, again, len(calls)) == (2, 4, 4)
+
+
+@pytest.mark.parametrize(
+    ("installed", "down", "state", "newer"),
+    [(OLD, False, ops.DONE, True), (NEW, False, ops.DONE, False), (OLD, True, ops.FAILED, None)],
+    ids=["a-newer-one", "the-newest-already", "github-does-not-answer"],
+)
+def test_check_now_asks_github_at_once_and_says_whether_a_newer_factory_is_ready(
+    ctx: Context, monkeypatch: pytest.MonkeyPatch, installed: str, down: bool, state: str, newer: bool | None
+) -> None:
+    _installed(ctx.places)
+    record = json.loads(upgrades.installed_path(ctx.places).read_text())
+    upgrades.installed_path(ctx.places).write_text(json.dumps({**record, "commit": installed}))
+    calls: list[str] = []
+    monkeypatch.setattr(releases, "http_get", _github(calls))
+    factory_upgrade.poll(ctx)
+    asked = len(calls)
+    monkeypatch.setattr(releases, "http_get", _github(calls, down=down))
+
+    op_id = factory_upgrade.check(ctx, {}, None)["op"]  # within install.release_check_hours of the last check
+    ops.join(op_id, 10)
+
+    op = ops.get(ctx, {"id": op_id}, None)["op"]
+    assert len(calls) > asked and op["state"] == state
+    assert op["result"].get("newer") == newer
+    if down:
+        assert "GitHub could not be asked" in op["steps"][0]["detail"]

@@ -137,6 +137,7 @@ document.addEventListener('click', e => {
   else if (a === 'review') reviewSettings();
   else if (a === 'discard') { UI.edits.clear(); render({keep: true}); toast('Changes discarded', 'x-mark'); }
   else if (a === 'change-repo') changeRepo();
+  else if (a === 'check-factory') checkFactory(t);
   else if (a === 'lib-clear-q') libFilter({q: ''});
   else if (a === 'lib-reset') { const sel = UI.lib.sel; UI.lib = {...libFresh(), sel}; viewChanged(); }
   else if (a === 'help') { closePops(); openHelp(); }

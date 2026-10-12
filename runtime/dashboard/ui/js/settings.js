@@ -21,12 +21,15 @@ function pSettings(env) {
   const d = partData(env, 'settings');
   const head = `<div class="page-h">${ph('Settings', 'Defaults come with the factory you installed. Nothing changes until you save. Saving needs your 6-digit code, keeps your values on this computer, and reloads only the part of the factory that reads them; no agent is stopped. Every change is listed under Recent changes.')}</div>`;
   if (!d) return head + acctSection(env) + part(env, 'settings', () => '');
-  return `${head}${acctSection(env)}
+  return `${head}${acctSection(env)}${factoryCard(env)}
     <div class="card repo-card"><div style="flex:1;min-width:0"><div class="label">Repo</div><div class="repo-path">${esc(d.repo.path)}</div></div><button class="btn" data-action="change-repo" data-write>Change repo</button></div>
     <div class="set-grid">${d.groups.map(g => `<div class="card set-card"><div class="sec-h"><div class="label">${esc(g.title)} ${g.hint ? hint(g.hint) : ''}</div></div>${g.rows.map(r => r.broken ? brokenRow(r) : setRow(r)).join('')}</div>`).join('')}
       <div class="card set-card"><div class="sec-h"><div class="label">Recent changes</div></div><ul class="audit">${d.audit.length ? d.audit.map(a => `<li><span>${esc(a.what)}</span><span class="faint">${a.sha ? `<span class="mono">${esc(a.sha)}</span> · ` : ''}${esc(a.ago)}</span></li>`).join('') : '<li><span class="muted">No setting has changed yet.</span></li>'}</ul></div></div>
     <div class="savebar" id="savebar"><span id="savebar-n"></span><button class="btn sm quiet" data-action="discard">Discard</button><button class="btn sm primary" data-action="review" data-write>Review and save</button></div>`;
 }
+/* The factory this laptop runs: its version, when GitHub was last asked for a newer one, and Check now. */
+const factoryCard = env => part(env, 'factory', f => `<div class="card repo-card"><div style="flex:1;min-width:0"><div class="label">Factory</div><div class="repo-path"><span class="mono">${esc(f.version)}</span> · ${esc(f.checked)}</div>${f.newer ? `<div class="help">${esc(f.newer)}</div>` : ''}${f.note ? `<div class="help">${esc(f.note)}</div>` : ''}</div><button class="btn" data-action="check-factory" data-write>${icon('arrow-path', 'sm')}${esc(f.button)}</button></div>`);
+const checkFactory = btn => act('/api/factory/check', {}, {btn, icon: 'arrow-path', quiet: true});
 function setRow(r) {
   const cur = curOf(r), changed = !same(cur, r.saved), key = esc(r.key), ro = r.control === 'readonly';
   const ctl = {

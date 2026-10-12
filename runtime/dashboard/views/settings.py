@@ -18,7 +18,7 @@ from runtime.shared.models import RETIRED
 from runtime.shared.settings import Settings
 from runtime.shared.settings_schema import AT_INSTALL, SCHEMA
 
-WANTS = ("settings", "sessions", "slots", "accounts")
+WANTS = ("settings", "sessions", "slots", "accounts", "upgrade")
 _EDITED_ELSEWHERE = {"models.allowed", "models.efforts", "prices", "factory.github", "intake.weights"}
 _ROLE_KEYS = {
     "implementer": None,
@@ -194,9 +194,27 @@ def to_saved(settings: Settings, key: str, value: Any) -> Any:
     return value
 
 
+def factory(snap: Snap) -> dict[str, Any]:
+    """The factory this laptop runs, when GitHub was last asked for a newer one, and Check now."""
+    found = snap.get("upgrade")
+    offer = found["offer"]
+    checked = offer["checked_at"]
+    return {
+        "version": found["installed"][:7] if found["installed"] else "Version unknown",
+        "checked": f"checked {ago(checked, snap.now)}" if checked is not None else "not checked yet",
+        "note": offer["note"],
+        "newer": "A newer factory is ready: Home has the upgrade." if offer["available"] else None,
+        "button": "Check now",
+    }
+
+
 def wants(query: Query) -> dict[str, Any]:
     return {"want": list(WANTS)}
 
 
 def parts(snap: Snap, query: Query) -> Parts:
-    return {"accounts": lambda: accounts.section(snap), "settings": lambda: page(snap)}
+    return {
+        "accounts": lambda: accounts.section(snap),
+        "factory": lambda: factory(snap),
+        "settings": lambda: page(snap),
+    }

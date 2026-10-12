@@ -25,6 +25,7 @@ from runtime.warden.sessions import lifecycle, registry, revive
 
 log = logging.getLogger(__name__)
 KIND = "upgrade"
+CHECK = "release check"  # the operation of the owner's Check now
 
 
 def offer_path(places: Places) -> Path:
@@ -62,14 +63,14 @@ def asked(places: Places) -> dict[str, Any] | None:
     return raw
 
 
-def poll(ctx: Context) -> None:
+def poll(ctx: Context, force: bool = False) -> None:
     settings, places, now = ctx.settings(), ctx.places, ctx.clock.now()
     last, every = offer(places), settings.get_int("install.release_check_hours") * 3600
     available, note, base = None, None, None
     try:
         installed = upgrades.read_installed(places)
         base = installed["commit"] if installed else None
-        if _asked_lately(places, last, base, now, every):
+        if not force and _asked_lately(places, last, base, now, every):
             return
         if installed is None:
             note = "Upgrade once by hand from a release file; the dashboard offers every upgrade after that."
@@ -84,6 +85,22 @@ def poll(ctx: Context) -> None:
             log.warning("warden: the release check failed (%s)", type(exc).__name__)
     record = {"available": available, "checked_at": now, "note": note, "base": base}
     store.write_json(offer_path(places), record, mode=0o600)
+
+
+def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
+    """The owner's Check now: GitHub asked at once, whatever install.release_check_hours says. It runs as an
+    operation, as asking GitHub can take longer than the dashboard waits for an answer."""
+    found: dict[str, Any] = {}
+    return ok(op=ops.launch(ctx, CHECK, [("Asking GitHub for a newer factory", lambda: _check(ctx, found))], found))
+
+
+def _check(ctx: Context, found: dict[str, Any]) -> str:
+    poll(ctx, force=True)
+    note = offer(ctx.places)["note"]
+    if note:
+        raise ops.StepError(note)
+    found["newer"] = _for_installed(ctx.places) is not None
+    return "a newer factory is ready" if found["newer"] else "this is the newest factory"
 
 
 def _asked_lately(places: Places, last: dict[str, Any], base: str | None, now: float, every: int) -> bool:

@@ -165,9 +165,10 @@ To act on one:
    <path>`). It refuses a checkout at another commit than `.github/factory-ref` names. Older builds stay deployable.
 4. **Restart the factory** on Home: every agent comes back with its work.
 
-The dashboard looks for releases with a read-only GitHub token for the factory's repo, which the install asks for
-once. So the first upgrade to a factory that has this button is by hand, from the release file. An upgrade that needs an answer
-(a new token, a key to add) stops and says so: run the release file by hand to give it.
+The dashboard looks for releases every `install.release_check_hours`, with a read-only GitHub token for the
+factory's repo, which the install asks for once, so the first upgrade to a factory that has this button is by hand,
+from the release file. **Check now** on Settings, beside the factory's version, asks at once. An upgrade that needs
+an answer (a new token, a key to add) stops and says so: run the release file by hand to give it.
 
 ## When something is wrong
 

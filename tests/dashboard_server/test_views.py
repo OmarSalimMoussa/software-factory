@@ -20,6 +20,8 @@ from runtime.shared import models, store
 from runtime.shared.models import OPEN_SEVERITIES
 from runtime.shared.settings_schema import SCHEMA
 from runtime.warden.delivery import deploys
+from runtime.warden.owner import factory_upgrade
+from runtime.warden.owner import ops as warden_ops
 
 BROKEN = {"broken", "id", "error"}
 
@@ -318,3 +320,42 @@ def test_home_says_where_an_upgrade_stands_and_offers_only_what_fits(
     assert (band["state"], band["actions"]) == (state, actions)
     assert (band["commit"] == _NEW) is ("upgrade" in actions)
     assert band["changelog"] == (changelog if state in ("available", "done") else [])
+
+
+@pytest.mark.parametrize(
+    ("available", "said"),
+    [(True, "A newer factory is ready: Home has the upgrade."), (False, "This is the newest factory.")],
+    ids=["a-newer-one", "the-newest-already"],
+)
+def test_settings_shows_the_factory_and_check_now_says_what_github_has(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch, available: bool, said: str
+) -> None:
+    rig.places.upgrade.mkdir(parents=True, exist_ok=True)
+    installed = {"commit": _OLD, "owner": "o", "product": "/home/o/shop", "repo": "acme/software-factory"}
+    store.write_json(rig.places.upgrade / "installed.json", installed)
+    offer = {"commit": _NEW, "tag": f"build-{_NEW[:12]}", "published": "2026-10-09T13:00:00Z", "changelog": ["Faster"]}
+
+    def github_asked(ctx: Any, force: bool = False) -> None:
+        found = {"available": offer if available else None, "checked_at": rig.clock.now(), "note": None, "base": _OLD}
+        store.write_json(rig.places.state / "upgrade-offer.json", found)
+
+    monkeypatch.setattr(factory_upgrade, "poll", github_asked)
+
+    sent = json.loads(rig.post("/api/factory/check", {"idempotency_key": "check-01"}).body)
+    warden_ops.join(sent["op"], 10)
+
+    done = rig.parts(f"/api/ops/{sent['op']}")["op"]["data"]
+    card = rig.parts("/api/settings")["factory"]["data"]
+    assert (sent["message"], done["title"], done["result"]["message"]) == (
+        "Asking GitHub for a newer factory.",
+        "Checking for a newer factory",
+        said,
+    )
+    newer = said if available else None
+    assert card == {
+        "version": _OLD[:7],
+        "checked": "checked 0 min ago",
+        "note": None,
+        "newer": newer,
+        "button": "Check now",
+    }
