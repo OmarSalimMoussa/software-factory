@@ -120,7 +120,7 @@ async function act(url, body = {}, opts = {}) {
   if (ans.ok) {
     if (ans.message) toast(ans.message, opts.icon);
     if (opts.onOk) opts.onOk(ans);
-    if (ans.op) runOp(ans.op, opts.opTitle || 'Working');
+    if (ans.op) runOp(ans.op, opts.opTitle || 'Working', opts.quiet);
     refreshParts(ans.refresh || []);
   } else refusedToast(ans);
   return ans;

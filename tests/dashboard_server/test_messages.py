@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from dashboard_rig import Rig
 
+from runtime.warden.owner import ops
 from runtime.warden.owner.messages import PREFIX
 
 THREAD = [
@@ -38,9 +39,14 @@ def test_the_panel_offers_what_the_session_can_take(
 
 def test_a_message_reaches_the_session_as_its_next_turn(rig: Rig) -> None:
     body = {"session": "impl-sign-in-loop", "text": "Check Safari.", "idempotency_key": "message-01"}
-    sent = rig.post("/api/agent/message", body)
-    said = "Sent. It reads your message as soon as its current turn ends."
-    assert json.loads(sent.body) == {"ok": True, "refresh": ["agent", "home"], "message": said}
+    sent = json.loads(rig.post("/api/agent/message", body).body)
+    assert (sent["ok"], sent["message"]) == (True, "Sending your message.")
+    ops.join(sent["op"], 10)
+    done = rig.parts(f"/api/ops/{sent['op']}")["op"]["data"]
+    assert (done["state"], done["result"]["message"]) == (
+        "done",
+        "Sent. It reads your message as soon as its current turn ends.",
+    )
     assert rig.warden.launcher.calls[-1] == ("message", ("impl-sign-in-loop", PREFIX + "Check Safari."))
     refused = rig.post("/api/agent/message", {"session": "qa-ui-1", "text": "Hi", "idempotency_key": "message-02"})
     assert refused.status == 409 and json.loads(refused.body)["refused"] == "subagent"

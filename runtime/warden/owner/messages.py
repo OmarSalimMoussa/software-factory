@@ -14,6 +14,7 @@ from runtime.shared import models
 from runtime.shared.models import DEPRIORITIZED, RETIRED, Session
 from runtime.shared.protocol import Refused, ok
 from runtime.warden.context import Context
+from runtime.warden.owner import ops
 from runtime.warden.sessions import launch, lifecycle, permits, registry, revive
 from runtime.warden.sessions.launch import LaunchError
 from runtime.warden.sessions.lifecycle import OWNER
@@ -22,6 +23,7 @@ from runtime.warden.spend import cost
 
 # The agent reads this line first; the thread finds the owner's messages in the transcript by it.
 PREFIX = "Message from the owner, sent from the dashboard:\n\n"
+KIND = "message"  # the operation that delivers one
 
 
 def _text(ctx: Context, args: dict[str, Any]) -> str:
@@ -52,11 +54,17 @@ def send(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     if s.state == DEPRIORITIZED:
         _bring_back(ctx, s, PREFIX + text)
         return ok(message="It is coming back from the bench with your message.")
+    return ok(op=ops.launch(ctx, KIND, [("Sending your message", lambda: _deliver(ctx, s.id, PREFIX + text))]))
+
+
+def _deliver(ctx: Context, session_id: str, text: str) -> str:
+    """Typing the message in holds the session for watch.message_seconds, longer than the dashboard waits for the
+    warden's answer: so it runs as an operation the page follows."""
     try:
-        ctx.launcher.message_session(s.id, PREFIX + text)
+        ctx.launcher.message_session(session_id, text)
     except LaunchError as exc:
-        raise Refused("message", f"the message did not reach the session: {exc}") from exc
-    return ok(message="Sent. It reads your message as soon as its current turn ends.")
+        raise ops.StepError(f"the message did not reach the session: {exc}") from exc
+    return "delivered"
 
 
 def _bring_back(ctx: Context, s: Session, message: str) -> None:

@@ -66,7 +66,7 @@ function msgBox(m, extra = '') {
 function sendMessage(session, btn) {
   const text = (UI.drafts[session] || '').trim();
   if (!text) { alertToast('msg:' + session, 'Write the message first.'); return; }
-  act('/api/agent/message', {session, text}, {btn, icon: 'chat-bubble-left-right', onOk: () => { delete UI.drafts[session]; $$(`[data-msg="${CSS.escape(session)}"]`).forEach(x => { x.value = ''; }); }});
+  act('/api/agent/message', {session, text}, {btn, icon: 'chat-bubble-left-right', quiet: true, onOk: () => { delete UI.drafts[session]; $$(`[data-msg="${CSS.escape(session)}"]`).forEach(x => { x.value = ''; }); }});
 }
 function agentFoot(a, id) {
   const B = {

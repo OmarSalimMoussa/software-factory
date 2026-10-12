@@ -9,14 +9,32 @@ from lifecycle_fakes import World
 
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, WORKING
 from runtime.shared.protocol import Refused
-from runtime.warden.owner import messages
+from runtime.warden.owner import messages, ops
+from runtime.warden.sessions.launch import LaunchError
 
 
-def test_a_running_session_gets_the_owners_message_as_its_own_turn(world: World) -> None:
+@pytest.mark.parametrize("reaches", [True, False], ids=["it-arrives", "the-session-cannot-be-reached"])
+def test_a_running_session_gets_the_owners_message_as_its_own_turn_while_the_owner_waits_for_nothing(
+    world: World, monkeypatch: pytest.MonkeyPatch, reaches: bool
+) -> None:
     world.seat("5e550001")
     world.ctx(role="dashboard", kind="dashboard")
-    messages.send(world.owner(), {"session": "5e550001", "text": "  Skip the dark-mode pass.  "}, None)
-    assert world.launcher.messages == [("5e550001", messages.PREFIX + "Skip the dark-mode pass.")]
+    if not reaches:
+        monkeypatch.setattr(world.launcher, "message_session", _unreachable)
+
+    answer = messages.send(world.owner(), {"session": "5e550001", "text": "  Skip the dark-mode pass.  "}, None)
+    ops.join(answer["op"], 10)
+
+    op = ops.get(world.owner(), {"id": answer["op"]}, None)["op"]
+    if reaches:
+        assert world.launcher.messages == [("5e550001", messages.PREFIX + "Skip the dark-mode pass.")]
+        assert op["state"] == ops.DONE
+    else:
+        assert (op["state"], op["steps"][0]["detail"]) == (ops.FAILED, "the message did not reach the session: gone")
+
+
+def _unreachable(session_id: str, text: str) -> None:
+    raise LaunchError("gone")
 
 
 @pytest.mark.parametrize(
