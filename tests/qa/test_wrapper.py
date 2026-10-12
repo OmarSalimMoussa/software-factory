@@ -55,6 +55,9 @@ class Session:
     def notify(self, method: str) -> None:
         self._write({"jsonrpc": "2.0", "method": method})
 
+    def answer(self, key: Any, result: dict[str, Any]) -> None:
+        self._write({"jsonrpc": "2.0", "id": key, "result": result})
+
     def _write(self, message: dict[str, Any]) -> None:
         self.to_wrapper.write(json.dumps(message) + "\n")
         self.to_wrapper.flush()
@@ -136,6 +139,25 @@ def test_a_factory_tool_that_breaks_still_answers(tmp_path: Path, world: World) 
     )
 
 
+def test_a_browser_that_asks_the_session_something_as_its_trace_starts_still_lists_its_tools(
+    tmp_path: Path, world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ASK_ROOTS", "1")
+    session = _open(tmp_path, world, lambda address: LINK, [])
+    asked = json.loads(session.from_wrapper.readline())
+    session.answer(asked["id"], {"roots": []})
+
+    listed: list[dict[str, Any]] = []
+    asking = threading.Thread(target=lambda: listed.append(session.send("tools/list")), daemon=True)
+    asking.start()
+    asking.join(5)
+
+    assert asked["method"] == "roots/list"
+    assert listed, "no tool list: the wrapper waited for the trace on the thread that reads the session"
+    assert "browser_navigate" in [t["name"] for t in listed[0]["result"]["tools"]]
+    assert session.close() == 0
+
+
 def test_a_trace_that_does_not_start_stops_the_browser(
     tmp_path: Path, world: World, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -143,6 +165,17 @@ def test_a_trace_that_does_not_start_stops_the_browser(
     session = _open(tmp_path, world, lambda address: LINK, [])
     assert session.close() == 1
     assert "the trace did not start, so this browser stops: ### Error" in capsys.readouterr().err
+
+
+def test_a_call_waits_for_the_trace_and_never_reaches_a_browser_whose_trace_did_not_start(
+    tmp_path: Path, world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAIL_TRACE", "1")
+    session = _open(tmp_path, world, lambda address: LINK, [])
+    session.post("tools/call", {"name": "browser_navigate", "arguments": {"url": "https://app.test/"}})
+
+    assert session.close() == 1
+    assert "tools/call browser_navigate" not in (tmp_path / "server.log").read_text()
 
 
 def test_the_wrapper_stops_when_the_browser_does(

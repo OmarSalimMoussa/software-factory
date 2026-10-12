@@ -44,10 +44,6 @@ OWN = "factory-"  # the ids of the wrapper's own requests to the server
 Answer = Callable[[str, dict[str, Any], threading.Event], tuple[str, bool]]
 
 
-class TraceError(Exception):
-    """The trace did not start; the browser stops rather than test untraced."""
-
-
 class ServerError(Exception):
     """A call the wrapper made to the server failed or was not answered in time; the message says which."""
 
@@ -71,6 +67,8 @@ class Proxy:
         self._running: dict[str, threading.Event] = {}  # the factory tools at work, by the session's request id
         self._ids = itertools.count(1)
         self._secrets: list[str] = []
+        self.untraced: Callable[[str], None] = lambda why: None
+        self._trace_asked, self._trace_ok, self._trace_answered = False, False, threading.Event()
 
     def add_tools(self, tools: list[dict[str, Any]], answer: Answer) -> None:
         """The factory's own tools, listed beside the server's and answered by ``answer``."""
@@ -115,25 +113,54 @@ class Proxy:
         if running is not None:
             running.set()  # the server never saw that request
             return
+        if method == "tools/call" and not self.traced():
+            self._error(message.get("id"), "the browser stopped: its trace did not start")
+            return
         self._to_server(line)
         if method == "notifications/initialized":
             self.start_trace()
 
     def start_trace(self) -> None:
-        """Before the session's first call: the server takes calls in order, so nothing runs untraced."""
+        """Awaited on a thread of its own: the server asks the session for its roots before it starts a trace, and the
+        thread that reads the session must stay free to carry the answer back."""
+        key, waiting = self._ask("tools/call", {"name": "browser_start_tracing", "arguments": {}})
+        self._trace_asked = True
+        threading.Thread(target=self._traced, args=(key, waiting), daemon=True).start()
+
+    def _traced(self, key: str, waiting: _Waiting) -> None:
         try:
-            answer = self.request("tools/call", {"name": "browser_start_tracing", "arguments": {}})
+            answer = self._result(key, waiting, "tools/call")
+            reason = text_of(answer)[:400] if answer.get("isError") else ""
+        # telemetry: surfaced — `untraced` stops the browser, and `serve` says why on `sys.stderr`
         except ServerError as exc:
-            raise TraceError(str(exc)) from exc
-        if answer.get("isError"):
-            raise TraceError(text_of(answer)[:400])
+            reason = str(exc)
+        self._trace_ok = not reason
+        if reason:
+            self.untraced(reason)
+        self._trace_answered.set()
+
+    def traced(self) -> bool:
+        """Whether the trace started, once it answered: every call waits for it, so nothing runs untraced. The
+        session calls no tool before it has the list, which the server sends only once the trace started."""
+        if not self._trace_asked:
+            return True
+        self._trace_answered.wait(self._wait)
+        return self._trace_ok
 
     def request(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         """Send one request of the wrapper's own and wait for its answer's result."""
+        if not self.traced():
+            raise ServerError("the browser's trace did not start")
+        return self._result(*self._ask(method, params), method)
+
+    def _ask(self, method: str, params: dict[str, Any]) -> tuple[str, _Waiting]:
         key = f"{OWN}{next(self._ids)}"
         waiting = _Waiting()
         self._mine[key] = waiting
         self._to_server(json.dumps({"jsonrpc": "2.0", "id": key, "method": method, "params": params}))
+        return key, waiting
+
+    def _result(self, key: str, waiting: _Waiting, method: str) -> dict[str, Any]:
         if not waiting.done.wait(self._wait):
             self._mine.pop(key, None)
             raise ServerError(f"the browser did not answer {method} within {self._wait:.0f} s")
@@ -204,6 +231,12 @@ def serve(
     equip(proxy)
     ended, why = threading.Event(), []
 
+    def untraced(reason: str) -> None:
+        why.append(f"the trace did not start, so this browser stops: {reason}")
+        ended.set()
+
+    proxy.untraced = untraced
+
     def pump() -> None:
         assert server.stdout is not None  # asked for as a pipe
         for line in server.stdout:
@@ -217,10 +250,8 @@ def serve(
             for line in client_in:
                 if line.strip():
                     proxy.from_client(line)
+            proxy.traced()
             why.append("session")
-        # telemetry: surfaced — `why` carries it to `serve`, which says it on `sys.stderr` and returns 1
-        except TraceError as exc:
-            why.append(f"the trace did not start, so this browser stops: {exc}")
         # telemetry: surfaced — the server is gone; `why` says so, and `serve` reports it on stderr
         except OSError:
             why.append("server")

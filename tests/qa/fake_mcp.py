@@ -1,6 +1,7 @@
 """A stand-in for Playwright's MCP server, for the wrapper's tests: it answers on standard input and output as the
 server does, and writes each request it gets to the file named first. With FAIL_TRACE set, the trace never starts;
-a call to browser_crash ends it with exit 3.
+with ASK_ROOTS set, it asks the session for its roots before it starts the trace and waits for the answer, as
+Playwright does; a call to browser_crash ends it with exit 3.
 
 Run: python3 fake_mcp.py <log file>
 """
@@ -41,14 +42,22 @@ def answer(message: dict[str, object]) -> dict[str, object] | None:
     return {"content": [{"type": "text", "text": said}]}
 
 
+ROOTS = "roots-1"
+lines, held = iter(sys.stdin), []
 with open(sys.argv[1], "a", encoding="utf-8") as log:
-    for line in sys.stdin:
-        message = json.loads(line)
+    while held or (line := next(lines, None)) is not None:
+        message = json.loads(held.pop(0) if held else line)
         params = message.get("params") or {}
         log.write(f"{message.get('method')} {params.get('name', '')}".strip() + "\n")
         log.flush()
         if params.get("name") == "browser_crash":
             sys.exit(3)
+        if params.get("name") == "browser_start_tracing" and os.environ.get("ASK_ROOTS"):
+            print(json.dumps({"jsonrpc": "2.0", "id": ROOTS, "method": "roots/list"}), flush=True)
+            for waited in lines:
+                if json.loads(waited).get("id") == ROOTS:
+                    break
+                held.append(waited)
         result = answer(message)
         if "id" in message and result is not None:
             print(json.dumps({"jsonrpc": "2.0", "id": message["id"], "result": result}), flush=True)
