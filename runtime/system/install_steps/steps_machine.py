@@ -18,6 +18,7 @@ from runtime.system import layout, render
 from runtime.system.host import CommandError, Host
 from runtime.system.install_steps import steps_wire
 from runtime.system.job import Install, refuse
+from runtime.warden.sessions import session_settings
 
 # Claude Code carries its seccomp helper (which blocks Unix sockets in the sandbox) inside its own binary; a version
 # without it finds the sandbox runtime's copy in the global npm folder instead.
@@ -130,7 +131,7 @@ def state_tree(ctx: Install) -> None:
     # settings the warden publishes there. No factory user is in the owner's group, so to them the folder stays shut.
     host.mkdir(state, mode=0o710, owner=WARDEN_USER, group=owner_group(ctx))
     public = layout.public(state)
-    for folder in (public, public / "launch", ctx.places.rendered_plugin):
+    for folder in (public, public / "launch", session_settings.folder(ctx.places), ctx.places.rendered_plugin):
         host.mkdir(folder, mode=0o755, owner=WARDEN_USER)
     for folder in (layout.secrets(state), layout.runs(state), ctx.places.overrides.parent):
         host.mkdir(folder, mode=0o700, owner=WARDEN_USER)

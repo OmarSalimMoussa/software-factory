@@ -20,7 +20,7 @@ from runtime.system.job import REPO_ROOT, Install
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
 from runtime.warden.delivery import pins
-from runtime.warden.sessions import registry
+from runtime.warden.sessions import registry, session_settings
 
 
 def _answered(job: Install) -> None:
@@ -544,3 +544,11 @@ def test_an_upgrade_moves_the_agents_product_to_its_factory_in_one_commit_root_r
     [pin] = upgrades.read_pins(job.places)
     assert (pin["commit"], pin["parent"]) == (head.strip(), before.strip())
     assert pins._pin(git, job.places, head.strip()) == set(pin["blobs"])  # the warden lets exactly this through
+
+
+def test_the_session_settings_folder_is_the_wardens_though_the_drills_write_there_first_as_root(tmp_path: Path) -> None:
+    job = dry_job(tmp_path)
+
+    steps_machine.state_tree(job)
+
+    assert f"make: {session_settings.folder(job.places)}/ (755, software-warden:software-warden)" in job.host.actions

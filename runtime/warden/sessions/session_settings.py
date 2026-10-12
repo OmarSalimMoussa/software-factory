@@ -74,9 +74,14 @@ def render(settings: Settings, places: Places, role: str, worktree: Path, agent_
     return body
 
 
+def folder(places: Places) -> Path:
+    """Where sessions' settings go: the install makes it the warden's, as the drills write there first, as root."""
+    return places.state / "public" / "session-settings"
+
+
 def write(settings: Settings, places: Places, request_id: str, role: str, worktree: Path, agent_home: Path) -> Path:
     """Write the session's settings where the agent user can read them; the path to pass with --settings."""
-    path = places.state / "public" / "session-settings" / f"{request_id}.json"
+    path = folder(places) / f"{request_id}.json"
     store.write_json(path, render(settings, places, role, worktree, agent_home))
     return path
 
