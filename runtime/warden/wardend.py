@@ -17,6 +17,7 @@ from collections.abc import Callable, Sequence
 from functools import partial
 from pathlib import Path
 
+from runtime.qa.replay import pending
 from runtime.queue import reports
 from runtime.shared import environment, error_reports, store
 from runtime.shared import settings as settings_module
@@ -84,6 +85,11 @@ def _push_pins(ctx: Context) -> None:
     loop.run_once(ctx, "the product pin's push", lambda: pins.push_pending(ctx))
 
 
+def _build_replays(ctx: Context, transcripts: Sequence[Path]) -> None:
+    # In its own thread: a replay reads a trace of thousands of frames.
+    loop.run_once(ctx, "the replays build", lambda: pending.build_pending(ctx, transcripts))
+
+
 def _pull_reports(ctx: Context) -> None:
     # In its own thread: a failure is reported there, once while it lasts, as a pass's is.
     loop.run_once(ctx, "the reports pull", lambda: reports.poll(ctx))
@@ -100,6 +106,10 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
         ("branch", imports.Background(_ask_branch, imports.in_thread("branch")).run_pass),
         ("releases", imports.Background(_check_releases, imports.in_thread("releases")).run_pass),
         ("pins", imports.Background(_push_pins, imports.in_thread("pins")).run_pass),
+        (
+            "replays",
+            imports.Background(partial(_build_replays, transcripts=transcripts), imports.in_thread("replays")).run_pass,
+        ),  # fmt: skip
         ("schedule", schedule.run_pass),
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),
         ("plan", watch.run_pass),

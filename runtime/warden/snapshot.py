@@ -11,14 +11,14 @@ import base64
 import copy
 import dataclasses
 import logging
-import os
 import re
-import stat
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from runtime.guard.rules import RULES
+from runtime.qa import evidence as qa_evidence
+from runtime.qa.replay import reader as replay_reader
 from runtime.queue import approvals, cards, files, goal, intake, pictures, proposals, records, triage
 from runtime.queue.book import Queue
 from runtime.queue.formats import TASK_ID
@@ -280,6 +280,7 @@ READERS: dict[str, Reader] = {
     "logs": _logs,
     "specs": _spec_text,
     "qa": _qa,
+    "replay": replay_reader.read,
     "goal": _goal,
     "triage": lambda ctx, args: dataclasses.asdict(triage.batch(ctx)),
     "docker": lambda ctx, args: store.read_json_or(gc.disk_path(ctx.places), None),
@@ -303,7 +304,8 @@ def _read_one(ctx: Context, name: str, args: dict[str, Any]) -> tuple[Any, str |
 
 
 def snapshot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """{"want": [names], "tasks"?: [ids], "specs"?: [ids], "days"?: n} → each name's state, or its error."""
+    """{"want": [names], "tasks"?: [ids], "specs"?: [ids], "days"?: n, "replay"?: {run}} → each name's state, or its
+    error."""
     want = args.get("want")
     if not isinstance(want, list) or not want or not all(isinstance(w, str) for w in want):
         raise Refused("snapshot", f"want is a list of: {', '.join(sorted(READERS))}")
@@ -355,25 +357,12 @@ def evidence(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     media = _IMAGES.get(parts[-1].rpartition(".")[2].lower())
     if not all(_SEGMENT.match(p) for p in parts) or media is None:
         raise Refused("evidence", "evidence is shown only as an image named inside the task's folder")
-    fd = -1
     try:
-        fd = os.open(ctx.places.evidence, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
-        for part in [task, *parts[:-1]]:
-            nxt = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=fd)
-            os.close(fd)
-            fd = nxt
-        leaf = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=fd)
+        raw = qa_evidence.read_file(ctx.places, [task, *parts], _MAX_IMAGE)
     except FileNotFoundError as exc:
         raise Refused("evidence", f"{task} has no evidence {rel}; it may have aged out") from exc
+    except qa_evidence.TooLarge as exc:
+        raise Refused("evidence", f"{rel} is too large to show here") from exc
     except OSError as exc:
         raise Refused("evidence", f"{rel} is not a plain file in {task}'s evidence") from exc
-    finally:
-        if fd >= 0:
-            os.close(fd)
-    with os.fdopen(leaf, "rb") as fh:
-        if not stat.S_ISREG(os.fstat(fh.fileno()).st_mode):
-            raise Refused("evidence", f"{rel} is not a plain file in {task}'s evidence")
-        raw = fh.read(_MAX_IMAGE + 1)
-    if len(raw) > _MAX_IMAGE:
-        raise Refused("evidence", f"{rel} is too large to show here")
     return {"type": media, "bytes_b64": base64.b64encode(raw).decode()}

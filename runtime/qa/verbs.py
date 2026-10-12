@@ -233,9 +233,8 @@ def qa_result(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
         else (f"{counts['blockers']} blockers, {counts['majors']} majors")
     )
     doing.record(ctx.places, ctx.caller.agent_id, verdict=verdict)
-    taken = evidence.intake(
-        ctx, qa_browser.runs_root(), session.id, session.task, full, tester.role, str(records[-1]["at"])
-    )
+    taken = evidence.intake(ctx, qa_browser.runs_root(), session.id, session.task, full, tester.role,
+                            ctx.caller.agent_id, str(records[-1]["at"]))  # fmt: skip
     return ok(head=full, tester=tester.role, evidence=taken, **counts)
 
 

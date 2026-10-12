@@ -75,6 +75,21 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         ],
     ),
     (
+        "replay",
+        "Replays",
+        "The timings apply to the next run a tester finishes; the pace, to the next replay you open.",
+        [
+            ("replay.long_wait_seconds", "A wait longer than this shows only its end, seconds"),
+            ("replay.wait_tail_seconds", "The end a long wait shows, seconds"),
+            ("replay.navigation_tail_seconds", "A page change shows this long, seconds"),
+            ("replay.secret_seconds", "Picture hidden after a typed secret, seconds"),
+            ("replay.recorder_before_seconds", "A page's note of an action may come early by, seconds"),
+            ("replay.recorder_after_seconds", "A page's note of an action may come late by, seconds"),
+            ("replay.desktop_view_share", "A field this much of the screen is a desktop's view"),
+            ("replay.read_part_share", "A looked-up element under this much of the screen is a part"),
+        ],
+    ),
+    (
         "intake",
         "Intake",
         "Applies to the next triage pass.",
