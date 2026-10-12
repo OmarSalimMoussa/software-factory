@@ -62,8 +62,7 @@ def http_get(url: str, timeout: float) -> Answer:
     except TimeoutError:
         raise
     except OSError as exc:
-        reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
-        raise NetworkFailure(type(reason).__name__) from exc
+        raise NetworkFailure(network.failure_class(exc)) from exc
     return Answer(found.status, found.body)
 
 

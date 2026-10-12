@@ -12,6 +12,14 @@ from runtime.shared import network
 
 class _Answers(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
+        if self.path == "/hangup":
+            return  # the connection closes with no answer
+        if self.path == "/cut":
+            self.send_response(200)
+            self.send_header("Content-Length", "100")
+            self.end_headers()
+            self.wfile.write(b"only part")
+            return
         if self.path == "/slow":
             time.sleep(2)
         status = 302 if self.path == "/moved" else int(self.path.strip("/") or 200) if self.path != "/slow" else 200
@@ -53,6 +61,16 @@ def test_checked_takes_only_success_and_a_passed_deadline_is_a_timeout(server: s
         network.call(server + "/503", 5).checked("the host")
     with pytest.raises(TimeoutError):
         network.call(server + "/slow", 0.3)
+
+
+@pytest.mark.parametrize(
+    ("path", "kind"), [("/hangup", "RemoteDisconnected"), ("/cut", "IncompleteRead")], ids=["dropped", "cut-short"]
+)
+def test_a_broken_exchange_fails_naming_what_broke(server: str, path: str, kind: str) -> None:
+    with pytest.raises(OSError) as failed:
+        network.call(server + path, 5)
+
+    assert network.failure_class(failed.value) == kind
 
 
 def test_a_request_for_this_machine_never_goes_through_a_proxy(server: str, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -64,4 +64,21 @@ def call(
             raise TimeoutError(f"{asked.host} did not answer in {timeout:g} s") from exc
         raise
     except http.client.HTTPException as exc:
-        raise OSError(f"{asked.host} answered with something that is not HTTP ({type(exc).__name__})") from exc
+        if isinstance(exc, OSError):
+            raise  # a connection that dropped before the answer (RemoteDisconnected) is the OSError it is
+        raise BrokenAnswer(asked.host, exc) from exc
+
+
+class BrokenAnswer(OSError):
+    """A host gave no whole HTTP answer: one cut short, or one that is not HTTP; ``kind`` names http.client's error."""
+
+    def __init__(self, host: str, cause: http.client.HTTPException) -> None:
+        self.kind = type(cause).__name__
+        super().__init__(f"{host} gave no whole HTTP answer ({self.kind})")
+
+
+def failure_class(exc: OSError) -> str:
+    """The name of what failed under an error the door raised: the address's own error, http.client's, or ``exc``'s."""
+    if isinstance(exc, urllib.error.URLError) and isinstance(exc.reason, BaseException):
+        return type(exc.reason).__name__
+    return exc.kind if isinstance(exc, BrokenAnswer) else type(exc).__name__

@@ -21,4 +21,6 @@ def call(url: str, timeout: float, *, data: bytes | None = None, limit: int | No
         with exc:
             return exc.code, exc.read() if limit is None else exc.read(limit)
     except http.client.HTTPException as exc:
-        raise OSError(f"{url} answered with something that is not HTTP ({type(exc).__name__})") from exc
+        if isinstance(exc, OSError):
+            raise  # a connection that dropped before the answer (RemoteDisconnected) is the OSError it is
+        raise OSError(f"{url} gave no whole HTTP answer ({type(exc).__name__})") from exc
