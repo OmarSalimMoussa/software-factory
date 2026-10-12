@@ -34,6 +34,31 @@ def test_yaml_subset_resolves_anchors_and_merge_keys_and_refuses_what_it_cannot_
         yaml_subset.load("key: !tag value\n")
 
 
+@pytest.mark.parametrize(
+    ("text", "loaded"),
+    [
+        ("a: ~\nb: True\nc: FALSE\nd: 12\ne: 0x1f\nf: 0oz\ng: 1.5\nh: '1'\ni: word\n",
+         {"a": None, "b": True, "c": False, "d": 12, "e": 31, "f": "0oz", "g": 1.5, "h": "1", "i": "word"}),
+        ("a: [1, 'x', {b: [], c: d}]\ne: {}\n", {"a": [1, "x", {"b": [], "c": "d"}], "e": {}}),
+        ("a:\n- 1\n- 2\nb:\n  c: &n 3\nd: *n\ne:\n", {"a": [1, 2], "b": {"c": 3}, "d": 3, "e": None}),
+    ],
+    ids=["scalars", "flow-collections", "values-below-and-aliases"],
+)  # fmt: skip
+def test_yaml_subset_reads_scalars_flows_and_values_below_their_key(text: str, loaded: dict[str, Any]) -> None:
+    assert yaml_subset.load(text) == loaded
+
+
+@pytest.mark.parametrize(
+    ("text", "says"),
+    [("a: 'x' y\n", "text after a quoted scalar"), ("a: [1] 2\n", "text after a flow collection"),
+     ("a: {b 1}\n", "needs a colon"), ("a: [1\n", "does not close"), ("a: *nowhere\n", "names no anchor")],
+    ids=["after-quote", "after-flow", "flow-colon", "flow-unclosed", "unknown-alias"],
+)  # fmt: skip
+def test_yaml_subset_refuses_a_broken_scalar_or_flow_by_line(text: str, says: str) -> None:
+    with pytest.raises(yaml_subset.YamlError, match=f"line 1: .*{says}"):
+        yaml_subset.load(text)
+
+
 def test_an_environment_read_outside_a_config_module_fails_by_line(make_repo: MakeRepo) -> None:
     root = make_repo({
         "svc/config.py": "import os\nX = os.environ['A']\n",

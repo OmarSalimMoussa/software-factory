@@ -63,29 +63,34 @@ def _unquote(text: str, number: int) -> tuple[str, str]:
     raise YamlError(f"line {number}: a quoted scalar does not close on its line")
 
 
+_WORDS: dict[str, bool | None] = {
+    **dict.fromkeys(("null", "Null", "NULL", "~")),
+    **dict.fromkeys(("true", "True", "TRUE"), True),
+    **dict.fromkeys(("false", "False", "FALSE"), False),
+}
+
+
 def scalar(text: str, number: int) -> Any:
     if text[:1] in ("'", '"'):
         value, rest = _unquote(text, number)
         if rest.strip():
             raise YamlError(f"line {number}: text after a quoted scalar: {rest.strip()!r}")
         return value
-    if text in ("null", "Null", "NULL", "~"):
-        return None
-    if text in ("true", "True", "TRUE"):
-        return True
-    if text in ("false", "False", "FALSE"):
-        return False
+    if text in _WORDS:
+        return _WORDS[text]
     if _INT_RE.match(text):
         return int(text)
     if text.startswith(("0x", "0o")):
-        try:
-            return int(text, 0)
-        # telemetry: expected — a 0x or 0o word that is no number is a string in YAML, as it reads
-        except ValueError:
-            return text
-    if _FLOAT_RE.match(text):
-        return float(text)
-    return text
+        return _based(text)
+    return float(text) if _FLOAT_RE.match(text) else text
+
+
+def _based(text: str) -> int | str:
+    try:
+        return int(text, 0)
+    # telemetry: expected — a 0x or 0o word that is no number is a string in YAML, as it reads
+    except ValueError:
+        return text
 
 
 def _split_key(content: str, number: int) -> tuple[str, str] | None:
@@ -120,28 +125,7 @@ class _Flow:
         opener = self.text[self.at]
         if opener in "[{":
             self.at += 1
-            closer = "]" if opener == "[" else "}"
-            items: list[Any] = []
-            table: dict[str, Any] = {}
-            while True:
-                self._space()
-                if self.text[self.at : self.at + 1] == closer:
-                    self.at += 1
-                    return items if opener == "[" else table
-                item = self.node()
-                self._space()
-                if opener == "{":
-                    if self.text[self.at : self.at + 1] != ":":
-                        raise YamlError(f"line {self.number}: a flow mapping entry needs a colon")
-                    self.at += 1
-                    table[str(item)] = self.node()
-                else:
-                    items.append(item)
-                self._space()
-                if self.text[self.at : self.at + 1] == ",":
-                    self.at += 1
-                elif self.text[self.at : self.at + 1] != closer:
-                    raise YamlError(f"line {self.number}: a flow collection does not close on its line")
+            return self._collection(opener)
         if opener in ("'", '"'):
             value, rest = _unquote(self.text[self.at :], self.number)
             self.at = len(self.text) - len(rest)
@@ -154,6 +138,31 @@ class _Flow:
         ):
             self.at += 1
         return scalar(self.text[start : self.at].strip(), self.number)
+
+    def _collection(self, opener: str) -> list[Any] | dict[str, Any]:
+        """A flow sequence or mapping, read from just after its OPENER through its closer."""
+        closer = "]" if opener == "[" else "}"
+        items: list[Any] = []
+        table: dict[str, Any] = {}
+        while True:
+            self._space()
+            if self.text[self.at : self.at + 1] == closer:
+                self.at += 1
+                return items if opener == "[" else table
+            item = self.node()
+            self._space()
+            if opener == "{":
+                if self.text[self.at : self.at + 1] != ":":
+                    raise YamlError(f"line {self.number}: a flow mapping entry needs a colon")
+                self.at += 1
+                table[str(item)] = self.node()
+            else:
+                items.append(item)
+            self._space()
+            if self.text[self.at : self.at + 1] == ",":
+                self.at += 1
+            elif self.text[self.at : self.at + 1] != closer:
+                raise YamlError(f"line {self.number}: a flow collection does not close on its line")
 
 
 class _Parser:
@@ -254,13 +263,7 @@ class _Parser:
         if anchor and rest and _split_key(rest, number) is not None:
             raise YamlError(f"line {number}: an anchor before an inline mapping entry is not read")
         if not rest:
-            nxt = self.peek()
-            if nxt is not None and nxt[0] > indent:
-                found = self.block(nxt[0])
-            elif nxt is not None and nxt[0] == indent and (nxt[1] == "-" or nxt[1].startswith("- ")):
-                found = self.sequence(indent)
-            else:
-                found = None
+            found = self._below(indent)
         elif rest[0] in "|>":
             found = self.block_scalar(rest, indent, number)
         elif rest.startswith("*"):
@@ -268,15 +271,22 @@ class _Parser:
                 raise YamlError(f"line {number}: the alias {rest} names no anchor above it")
             found = self.anchors[rest[1:]]
         elif rest[0] in "[{":
-            flow = _Flow(rest, number)
-            found = flow.node()
-            if rest[flow.at :].strip():
-                raise YamlError(f"line {number}: text after a flow collection")
+            found = _flow_value(rest, number)
         else:
             found = scalar(rest, number)
         if anchor:
             self.anchors[anchor] = found
         return found
+
+    def _below(self, indent: int) -> Any:
+        """The value of an entry with nothing after it on its line: a deeper block, a sequence at its own indent, or
+        none."""
+        nxt = self.peek()
+        if nxt is not None and nxt[0] > indent:
+            return self.block(nxt[0])
+        if nxt is not None and nxt[0] == indent and (nxt[1] == "-" or nxt[1].startswith("- ")):
+            return self.sequence(indent)
+        return None
 
     def block_scalar(self, header: str, indent: int, number: int) -> str:
         if header[1:].strip() not in ("", "-", "+"):
@@ -294,6 +304,14 @@ class _Parser:
         lines = [r[depth:] for r in body]
         text = "\n".join(lines) if header[0] == "|" else " ".join(r.strip() for r in lines if r.strip())
         return text if header.endswith("-") else text + "\n"
+
+
+def _flow_value(text: str, number: int) -> Any:
+    flow = _Flow(text, number)
+    found = flow.node()
+    if text[flow.at :].strip():
+        raise YamlError(f"line {number}: text after a flow collection")
+    return found
 
 
 def load(text: str) -> Any:

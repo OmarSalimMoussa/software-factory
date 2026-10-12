@@ -104,15 +104,8 @@ def images(repo: Path, config: Config, compose: Compose, short: str) -> tuple[Im
     by_name = {s.name: s for s in sources}
     built: list[Image] = []
     for source in sources:
-        if len(source.bases) > 1:
-            problems.append(f"{source.dockerfile}: builds FROM {', '.join(source.bases)}; an image derives from one "
-                            "product image at most")  # fmt: skip
+        problems += _derivation_problems(source, by_name)
         after = source.bases[0] if source.bases else None
-        if after == source.name:
-            problems.append(f"{source.dockerfile}: {source.name} builds FROM its own image; name a base image")
-        elif after in by_name and by_name[after].bases:
-            problems.append(f"{source.dockerfile}: {source.name} derives from {after}, which itself derives from "
-                            f"{by_name[after].bases[0]}; derive from a base image only (one level)")  # fmt: skip
         args = _args(config, source, short, problems)
         args[config.build.commit_arg] = short
         if after is not None:
@@ -124,6 +117,22 @@ def images(repo: Path, config: Config, compose: Compose, short: str) -> tuple[Im
     if problems:
         raise PlanError(problems)
     return tuple([i for i in built if i.after is None] + [i for i in built if i.after is not None])
+
+
+def _derivation_problems(source: _Source, by_name: dict[str, _Source]) -> list[str]:
+    """Why an image's FROM breaks the one rule: it derives from one other product image at most, never itself, and
+    only from one that derives from none."""
+    problems = []
+    if len(source.bases) > 1:
+        problems.append(f"{source.dockerfile}: builds FROM {', '.join(source.bases)}; an image derives from one "
+                        "product image at most")  # fmt: skip
+    after = source.bases[0] if source.bases else None
+    if after == source.name:
+        problems.append(f"{source.dockerfile}: {source.name} builds FROM its own image; name a base image")
+    elif after in by_name and by_name[after].bases:
+        problems.append(f"{source.dockerfile}: {source.name} derives from {after}, which itself derives from "
+                        f"{by_name[after].bases[0]}; derive from a base image only (one level)")  # fmt: skip
+    return problems
 
 
 def make(repo: Path, commit: str, factory_commit: str) -> Plan:

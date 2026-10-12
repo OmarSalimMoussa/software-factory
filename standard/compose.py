@@ -291,15 +291,7 @@ def dockerfile(path: Path) -> Dockerfile:
         word, _, rest = line.partition(" ")
         word = word.upper()
         if word == "ARG" and not froms:
-            try:
-                words = shlex.split(rest)
-            # telemetry: surfaced — an ARG line that cannot be read is one of the Dockerfile's `problems`
-            except ValueError as exc:
-                problems.append(f"line {number}: ARG cannot be read: {exc}")
-                continue
-            for item in words:
-                key, eq, default = item.partition("=")
-                args[key] = default if eq else None
+            _arg(rest, number, args, problems)
         elif word == "FROM":
             image = [w for w in rest.split() if not w.startswith("--")]
             if not image:
@@ -311,6 +303,19 @@ def dockerfile(path: Path) -> Dockerfile:
     if problems:
         raise ComposeError(path, problems)
     return Dockerfile(args, tuple(froms))
+
+
+def _arg(rest: str, number: int, args: dict[str, str | None], problems: list[str]) -> None:
+    """A global ARG line's names into ``args``, each with its default or None."""
+    try:
+        words = shlex.split(rest)
+    # telemetry: surfaced — an ARG line that cannot be read is one of the Dockerfile's `problems`
+    except ValueError as exc:
+        problems.append(f"line {number}: ARG cannot be read: {exc}")
+        return
+    for item in words:
+        key, eq, default = item.partition("=")
+        args[key] = default if eq else None
 
 
 def _instructions(text: str) -> list[tuple[int, str]]:

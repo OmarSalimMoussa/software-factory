@@ -76,13 +76,7 @@ def write(
     defaults = _existing(defaults_path(target), problems) if existing is not None else None
     keys = [line.key for line in lines if line.key]
     rendered = _rendered(config, placeholders, keys, template, problems)
-    for key, value in {**rendered, **services}.items():
-        if key in rendered and key in services:
-            problems.append(
-                f"{key} is an [env.set] key and also one the factory's services write; drop it from [env.set]"
-            )
-        if "\n" in value or "\r" in value:
-            problems.append(f"{key}: a value may not hold a line break")
+    problems += _clashes(rendered, services)
     if problems:
         raise EnvError(problems)
 
@@ -100,13 +94,7 @@ def write(
         if note:
             notes.append(note)
         if server and line.server_why and line.key not in rendered and line.key not in services:
-            if value == "":
-                refusals.append(f"{line.key} is empty; a server workspace sets it by hand: {line.server_why}")
-            elif value == line.value:
-                refusals.append(
-                    f"{line.key} still holds the template's value; a server workspace sets it by hand: "
-                    f"{line.server_why}"
-                )
+            refusals += _unset_on_a_server(line, value)
         out.append(f"{line.key}={value}")
     extra = [key for key in services if key not in keys]
     if extra:
@@ -119,6 +107,27 @@ def write(
     if refusals:
         raise EnvError([*refusals, f"set each in {target}, then deploy again"])
     return notes
+
+
+def _clashes(rendered: dict[str, str], services: dict[str, str]) -> list[str]:
+    problems = []
+    for key, value in {**rendered, **services}.items():
+        if key in rendered and key in services:
+            problems.append(
+                f"{key} is an [env.set] key and also one the factory's services write; drop it from [env.set]"
+            )
+        if "\n" in value or "\r" in value:
+            problems.append(f"{key}: a value may not hold a line break")
+    return problems
+
+
+def _unset_on_a_server(line: _Line, value: str) -> list[str]:
+    """Why a key the template marks for a server workspace to set by hand is not set yet; empty when it is."""
+    if value == "":
+        return [f"{line.key} is empty; a server workspace sets it by hand: {line.server_why}"]
+    if value == line.value:
+        return [f"{line.key} still holds the template's value; a server workspace sets it by hand: {line.server_why}"]
+    return []
 
 
 def generate(marker: str) -> str | None:
@@ -165,7 +174,12 @@ def _value(
         return rendered[line.key], ""
     if line.key in services:
         return services[line.key], ""
-    current = held.get(line.key)
+    return _kept_or_made(line, held.get(line.key), defaults, fresh)
+
+
+def _kept_or_made(line: _Line, current: str | None, defaults: dict[str, str] | None, fresh: bool) -> tuple[str, str]:
+    """A template key's value when neither [env.set] nor the services set it: the one held, unless the template's
+    default changed under it; else one generated, or the template's own."""
     if current is not None and defaults is not None and current == defaults.get(line.key) != line.value:
         made = generate(line.value)
         return (line.value if made is None else made), f"updated {line.key}: the template's default changed"
@@ -221,18 +235,22 @@ def _template(path: Path, problems: list[str]) -> list[_Line]:
                 problems.append(f"{path.name} line {number} is not KEY=value or a # comment")
             lines.append(_Line(raw, "", "", ""))
             continue
-        key, value = match.group(1), match.group(2)
-        if key in seen:
-            problems.append(f"{path.name} line {number} sets {key} a second time")
-        seen.add(key)
-        hex_marker = _HEX.fullmatch(value)
-        if hex_marker is not None and not 1 <= int(hex_marker.group(2)) <= _MAX_HEX_BYTES:
-            problems.append(f"{path.name} line {number}: {key} asks for 1 to {_MAX_HEX_BYTES} random bytes")
-        lines.append(_Line(raw, key, value, why))
+        lines.append(_assignment(f"{path.name} line {number}", match, raw, why, seen, problems))
         why = ""
     if why:
         problems.append(f"{path.name} line {why_at}: a `{SERVER_MARKER}` line must sit directly above a KEY=value")
     return lines
+
+
+def _assignment(where: str, match: re.Match[str], raw: str, why: str, seen: set[str], problems: list[str]) -> _Line:
+    key, value = match.group(1), match.group(2)
+    if key in seen:
+        problems.append(f"{where} sets {key} a second time")
+    seen.add(key)
+    hex_marker = _HEX.fullmatch(value)
+    if hex_marker is not None and not 1 <= int(hex_marker.group(2)) <= _MAX_HEX_BYTES:
+        problems.append(f"{where}: {key} asks for 1 to {_MAX_HEX_BYTES} random bytes")
+    return _Line(raw, key, value, why)
 
 
 def _existing(path: Path, problems: list[str]) -> dict[str, str] | None:
