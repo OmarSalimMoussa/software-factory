@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
 from warden_fakes import FakeClock
 
 from runtime.shared import store
-from runtime.warden.context import Context
+from runtime.shared.models import WORKING, Session
+from runtime.shared.protocol import Refused
+from runtime.warden.context import Caller, Context
+from runtime.warden.dispatch import Doors
 from runtime.warden.owner import reflections
+from runtime.warden.sessions import registry
 
 
 def reflect(ctx: Context, kind: str, text: str) -> dict[str, Any]:
@@ -27,6 +32,21 @@ def test_a_repeat_within_the_fold_window_bumps_the_first_entry(ctx: Context) -> 
         ("miss", 1),
         ("friction", 1),
     ]
+
+
+def test_a_subagents_entry_names_its_kind_and_it_never_writes_for_the_orchestrator(doors: Doors) -> None:
+    orchestrator = Session(id="s1", name="orch-a", role="orchestrator", family="orch", model="m", effort="high",
+                           task="", parent="", worktree="/w", state=WORKING, started="2026-10-09T10:00:00Z",
+                           started_by="owner")  # fmt: skip
+    registry.write(doors.places, {"s1": orchestrator})
+    tester = doors.context(Caller("agent", session="s1", role="orchestrator", agent_id="a1", agent_kind="qa-prod"))
+
+    with pytest.raises(Refused):
+        reflect(tester, "owner-feedback", "The owner wants it faster.")
+    reflect(tester, "friction", "The browser could not start.")
+
+    [entry] = reflections.entries(doors.places)
+    assert entry["who"] == "qa-prod subagent of orchestrator orch-a"
 
 
 def test_a_writer_learns_nothing_back_and_the_files_are_the_wardens_alone(ctx: Context) -> None:

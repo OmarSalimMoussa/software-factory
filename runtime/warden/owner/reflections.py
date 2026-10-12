@@ -95,7 +95,7 @@ def append(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
     if kind not in KINDS or kind == INCIDENT:
         allowed = ", ".join(k for k in KINDS if k != INCIDENT)
         raise Refused("reflect", f"--kind must be one of {allowed}")
-    if kind in ORCHESTRATOR_KINDS and ctx.caller.role not in (ORCH, OWNER):
+    if kind in ORCHESTRATOR_KINDS and (ctx.caller.role not in (ORCH, OWNER) or ctx.caller.agent_id):
         raise Refused("reflect", f"only the orchestrator writes {kind}")
     if not isinstance(text, str) or not one_line(text):
         raise Refused("reflect", "say what happened and what would have prevented it, in one or two sentences")
@@ -107,6 +107,8 @@ def append(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
     if session is not None:
         who = f"{session.role} {session.name}"
         where = f"task {session.task}" if session.task else ""
+    if ctx.caller.agent_id:
+        who = f"{ctx.caller.agent_kind} subagent of {who}"
     add(ctx, kind, who, where, text)
     return ok(message="Recorded.")
 

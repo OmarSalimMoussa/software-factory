@@ -240,14 +240,33 @@ def test_a_finished_subagent_of_any_kind_is_not_resumed(tmp_path: Path, kind: st
     assert kit.rule("SendMessage", {"to": TESTER_ID, "message": "one more"}) == "resume-subagent"
 
 
-def test_every_brief_ends_with_the_note_on_reflecting(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("role", "kind", "may"),
+    [
+        ("implementer", "qa-backend", True),
+        ("designer", "critic-security", True),
+        ("orchestrator", "triage", True),
+        ("implementer", "Explore", False),
+    ],
+)
+def test_a_brief_ends_with_the_note_on_reflecting_exactly_when_its_kind_may_reflect(
+    tmp_path: Path, role: str, kind: str, may: bool
+) -> None:
     kit = Kit(tmp_path)
-    kit.session("implementer")
+    where = kit.repo if role == "orchestrator" else kit.worktree
+    kit.session(role, worktree=where)
     kit.switch_off("qa-ready")
-    decision = kit.decide("Agent", _agent("qa-backend"))
-    assert isinstance(decision, Rewrite)
-    assert decision.updated_input["prompt"].endswith("Write to SELF_REFLECT.md when a miss got past you.\n")
-    assert not isinstance(kit.decide("Agent", decision.updated_input), Refusal)
+    decision = kit.decide("Agent", _agent(kind))
+    noted = isinstance(decision, Rewrite) and decision.updated_input["prompt"].endswith(
+        "Write to SELF_REFLECT.md when a miss got past you.\n"
+    )
+    assert noted is may
+    if noted:
+        assert isinstance(decision, Rewrite)
+        assert not isinstance(kit.decide("Agent", decision.updated_input), Refusal)
+    kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
+    reflect = kit.bash('factory reflect --kind friction "x"', cwd=str(where), agent_id=TESTER_ID, agent_type=kind)
+    assert (reflect is None) is may
 
 
 def test_intakes_time_runs_out_and_then_only_factory_and_its_hand_back_go(tmp_path: Path) -> None:

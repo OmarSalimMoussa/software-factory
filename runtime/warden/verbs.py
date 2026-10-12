@@ -58,7 +58,7 @@ VERBS: dict[str, Verb] = {
     "check": _v("runtime.warden.checks:check", ORCH, IMPL),
     "promote": _v("runtime.warden.delivery.prod_push:promote_cli", OWNER),
     # reflections, status, settings (1B-3)
-    "reflect": _v("runtime.warden.owner.reflections:append", *ANY, kinds=frozenset({INTAKE, TRIAGE})),
+    "reflect": _v("runtime.warden.owner.reflections:append", *ANY, kinds=READERS | CRITICS),
     "status": _v("runtime.warden.status:status", *ANY, kinds=READERS),
     "settings.show": _v("runtime.warden.status:settings_show", *ANY, kinds=READERS),
     # contract: added by FB6, read-only telemetry; the guard lets only intake, triage and testers among subagents ask

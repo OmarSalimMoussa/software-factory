@@ -28,6 +28,7 @@ from runtime.guard.wire import HANDBACK, REFUSED
 from runtime.shared.models import RETIRED, WITH_PARENT
 from runtime.shared.settings import model_role
 from runtime.shared.settings_schema import SCHEMA
+from runtime.warden.verbs import VERBS
 
 INTAKE = "intake"
 TESTER, CRITIC = "qa-", "critic-"
@@ -38,7 +39,7 @@ TIME_UP = "your time is up: report what you have"
 
 def check_agent(call: Call) -> Decision:
     """A subagent start: its kind and model, the number running, a tester's brief, readiness and rounds; then its
-    brief gains the factory's note on when to reflect."""
+    brief gains the factory's note on when to reflect, if its kind may."""
     kind = str(call.tool_input.get("subagent_type") or "general-purpose")
     current = str(call.payload.get("tool_use_id", ""))
     refused = transcript.refused_ids(call.transcript, REFUSED)
@@ -47,7 +48,7 @@ def check_agent(call: Call) -> Decision:
         decision = rule(call, kind, calls)
         if decision is not None:
             return decision
-    return _with_reflection(call)
+    return _with_reflection(call, kind)
 
 
 def _kind(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
@@ -236,8 +237,10 @@ def _saves_spec(command: str) -> bool:
     return any(inv.program == factory_calls.FACTORY and factory_calls.verb_of(inv.argv) == "spec.save" for inv in found)
 
 
-def _with_reflection(call: Call) -> Decision:
-    """Every subagent's brief ends with the factory's note on when to write to SELF_REFLECT.md."""
+def _with_reflection(call: Call, kind: str) -> Decision:
+    """Each brief of a kind that may run `factory reflect` ends with the factory's note on when to write to it."""
+    if kind not in VERBS["reflect"].kinds:
+        return None
     note = (call.places.plugin / "self-reflect.md").read_text(encoding="utf-8").strip()
     prompt = str(call.tool_input.get("prompt", ""))
     if note in prompt:
