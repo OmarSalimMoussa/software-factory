@@ -249,26 +249,51 @@ def _watch_until(ctx: Context, until: float) -> None:
 
 
 def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list[tuple[str, Callable[[], str]]]:
-    tick = ctx.settings().get_int("watch.tick_seconds")
-    deadline = time.monotonic() + wait_s
-    run: dict[str, str] = {}
+    push = _Push(ctx, kind, sha, wait_s, watch_s)
+    return [
+        ("Starting the push workflow", push.dispatch),
+        (f"Redeploying prod at {sha[:12]}", push.redeploy),
+        ("Waiting for prod to answer on the new build", push.answer),
+        ("Starting a qa-prod pass", push.qa_prod),
+        ("Releasing what changed", push.releases),
+    ]
 
-    full = {"sha": sha}
 
-    def dispatch() -> str:
+def _deploy_job(state: dict[str, Any]) -> dict[str, Any] | None:
+    """Prod's deploy is the workflow's `deploy` job; the releases after it must not decide whether prod moved."""
+    job = state["jobs"].get(PROMOTE_JOB)
+    if job is not None and job["status"] == "completed":
+        return {**job, "url": state["url"]}
+    if state["status"] == "completed":
+        return {"conclusion": f"without a {PROMOTE_JOB} job", "url": state["url"]}
+    return None
+
+
+class _Push:
+    """One push's steps, sharing its workflow run and one deadline for every wait."""
+
+    def __init__(self, ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> None:
+        self.ctx, self.kind, self.sha, self.wait_s, self.watch_s = ctx, kind, sha, wait_s, watch_s
+        self.tick = ctx.settings().get_int("watch.tick_seconds")
+        self.deadline = time.monotonic() + wait_s
+        self.run_id = ""
+        self.full_sha = sha
+
+    def dispatch(self) -> str:
+        ctx = self.ctx
         try:
-            full["sha"] = sha if FULL_SHA.match(sha) else ctx.github.full_sha(sha)
-            run["id"] = ctx.github.dispatch_promote(full["sha"], released(ctx.places) or "-")
+            self.full_sha = self.sha if FULL_SHA.match(self.sha) else ctx.github.full_sha(self.sha)
+            self.run_id = ctx.github.dispatch_promote(self.full_sha, released(ctx.places) or "-")
         except GitHubError as exc:
             raise ops.StepError(str(exc)) from exc
-        return f"workflow run {run['id']}"
+        return f"workflow run {self.run_id}"
 
-    def finished(what: str, done: Callable[[dict[str, Any]], dict[str, Any] | None]) -> dict[str, Any]:
+    def _finished(self, what: str, done: Callable[[dict[str, Any]], dict[str, Any] | None]) -> dict[str, Any]:
         """Ask GitHub about the run until ``done`` finds what finished in it; GitHub's own trouble is retried."""
         trouble = ""
         while True:
             try:
-                state = ctx.github.run(run["id"])
+                state = self.ctx.github.run(self.run_id)
             # telemetry: surfaced — the run goes on at GitHub; `trouble` names GitHub's last word if the wait ends
             except GitHubError as exc:
                 trouble = f"; GitHub last said: {exc}"
@@ -276,54 +301,41 @@ def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list
                 found = done(state)
                 if found is not None:
                     return found
-            if time.monotonic() > deadline:
-                raise ops.StepError(f"the push workflow's {what} did not finish in {wait_s // 60} minutes{trouble}")
-            time.sleep(tick)
+            if time.monotonic() > self.deadline:
+                raise ops.StepError(
+                    f"the push workflow's {what} did not finish in {self.wait_s // 60} minutes{trouble}"
+                )
+            time.sleep(self.tick)
 
-    def redeploy() -> str:
-        # Prod's deploy is the workflow's `deploy` job; the releases after it must not decide whether prod moved.
-        def deploy_job(state: dict[str, Any]) -> dict[str, Any] | None:
-            job = state["jobs"].get(PROMOTE_JOB)
-            if job is not None and job["status"] == "completed":
-                return {**job, "url": state["url"]}
-            if state["status"] == "completed":
-                return {"conclusion": f"without a {PROMOTE_JOB} job", "url": state["url"]}
-            return None
-
-        job = finished("deploy", deploy_job)
+    def redeploy(self) -> str:
+        job = self._finished("deploy", _deploy_job)
         if job["conclusion"] == "success":
             return f"the deploy finished: {job['url']}"
         raise ops.StepError(f"the deploy ended {job['conclusion']}: {job['url']}")
 
-    def releases() -> str:
-        state = finished("releases", lambda state: state if state["status"] == "completed" else None)
+    def releases(self) -> str:
+        state = self._finished("releases", lambda state: state if state["status"] == "completed" else None)
         if state["conclusion"] == "success":
             # The next push's releases compare with this commit; one that failed is tried again then.
-            store.write_json(released_path(ctx.places), {"commit": full["sha"], "at": ctx.clock.iso()})
+            store.write_json(released_path(self.ctx.places), {"commit": self.full_sha, "at": self.ctx.clock.iso()})
             return f"the releases finished: {state['url']}"
-        raise ops.StepError(f"prod is live at {sha[:12]}, but the releases ended {state['conclusion']}: {state['url']}")
+        raise ops.StepError(
+            f"prod is live at {self.sha[:12]}, but the releases ended {state['conclusion']}: {state['url']}"
+        )
 
-    def answer() -> str:
-        since = ctx.clock.iso()
+    def answer(self) -> str:
+        since, sha = self.ctx.clock.iso(), self.sha
         while True:
-            last = _latest(ctx, probes.PROD)
+            last = _latest(self.ctx, probes.PROD)
             if last is not None and last.at >= since and last.ok and last.commit == sha:
                 return f"prod answers on {sha[:12]}"
-            if time.monotonic() > deadline:
+            if time.monotonic() > self.deadline:
                 said = "nothing yet" if last is None else (last.commit[:12] if last.ok else last.error)
-                raise ops.StepError(f"prod did not answer on {sha[:12]} in {wait_s // 60} minutes; it said {said}")
-            time.sleep(tick)
+                raise ops.StepError(f"prod did not answer on {sha[:12]} in {self.wait_s // 60} minutes; it said {said}")
+            time.sleep(self.tick)
 
-    def qa_prod() -> str:
-        _watch_until(ctx, ctx.clock.now() + watch_s)
+    def qa_prod(self) -> str:
+        _watch_until(self.ctx, self.ctx.clock.now() + self.watch_s)
         # The tester looks for issues first seen since prod began to answer on this build.
-        post_qa_prod(ctx, sha, kind, ctx.clock.iso())
+        post_qa_prod(self.ctx, self.sha, self.kind, self.ctx.clock.iso())
         return "the orchestrator starts it"
-
-    return [
-        ("Starting the push workflow", dispatch),
-        (f"Redeploying prod at {sha[:12]}", redeploy),
-        ("Waiting for prod to answer on the new build", answer),
-        ("Starting a qa-prod pass", qa_prod),
-        ("Releasing what changed", releases),
-    ]

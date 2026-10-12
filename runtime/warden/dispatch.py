@@ -132,6 +132,12 @@ class Dispatcher:
         key = args.get("idempotency_key")
         if key is None:
             return self._run(caller, name, verb, args, data)[0]
+        return self._once(key, caller, name, verb, args, data)
+
+    def _once(
+        self, key: object, caller: Caller, name: str, verb: Verb, args: dict[str, Any], data: bytes | None
+    ) -> dict[str, Any]:
+        """The verb run once for its idempotency key: asked again with the key, it answers what it answered then."""
         if not isinstance(key, str) or not _KEY.match(key):
             return protocol.refused("protocol", "idempotency_key must be 8 to 128 letters, digits, - or _")
         try:

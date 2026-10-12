@@ -210,6 +210,11 @@ def check_start(ctx: Context, sessions: dict[str, Session], role: str, task: Tas
             raise Refused("outage", "no outage bypass is open: prod is up or the fix already started; propose it")
         model, effort = model_for(settings, role, task.run, task.slices)
         return Permit(role, model, effort, task.run, bypass=True)
+    return _approved(ctx, settings, role, task)
+
+
+def _approved(ctx: Context, settings: Settings, role: str, task: Task) -> Permit:
+    """The permit the owner's approval of ``task`` gives, while its facts, status and model still match it."""
     approval = approvals.current(ctx.places, task.id)
     if approval is None:
         raise Refused("approval", f"the owner has not approved {task.id}; propose it")

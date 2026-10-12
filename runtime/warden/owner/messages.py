@@ -103,21 +103,26 @@ def thread(ctx: Context, s: Session) -> list[dict[str, Any]]:
         # telemetry: expected — the last line is still being written
         except ValueError:
             continue
-        if not isinstance(record, dict) or record.get("type") not in ("user", "assistant"):
-            continue
-        content = record.get("message", {}).get("content")
-        at = str(record.get("timestamp", ""))
-        if record["type"] == "user" and isinstance(content, str):
-            # A prompt of any kind ends the reply before it; only the owner's starts a new entry.
-            if content.startswith(PREFIX):
-                found.append({"at": at, "text": content.removeprefix(PREFIX), "replies": []})
-            elif found:
-                found[-1]["closed"] = True
-            continue
-        if record["type"] == "assistant" and found and not found[-1].get("closed") and isinstance(content, list):
-            words = "\n\n".join(c["text"] for c in content if isinstance(c, dict) and c.get("type") == "text")
-            if words.strip():
-                found[-1]["replies"].append({"at": at, "text": words})
+        if isinstance(record, dict) and record.get("type") in ("user", "assistant"):
+            _add(found, record)
     for entry in found:
         entry.pop("closed", None)
     return found[-settings.get_int("dashboard.thread_messages") :]
+
+
+def _add(found: list[dict[str, Any]], record: dict[str, Any]) -> None:
+    """One transcript record into the thread: the owner's message starts an entry, and the agent's words after it,
+    until the next prompt, are its replies."""
+    content = record.get("message", {}).get("content")
+    at = str(record.get("timestamp", ""))
+    if record["type"] == "user" and isinstance(content, str):
+        # A prompt of any kind ends the reply before it; only the owner's starts a new entry.
+        if content.startswith(PREFIX):
+            found.append({"at": at, "text": content.removeprefix(PREFIX), "replies": []})
+        elif found:
+            found[-1]["closed"] = True
+        return
+    if record["type"] == "assistant" and found and not found[-1].get("closed") and isinstance(content, list):
+        words = "\n\n".join(c["text"] for c in content if isinstance(c, dict) and c.get("type") == "text")
+        if words.strip():
+            found[-1]["replies"].append({"at": at, "text": words})
