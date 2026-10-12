@@ -39,15 +39,17 @@ FILE, EXEC, LINK = "file", "exec", "link"
 _MODES = {FILE: 0o100644, EXEC: 0o100755, LINK: 0o120777}
 # Every member's time: two builds of one commit then differ only in release.json's build time.
 _STAMP = (1980, 1, 1, 0, 0, 0)
-# The zip's own entry point: the factory's code inside, under factory/, is what runs.
+# The zip's own entry point: the factory's code inside, under factory/, is what runs. An installed factory checks a
+# newer release's copy against its own before it upgrades to it, so these bytes never change.
 LAUNCHER = """import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "factory"))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "factory"))
 
-from runtime.system import release
+from runtime.system import release  # noqa: E402
 
-sys.exit(release.launch(os.path.dirname(os.path.abspath(__file__)), sys.argv[1:]))
+sys.exit(release.launch(HERE, sys.argv[1:]))
 """
 
 

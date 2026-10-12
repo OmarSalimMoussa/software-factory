@@ -173,3 +173,11 @@ def test_a_stage_from_a_release_is_read_only_and_carries_its_manifest(tmp_path: 
     assert os.readlink(stage / "bin" / "again") == "run" and stat.S_IMODE(stage.stat().st_mode) == 0o555
     folder = sealed.release_folder(stage)
     assert release.read_manifest(folder) == made
+
+
+def test_the_starting_code_never_changes_so_an_installed_factory_takes_the_next_release() -> None:
+    # The dashboard's upgrade checks a newer release with the installed factory's code, which compares this file's
+    # starting code with its own: a release that changed it would be refused by every factory installed before it.
+    assert hashlib.sha256(release.LAUNCHER.encode()).hexdigest() == (
+        "bd8c93c714c51cb57d69d4b1f15946352ba132357262ea32a6706f923c96c61b"
+    )
