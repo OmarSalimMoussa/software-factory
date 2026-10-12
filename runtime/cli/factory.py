@@ -282,7 +282,10 @@ def _local(argv: list[str], places: Places) -> int:
     if argv[0] == "qa-browser":
         from runtime.qa import qa_browser
 
-        return qa_browser.main(argv[1:], places)
+        def sign_in(address: str) -> dict[str, Any]:
+            return ask(places.socket, Call("slot", {"op": "sign-in", "email": address}))
+
+        return qa_browser.main(argv[1:], places, sign_in)
     from runtime.slots import slot_api
 
     return slot_api.main(lambda: ask(places.socket, Call("slot", {"op": "which"})))

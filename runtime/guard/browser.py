@@ -13,6 +13,7 @@ from pathlib import Path, PurePosixPath
 
 from runtime.guard import shell
 from runtime.guard.facts import Call, Decision, Refusal, Rewrite, inside, public, resolve
+from runtime.qa.wrapper_tools import WAIT_UNTIL
 
 BROWSER = "mcp__qa-browser__"
 CHROME = "mcp__claude-in-chrome__"
@@ -23,6 +24,8 @@ DRIVERS = (BROWSER, *DESKTOP)
 # Runs code in the browser server's own process, beside the session and out of the guard's sight.
 SERVER_CODE = "browser_run_code_unsafe"
 WAIT = "browser_wait_for"
+# Each browser wait the guard cuts to a tester's time left: the input that sets its length, and seconds per unit.
+_WAITS = {BROWSER + WAIT: ("time", 1), BROWSER + WAIT_UNTIL: ("minutes", 60)}
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
 # The input fields that name a file or an address, tool by tool; Grep's `pattern` is text, Glob's a path.
 _PATH_FIELDS = {
@@ -80,11 +83,16 @@ def _server(call: Call) -> Decision:
 
 
 def cap_wait(call: Call, left: float) -> Decision:
-    """A tester's browser wait, cut to the seconds it has left."""
-    asked = call.tool_input.get("time")
-    if call.tool != BROWSER + WAIT or isinstance(asked, bool) or not isinstance(asked, int | float) or asked <= left:
+    """A tester's browser wait, Playwright's or the factory's, cut to the seconds it has left."""
+    found = _WAITS.get(call.tool)
+    if found is None:
         return None
-    return Rewrite({**call.tool_input, "time": max(1, int(left))})
+    name, unit = found
+    asked = call.tool_input.get(name)
+    if isinstance(asked, bool) or not isinstance(asked, int | float) or asked * unit <= left:
+        return None
+    seconds = max(1, int(left))
+    return Rewrite({**call.tool_input, name: seconds if unit == 1 else seconds / unit})
 
 
 def _named(call: Call) -> list[str]:

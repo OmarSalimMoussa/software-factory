@@ -58,6 +58,10 @@ screenshots_for_owner_only = ["qa-prod"]
 viewport_height = 900   # a tester browser's height; its width is the first of widths
 max_steps = 6           # numbered steps a standing scenario may have; one scenario fits seconds_per_item
 prod_every_hours = 24   # the warden asks for a read-only walk of prod this long after the last one
+desktop_viewport = [1280, 800]  # a desktop tester's browser, at the desktop's own size: its screenshots are not shrunk
+wait_reload_seconds = 60  # a tester's wait reloads the page this often
+wait_max_minutes = 15   # the longest one wait may last
+browser_answer_seconds = 120  # the longest the browser wrapper waits for the browser to answer one of its calls
 
 [intake]                # see the intake spec
 batch_size = 100

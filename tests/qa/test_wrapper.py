@@ -1,0 +1,290 @@
+"""The tester's browser wrapper: the trace starts before the session's first call, and the tester can neither see nor
+stop it; the factory's tools sit beside Playwright's, never show a sign-in link, and always answer; the wrapper stops
+when the trace does not start or the browser stops."""
+
+from __future__ import annotations
+
+import io
+import json
+import os
+import sys
+import threading
+from collections.abc import Callable, Iterator
+from pathlib import Path
+from typing import Any
+
+import pytest
+from queue_kit import World
+
+from runtime.qa import qa_browser, wrapper
+from runtime.qa.wrapper import ServerError
+from runtime.qa.wrapper_tools import Tools
+from runtime.shared.settings import Settings
+
+FAKE = Path(__file__).with_name("fake_mcp.py")
+LINK = "https://app.test/auth/link/one-time-secret"
+
+
+class Session:
+    """The tester's session, talking to the wrapper over two pipes, the wrapper running the fake server and equipped
+    as the tester's browser is."""
+
+    def __init__(self, log: Path, settings: Settings, link_for: Callable[[str], str], kept: list[str]) -> None:
+        read_in, write_in = os.pipe()
+        read_out, write_out = os.pipe()
+        self.to_wrapper, self.from_wrapper = os.fdopen(write_in, "w"), os.fdopen(read_out)
+        client_in, client_out = os.fdopen(read_in), os.fdopen(write_out, "w")
+        equip = qa_browser.equipper(link_for, kept.append, settings)
+        argv = [sys.executable, str(FAKE), str(log)]
+        self.exit: list[int] = []
+        self.thread = threading.Thread(
+            target=lambda: self.exit.append(wrapper.serve(argv, equip, 10, client_in, client_out))
+        )
+        self.thread.start()
+        self.sent = 0
+
+    def send(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.post(method, params)
+        answer: dict[str, Any] = json.loads(self.from_wrapper.readline())
+        return answer
+
+    def post(self, method: str, params: dict[str, Any] | None = None) -> None:
+        self.sent += 1
+        self._write({"jsonrpc": "2.0", "id": self.sent, "method": method, "params": params or {}})
+
+    def notify(self, method: str) -> None:
+        self._write({"jsonrpc": "2.0", "method": method})
+
+    def _write(self, message: dict[str, Any]) -> None:
+        self.to_wrapper.write(json.dumps(message) + "\n")
+        self.to_wrapper.flush()
+
+    def close(self) -> int:
+        self.to_wrapper.close()
+        self.thread.join(10)
+        return self.exit[0]
+
+
+def _open(tmp_path: Path, world: World, link_for: Callable[[str], str], kept: list[str]) -> Session:
+    session = Session(tmp_path / "server.log", world.ctx().settings(), link_for, kept)
+    session.send("initialize", {"protocolVersion": "2025-06-18"})
+    session.notify("notifications/initialized")
+    return session
+
+
+@pytest.fixture
+def opened(tmp_path: Path, world: World) -> Iterator[tuple[Session, Path, list[str]]]:
+    kept: list[str] = []
+    session = _open(tmp_path, world, lambda address: LINK, kept)
+    yield session, tmp_path / "server.log", kept
+    session.from_wrapper.close()
+
+
+def test_the_trace_starts_before_the_first_call_and_the_tester_can_neither_see_nor_stop_it(
+    opened: tuple[Session, Path, list[str]],
+) -> None:
+    session, log, _ = opened
+    listed = [t["name"] for t in session.send("tools/list")["result"]["tools"]]
+    stopped = session.send("tools/call", {"name": "browser_stop_tracing", "arguments": {}})
+    closed = session.send("tools/call", {"name": "browser_close", "arguments": {}})
+    session.send("tools/call", {"name": "browser_navigate", "arguments": {"url": "https://app.test/"}})
+    assert session.close() == 0
+    assert listed == [
+        "browser_navigate",
+        "browser_snapshot",
+        "browser_resize",
+        "browser_sign_in",
+        "browser_wait_until",
+        "browser_open_desktop",
+    ]
+    assert stopped["error"]["message"] == "there is no tool browser_stop_tracing"
+    assert closed["error"]["message"] == "there is no tool browser_close"  # closing would end the trace
+    assert log.read_text().splitlines() == [
+        "initialize",
+        "notifications/initialized",
+        "tools/call browser_start_tracing",
+        "tools/list",
+        "tools/call browser_navigate",
+    ]
+
+
+def test_signing_in_opens_a_fresh_link_the_tester_never_sees_and_keeps_it_for_the_replay(
+    opened: tuple[Session, Path, list[str]],
+) -> None:
+    session, log, kept = opened
+    answer = session.send("tools/call", {"name": "browser_sign_in", "arguments": {"address": "tester-1@example.com"}})
+    # A page left on the link names it in every answer after; the session still never sees it.
+    later = session.send("tools/call", {"name": "browser_snapshot", "arguments": {}})
+    assert session.close() == 0
+    said = answer["result"]["content"][0]["text"]
+    assert said.startswith("Signed in as tester-1@example.com.") and "Page URL: the sign-in link" in said
+    assert later["result"]["content"][0]["text"] == "### Page\n- Page URL: the sign-in link\n"
+    assert LINK not in json.dumps([answer, later]) and kept == [LINK]
+    assert log.read_text().splitlines()[-2:] == ["tools/call browser_navigate", "tools/call browser_snapshot"]
+
+
+def test_a_factory_tool_that_breaks_still_answers(tmp_path: Path, world: World) -> None:
+    def warden_away(address: str) -> str:
+        raise ConnectionRefusedError("the warden's socket refused")
+
+    session = _open(tmp_path, world, warden_away, [])
+    answer = session.send("tools/call", {"name": "browser_sign_in", "arguments": {"address": "tester-1@example.com"}})
+    assert session.close() == 0
+    said = answer["result"]
+    assert said["isError"] and said["content"][0]["text"] == (
+        "the factory's browser_sign_in broke (ConnectionRefusedError); report the step blocked with that"
+    )
+
+
+def test_a_trace_that_does_not_start_stops_the_browser(
+    tmp_path: Path, world: World, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("FAIL_TRACE", "1")
+    session = _open(tmp_path, world, lambda address: LINK, [])
+    assert session.close() == 1
+    assert "the trace did not start, so this browser stops: ### Error" in capsys.readouterr().err
+
+
+def test_the_wrapper_stops_when_the_browser_does(
+    opened: tuple[Session, Path, list[str]], capsys: pytest.CaptureFixture[str]
+) -> None:
+    session, _, _ = opened
+    session.post("tools/call", {"name": "browser_crash", "arguments": {}})  # the fake server exits on it
+    session.thread.join(10)
+    assert session.exit == [1]
+    assert "factory qa-browser: the browser stopped (exit 3)" in capsys.readouterr().err
+
+
+def _proxy() -> tuple[wrapper.Proxy, io.StringIO, io.StringIO]:
+    to_server, to_session = io.StringIO(), io.StringIO()
+    return wrapper.Proxy(to_server, to_session, 0.01), to_server, to_session
+
+
+def test_an_answer_the_wrapper_stopped_waiting_for_reaches_no_one() -> None:
+    proxy, _, to_session = _proxy()
+    with pytest.raises(ServerError, match="did not answer tools/call"):
+        proxy.request("tools/call", {"name": "browser_snapshot", "arguments": {}})
+    proxy.from_server(json.dumps({"jsonrpc": "2.0", "id": "factory-1", "result": {"content": []}}))
+    assert to_session.getvalue() == ""
+
+
+def test_a_cancelled_factory_call_stops_and_gets_no_answer() -> None:
+    proxy, to_server, to_session = _proxy()
+    stopped = threading.Event()
+
+    def answer(name: str, args: dict[str, Any], cancelled: threading.Event) -> tuple[str, bool]:
+        stopped.set() if cancelled.wait(10) else None
+        return "Waited", False
+
+    proxy.add_tools([{"name": "browser_wait_until"}, {"name": "browser_open_desktop"}], answer)
+    proxy.from_client(
+        json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 7,
+                "method": "tools/call",
+                "params": {"name": "browser_wait_until", "arguments": {}},
+            }
+        )
+    )
+    proxy.from_client(json.dumps({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": 7}}))
+    assert stopped.wait(10)
+    assert to_server.getvalue() == ""  # the server never saw the call, so it is not told it was cancelled
+
+
+class Ticks(threading.Event):
+    """A cancel flag whose waits pass on a clock of their own, and never end early."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.clock = 0.0
+
+    def wait(self, timeout: float | None = None) -> bool:
+        self.clock += timeout or 0
+        return self.is_set()
+
+
+class Browser:
+    """Playwright's tools as the factory's tools call them: each call kept, each snapshot the next page given."""
+
+    def __init__(self, pages: list[str]) -> None:
+        self.pages, self.ticks = iter(pages), Ticks()
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    def call(self, name: str, args: dict[str, Any]) -> str:
+        self.calls.append((name, args))
+        return next(self.pages) if name == "browser_snapshot" else f"{name} done"
+
+    def answer(
+        self, name: str, args: dict[str, Any], reload_seconds: int = 60, max_minutes: int = 15
+    ) -> tuple[str, bool]:
+        tools = Tools(
+            self.call,
+            lambda address: LINK,
+            lambda link: None,
+            reload_seconds,
+            max_minutes,
+            (1280, 800),
+            lambda: self.ticks.clock,
+        )
+        return tools.answer(name, args, self.ticks)
+
+
+def test_a_wait_reloads_until_its_words_show_in_one_call() -> None:
+    page = "- Page URL: https://app.test/jobs/7\n"
+    browser = Browser([page + "Building", page + "Building", page + "Ready"])
+    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 5})
+    assert not failed and said.startswith("“Ready” shows, after 2 min.")
+    reload = ("browser_navigate", {"url": "https://app.test/jobs/7"})
+    look = ("browser_snapshot", {})
+    assert browser.calls == [look, reload, look, reload, look]
+
+
+def test_a_wait_never_lasts_past_the_factorys_ceiling() -> None:
+    browser = Browser(["- Page URL: https://app.test/jobs/7\nBuilding"] * 3)
+    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 90}, 30, 1)
+    assert not failed
+    assert said.startswith("“Ready” did not show within 1 min (the most one wait may last is 1 min). The page now:")
+
+
+def test_a_cancelled_wait_stops_at_its_next_reload() -> None:
+    browser = Browser(["- Page URL: https://app.test/jobs/7\nBuilding"] * 3)
+    browser.ticks.set()
+    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 5})
+    assert (said, failed) == ("the wait was cancelled", True)
+    assert browser.calls == [("browser_snapshot", {})]
+
+
+def test_the_desktop_opens_at_its_own_size() -> None:
+    browser = Browser([])
+    browser.answer("browser_open_desktop", {"url": "http://127.0.0.1:6080/vnc.html"})
+    assert browser.calls == [
+        ("browser_resize", {"width": 1280, "height": 800}),
+        ("browser_navigate", {"url": "http://127.0.0.1:6080/vnc.html"}),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("name", "args", "says"),
+    [
+        ("browser_sign_in", {"address": "me"}, "name the test address your brief gives"),
+        ("browser_wait_until", {"text": " ", "minutes": 1}, "name the words to wait for"),
+        ("browser_wait_until", {"text": "Ready", "minutes": 0}, "above zero"),
+        ("browser_wait_until", {"text": "Ready", "minutes": 1}, "the page names no address to reload"),
+        ("browser_open_desktop", {"url": "file:///etc/passwd"}, "starting http:// or https://"),
+    ],
+)
+def test_a_factory_tool_that_cannot_do_what_was_asked_fails_and_says_why(
+    name: str, args: dict[str, Any], says: str
+) -> None:
+    said, failed = Browser(["Building"] * 3).answer(name, args)
+    assert failed and says in said
+
+
+def test_a_browser_failure_reaches_the_tester_without_the_sign_in_link() -> None:
+    def broken(name: str, args: dict[str, Any]) -> str:
+        raise ServerError(f"browser_navigate failed: net::ERR_CONNECTION_REFUSED at {args['url']}")
+
+    tools = Tools(broken, lambda address: LINK, lambda link: None, 60, 15, (1280, 800), lambda: 0.0)
+    said, failed = tools.answer("browser_sign_in", {"address": "tester-1@example.com"}, threading.Event())
+    assert failed and said == "browser_navigate failed: net::ERR_CONNECTION_REFUSED at the sign-in link"

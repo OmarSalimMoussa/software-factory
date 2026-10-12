@@ -68,6 +68,10 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("qa.screenshots_for_owner_only", "Testers whose screenshots only you see"),
             ("qa.max_steps", "Steps a standing scenario may have"),
             ("qa.prod_every_hours", "Hours between read-only walks of prod"),
+            ("qa.desktop_viewport", "Desktop tester's screen, width and height"),
+            ("qa.wait_reload_seconds", "Seconds between a wait's reloads"),
+            ("qa.wait_max_minutes", "Longest wait, minutes"),
+            ("qa.browser_answer_seconds", "Seconds the browser has to answer"),
         ],
     ),
     (

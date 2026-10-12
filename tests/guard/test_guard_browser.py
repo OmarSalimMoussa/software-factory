@@ -88,8 +88,13 @@ def test_a_browser_call_that_names_a_file_loses_the_name(kit: Kit) -> None:
     assert isinstance(decision, Rewrite) and decision.updated_input == {"type": "png"}
 
 
-def test_a_browser_wait_is_cut_to_the_testers_time_left(kit: Kit) -> None:
-    tool = "mcp__qa-browser__browser_wait_for"
-    decision = kit.decide(tool, {"time": 3600}, **UI_TESTER)
-    assert isinstance(decision, Rewrite) and decision.updated_input["time"] <= 5 * 120 - 10
-    assert kit.decide(tool, {"time": 3}, **UI_TESTER) is None
+@pytest.mark.parametrize(
+    ("tool", "field", "long", "short", "unit"),
+    [("browser_wait_for", "time", 3600, 3, 1), ("browser_wait_until", "minutes", 60, 0.05, 60)],
+)
+def test_a_browser_wait_is_cut_to_the_testers_time_left(
+    kit: Kit, tool: str, field: str, long: float, short: float, unit: int
+) -> None:
+    decision = kit.decide("mcp__qa-browser__" + tool, {"text": "Ready", field: long}, **UI_TESTER)
+    assert isinstance(decision, Rewrite) and 0 < decision.updated_input[field] * unit <= 5 * 120 - 10
+    assert kit.decide("mcp__qa-browser__" + tool, {"text": "Ready", field: short}, **UI_TESTER) is None
