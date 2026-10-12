@@ -62,10 +62,12 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
     resumed, _ = lf.command_argv({"kind": "command", "argv": RESUME, "cwd": str(REPO)}, HOME, STATE)
     shape = lf.check_parts({"kind": "check", "checkout": str(REPO), "args": ["--only", "repo-shape"]}, HOME)
 
-    assert argv[0] == str(layout.CLAUDE_BIN)
+    # A start and a resume load the skills only from the folder the warden renders: plugin hooks run unsandboxed.
+    plugin = ["--plugin-dir", f"{STATE}/public/plugin"]
+    assert argv[:3] == [str(layout.CLAUDE_BIN), *plugin]
     assert argv[-2:] == ["--", "-- build it"]  # a prompt that looks like a flag stays the prompt
     assert command[0] == "/usr/bin/git" and cwd == REPO
-    assert resumed == [str(layout.CLAUDE_BIN), *RESUME[1:]]
+    assert resumed == [str(layout.CLAUDE_BIN), *plugin, *RESUME[1:]]
     assert shape == (REPO, ["--only", "repo-shape"])
     assert lf.checkout_for("s1", settings(), SESSIONS) == REPO / ".claude" / "worktrees" / "impl-cart"
     assert lf.checkout_for("", settings(), SESSIONS) == REPO

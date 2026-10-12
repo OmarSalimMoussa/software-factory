@@ -56,11 +56,15 @@ def agent_uid() -> int | None:
         return None
 
 
+# What every session runs under, start or resume, as flag and launch key; the runner checks a resume against it.
+CARRIED = (("--remote-control", "name"), ("--model", "model"), ("--effort", "effort"), ("--agent", "agent"),
+           ("--settings", "settings"), ("--agents", "agents"))  # fmt: skip
+
+
 def _carried(launch: dict[str, Any]) -> list[str]:
     """What a session runs under. A resume passes all of it again: Claude Code promises none of it carries over, and
     a session resumed without its --settings would run outside the sandbox."""
-    return ["--remote-control", launch["name"], "--model", launch["model"], "--effort", launch["effort"],
-            "--agent", launch["agent"], "--settings", launch["settings"], "--agents", launch["agents"]]  # fmt: skip
+    return [word for flag, key in CARRIED for word in (flag, launch[key])]
 
 
 def session_argv(launch: dict[str, Any]) -> list[str]:

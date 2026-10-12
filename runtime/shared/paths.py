@@ -236,6 +236,10 @@ class Places:
         # contract: changed by 1B-3 to public/, where agent sessions can read it; procedures/ and rules/ sit beside it
         return self.state / "public" / "plugin"
 
+    @property
+    def rendered_agents(self) -> Path:
+        return self.state / "public" / "agents"
+
     # sockets
     @property
     def socket(self) -> Path:

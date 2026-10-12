@@ -90,14 +90,18 @@ def _role_of(agent: str) -> str | None:
 
 
 def render_plugin(places: Places, settings: Settings) -> None:
-    """Copy the installed plugin, with each launcher's model and effort filled in, into public/ where sessions read
-    it, with the procedures and rules its skills reach beside it; each folder is swapped in whole."""
+    """Copy the installed plugin into public/, where every session loads it, with the procedures and rules its skills
+    reach beside it, and its launchers, models filled in, apart: in the plugin each would be a second agent of its
+    kind, without its browser server. Each folder is swapped in whole."""
     target = places.rendered_plugin.parent
-    for name in ("plugin", "procedures", "rules"):
+    plugin, agents = places.rendered_plugin.name, places.rendered_agents.name
+    for name in (plugin, "procedures", "rules"):
         staging = target / f".{name}.new"
         shutil.rmtree(staging, ignore_errors=True)
         shutil.copytree(places.install / name, staging, symlinks=False)
-    for agent in sorted((target / ".plugin.new" / "agents").glob("*.md")):
+    shutil.rmtree(target / f".{agents}.new", ignore_errors=True)
+    (target / f".{plugin}.new" / "agents").rename(target / f".{agents}.new")
+    for agent in sorted((target / f".{agents}.new").glob("*.md")):
         text = agent.read_text()
         if not any(mark in text for mark in _PLACEHOLDERS):
             continue
@@ -106,7 +110,7 @@ def render_plugin(places: Places, settings: Settings) -> None:
             raise ValueError(f"agents/{agent.name} asks for a model, but no [models] setting is its")
         model, effort = settings.model(role)
         agent.write_text(text.replace("{{model}}", model).replace("{{effort}}", effort))
-    for name in ("plugin", "procedures", "rules"):
+    for name in (plugin, agents, "procedures", "rules"):
         old = target / f".{name}.old"
         shutil.rmtree(old, ignore_errors=True)
         if (target / name).exists():

@@ -77,9 +77,10 @@ def test_a_save_applies_at_once_stays_on_this_machine_and_is_audited(ctx: Contex
     assert stat.S_IMODE(ctx.places.overrides.stat().st_mode) == 0o600
     assert ctx.settings().get_int("watch.outage_after") == 3
     assert json.loads((ctx.places.state / "public" / "settings.json").read_text())["models"]["critic"] == critic
-    rendered = (ctx.places.rendered_plugin / "agents" / "critic-ux.md").read_text()
+    rendered = (ctx.places.rendered_agents / "critic-ux.md").read_text()
     assert f'model: "{HAIKU}"\neffort: "low"' in rendered
     assert (ctx.places.rendered_plugin.parent / "procedures" / "a.md").exists()
+    assert not (ctx.places.rendered_plugin / "agents").exists()
     assert ctx.places.defaults.read_text() == defaults  # the installed release's defaults are never written
     [audit] = store.read_jsonl(ctx.places.audit)
     assert "commit" not in audit

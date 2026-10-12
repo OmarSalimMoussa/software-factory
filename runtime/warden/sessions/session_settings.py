@@ -6,7 +6,7 @@ and not Claude Code's sign-in token, and reach only the allowed hosts. The one c
 factory's own, so it can reach the warden. The orchestrator's file also runs the status line that records the plan's
 limits.
 
-The agent definitions come from the rendered plugin's launchers, passed as JSON because Claude Code ignores a plugin
+The agent definitions come from the plugin's rendered launchers, passed as JSON because Claude Code ignores a plugin
 agent's mcpServers and initialPrompt (the browser testers need their browser server). A session gets its own
 launcher and those of the subagent kinds its role may start.
 """
@@ -138,7 +138,7 @@ def agents(settings: Settings, places: Places, role: str, model: str, effort: st
     A kind without a launcher is one of Claude Code's own (Explore) and needs none. A launcher whose model or effort
     was not rendered from the settings raises ValueError.
     """
-    folder = places.rendered_plugin / "agents"
+    folder = places.rendered_agents
     found: dict[str, Any] = {}
     for kind in [role, *settings.get_list(f"subagents.{role}")]:
         path = folder / f"{kind}.md"

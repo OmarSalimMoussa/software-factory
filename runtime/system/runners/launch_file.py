@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from runtime.shared.paths import Places
 from runtime.shared.settings import Settings
 from runtime.shared.settings_schema import SCHEMA
 from runtime.slots import leases
@@ -38,9 +39,7 @@ _CHECK_WORD = re.compile(r"^[a-z0-9][a-z0-9,-]{0,511}$")
 DEV_VERBS = frozenset({"up", "down", "empty", "health", "sign-in", "seed", "desktop", "reports", "verbs"})
 SWEEP, PRUNE, DISK = leases.SWEEP, "factory-prune", "factory-disk"
 OWN_VERBS = frozenset({SWEEP, PRUNE, DISK})
-# What every session runs under, start or resume, as launch._carried passes it: flag, then its value.
-_CARRIED = (("--remote-control", "name"), ("--model", "model"), ("--effort", "effort"), ("--agent", "agent"),
-            ("--settings", "settings"), ("--agents", "agents"))  # fmt: skip
+_INSTALL = Path(__file__).resolve().parents[3]  # the runner runs from the install it belongs to
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 _SESSION_REF = re.compile(r"^[0-9a-f][0-9a-f-]{5,35}$")  # a short id or a uuid, as `claude stop` and `rm` take
 
@@ -89,7 +88,7 @@ def _inside(path: Path, root: Path) -> bool:
 def _carried_ok(values: dict[str, Any], state: Path) -> None:
     """A session's options, the same for a start and a resume: plain values, the sandbox settings the warden wrote
     for it, and agent definitions as one JSON object."""
-    for _, key in _CARRIED:
+    for _, key in launch.CARRIED:
         _value(values, key)
     allowed = layout.public(state) / "session-settings"
     if not _inside(Path(os.path.normpath(values["settings"])), allowed) or not values["settings"].endswith(".json"):
@@ -102,6 +101,11 @@ def _carried_ok(values: dict[str, Any], state: Path) -> None:
         raise BadRequest("agents must be one JSON object of agent definitions")
 
 
+def _plugin(state: Path) -> list[str]:
+    """The skills, from the folder the warden renders: never one a request names, as plugin hooks run unsandboxed."""
+    return ["--plugin-dir", str(Places.for_runner(_INSTALL, state).rendered_plugin)]
+
+
 def session_argv(raw: dict[str, Any], state: Path) -> list[str]:
     """A session's `claude --bg` command, built by the warden's own function, with the installed claude."""
     _value(raw, "worktree", empty=True)
@@ -109,18 +113,18 @@ def session_argv(raw: dict[str, Any], state: Path) -> list[str]:
         raise BadRequest("prompt must be text")
     _carried_ok(raw, state)
     argv = launch.session_argv(raw)
-    return [PROGRAMS["claude"], *argv[1:]]
+    return [PROGRAMS["claude"], *_plugin(state), *argv[1:]]
 
 
 def _claude_ok(args: list[str], state: Path) -> None:
     """`claude stop <id>`, `claude rm <id>`, or a resume that passes every option a start does, then its message."""
     if len(args) == 2 and args[0] in ("stop", "rm") and _SESSION_REF.match(args[1]):
         return
-    flags = [flag for flag, _ in _CARRIED]
+    flags = [flag for flag, _ in launch.CARRIED]
     shape = len(args) == 5 + 2 * len(flags) and args[:1] == ["--resume"] and args[2] == "--bg" and args[-2] == "--"
     if not shape or args[3:-2:2] != flags or not _UUID.match(args[1]):
         raise BadRequest("claude runs only as stop, rm, or a resume with the options a start passes")
-    _carried_ok({key: args[4 + 2 * n] for n, (_, key) in enumerate(_CARRIED)}, state)
+    _carried_ok({key: args[4 + 2 * n] for n, (_, key) in enumerate(launch.CARRIED)}, state)
 
 
 def command_argv(raw: dict[str, Any], home: Path, state: Path) -> tuple[list[str], Path]:
@@ -133,6 +137,8 @@ def command_argv(raw: dict[str, Any], home: Path, state: Path) -> tuple[list[str
     program, args = argv[0], argv[1:]
     if program == "claude":
         _claude_ok(args, state)
+        if args[0] == "--resume":
+            args = [*_plugin(state), *args]
     elif program == "rm":
         target = Path(os.path.normpath(args[-1])) if len(args) == 3 and os.path.isabs(args[-1]) else None
         if args[:2] != ["-rf", "--"] or target is None or target == home or not _inside(target, home):
