@@ -29,6 +29,7 @@ WANTS = (
     "rules",
     "triage",
     "upgrade",
+    "staging_push",
 )
 SPARK_DAYS = 14
 _LAPTOP = {
@@ -131,6 +132,39 @@ def envs(snap: Snap) -> dict[str, Any]:
         # Between the cards when no task waits on staging: staging can still differ from prod (a push back, a pin).
         "step_word": "in step" if prod_runs_staging(snap) else "differs",
         "laptop": laptop(snap),
+        "ready": staging_ready(snap),
+    }
+
+
+def staging_ready(snap: Snap) -> dict[str, Any] | None:
+    """What waits for the owner to push to staging, as the Staging card's button and its panel say it; None when
+    nothing waits."""
+    held = snap.get("staging_push")
+    if held is None:
+        return None
+    tasks, found = taskwords.tasks(snap), snap.get("outage")
+    fix = found["task"] if found else ""
+    items = []
+    for item in held["items"]:
+        task = tasks.get(item["task"])
+        title = task["title"] if task else "A merge no task names"
+        if item["kind"] == "factory":
+            items.append({"chip": {"text": "factory", "tone": ""}, "title": "Factory upgrade"})
+        elif item["kind"] == "revert":
+            items.append({"chip": {"text": "revert", "tone": "warn"}, "title": f"Takes back: {title}"})
+        elif fix and item["task"] == fix:
+            items.append({"chip": {"text": "outage fix", "tone": "bad"}, "title": title})
+        else:
+            items.append({"chip": {"text": item["task"] or "merge", "tone": "accent"}, "title": title})
+    count = len(items) or held["commits"]
+    label = (
+        "Push the outage fix" if fix and any(i["task"] == fix for i in held["items"]) else f"Push {count} to staging"
+    )
+    return {
+        "sha": held["sha"],
+        "label": label,
+        "items": items,
+        "note": "Each passed its check. CI deploys staging; prod moves only when you push it.",
     }
 
 

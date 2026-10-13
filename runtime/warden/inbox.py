@@ -36,10 +36,10 @@ NEEDS_RUNG = "needs rung"  # an implementer spent routing.cause_tries without co
 APPROVED, NOT_NOW, DROPPED, BOOSTED, GO = "approved", "not-now", "dropped", "boosted", "go"
 DECIDED_EXTEND, LIMIT_EXTENDED, TO_DESIGNER, PARK = "decided-extend", "limit-extended", "to-designer", "park"
 STOPPED, PAUSED, RESUMED, SLOT_FREE = "stopped", "paused", "resumed", "proposal-slot-free"
-ANSWERED, ORCHESTRATOR_STARTED = "answered", "orchestrator-started"
+ANSWERED, ORCHESTRATOR_STARTED, PUSHED = "answered", "orchestrator-started", "pushed"
 OWNER_DECISIONS = (
     APPROVED, NOT_NOW, DROPPED, BOOSTED, GO, DECIDED_EXTEND, LIMIT_EXTENDED, TO_DESIGNER, PARK, STOPPED, PAUSED,
-    RESUMED, SLOT_FREE, GOAL_CHANGED, ANSWERED, ORCHESTRATOR_STARTED,
+    RESUMED, SLOT_FREE, GOAL_CHANGED, ANSWERED, ORCHESTRATOR_STARTED, PUSHED,
 )  # fmt: skip
 KINDS = frozenset(
     {

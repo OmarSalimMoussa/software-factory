@@ -1,9 +1,10 @@
 """The owner's moves of the product to an upgraded factory: commits only root makes, at an upgrade the owner asked
 for, and the one way a change to .github/factory-ref or the CI workflows ships.
 
-A push lets a pin's own paths through when nothing else in the range changed them, before or after it; a pin's tree
-counts as checked when its parent's tree passed, since it changes nothing a check reads. The warden pushes a pin
-itself, once it is the newest commit that may ship, trying again every watch.branch_retry_minutes.
+A push lets a pin's own paths through when nothing but pins changes them in the range; a pin's tree
+counts as checked when its parent's tree passed, since it changes nothing a check reads. The warden asks the owner
+to push a pin once it may ship, as the orchestrator asks, asking again every watch.branch_retry_minutes until GitHub
+holds it.
 """
 
 from __future__ import annotations
@@ -40,16 +41,17 @@ def _pin(git: Git, places: Places, commit: str) -> set[str] | None:
 
 
 def allowed(git: Git, places: Places, remote: str, head: str) -> set[str]:
-    """The protected paths the pins in remote..head may change, each changed by nothing else in the range."""
-    found: set[str] = set()
-    for commit in git("rev-list", f"{remote}..{head}").split():
-        paths = _pin(git, places, commit)
-        if not paths:
-            continue
-        before = git("diff", "--name-only", remote, f"{commit}^", "--", *paths)
-        after = git("diff", "--name-only", commit, head, "--", *paths)
-        if not before.strip() and not after.strip():
-            found |= paths
+    """The protected paths the pins in remote..head change, when nothing but those pins changes them in the range:
+    an upgrade's pin may sit on the one before it, both not pushed yet."""
+    line = git("rev-list", "--reverse", "--first-parent", f"{remote}..{head}").split()
+    pinned = [(commit, paths) for commit in line if (paths := _pin(git, places, commit))]
+    if not pinned:
+        return set()
+    found = set().union(*(paths for _, paths in pinned))
+    starts, ends = [remote, *(c for c, _ in pinned)], [*(f"{c}^" for c, _ in pinned), head]
+    segments = zip(starts, ends, strict=True)
+    if any(git("diff", "--name-only", start, end, "--", *found).strip() for start, end in segments):
+        return set()
     return found
 
 
@@ -62,7 +64,7 @@ def tree_passes(git: Git, places: Places, commit: str) -> bool:
     return checks.passed(places, git("rev-parse", f"{parent}^{{tree}}").strip()) or tree_passes(git, places, parent)
 
 
-def push_pending(ctx: Context) -> None:
+def ask_pending(ctx: Context) -> None:
     from runtime.warden.delivery import github_push  # it reads this module's rules when it pushes
 
     places = ctx.places
@@ -74,7 +76,7 @@ def push_pending(ctx: Context) -> None:
     pushed = list(record["pushed"])
     try:
         for commit in waiting:
-            github_push.push_checked(ctx, {"sha": commit}, None)
-            pushed.append(commit)
+            if not github_push.ask_push(ctx, {"sha": commit}, None)["commits"]:
+                pushed.append(commit)
     finally:
         store.write_json(_pushed_path(places), {"pushed": pushed, "tried_at": ctx.clock.now()}, mode=0o600)

@@ -54,7 +54,7 @@ VERBS: dict[str, Verb] = {
     "tick": _v("runtime.warden.loop:tick", ORCH),
     "inbox": _v("runtime.warden.inbox:read", ORCH),
     "inbox.wait": _v("runtime.warden.inbox:wait", ORCH),
-    "push": _v("runtime.warden.delivery.github_push:push_checked", ORCH),
+    "push": _v("runtime.warden.delivery.github_push:ask_push", ORCH),
     "check": _v("runtime.warden.checks:check", ORCH, IMPL),
     "promote": _v("runtime.warden.delivery.prod_push:promote_cli", OWNER),
     # reflections, status, settings (1B-3)
@@ -134,6 +134,7 @@ VERBS: dict[str, Verb] = {
     "rule.switch": _o("runtime.warden.owner.settings_save:switch_rule"),
     "push.prod": _o("runtime.warden.delivery.prod_push:push_prod"),
     "push.back": _o("runtime.warden.delivery.prod_push:push_back"),
+    "staging.push": _o("runtime.warden.delivery.github_push:owner_push"),
     # contract: added by FB9, the agents' Claude accounts. No code: only the owner's own uid reaches owner.sock.
     "account.list": _o("runtime.warden.owner.accounts:list_accounts"),
     "account.add": _o("runtime.warden.owner.accounts:add"),

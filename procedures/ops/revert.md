@@ -11,7 +11,7 @@ after a push.
    is known at once and runs nothing; any other revert is checked from the newest commit that passed.
 4. Check the revert like a merge: rebuild slot 0 with what it touched, and walk the scenario that failed, so it has
    a fresh pass before the work comes back.
-5. Push it with `factory push`.
+5. Ask for its push with `factory push`: it waits on Home, marked as a revert, until the owner pushes it.
 6. Send the task back: `factory queue task status <task> building --note "<why>; reverted as <the revert's sha>"`.
    The warden hands the note to its implementer. After a push, that implementer has ended: the warden puts the task
    back in the approved runs instead (a designed build back in the designed builds), and the new implementer's

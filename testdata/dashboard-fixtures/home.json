@@ -61,6 +61,27 @@
      "value": "Mains"
     }
    ]
+  },
+  "ready": {
+   "sha": "ffffffffffffffffffffffffffffffffffffffff",
+   "label": "Push 2 to staging",
+   "note": "Each passed its check. CI deploys staging; prod moves only when you push it.",
+   "items": [
+    {
+     "chip": {
+      "text": "t-0013",
+      "tone": "accent"
+     },
+     "title": "Retry an upload that timed out"
+    },
+    {
+     "chip": {
+      "text": "factory",
+      "tone": ""
+     },
+     "title": "Factory upgrade"
+    }
+   ]
   }
  },
  "outage": null,

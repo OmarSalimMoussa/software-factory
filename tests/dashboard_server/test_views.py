@@ -184,6 +184,7 @@ def test_each_step_of_an_operation_says_how_the_page_draws_it(state: str, look: 
 _RECORDED = {
     kinds.PUSH: {"sha": "abc1234def"},
     kinds.PUSH_BACK: {"sha": "abc1234def"},
+    kinds.STAGING_PUSH: {"sha": "abc1234def"},
     kinds.ACCOUNT: {"name": "work"},
     kinds.MESSAGE: {"revived": False},
     kinds.RELEASE_CHECK: {"newer": True},

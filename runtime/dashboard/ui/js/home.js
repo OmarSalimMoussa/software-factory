@@ -23,13 +23,19 @@ PAGE.home = {
 const homePart = name => { const env = UI.data['/api/home'], p = env && env.parts[name]; return p && p.ok ? p.data : null; };
 
 function envsHTML(e) {
-  return `<div class="envs">${envCard(e.staging)}<div class="promote-col"><span class="arrow">${icon('chevron-right', 'lg')}</span><span class="ahead">${e.to_push ? `<b class="num" style="font-size:18px;color:var(--fg)">${e.to_push}</b><br>to push` : esc(e.step_word)}</span></div>${envCard(e.prod)}${laptopHTML(e.laptop)}</div>`;
+  return `<div class="envs">${envCard(e.staging, e.ready)}<div class="promote-col"><span class="arrow">${icon('chevron-right', 'lg')}</span><span class="ahead">${e.to_push ? `<b class="num" style="font-size:18px;color:var(--fg)">${e.to_push}</b><br>to push` : esc(e.step_word)}</span></div>${envCard(e.prod)}${laptopHTML(e.laptop)}</div>`;
 }
-function envCard(env) {
+function envCard(env, ready) {
   const dot = esc(env.tone);
   return `<div class="card env"><div class="env-top"><i class="dot ${dot}"></i><span class="env-name">${esc(env.name)}</span><span class="chip mono" style="margin-left:auto">${esc(env.sha || 'unknown')}</span></div><div class="env-state" style="color:${cv(env.state_color)}">${esc(env.state_word)}</div>
     <div class="env-meta"><span class="dep">${icon('clock', 'sm')}deployed <b>${esc(env.deployed || 'unknown')}</b></span>${env.chips.map(chip).join('')}</div>
-    <div class="env-links">${env.deployment_url ? `<a href="${esc(env.deployment_url)}" target="_blank" rel="noopener">${icon('rocket-launch', 'sm')}Deployment</a>` : ''}${env.commit_url ? `<a href="${esc(env.commit_url)}" target="_blank" rel="noopener">${icon('code-bracket', 'sm')}Commit on GitHub</a>` : ''}</div></div>`;
+    <div class="env-links">${env.deployment_url ? `<a href="${esc(env.deployment_url)}" target="_blank" rel="noopener">${icon('rocket-launch', 'sm')}Deployment</a>` : ''}${env.commit_url ? `<a href="${esc(env.commit_url)}" target="_blank" rel="noopener">${icon('code-bracket', 'sm')}Commit on GitHub</a>` : ''}${ready ? `<button class="btn sm primary" style="margin-left:auto" data-action="push-staging" data-write>${icon('arrow-up-circle', 'sm')}${esc(ready.label)}</button>` : ''}</div></div>`;
+}
+/* What waits for staging: the warden checked it, and nothing reaches GitHub until the owner pushes it here. */
+function openPushStaging() {
+  const r = (homePart('envs') || {}).ready; if (!r) return;
+  confirmSheet('Push to staging', `<div class="label">What goes out</div><ul class="changes">${r.items.map(i => `<li><span>${esc(i.title)}</span>${chip(i.chip)}</li>`).join('')}</ul><div class="muted">${esc(r.note)}</div>`,
+    'Push to staging', key => post('/api/staging/push', {sha: r.sha}, key), {icon: 'arrow-up-circle'});
 }
 function laptopHTML(l) {
   return `<div class="card vitals-mini"><div class="env-top"><span class="env-name">Laptop</span><span class="chip ${esc(l.tone)}" style="margin-left:auto">${esc(l.label)}</span></div>${l.rows.map(r => `<div class="vrow"><span>${esc(r.label)}</span>${r.pct == null ? '<div class="meter unknown"></div>' : `<div class="meter"><i style="width:${r.pct}%"></i></div>`}<span class="num">${esc(r.value)}</span></div>`).join('')}</div>`;

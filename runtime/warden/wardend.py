@@ -82,7 +82,7 @@ def _check_releases(ctx: Context) -> None:
 
 def _push_pins(ctx: Context) -> None:
     # In its own thread: a push fetches from GitHub and the agents' checkout.
-    loop.run_once(ctx, "the product pin's push", lambda: pins.push_pending(ctx))
+    loop.run_once(ctx, "the product pin's push", lambda: pins.ask_pending(ctx))
 
 
 def _build_replays(ctx: Context, transcripts: Sequence[Path]) -> None:

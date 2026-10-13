@@ -43,6 +43,7 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 | `approved` | The warden starts it when a place frees. Fill the free proposal slot. |
 | `not-now`, `dropped`, `boosted`, `proposal-slot-free` | Fill the free proposal slots. |
 | `go` | The owner said Go to a spec: the warden starts its build when a place frees and ends its designer. Nothing to do. |
+| `pushed` | The owner pushed what waited to staging, and CI deploys it. Nothing to do: a regression there comes as `staging red`. |
 | `decided-extend`, `park`, `to-designer` | The owner decided a stuck task; the warden told its session or ended it. `to-designer`: propose it at rung 3. |
 | `limit-extended` | The owner gave a session more of a limit; the warden told it. Nothing to do. |
 | `answered` | The owner answered a question you asked: act on it. A session's own answer reaches it from the warden. |
@@ -123,10 +124,11 @@ merged for a while, a regression walk of the scenarios that waited longest.
    pass: `git revert -m 1 <merge> --no-edit`, then `factory queue task status <task> building --note "<why>; reverted
    as <the revert's sha>"`. The warden tells its implementer, or starts a new one once it has ended. Any other
    failure becomes a request. A saved check with no failure moves the task to `checked` by itself.
-5. **Ship.** `factory push` has the warden push the newest commit that is safe to ship: its tree passed, and every
-   merge it adds passed its check (or was reverted). CI deploys staging. Staging regressing after your push: revert,
-   `factory check`, push again at once (`${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md`). Prod moves only when
-   the owner pushes it.
+5. **Ship.** `factory push` asks the owner to push the newest commit that is safe to ship: its tree passed, and every
+   merge it adds passed its check (or was reverted). It waits on Home until the owner pushes it, and CI then deploys
+   staging; carry on meanwhile, and ask again after each check that passes: the one waiting push holds them all.
+   Staging regressing after a push: revert, `factory check`, `factory push` at once
+   (`${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md`). Prod moves only when the owner pushes it.
 
 ## When something is red
 
@@ -135,8 +137,8 @@ merged for a while, a regression walk of the scenarios that waited longest.
   The warden filed the severe request.
 - **Prod red** is a clear outage only when the warden says so. The warden files its severe request, which goes to
   intake at once, and
-  `factory start implementer <task>` starts the one fix without an approval, at rung 1 or 2. The fix ships to
-  staging like any other; the owner pushes it to prod.
+  `factory start implementer <task>` starts the one fix without an approval, at rung 1 or 2. The fix waits for the
+  owner's push to staging like any other; the owner pushes it to prod.
 
 ## Never
 

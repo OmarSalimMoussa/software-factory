@@ -244,6 +244,8 @@ WRITES: list[tuple[re.Pattern[str], Write]] = [
        lambda a, s: _said(a, "Pushing to prod."), ["home", "shell"]),
     _w("push/back", "push.back", _push_back_args, lambda a, s: _said(a, "Pushing prod back."), ["home", "shell"],
        wants=("deploys",)),
+    _w("staging/push", "staging.push", lambda b, r, s: {"sha": _text(b, "sha")},
+       lambda a, s: _said(a, "Pushing to staging."), ["home", "shell"]),
     _w("accounts", "account.add", lambda b, r, s: {"name": _account_name(b)}, lambda a, s: _said(a, "Added."),
        ["settings"], data=_account_token),
     _w(f"accounts/{_P}/use", "account.use", lambda b, r, s: {"name": r}, lambda a, s: _said(a, "Switching."),

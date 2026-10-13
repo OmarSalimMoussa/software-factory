@@ -88,6 +88,20 @@
      "value": "Mains"
     }
    ]
+  },
+  "ready": {
+   "sha": "ffffffffffffffffffffffffffffffffffffffff",
+   "label": "Push the outage fix",
+   "note": "Each passed its check. CI deploys staging; prod moves only when you push it.",
+   "items": [
+    {
+     "chip": {
+      "text": "outage fix",
+      "tone": "bad"
+     },
+     "title": "Staging answers again after its deploy"
+    }
+   ]
   }
  }
 }

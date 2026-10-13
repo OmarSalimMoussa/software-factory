@@ -22,7 +22,7 @@ from runtime.shared import claude_accounts, models, store, totp
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import Places
 from runtime.warden import public
-from runtime.warden.delivery import deploys
+from runtime.warden.delivery import deploys, github_push
 
 T0 = 1_791_546_000.0  # 2026-10-09 11:40:00 UTC
 TEST_TOKEN = "1"  # the device token the UI drives send as their owner cookie
@@ -197,6 +197,10 @@ def seed(root: Path, now: float = T0) -> Places:
     store.write_text(places.history, history_lines(sessions))
     store.write_json(places.registry, {s.id: models.dump(s) for s in sessions})
     store.write_json(places.state / "doing" / "impl-sign-in-loop.json", {"qa_round": 2})
+    # A push the orchestrator asked for, waiting for the owner: a checked fix and the factory's upgrade.
+    going = [{"kind": "task", "task": "t-0013"}, {"kind": "factory", "task": ""}]
+    waiting = {"sha": "f" * 40, "commits": 3, "items": going, "asked_at": iso(now - 600)}
+    store.write_json(github_push.waiting_path(places), waiting)
     for n, holder in ((1, "impl-sign-in-loop"), (2, "impl-retry-upload"), (3, "impl-staging-down")):
         store.write_text(
             places.slot(n) / "lease",

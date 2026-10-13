@@ -130,6 +130,7 @@ document.addEventListener('click', e => {
   else if (a === 'gs-close') closeGs();
   else if (a === 'back') { if (UI.hist) history.back(); else restoreView(UI.back); }
   else if (a === 'promote') openPromote();
+  else if (a === 'push-staging') openPushStaging();
   else if (a === 'promote-back') openPushBack(d.sha);
   else if (a === 'outage-stop') act('/api/outage/stop', {}, {btn: t, icon: 'stop-circle'});
   else if (a === 'start-orch') act('/api/orchestrator/start', {}, {btn: t});

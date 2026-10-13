@@ -74,6 +74,10 @@ first, and seal the commit from your checkout the same way.
 
 ## Ship
 
+Nothing reaches GitHub until you push it. When checked work is ready, the Staging card on Home shows **Push N to
+staging**: press it to see what goes out (each task, a revert, the factory's upgrade), then Push to staging. The
+warden checks it all again, pushes, and CI deploys staging.
+
 The product's CI is the factory's templates, copied in unchanged. It checks every push, and builds each push to the
 default branch, smoke-tests it and deploys it to staging, the standard way the product's `factory.toml` describes
 ([ci.md](ci.md)). The server's deploy command does the rest ([deploy.md](deploy.md)). Staging and prod each answer a
@@ -160,7 +164,7 @@ To act on one:
    factory, waits for every agent to settle, and installs the release as root, after checking on GitHub that CI made
    it. While the dashboard is away, its address shows a page that says the factory is upgrading and comes back by
    itself. The upgrade also commits the product's `.github/factory-ref` and CI
-   workflows for the new factory, and the warden pushes that commit itself.
+   workflows for the new factory; that commit waits on Home for your Push to staging, like any other.
 3. Run the server set-up again from a factory checkout at that commit (`python3 -m standard.server.setup --product
    <path>`). It refuses a checkout at another commit than `.github/factory-ref` names. Older builds stay deployable.
 4. **Restart the factory** on Home: every agent comes back with its work.

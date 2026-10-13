@@ -14,6 +14,7 @@ from runtime.queue.book import Queue
 from runtime.shared.models import FINISHED, RETIRED, WORKING
 from runtime.warden import checks, loop
 from runtime.warden.delivery import deploys
+from runtime.warden.owner import ops
 from runtime.warden.sessions import crashwatch, registry
 
 TASK = "t-0001"
@@ -80,7 +81,7 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
 
     # The orchestrator's loop pass: its inbox, staging's health in its status, then its tick.
     events = [e["kind"] for e in r.session(orch, ["inbox"])["events"]]
-    assert events == ["orchestrator-started", "proposal-slot-free", "approved", "loop due"]
+    assert events == ["orchestrator-started", "proposal-slot-free", "approved", "pushed", "loop due"]
     status = r.session(orch, ["status"])
     assert (status["staging"]["ok"], status["staging"]["commit"], status["prod"]["commit"]) == (True, merge, first)
     r.session(orch, ["tick"])
@@ -168,8 +169,8 @@ def _merged_and_pushed(r: Rehearsal, orch: str, impl: str, worktree: Path, branc
     git(worktree, "rebase", "-q", "master")
     assert r.session(impl, ["check"])["passed"]
 
-    # The orchestrator merges; the warden finds the merge. The passing check of master marks the task checked, and
-    # the push ships the newest checked commit.
+    # The orchestrator merges; the warden finds the merge. The passing check of master marks the task checked, the
+    # orchestrator asks for the push of the newest checked commit, and the owner pushes it from Home.
     git(r.repo, "merge", "-q", "--no-ff", branch, "-m", f"Merge {branch}: new notes show first")
     merge = git(r.repo, "rev-parse", "HEAD")
     assert checks.passed(r.places, git(r.repo, "rev-parse", "HEAD^{tree}"))
@@ -178,5 +179,8 @@ def _merged_and_pushed(r: Rehearsal, orch: str, impl: str, worktree: Path, branc
     report = r.body(r.repo, "check.md", REPORT.encode())
     assert r.session(orch, ["queue", "check", merge, "--body", report])["checked"] == TASK
     pushed = r.session(orch, ["push"])
-    assert (pushed["sha"], pushed["commits"]) == (merge, 2)
+    assert (pushed["sha"], pushed["commits"], pushed["waiting"]) == (merge, 2, True)
+    assert git(r.github, "rev-parse", "master") != merge
+    ops.join(r.dashboard("staging.push", {"sha": merge})["op"])
+    assert git(r.github, "rev-parse", "master") == merge
     return merge

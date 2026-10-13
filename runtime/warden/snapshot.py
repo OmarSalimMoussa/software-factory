@@ -28,7 +28,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import gc, public
 from runtime.warden.context import Context
-from runtime.warden.delivery import ci_watch, deploys, outage, prod_push
+from runtime.warden.delivery import ci_watch, deploys, github_push, outage, prod_push
 from runtime.warden.folds import Cost, History, Refusals, Streaks, kept
 from runtime.warden.health import probes
 from runtime.warden.owner import accounts, codes, factory_upgrade, messages, reflections, settings_save
@@ -270,6 +270,7 @@ READERS: dict[str, Reader] = {
         "staging_pinned": _staging_pinned(ctx),
     },
     "ci": lambda ctx, args: ci_watch.read(ctx.places),
+    "staging_push": lambda ctx, args: github_push.waiting(ctx.places),
     "upgrade": lambda ctx, args: factory_upgrade.view(ctx),
     "plan": lambda ctx, args: plan.reading(ctx),
     "vitals": lambda ctx, args: {"reading": store.read_json_or(ctx.places.vitals, None), "memory": _memory()},

@@ -5,6 +5,7 @@ import shutil
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from loop_fakes import World
@@ -51,6 +52,16 @@ def move(src: str, dst: str) -> Callable[[Path], None]:
 def passed(world: World, tree: str) -> None:
     """The warden's record of a whole check that passed on ``tree``."""
     store.write_json(world.ctx.places.check_passes, [{"tree": tree, "commit": "", "branch": "", "task": "", "at": ""}])
+
+
+def ship(world: World, sha: str | None = None) -> dict[str, Any]:
+    """The orchestrator asks for the push, then the owner pushes what waits, as Push to staging does; the ask's
+    answer."""
+    asked = github_push.ask_push(world.ctx, {"sha": sha} if sha else {}, None)
+    op = github_push.owner_push(world.ctx, {"sha": asked["sha"]}, None)["op"]
+    ops.join(op)
+    assert ops.get(world.ctx, {"id": op}, None)["op"]["state"] == ops.DONE
+    return asked
 
 
 @pytest.fixture
@@ -104,7 +115,7 @@ def test_push_refuses_a_range_touching_a_protected_path(
     commit(world.checkout, write("src/app.py"))
     sha = commit(world.checkout, change)
     with pytest.raises(Refused) as refused:
-        github_push.push_checked(world.ctx, {"sha": sha}, None)
+        github_push.ask_push(world.ctx, {"sha": sha}, None)
     assert refused.value.rule == "protected-path"
     assert git(github_repo, "rev-parse", "master") == before
 
@@ -113,11 +124,11 @@ def test_push_sends_only_a_commit_whose_tree_passed_the_checks(world: World, git
     checked = commit(world.checkout, write("src/app.py"))
     commit(world.checkout, write("src/later.py"))
     with pytest.raises(Refused) as refused:
-        github_push.push_checked(world.ctx, {"sha": checked}, None)
+        github_push.ask_push(world.ctx, {"sha": checked}, None)
     assert refused.value.rule == "unchecked"
 
     passed(world, git(world.checkout, "rev-parse", f"{checked}^{{tree}}"))
-    answer = github_push.push_checked(world.ctx, {"sha": checked}, None)
+    answer = ship(world, checked)
     assert answer["commits"] == 1
     assert git(github_repo, "rev-parse", "master") == checked
 
@@ -134,9 +145,50 @@ def test_push_reads_the_agents_checkout_though_another_user_owns_it(
     config.write_text(config.read_text() + f"[safe]\n\tdirectory = {mirror}\n\tdirectory = {github_repo}\n")
     monkeypatch.setenv("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
 
-    answer = github_push.push_checked(world.ctx, {"sha": checked}, None)
+    answer = ship(world, checked)
 
     assert answer["commits"] == 1
+
+
+def test_nothing_reaches_github_until_the_owner_pushes_what_waits(world: World, github_repo: Path) -> None:
+    before = git(github_repo, "rev-parse", "master")
+    older = commit(world.checkout, write("src/app.py"))
+    newer = commit(world.checkout, write("src/later.py"))
+    trees = [git(world.checkout, "rev-parse", f"{sha}^{{tree}}") for sha in (older, newer)]
+    store.write_json(
+        world.ctx.places.check_passes,
+        [{"tree": tree, "commit": "", "branch": "", "task": "", "at": ""} for tree in trees],
+    )
+
+    asked = github_push.ask_push(world.ctx, {"sha": newer}, None)
+    github_push.ask_push(world.ctx, {"sha": older}, None)  # the waiting push already holds it
+
+    assert asked["waiting"] is True and git(github_repo, "rev-parse", "master") == before
+    held = github_push.waiting(world.ctx.places)
+    assert held is not None and (held["sha"], held["commits"]) == (newer, 2)
+    with pytest.raises(Refused) as stale:
+        github_push.owner_push(world.ctx, {"sha": older}, None)
+    assert stale.value.rule == "stale"
+    ops.join(github_push.owner_push(world.ctx, {"sha": newer}, None)["op"])
+    assert git(github_repo, "rev-parse", "master") == newer and github_push.waiting(world.ctx.places) is None
+    assert world.events == [(inbox.PUSHED, {"sha": newer, "commits": 2})]
+
+
+def test_the_owners_push_checks_again_and_sends_nothing_when_github_moved(world: World, github_repo: Path) -> None:
+    checked = commit(world.checkout, write("src/app.py"))
+    passed(world, git(world.checkout, "rev-parse", f"{checked}^{{tree}}"))
+    github_push.ask_push(world.ctx, {"sha": checked}, None)
+    elsewhere = github_repo.parent / "elsewhere"
+    git(github_repo.parent, "clone", "-q", str(github_repo), str(elsewhere))
+    moved = commit(elsewhere, write("src/other.py"))
+    git(elsewhere, "push", "-q", "origin", "master")
+
+    op = github_push.owner_push(world.ctx, {"sha": checked}, None)["op"]
+    ops.join(op)
+
+    failed = ops.get(world.ctx, {"id": op}, None)["op"]
+    assert failed["state"] == ops.FAILED and "has commits" in failed["steps"][0]["detail"]
+    assert git(github_repo, "rev-parse", "master") == moved and github_push.waiting(world.ctx.places) is not None
 
 
 def probe(world: World, env: str, ok: bool, commit: str = "", on_default: bool | None = True) -> None:
@@ -269,10 +321,10 @@ def test_push_never_ships_a_merge_whose_check_of_the_default_branch_has_not_pass
         (world.checkout / "queue" / "checks" / f"{saved.id}.md").write_text(records.dump_check(saved))
 
     if ships:
-        assert github_push.push_checked(world.ctx, {}, None)["sha"] == merge  # the newest shippable commit
+        assert ship(world)["sha"] == merge  # the newest shippable commit
     else:
         with pytest.raises(Refused, match=f"t-0001, {status}") as refused:
-            github_push.push_checked(world.ctx, {}, None)
+            github_push.ask_push(world.ctx, {}, None)
         assert refused.value.rule == "unchecked"
 
 
@@ -283,7 +335,7 @@ def test_a_merge_reverted_in_the_range_ships_nothing_of_its_own(world: World, gi
     head = git(world.checkout, "rev-parse", "HEAD")
     passed(world, git(world.checkout, "rev-parse", f"{head}^{{tree}}"))
 
-    assert github_push.push_checked(world.ctx, {}, None)["sha"] == head
+    assert ship(world)["sha"] == head
 
 
 def test_push_back_goes_to_what_prod_ran_when_the_last_push_began_even_if_that_push_never_answered(
@@ -386,11 +438,11 @@ def test_the_owners_pin_ships_on_its_parents_check_and_lets_nothing_else_through
         passed(world, git(world.checkout, "rev-parse", f"{head}^{{tree}}"))
 
     if ships:
-        assert github_push.push_checked(world.ctx, {"sha": head}, None)["sha"] == head
+        assert ship(world, head)["sha"] == head
         assert git(github_repo, "rev-parse", "master") == head
     else:
         with pytest.raises(Refused) as refused:
-            github_push.push_checked(world.ctx, {"sha": head}, None)
+            github_push.ask_push(world.ctx, {"sha": head}, None)
         assert refused.value.rule == "protected-path"
 
 
@@ -399,25 +451,33 @@ def test_a_change_to_the_pins_files_that_root_did_not_make_is_refused(world: Wor
     sha = commit(world.checkout, write(".github/factory-ref"))  # an agent's, not in root's record
     passed(world, git(world.checkout, "rev-parse", f"{sha}^{{tree}}"))
     with pytest.raises(Refused) as refused:
-        github_push.push_checked(world.ctx, {"sha": sha}, None)
+        github_push.ask_push(world.ctx, {"sha": sha}, None)
     assert refused.value.rule == "protected-path"
 
 
-def test_the_warden_pushes_a_pin_itself_and_only_tries_again_after_a_while(
+def test_the_warden_asks_for_a_pins_push_only_now_and_then_and_it_counts_once_github_holds_it(
     world: World, github_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    before = git(github_repo, "rev-parse", "master")
     passed(world, git(world.checkout, "rev-parse", "HEAD^{tree}"))
     pin = _pin(world)
     tries: list[str] = []
-    real = github_push.push_checked
+    real = github_push.ask_push
     monkeypatch.setattr(
-        github_push, "push_checked", lambda ctx, args, data: tries.append(args["sha"]) or real(ctx, args, data)
+        github_push, "ask_push", lambda ctx, args, data: tries.append(args["sha"]) or real(ctx, args, data)
     )
 
-    pins.push_pending(world.ctx)
-    pins.push_pending(world.ctx)
+    pins.ask_pending(world.ctx)
+    pins.ask_pending(world.ctx)
 
-    assert tries == [pin] and git(github_repo, "rev-parse", "master") == pin
+    assert tries == [pin] and git(github_repo, "rev-parse", "master") == before
+    held = github_push.waiting(world.ctx.places)
+    assert held is not None and held["sha"] == pin and held["items"] == [{"kind": "factory", "task": ""}]
+    ops.join(github_push.owner_push(world.ctx, {"sha": pin}, None)["op"])
+    world.clock.t += world.ctx.settings().get_int("watch.branch_retry_minutes") * 60
+    pins.ask_pending(world.ctx)
+    pins.ask_pending(world.ctx)
+    assert tries == [pin, pin] and git(github_repo, "rev-parse", "master") == pin
 
 
 def test_a_git_failure_names_git_s_own_reason_not_its_closing_advice(
@@ -434,7 +494,10 @@ def test_an_upgrade_s_pin_on_the_last_one_not_yet_pushed_goes_out_after_it(
     first = _pin(world, "acme/software-factory@" + "d" * 40)
     second = _pin(world, "acme/software-factory@" + "e" * 40)
 
-    pins.push_pending(world.ctx)
+    pins.ask_pending(world.ctx)
+    held = github_push.waiting(world.ctx.places)
+    assert held is not None and held["sha"] == second
+    ops.join(github_push.owner_push(world.ctx, {"sha": second}, None)["op"])
 
     assert git(github_repo, "rev-parse", "master") == second
     assert git(github_repo, "rev-parse", "master^") == first

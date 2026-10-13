@@ -16,6 +16,11 @@ _KINDS: dict[str, tuple[str, list[str], Said]] = {
     kinds.REPO: ("Changing the repo", ["settings", "shell"], lambda r: "The factory works on the new repo."),
     kinds.PUSH: ("Pushing to prod", ["home", "shell"], lambda r: f"Prod runs {r['sha'][:7]}."),
     kinds.PUSH_BACK: ("Pushing prod back", ["home", "shell"], lambda r: f"Prod runs {r['sha'][:7]} again."),
+    kinds.STAGING_PUSH: (
+        "Pushing to staging",
+        ["home", "shell"],
+        lambda r: f"Pushed. CI deploys {r['sha'][:7]} to staging.",
+    ),
     kinds.PAUSE: (
         "Pausing the factory",
         ["agents", "home", "shell"],
