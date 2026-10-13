@@ -115,6 +115,10 @@ class Places:
         return self.state / "history.jsonl"
 
     @property
+    def drill_permits(self) -> Path:
+        return self.state / "drill-permits.json"
+
+    @property
     def approvals(self) -> Path:
         return self.state / "approvals"
 

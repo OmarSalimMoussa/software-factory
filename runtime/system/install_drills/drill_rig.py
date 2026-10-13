@@ -87,6 +87,7 @@ class RealRig:
         self.transcript = layout.DRILLS / "transcript.jsonl"
         self.session_a = str(uuid.uuid4())
         self.sessions: dict[str, Session] = {}
+        self.permits: dict[str, float] = {}
         self.timeout = self.settings.get_int("install.drill_seconds")
         # Every drill session's whole output, for the owner to read when a drill fails: its evidence is one line.
         stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
@@ -147,6 +148,7 @@ class RealRig:
 
     def close(self) -> None:
         self._remove_worktrees()
+        self.places.drill_permits.unlink(missing_ok=True)
         shutil.rmtree(layout.DRILLS, ignore_errors=True)
         if self.log_dir.exists():
             owner = self.ctx.owner
@@ -211,6 +213,7 @@ class RealRig:
         with self.lock:
             self.sessions[sid] = _session(sid, f"{_DRILL_NAME}-{sid[:8]}", self.worktree_a)
             registry.write(self.view, dict(self.sessions))
+            self._permit(sid)
         body = session_settings.render(self.settings, self.places, "implementer", self.worktree_a, layout.AGENT_HOME)
         for key, value in (extra or {}).items():
             body[key] = {**body.get(key, {}), **value}
@@ -229,6 +232,11 @@ class RealRig:
         )
         self._log(prompt, ran, self._debug(sid))
         return ran
+
+    def _permit(self, key: str) -> None:
+        """The warden's backstop leaves the session alone for one drill's time. The caller holds self.lock."""
+        self.permits[key] = time.time() + self.timeout
+        store.write_json(self.places.drill_permits, self.permits, mode=0o644)
 
     def _debug(self, sid: str) -> Path:
         """Where the session writes Claude Code's own debug log: its sandbox decisions and mounts."""
@@ -324,6 +332,8 @@ class RealRig:
     def real_session(self, name: str, prompt: str) -> Ran:
         request_id = f"{_DRILL_NAME}-{uuid.uuid4().hex[:12]}"
         model, role, checkout = self.settings["install.drill"], "implementer", self.ctx.checkout()
+        with self.lock:
+            self._permit(name)
         written = session_settings.write(self.settings, self.places, request_id, role, checkout, layout.AGENT_HOME)
         agents = session_settings.agents(self.settings, self.places, role, model["model"], model["effort"])
         request = {

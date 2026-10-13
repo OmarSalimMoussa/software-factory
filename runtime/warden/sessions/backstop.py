@@ -16,6 +16,7 @@ from pathlib import Path
 
 from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, PENDING, RETIRED, REVIVING, Session
+from runtime.shared.paths import Places
 from runtime.warden.context import Context
 from runtime.warden.sessions import launch, registry
 from runtime.warden.sessions.launch import LaunchError
@@ -102,9 +103,9 @@ def sessions_folder() -> Path:
 
 def unseen(folder: Path, proc: Path, agent_uid: int, settled: float) -> list[int]:
     """The agent's claude processes running for at least ``settled`` seconds that no session record names: sessions
-    the warden cannot see, as when a Claude Code update moved or reshaped its records. Neither its daemon nor a
-    one-shot `claude -p` (the install's drills) writes a record, so neither counts. OSError or ValueError when /proc
-    cannot be read."""
+    the warden cannot see, as when a Claude Code update moved or reshaped its records. Neither its daemon, which
+    writes no record, nor a one-shot `claude -p` (the install's drills) counts. OSError or ValueError when /proc cannot
+    be read."""
     named = {p.pid for p in read_processes(folder, proc).values()}
     uptime = float((proc / "uptime").read_text().split()[0])
     entries = [e for e in proc.iterdir() if e.name.isdigit()]
@@ -159,6 +160,20 @@ def unpermitted(sessions: dict[str, Session], proc: Proc) -> bool:
     return known.state in (RETIRED, DEPRIORITIZED)
 
 
+def drilled(places: Places, now: float) -> frozenset[str]:
+    """The install's drill sessions, by id or name, whose permits have not ended: the backstop leaves them alone. Only
+    root and the warden can reach the file. None when it cannot be read, so its sessions are stopped."""
+    try:
+        permits = store.read_json_or(places.drill_permits, {})
+    except store.StoreError as exc:
+        log.warning("backstop: the install's drill permits cannot be read (%s)", type(exc).__name__)
+        return frozenset()
+    if not isinstance(permits, dict):
+        log.warning("backstop: the install's drill permits are not a map of sessions to times")
+        return frozenset()
+    return frozenset(key for key, ends in permits.items() if key and isinstance(ends, int | float) and ends > now)
+
+
 def stop(ctx: Context, proc: Proc) -> None:
     try:
         ctx.launcher.stop_session(proc.session)
@@ -196,7 +211,8 @@ def sweep(ctx: Context, procs: dict[str, Proc]) -> list[Proc]:
                     "why": "bound",
                 },
             )
-        strays = [p for p in procs.values() if unpermitted(sessions, p)]
+        drills = drilled(ctx.places, ctx.clock.now())
+        strays = [p for p in procs.values() if unpermitted(sessions, p) and not {p.session, p.name} & drills]
         for proc in strays:
             log.warning("backstop: stopping session %s (pid %d), which runs without a permit", proc.session, proc.pid)
             stop(ctx, proc)
