@@ -21,12 +21,19 @@ function pSettings(env) {
   const d = partData(env, 'settings');
   const head = `<div class="page-h">${ph('Settings', 'Defaults come with the factory you installed. Nothing changes until you save. Saving keeps your values on this computer, and reloads only the part of the factory that reads them; no agent is stopped. Every change is listed under Recent changes.')}</div>`;
   if (!d) return head + acctSection(env) + part(env, 'settings', () => '');
-  return `${head}${acctSection(env)}${factoryCard(env)}
+  return `${head}${modeCard(env)}${acctSection(env)}${factoryCard(env)}
     <div class="card repo-card"><div style="flex:1;min-width:0"><div class="label">Repo</div><div class="repo-path">${esc(d.repo.path)}</div></div><button class="btn" data-action="change-repo" data-write>Change repo</button></div>
     <div class="set-grid">${d.groups.map(g => `<div class="card set-card"><div class="sec-h"><div class="label">${esc(g.title)} ${g.hint ? hint(g.hint) : ''}</div></div>${g.rows.map(r => r.broken ? brokenRow(r) : setRow(r)).join('')}</div>`).join('')}
       <div class="card set-card"><div class="sec-h"><div class="label">Recent changes</div></div><ul class="audit">${d.audit.length ? d.audit.map(a => `<li><span>${esc(a.what)}</span><span class="faint">${a.sha ? `<span class="mono">${esc(a.sha)}</span> · ` : ''}${esc(a.ago)}</span></li>`).join('') : '<li><span class="muted">No setting has changed yet.</span></li>'}</ul></div></div>
     <div class="savebar" id="savebar"><span id="savebar-n"></span><button class="btn sm quiet" data-action="discard">Discard</button><button class="btn sm primary" data-action="review" data-write>Review and save</button></div>`;
 }
+/* YOLO mode: on or off; turning it on says once what the factory then does alone. */
+const modeCard = env => part(env, 'mode', m => `<div class="card mode-card"><div style="flex:1;min-width:0"><div class="label">Mode</div><div style="font-weight:650;margin-top:4px">${esc(m.title)}</div><div class="help">${esc(m.text)}</div></div><button class="btn${m.on ? '' : ' primary'}" data-action="${m.on ? 'yolo-off' : 'yolo-on'}" data-write>${icon('moon', 'sm')}${esc(m.button)}</button></div>`);
+function yoloOn() {
+  const m = partData(UI.data['/api/settings'], 'mode'); if (!m) return;
+  confirmSheet(m.confirm.title, `<div class="muted">${esc(m.confirm.text)}</div>`, m.confirm.button, key => post('/api/yolo', {on: true}, key), {icon: 'moon'});
+}
+const yoloOff = btn => act('/api/yolo', {on: false}, {btn, icon: 'moon'});
 /* The factory this laptop runs: its version, when GitHub was last asked for a newer one, and Check now. */
 const factoryCard = env => part(env, 'factory', f => `<div class="card repo-card"><div style="flex:1;min-width:0"><div class="label">Factory</div><div class="repo-path"><span class="mono">${esc(f.version)}</span> · ${esc(f.checked)}</div>${f.newer ? `<div class="help">${esc(f.newer)}</div>` : ''}${f.note ? `<div class="help">${esc(f.note)}</div>` : ''}</div><button class="btn" data-action="check-factory" data-write>${icon('arrow-path', 'sm')}${esc(f.button)}</button></div>`);
 const checkFactory = btn => act('/api/factory/check', {}, {btn, icon: 'arrow-path', quiet: true});

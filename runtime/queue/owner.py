@@ -26,7 +26,7 @@ def _proposed(queue: Queue, task_id: str) -> Task:
     return task
 
 
-def approve(ctx: Context, task_id: str) -> dict[str, Any]:
+def approve(ctx: Context, task_id: str, by: str = "you") -> dict[str, Any]:
     queue = Queue.of(ctx)
     with ctx.lock, queue.lock():
         task = _proposed(queue, task_id)
@@ -36,7 +36,8 @@ def approve(ctx: Context, task_id: str) -> dict[str, Any]:
         routed = route.route(task, ctx.settings())
         approval = approvals.record(ctx.places, task, model, ctx.clock.iso(), routed)
         try:
-            tasks.transition(ctx, queue, task, "approved", "approve", OWNER, f"approved at rung {task.run} on {model}")
+            said = f"approved at rung {task.run} on {model}" + ("" if by == "you" else f", by {by}")
+            tasks.transition(ctx, queue, task, "approved", "approve", OWNER, said)
         except BaseException:
             approvals.void(ctx.places, task_id)
             raise
@@ -134,13 +135,15 @@ def unpark(ctx: Context, item: str) -> dict[str, Any]:
     return {"item": item}
 
 
-def go(ctx: Context, card_id: str) -> dict[str, Any]:
+def go(ctx: Context, card_id: str, by: str = "you") -> dict[str, Any]:
     queue = Queue.of(ctx)
     with ctx.lock, queue.lock():
         found, card = cards.find(ctx.places, card_id, "spec")
         task = queue.task(card.task)
         approvals.record_go(ctx.places, task.id, ctx.clock.iso())
-        tasks.transition(ctx, queue, task, "building", "go", OWNER, "Go on the spec")
+        tasks.transition(
+            ctx, queue, task, "building", "go", OWNER, "Go on the spec" + ("" if by == "you" else f", by {by}")
+        )
         documents.approve_spec(ctx, queue, task.id)
         cards.settle(ctx, found, card, "go")
     ctx.post_event(inbox.GO, {"task": card.task, "card": card_id})
@@ -158,7 +161,7 @@ def feedback(ctx: Context, card_id: str) -> dict[str, Any]:
     return {"card": card_id, "op": op}
 
 
-def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
+def decide(ctx: Context, card_id: str, choice: str, by: str = "you") -> dict[str, Any]:
     """A stuck task: Extend the spent limit of its live session, send it To a designer (rung 3), or Park it. The
     warden tells the session itself, or ends it when its task leaves the run, so nothing is relayed."""
     to, event, kind = {
@@ -176,7 +179,7 @@ def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
         live = next((s for s in sessions.values() if s.task == task.id and not s.parent and s.role in permits.CAP
                      and s.state not in (RETIRED,)), None)  # fmt: skip
         fields: dict[str, Any] = {"run": 3} if choice == "designer" else {}
-        tasks.transition(ctx, queue, task, to, event, OWNER, f"{kind} by you", **fields)
+        tasks.transition(ctx, queue, task, to, event, OWNER, f"{kind} by {by}", **fields)
         if choice == "extend" and live is not None:
             extra = limits.raise_limit(ctx, sessions, live, card.limit, by_orchestrator=False)
             registry.write(ctx.places, sessions)

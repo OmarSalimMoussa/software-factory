@@ -132,6 +132,13 @@ def _push_back_args(body: Body, ref: str, snap: Snap | None) -> dict[str, Any]:
     return {"expected_sha": previous}
 
 
+def _yolo_args(body: Body, ref: str, snap: Snap | None) -> dict[str, Any]:
+    on = body.get("on")
+    if not isinstance(on, bool):
+        raise PartError("Say whether YOLO mode is on.")
+    return {"on": on}
+
+
 def _account_name(body: Body) -> str:
     name = body.get("name")
     if not isinstance(name, str) or not name.strip():
@@ -246,6 +253,8 @@ WRITES: list[tuple[re.Pattern[str], Write]] = [
        wants=("deploys",)),
     _w("staging/push", "staging.push", lambda b, r, s: {"sha": _text(b, "sha")},
        lambda a, s: _said(a, "Pushing to staging."), ["home", "shell"]),
+    _w("yolo", "yolo.switch", _yolo_args, lambda a, s: "YOLO mode is on." if a["on"] else "YOLO mode is off.",
+       ["home", "settings", "shell"]),
     _w("accounts", "account.add", lambda b, r, s: {"name": _account_name(b)}, lambda a, s: _said(a, "Added."),
        ["settings"], data=_account_token),
     _w(f"accounts/{_P}/use", "account.use", lambda b, r, s: {"name": r}, lambda a, s: _said(a, "Switching."),

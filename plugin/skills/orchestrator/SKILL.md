@@ -51,6 +51,9 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 | `benched` | A session was benched for higher work and keeps its context; the warden starts what it made room for. |
 | `crashed` | A session kept dying and was retired. Its task is back in Proposed with its branch kept: propose it again. |
 | `paused`, `resumed` | Pause: start nothing, end your turn. Resume: run the start steps again. |
+| `yolo on` | The owner is away and the factory runs on its own. Each proposal you make is approved as places free, so propose only what moves the goal most. A question you ask the owner is answered "Be proactive and solve it yourself." Nothing is pushed: keep checking, and ask with `factory push`; the owner pushes later. |
+| `yolo off` | The owner approves and decides again. |
+| `yours to decide` | With YOLO mode on, a card the owner would decide is yours: read its task, then `factory decide <card> <choice>` with one of the event's `choices` (`go` on a spec; `extend`, `designer` or `park` on a stuck task). |
 | `goal-changed` | Reread `GOAL.md` and fill the proposal slots again. |
 
 ## A loop pass

@@ -18,7 +18,7 @@ from runtime.shared.models import RETIRED
 from runtime.shared.settings import Settings
 from runtime.shared.settings_schema import AT_INSTALL, SCHEMA
 
-WANTS = ("settings", "sessions", "slots", "accounts", "upgrade")
+WANTS = ("settings", "sessions", "slots", "accounts", "upgrade", "yolo")
 _EDITED_ELSEWHERE = {"models.allowed", "models.efforts", "prices", "factory.github", "intake.weights"}
 _ROLE_KEYS = {
     "implementer": None,
@@ -208,6 +208,27 @@ def factory(snap: Snap) -> dict[str, Any]:
     }
 
 
+def mode(snap: Snap) -> dict[str, Any]:
+    """YOLO mode, on or off, the button that switches it, and what turning it on means, said once before it does."""
+    on = snap.get("yolo") is not None
+    return {
+        "on": on,
+        "title": "YOLO mode is on" if on else "YOLO mode is off",
+        "text": "The factory approves, decides and answers on its own. Nothing is pushed."
+        if on
+        else "You approve, decide and answer.",
+        "button": "Turn off" if on else "Turn on",
+        "confirm": {
+            "title": "Turn on YOLO mode",
+            "text": "The factory runs without you until you switch this off. It approves its own proposals as places "
+            "free, its orchestrator says Go on specs and decides stuck tasks, and any question an agent asks you is "
+            "answered: be proactive and solve it yourself. Nothing is pushed: the work waits on Home for your Push to "
+            "staging. The daily budget still applies.",
+            "button": "Turn on",
+        },
+    }
+
+
 def wants(query: Query) -> dict[str, Any]:
     return {"want": list(WANTS)}
 
@@ -216,5 +237,6 @@ def parts(snap: Snap, query: Query) -> Parts:
     return {
         "accounts": lambda: accounts.section(snap),
         "factory": lambda: factory(snap),
+        "mode": lambda: mode(snap),
         "settings": lambda: page(snap),
     }

@@ -220,6 +220,7 @@ _CALLS: dict[str, Callable[[argparse.Namespace, Callable[[str], bytes]], Call]] 
     "doing": lambda ns, _: Call("doing", {"text": ns.text}),
     "inbox": lambda ns, _: Call("inbox.wait" if ns.wait else "inbox", {}),
     "push": lambda ns, _: Call("push", {"sha": ns.sha} if ns.sha else {}),
+    "decide": lambda ns, _: Call("decide", {"card": ns.card, "choice": ns.choice}),
     "promote": lambda ns, _: Call("promote", {"back": ns.back}),
     "reflect": lambda ns, _: Call("reflect", {"kind": ns.kind, "text": ns.text}),
     "settings": lambda ns, _: Call("settings.show", {}),

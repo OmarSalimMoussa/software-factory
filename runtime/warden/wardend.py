@@ -27,7 +27,7 @@ from runtime.warden import gc, imports, inbox, loop, public, schedule, server, u
 from runtime.warden.context import Caller, Clock, Context
 from runtime.warden.delivery import github, pins, prod_push
 from runtime.warden.dispatch import Dispatcher, Doors, resolve
-from runtime.warden.owner import factory_upgrade, ops, reflections, settings_save
+from runtime.warden.owner import factory_upgrade, ops, reflections, settings_save, yolo
 from runtime.warden.sessions import crashwatch, launch, reap, registry
 from runtime.warden.spend import cost, plan
 from runtime.warden.verbs import VERBS
@@ -111,6 +111,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
             imports.Background(partial(_build_replays, transcripts=transcripts), imports.in_thread("replays")).run_pass,
         ),  # fmt: skip
         ("schedule", schedule.run_pass),
+        ("yolo", yolo.run_pass),
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),
         ("plan", watch.run_pass),
         ("reap", reaper.run_pass),

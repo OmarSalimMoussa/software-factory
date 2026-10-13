@@ -30,6 +30,7 @@ WANTS = (
     "triage",
     "upgrade",
     "staging_push",
+    "yolo",
 )
 SPARK_DAYS = 14
 _LAPTOP = {
@@ -356,6 +357,19 @@ def _upgrade_asked(found: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def yolo(snap: Snap) -> dict[str, Any] | None:
+    """The band while YOLO mode is on: the factory runs on its own, and pushes nothing."""
+    found = snap.get("yolo")
+    if found is None:
+        return None
+    since = when(epoch(found["since"]))
+    return {
+        "title": "YOLO mode is on",
+        "message": f"Since {since}, the factory approves, decides and answers on its own. Nothing is pushed.",
+        "button": "Turn off",
+    }
+
+
 def wants(query: Query) -> dict[str, Any]:
     return {"want": list(WANTS), "days": SPARK_DAYS}
 
@@ -365,6 +379,7 @@ def parts(snap: Snap, query: Query) -> Parts:
         "envs": lambda: envs(snap),
         "outage": lambda: outage(snap),
         "upgrade": lambda: upgrade(snap),
+        "yolo": lambda: yolo(snap),
         "proposals": lambda: proposals.slots(snap),
         "needs": lambda: proposals.needs(snap),
         "tiles": lambda: tiles(snap),

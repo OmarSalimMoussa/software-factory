@@ -5,6 +5,7 @@ PAGE.home = {
   url: () => '/api/home',
   render: env => `${part(env, 'outage', o => o ? outageBand(o) : '')}
   ${part(env, 'upgrade', u => u ? upgradeBand(u) : '')}
+  ${part(env, 'yolo', y => y ? yoloBand(y) : '')}
   ${part(env, 'envs', envsHTML)}
   ${propsSection(env)}
   ${needsSection(env)}
@@ -40,6 +41,9 @@ function openPushStaging() {
 function laptopHTML(l) {
   return `<div class="card vitals-mini"><div class="env-top"><span class="env-name">Laptop</span><span class="chip ${esc(l.tone)}" style="margin-left:auto">${esc(l.label)}</span></div>${l.rows.map(r => `<div class="vrow"><span>${esc(r.label)}</span>${r.pct == null ? '<div class="meter unknown"></div>' : `<div class="meter"><i style="width:${r.pct}%"></i></div>`}<span class="num">${esc(r.value)}</span></div>`).join('')}</div>`;
 }
+
+/* ---------- YOLO mode: the factory runs on its own until the owner switches it off ---------- */
+const yoloBand = y => `<div class="card upgrade yolo" role="status"><span class="ico">${icon('moon')}</span><div style="min-width:0"><div class="o-t">${esc(y.title)}</div><div class="o-s">${esc(y.message)}</div></div><div class="o-a"><button class="btn sm" data-action="yolo-off" data-write>${esc(y.button)}</button></div></div>`;
 
 /* ---------- the upgrade band: a newer factory, the upgrade under way, or how it ended ---------- */
 function upgradeBand(u) {

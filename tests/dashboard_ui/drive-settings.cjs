@@ -9,6 +9,16 @@ drive('settings', async t => {
   t.check(await p.$('[data-row="models.intake"] [data-ddbtn]') && await p.$('[data-row="caps.designers"] .stepper') && await p.$('[data-row="budget.slice_memory_high"] input.txt')
     && await p.$('[data-row="sandbox.allowed_domains"] .listed') && await p.$('[data-row="prices"] .ro'), 'a control kind is missing');
   t.check(!(await p.$('[data-row="prices"] .reset, [data-row="prices"] [data-default]')), 'a read-only row can be changed');
+  // YOLO mode: Turn on says once what it does, Home then shows its band, and Turn off there ends it
+  await p.click('[data-action="yolo-on"]'); await settle(p);
+  t.check((await p.textContent('#sheet-body')).includes('solve it yourself') && !(await p.$('#code-0')), 'turning YOLO on does not say what it does, or asks for a code');
+  await t.confirm(p);
+  t.check(await until(p, () => document.querySelector('[data-action="yolo-off"]')), 'Settings does not show YOLO mode on');
+  await t.go(p, 'home');
+  t.check(await until(p, () => document.querySelector('.yolo [data-action="yolo-off"]')), 'no YOLO band on Home');
+  await p.click('.yolo [data-action="yolo-off"]');
+  t.check(await until(p, () => !document.querySelector('.yolo')), 'the YOLO band stayed after Turn off');
+  await t.go(p, 'settings');
   // the factory card: its version and last check, and Check now answers in a toast, whatever GitHub said
   t.check((await p.textContent('.card:has([data-action="check-factory"])')).includes('Factory'), 'no Factory card');
   await p.click('[data-action="check-factory"]');
