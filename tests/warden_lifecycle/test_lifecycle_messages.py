@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 from typing import Any
 
 import pytest
 from lifecycle_fakes import World
 
+from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, WORKING
 from runtime.shared.protocol import Refused
 from runtime.warden.owner import messages, ops
+from runtime.warden.sessions import lifecycle, revive
 from runtime.warden.sessions.launch import LaunchError
 
 
@@ -54,7 +57,7 @@ def test_a_message_goes_only_to_a_session_that_can_take_a_turn(world: World, fie
 def test_a_benched_session_comes_back_with_the_message(world: World) -> None:
     world.queue.add("t-0001", status="deprioritized")
     world.seat("5e550001", task="t-0001", state=DEPRIORITIZED)
-    messages.send(world.owner(), {"session": "5e550001", "text": "Finish the menu first."}, None)
+    ops.join(messages.send(world.owner(), {"session": "5e550001", "text": "Finish the menu first."}, None)["op"])
     [(sid, said)] = world.launcher.messages
     assert world.launcher.resumed == [sid] == ["5e550001"] and said.endswith(messages.PREFIX + "Finish the menu first.")
     assert world.session("5e550001").state == WORKING
@@ -86,3 +89,32 @@ def test_the_thread_pairs_each_owner_message_with_what_the_agent_said_after_it(w
         ("Skip dark mode.", ["Understood.", "Dropped the slice."]),
         ("Status?", []),
     ]
+
+
+@pytest.mark.parametrize("action", ["message", "message-to-the-bench", "resume"])
+def test_the_owners_action_answers_before_the_session_hears_it(
+    world: World, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    # Handing a session its word takes longer than the dashboard waits for an answer: a cited bug said "did not go
+    # through" for a message that did.
+    let_go, heard = threading.Event(), world.launcher.message_session
+
+    def slow(session_id: str, text: str) -> None:
+        let_go.wait(10)
+        heard(session_id, text)
+
+    monkeypatch.setattr(world.launcher, "message_session", slow)
+    benched = DEPRIORITIZED if action != "message" else WORKING
+    world.seat("0c0c0c0c", role="orchestrator", family="orch", state=benched)
+    if action == "message":
+        world.run("0c0c0c0c")
+    if action == "resume":
+        store.write_json(lifecycle.paused_path(world.ctx()), {"at": "", "sessions": ["0c0c0c0c"], "op": "op-paused"})
+        answer = revive.owner_resume(world.owner(), {}, None)
+    else:
+        answer = messages.send(world.owner(), {"session": "0c0c0c0c", "text": "Carry on."}, None)
+    assert answer["op"] and world.launcher.messages == []
+    let_go.set()
+    ops.join(answer["op"], 10)
+    assert [sid for sid, _ in world.launcher.messages] == ["0c0c0c0c"]
+    assert ops.get(world.owner(), {"id": answer["op"]}, None)["op"]["state"] == ops.DONE

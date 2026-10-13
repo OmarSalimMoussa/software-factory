@@ -52,8 +52,9 @@ def send(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
             moving = "going to" if s.state == models.BENCH_PENDING else "coming back from"
             raise Refused("settling", f"this session is {moving} the bench; send it again in a minute")
     if s.state == DEPRIORITIZED:
-        _bring_back(ctx, s, PREFIX + text)
-        return ok(message="It is coming back from the bench with your message.")
+        _to_revive(ctx, s)
+        step = ("Bringing it back with your message", lambda: _revive(ctx, s.id, PREFIX + text))
+        return ok(op=ops.launch(ctx, KIND, [step], {"revived": True}))
     return ok(op=ops.launch(ctx, KIND, [("Sending your message", lambda: _deliver(ctx, s.id, PREFIX + text))]))
 
 
@@ -67,9 +68,9 @@ def _deliver(ctx: Context, session_id: str, text: str) -> str:
     return "delivered"
 
 
-def _bring_back(ctx: Context, s: Session, message: str) -> None:
-    """Revive a benched session with the owner's message, when a place is free. The owner picks which one comes back,
-    so the order the orchestrator keeps is not checked."""
+def _to_revive(ctx: Context, s: Session) -> None:
+    """Mark a benched session reviving with the owner's message, when a place is free. The owner picks which one comes
+    back, so the order the orchestrator keeps is not checked."""
     with ctx.lock:
         if lifecycle.paused_path(ctx).exists():
             raise Refused("paused", "the factory is paused: resume it first, then send the message")
@@ -84,9 +85,13 @@ def _bring_back(ctx: Context, s: Session, message: str) -> None:
             permits.check_cap(ctx.settings(), sessions.values(), s.role)
         lifecycle.move(ctx, s, models.REVIVING, OWNER, "coming back with the owner's message")
         registry.write(ctx.places, sessions)
-    failed = revive.bring_back(ctx, s.id, OWNER, note=message)
+
+
+def _revive(ctx: Context, session_id: str, message: str) -> str:
+    failed = revive.bring_back(ctx, session_id, OWNER, note=message)
     if failed:
         raise Refused("revive", f"it stays on the bench: {failed}")
+    return "back with your message"
 
 
 def thread(ctx: Context, s: Session) -> list[dict[str, Any]]:

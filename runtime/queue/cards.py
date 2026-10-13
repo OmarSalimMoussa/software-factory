@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from collections.abc import Callable
 
 from runtime.queue import formats, pictures, records, statuses, tasks
 from runtime.queue.book import Queue, spec_rel
@@ -15,10 +16,12 @@ from runtime.shared.models import WAITING, WORKING, Card, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
+from runtime.warden.owner import ops
 from runtime.warden.sessions import lifecycle, limits, registry
 from runtime.warden.sessions.launch import LaunchError
 
 log = logging.getLogger(__name__)
+WORD = "word"
 
 
 def read(places: Places) -> list[Card]:
@@ -97,20 +100,32 @@ def _waiting(ctx: Context, card: Card) -> Card:
     return card
 
 
-def wake(ctx: Context, card: Card, message: str) -> bool:
-    """Hand the session that asked the owner's word, and it works again; whether it reached it. The orchestrator
-    hears through its inbox instead, and a session no longer working or waiting has nothing to hear: the card keeps
-    the answer either way."""
+def tell(ctx: Context, s: Session, message: str, missed: Callable[[], None]) -> str:
+    """Hand a session the owner's word, and it works again: the operation the page follows, since handing it over
+    holds the session longer than the dashboard waits for an answer. ``missed`` runs when the word does not arrive."""
+
+    def hand() -> str:
+        try:
+            lifecycle.deliver(ctx, s.id, message, statuses.OWNER)
+        except Refused:
+            missed()
+            raise
+        except LaunchError as exc:
+            missed()
+            raise ops.StepError(f"it did not reach {s.name}: {exc}") from exc
+        return "told"
+
+    return ops.launch(ctx, WORD, [(f"Tell {s.name}", hand)])
+
+
+def wake(ctx: Context, card: Card, message: str, missed: Callable[[], None]) -> str | None:
+    """Tell the session that asked the owner's word; None when no session can hear it. The orchestrator hears
+    through its inbox instead, and a session no longer working or waiting has nothing to hear: the card keeps the
+    answer either way."""
     asker = registry.read(ctx.places).get(card.asked_by)
     if asker is None or asker.role == statuses.ORCH or asker.state not in (WORKING, WAITING):
-        return False
-    try:
-        lifecycle.deliver(ctx, asker.id, message, statuses.OWNER)
-    except LaunchError as exc:
-        log.warning("warden: the owner's word on %s did not reach session %s (%s)", card.id, asker.id,
-                    type(exc).__name__)  # fmt: skip
-        return False
-    return True
+        return None
+    return tell(ctx, asker, message, missed)
 
 
 def to_decide(ctx: Context, task_id: str, why: str, limit: str) -> Card:

@@ -6,7 +6,6 @@ the orchestrator acts at once (R4). The warden writes the approval where no agen
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from runtime.queue import approvals, cards, documents, formats, intake, proposals, route, tasks
@@ -18,9 +17,6 @@ from runtime.shared.protocol import Refused
 from runtime.warden import inbox
 from runtime.warden.context import Context
 from runtime.warden.sessions import lifecycle, limits, permits, registry
-from runtime.warden.sessions.launch import LaunchError
-
-log = logging.getLogger(__name__)
 
 
 def _proposed(queue: Queue, task_id: str) -> Task:
@@ -155,10 +151,11 @@ def feedback(ctx: Context, card_id: str) -> dict[str, Any]:
     """Check feedback hands the designer the owner's comments on the artifact; the warden delivers it, so nothing
     goes through the orchestrator."""
     _, card = cards.find(ctx.places, card_id, "spec")
-    if not cards.wake(ctx, card, f"The owner left comments on the spec of {card.task} ({card.brief}); read and "
-                                 "answer them."):  # fmt: skip
+    words = f"The owner left comments on the spec of {card.task} ({card.brief}); read and answer them."
+    op = cards.wake(ctx, card, words, lambda: None)
+    if op is None:
         raise Refused("feedback", "the designer who asked is not running now; its comments wait on the artifact")
-    return {"card": card_id}
+    return {"card": card_id, "op": op}
 
 
 def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
@@ -184,13 +181,15 @@ def decide(ctx: Context, card_id: str, choice: str) -> dict[str, Any]:
             extra = limits.raise_limit(ctx, sessions, live, card.limit, by_orchestrator=False)
             registry.write(ctx.places, sessions)
         cards.settle(ctx, found, card, kind)
+    op = None
     if live is not None and choice == "extend":
         again = " Your merge turn ended while you waited: it comes back with the next turn." if to == "qa-clean" else ""
-        _tell(ctx, live.id, f"The owner extended your {card.limit} to {extra} more than the setting: carry on.{again}")
+        words = f"The owner extended your {card.limit} to {extra} more than the setting: carry on.{again}"
+        op = cards.tell(ctx, live, words, lambda: None)
     elif live is not None:
         lifecycle.retire_session(ctx, live.id, STOPPED, lifecycle.OWNER)
     ctx.post_event(kind, {"task": card.task, "card": card_id})
-    return {"card": card_id, "task": card.task, "status": to}
+    return {"card": card_id, "task": card.task, "status": to, "op": op}
 
 
 def _before_decide(queue: Queue, task_id: str) -> str:
@@ -203,13 +202,6 @@ def _before_decide(queue: Queue, task_id: str) -> str:
     return "qa-clean" if moves[-1]["from"] == "turn" else str(moves[-1]["from"])
 
 
-def _tell(ctx: Context, sid: str, message: str) -> None:
-    try:
-        lifecycle.deliver(ctx, sid, message, OWNER)
-    except (LaunchError, Refused) as exc:
-        log.warning("warden: the owner's extension did not reach session %s (%s)", sid, type(exc).__name__)
-
-
 def answer(ctx: Context, card_id: str, text: str) -> dict[str, Any]:
     if not text.strip():
         raise Refused("answer", "the answer is empty")
@@ -217,8 +209,13 @@ def answer(ctx: Context, card_id: str, text: str) -> dict[str, Any]:
         found, card = cards.find(ctx.places, card_id, "question")
         cards.settle(ctx, found, card, text)
     words = f"The owner answered your question on {card.task or 'your work'}: {one_line(text)}"
-    if not cards.wake(ctx, card, words):
-        # The orchestrator asked, or the asker no longer runs: the orchestrator hears it and acts on it.
+
+    def to_orchestrator() -> None:
+        """The orchestrator asked, or the answer did not reach the asker: the orchestrator hears it and acts on it."""
         ctx.post_event(inbox.ANSWERED, {"card": card_id, "task": card.task, "session": card.asked_by,
-                                    "answer": one_line(text)})  # fmt: skip
-    return {"card": card_id}
+                                        "answer": one_line(text)})  # fmt: skip
+
+    op = cards.wake(ctx, card, words, to_orchestrator)
+    if op is None:
+        to_orchestrator()
+    return {"card": card_id, "op": op}

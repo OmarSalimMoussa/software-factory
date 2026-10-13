@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import threading
 from collections.abc import Callable
 
 import pytest
@@ -13,7 +14,7 @@ from runtime.queue.book import task_rel
 from runtime.queue.propose import propose
 from runtime.shared.models import RETIRED, STOPPED, WAITING, WORKING
 from runtime.shared.protocol import Refused
-from runtime.warden.owner import reflections
+from runtime.warden.owner import ops, reflections
 from runtime.warden.sessions import backstop, limits, registry
 from runtime.warden.sessions.backstop import Proc
 
@@ -71,8 +72,18 @@ def test_the_asking_session_waits_and_the_answer_reaches_it_once_and_it_works_ag
     asked = cards.needs_owner(world.ctx("implementer", "s-impl"), task.id, "", "", "Keep the old link?", PICTURE)
     assert registry.read(world.places)["s-impl"].state == WAITING
 
-    owner.answer(world.owner(), asked.id, "Yes")
+    let_go, heard = threading.Event(), world.launcher.message_session
+    monkeypatch.setattr(world.launcher, "message_session", lambda sid, text: let_go.wait(10) and heard(sid, text))
 
+    answer = owner.answer(world.owner(), asked.id, "Yes")
+
+    # Recorded and answered at once: handing it over takes longer than the dashboard waits.
+    assert (
+        world.launcher.messages == []
+        and next(c for c in cards.read(world.places) if c.id == asked.id).answered == "Yes"
+    )
+    let_go.set()
+    ops.join(answer["op"], 10)
     # Handed over as its next turn, its busy turn left alone; not relayed through the orchestrator as well.
     assert world.launcher.messages == [("s-impl", f"The owner answered your question on {task.id}: Yes")]
     assert world.launcher.commands == [] and world.events == []
@@ -120,7 +131,7 @@ def test_the_owners_extend_raises_the_live_sessions_limit_and_tells_it_and_park_
     card = next(c for c in cards.read(world.places) if c.kind == "decide")
     by = world.settings.get_int("rounds.extend_by")
 
-    owner.decide(world.owner(), card.id, "extend")
+    ops.join(owner.decide(world.owner(), card.id, "extend")["op"])
 
     assert registry.read(world.places)["s-impl"].extensions["qa"] == 2 * by
     assert [sid for sid, _ in world.launcher.messages] == ["s-impl"]
@@ -144,7 +155,7 @@ def test_the_owners_extend_of_a_task_stopped_in_its_merge_turn_sends_it_back_for
     world.launcher.git = lambda argv: (0, "c0ffee" * 6 + "abcd\n")
     assert turn.next_turn(world.ctx(), {}, None)["task"] == other.id
 
-    owner.decide(world.owner(), card.id, "extend")
+    ops.join(owner.decide(world.owner(), card.id, "extend")["op"])
 
     assert world.queue().task(task_id).status == "qa-clean"
     assert turn.holder(world.places) == {"task": other.id, "branch": "impl-b", "base": "c0ffee" * 6 + "abcd"}
@@ -163,7 +174,7 @@ def test_the_owners_extend_of_a_designers_spent_limit_sends_the_task_back_to_its
     cards.spent(world.ctx(), registry.read(world.places)["s-design"], "critic", "spent again")
     card = next(c for c in cards.read(world.places) if c.kind == "decide")
 
-    owner.decide(world.owner(), card.id, "extend")
+    ops.join(owner.decide(world.owner(), card.id, "extend")["op"])
 
     assert world.queue().task(task.id).status == "designing"
     assert registry.read(world.places)["s-design"].state != RETIRED and world.launcher.stopped == []

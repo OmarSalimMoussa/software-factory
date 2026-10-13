@@ -120,7 +120,9 @@ def test_pause_benches_every_session_and_resume_brings_them_back_in_order(world:
     crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
     assert {world.session(s).state for s in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {DEPRIORITIZED}
     assert ops.get(world.owner(), {"id": op_id}, None)["op"]["state"] == ops.DONE
-    revive.owner_resume(world.owner(), {}, None)
+    back = revive.owner_resume(world.owner(), {}, None)["op"]
+    ops.join(back)
+    assert ops.get(world.owner(), {"id": back}, None)["op"]["state"] == ops.DONE
     assert world.launcher.resumed == ["0c0c0c0c", "1a1a1a1a", "2b2b2b2b"]
     assert {world.session(s).state for s in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {WORKING}
     assert [kind for kind, _ in world.events] == ["paused", "benched", "benched", "benched", "resumed"]

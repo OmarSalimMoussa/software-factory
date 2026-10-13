@@ -128,7 +128,7 @@ function needAct(id, what, btn, close) {
   const n = needOf(id); if (!n) return;
   const body = {version: n.version};
   if (what === 'answer') { body.text = (UI.answers[id] || '').trim(); if (!body.text) { alertToast('answer:' + id, 'Write an answer first.'); return; } }
-  act(`/api/needs/${encodeURIComponent(id)}/${what}`, body, {btn, onOk: () => { if (what === 'answer') delete UI.answers[id]; if (close) closeSheet(); }});
+  act(`/api/needs/${encodeURIComponent(id)}/${what}`, body, {btn, quiet: true, onOk: () => { if (what === 'answer') delete UI.answers[id]; if (close) closeSheet(); }});
 }
 function openPic(id) {
   const n = needOf(id); if (!n) return;

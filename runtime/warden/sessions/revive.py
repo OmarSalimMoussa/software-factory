@@ -32,6 +32,7 @@ from runtime.warden.sessions.permits import CAP, DESIGN, IMPL, SEVERE
 log = logging.getLogger(__name__)
 PAUSED = {"message": "The factory is paused; every session keeps its context.", "refresh": "all"}
 REVIVED = "The warden brought you back: carry on with your task from your branch."
+RESUME = "resume"
 
 
 def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
@@ -141,7 +142,8 @@ def pause_progress(ctx: Context, sid: str, detail: str) -> None:
 
 
 def owner_resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Bring back every session the pause benched, in the order it benched them: the orchestrator first."""
+    """Bring back every session the pause benched, in the order it benched them: the orchestrator first. Each takes
+    longer than the dashboard waits for an answer, so they come back in an operation the page follows."""
     with ctx.lock:
         try:
             record = store.read_json(paused_path(ctx))
@@ -159,6 +161,14 @@ def owner_resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
             move(ctx, s, models.REVIVING, OWNER, "resuming with the factory")
         registry.write(ctx.places, sessions)
         paused_path(ctx).unlink()
-    failed = {s.name: why for s in back if (why := bring_back(ctx, s.id, OWNER))}
-    ctx.post_event(inbox.RESUMED, {"sessions": [s.id for s in back], "failed": sorted(failed)})
-    return ok(resumed=[s.name for s in back if s.name not in failed], failed=failed)
+
+    def bring_all() -> str:
+        failed = {s.name: why for s in back if (why := bring_back(ctx, s.id, OWNER))}
+        ctx.post_event(inbox.RESUMED, {"sessions": [s.id for s in back], "failed": sorted(failed)})
+        if failed:
+            raise ops.StepError("; ".join(f"{name} stays on the bench: {why}" for name, why in failed.items()))
+        return f"back: {', '.join(s.name for s in back)}" if back else "no agent was on the bench"
+
+    return ok(
+        op=ops.launch(ctx, RESUME, [("Bring back every benched agent", bring_all)]), resuming=[s.name for s in back]
+    )

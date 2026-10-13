@@ -13,8 +13,10 @@ _TITLES = {
     "push": "Pushing to prod",
     "push back": "Pushing prod back",
     "pause": "Pausing the factory",
+    "resume": "Resuming the factory",
     "account": "Switching the Claude account",
     "message": "Sending your message",
+    "word": "Telling the agent",
     "release check": "Checking for a newer factory",
 }
 _REFRESH = {
@@ -23,8 +25,10 @@ _REFRESH = {
     "push": ["home", "shell"],
     "push back": ["home", "shell"],
     "pause": ["agents", "home", "shell"],
+    "resume": ["agents", "home", "shell"],
     "account": ["settings", "agents", "shell"],
     "message": ["agent", "home"],
+    "word": ["agent", "home"],
     "release check": ["settings", "home", "shell"],
 }
 
@@ -51,8 +55,12 @@ def operation(answer: dict[str, Any]) -> dict[str, Any]:
             "push": f"Prod runs {str(sha)[:7]}.",
             "push back": f"Prod runs {str(sha)[:7]} again.",
             "pause": "Paused. Every agent is benched with its work kept.",
+            "resume": "Resumed. Every benched agent is back at work.",
             "account": f"The agents now use {op['result'].get('name')}.",
-            "message": "Sent. It reads your message as soon as its current turn ends.",
+            "message": "Sent. It is back from the bench and reads your message now."
+            if op["result"].get("revived")
+            else "Sent. It reads your message as soon as its current turn ends.",
+            "word": "Told. It reads it as soon as its current turn ends.",
             "release check": "A newer factory is ready: Home has the upgrade."
             if op["result"].get("newer")
             else "This is the newest factory.",
