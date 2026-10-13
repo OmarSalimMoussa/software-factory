@@ -21,6 +21,6 @@
    }
   ],
   "button": "Stop 2 agents",
-  "coded": false
+  "confirm": false
  }
 }

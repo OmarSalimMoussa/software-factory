@@ -1,9 +1,8 @@
-"""The owner's 6-digit code, checked inside each coded action, and the devices one code admitted to the dashboard.
+"""The owner's 6-digit code, which signs a device in to the dashboard, and the devices one code admitted.
 
 A code is accepted once: the step it belongs to is remembered and no code of that step or an earlier one is accepted
-again. ``dashboard.wrong_codes_to_lock`` wrong codes within ``dashboard.lock_minutes`` lock coded actions for that
-long; a lock never blocks pausing or stopping the factory (``lock_exempt``). A refused action is not a wrong code:
-only the code itself is counted here.
+again. ``dashboard.wrong_codes_to_lock`` wrong codes within ``dashboard.lock_minutes`` lock signing in for that long.
+A refused action is not a wrong code: only the code itself is counted here.
 """
 
 from __future__ import annotations
@@ -57,8 +56,8 @@ def _step_of(secret: str, code: str, now: float) -> int | None:
     return None
 
 
-def check_code(ctx: Context, code: object, *, lock_exempt: bool = False) -> None:
-    """Accept the owner's code for one coded action, or raise Refused saying why it was not accepted."""
+def check_code(ctx: Context, code: object) -> None:
+    """Accept the owner's code to sign a device in, or raise Refused saying why it was not accepted."""
     settings = ctx.settings()
     limit = settings.get_int("dashboard.wrong_codes_to_lock")
     window = settings.get_int("dashboard.lock_minutes") * 60
@@ -67,10 +66,10 @@ def check_code(ctx: Context, code: object, *, lock_exempt: bool = False) -> None
         state = _read_lock(ctx.places)
         until = state["locked_until"]
         locked = isinstance(until, int | float) and until > now
-        if locked and not lock_exempt:
-            raise Refused("code-locked", f"coded actions are locked until {_clock_time(until)} after wrong codes")
+        if locked:
+            raise Refused("code-locked", f"signing in is locked until {_clock_time(until)} after wrong codes")
         if not isinstance(code, str) or not code:
-            raise Refused("code", "this action needs the 6-digit code from your authenticator app")
+            raise Refused("code", "signing in needs the 6-digit code from your authenticator app")
         step = _step_of(ctx.places.totp_secret.read_text().strip(), code, now)
         last = state["last_step"]
         if step is not None and isinstance(last, int) and step <= last:
@@ -84,7 +83,7 @@ def check_code(ctx: Context, code: object, *, lock_exempt: bool = False) -> None
             if len(wrong) >= limit:
                 state.update(wrong=[], locked_until=now + window)
                 store.write_json(ctx.places.code_lock, state, mode=0o600)
-                raise Refused("code-locked", f"wrong code; coded actions are locked until {_clock_time(now + window)}")
+                raise Refused("code-locked", f"wrong code; signing in is locked until {_clock_time(now + window)}")
             state["wrong"] = wrong
             store.write_json(ctx.places.code_lock, state, mode=0o600)
             left = limit - len(wrong)

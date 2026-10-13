@@ -1,5 +1,5 @@
 'use strict';
-/* Settings: every value by its kind of control; edits collect locally, and one coded save commits them all. */
+/* Settings: every value by its kind of control; edits collect locally, and one save commits them all. */
 
 PAGE.settings = {
   url: () => '/api/settings',
@@ -19,7 +19,7 @@ const curOf = r => UI.edits.has(r.key) ? UI.edits.get(r.key).value : r.saved;
 const showVal = (r, v) => r.control === 'model' ? `${v.model} · ${v.effort}` : r.control === 'list' ? v.join(', ') : String(v);
 function pSettings(env) {
   const d = partData(env, 'settings');
-  const head = `<div class="page-h">${ph('Settings', 'Defaults come with the factory you installed. Nothing changes until you save. Saving needs your 6-digit code, keeps your values on this computer, and reloads only the part of the factory that reads them; no agent is stopped. Every change is listed under Recent changes.')}</div>`;
+  const head = `<div class="page-h">${ph('Settings', 'Defaults come with the factory you installed. Nothing changes until you save. Saving keeps your values on this computer, and reloads only the part of the factory that reads them; no agent is stopped. Every change is listed under Recent changes.')}</div>`;
   if (!d) return head + acctSection(env) + part(env, 'settings', () => '');
   return `${head}${acctSection(env)}${factoryCard(env)}
     <div class="card repo-card"><div style="flex:1;min-width:0"><div class="label">Repo</div><div class="repo-path">${esc(d.repo.path)}</div></div><button class="btn" data-action="change-repo" data-write>Change repo</button></div>
@@ -78,13 +78,13 @@ function dropConflicts(env) {
 function reviewSettings() {
   if (!UI.edits.size) return;
   const items = [...UI.edits].map(([k, e]) => [rowOf(k), e.value]).filter(([r]) => r);
-  codeSheet(`Save ${items.length} change${items.length === 1 ? '' : 's'}`, `<ul class="changes">${items.map(([r, v]) => `<li><span>${esc(r.label)}</span><b>${esc(showVal(r, r.saved))} → ${esc(showVal(r, v))}</b></li>`).join('')}</ul>`, 'Save',
-    (code, key) => post('/api/settings', {changes: Object.fromEntries(items.map(([r, v]) => [r.key, v])), code}, key), {onOk: () => { UI.edits.clear(); updateSavebar(); }});
+  confirmSheet(`Save ${items.length} change${items.length === 1 ? '' : 's'}`, `<ul class="changes">${items.map(([r, v]) => `<li><span>${esc(r.label)}</span><b>${esc(showVal(r, r.saved))} → ${esc(showVal(r, v))}</b></li>`).join('')}</ul>`, 'Save',
+    key => post('/api/settings', {changes: Object.fromEntries(items.map(([r, v]) => [r.key, v]))}, key), {onOk: () => { UI.edits.clear(); updateSavebar(); }});
 }
 function changeRepo() {
   const d = setData(); if (!d) return;
-  codeSheet('Change repo', `<label class="search" style="max-width:none">${icon('book-open', 'sm')}<input id="repo-path" value="${esc(d.repo.path)}" aria-label="Repo path" autocomplete="off" spellcheck="false"></label><div class="muted" style="font-size:12px">The orchestrator must be stopped first. The factory works on one repo at a time.</div>`, 'Save',
-    (code, key) => post('/api/settings/repo', {path: $('#repo-path').value.trim(), code}, key));
+  confirmSheet('Change repo', `<label class="search" style="max-width:none">${icon('book-open', 'sm')}<input id="repo-path" value="${esc(d.repo.path)}" aria-label="Repo path" autocomplete="off" spellcheck="false"></label><div class="muted" style="font-size:12px">The orchestrator must be stopped first. The factory works on one repo at a time.</div>`, 'Save',
+    key => post('/api/settings/repo', {path: $('#repo-path').value.trim()}, key));
 }
 
 /* The Claude account section: the server lists the accounts and words every label. Switch runs as an operation, Remove

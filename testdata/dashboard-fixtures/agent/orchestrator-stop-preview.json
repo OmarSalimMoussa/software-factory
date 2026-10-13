@@ -93,6 +93,6 @@
    }
   ],
   "button": "Stop the factory",
-  "coded": true
+  "confirm": true
  }
 }

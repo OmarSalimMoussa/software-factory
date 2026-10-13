@@ -9,6 +9,7 @@ from warden_fakes import FakeClock, code_now
 from runtime.shared import protocol, totp
 from runtime.shared.models import WORKING, Session
 from runtime.shared.protocol import Refused
+from runtime.warden import verbs
 from runtime.warden.context import Caller, Context
 from runtime.warden.dispatch import AGENT_SOCKET, OWNER_SOCKET, Dispatcher, Doors
 from runtime.warden.sessions import registry
@@ -69,6 +70,10 @@ def test_a_coded_action_runs_only_with_the_owners_code(
     assert handlers.ran == ["settings.save"]
 
 
+def test_only_signing_a_device_in_asks_for_the_code() -> None:
+    assert sorted(name for name, verb in verbs.VERBS.items() if verb.coded) == ["device.admit"]
+
+
 def test_a_code_is_accepted_once(dispatcher: Dispatcher, doors: Doors, handlers: Handlers) -> None:
     code = code_now(doors.places, doors.clock)
     assert ask(dispatcher, "settings.save", code=code)["ok"] is True
@@ -87,16 +92,14 @@ def _wrong(doors: Doors) -> str:
     return next(c for c in (f"{n:06d}" for n in range(1000)) if c not in near and c != right)
 
 
-def test_wrong_codes_lock_coded_actions_but_never_pausing(dispatcher: Dispatcher, doors: Doors,
-                                                          handlers: Handlers) -> None:  # fmt: skip
+def test_wrong_codes_lock_coded_actions_for_a_while(dispatcher: Dispatcher, doors: Doors, handlers: Handlers) -> None:
     limit = doors.settings().get_int("dashboard.wrong_codes_to_lock")
     answers = [ask(dispatcher, "settings.save", code=_wrong(doors)) for _ in range(limit)]
     assert answers[0]["reason"] == f"wrong code, {limit - 1} tries left"
     assert answers[-1]["refused"] == "code-locked"
 
     assert ask(dispatcher, "settings.save", code=code_now(doors.places, doors.clock))["refused"] == "code-locked"
-    assert ask(dispatcher, "factory.pause", code=code_now(doors.places, doors.clock))["ok"] is True
-    assert handlers.ran == ["factory.pause"]
+    assert handlers.ran == []
 
     assert isinstance(doors.clock, FakeClock)
     doors.clock.t += doors.settings().get_int("dashboard.lock_minutes") * 60 + totp.STEP_S

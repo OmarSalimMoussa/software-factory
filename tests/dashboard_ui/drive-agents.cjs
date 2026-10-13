@@ -76,21 +76,21 @@ drive('agents', async t => {
   await p.click('#sheet-foot [data-action="sheet-back"]'); await settle(p);
   t.check((await p.textContent('#sheet-title')).trim() === 'Clearer empty states on Projects and Invoices', 'Keep running did not return to the agent');
   await p.keyboard.press('Escape'); await settle(p);
-  // Pause from the orchestrator's panel: the code, the steps, then the paused banner with Resume
+  // Pause from the orchestrator's panel: one click, the steps, then the paused banner with Resume
   await p.click('[data-agent="orchestrator"] .nname'); await settle(p);
   t.check(await p.$('#sheet-foot [data-action="pause"]') && await p.$('#sheet-foot [data-stop="orchestrator"]') && await p.$('#sheet-foot a[href*="claude.ai"]'), 'orchestrator panel lacks Pause, Stop or Open chat');
   await p.click('#sheet-foot [data-action="pause"]'); await settle(p);
-  await t.code(p);
+  await t.confirm(p);
   t.check(await until(p, () => document.querySelector('.steps li')), 'pausing shows no steps');
   await p.waitForFunction(() => (document.querySelector('.ro-banner') || {}).textContent?.includes('The factory is paused'), null, {timeout: 8000}).catch(() => t.errors.push('no paused banner'));
   await t.shot(p, 'paused-1440.png');
-  await p.click('[data-action="resume"]'); await settle(p); await t.code(p);
+  await p.click('[data-action="resume"]'); await settle(p); await t.confirm(p);
   await p.waitForFunction(() => !document.querySelector('.ro-banner'), null, {timeout: 8000}).catch(() => t.errors.push('banner stayed after Resume'));
-  // stopping the whole factory needs the code; then the stopped banner offers Start
+  // stopping the whole factory asks to confirm it first; then the stopped banner offers Start
   await p.click('[data-stop="orchestrator"]'); await settle(p);
   await p.click('#sheet-foot [data-stopnow="orchestrator"]'); await settle(p);
-  t.check(await p.$('#code-0'), 'no code asked to stop the factory');
-  await t.code(p);
+  t.check(await p.$('#confirm-ok') && !(await p.$('#code-0')), 'stopping the factory is not confirmed first, without a code');
+  await t.confirm(p);
   t.check(await until(p, () => document.querySelector('.ro-banner [data-action="start-orch"]')), 'no stopped-factory banner');
   await settle(p);
   t.check(!(await p.$('.node-card .kill')), 'agents still stoppable after stopping the factory');

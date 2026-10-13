@@ -64,6 +64,7 @@ async function drive(name, fn, start = liveServer) {
     wide: async (p, tag) => { if (await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) errors.push(tag + ': sideways scroll'); },
     shot: async (p, file, opts = {}) => { if (shots) { fs.mkdirSync(shots, {recursive: true}); await p.screenshot({path: path.join(shots, file), ...opts}); } },
     code: async (p, digits = '123456') => { for (let i = 0; i < 6; i++) await p.fill('#code-' + i, digits[i]); },
+    confirm: async p => { await p.click('#confirm-ok'); },
     go: async (p, page) => { await p.evaluate(pg => go(pg), page); await ready(p); }
   };
   try { await fn(t); } catch (e) { errors.push('DRIVER FAILED: ' + (e.stack || e.message)); }

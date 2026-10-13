@@ -329,7 +329,7 @@ def stop(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
 
 
 def owner_stop(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Retire a session and all under it; the orchestrator takes the whole factory with it, and needs the code."""
+    """Retire a session and all under it; the orchestrator takes the whole factory with it."""
     with ctx.lock:
         sessions = read(ctx)
         target = find(ctx, sessions, text_arg(args, "session"))
@@ -337,9 +337,6 @@ def owner_stop(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[s
             raise Refused("retired", f"{target.name} is already retired")
         tree = registry.subtree(sessions, target.id)
         if target.role == ORCH:
-            from runtime.warden.owner.codes import check_code
-
-            check_code(ctx, args.get("code"), lock_exempt=True)  # a code lock never blocks stopping the factory
             tree = [target, *(s for s in sessions.values() if s is not target)]
         retired = retire(ctx, tree, target, models.STOPPED, OWNER, "stopped by the owner")
         registry.write(ctx.places, sessions)

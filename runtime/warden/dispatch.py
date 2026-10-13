@@ -27,9 +27,6 @@ from runtime.warden.verbs import VERBS, Verb
 log = logging.getLogger("factory.warden")
 
 AGENT_SOCKET, OWNER_SOCKET = "agent", "owner"
-# Pausing the factory stays possible while coded actions are locked; stopping the orchestrator is checked in its
-# handler with the same exemption.
-LOCK_EXEMPT = frozenset({"factory.pause"})
 _KEY = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
 
 Handler = Callable[[Context, dict[str, Any], bytes | None], dict[str, Any]]
@@ -175,7 +172,7 @@ class Dispatcher:
         ctx = self.doors.context(caller)
         try:
             if verb.coded:
-                codes.check_code(ctx, args.get("code"), lock_exempt=name in LOCK_EXEMPT)
+                codes.check_code(ctx, args.get("code"))
             result = self.handlers[name](ctx, args, data)
         # telemetry: surfaced — the caller's answer is `refused`, with the rule and the reason
         except Refused as exc:

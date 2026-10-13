@@ -118,7 +118,7 @@ def _settings_args(body: Body, ref: str, snap: Snap | None) -> dict[str, Any]:
     if not isinstance(changes, dict) or not changes:
         raise PartError("Send the changed settings.")
     saved = {key: settings.to_saved(snap.settings, key, value) for key, value in changes.items()}
-    return {"changes": saved, "code": body.get("code")}
+    return {"changes": saved}
 
 
 def _push_back_args(body: Body, ref: str, snap: Snap | None) -> dict[str, Any]:
@@ -129,7 +129,7 @@ def _push_back_args(body: Body, ref: str, snap: Snap | None) -> dict[str, Any]:
     previous = snap.get("deploys")["push_back"]
     if not previous or not previous.startswith(sent):
         raise Stale(STALE)
-    return {"expected_sha": previous, "code": body.get("code")}
+    return {"expected_sha": previous}
 
 
 def _account_name(body: Body) -> str:
@@ -220,29 +220,27 @@ WRITES: list[tuple[re.Pattern[str], Write]] = [
     _needs("designer", "needs.designer", lambda b, r, s: {"card": r}),
     _needs("park", "needs.park", lambda b, r, s: {"card": r}),
     _needs("answer", "needs.answer", lambda b, r, s: {"card": r, "answer": _text(b, "text")}),
-    _w(f"agents/{_P}/stop", "agent.stop", lambda b, r, s: {"session": r, "code": b.get("code")},
+    _w(f"agents/{_P}/stop", "agent.stop", lambda b, r, s: {"session": r},
        lambda a, s: _stopped(a), ["agents", "home", "shell"], _agent_check, ("sessions",)),
     _w("agent/message", "agent.message", lambda b, r, s: {"session": _text(b, "session"), "text": _said_text(b)},
        lambda a, s: _said(a, "Sending your message."), ["agent", "home"]),
     _w("outage/stop", "outage.stop", lambda b, r, s: {}, lambda a, s: _said(a, "The fix is stopped."), _HOME),
     _w("orchestrator/start", "orchestrator.start", lambda b, r, s: {},
        lambda a, s: "The orchestrator is starting.", ["agents", "shell"]),
-    _w("factory/pause", "factory.pause", lambda b, r, s: {"code": b.get("code")},
+    _w("factory/pause", "factory.pause", lambda b, r, s: {},
        lambda a, s: "Paused. Every agent is benched with its work kept.", ["agents", "home", "shell"]),
     _w("factory/resume", "factory.resume", lambda b, r, s: {},
        lambda a, s: "Resuming. Every agent comes back in order.", ["agents", "home", "shell"]),
     _w("factory/check", "factory.check", lambda b, r, s: {},
        lambda a, s: "Asking GitHub for a newer factory.", ["settings"]),
-    _w("factory/upgrade", "factory.upgrade", lambda b, r, s: {"commit": _text(b, "commit"), "code": b.get("code")},
+    _w("factory/upgrade", "factory.upgrade", lambda b, r, s: {"commit": _text(b, "commit")},
        lambda a, s: "Upgrading. The dashboard restarts on the way.", ["home", "shell"]),
     _w("settings", "settings.save", _settings_args, lambda a, s: "Saving.", ["settings"], wants=("settings",)),
-    _w("settings/repo", "repo.change", lambda b, r, s: {"changes": {"repo.path": _text(b, "path")},
-                                                         "code": b.get("code")},
+    _w("settings/repo", "repo.change", lambda b, r, s: {"changes": {"repo.path": _text(b, "path")}},
        lambda a, s: "Changing the repo.", ["settings"]),
-    _w(f"rules/{_P}", "rule.switch", lambda b, r, s: {"rule": r, "on": b.get("on"), "code": b.get("code")},
+    _w(f"rules/{_P}", "rule.switch", lambda b, r, s: {"rule": r, "on": b.get("on")},
        lambda a, s: f"{a['rule']} is {'on' if a['on'] else 'off'}.", ["guard"]),
-    _w("push", "push.prod", lambda b, r, s: {"expected_staging_sha": _text(b, "expected_staging_sha"),
-                                              "code": b.get("code")},
+    _w("push", "push.prod", lambda b, r, s: {"expected_staging_sha": _text(b, "expected_staging_sha")},
        lambda a, s: _said(a, "Pushing to prod."), ["home", "shell"]),
     _w("push/back", "push.back", _push_back_args, lambda a, s: _said(a, "Pushing prod back."), ["home", "shell"],
        wants=("deploys",)),

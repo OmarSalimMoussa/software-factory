@@ -13,6 +13,6 @@
    }
   ],
   "button": "Stop it",
-  "coded": false
+  "confirm": false
  }
 }

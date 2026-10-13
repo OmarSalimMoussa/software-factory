@@ -68,7 +68,7 @@ def test_a_right_code_admits_the_device_with_a_strict_owner_cookie(rig: Rig) -> 
 
 
 def test_a_wrong_code_says_how_many_tries_are_left(rig: Rig) -> None:
-    reply = rig.post("/api/factory/pause", {"code": "000000", "idempotency_key": "pause-0001"})
+    reply = rig.post("/api/device", {"code": "000000", "idempotency_key": "device-0001"})
     assert reply.status == 403
     assert json.loads(reply.body) == {
         "ok": False,

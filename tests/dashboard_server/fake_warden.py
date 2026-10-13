@@ -119,11 +119,11 @@ class FakeWarden:
         respawn.resume = lambda ctx, s, message: calls.append(("resume", (s.id, message)))
         if accept is not None:
 
-            def check(ctx: Any, code: object, *, lock_exempt: bool = False) -> None:
+            def check(ctx: Any, code: object) -> None:
                 if code == accept and codes.locked_until(ctx.places, ctx.clock.now()) is None:
                     store.write_json(ctx.places.code_lock, {"last_step": None, "wrong": [], "locked_until": None})
                     return
-                real(ctx, code, lock_exempt=lock_exempt)
+                real(ctx, code)
 
             codes.check_code = check
 

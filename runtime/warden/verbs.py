@@ -122,20 +122,18 @@ VERBS: dict[str, Verb] = {
     "needs.park": _o("runtime.queue.verbs:owner_park"),
     "needs.answer": _o("runtime.queue.verbs:owner_answer"),
     "agent.message": _o("runtime.warden.owner.messages:send"),  # contract: the owner's message to a running session
-    "agent.stop": _o(
-        "runtime.warden.sessions.lifecycle:owner_stop"
-    ),  # coded for the orchestrator: checked in the handler
+    "agent.stop": _o("runtime.warden.sessions.lifecycle:owner_stop"),
     "orchestrator.start": _o("runtime.warden.sessions.lifecycle:owner_start_orchestrator"),
-    "factory.pause": _o("runtime.warden.sessions.revive:owner_pause", coded=True),
+    "factory.pause": _o("runtime.warden.sessions.revive:owner_pause"),
     "factory.resume": _o("runtime.warden.sessions.revive:owner_resume"),
-    "factory.upgrade": _o("runtime.warden.owner.factory_upgrade:start", coded=True),
+    "factory.upgrade": _o("runtime.warden.owner.factory_upgrade:start"),
     "factory.check": _o("runtime.warden.owner.factory_upgrade:check"),
     "outage.stop": _o("runtime.warden.delivery.outage:owner_stop_fix"),
-    "settings.save": _o("runtime.warden.owner.settings_save:save", coded=True),
-    "repo.change": _o("runtime.warden.owner.settings_save:change_repo", coded=True),
-    "rule.switch": _o("runtime.warden.owner.settings_save:switch_rule", coded=True),
-    "push.prod": _o("runtime.warden.delivery.prod_push:push_prod", coded=True),
-    "push.back": _o("runtime.warden.delivery.prod_push:push_back", coded=True),
+    "settings.save": _o("runtime.warden.owner.settings_save:save"),
+    "repo.change": _o("runtime.warden.owner.settings_save:change_repo"),
+    "rule.switch": _o("runtime.warden.owner.settings_save:switch_rule"),
+    "push.prod": _o("runtime.warden.delivery.prod_push:push_prod"),
+    "push.back": _o("runtime.warden.delivery.prod_push:push_back"),
     # contract: added by FB9, the agents' Claude accounts. No code: only the owner's own uid reaches owner.sock.
     "account.list": _o("runtime.warden.owner.accounts:list_accounts"),
     "account.add": _o("runtime.warden.owner.accounts:add"),

@@ -190,7 +190,7 @@ def code_question(secret: str, link: str) -> dict[str, Any]:
     """The 6-digit code's secret as a QR code to scan, its key below it to type instead."""
     grid = qr.matrix(link)
     text = ("Scan this with your authenticator app. It is shown once, now. The dashboard asks for a code from it to "
-            "sign in a device and before each coded action, such as Push to prod.")  # fmt: skip
+            "sign in a device.")  # fmt: skip
     return _question(
         "Add the 6-digit code to your authenticator app", text, [_action("done", "I added it", "primary")],
         boxes=[_box("Or type this key into the app", secret)],

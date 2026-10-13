@@ -76,11 +76,35 @@ function sheetPart(env, name, draw, title) {
   return draw(p.data);
 }
 
-/* ---------- the code sheet: six boxes; wrong code, locked, refused and failed each say what happened ---------- */
+/* ---------- the confirm sheet: what the action does, and one button; refused and failed each say what happened ---------- */
+const sendFailed = e => e instanceof TimedOut ? 'No answer came in time, so it may have gone through. Trying again is safe: it is never done twice.' : e instanceof ApiDown ? "The warden did not answer, so nothing changed. Try again." : `That failed: ${e.message} Nothing changed.`;
+function sheetDone(ans, opts) {
+  UI.device = false; closeSheet();
+  if (ans.message) toast(ans.message, opts.icon);
+  if (opts.onOk) opts.onOk(ans);
+  if (ans.op) runOp(ans.op);
+  refreshParts(ans.refresh || []);
+}
+function confirmSheet(title, intro, okWord, send, opts = {}) {
+  openSheet(title, `${intro}<div class="code-note ${opts.blocked ? 'bad' : ''}" id="confirm-note">${esc(opts.blocked || '')}</div>`,
+    `<button class="btn quiet" data-action="close-sheet">Cancel</button><button class="btn primary" id="confirm-ok" ${opts.blocked ? 'disabled' : ''}>${esc(okWord)}</button>`);
+  const ok = $('#confirm-ok'), noteEl = $('#confirm-note'), key = newKey();
+  const say = (text, bad) => { noteEl.textContent = text; noteEl.className = 'code-note' + (bad ? ' bad' : ''); };
+  ok.addEventListener('click', async () => {
+    if (UI.down) { say(`Can't reach the warden since ${UI.down}. Nothing was sent.`, true); return; }
+    ok.disabled = true; say('Sending…');
+    let ans;
+    try { ans = await send(key); }
+    catch (e) { ok.disabled = false; if (e instanceof NeedsDevice) { closeSheet(); askDevice(); return; } say(sendFailed(e), true); return; }
+    if (!ans.ok) { ok.disabled = false; say(ans.reason || 'The factory refused that.', true); return; }
+    sheetDone(ans, opts);
+  });
+}
+/* ---------- the code sheet, which signs a device in: six boxes; wrong code, locked and failed each say what happened ---------- */
 function codeSheet(title, intro, okWord, send, opts = {}) {
-  const lockedUntil = UI.shell && UI.shell.code.locked_until && !opts.lockExempt ? UI.shell.code.locked_until : null;
-  const off = !!lockedUntil || !!opts.blocked;
-  const note = lockedUntil ? `Coded actions are locked until ${lockedUntil}.` : opts.blocked ? opts.blocked : 'The code from your authenticator app.';
+  const lockedUntil = UI.shell && UI.shell.code.locked_until ? UI.shell.code.locked_until : null;
+  const off = !!lockedUntil;
+  const note = lockedUntil ? `Signing in is locked until ${lockedUntil}.` : 'The code from your authenticator app.';
   openSheet(title, `${intro}<div class="section"><div class="label">Your 6-digit code</div><div class="code-boxes" id="code">${Array.from({length: 6}, (_, i) => `<input id="code-${i}" maxlength="1" inputmode="numeric" autocomplete="one-time-code" aria-label="Digit ${i + 1}" ${off ? 'disabled' : ''}>`).join('')}</div><div class="code-note ${off ? 'bad' : ''}" id="code-note">${esc(note)}</div></div>`,
     `${opts.device ? '' : '<button class="btn quiet" data-action="close-sheet">Cancel</button>'}<button class="btn primary" id="code-ok" ${off ? 'disabled' : ''}>${esc(okWord)}</button>`, opts.fresh);
   if (opts.device) $('#sheet-x').hidden = true;
@@ -98,7 +122,7 @@ function codeSheet(title, intro, okWord, send, opts = {}) {
     catch (e) {
       boxes.forEach(b => b.disabled = false); ok.disabled = false;
       if (e instanceof NeedsDevice) { UI.device = false; closeSheet(); askDevice(); return; }
-      say(e instanceof TimedOut ? 'No answer came in time, so it may have gone through. Trying again is safe: it is never done twice.' : e instanceof ApiDown ? "The warden did not answer, so nothing changed. Try again." : `That failed: ${e.message} Nothing changed.`, true);
+      say(sendFailed(e), true);
       return;
     }
     if (!ans.ok) {
@@ -108,11 +132,7 @@ function codeSheet(title, intro, okWord, send, opts = {}) {
       if (c.tries_left != null) { const box = $('#code'); box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake'); boxes[0].focus(); say(ans.reason, true); return; }
       boxes[0].focus(); say(ans.reason || 'The factory refused that.', true); return;
     }
-    UI.device = false; closeSheet();
-    if (ans.message) toast(ans.message, opts.icon);
-    if (opts.onOk) opts.onOk(ans);
-    if (ans.op) runOp(ans.op);
-    refreshParts(ans.refresh || []);
+    sheetDone(ans, opts);
   };
   boxes.forEach((b, i) => {
     b.addEventListener('input', () => { b.value = b.value.replace(/\D/g, '').slice(-1); if (b.value && i < 5) boxes[i + 1].focus(); if (boxes.every(x => x.value)) submit(); });
@@ -126,7 +146,7 @@ function askDevice() {
   if (UI.device) return;
   closeSheet(); UI.device = true; clearTimeout(UI.pollT);
   codeSheet('Sign in this device', '<div class="muted">Enter the 6-digit code from your authenticator app. This browser then stays signed in to the dashboard.</div>', 'Sign in',
-    (code, key) => post('/api/device', {code}, key), {device: true, lockExempt: true, fresh: true, onOk: () => { start(); }});
+    (code, key) => post('/api/device', {code}, key), {device: true, fresh: true, onOk: () => { start(); }});
 }
 
 /* ---------- operations: long actions show their steps, and survive a reload ---------- */
@@ -192,12 +212,12 @@ async function openPromote() {
   const d = p.data;
   UI.origins = Object.fromEntries(d.tasks.map(t => [t.id, t.built_from]));
   if (d.prod_runs_staging) { openSheet('Push to prod', `<div class="card empty" style="min-height:120px">${icon('check')} Prod already runs what staging runs.</div>${d.previous_prod ? `<button class="btn" data-action="promote-back" data-write data-sha="${esc(d.previous_prod)}">Push prod back to ${esc(d.previous_prod)}</button>` : ''}`, ''); return; }
-  codeSheet('Push to prod', `<div class="diff">${envBox('Prod now', d.prod)}<span style="color:var(--faint);display:grid;place-items:center">${icon('chevron-right')}</span>${envBox('Staging', d.staging, true)}</div>
+  confirmSheet('Push to prod', `<div class="diff">${envBox('Prod now', d.prod)}<span style="color:var(--faint);display:grid;place-items:center">${icon('chevron-right')}</span>${envBox('Staging', d.staging, true)}</div>
     ${d.tasks.length ? `<div class="section"><div class="label">What prod gains <span class="n">${d.gains}</span> ${hint('Open a change to see what it was built from. Prod is redeployed at exactly the commit staging runs.')}</div><div class="card rows" style="overflow:hidden">${d.tasks.map(t => `<button class="origin-row" data-origin="${esc(t.id)}" aria-expanded="false" aria-controls="origin-${esc(t.id)}"><span class="tt" style="font-weight:500">${esc(t.title)}</span>${chip(t.chip)}<span class="chev faint">${icon('chevron-right', 'sm')}</span></button><div class="origin" id="origin-${esc(t.id)}" hidden></div>`).join('')}</div></div>` : ''}`,
-  'Push to prod', (code, key) => post('/api/push', {expected_staging_sha: d.expected_staging_sha, code}, key), {icon: 'rocket-launch', blocked: d.blocked});
+  'Push to prod', key => post('/api/push', {expected_staging_sha: d.expected_staging_sha}, key), {icon: 'rocket-launch', blocked: d.blocked});
 }
 function openPushBack(sha) {
-  codeSheet('Push prod back', `<div class="muted">Prod is redeployed at ${esc(sha)}, the commit it ran before.</div>`, 'Push back', (code, key) => post('/api/push/back', {expected_sha: sha, code}, key), {icon: 'arrow-path'});
+  confirmSheet('Push prod back', `<div class="muted">Prod is redeployed at ${esc(sha)}, the commit it ran before.</div>`, 'Push back', key => post('/api/push/back', {expected_sha: sha}, key), {icon: 'arrow-path'});
 }
 
 function openMore() { openSheet('More', `<div class="more-grid">${UI.pages.slice(4).map(([id, n, ic]) => `<button data-go="${id}" data-close="1">${icon(ic)}${esc(n)}</button>`).join('')}</div><div class="section"><div class="label">Theme</div><div class="seg">${['system', 'light', 'dark'].map(t => `<button data-theme-set="${t}" aria-pressed="${theme() === t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join('')}</div></div>`, '', true); }

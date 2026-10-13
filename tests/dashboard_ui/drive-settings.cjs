@@ -1,5 +1,5 @@
 'use strict';
-/* Settings: a control for each kind, changed rows with "was", Undo and Reset to default, the save bar, the coded save
+/* Settings: a control for each kind, changed rows with "was", Undo and Reset to default, the save bar, the save
    with its steps, Change repo sending the path (and refused while running), a conflict from another device. */
 const {drive, settle, until, texts} = require('./lib.cjs');
 
@@ -39,16 +39,16 @@ drive('settings', async t => {
   await p.click('[data-step="1"][data-key="caps.designers"]');
   await p.click('[data-action="review"]'); await settle(p);
   t.check((await p.textContent('#sheet-body .changes')).includes('Sonnet 5.5 · medium → Haiku 5.5 · medium'), 'review does not list the change');
-  await t.code(p);
+  await t.confirm(p);
   t.check(await until(p, () => document.querySelector('#sheet-title').textContent === 'Saving settings' && document.querySelector('.steps li')), 'no save steps');
   await p.waitForFunction(() => document.querySelector('.audit') && document.querySelector('.audit').textContent.includes('Haiku 5.5'), null, {timeout: 8000}).catch(() => t.errors.push('audit did not record the save'));
   const save = (await t.srv.calls()).filter(c => c.method === 'POST' && c.path === '/api/settings').at(-1);
   t.check(save && JSON.stringify(save.body.changes) === '{"models.intake":{"model":"Haiku 5.5","effort":"medium"},"caps.designers":3}', 'save sent: ' + JSON.stringify(save && save.body.changes));
   t.check(!(await p.$eval('#savebar', e => e.classList.contains('show'))), 'savebar still shows after saving');
-  // Change repo sends the path; the factory refuses while it runs, and says why (it is not a wrong code)
+  // Change repo sends the path; the factory refuses while it runs, and says why
   await p.click('[data-action="change-repo"]'); await settle(p);
-  await p.fill('#repo-path', '/srv/products/other-app'); await t.code(p); await settle(p);
-  t.check((await p.textContent('#code-note')).includes('Stop the factory first'), 'repo refusal not shown: ' + await p.textContent('#code-note'));
+  await p.fill('#repo-path', '/srv/products/other-app'); await t.confirm(p); await settle(p);
+  t.check((await p.textContent('#confirm-note')).includes('Stop the factory first'), 'repo refusal not shown: ' + await p.textContent('#confirm-note'));
   const repo = (await t.srv.calls()).filter(c => c.method === 'POST' && c.path === '/api/settings/repo').at(-1); t.check(repo && repo.body.path === '/srv/products/other-app', 'repo path not sent');
   await p.keyboard.press('Escape'); await settle(p);
   // an edit made against a value another device then changed is dropped, and the owner is told

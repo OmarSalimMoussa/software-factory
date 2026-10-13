@@ -7,7 +7,7 @@ PAGE.guard = {
     ${part(env, 'vitals', v => `<div class="gauges ${env.parts.docker ? 'five' : ''}">${v.map(gauge).join('')}${dockerCard(env.parts.docker)}</div>`)}
     <section class="section"><div class="sec-h"><div class="label">Slots</div></div>${part(env, 'slots', s => s.length ? `<div class="slots-row">${s.map(slotCard).join('')}</div>` : '<div class="card empty">No slot is set up.</div>')}</section>
     <section class="section"><div class="sec-h"><div class="label">Most refusals today</div></div>${part(env, 'refusals', refusalBars)}</section>
-    <section class="section"><div class="sec-h"><div class="label">Rules ${hint('Switching a rule on or off needs your 6-digit code.')}</div></div>${part(env, 'rules', rs => `<div class="rules">${rs.map(ruleCard).join('')}</div>`)}</section>`
+    <section class="section"><div class="sec-h"><div class="label">Rules</div></div>${part(env, 'rules', rs => `<div class="rules">${rs.map(ruleCard).join('')}</div>`)}</section>`
 };
 const meterHTML = (pct, tone) => pct == null ? '<div class="meter unknown"></div>' : `<div class="meter"><i style="width:${pct}%;background:${toneColor(tone)}"></i></div>`;
 const gauge = g => `<div class="card gauge"><div class="label">${esc(g.label)}</div><div class="big" style="font-size:24px">${esc(g.value)}</div>${meterHTML(g.pct, g.tone)}</div>`;
@@ -26,6 +26,6 @@ function refusalBars(rs) {
 }
 const ruleCard = r => r.broken ? `<div class="card rule">${brokenRow(r)}</div>` : `<div class="card rule"><div><div class="rn">${esc(r.id)}${r.hint ? ' ' + hint(r.hint, true) : ''}</div><div class="rr">${esc(r.today)}</div></div><button class="switch" role="switch" aria-checked="${r.on}" data-rule="${esc(r.id)}" data-on="${r.on}" aria-label="${esc(r.id)}" data-write></button></div>`;
 function ruleToggle(id, on) {
-  codeSheet(`${on ? 'Switch off' : 'Switch on'} ${id}`, `<div class="muted">${on ? 'Agents will no longer be stopped by this rule until you switch it back on.' : 'The rule applies again to every agent at once.'}</div>`, on ? 'Switch off' : 'Switch on',
-    (code, key) => post(`/api/rules/${encodeURIComponent(id)}`, {on: !on, code}, key), {icon: 'shield-check'});
+  confirmSheet(`${on ? 'Switch off' : 'Switch on'} ${id}`, `<div class="muted">${on ? 'Agents will no longer be stopped by this rule until you switch it back on.' : 'The rule applies again to every agent at once.'}</div>`, on ? 'Switch off' : 'Switch on',
+    key => post(`/api/rules/${encodeURIComponent(id)}`, {on: !on}, key), {icon: 'shield-check'});
 }

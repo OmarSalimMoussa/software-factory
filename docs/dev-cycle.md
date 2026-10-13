@@ -32,7 +32,7 @@ part; the guard and the warden enforce the limits in code.
    checked.
 10. **Staging.** `factory push` pushes the newest commit whose merges all passed their check, and CI deploys
     staging. A regression there is reverted at once.
-11. **Prod.** Only the owner pushes to prod, from the dashboard with the 6-digit code, at exactly the commit staging
+11. **Prod.** Only the owner pushes to prod, from the dashboard, at exactly the commit staging
     runs. Pushing back redeploys the commit prod ran before.
 
 ## The rungs

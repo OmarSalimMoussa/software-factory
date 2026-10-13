@@ -93,40 +93,32 @@ drive('errors', async t => {
   await p.click('#sheet-foot [data-prop-act="approve"]'); await settle(p);
   t.check((await toastText(p)).includes('This changed; here it is now.') && await p.$eval('#sheet', e => e.classList.contains('open')), 'stale action not refused in place');
   await p.keyboard.press('Escape'); await settle(p);
-  // wrong codes count down, then lock with a time; a locked sheet opens locked; Pause is never locked
-  await t.go(p, 'guard');
-  await p.click('.rule .switch'); await settle(p);
+  await p.close();
+  // wrong codes count down, then lock signing in with a time
+  const l = await t.open(1440, 900, 'home', {admit: false});
+  await l.waitForSelector('#code-0');
   for (const left of [4, 3, 2, 1]) {
-    await t.code(p, '000000'); await settle(p);
-    const note = await p.textContent('#code-note');
+    await t.code(l, '000000'); await settle(l);
+    const note = await l.textContent('#code-note');
     t.check(note.includes(`Wrong code, ${left} ${left === 1 ? 'try' : 'tries'} left.`), `tries left ${left}: ${note}`);
   }
-  await t.code(p, '000000'); await settle(p);
-  t.check(/Locked after too many wrong codes\. Try again at \d\d:\d\d\./.test(await p.textContent('#code-note')) && await p.$eval('#code-0', e => e.disabled), 'no lock after five wrong codes');
-  await t.shot(p, 'locked-1440.png');
-  await p.keyboard.press('Escape'); await settle(p);
-  await p.evaluate(() => loadShell()); await settle(p);
-  await p.click('.rule .switch'); await settle(p);
-  t.check((await p.textContent('#code-note')).includes('Coded actions are locked until') && await p.$eval('#code-0', e => e.disabled), 'a coded sheet does not open locked');
-  await p.keyboard.press('Escape'); await settle(p);
-  await t.go(p, 'agents');
-  await p.click('[data-agent="orchestrator"] .nname'); await settle(p); await p.click('#sheet-foot [data-action="pause"]'); await settle(p);
-  t.check(!(await p.$eval('#code-0', e => e.disabled)), 'Pause is blocked by the lock');
-  await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await settle(p);
-  await p.close();
+  await t.code(l, '000000'); await settle(l);
+  t.check(/Locked after too many wrong codes\. Try again at \d\d:\d\d\./.test(await l.textContent('#code-note')) && await l.$eval('#code-0', e => e.disabled), 'no lock after five wrong codes');
+  await t.shot(l, 'locked-1440.png');
+  await l.close();
 
   // an operation survives a reload, and a failing one says which step failed
   await t.srv.reset(); await t.srv.set({op_ms: 1200});
   const o = await t.open(1440, 900, 'settings');
   await o.click('[data-step="1"][data-key="caps.designers"]'); await o.click('[data-action="review"]'); await settle(o);
-  await t.code(o);
+  await t.confirm(o);
   t.check(await until(o, () => document.querySelector('.steps li')), 'no steps before the reload');
   await o.reload(); await ready(o);
   await o.waitForFunction(() => document.querySelector('#sheet-title').textContent === 'Saving settings' && document.querySelector('.steps li'), null, {timeout: 4000}).catch(() => t.errors.push('the operation did not come back after a reload'));
   await o.waitForFunction(() => document.querySelector('#toasts').textContent.includes('The new values are in effect.'), null, {timeout: 9000}).catch(() => t.errors.push('the operation did not finish after a reload'));
   await settle(o);
   await t.srv.set({op_fail: true, op_ms: 400});
-  await o.click('#top-promote'); await settle(o); await t.code(o);
+  await o.click('#top-promote'); await settle(o); await t.confirm(o);
   await o.waitForFunction(() => document.querySelector('#toasts').textContent.includes('failed at'), null, {timeout: 6000}).catch(() => t.errors.push('a failed operation did not say so'));
   t.check((await toastText(o)).includes('Pushing to prod failed at “Redeploying prod at a1b2c3d”. The deploy ended failure: https://github.invalid/r'), 'failed step not named: ' + await toastText(o));
   t.check(await o.$('.steps li.failed') && await o.$('#sheet-foot [data-action="close-sheet"]'), 'the failed step is not marked in the panel');

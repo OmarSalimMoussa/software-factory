@@ -112,7 +112,7 @@ def preview(snap: Snap, row: dict[str, Any]) -> dict[str, Any]:
             "back to Proposed next for you to start again.",
             "rows": listed,
             "button": "Stop the factory",
-            "coded": True,
+            "confirm": True,
         }
     name = words.name(snap, row)
     text = (
@@ -127,7 +127,7 @@ def preview(snap: Snap, row: dict[str, Any]) -> dict[str, Any]:
         "text": text,
         "rows": listed if len(rows) > 1 else [],
         "button": f"Stop {len(rows)} agents" if len(rows) > 1 else "Stop it",
-        "coded": False,
+        "confirm": False,
     }
 
 

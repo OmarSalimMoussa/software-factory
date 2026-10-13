@@ -1,7 +1,7 @@
 # Operating the factory
 
-What the owner does, day to day. The dashboard is the one window; the code is the 6-digit code from the
-authenticator app set up at install.
+What the owner does, day to day. The dashboard is the one window. A device signs in to it once, with the 6-digit
+code from the authenticator app set up at install; after that, every action is one click.
 
 ## Install, upgrade and uninstall
 
@@ -60,7 +60,7 @@ first, and seal the commit from your checkout the same way.
 ## Start
 
 1. Plug the laptop in and run `factory status`: the vitals, the sessions and both environments.
-2. Start the orchestrator from the dashboard's Agents page, or with `factory start orchestrator`. It needs no code.
+2. Start the orchestrator from the dashboard's Agents page, or with `factory start orchestrator`.
 
 ## Every day
 
@@ -80,12 +80,12 @@ default branch, smoke-tests it and deploys it to staging, the standard way the p
 health address with JSON naming the workspace, the running commit as `build_commit`, and the work still running as
 `busy`.
 
-When staging looks right, press Push to prod in the top bar and enter the code. The warden starts the product's
-`deploy-prod.yml` with exactly the commit staging runs, follows its deploy job, then watches prod until it answers on
-it. The release steps run last (a browser extension's store upload, when it changed); a failed release shows as the
-push's last step, with prod already live. If prod misbehaves, push back the same way: the warden starts the same
-workflow with the commit prod ran when the last push began, so a push that never answered does not move the target.
-Push to prod refuses a staging build pinned off the default branch: lift the pin first.
+When staging looks right, press Push to prod in the top bar, then Push to prod in the panel. The warden starts the
+product's `deploy-prod.yml` with exactly the commit staging runs, follows its deploy job, then watches prod until it
+answers on it. The release steps run last (a browser extension's store upload, when it changed); a failed release shows
+as the push's last step, with prod already live. If prod misbehaves, push back the same way: the warden starts the same
+workflow with the commit prod ran when the last push began, so a push that never answered does not move the target. Push
+to prod refuses a staging build pinned off the default branch: lift the pin first.
 
 Your own checkout of the product runs the factory's git hooks too: a merge into the default branch there lands only
 with a tree that passed `factory check`.
@@ -117,17 +117,17 @@ record the warden reads, the vitals turn red and the crash watch resumes and ret
 
 ## Pause, stop, resume
 
-- **Pause the factory** (code): every session, the orchestrator included, commits its work and pauses. Nothing is
+- **Pause the factory:** every session, the orchestrator included, commits its work and pauses. Nothing is
   lost; Resume brings everything back in order.
 - **Stop an agent** from the Agents page: it retires with everything under it, and its task returns to Proposed with
-  its branch kept. Stopping the orchestrator stops the whole factory and needs the code.
+  its branch kept. Stopping the orchestrator stops the whole factory, so the dashboard asks you to confirm it.
 
 ## Switch the Claude account
 
 The agents sign in to Claude with one of your accounts at a time. To move them to another, when one nears its
 limits:
 
-- **On the dashboard:** open Settings. Under Claude account, press Switch on the account you want. No code is needed.
+- **On the dashboard:** open Settings. Under Claude account, press Switch on the account you want.
 - **In a terminal:** run `factory account use <name>`.
 
 The factory makes that account active, restarts the agents' Claude daemon, and brings back every agent that was
@@ -146,8 +146,8 @@ accounts keeps its one token as the account `main`.
 
 ## Tune
 
-Change any setting on the Settings page and save with the code. Each value is checked before it is saved, the save
-is written to the warden's state on this machine, and only what reads that value reloads. See [settings.md](settings.md).
+Change any setting on the Settings page and save. Each value is checked before it is saved, the save is written to the
+warden's state on this machine, and only what reads that value reloads. See [settings.md](settings.md).
 
 ## Improve the factory
 
@@ -156,7 +156,7 @@ To act on one:
 
 1. Change the factory's repo by hand: branch, test, merge, push. The factory's CI publishes a release once every
    check passes.
-2. Home shows **A newer factory is ready**, with what changed. **Upgrade**, with your 6-digit code, pauses the
+2. Home shows **A newer factory is ready**, with what changed. **Upgrade** pauses the
    factory, waits for every agent to settle, and installs the release as root, after checking on GitHub that CI made
    it. While the dashboard is away, its address shows a page that says the factory is upgrading and comes back by
    itself. The upgrade also commits the product's `.github/factory-ref` and CI

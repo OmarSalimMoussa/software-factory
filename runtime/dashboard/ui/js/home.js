@@ -48,8 +48,8 @@ function upgradeBand(u) {
 }
 function upgradeFactory(commit) {
   const u = homePart('upgrade') || {changelog: []};
-  codeSheet('Upgrade the factory', `<div class="muted">The factory pauses, every agent keeps its work, and the new factory is installed. The dashboard restarts on the way; then you choose when to restart the factory.</div>${u.changelog.length ? `<ul class="changes">${u.changelog.map(c => `<li><span>${esc(c)}</span></li>`).join('')}</ul>` : ''}`, 'Upgrade',
-    (code, key) => post('/api/factory/upgrade', {commit, code}, key), {icon: 'arrow-up-circle'});
+  confirmSheet('Upgrade the factory', `<div class="muted">The factory pauses, every agent keeps its work, and the new factory is installed. The dashboard restarts on the way; then you choose when to restart the factory.</div>${u.changelog.length ? `<ul class="changes">${u.changelog.map(c => `<li><span>${esc(c)}</span></li>`).join('')}</ul>` : ''}`, 'Upgrade',
+    key => post('/api/factory/upgrade', {commit}, key), {icon: 'arrow-up-circle'});
 }
 
 /* ---------- the outage band: decided by the warden's probes, never by an agent ---------- */

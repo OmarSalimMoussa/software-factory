@@ -71,10 +71,11 @@ drive('home', async t => {
   await p.click('[data-origin="t-0012"]'); await settle(p); t.check(await p.$('#origin-t-0012 .mock img'), 'spec built-from has no picture');
   await p.click('[data-origin="t-0013"]'); await settle(p); t.check((await p.$$('#origin-t-0013 .shot img')).length === 3, 'fix built-from has no QA shots');
   await t.shot(p, 'push-1440.png');
-  await t.code(p);
+  t.check(!(await p.$('#code-0')), 'the push to prod still asks for the code');
+  await t.confirm(p);
   t.check(await until(p, () => document.querySelector('.steps li')), 'no steps shown for the push');
   await p.waitForFunction(() => document.querySelector('#pill-prod').textContent.includes('a1b2c3d'), null, {timeout: 8000}).catch(() => t.errors.push('prod pill did not move to a1b2c3d'));
-  const push = await lastCall('/api/push'); t.check(push && push.body.expected_staging_sha === 'a1b2c3d' && push.body.code === '123456', 'push did not send the expected staging build');
+  const push = await lastCall('/api/push'); t.check(push && push.body.expected_staging_sha === 'a1b2c3d' && !('code' in push.body), 'push did not send the expected staging build');
   await p.close();
 
   // the outage band: probes, the fix the factory started, Watch and Stop; the stopped fix waits first in Proposed next

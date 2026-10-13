@@ -29,6 +29,6 @@
    }
   ],
   "button": "Stop 3 agents",
-  "coded": false
+  "confirm": false
  }
 }

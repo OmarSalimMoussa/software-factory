@@ -5,7 +5,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 ## Two layers
 
 - **Defaults** are `settings.toml` in the factory's repo, installed with it.
-- **The owner's values** are saved from the dashboard's Settings page, with the 6-digit code. Nothing changes until
+- **The owner's values** are saved from the dashboard's Settings page. Nothing changes until
   Save. Each save is checked first: the type, the range, and for a model, the allowed list. A bad value is refused
   with the reason, and nothing is written.
 - **A save** is applied at once and kept in the warden's state, on this machine only: the factory never writes its

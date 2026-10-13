@@ -97,21 +97,21 @@ async function openStop(id) {
   const p = onlyPart(pv), a = onlyPart(ag);
   if (!p.ok) { alertToast('stop:' + id, p.error); return; }
   const d = p.data;
-  UI.stopping = {id, version: a.ok ? a.data.version : null, coded: d.coded, button: d.button, title: d.title, text: d.text};
+  UI.stopping = {id, version: a.ok ? a.data.version : null, confirm: d.confirm, button: d.button, title: d.title, text: d.text};
   const keep = sheetOpen() ? 'sheet-back' : 'close-sheet';
   openSheet(d.title, `<div>${esc(d.text)}</div><div class="stoplist">${d.rows.map(x => `<div>${ava(x.family, x.initials, 28)}<span style="min-width:0"><b>${esc(x.name)}</b> <span class="faint">${esc(x.role)} · ${esc(x.model)}</span></span><span class="cost">${esc(x.cost)}</span></div>`).join('')}</div>`,
     `<button class="btn quiet" data-action="${keep}">Keep running</button><button class="btn danger" data-stopnow="${esc(id)}" data-write>${icon('stop-circle', 'sm')}${esc(d.button)}</button>`);
 }
 function stopNow(id, btn) {
   const s = UI.stopping; if (!s || s.id !== id) return;
-  if (s.coded) codeSheet(s.title, `<div class="muted">${esc(s.text)}</div>`, s.button, (code, key) => post(`/api/agents/${encodeURIComponent(id)}/stop`, {version: s.version, code}, key), {lockExempt: true, icon: 'stop-circle'});
+  if (s.confirm) confirmSheet(s.title, `<div class="muted">${esc(s.text)}</div>`, s.button, key => post(`/api/agents/${encodeURIComponent(id)}/stop`, {version: s.version}, key), {icon: 'stop-circle'});
   else act(`/api/agents/${encodeURIComponent(id)}/stop`, {version: s.version}, {btn, icon: 'stop-circle', onOk: () => closeSheet()});
 }
 function pauseFactory() {
-  codeSheet('Pause the factory', '<div class="muted">Every agent is benched, the orchestrator included. Nothing is lost, and everything comes back in order when you resume.</div>', 'Pause the factory',
-    (code, key) => post('/api/factory/pause', {code}, key), {lockExempt: true, icon: 'pause-circle'});
+  confirmSheet('Pause the factory', '<div class="muted">Every agent is benched, the orchestrator included. Nothing is lost, and everything comes back in order when you resume.</div>', 'Pause the factory',
+    key => post('/api/factory/pause', {}, key), {icon: 'pause-circle'});
 }
 function resumeFactory() {
-  codeSheet('Resume the factory', '<div class="muted">Every benched agent comes back in order, with its full context.</div>', 'Resume the factory',
-    (code, key) => post('/api/factory/resume', {code}, key), {icon: 'play-circle'});
+  confirmSheet('Resume the factory', '<div class="muted">Every benched agent comes back in order, with its full context.</div>', 'Resume the factory',
+    key => post('/api/factory/resume', {}, key), {icon: 'play-circle'});
 }
