@@ -146,6 +146,7 @@ resume_backoff_seconds = 30  # the wait before a crashed session's next resume, 
 daemon_settle_seconds = 15  # how long the agent's Claude daemon gets, once it starts, before sessions resume in it
 bench_grace_seconds = 60  # time a pushed-out session gets to commit before it pauses
 start_grace_seconds = 120  # a started session that has not appeared by then is retired as crashed
+respawn_poll_seconds = 1  # how often the warden looks whether a session it respawned runs again
 reap_retry_minutes = 10  # a reap that could not empty a retired session's slot is tried again after this
 message_seconds = 10    # how long the warden holds the owner's message out to a session before letting go
 loop_minutes = 30

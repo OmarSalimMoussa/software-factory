@@ -155,8 +155,7 @@ def test_a_switch_restarts_the_daemon_and_brings_each_working_session_back_witho
         ("Bringing back the sessions", "done"),
     ]
     assert (op["state"], world.launcher.restarts, during) == ("done", 1, {"start": "switching", "switch": "switching"})
-    resumes = [(argv[2], argv[-1]) for argv in world.launcher.commands if argv[:2] == ["claude", "--resume"]]
-    assert resumes == [(sid, accounts.NOTE) for sid in ("0c0c0c0c", "5e550001", "5e550002")]
+    assert world.launcher.messages == [(sid, accounts.NOTE) for sid in ("0c0c0c0c", "5e550001", "5e550002")]
     assert world.events == [] and reflections.entries(world.places) == []
     assert [world.session(sid).resume_tries for sid in ("0c0c0c0c", "5e550001", "5e550002")] == [0, 0, 0]
     tester, benched = world.session("a9a9a9a9"), world.session("5e550003")
@@ -171,12 +170,12 @@ def test_a_session_that_cannot_come_back_says_why_and_the_crash_watch_resumes_it
     world.queue.add("t-0001", status="building")
     world.seat("5e550001", task="t-0001")
     world.run("5e550001")
-    world.launcher.copy = True  # Claude Code starts a copy instead of the session
+    world.launcher.lost = True
 
     op = _switch(world, "work")
 
     assert (op["state"], op["steps"][2]["state"]) == ("failed", "failed")
-    assert op["steps"][2]["detail"].startswith("implementer-5e550001 did not come back (Claude Code started a copy")
-    world.launcher.copy = False
+    assert op["steps"][2]["detail"].startswith("implementer-5e550001 did not come back (claude respawn failed")
+    world.launcher.lost = False
     crashwatch.watch(world.ctx())
     assert (world.session("5e550001").state, world.session("5e550001").resume_tries) == (WORKING, 1)

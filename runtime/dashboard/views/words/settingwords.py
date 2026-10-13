@@ -168,6 +168,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("watch.daemon_settle_seconds", "Seconds Claude's daemon gets to start before agents resume"),
             ("watch.bench_grace_seconds", "Seconds a pushed-out agent gets to commit"),
             ("watch.start_grace_seconds", "Seconds a starting agent gets to appear"),
+            ("watch.respawn_poll_seconds", "Look for an agent coming back every, seconds"),
             ("watch.reap_retry_minutes", "Try a failed clean-up again after, minutes"),
             ("watch.orchestrator_silent_minutes", "Restart a silent orchestrator after, minutes"),
             ("watch.orchestrator_busy_silent_minutes", "Restart a busy, silent orchestrator after, minutes"),

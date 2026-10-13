@@ -13,7 +13,7 @@ from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
 from runtime.shared import store
 from runtime.shared.models import REVIVING, Task
 from runtime.shared.protocol import Refused
-from runtime.warden.sessions import backstop, launch, lifecycle, permits, registry, revive
+from runtime.warden.sessions import backstop, lifecycle, permits, registry, respawn, revive
 
 TASK = Task("t-0001", "T", ["r-2026-10-09-0001"], "G1", "major", ["ui"], "queued", "2026-10-09T12:00:00Z", "")
 
@@ -160,7 +160,7 @@ def test_a_revert_said_while_its_implementer_comes_back_follows_it_once_it_is_ba
         if len(resumed) == 1:  # the orchestrator's revert lands while the revive runs
             tasks.set_status(world.ctx(), task.id, "building", "", "staging regressed; reverted as 0abc123")
 
-    monkeypatch.setattr(launch, "resume", resume)
+    monkeypatch.setattr(respawn, "resume", resume)
 
     assert revive.bring_back(world.ctx(), "s-impl", "warden") == ""
 

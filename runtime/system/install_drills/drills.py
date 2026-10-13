@@ -121,9 +121,10 @@ def hosts_refused(rig: Rig) -> Result:
 
 def background_session(rig: Rig) -> Result:
     """A real background session, started as the warden starts one: `claude --bg` names it, its record in the
-    agent's ~/.claude/sessions names it, it answers (so the daemon signed it in), and `claude stop` ends it. Each is
-    Claude Code's own, which the warden reads and no version promises to keep."""
-    name = "a background session starts, is recorded by its name, answers, and stops, as the warden reads them"
+    agent's ~/.claude/sessions names it, it answers (so the daemon signed it in), `claude stop` ends it, and
+    `claude respawn` brings it back under its own id, as the warden resumes one. Each is Claude Code's own, which the
+    warden reads and no version promises to keep."""
+    name = "a background session starts, is recorded by its name, answers, stops and respawns, as the warden reads them"
     tag = f"drill-session-{uuid.uuid4().hex[:8]}"
     ran = rig.real_session(tag, SESSION_PROMPT)
     started = BACKGROUNDED.search(ran.out)
@@ -142,16 +143,30 @@ def background_session(rig: Rig) -> Result:
     [(sid, named)] = found.items()
     while not (said := rig.session_said(sid)) and rig.now() - begun <= limit:
         rig.wait(_POLL_S)
-    stopped = rig.stop_session(short)
-    while sid in rig.session_records() and rig.now() - begun <= limit:
-        rig.wait(_POLL_S)
-    if sid in rig.session_records():
-        return Result(name, False, f"claude stop {short} left it running: {first_line(stopped.out)}")
+    failed = _stop_and_respawn(rig, short, sid, begun + limit)
+    if failed:
+        return Result(name, False, failed)
     if named != tag:
         return Result(name, False, f"its record names it {named!r}, not {tag}: the warden binds a start by its name")
     if SESSION_REPLY not in said.lower():
         return Result(name, False, f"it never answered as asked: {first_line(said) or 'it said nothing'}")
-    return Result(name, True, f"started {short}, recorded as {tag}, answered {first_line(said)!r}, stopped")
+    return Result(name, True, f"started {short}, recorded as {tag}, answered {first_line(said)!r}, stopped, respawned")
+
+
+def _stop_and_respawn(rig: Rig, short: str, sid: str, deadline: float) -> str:
+    """Why `claude stop` left the session running or `claude respawn` did not bring it back under its id; "" when
+    both did as the warden needs. The respawned session is stopped again."""
+    stopped = rig.stop_session(short)
+    while sid in rig.session_records() and rig.now() <= deadline:
+        rig.wait(_POLL_S)
+    if sid in rig.session_records():
+        return f"claude stop {short} left it running: {first_line(stopped.out)}"
+    back = rig.warden_command(["claude", "respawn", short])
+    while sid not in rig.session_records() and rig.now() <= deadline:
+        rig.wait(_POLL_S)
+    respawned = sid in rig.session_records()
+    rig.stop_session(short)
+    return "" if respawned else f"claude respawn {short} did not bring it back under its id: {first_line(back.out)}"
 
 
 def backstop_stops_claude(rig: Rig) -> Result:

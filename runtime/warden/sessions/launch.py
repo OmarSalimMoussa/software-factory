@@ -1,4 +1,4 @@
-"""How the warden starts and resumes sessions, and the real Launcher under it.
+"""How the warden starts sessions, and the real Launcher under it.
 
 The warden runs anything only by writing a request to public/launch/<id>.json and starting one of the three template
 units polkit lets it start. The one other unit action polkit allows it is a restart of the agents' Claude daemon, when
@@ -56,14 +56,12 @@ def agent_uid() -> int | None:
         return None
 
 
-# What every session runs under, start or resume, as flag and launch key; the runner checks a resume against it.
+# What every session runs under, as flag and launch key.
 CARRIED = (("--remote-control", "name"), ("--model", "model"), ("--effort", "effort"), ("--agent", "agent"),
            ("--settings", "settings"), ("--agents", "agents"))  # fmt: skip
 
 
 def _carried(launch: dict[str, Any]) -> list[str]:
-    """What a session runs under. A resume passes all of it again: Claude Code promises none of it carries over, and
-    a session resumed without its --settings would run outside the sandbox."""
     return [word for flag, key in CARRIED for word in (flag, launch[key])]
 
 
@@ -171,36 +169,15 @@ class Units:
         return StackResult(exit=code, tail=tail, log=str(log))
 
 
-def _options(ctx: Context, settings_id: str, role: str, model: str, effort: str, place: Path) -> dict[str, str]:
+def _options(ctx: Context, request_id: str, role: str, model: str, effort: str, place: Path) -> dict[str, str]:
     """The sandbox settings and agent definitions a session runs under, rendered from the current settings."""
     settings = ctx.settings()
-    path = session_settings.write(settings, ctx.places, settings_id, role, place, agent_home())
+    path = session_settings.write(settings, ctx.places, request_id, role, place, agent_home())
     try:
         agents = session_settings.agents(settings, ctx.places, role, model, effort)
     except (OSError, ValueError) as exc:
         raise Refused("launch", f"the agent launchers cannot be read ({exc}); the factory needs a reinstall") from exc
     return {"model": model, "effort": effort, "agent": role, "settings": str(path), "agents": json.dumps(agents)}
-
-
-def resume(ctx: Context, s: Session, message: str) -> None:
-    """Resume a stopped session under its own id with a message; raises LaunchError when it did not.
-
-    A copy Claude Code starts instead (it does when it still counts the session as running) is removed at once.
-    """
-    if not message.strip():
-        raise LaunchError("a resume needs a message")
-    cwd = ctx.settings().get_str("repo.path")
-    options = _options(ctx, s.id, s.role, s.model, s.effort, Path(s.worktree))
-    argv = ["claude", "--resume", s.id, "--bg", *_carried({"name": s.name, **options}), "--", message]
-    code, output = ctx.launcher.agent_command(argv, cwd)
-    if code != 0:
-        raise LaunchError(f"claude --resume failed: {output.strip()[-300:]}")
-    started = BACKGROUNDED.search(output)
-    if started is None:
-        raise LaunchError("claude --resume named no session it started")
-    if not s.id.startswith(started.group(1)):
-        ctx.launcher.agent_command(["claude", "rm", started.group(1)], cwd)
-        raise LaunchError(f"Claude Code started a copy ({started.group(1)}) instead; it was removed, try again")
 
 
 def start_session(

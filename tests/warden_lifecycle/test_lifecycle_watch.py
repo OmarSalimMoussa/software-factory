@@ -112,8 +112,8 @@ def test_a_restarted_orchestrator_is_told_the_events_it_has_not_acted_on(world: 
     world.seat("0c0c0c0c", role="orchestrator", family="orch")
     inbox.post_event(world.places, world.clock, inbox.TRIAGE_DUE, {"waiting": 3})
     crashwatch.watch(world.ctx())
-    resumed = next(argv for argv in world.launcher.commands if argv[:2] == ["claude", "--resume"])
-    assert "Events you have not acted on yet: triage due." in resumed[-1]
+    [(_, said)] = world.launcher.messages
+    assert "Events you have not acted on yet: triage due." in said
 
 
 def test_while_sessions_run_unseen_the_crash_watch_resumes_and_retires_none(world: World) -> None:

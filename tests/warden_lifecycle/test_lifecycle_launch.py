@@ -9,7 +9,7 @@ from lifecycle_fakes import World
 
 from runtime.shared import store
 from runtime.shared.protocol import Refused
-from runtime.warden.sessions import doing, launch, lifecycle, session_settings
+from runtime.warden.sessions import doing, launch, lifecycle, respawn, session_settings
 from runtime.warden.sessions.launch import LaunchError
 
 FIXTURE = Path(__file__).resolve().parents[2] / "testdata" / "fixture-product"
@@ -81,19 +81,30 @@ def test_a_stack_run_keeps_what_the_runner_printed_and_hands_back_its_tail(world
     assert not list((world.places.state / "runs").iterdir())
 
 
-def test_a_resume_runs_under_the_sessions_sandbox_settings_again(world: World) -> None:
+def test_a_resume_respawns_the_session_with_its_start_options_and_then_hands_it_the_message(world: World) -> None:
     s = world.seat("1234abcd-0000", worktree=world.settings.get_str("repo.path"))
-    launch.resume(world.ctx(), s, "carry on")
-    argv = world.launcher.commands[-1]
-    settings = json.loads(Path(argv[argv.index("--settings") + 1]).read_text())
-    assert settings["sandbox"]["enabled"] is True and "implementer" in json.loads(argv[argv.index("--agents") + 1])
+    respawn.resume(world.ctx(), s, "carry on")
+    assert world.launcher.commands == [["claude", "respawn", "1234abcd"]]
+    written = session_settings.folder(world.places) / "pending-1234abcd-0000.json"
+    assert json.loads(written.read_text())["sandbox"]["enabled"] is True
+    assert world.launcher.messages == [("1234abcd-0000", "carry on")]
 
 
-def test_a_resume_that_starts_a_copy_removes_it_and_fails(world: World) -> None:
-    world.launcher.copy = True
-    with pytest.raises(LaunchError):
-        launch.resume(world.ctx(), world.seat("1234abcd-0000"), "carry on")
-    assert ["claude", "rm", "0badc0de"] in world.launcher.commands
+@pytest.mark.parametrize(
+    ("trouble", "said"),
+    [("lost", "claude respawn failed"), ("stays_down", "did not run again"), ("unbound", "not in the history")],
+)
+def test_a_resume_that_cannot_bring_the_session_back_fails_and_sends_nothing(
+    world: World, trouble: str, said: str
+) -> None:
+    s = world.seat("1234abcd-0000")
+    if trouble == "unbound":
+        world.places.history.unlink()
+    else:
+        setattr(world.launcher, trouble, True)
+    with pytest.raises(LaunchError, match=said):
+        respawn.resume(world.ctx(), s, "carry on")
+    assert world.launcher.messages == []
 
 
 @pytest.mark.parametrize("text", ["x" * 61, "<b>bold</b>", "a & b", "\x1b[31mred"])

@@ -52,11 +52,13 @@ class FakeRig:
     launched: str = "backgrounded · 5e55abcd\n"
     recorded: str | None = "tag"  # "tag": the name the drill gave it
     stops: bool = True
+    respawns: bool = True
     said: str = "Ready"  # what the session answers
     # What the browser check printed inside the daemon's walls, and each command run there.
     browser: Ran = Ran(0, "npx: installed 1 package\nthe browser opened a page\n")
     walled: list[list[str]] = field(default_factory=list)
     _session: dict[str, str] = field(default_factory=dict)
+    _stopped: dict[str, str] = field(default_factory=dict)
 
     def real_session(self, name: str, prompt: str) -> Ran:
         if self.recorded is not None:
@@ -71,6 +73,7 @@ class FakeRig:
 
     def stop_session(self, short_id: str) -> Ran:
         if self.stops:
+            self._stopped.update(self._session)
             self._session.clear()
         return Ran(0 if self.stops else 1, "" if self.stops else "claude stop: no such session")
 
@@ -109,6 +112,9 @@ class FakeRig:
         return self.clock
 
     def warden_command(self, argv: list[str]) -> Ran:
+        if argv[:2] == ["claude", "respawn"]:
+            self._session.update(self._stopped if self.respawns else {})
+            return Ran(0, "") if self.respawns else Ran(1, f"No background session {argv[2]}")
         return self.warden[0] if "--is-inside-work-tree" in argv else self.warden[1]
 
     def warden_check(self, probe: list[str]) -> tuple[Path, Ran]:
@@ -475,10 +481,11 @@ def test_the_stack_drill_needs_both_the_user_and_a_container_walled_off(plain: s
         ({"recorded": "another-name"}, False, "its record names it 'another-name'"),
         ({"said": "Not logged in · Please run /login"}, False, "it never answered as asked: Not logged in"),
         ({"stops": False}, False, "claude stop 5e55abcd left it running"),
+        ({"respawns": False}, False, "claude respawn 5e55abcd did not bring it back under its id"),
     ],
-    ids=["whole", "launch-line-changed", "no-record", "name-not-recorded", "not-signed-in", "stop-fails"],
+    ids=["whole", "launch-line-changed", "no-record", "name-not-recorded", "not-signed-in", "stop-fails", "no-respawn"],
 )
-def test_the_session_drill_needs_the_launch_line_the_record_an_answer_and_the_stop_the_warden_reads(
+def test_the_session_drill_needs_the_launch_line_the_record_an_answer_the_stop_and_the_respawn_the_warden_reads(
     rig: dict[str, Any], ok: bool, says: str
 ) -> None:
     result = drills.background_session(FakeRig(**rig))

@@ -33,12 +33,6 @@ SESSION = {
     "settings": f"{STATE}/public/session-settings/r1.json", "agents": "{}",
     "worktree": "impl-cart", "prompt": "-- build it",
 }  # fmt: skip
-RESUME = [
-    "claude", "--resume", "0b8f6a52-3c1e-4f7a-9d2b-5e6c7d8e9f01", "--bg", "--remote-control", "impl-cart",
-    "--model", "claude-opus-5-5",
-    "--effort", "high", "--agent", "implementer", "--settings", f"{STATE}/public/session-settings/s1.json",
-    "--agents", '{"qa-ux": {"model": "claude-sonnet-5-5"}}', "--", "-- carry on",
-]  # fmt: skip
 SESSIONS = {"s1": {"worktree": f"{REPO}/.claude/worktrees/impl-cart"}, "s2": {"worktree": "/home/owner/elsewhere"}}
 
 
@@ -59,15 +53,16 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
     command, cwd = lf.command_argv(
         {"kind": "command", "argv": ["git", "worktree", "list"], "cwd": str(REPO)}, HOME, STATE
     )
-    resumed, _ = lf.command_argv({"kind": "command", "argv": RESUME, "cwd": str(REPO)}, HOME, STATE)
+    respawn = {"kind": "command", "argv": ["claude", "respawn", "0b8f6a52"], "cwd": str(REPO)}
+    respawned, _ = lf.command_argv(respawn, HOME, STATE)
     shape = lf.check_parts({"kind": "check", "checkout": str(REPO), "args": ["--only", "repo-shape"]}, HOME)
 
-    # A start and a resume load the skills only from the folder the warden renders: plugin hooks run unsandboxed.
+    # A start loads the skills only from the folder the warden renders: plugin hooks run unsandboxed.
     plugin = ["--plugin-dir", f"{STATE}/public/plugin"]
     assert argv[:3] == [str(layout.CLAUDE_BIN), *plugin]
     assert argv[-2:] == ["--", "-- build it"]  # a prompt that looks like a flag stays the prompt
     assert command[0] == "/usr/bin/git" and cwd == REPO
-    assert resumed == [str(layout.CLAUDE_BIN), *plugin, *RESUME[1:]]
+    assert respawned == [str(layout.CLAUDE_BIN), "respawn", "0b8f6a52"]
     assert shape == (REPO, ["--only", "repo-shape"])
     assert lf.checkout_for("s1", settings(), SESSIONS) == REPO / ".claude" / "worktrees" / "impl-cart"
     assert lf.checkout_for("", settings(), SESSIONS) == REPO
@@ -83,9 +78,9 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
         {"kind": "command", "argv": ["git", "status"], "cwd": "shop"},
         {"kind": "command", "argv": ["/usr/local/bin/factory", "check", "--all"], "cwd": str(REPO)},
         {"kind": "command", "argv": ["claude", "--bg", "--settings", "/tmp/open.json", "--", "go"], "cwd": str(REPO)},
-        {"kind": "command", "argv": [*RESUME[:13], "/tmp/open.json", *RESUME[14:]], "cwd": str(REPO)},
-        {"kind": "command", "argv": [*RESUME[:15], "not json", *RESUME[16:]], "cwd": str(REPO)},
-        {"kind": "command", "argv": RESUME[:-2], "cwd": str(REPO)},
+        {"kind": "command", "argv": ["claude", "--resume", "0b8f6a52", "--bg", "--", "go"], "cwd": str(REPO)},
+        {"kind": "command", "argv": ["claude", "respawn", "0b8f6a52", "--settings", "/tmp/x.json"], "cwd": str(REPO)},
+        {"kind": "command", "argv": ["claude", "respawn", "--all"], "cwd": str(REPO)},
         {"kind": "command", "argv": ["rm", "-rf", "--", str(HOME)], "cwd": str(REPO)},
         {"kind": "command", "argv": ["rm", "-rf", "--", "/var/lib/software-factory"], "cwd": str(REPO)},
         {"kind": "command", "argv": ["kill", "-KILL", "1"], "cwd": str(REPO)},

@@ -10,7 +10,7 @@ from typing import Any, cast
 from runtime.queue import approvals, route, statuses
 from runtime.shared import settings as settings_mod
 from runtime.shared import store
-from runtime.shared.models import WORKING, Session, Task
+from runtime.shared.models import PENDING, WORKING, Session, Task
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Caller, Clock, Context, GitHub, StackResult
@@ -33,18 +33,24 @@ class FakeClock(Clock):
     def now(self) -> float:
         return self.at
 
+    def sleep(self, seconds: float) -> None:
+        self.at += seconds
+
 
 class FakeLauncher:
     """Records what the warden asked for; answers commands the way claude and git would."""
 
-    def __init__(self, procs: dict[str, Proc]) -> None:
-        self.procs = procs  # a stop ends a process, a resume starts one
+    def __init__(self, procs: dict[str, Proc], places: Places) -> None:
+        self.procs = procs  # a stop ends a process, a respawn starts one
+        self.places = places
         self.started: list[tuple[str, dict[str, Any]]] = []
         self.stopped: list[str] = []
         self.commands: list[list[str]] = []
         self.stacks: list[tuple[int, list[str]]] = []
         self.remote = REMOTE
-        self.copy = False  # the next resume starts a copy instead
+        self.lost = False
+        self.stays_down = False
+        self.resumed: list[str] = []
         self.messages: list[tuple[str, str]] = []
         self.restarts = 0
         self.upgrades: list[str] = []
@@ -55,11 +61,14 @@ class FakeLauncher:
 
     def agent_command(self, argv: list[str], cwd: str) -> tuple[int, str]:
         self.commands.append(argv)
-        if argv[:2] == ["claude", "--resume"]:
-            if self.copy:
-                return 0, "backgrounded · 0badc0de\n"
-            self.procs[argv[2]] = Proc(pid=5000 + len(self.commands), session=argv[2], name="", chat_link="")
-            return 0, f"backgrounded · {argv[2][:8]}\n"
+        if argv[:2] == ["claude", "respawn"]:
+            if self.lost:
+                return 1, f"No background session {argv[2]}"
+            [sid] = [sid for sid in registry.read(self.places) if sid.startswith(argv[2])]
+            self.resumed.append(sid)
+            if not self.stays_down:
+                self.procs[sid] = Proc(pid=5000 + len(self.commands), session=sid, name="", chat_link="")
+            return 0, ""
         if "remote" in argv:
             return 0, self.remote + "\n"
         if "rev-parse" in argv:
@@ -86,10 +95,6 @@ class FakeLauncher:
         self.restarts += 1
         self.procs.clear()  # stopping the daemon stops every session it hosts
         self.on_restart()
-
-    @property
-    def resumed(self) -> list[str]:
-        return [argv[2] for argv in self.commands if argv[:2] == ["claude", "--resume"]]
 
 
 class Queue:
@@ -147,6 +152,18 @@ class World:
         session = Session(id=sid, role=role, **{**base, **fields})
         sessions[sid] = session
         registry.write(self.places, sessions)
+        # The backstop's line binding it to its start's pending id, which names its sandbox settings.
+        store.append_jsonl(
+            self.places.history,
+            {
+                "at": session.started,
+                "session": sid,
+                "was": f"{PENDING}{sid}",
+                "name": session.name,
+                "by": "warden",
+                "why": "bound",
+            },
+        )
         return session
 
     def session(self, sid: str) -> Session:

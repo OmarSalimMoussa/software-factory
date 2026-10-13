@@ -41,7 +41,7 @@ from runtime.warden import imports, inbox, loop
 from runtime.warden.context import Context
 from runtime.warden.health import vitals
 from runtime.warden.owner import reflections
-from runtime.warden.sessions import backstop, launch, lifecycle, permits, registry, revive
+from runtime.warden.sessions import backstop, lifecycle, permits, registry, respawn, revive
 from runtime.warden.sessions.backstop import Proc
 from runtime.warden.sessions.launch import LaunchError
 from runtime.warden.sessions.permits import DESIGN, IMPL, ORCH
@@ -262,7 +262,7 @@ def _act(ctx: Context, sid: str, retired: list[Session], relaunch: tuple[Session
 def _resume(ctx: Context, s: Session, counted: bool) -> None:
     """Resume ``s``, claimed for it under ctx.lock, outside the lock."""
     try:
-        launch.resume(ctx, s, RESTARTED + (_owed(ctx) if s.role == ORCH else ""))
+        respawn.resume(ctx, s, RESTARTED + (_owed(ctx) if s.role == ORCH else ""))
     except LaunchError as exc:
         log.warning("resume of session %s after its process ended failed (%s)", s.id, type(exc).__name__)
     finally:

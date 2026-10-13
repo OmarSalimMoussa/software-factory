@@ -24,7 +24,7 @@ from runtime.shared.protocol import Refused, ok
 from runtime.system import layout
 from runtime.warden.context import Context
 from runtime.warden.owner import ops
-from runtime.warden.sessions import backstop, launch, lifecycle, permits, registry
+from runtime.warden.sessions import backstop, lifecycle, permits, registry, respawn
 from runtime.warden.sessions.launch import LaunchError
 from runtime.warden.sessions.lifecycle import WARDEN
 from runtime.warden.sessions.permits import BACK, ORCH, RESTARTING
@@ -199,7 +199,7 @@ def _bring_back(ctx: Context, ids: list[str]) -> str:
                 continue
             lifecycle.end_children(ctx, sessions, s, "ended when the factory switched Claude accounts")
             try:
-                launch.resume(ctx, s, NOTE)
+                respawn.resume(ctx, s, NOTE)
             # telemetry: surfaced — a session that did not come back is one of the `failed` the owner reads
             except (LaunchError, Refused) as exc:
                 failed.append(f"{s.name} did not come back ({exc})")

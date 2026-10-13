@@ -21,7 +21,7 @@ from runtime.slots import leases
 from runtime.warden import inbox
 from runtime.warden.context import Context
 from runtime.warden.delivery import outage
-from runtime.warden.sessions import backstop, doing, launch, permits, registry
+from runtime.warden.sessions import backstop, doing, launch, permits, registry, respawn
 from runtime.warden.sessions.launch import LaunchError
 from runtime.warden.sessions.permits import CAP, DESIGN, FAMILY, IMPL, ORCH, SEVERE, actor
 
@@ -159,7 +159,7 @@ def restart(ctx: Context, s: Session, message: str) -> None:
     try:
         if s.id in backstop.processes():
             ctx.launcher.stop_session(s.id)
-        launch.resume(ctx, s, message)
+        respawn.resume(ctx, s, message)
     finally:
         release_launch(ctx, s.id)
 
@@ -184,7 +184,7 @@ def deliver(ctx: Context, sid: str, message: str, by: str) -> None:
         ctx.launcher.message_session(s.id, message)
     else:
         try:
-            launch.resume(ctx, s, message)
+            respawn.resume(ctx, s, message)
         finally:
             release_launch(ctx, sid)
     with ctx.lock:

@@ -28,7 +28,9 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> World:
     defaults = tomllib.loads((ROOT / "settings.toml").read_text())
     overrides = {"repo.path": str(repo), "repo.github": "acme/product", "caps.implementers": 1, "caps.designers": 1}
     procs: dict[str, Proc] = {}
-    built = World(places, settings_mod.build(defaults, overrides), FakeClock(), FakeLauncher(procs), Queue(), procs, [])
+    built = World(
+        places, settings_mod.build(defaults, overrides), FakeClock(), FakeLauncher(procs, places), Queue(), procs, []
+    )
     built.vitals("green")
     for part in ("plugin", "procedures", "rules"):
         shutil.copytree(ROOT / part, places.install / part)

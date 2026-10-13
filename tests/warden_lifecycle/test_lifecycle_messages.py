@@ -55,10 +55,8 @@ def test_a_benched_session_comes_back_with_the_message(world: World) -> None:
     world.queue.add("t-0001", status="deprioritized")
     world.seat("5e550001", task="t-0001", state=DEPRIORITIZED)
     messages.send(world.owner(), {"session": "5e550001", "text": "Finish the menu first."}, None)
-    resume = world.launcher.commands[-1]
-    assert resume[:3] == ["claude", "--resume", "5e550001"] and resume[-1].endswith(
-        messages.PREFIX + "Finish the menu first."
-    )
+    [(sid, said)] = world.launcher.messages
+    assert world.launcher.resumed == [sid] == ["5e550001"] and said.endswith(messages.PREFIX + "Finish the menu first.")
     assert world.session("5e550001").state == WORKING
 
 

@@ -19,7 +19,7 @@ from runtime.shared.protocol import MAX_LINE
 from runtime.warden.context import Caller, Clock, StackResult
 from runtime.warden.dispatch import OWNER_SOCKET, Dispatcher, Doors, resolve
 from runtime.warden.owner import codes
-from runtime.warden.sessions import backstop, launch
+from runtime.warden.sessions import backstop, launch, respawn
 from runtime.warden.verbs import DASH, VERBS
 
 DASHBOARD = Caller(kind="dashboard", role=DASH)
@@ -112,11 +112,11 @@ class FakeWarden:
         """No Claude session runs on a test machine, and its agent user does not exist here: while this warden
         answers, the module functions that look for them see the seeded agent home instead, and a resume is recorded
         as a start is. stop() puts the real ones back, so a later test in the same run never inherits these."""
-        self._real = (backstop.processes, launch.agent_home, launch.resume, codes.check_code)
+        self._real = (backstop.processes, launch.agent_home, respawn.resume, codes.check_code)
         places, accept, real, calls = self.places, self.accept, codes.check_code, self.launcher.calls
         backstop.processes = dict
         launch.agent_home = lambda: places.state / "agent-home"
-        launch.resume = lambda ctx, s, message: calls.append(("resume", (s.id, message)))
+        respawn.resume = lambda ctx, s, message: calls.append(("resume", (s.id, message)))
         if accept is not None:
 
             def check(ctx: Any, code: object, *, lock_exempt: bool = False) -> None:
@@ -150,5 +150,5 @@ class FakeWarden:
             self.server.server_close()
             self.server = None
         if self._real is not None:
-            backstop.processes, launch.agent_home, launch.resume, codes.check_code = self._real
+            backstop.processes, launch.agent_home, respawn.resume, codes.check_code = self._real
             self._real = None

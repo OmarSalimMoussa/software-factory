@@ -41,7 +41,7 @@ SWEEP, PRUNE, DISK = leases.SWEEP, "factory-prune", "factory-disk"
 OWN_VERBS = frozenset({SWEEP, PRUNE, DISK})
 _INSTALL = Path(__file__).resolve().parents[3]  # the runner runs from the install it belongs to
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
-_SESSION_REF = re.compile(r"^[0-9a-f][0-9a-f-]{5,35}$")  # a short id or a uuid, as `claude stop` and `rm` take
+_SESSION_REF = re.compile(r"^[0-9a-f][0-9a-f-]{5,35}$")  # a short id or a uuid, as `claude stop`, `rm`, `respawn` take
 
 
 class BadRequest(Exception):
@@ -86,8 +86,8 @@ def _inside(path: Path, root: Path) -> bool:
 
 
 def _carried_ok(values: dict[str, Any], state: Path) -> None:
-    """A session's options, the same for a start and a resume: plain values, the sandbox settings the warden wrote
-    for it, and agent definitions as one JSON object."""
+    """A session's options: plain values, the sandbox settings the warden wrote for it, and agent definitions as one
+    JSON object."""
     for _, key in launch.CARRIED:
         _value(values, key)
     allowed = layout.public(state) / "session-settings"
@@ -116,15 +116,10 @@ def session_argv(raw: dict[str, Any], state: Path) -> list[str]:
     return [PROGRAMS["claude"], *_plugin(state), *argv[1:]]
 
 
-def _claude_ok(args: list[str], state: Path) -> None:
-    """`claude stop <id>`, `claude rm <id>`, or a resume that passes every option a start does, then its message."""
-    if len(args) == 2 and args[0] in ("stop", "rm") and _SESSION_REF.match(args[1]):
-        return
-    flags = [flag for flag, _ in launch.CARRIED]
-    shape = len(args) == 5 + 2 * len(flags) and args[:1] == ["--resume"] and args[2] == "--bg" and args[-2] == "--"
-    if not shape or args[3:-2:2] != flags or not _UUID.match(args[1]):
-        raise BadRequest("claude runs only as stop, rm, or a resume with the options a start passes")
-    _carried_ok({key: args[4 + 2 * n] for n, (_, key) in enumerate(launch.CARRIED)}, state)
+def _claude_ok(args: list[str]) -> None:
+    """`claude stop`, `rm` or `respawn` of one session, by its id: a respawn runs under the options it started with."""
+    if len(args) != 2 or args[0] not in ("stop", "rm", "respawn") or not _SESSION_REF.match(args[1]):
+        raise BadRequest("claude runs only as stop, rm or respawn of one session")
 
 
 def command_argv(raw: dict[str, Any], home: Path, state: Path) -> tuple[list[str], Path]:
@@ -136,9 +131,7 @@ def command_argv(raw: dict[str, Any], home: Path, state: Path) -> tuple[list[str
         raise BadRequest(f"cwd must be a folder in {home}")
     program, args = argv[0], argv[1:]
     if program == "claude":
-        _claude_ok(args, state)
-        if args[0] == "--resume":
-            args = [*_plugin(state), *args]
+        _claude_ok(args)
     elif program == "rm":
         target = Path(os.path.normpath(args[-1])) if len(args) == 3 and os.path.isabs(args[-1]) else None
         if args[:2] != ["-rf", "--"] or target is None or target == home or not _inside(target, home):
