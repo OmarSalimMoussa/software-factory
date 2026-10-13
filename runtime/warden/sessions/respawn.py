@@ -31,7 +31,6 @@ def resume(ctx: Context, s: Session, message: str) -> None:
         raise LaunchError("a resume needs a message")
     settings = ctx.settings()
     session_settings.write(settings, ctx.places, _start_id(ctx, s.id), s.role, Path(s.worktree), launch.agent_home())
-    # Like `claude stop`, `claude respawn` takes the first 8 characters of the id.
     code, output = ctx.launcher.agent_command(["claude", "respawn", s.id[:8]], settings.get_str("repo.path"))
     if code != 0:
         raise LaunchError(f"claude respawn failed: {output.strip()[-300:]}")

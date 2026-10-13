@@ -43,7 +43,7 @@ def test_each_session_starts_sandboxed_in_its_worktree(world: World, tmp_path: P
         assert str(other) in sandbox["filesystem"]["denyRead"]
         assert not any(own.is_relative_to(Path(p)) for p in sandbox["filesystem"]["denyRead"])
         assert "allowRead" not in sandbox["filesystem"]
-    assert str(tmp_path / "agent" / ".claude" / ".credentials.json") in sandbox["filesystem"]["denyRead"]
+    assert str(tmp_path / "agent" / ".claude") in sandbox["filesystem"]["denyRead"]
     assert body["worktree"] == {"bgIsolation": "none"}
     # The scrub runs every command sandboxed, the excluded `factory` too, which then cannot reach the warden.
     assert "env" not in body
