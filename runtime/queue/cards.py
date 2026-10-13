@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 from runtime.queue import formats, pictures, records, statuses, tasks
 from runtime.queue.book import Queue, spec_rel
-from runtime.shared import models, store
+from runtime.shared import models, operations, store
 from runtime.shared.models import WAITING, WORKING, Card, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
@@ -21,7 +21,6 @@ from runtime.warden.sessions import lifecycle, limits, registry
 from runtime.warden.sessions.launch import LaunchError
 
 log = logging.getLogger(__name__)
-WORD = "word"
 
 
 def read(places: Places) -> list[Card]:
@@ -115,7 +114,7 @@ def tell(ctx: Context, s: Session, message: str, missed: Callable[[], None]) -> 
             raise ops.StepError(f"it did not reach {s.name}: {exc}") from exc
         return "told"
 
-    return ops.launch(ctx, WORD, [(f"Tell {s.name}", hand)])
+    return ops.launch(ctx, operations.WORD, [(f"Tell {s.name}", hand)])
 
 
 def wake(ctx: Context, card: Card, message: str, missed: Callable[[], None]) -> str | None:

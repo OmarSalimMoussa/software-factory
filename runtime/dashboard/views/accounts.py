@@ -9,7 +9,6 @@ from urllib.parse import quote
 from runtime.dashboard.views.kit import Snap, epoch, when
 
 TITLE = "Claude account"
-OP_TITLE = "Switching the Claude account"
 HINT = (
     "The agents sign in to Claude with the active account. Switching restarts their Claude daemon, which stops every "
     "agent for a moment; each one that was working comes back where it left off."
@@ -45,7 +44,6 @@ def section(snap: Snap) -> dict[str, Any]:
     return {
         "title": TITLE,
         "hint": HINT,
-        "op_title": OP_TITLE,
         "rows": rows,
         "empty": None if rows else "No account yet. Add the one `claude setup-token` gives you.",
         "add": {

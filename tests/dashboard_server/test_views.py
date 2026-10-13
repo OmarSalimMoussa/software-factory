@@ -14,10 +14,11 @@ from seed_agents import REPLAY_URL
 from seed_kit import FIXTURES, iso
 
 from runtime.dashboard.views import agents, ops
-from runtime.dashboard.views.kit import Snap
+from runtime.dashboard.views.kit import PartError, Snap
 from runtime.dashboard.views.task import qa_line
 from runtime.dashboard.views.words.settingwords import LABELS
 from runtime.shared import models, store
+from runtime.shared import operations as kinds
 from runtime.shared.models import OPEN_SEVERITIES
 from runtime.shared.settings_schema import SCHEMA
 from runtime.warden.delivery import deploys
@@ -177,6 +178,30 @@ def test_each_step_of_an_operation_says_how_the_page_draws_it(state: str, look: 
         {"text": "Switch the account", "state": state, "detail": ""}
     ]}  # fmt: skip
     assert ops.operation({"op": op})["steps"][0]["look"] == look
+
+
+# What each kind records as it finishes, where the dashboard's words read it.
+_RECORDED = {
+    kinds.PUSH: {"sha": "abc1234def"},
+    kinds.PUSH_BACK: {"sha": "abc1234def"},
+    kinds.ACCOUNT: {"name": "work"},
+    kinds.MESSAGE: {"revived": False},
+    kinds.RELEASE_CHECK: {"newer": True},
+    kinds.UPGRADE: {"to": "abc1234def"},
+}
+
+
+@pytest.mark.parametrize("kind", kinds.KINDS)
+def test_every_kind_of_operation_has_a_title_and_says_what_it_did(kind: str) -> None:
+    op = {"id": "op-1", "kind": kind, "state": "done", "result": _RECORDED.get(kind, {}), "steps": []}
+    shown = ops.operation({"op": op})
+    assert shown["title"] and shown["result"]["message"] and shown["result"]["refresh"]
+
+
+def test_an_operation_the_dashboard_does_not_know_is_refused() -> None:
+    op = {"id": "op-1", "kind": "unheard-of", "state": "running", "result": {}, "steps": []}
+    with pytest.raises(PartError, match="does not know"):
+        ops.operation({"op": op})
 
 
 def test_the_outage_band_has_the_fixture_shape(rig: Rig) -> None:

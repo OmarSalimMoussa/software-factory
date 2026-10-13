@@ -16,7 +16,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from runtime.shared import store
+from runtime.shared import operations, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import PROMOTE_JOB, Places
 from runtime.shared.protocol import Refused, ok
@@ -45,7 +45,7 @@ def push_prod(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
         sha = _staging_build(ctx)
         if sha != expected:
             raise Refused("stale", f"staging now runs {sha[:12]}, not {expected[:12]}: look again, then push")
-        return _start(ctx, "push", sha)
+        return _start(ctx, operations.PUSH, sha)
 
 
 def push_back(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
@@ -58,7 +58,7 @@ def push_back(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
     with pushing:
         if previous != expected:
             raise Refused("stale", f"prod's previous build is now {previous[:12]}, not {expected[:12]}: look again")
-        return _start(ctx, "push back", previous)
+        return _start(ctx, operations.PUSH_BACK, previous)
 
 
 def promote_cli(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
@@ -69,9 +69,9 @@ def promote_cli(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
     if back:
         previous = _previous_prod(ctx)
         with pushing:
-            return _start(ctx, "push back", previous)
+            return _start(ctx, operations.PUSH_BACK, previous)
     with pushing:
-        return _start(ctx, "push", _staging_build(ctx))
+        return _start(ctx, operations.PUSH, _staging_build(ctx))
 
 
 def watching(ctx: Context) -> bool:

@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from runtime.shared import models, store
+from runtime.shared import models, operations, store
 from runtime.shared.models import RETIRED, WAITING, WORKING
 from runtime.shared.protocol import Refused, ok
 from runtime.warden import inbox
@@ -32,7 +32,6 @@ from runtime.warden.sessions.permits import CAP, DESIGN, IMPL, SEVERE
 log = logging.getLogger(__name__)
 PAUSED = {"message": "The factory is paused; every session keeps its context.", "refresh": "all"}
 REVIVED = "The warden brought you back: carry on with your task from your branch."
-RESUME = "resume"
 
 
 def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
@@ -122,7 +121,9 @@ def owner_pause(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
             begin_bench(ctx, s, OWNER, "paused with the factory", models.PAUSED)
         registry.write(ctx.places, sessions)
         # One step per session; the crash watch completes each as it settles that bench (pause_progress).
-        op_id = ops.start(ctx, "pause", ["Ask every session to commit and stop", *(f"Bench {s.name}" for s in ranked)])
+        op_id = ops.start(
+            ctx, operations.PAUSE, ["Ask every session to commit and stop", *(f"Bench {s.name}" for s in ranked)]
+        )
         for index in range(1, len(ranked) + 1):
             ops.step(ctx, op_id, index, ops.RUNNING)
         ops.complete(ctx, op_id, 0, f"{len(ranked)} told", PAUSED)
@@ -170,5 +171,6 @@ def owner_resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
         return f"back: {', '.join(s.name for s in back)}" if back else "no agent was on the bench"
 
     return ok(
-        op=ops.launch(ctx, RESUME, [("Bring back every benched agent", bring_all)]), resuming=[s.name for s in back]
+        op=ops.launch(ctx, operations.RESUME, [("Bring back every benched agent", bring_all)]),
+        resuming=[s.name for s in back],
     )

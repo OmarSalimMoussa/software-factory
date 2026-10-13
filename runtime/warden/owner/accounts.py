@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from runtime.shared import claude_accounts, store
+from runtime.shared import claude_accounts, operations, store
 from runtime.shared.claude_accounts import ACTIVE, SHOWN, UNIT_TOKEN, AccountError
 from runtime.shared.models import PENDING, REVIVING, WAITING, WORKING
 from runtime.shared.protocol import Refused, ok
@@ -29,7 +29,6 @@ from runtime.warden.sessions.launch import LaunchError
 from runtime.warden.sessions.lifecycle import WARDEN
 from runtime.warden.sessions.permits import BACK, ORCH, RESTARTING
 
-KIND = "account"
 NOTE = "The factory switched Claude accounts; carry on where you left off."
 
 
@@ -157,7 +156,7 @@ def use(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any
             ("Restarting the agents' Claude daemon", lambda: _restart(ctx)),
             ("Bringing back the sessions", lambda: _bring_back(ctx, back)),
         ]
-        op_id = ops.launch(ctx, KIND, steps, {"name": name})
+        op_id = ops.launch(ctx, operations.ACCOUNT, steps, {"name": name})
         # Written before the steps run: the first step waits for this lock.
         record = {"op": op_id, "name": name, "sessions": back, "daemon": RESTARTING}
         store.write_json(permits.switch_path(ctx), record, mode=0o600)

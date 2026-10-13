@@ -21,8 +21,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from runtime.shared import operations, store
 from runtime.shared import settings as settings_module
-from runtime.shared import store
 from runtime.shared.models import RETIRED
 from runtime.shared.paths import SLICE, Places
 from runtime.shared.protocol import Refused
@@ -194,7 +194,7 @@ def save(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     if repo:
         raise Refused("settings", "the repo's values change only with Change repo")
     _checked(current, changes)
-    return {"op": ops.launch(ctx, "settings", _steps(ctx, changes), {})}
+    return {"op": ops.launch(ctx, operations.SETTINGS, _steps(ctx, changes), {})}
 
 
 def change_repo(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
@@ -228,7 +228,7 @@ def change_repo(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
         return "the standard shape"
 
     steps = [("Check the repo's shape", shape), *_steps(ctx, changes)]
-    return {"op": ops.launch(ctx, "repo", steps, {})}
+    return {"op": ops.launch(ctx, operations.REPO, steps, {})}
 
 
 # ---- guard rule switches ----------------------------------------------------------------------------------------

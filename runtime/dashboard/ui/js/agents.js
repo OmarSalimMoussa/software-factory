@@ -109,9 +109,9 @@ function stopNow(id, btn) {
 }
 function pauseFactory() {
   codeSheet('Pause the factory', '<div class="muted">Every agent is benched, the orchestrator included. Nothing is lost, and everything comes back in order when you resume.</div>', 'Pause the factory',
-    (code, key) => post('/api/factory/pause', {code}, key), {lockExempt: true, opTitle: 'Pausing the factory', icon: 'pause-circle'});
+    (code, key) => post('/api/factory/pause', {code}, key), {lockExempt: true, icon: 'pause-circle'});
 }
 function resumeFactory() {
   codeSheet('Resume the factory', '<div class="muted">Every benched agent comes back in order, with its full context.</div>', 'Resume the factory',
-    (code, key) => post('/api/factory/resume', {code}, key), {opTitle: 'Resuming the factory', icon: 'play-circle'});
+    (code, key) => post('/api/factory/resume', {code}, key), {icon: 'play-circle'});
 }

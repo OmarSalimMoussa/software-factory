@@ -111,7 +111,7 @@ function codeSheet(title, intro, okWord, send, opts = {}) {
     UI.device = false; closeSheet();
     if (ans.message) toast(ans.message, opts.icon);
     if (opts.onOk) opts.onOk(ans);
-    if (ans.op) runOp(ans.op, opts.opTitle || title);
+    if (ans.op) runOp(ans.op);
     refreshParts(ans.refresh || []);
   };
   boxes.forEach((b, i) => {
@@ -135,7 +135,7 @@ const OPS = 'ef-ops';
 function openOps() { try { return JSON.parse(sessionStorage.getItem(OPS) || '[]'); } catch (e) { return []; } }
 // telemetry: expected — without storage an operation is followed only until the page reloads
 function keepOps(list) { try { sessionStorage.setItem(OPS, JSON.stringify(list)); } catch (e) { } }
-const holdOp = (id, title) => keepOps(openOps().filter(o => o.id !== id).concat([{id, title}]));
+const holdOp = id => keepOps(openOps().filter(o => o.id !== id).concat([{id}]));
 const forgetOp = id => keepOps(openOps().filter(o => o.id !== id));
 function drawSteps(op) {
   const ul = document.getElementById('steps-' + op.id); if (!ul) return;
@@ -143,9 +143,11 @@ function drawSteps(op) {
   const mark = m => m === 'spin' ? '<span class="spin"></span>' : m === 'ring' ? '<span class="dot ring"></span>' : icon(m, 'sm');
   ul.innerHTML = op.steps.map(s => `<li class="${s.look.cls}">${mark(s.look.mark)}<span>${esc(s.text)}${s.detail ? `<span class="detail">${esc(s.detail)}</span>` : ''}</span></li>`).join('');
 }
-async function runOp(id, title, quiet) {
-  holdOp(id, title);
-  if (!quiet) { openSheet(title, `<ul class="steps" id="steps-${esc(id)}"></ul>`, '', true); $('#sheet').dataset.key = 'op:' + id; }
+/* The warden names the operation: its title heads the sheet from the first answer on. */
+async function runOp(id, quiet) {
+  holdOp(id);
+  if (!quiet) { openSheet('', `<ul class="steps" id="steps-${esc(id)}"></ul>`, '', true); $('#sheet').dataset.key = 'op:' + id; }
+  let title = 'The action';
   for (;;) {
     let env;
     try { env = await fetchEnv('op:' + id, '/api/ops/' + encodeURIComponent(id)); }
@@ -153,7 +155,7 @@ async function runOp(id, title, quiet) {
     if (!env) { await sleep(700); continue; }
     const p = env.parts.op;
     if (!p.ok) { forgetOp(id); alertToast('op:' + id, `${title}: ${p.error}`); return; }
-    const op = p.data; drawSteps(op);
+    const op = p.data; title = op.title; drawSteps(op);
     if (op.state === 'running') { await sleep(700); continue; }
     forgetOp(id);
     const result = op.result || {};
@@ -192,10 +194,10 @@ async function openPromote() {
   if (d.prod_runs_staging) { openSheet('Push to prod', `<div class="card empty" style="min-height:120px">${icon('check')} Prod already runs what staging runs.</div>${d.previous_prod ? `<button class="btn" data-action="promote-back" data-write data-sha="${esc(d.previous_prod)}">Push prod back to ${esc(d.previous_prod)}</button>` : ''}`, ''); return; }
   codeSheet('Push to prod', `<div class="diff">${envBox('Prod now', d.prod)}<span style="color:var(--faint);display:grid;place-items:center">${icon('chevron-right')}</span>${envBox('Staging', d.staging, true)}</div>
     ${d.tasks.length ? `<div class="section"><div class="label">What prod gains <span class="n">${d.gains}</span> ${hint('Open a change to see what it was built from. Prod is redeployed at exactly the commit staging runs.')}</div><div class="card rows" style="overflow:hidden">${d.tasks.map(t => `<button class="origin-row" data-origin="${esc(t.id)}" aria-expanded="false" aria-controls="origin-${esc(t.id)}"><span class="tt" style="font-weight:500">${esc(t.title)}</span>${chip(t.chip)}<span class="chev faint">${icon('chevron-right', 'sm')}</span></button><div class="origin" id="origin-${esc(t.id)}" hidden></div>`).join('')}</div></div>` : ''}`,
-  'Push to prod', (code, key) => post('/api/push', {expected_staging_sha: d.expected_staging_sha, code}, key), {opTitle: 'Pushing to prod', icon: 'rocket-launch', blocked: d.blocked});
+  'Push to prod', (code, key) => post('/api/push', {expected_staging_sha: d.expected_staging_sha, code}, key), {icon: 'rocket-launch', blocked: d.blocked});
 }
 function openPushBack(sha) {
-  codeSheet('Push prod back', `<div class="muted">Prod is redeployed at ${esc(sha)}, the commit it ran before.</div>`, 'Push back', (code, key) => post('/api/push/back', {expected_sha: sha, code}, key), {opTitle: 'Pushing prod back', icon: 'arrow-path'});
+  codeSheet('Push prod back', `<div class="muted">Prod is redeployed at ${esc(sha)}, the commit it ran before.</div>`, 'Push back', (code, key) => post('/api/push/back', {expected_sha: sha, code}, key), {icon: 'arrow-path'});
 }
 
 function openMore() { openSheet('More', `<div class="more-grid">${UI.pages.slice(4).map(([id, n, ic]) => `<button data-go="${id}" data-close="1">${icon(ic)}${esc(n)}</button>`).join('')}</div><div class="section"><div class="label">Theme</div><div class="seg">${['system', 'light', 'dark'].map(t => `<button data-theme-set="${t}" aria-pressed="${theme() === t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join('')}</div></div>`, '', true); }

@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from runtime.shared import models
+from runtime.shared import models, operations
 from runtime.shared.models import DEPRIORITIZED, RETIRED, Session
 from runtime.shared.protocol import Refused, ok
 from runtime.warden.context import Context
@@ -23,7 +23,6 @@ from runtime.warden.spend import cost
 
 # The agent reads this line first; the thread finds the owner's messages in the transcript by it.
 PREFIX = "Message from the owner, sent from the dashboard:\n\n"
-KIND = "message"  # the operation that delivers one
 
 
 def _text(ctx: Context, args: dict[str, Any]) -> str:
@@ -54,8 +53,9 @@ def send(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     if s.state == DEPRIORITIZED:
         _to_revive(ctx, s)
         step = ("Bringing it back with your message", lambda: _revive(ctx, s.id, PREFIX + text))
-        return ok(op=ops.launch(ctx, KIND, [step], {"revived": True}))
-    return ok(op=ops.launch(ctx, KIND, [("Sending your message", lambda: _deliver(ctx, s.id, PREFIX + text))]))
+        return ok(op=ops.launch(ctx, operations.MESSAGE, [step], {"revived": True}))
+    step = ("Sending your message", lambda: _deliver(ctx, s.id, PREFIX + text))
+    return ok(op=ops.launch(ctx, operations.MESSAGE, [step], {"revived": False}))
 
 
 def _deliver(ctx: Context, session_id: str, text: str) -> str:

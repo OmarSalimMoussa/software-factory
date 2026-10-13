@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from runtime.shared import releases, store, upgrades
+from runtime.shared import operations, releases, store, upgrades
 from runtime.shared.models import RESTING
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
@@ -24,8 +24,6 @@ from runtime.warden.owner import ops
 from runtime.warden.sessions import lifecycle, registry, revive
 
 log = logging.getLogger(__name__)
-KIND = "upgrade"
-CHECK = "release check"  # the operation of the owner's Check now
 
 
 def offer_path(places: Places) -> Path:
@@ -91,7 +89,11 @@ def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
     """The owner's Check now: GitHub asked at once, whatever install.release_check_hours says. It runs as an
     operation, as asking GitHub can take longer than the dashboard waits for an answer."""
     found: dict[str, Any] = {}
-    return ok(op=ops.launch(ctx, CHECK, [("Asking GitHub for a newer factory", lambda: _check(ctx, found))], found))
+    return ok(
+        op=ops.launch(
+            ctx, operations.RELEASE_CHECK, [("Asking GitHub for a newer factory", lambda: _check(ctx, found))], found
+        )
+    )
 
 
 def _check(ctx: Context, found: dict[str, Any]) -> str:
@@ -143,7 +145,7 @@ def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
             ("Waiting for every agent to settle", lambda: _settled(ctx)),
             ("Starting the upgrade", lambda: _start(ctx, commit)),
         ]
-        op_id = ops.launch(ctx, KIND, steps, {"to": commit})
+        op_id = ops.launch(ctx, operations.UPGRADE, steps, {"to": commit})
         record = {"from": installed["commit"], "to": commit, "changelog": available["changelog"], "op": op_id}
         record["at"] = ctx.clock.iso()
         store.write_json(asked_path(places), record, mode=0o600)

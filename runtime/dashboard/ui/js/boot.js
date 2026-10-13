@@ -201,7 +201,7 @@ async function start() {
   renderShell(); render();
   await loadPage();
   const ops = openOps();
-  ops.forEach((o, i) => runOp(o.id, o.title, i < ops.length - 1));
+  ops.forEach((o, i) => runOp(o.id, i < ops.length - 1));
   clearTimeout(UI.pollT);
   if (!UI.device && !UI.halted) UI.pollT = setTimeout(poll, (UI.shell ? UI.shell.live.refresh_seconds : TIMEOUT_MS / 1000) * 1000);
 }

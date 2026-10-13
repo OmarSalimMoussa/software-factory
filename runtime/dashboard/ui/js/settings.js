@@ -79,12 +79,12 @@ function reviewSettings() {
   if (!UI.edits.size) return;
   const items = [...UI.edits].map(([k, e]) => [rowOf(k), e.value]).filter(([r]) => r);
   codeSheet(`Save ${items.length} change${items.length === 1 ? '' : 's'}`, `<ul class="changes">${items.map(([r, v]) => `<li><span>${esc(r.label)}</span><b>${esc(showVal(r, r.saved))} → ${esc(showVal(r, v))}</b></li>`).join('')}</ul>`, 'Save',
-    (code, key) => post('/api/settings', {changes: Object.fromEntries(items.map(([r, v]) => [r.key, v])), code}, key), {opTitle: 'Saving settings', onOk: () => { UI.edits.clear(); updateSavebar(); }});
+    (code, key) => post('/api/settings', {changes: Object.fromEntries(items.map(([r, v]) => [r.key, v])), code}, key), {onOk: () => { UI.edits.clear(); updateSavebar(); }});
 }
 function changeRepo() {
   const d = setData(); if (!d) return;
   codeSheet('Change repo', `<label class="search" style="max-width:none">${icon('book-open', 'sm')}<input id="repo-path" value="${esc(d.repo.path)}" aria-label="Repo path" autocomplete="off" spellcheck="false"></label><div class="muted" style="font-size:12px">The orchestrator must be stopped first. The factory works on one repo at a time.</div>`, 'Save',
-    (code, key) => post('/api/settings/repo', {path: $('#repo-path').value.trim(), code}, key), {opTitle: 'Changing the repo'});
+    (code, key) => post('/api/settings/repo', {path: $('#repo-path').value.trim(), code}, key));
 }
 
 /* The Claude account section: the server lists the accounts and words every label. Switch runs as an operation, Remove
@@ -101,7 +101,7 @@ function acctSection(env) {
       <button class="btn primary a-b" data-acct-add data-write>${esc(a.add.button)}</button></div>
       <div class="code-note" id="acct-note" role="status"></div></div></div>`);
 }
-const useAccount = (url, btn) => act(url, {}, {btn, icon: 'arrow-path', opTitle: acctData().op_title});
+const useAccount = (url, btn) => act(url, {}, {btn, icon: 'arrow-path'});
 function removeAccount(name) {
   const r = acctData().rows.find(x => x.name === name); if (!r || !r.remove) return;
   openSheet(r.remove.title, `<div class="muted">${esc(r.remove.body)}</div>`, `<button class="btn quiet" data-action="close-sheet">${esc(r.remove.keep)}</button><button class="btn danger" data-acct-remove-now="${esc(r.remove.url)}" data-write>${esc(r.remove.label)}</button>`);
