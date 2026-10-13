@@ -39,11 +39,14 @@ drive('home', async t => {
   t.check((await p.textContent('.sec-h')).includes('1 approved, waiting for a slot'), 'approved count missing on Home');
   // Not now, then nothing else is worth proposing
   await p.click('[data-prop-act="later"][data-id="t-0027"]');
+  t.check(!(await p.$eval('#sheet', e => e.classList.contains('open'))), 'Not now opened the panel');
   await p.waitForFunction(() => document.querySelector('#props').textContent.includes('Nothing else worth proposing'), null, {timeout: 10000}).catch(() => t.errors.push('no "nothing else" slot'));
   t.check((await tops(p)).join() === h0.join(), 'layout shift after Not now');
-  // the proposal panel: the sketch large, with Approve, which closes it once the server agrees
-  await p.click('[data-flip="t-0025"] .prop-t'); await settle(p);
-  t.check(await p.$('#sheet-body .mock img'), 'no big sketch in the panel');
+  // the proposal panel, opened from anywhere on the card: the sketch large, with Approve, which closes it once the
+  // server agrees
+  await p.click('[data-flip="t-0025"] .prop-why'); await settle(p);
+  const big = await p.$eval('#sheet-body .mock img', i => i.complete && i.naturalWidth > 0 && i.closest('.mock').getBoundingClientRect().height).catch(() => 0);
+  t.check(big > 150, `the big sketch in the panel is not shown (${big} px tall)`);
   t.check((await p.textContent('#sheet-body')).includes('Log'), 'the task panel has no log');
   await p.click('#sheet-foot [data-prop-act="approve"]'); await settle(p);
   t.check(!(await p.$eval('#sheet', e => e.classList.contains('open'))), 'the panel stayed open after Approve');

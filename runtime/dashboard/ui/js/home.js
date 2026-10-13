@@ -74,13 +74,13 @@ const homePartOf = (env, name) => { const p = env.parts[name]; return p && p.ok 
 function slotHTML(s, i) {
   if (s.broken) return `<div class="card prop slot" data-flip="slot-${i}" role="status">${icon('exclamation-triangle')}This proposal could not be read: ${esc(s.error)}</div>`;
   if (s.kind === 'card') return propCard(s);
-  if (s.kind === 'settled') return `<div class="card prop ${esc(s.look)}" data-flip="${esc(s.task)}"><button class="sk" data-task="${esc(s.task)}" aria-label="Open the proposal">${picture(s.picture, 'Sketch: now and after')}</button><div class="prop-main"><div class="prop-t">${esc(s.line)}</div><div class="result">${icon(s.icon, 'sm')}${esc(s.message)}</div></div><span></span></div>`;
+  if (s.kind === 'settled') return `<div class="card prop ${esc(s.look)}" data-flip="${esc(s.task)}" data-task="${esc(s.task)}"><button class="sk" data-task="${esc(s.task)}" aria-label="Open the proposal">${picture(s.picture, 'Sketch: now and after')}</button><div class="prop-main"><div class="prop-t">${esc(s.line)}</div><div class="result">${icon(s.icon, 'sm')}${esc(s.message)}</div></div><span></span></div>`;
   if (s.kind === 'choosing') return `<div class="card prop slot" data-flip="slot-${i}"><span class="spin"></span>The orchestrator is choosing the next proposal…</div>`;
   return `<div class="card prop slot" data-flip="slot-${i}">${s.message ? icon('check') + esc(s.message) : ''}</div>`;
 }
 function propCard(c) {
   const id = esc(c.task);
-  return `<div class="card prop ${c.severe ? 'severe' : ''}" data-flip="${id}">
+  return `<div class="card prop ${c.severe ? 'severe' : ''}" data-flip="${id}" data-task="${id}">
     <button class="sk" data-task="${id}" aria-label="See the sketch larger">${picture(c.picture, 'Sketch: now and after')}</button>
     <div class="prop-main">
       <div class="prop-top"><span class="prop-n">${c.number}</span>${c.goal_item ? `<span class="chip accent">${esc(c.goal_item)}</span>` : c.severe ? '<span class="chip bad">severe</span>' : ''}<button class="prop-t" data-task="${id}">${esc(c.line)}</button></div>

@@ -162,6 +162,8 @@ a.btn{text-decoration:none}
 .prop-n{width:22px;height:22px;border-radius:6px;background:var(--fg);color:var(--bg);display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
 .prop-t{font-weight:650;font-size:15px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:none;border:0;padding:0;color:var(--fg);cursor:pointer;text-align:left;min-width:0;font-family:inherit}
 .prop-t:hover{text-decoration:underline}
+.prop[data-task]{cursor:pointer}
+.prop[data-task]:hover{border-color:var(--line-strong)}
 .prop-why{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prop-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .prop-chips .dd{width:auto!important}
@@ -462,6 +464,8 @@ mark{background:color-mix(in srgb,var(--warn) 35%,transparent);color:inherit;bor
 .sheet-h{display:flex;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid var(--line)}
 .sheet-h h2{margin:0;font-size:17px;flex:1;min-width:0;letter-spacing:-.01em}
 .sheet-b{padding:20px;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:20px;flex:1;scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent}
+/* The panel scrolls and nothing in it shrinks: a box that clips its content would be squeezed out of sight. */
+.sheet-b>*{flex-shrink:0}
 .sheet-f{padding:14px 20px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
 .kv{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .kv>div{background:var(--sunken);border-radius:9px;padding:10px 12px}
