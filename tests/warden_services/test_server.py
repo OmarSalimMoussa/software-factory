@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import socket
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -13,12 +14,17 @@ from runtime.shared.models import DEPRIORITIZED, RETIRED, WORKING, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden import server
+from runtime.warden.context import Clock
 from runtime.warden.dispatch import AGENT_SOCKET, OWNER_SOCKET, Dispatcher, Doors
 from runtime.warden.sessions import registry
 from runtime.warden.verbs import ANY, Verb
 
 AGENT, OWNER, DASHBOARD, STRANGER = 1001, 1000, 1002, 1003
 CLAUDE, SHELL, CLI = 400, 500, 600
+
+
+def binding(places: Places) -> server.Bind:
+    return server.binder(places, threading.RLock(), Clock())
 
 
 def session(sid: str, state: str = WORKING) -> Session:
@@ -43,9 +49,24 @@ def peers(tmp_path: Path) -> server.Peers:
 def test_an_agent_caller_is_the_registered_session_among_its_ancestors(places: Places, peers: server.Peers) -> None:
     registry.write(places, {"s1": session("s1")})
 
-    caller = server.identify(places, peers, AGENT_SOCKET, CLI, AGENT)
+    caller = server.identify(places, peers, AGENT_SOCKET, CLI, AGENT, binding(places))
 
     assert (caller.kind, caller.session, caller.role, caller.worktree) == ("agent", "s1", "implementer", "/w/s1")
+
+
+def test_a_session_that_asks_before_the_backstop_bound_its_start_is_bound_then(
+    places: Places, peers: server.Peers
+) -> None:
+    # A spare the daemon kept warm runs a new session's first command within a second: before the backstop's tick.
+    registry.write(places, {"pending-1": session("pending-1")})
+    (peers.sessions_folder / "400.json").write_text(
+        json.dumps({"pid": CLAUDE, "sessionId": "s1", "procStart": "777", "name": "impl-pending-1"})
+    )
+
+    caller = server.identify(places, peers, AGENT_SOCKET, CLI, AGENT, binding(places))
+
+    assert (caller.session, caller.role) == ("s1", "implementer") and list(registry.read(places)) == ["s1"]
+    assert '"was": "pending-1"' in places.history.read_text()
 
 
 @pytest.mark.parametrize(
@@ -65,7 +86,7 @@ def test_the_peer_uid_decides_who_may_ask_on_each_socket(
 ) -> None:
     registry.write(places, {"s1": session("s1", state)})
     try:
-        role = server.identify(places, peers, socket_kind, CLI, uid).role
+        role = server.identify(places, peers, socket_kind, CLI, uid, binding(places)).role
     except Refused as exc:
         role = exc.rule
     assert role == expect
@@ -75,7 +96,7 @@ def test_a_process_whose_record_names_a_reused_pid_is_no_session(places: Places,
     registry.write(places, {"s1": session("s1")})
     (peers.sessions_folder / "400.json").write_text(json.dumps({"pid": CLAUDE, "sessionId": "s1", "procStart": "9"}))
 
-    assert server.identify(places, peers, AGENT_SOCKET, CLI, AGENT).role == ""
+    assert server.identify(places, peers, AGENT_SOCKET, CLI, AGENT, binding(places)).role == ""
 
 
 def test_the_socket_answers_one_json_line_per_request(places: Places, doors: Doors, tmp_path: Path) -> None:

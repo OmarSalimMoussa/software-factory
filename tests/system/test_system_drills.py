@@ -53,6 +53,7 @@ class FakeRig:
     recorded: str | None = "tag"  # "tag": the name the drill gave it
     stops: bool = True
     respawns: bool = True
+    hears: bool = True  # whether a message handed over as the warden does gets its answer
     said: str = "Ready"  # what the session answers
     # What the browser check printed inside the daemon's walls, and each command run there.
     browser: Ran = Ran(0, "npx: installed 1 package\nthe browser opened a page\n")
@@ -76,6 +77,11 @@ class FakeRig:
             self._stopped.update(self._session)
             self._session.clear()
         return Ran(0 if self.stops else 1, "" if self.stops else "claude stop: no such session")
+
+    def message_session(self, session_id: str, text: str) -> Ran:
+        if self.hears:
+            self.said = "Again"
+        return Ran(0, "")
 
     def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran:
         return Ran(1, "")
@@ -482,8 +488,18 @@ def test_the_stack_drill_needs_both_the_user_and_a_container_walled_off(plain: s
         ({"said": "Not logged in · Please run /login"}, False, "it never answered as asked: Not logged in"),
         ({"stops": False}, False, "claude stop 5e55abcd left it running"),
         ({"respawns": False}, False, "claude respawn 5e55abcd did not bring it back under its id"),
+        ({"hears": False}, False, "a message handed over as the warden does got no answer"),
     ],
-    ids=["whole", "launch-line-changed", "no-record", "name-not-recorded", "not-signed-in", "stop-fails", "no-respawn"],
+    ids=[
+        "whole",
+        "launch-line-changed",
+        "no-record",
+        "name-not-recorded",
+        "not-signed-in",
+        "stop-fails",
+        "no-respawn",
+        "message-unheard",
+    ],
 )
 def test_the_session_drill_needs_the_launch_line_the_record_an_answer_the_stop_and_the_respawn_the_warden_reads(
     rig: dict[str, Any], ok: bool, says: str

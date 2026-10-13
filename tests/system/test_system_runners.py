@@ -174,7 +174,7 @@ def test_a_stopped_request_records_how_it_ended(
 
 @pytest.mark.parametrize("before", [None, {"numStartups": 7, "projects": {"/elsewhere": {"allowedTools": []}}}],
                          ids=["no-file-yet", "a-file-claude-code-wrote"])  # fmt: skip
-def test_the_agents_checkout_is_trusted_and_the_rest_of_claude_codes_file_kept(
+def test_the_agents_checkout_is_trusted_its_first_run_done_and_the_rest_of_claude_codes_file_kept(
     tmp_path: Path, before: dict[str, Any] | None
 ) -> None:
     config = tmp_path / ".claude.json"
@@ -185,7 +185,8 @@ def test_the_agents_checkout_is_trusted_and_the_rest_of_claude_codes_file_kept(
 
     after = json.loads(config.read_text())
     assert after["projects"]["/home/software-agent/shop"] == {"hasTrustDialogAccepted": True}
-    assert {k: v for k, v in after.items() if k != "projects"} == {
+    assert after["hasCompletedOnboarding"] is True
+    assert {k: v for k, v in after.items() if k not in ("projects", "hasCompletedOnboarding")} == {
         k: v for k, v in (before or {}).items() if k != "projects"
     }
     assert all(after["projects"][p] == v for p, v in (before or {}).get("projects", {}).items())

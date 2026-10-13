@@ -225,6 +225,10 @@ class Rehearsal:
     pids: dict[str, int] = field(default_factory=dict)  # each running session's claude process
     answers: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
 
+    def _bind_now(self) -> server.Bind:
+        doors = self.dispatcher.doors
+        return server.binder(self.places, doors.lock, doors.clock)
+
     def _ask(self, caller: Caller, socket: str, line: bytes) -> dict[str, Any]:
         self.clock.t += 30
         answer = self.dispatcher.answer(caller, socket, line)
@@ -235,17 +239,21 @@ class Rehearsal:
     def owner(self, argv: list[str]) -> dict[str, Any]:
         """The owner's own terminal: `factory <argv>` on the agent socket."""
         call = cli.build(argv, cli.read_file)
-        caller = server.identify(self.places, self.peers, AGENT_SOCKET, pid=9000, uid=OWNER_UID)
+        caller = server.identify(
+            self.places, self.peers, AGENT_SOCKET, pid=9000, uid=OWNER_UID, bind_now=self._bind_now()
+        )
         return self._ask(caller, AGENT_SOCKET, protocol.request(call.verb, call.args, call.data))
 
     def dashboard(self, verb: str, args: dict[str, Any]) -> dict[str, Any]:
-        caller = server.identify(self.places, self.peers, OWNER_SOCKET, pid=9100, uid=DASHBOARD_UID)
+        caller = server.identify(
+            self.places, self.peers, OWNER_SOCKET, pid=9100, uid=DASHBOARD_UID, bind_now=self._bind_now()
+        )
         return self._ask(caller, OWNER_SOCKET, protocol.request(verb, args))
 
     def _from_session(self, session: str) -> Caller:
         """Who a process the session started is, as the socket server works it out from the process tree."""
         pid = self.kernel.process(parent=self.pids[session])
-        return server.identify(self.places, self.peers, AGENT_SOCKET, pid=pid, uid=AGENT_UID)
+        return server.identify(self.places, self.peers, AGENT_SOCKET, pid=pid, uid=AGENT_UID, bind_now=self._bind_now())
 
     def session(self, session: str, argv: list[str], agent_id: str = "") -> dict[str, Any]:
         """`factory <argv>` run by the session, or by its subagent ``agent_id``, whose id the guard puts first."""

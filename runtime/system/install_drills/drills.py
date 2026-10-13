@@ -41,6 +41,7 @@ UNREACHABLE = "cannot be reached"  # how the factory command says it found no wa
 SANDBOX_MARK = "software-drill-sandbox-ok"
 _POLL_S = 1.0
 SESSION_PROMPT, SESSION_REPLY = "This is a drill. Reply with the one word ready, and do nothing else.", "ready"
+AGAIN_PROMPT, AGAIN_REPLY = "This is a drill. Reply with the one word again, and do nothing else.", "again"
 
 
 def sandbox_runs(rig: Rig) -> Result:
@@ -121,10 +122,11 @@ def hosts_refused(rig: Rig) -> Result:
 
 def background_session(rig: Rig) -> Result:
     """A real background session, started as the warden starts one: `claude --bg` names it, its record in the
-    agent's ~/.claude/sessions names it, it answers (so the daemon signed it in), `claude stop` ends it, and
-    `claude respawn` brings it back under its own id, as the warden resumes one. Each is Claude Code's own, which the
-    warden reads and no version promises to keep."""
-    name = "a background session starts, is recorded by its name, answers, stops and respawns, as the warden reads them"
+    agent's ~/.claude/sessions names it, it answers (so the daemon signed it in), `claude stop` ends it,
+    `claude respawn` brings it back under its own id, as the warden resumes one, and a message handed over as the
+    warden hands one gets its answer. Each is Claude Code's own, which the warden uses and no version promises to
+    keep."""
+    name = "a background session starts, is recorded by name, answers, stops, respawns and hears a message"
     tag = f"drill-session-{uuid.uuid4().hex[:8]}"
     ran = rig.real_session(tag, SESSION_PROMPT)
     started = BACKGROUNDED.search(ran.out)
@@ -150,12 +152,13 @@ def background_session(rig: Rig) -> Result:
         return Result(name, False, f"its record names it {named!r}, not {tag}: the warden binds a start by its name")
     if SESSION_REPLY not in said.lower():
         return Result(name, False, f"it never answered as asked: {first_line(said) or 'it said nothing'}")
-    return Result(name, True, f"started {short}, recorded as {tag}, answered {first_line(said)!r}, stopped, respawned")
+    done = f"started {short}, recorded as {tag}, answered {first_line(said)!r}, stopped, respawned, heard"
+    return Result(name, True, done)
 
 
 def _stop_and_respawn(rig: Rig, short: str, sid: str, deadline: float) -> str:
-    """Why `claude stop` left the session running or `claude respawn` did not bring it back under its id; "" when
-    both did as the warden needs. The respawned session is stopped again."""
+    """Why `claude stop` left the session running, `claude respawn` did not bring it back under its id, or it did not
+    answer a message; "" when all did as the warden needs. The respawned session is stopped again."""
     stopped = rig.stop_session(short)
     while sid in rig.session_records() and rig.now() <= deadline:
         rig.wait(_POLL_S)
@@ -164,9 +167,22 @@ def _stop_and_respawn(rig: Rig, short: str, sid: str, deadline: float) -> str:
     back = rig.warden_command(["claude", "respawn", short])
     while sid not in rig.session_records() and rig.now() <= deadline:
         rig.wait(_POLL_S)
-    respawned = sid in rig.session_records()
+    if sid not in rig.session_records():
+        rig.stop_session(short)
+        return f"claude respawn {short} did not bring it back under its id: {first_line(back.out)}"
+    missed = _unheard(rig, sid, deadline)
     rig.stop_session(short)
-    return "" if respawned else f"claude respawn {short} did not bring it back under its id: {first_line(back.out)}"
+    return missed
+
+
+def _unheard(rig: Rig, sid: str, deadline: float) -> str:
+    """Why a message handed to the session as the warden hands one got no answer; "" when it got one."""
+    handed = rig.message_session(sid, AGAIN_PROMPT)
+    while AGAIN_REPLY not in rig.session_said(sid).lower() and rig.now() <= deadline:
+        rig.wait(_POLL_S)
+    if AGAIN_REPLY in rig.session_said(sid).lower():
+        return ""
+    return f"a message handed over as the warden does got no answer: {first_line(handed.out or rig.session_said(sid))}"
 
 
 def backstop_stops_claude(rig: Rig) -> Result:

@@ -21,12 +21,13 @@ from pathlib import Path
 from typing import Any
 
 from runtime.shared import protocol
-from runtime.shared.models import RETIRED
+from runtime.shared.models import RETIRED, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.warden.context import Caller
+from runtime.warden.context import Caller, Clock
 from runtime.warden.dispatch import AGENT_SOCKET, OWNER_SOCKET, Dispatcher
-from runtime.warden.sessions import registry
+from runtime.warden.sessions import backstop, registry
+from runtime.warden.sessions.backstop import Proc
 from runtime.warden.verbs import DASH, OWNER
 
 log = logging.getLogger("factory.warden")
@@ -66,42 +67,22 @@ def ancestry(pid: int, proc: Path) -> list[int]:
     return chain
 
 
-def _start_time(proc: Path, pid: int) -> str:
-    try:
-        stat = (proc / str(pid) / "stat").read_text()
-    # telemetry: expected — the process ended, so its record names no live session
-    except OSError:
-        return ""
-    # Field 22 of stat is the start time; the fields after "pid (comm)" begin at field 3.
-    fields = stat.rsplit(")", 1)[-1].split()
-    return fields[19] if len(fields) > 19 else ""
+Bind = Callable[[dict[str, Proc]], dict[str, Session]]
 
 
-def session_pids(folder: Path, proc: Path) -> dict[int, str]:
-    """Each live Claude session process of the agent user, by pid: its session id.
+def binder(places: Places, lock: threading.RLock, clock: Clock) -> Bind:
+    """The registry once every pending start whose session now runs is bound to it, under the warden's lock."""
 
-    A record whose pid now belongs to another process (the kernel's start time differs from ``procStart``) is skipped.
-    """
-    found: dict[int, str] = {}
-    for path in folder.glob("*.json"):
-        try:
-            record = json.loads(path.read_text())
-        # telemetry: expected — a record is removed or rewritten as its process ends
-        except (OSError, ValueError):
-            continue
-        if not isinstance(record, dict):
-            continue
-        pid, session_id = record.get("pid"), record.get("sessionId")
-        if (
-            isinstance(pid, int)
-            and isinstance(session_id, str)
-            and _start_time(proc, pid) == str(record.get("procStart"))
-        ):
-            found[pid] = session_id
-    return found
+    def bind_now(procs: dict[str, Proc]) -> dict[str, Session]:
+        with lock:
+            sessions = registry.read(places)
+            backstop.bind_running(places, clock, sessions, procs)
+            return sessions
+
+    return bind_now
 
 
-def identify(places: Places, peers: Peers, socket_kind: str, pid: int, uid: int) -> Caller:
+def identify(places: Places, peers: Peers, socket_kind: str, pid: int, uid: int, bind_now: Bind) -> Caller:
     if socket_kind == OWNER_SOCKET:
         if uid == peers.dashboard_uid:
             return Caller(kind="dashboard", role=DASH, uid=uid, pid=pid)
@@ -112,17 +93,19 @@ def identify(places: Places, peers: Peers, socket_kind: str, pid: int, uid: int)
         return Caller(kind="owner", role=OWNER, uid=uid, pid=pid)
     if uid != peers.agent_uid:
         raise Refused("caller", "this socket answers factory sessions and the owner's own command")
-    chain = set(ancestry(pid, peers.proc))
-    live = session_pids(peers.sessions_folder, peers.proc)
+    procs = backstop.read_processes(peers.sessions_folder, peers.proc)
+    by_pid = {p.pid: p.session for p in procs.values()}
+    mine = [by_pid[p] for p in ancestry(pid, peers.proc) if p in by_pid]
     sessions = registry.read(places)
-    for session_pid, session_id in live.items():
-        session = sessions.get(session_id)
-        if session_pid in chain and session is not None:
-            if session.state == RETIRED:
-                raise Refused("retired", f"{session.name} is retired and can never act again")
-            return Caller(kind="agent", session=session.id, role=session.role, uid=uid, pid=pid,
-                          worktree=session.worktree)  # fmt: skip
-    return Caller(kind="agent", uid=uid, pid=pid)
+    if any(sid not in sessions for sid in mine):
+        # A start is bound to its session on the backstop's next tick; a session that asks before then is bound now.
+        sessions = bind_now(procs)
+    session = next((sessions[sid] for sid in mine if sid in sessions), None)
+    if session is None:
+        return Caller(kind="agent", uid=uid, pid=pid)
+    if session.state == RETIRED:
+        raise Refused("retired", f"{session.name} is retired and can never act again")
+    return Caller(kind="agent", session=session.id, role=session.role, uid=uid, pid=pid, worktree=session.worktree)
 
 
 class _PooledServer(socketserver.UnixStreamServer):
@@ -175,6 +158,7 @@ def _listen(path: Path, threads: int, answer: Callable[[int, int, bytes], dict[s
 def serve(places: Places, peers: Peers, dispatcher: Dispatcher, threads: int) -> list[_PooledServer]:
     """Start answering on warden.sock and owner.sock; returns the servers so a test can shut them down."""
     settings = dispatcher.doors.settings
+    bind_now = binder(places, dispatcher.doors.lock, dispatcher.doors.clock)
 
     def read_seconds() -> int:
         return settings().get_int("watch.socket_read_seconds")
@@ -182,7 +166,7 @@ def serve(places: Places, peers: Peers, dispatcher: Dispatcher, threads: int) ->
     def on(socket_kind: str) -> Callable[[int, int, bytes], dict[str, Any]]:
         def answer(pid: int, uid: int, line: bytes) -> dict[str, Any]:
             try:
-                caller = identify(places, peers, socket_kind, pid, uid)
+                caller = identify(places, peers, socket_kind, pid, uid, bind_now)
             # telemetry: surfaced — the caller's answer is `refused`, with the rule and the reason
             except Refused as exc:
                 return protocol.refused(exc.rule, exc.reason, exc.detail)

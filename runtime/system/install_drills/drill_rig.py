@@ -18,7 +18,7 @@ import subprocess
 import threading
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -347,12 +347,7 @@ class RealRig:
             "settings": str(written),
             "agents": json.dumps(agents),
         }
-        try:
-            code, out = Units(self.places, lambda: self.settings).start_waiting(request_id, request)
-        # telemetry: surfaced — a session that could not start comes back as a failed `Ran` naming why
-        except LaunchError as exc:
-            return Ran(-1, str(exc))
-        return Ran(code, out)
+        return self._launch(lambda units: units.start_waiting(request_id, request))
 
     def session_records(self) -> dict[str, str]:
         found = backstop.read_processes(layout.AGENT_HOME / ".claude" / "sessions", backstop.PROC)
@@ -361,7 +356,7 @@ class RealRig:
     def session_said(self, session_id: str) -> str:
         path = cost.transcript_of([layout.AGENT_HOME / ".claude" / "projects"], "", session_id)
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines() if path else []
-        for line in lines:
+        for line in reversed(lines):
             try:
                 record = json.loads(line)
             # telemetry: expected — the last line is still being written
@@ -373,21 +368,23 @@ class RealRig:
         return ""
 
     def stop_session(self, short_id: str) -> Ran:
-        try:
-            Units(self.places, lambda: self.settings).stop_session(short_id)
-        # telemetry: surfaced — a stop that failed comes back as a failed `Ran` naming why
-        except LaunchError as exc:
-            return Ran(1, str(exc))
-        return Ran(0, "")
+        return self._launch(lambda units: units.stop_session(short_id))
+
+    def message_session(self, session_id: str, text: str) -> Ran:
+        """``text`` as the session's next turn, handed over as the warden hands it the owner's message."""
+        return self._launch(lambda units: units.message_session(session_id, text))
 
     def warden_command(self, argv: list[str]) -> Ran:
         """``argv`` as the agent, the way the warden runs it: its launcher, through the agent-run template unit."""
+        return self._launch(lambda units: units.agent_command(argv, str(self.ctx.checkout())))
+
+    def _launch(self, call: Callable[[Units], tuple[int, str] | None]) -> Ran:
         try:
-            code, out = Units(self.places, lambda: self.settings).agent_command(argv, str(self.ctx.checkout()))
-        # telemetry: surfaced — a command that could not run comes back as a failed `Ran` naming why
+            done = call(Units(self.places, lambda: self.settings))
+        # telemetry: surfaced — a call that failed comes back as a failed `Ran` naming why
         except LaunchError as exc:
             return Ran(-1, str(exc))
-        return Ran(code, out)
+        return Ran(*done) if done is not None else Ran(0, "")
 
 
 @contextmanager

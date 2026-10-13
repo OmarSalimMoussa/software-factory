@@ -17,7 +17,7 @@ from pathlib import Path
 from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, PENDING, RETIRED, REVIVING, Session
 from runtime.shared.paths import Places
-from runtime.warden.context import Context
+from runtime.warden.context import Clock, Context
 from runtime.warden.sessions import launch, registry
 from runtime.warden.sessions.launch import LaunchError
 
@@ -186,6 +186,24 @@ def stop(ctx: Context, proc: Proc) -> None:
         log.warning("backstop: session %s (pid %d) could not be stopped; tried again next tick", proc.session, proc.pid)
 
 
+def bind_running(places: Places, clock: Clock, sessions: dict[str, Session], procs: dict[str, Proc]) -> None:
+    """Bind each pending start whose session now runs, and record it; the caller holds the warden's lock."""
+    changed, bound = bind(sessions, procs)
+    if changed:
+        registry.write(places, sessions)
+    for was, sid in bound.items():
+        # A start answered with its pending id; this line lets a later request still name it by that id.
+        line = {
+            "at": clock.iso(),
+            "session": sid,
+            "was": was,
+            "name": sessions[sid].name,
+            "by": "warden",
+            "why": "bound",
+        }
+        store.append_jsonl(places.history, line)
+
+
 def sweep(ctx: Context, procs: dict[str, Proc]) -> list[Proc]:
     """Bind pending starts, then stop every session the warden did not permit; the sessions it stopped."""
     with ctx.lock:
@@ -195,22 +213,7 @@ def sweep(ctx: Context, procs: dict[str, Proc]) -> list[Proc]:
             # Without the registry every session looks unpermitted; stopping them all would be worse than waiting.
             log.warning("backstop: skipped this tick, the registry cannot be read (%s)", type(exc).__name__)
             return []
-        changed, bound = bind(sessions, procs)
-        if changed:
-            registry.write(ctx.places, sessions)
-        for was, sid in bound.items():
-            # A start answered with its pending id; this line lets a later request still name it by that id.
-            store.append_jsonl(
-                ctx.places.history,
-                {
-                    "at": ctx.clock.iso(),
-                    "session": sid,
-                    "was": was,
-                    "name": sessions[sid].name,
-                    "by": "warden",
-                    "why": "bound",
-                },
-            )
+        bind_running(ctx.places, ctx.clock, sessions, procs)
         drills = drilled(ctx.places, ctx.clock.now())
         strays = [p for p in procs.values() if unpermitted(sessions, p) and not {p.session, p.name} & drills]
         for proc in strays:
