@@ -41,7 +41,7 @@ UNREACHABLE = "cannot be reached"  # how the factory command says it found no wa
 SANDBOX_MARK = "software-drill-sandbox-ok"
 _POLL_S = 1.0
 SESSION_PROMPT, SESSION_REPLY = "This is a drill. Reply with the one word ready, and do nothing else.", "ready"
-AGAIN_PROMPT, AGAIN_REPLY = "This is a drill. Reply with the one word again, and do nothing else.", "again"
+HEARD_PROMPT, HEARD_REPLY = "This is a drill. Reply with the one word heard, and do nothing else.", "heard"
 
 
 def sandbox_runs(rig: Rig) -> Result:
@@ -177,10 +177,10 @@ def _stop_and_respawn(rig: Rig, short: str, sid: str, deadline: float) -> str:
 
 def _unheard(rig: Rig, sid: str, deadline: float) -> str:
     """Why a message handed to the session as the warden hands one got no answer; "" when it got one."""
-    handed = rig.message_session(sid, AGAIN_PROMPT)
-    while AGAIN_REPLY not in rig.session_said(sid).lower() and rig.now() <= deadline:
+    handed = rig.message_session(sid, HEARD_PROMPT)
+    while HEARD_REPLY not in rig.session_said(sid).lower() and rig.now() <= deadline:
         rig.wait(_POLL_S)
-    if AGAIN_REPLY in rig.session_said(sid).lower():
+    if HEARD_REPLY in rig.session_said(sid).lower():
         return ""
     return f"a message handed over as the warden does got no answer: {first_line(handed.out or rig.session_said(sid))}"
 

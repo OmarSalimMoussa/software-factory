@@ -80,7 +80,7 @@ class FakeRig:
 
     def message_session(self, session_id: str, text: str) -> Ran:
         if self.hears:
-            self.said = "Again"
+            self.said = "Heard"
         return Ran(0, "")
 
     def as_user(self, user: str, argv: list[str], *, view: bool = False) -> Ran:
