@@ -36,6 +36,8 @@ def _refuse(places: Places, payload: dict[str, object], rule: str, reason: str, 
     record = {
         "at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "session": str(payload.get("session_id", "")),
+        "agent_id": str(payload.get("agent_id") or ""),
+        "agent_type": str(payload.get("agent_type") or ""),
         "rule": rule,
         "tool": str(payload.get("tool_name") or payload.get("hook_event_name") or ""),
         "detail": " ".join(reason.split())[:_DETAIL_LIMIT],

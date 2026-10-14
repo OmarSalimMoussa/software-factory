@@ -156,8 +156,8 @@ def decide_tool(call: Call) -> Decision:
 
 
 def session_context(call: Call) -> str:
-    """What a session reads at start, on resume and after a compaction: where its goal is, and when to write to
-    SELF_REFLECT.md; its role is its system prompt. It only informs; the PreToolUse rules refuse."""
+    """What a session reads at start, on resume and after a compaction: where its goal is, how to call factory, and
+    when to write to SELF_REFLECT.md; its role is its system prompt. It only informs; the PreToolUse rules refuse."""
     if call.session is not None and call.session.state == RETIRED:
         return RETIRED_NOTE
     if call.session is None:
@@ -166,6 +166,7 @@ def session_context(call: Call) -> str:
     parts = [
         f"The product's goal is {goal}: read it before you act. It says who the product is for, the ranked goal, "
         "how it looks and how it speaks. Only a person edits it.",
+        _read(call.places.plugin / "factory-calls.md", "the note on calling factory"),
         _read(call.places.plugin / "self-reflect.md", "the note on when to reflect"),
     ]
     if call.session.state == BENCH_PENDING:

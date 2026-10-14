@@ -39,16 +39,20 @@ TIME_UP = "your time is up: report what you have"
 
 def check_agent(call: Call) -> Decision:
     """A subagent start: its kind and model, the number running, a tester's brief, readiness and rounds; then its
-    brief gains the factory's note on when to reflect, if its kind may."""
+    brief gains the factory's notes on calling factory and on when to reflect, as its kind may."""
     kind = str(call.tool_input.get("subagent_type") or "general-purpose")
     current = str(call.payload.get("tool_use_id", ""))
     refused = transcript.refused_ids(call.transcript, REFUSED)
-    calls = [c for c in transcript.agent_calls(call.transcript) if c.tool_use_id not in refused | {current}]
+    found = transcript.agent_calls(call.transcript)
+    ids = [c.tool_use_id for c in found]
+    # Starts sent in one message are all in the transcript at the first one's hook: only those before this one count.
+    earlier = found[: ids.index(current)] if current in ids else found
+    calls = [c for c in earlier if c.tool_use_id not in refused]
     for rule in (_kind, _model, _at_once, _brief, _qa, _critic_rounds):
         decision = rule(call, kind, calls)
         if decision is not None:
             return decision
-    return _with_reflection(call, kind)
+    return _with_notes(call, kind)
 
 
 def _kind(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
@@ -237,15 +241,16 @@ def _saves_spec(command: str) -> bool:
     return any(inv.program == factory_calls.FACTORY and factory_calls.verb_of(inv.argv) == "spec.save" for inv in found)
 
 
-def _with_reflection(call: Call, kind: str) -> Decision:
-    """Each brief of a kind that may run `factory reflect` ends with the factory's note on when to write to it."""
-    if kind not in VERBS["reflect"].kinds:
-        return None
-    note = (call.places.plugin / "self-reflect.md").read_text(encoding="utf-8").strip()
+def _with_notes(call: Call, kind: str) -> Decision:
+    """A brief gains the note on calling factory if its kind may, and ends with the note on reflecting if it may."""
+    names = [name for name, may in (("factory-calls.md", any(kind in v.kinds for v in VERBS.values())),
+                                    ("self-reflect.md", kind in VERBS["reflect"].kinds)) if may]  # fmt: skip
     prompt = str(call.tool_input.get("prompt", ""))
-    if note in prompt:
+    notes = [n for n in ((call.places.plugin / name).read_text(encoding="utf-8").strip() for name in names)
+             if n not in prompt]  # fmt: skip
+    if not notes:
         return None
-    return Rewrite({**call.tool_input, "prompt": f"{prompt.rstrip()}\n\n{note}\n"})
+    return Rewrite({**call.tool_input, "prompt": "\n\n".join([prompt.rstrip(), *notes]) + "\n"})
 
 
 def check_send(call: Call) -> Decision:

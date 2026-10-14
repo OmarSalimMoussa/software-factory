@@ -86,6 +86,19 @@ def test_the_orchestrator_keeps_one_place_for_intake(
     assert (kit.rule("Agent", _agent(kind)) == "subagents-at-once") is refused
 
 
+@pytest.mark.parametrize(("current", "refused"), [("t0", False), ("t3", False), ("t4", True)])
+def test_a_batch_of_starts_past_the_cap_refuses_only_the_starts_past_it(
+    tmp_path: Path, current: str, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("designer")
+    kit.settings(caps__subagents_at_once=4)
+    # Five critics started in one message: each one's hook saw the other four as running, and all five were refused.
+    kit.transcript(_running("critic-architecture", "critic-reliability", "critic-ux", "critic-product",
+                            "critic-security", ago=0))  # fmt: skip
+    assert (kit.rule("Agent", _agent("critic-security"), tool_use_id=current) == "subagents-at-once") is refused
+
+
 def test_a_subagent_quiet_past_the_stale_limit_or_stopped_frees_its_place(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("designer")
@@ -249,7 +262,7 @@ def test_a_finished_subagent_of_any_kind_is_not_resumed(tmp_path: Path, kind: st
         ("implementer", "Explore", False),
     ],
 )
-def test_a_brief_ends_with_the_note_on_reflecting_exactly_when_its_kind_may_reflect(
+def test_a_brief_carries_the_notes_on_calling_factory_and_reflecting_exactly_when_its_kind_may(
     tmp_path: Path, role: str, kind: str, may: bool
 ) -> None:
     kit = Kit(tmp_path)
@@ -261,6 +274,8 @@ def test_a_brief_ends_with_the_note_on_reflecting_exactly_when_its_kind_may_refl
         "Write to SELF_REFLECT.md when a miss got past you.\n"
     )
     assert noted is may
+    told = isinstance(decision, Rewrite) and "Run factory on its own." in decision.updated_input["prompt"]
+    assert told is may
     if noted:
         assert isinstance(decision, Rewrite)
         assert not isinstance(kit.decide("Agent", decision.updated_input), Refusal)

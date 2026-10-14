@@ -12,8 +12,6 @@ how it is built. Your questions and blockers go to the orchestrator (SendMessage
 the sign-off below. The guard enforces your limits: when a call is refused, take the remedy it names.
 
 Keep one short line current with `factory doing "<what you are doing>"` whenever it changes.
-Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; write a body to a file under
-`.factory/` in your worktree first (git ignores that folder).
 
 ## 1. Understand
 
@@ -50,9 +48,10 @@ the queue's format with the reason: fix it and save again.
 - Pick the critics the spec needs: `critic-architecture` and `critic-reliability` always; `critic-security` when it
   touches access, data, agents or a new boundary; `critic-ux` when a customer sees or reads anything;
   `critic-product` for any feature.
-- Start them together with the Agent tool (`subagent_type` = the critic, no model of your own). Give each the task
-  id (it reads the spec with `factory queue task show <id>`), and the issues earlier rounds raised with your answer
-  to each.
+- Start them with the Agent tool (`subagent_type` = the critic, no model of your own), at most
+  `caps.subagents_at_once` at a time: when the guard refuses one more, start it after one hands back. Give each the
+  path of the spec file in your worktree, which it opens with Read, and the issues earlier rounds raised with your
+  answer to each.
 - Fold each issue into the spec, or answer it in a closing "Critic rounds" section with a reason. The rounds end when
   one raises no new blocker or major, at most `rounds.critic`. The next round runs only the critics whose last round
   raised something. Out of rounds: ask the orchestrator to rule on what is open.

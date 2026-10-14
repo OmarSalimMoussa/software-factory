@@ -84,3 +84,20 @@ def test_one_rule_refusing_one_session_again_and_again_files_one_incident(ctx: C
     [entry] = reflections.entries(ctx.places)
     assert (entry["kind"], entry["who"]) == ("incident", "warden")
     assert "own-worktree" in entry["text"] and len(store.read_jsonl(ctx.places.refusals)) == limit + 1
+
+
+def test_a_subagent_refused_again_and_again_files_an_incident_that_names_it(ctx: Context) -> None:
+    watch = reflections.RefusalWatch()
+    limit = ctx.settings().get_int("watch.refusals_to_notify")
+    line = {"session": "s1", "agent_id": "a1b2c3d4e5f6", "agent_type": "critic-ux", "rule": "factory-alone",
+            "tool": "Bash", "detail": "pipe"}  # fmt: skip
+
+    for n in range(limit - 1):
+        watch.record(ctx, {**line, "agent_id": f"other{n}"})
+    watch.record(ctx, line)
+    assert reflections.entries(ctx.places) == []
+    for _ in range(limit - 1):
+        watch.record(ctx, line)
+
+    [entry] = reflections.entries(ctx.places)
+    assert "critic-ux a1b2c3d4 of s1" in entry["text"]

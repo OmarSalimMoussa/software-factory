@@ -50,6 +50,7 @@ class Kit:
         (self.repo / "factory.toml").write_bytes(FACTORY_TOML.read_bytes())
         self.places.plugin.mkdir(parents=True)
         (self.places.plugin / "self-reflect.md").write_text("Write to SELF_REFLECT.md when a miss got past you.\n")
+        (self.places.plugin / "factory-calls.md").write_text("Run factory on its own.\n")
         self.settings()
         self.transcript([])
         store.write_json(self.public / "vitals.json", {"level": "green"})  # the warden's last reading

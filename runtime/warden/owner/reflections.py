@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from runtime.guard.wire import REFUSAL_FIELDS
 from runtime.shared import store
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
@@ -136,23 +137,23 @@ def _spent(ctx: Context, sid: str, limit: str) -> None:
 
 
 class RefusalWatch:
-    """Records each guard refusal and files an incident when one rule refuses the same session again and again."""
+    """Records each guard refusal, and files an incident when one rule refuses one session or subagent repeatedly."""
 
     def __init__(self) -> None:
-        self._recent: dict[tuple[str, str], deque[float]] = {}
+        self._recent: dict[tuple[str, str, str], deque[float]] = {}
         self._lock = threading.Lock()
 
     def record(self, ctx: Context, line: dict[str, Any]) -> None:
         settings = ctx.settings()
         now = ctx.clock.now()
-        # The guard's record: session, rule, tool and detail; the warden stamps its own time.
-        fields = {k: str(line.get(k, ""))[:2000] for k in ("session", "rule", "tool", "detail")}
+        # The guard's record, as wire names its fields; the warden stamps its own time.
+        fields = {k: str(line.get(k, ""))[:2000] for k in REFUSAL_FIELDS}
         store.append_jsonl(ctx.places.refusals, {"at": ctx.clock.iso(), **fields})
         if fields["rule"] in SPENT:
             _spent(ctx, fields["session"], SPENT[fields["rule"]])
         window = settings.get_int("watch.refusal_window_minutes") * 60
         limit = settings.get_int("watch.refusals_to_notify")
-        key = (fields["session"], fields["rule"])
+        key = (fields["session"], fields["agent_id"], fields["rule"])
         with self._lock:
             recent = self._recent.setdefault(key, deque())
             recent.append(now)
@@ -163,4 +164,6 @@ class RefusalWatch:
             recent.clear()
         session = registry.read(ctx.places).get(fields["session"])
         who = session.name if session is not None else fields["session"] or "an unregistered session"
+        if fields["agent_id"]:
+            who = f"{fields['agent_type'] or 'a subagent'} {fields['agent_id'][:8]} of {who}"
         incident(ctx, f"Rule {fields['rule']} refused {who} {limit} times within {window // 60} minutes.")

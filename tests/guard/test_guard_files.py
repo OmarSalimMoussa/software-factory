@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from guard_kit import NOW, TESTER_ID, Kit, entry
 
-from runtime.guard.facts import Rewrite
+from runtime.guard.facts import Refusal, Rewrite
 
 EXPLORE = {"subagent_type": "Explore", "prompt": "p"}
 
@@ -151,6 +151,27 @@ def test_each_role_and_its_subagents_run_only_their_verbs(
 )
 def test_a_factory_call_is_one_plain_command_and_names_no_subagent(kit: Kit, command: str, rule: str | None) -> None:
     assert kit.bash(command) == rule
+
+
+@pytest.mark.parametrize(
+    ("command", "cause"),
+    [
+        ("factory queue task show t-0007 | head -80", "`|` pipes the answer into another command"),
+        ("factory status && ls", "`&&` adds a second command"),
+        ("factory status 2>&1", "`>&` joins a second command or a file"),
+        ("factory status > out.txt", "`>` sends the answer to a file"),
+        ("cd src && factory status", "something comes before the bare word factory"),
+        ("factory status\nls", "a line break starts a second command"),
+        ('factory reflect --kind miss "costs $5"', "the shell would expand `$` there"),
+    ],
+)
+def test_a_factory_alone_refusal_names_what_made_the_call_more_than_one_command(
+    kit: Kit, command: str, cause: str
+) -> None:
+    decision = kit.decide("Bash", {"command": command})
+    # One text for every cause left agents guessing, and they retried the same call until the incident filed.
+    assert isinstance(decision, Refusal) and decision.rule == "factory-alone"
+    assert decision.reason.startswith(cause) and "run factory on its own" in decision.reason
 
 
 def test_a_subagents_factory_call_names_it_right_after_the_program(tmp_path: Path) -> None:

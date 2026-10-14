@@ -23,9 +23,11 @@ FACTORY = "factory"
 AGENT_ID_FLAG = "--agent-id"
 _SAFE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _PLAIN_START = re.compile(r"^factory(\s|$)")
-# Outside single quotes the shell expands or joins on these, so the text is no longer one plain call.
 _SHELL_SPECIAL = frozenset("$`*?[{}")
-ALONE = "run factory on its own; write a body to a file in your worktree and pass it as an argument"
+_JOINS = {"|": "pipes the answer into another command", "&&": "adds a second command", "||": "adds a second command",
+          ";": "adds a second command", "&": "runs it in the background", ">": "sends the answer to a file",
+          ">>": "sends the answer to a file", "<": "feeds it a file", "<<": "feeds it a heredoc",
+          "(": "runs it in a subshell", ")": "runs it in a subshell"}  # fmt: skip
 _HELP = frozenset({"-h", "--help", "help"})
 _FLAG_VERBS = {("inbox", "--wait"): "inbox.wait", ("propose", "--none"): "propose.none"}
 _STARTS = frozenset({"implementer", "designer"})
@@ -82,11 +84,8 @@ def _not_theirs(call: Call, verb: str, inv: shell.Invocation) -> Decision:
     return None
 
 
-def plain_words(command: str) -> list[str] | None:
-    """The words of a command that is one plain `factory` call, or None when the shell would read more into it."""
-    text = command.strip()
-    if not _PLAIN_START.match(text) or "\n" in text or "\r" in text:
-        return None
+def _expanded(text: str) -> str:
+    """The first character the shell would expand in ``text`` (``$`` and backticks even in double quotes), or ""."""
     quote, escaped = "", False
     for ch in text:
         if escaped:
@@ -96,27 +95,51 @@ def plain_words(command: str) -> list[str] | None:
         elif ch == "\\":
             escaped = True
         elif ch in _SHELL_SPECIAL and (not quote or ch in "$`"):
-            return None
+            return ch
         elif ch in "'\"":
             quote = "" if quote == ch else quote or ch
+    return ""
+
+
+def _parse(command: str) -> tuple[list[str], str]:
+    """The words of a command and, when it is not one plain `factory` call, why not: the words are then partial."""
+    text = command.strip()
+    if not _PLAIN_START.match(text):
+        return [], "something comes before the bare word factory"
+    if "\n" in text or "\r" in text:
+        return [], "a line break starts a second command"
+    expanded = _expanded(text)
+    if expanded:
+        return [], f"the shell would expand `{expanded}` there; only single quotes keep it as text"
     lexer = shlex.shlex(text, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
     lexer.commenters = ""
     try:
         words = list(lexer)
-    # telemetry: expected — words shlex cannot split are no plain words; the shell rules refuse them
+    # telemetry: surfaced — words shlex cannot split come back as no words, `[]`, and the reason
     except ValueError:
-        return None
-    return None if any(set(w) <= set("();<>|&") for w in words) else words
+        return [], "a quote is never closed"
+    joined = next((w for w in words if set(w) <= set("();<>|&")), None)
+    if joined is not None:
+        return words, f"`{joined}` {_JOINS.get(joined, 'joins a second command or a file')}"
+    return words, ""
+
+
+def plain_words(command: str) -> list[str] | None:
+    """The words of a command that is one plain `factory` call, or None when the shell would read more into it."""
+    words, why = _parse(command)
+    return None if why else words
 
 
 def check_alone(call: Call, command: str, found: list[shell.Invocation], cwd: Path) -> Decision:
     """A call that runs `factory` is that one plain call, and it reads files only from the session's own worktree."""
     if not any(inv.program == FACTORY for inv in found) or call.off("factory-alone"):
         return None
-    words = plain_words(command)
-    if words is None:
-        return Refusal("factory-alone", ALONE)
+    words, why = _parse(command)
+    if why:
+        return Refusal(
+            "factory-alone", f"{why}: run factory on its own, one plain call, and read its answer as printed"
+        )
     worktree = Path(os.path.realpath(call.worktree))
     # Its arguments are read outside the sandbox, so a file it names must be the session's own.
     for word in words[1:]:

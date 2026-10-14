@@ -16,6 +16,8 @@ REFUSED = "Refused by the factory guard"
 HANDBACK = "SubagentHandback"
 READ_TOOLS = frozenset({"Read", "Grep", "Glob", "LS", "ToolSearch", "TaskOutput", "TodoWrite", HANDBACK})
 PARENTS = frozenset({"main", "orchestrator"})
+# A refusal line's fields beside its time; a subagent's id and kind are empty on its parent's own calls.
+REFUSAL_FIELDS = ("session", "agent_id", "agent_type", "rule", "tool", "detail")
 
 
 def one_line(rule: str, reason: str) -> str:

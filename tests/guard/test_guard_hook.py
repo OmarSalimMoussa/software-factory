@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from guard_kit import NOW, SID, TESTER_ID, Kit, entry
 
-from runtime.guard import hook
+from runtime.guard import hook, wire
 from runtime.shared.paths import SLICE
 
 IN_SLICE = f"0::/{SLICE}/agent-run@{SID}.service\n"
@@ -51,7 +51,7 @@ def test_a_refusal_is_one_line_to_the_agent_and_one_json_line_to_the_warden(kit:
     line = refusals.recv(65536).decode()
     assert line.endswith("\n")
     record = json.loads(line)
-    assert set(record) == {"at", "session", "rule", "tool", "detail"}
+    assert set(record) == {"at", *wire.REFUSAL_FIELDS}
     assert (record["at"], record["session"], record["rule"], record["tool"]) == (
         "2026-10-09T12:00:00Z",
         SID,

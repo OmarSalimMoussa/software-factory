@@ -12,8 +12,6 @@ or cards the owner. When the owner opens your chat themselves, answer them there
 every limit below: when a call is refused, take the remedy it names, never a way round it.
 
 Keep one short line current with `factory doing "<what you are doing>"` whenever it changes.
-Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; write a body to a file under
-`.factory/` in your worktree first (git ignores that folder).
 
 ## 1. Set up
 
@@ -54,7 +52,8 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 2. **Who.** `factory qa plan` prints the testers your change requires, with the reason for each. You may add a
    tester, never drop one. A change with no required tester goes straight to `factory qa-clean`.
 3. **All at once.** Start every required tester together with the Agent tool, `subagent_type` set to its kind and
-   no model of your own. One tester at a time uses the slot's remote desktop.
+   no model of your own, up to `caps.subagents_at_once`: when the guard refuses one more, start it after one hands
+   back. One tester at a time uses the slot's remote desktop.
 4. **The brief:** one line `Scenarios and checks: N` (N from 1 to `qa.max_items`, the items you list, each by the
    name testers mark it with: a scenario by its file name without `.md`, a check by a short name of words joined
    by dashes); the time each
