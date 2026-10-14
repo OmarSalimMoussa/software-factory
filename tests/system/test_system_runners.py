@@ -203,6 +203,16 @@ def test_the_install_has_the_agent_user_trust_its_checkout(tmp_path: Path) -> No
     assert f"run: {trusting} {job.checkout()} (as software-agent)" in job.host.actions  # type: ignore[attr-defined]  # a dry host
 
 
+def test_the_install_opens_the_agents_own_files_to_a_slots_containers_and_nothing_else(tmp_path: Path) -> None:
+    job = dry_job(tmp_path)
+    job.settings = settings()
+    steps_machine.agent_checkout(job)
+    opening = next(a for a in job.host.actions if "chmod" in a)  # type: ignore[attr-defined]  # a dry host
+    # As the agent, never as root: root would follow a link an agent planted to any file on the machine.
+    assert opening.endswith("(as software-agent)")
+    assert "! -user software-agent ) -prune" in opening and "( -type f -o -type d )" in opening
+
+
 @pytest.mark.parametrize(("verb", "code", "status"), [("up", 0, 0), ("up", 1, 1), ("stop", 0, 0), ("stop", 1, 1)])
 def test_the_factorys_own_glitchtip_starts_and_stops_on_its_own_and_says_when_it_did_not(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], verb: str, code: int, status: int

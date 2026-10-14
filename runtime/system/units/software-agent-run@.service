@@ -23,7 +23,8 @@ ExecStart=@python@ -I @install@/runtime/system/runners/agent_run.py @state@ %i
 StandardOutput=append:@runs@/%i.log
 StandardError=inherit
 ExecStopPost=+@python@ -I @install@/runtime/system/runners/record_exit.py @runs@/%i.exit
-UMask=0027
+# As the agents' daemon: what this writes in a worktree, a slot's containers must be able to read.
+UMask=0022
 TemporaryFileSystem=@state@:ro
 # The exit recorder runs in this unit's mount namespace too, + or not: runs/ is bound back for it. It stays the
 # warden's and 0700, so this unit's own user can neither read nor write it.

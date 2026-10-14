@@ -24,8 +24,9 @@ Restart=always
 RestartSec=@restart_seconds@
 # Stopping the daemon stops every session it hosts.
 KillMode=control-group
-# Files stay readable by the agent's group, which the stack user's runs join to build the checkout.
-UMask=0027
+# What a session writes, others may read: a slot's containers read the worktree through their bind mounts as users
+# outside the agent's group. No other user on the host gets in, because the agent's home is 0750.
+UMask=0022
 # Of the warden's state, public/ alone, read-only; of /home, the agent's own home.
 TemporaryFileSystem=@state@:ro
 BindReadOnlyPaths=@public@

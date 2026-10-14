@@ -16,7 +16,7 @@ from runtime.qa import browser_check
 from runtime.shared.paths import FACTORY_BIN, WARDEN_USER, Places
 from runtime.shared.protocol import Refused
 from runtime.system import drill_probe, install, layout, render
-from runtime.system.install_drills import browser_drill, drills, roster
+from runtime.system.install_drills import browser_drill, drills, roster, worktree_drill
 from runtime.system.install_drills.evidence import Ran, Result
 
 
@@ -55,8 +55,8 @@ class FakeRig:
     respawns: bool = True
     hears: bool = True  # whether a message handed over as the warden does gets its answer
     said: str = "Ready"  # what the session answers
-    # What the browser check printed inside the daemon's walls, and each command run there.
-    browser: Ran = Ran(0, "npx: installed 1 package\nthe browser opened a page\n")
+    # What a command printed inside the daemon's walls, and each command run there.
+    daemon: Ran = Ran(0, "npx: installed 1 package\nthe browser opened a page\n")
     walled: list[list[str]] = field(default_factory=list)
     _session: dict[str, str] = field(default_factory=dict)
     _stopped: dict[str, str] = field(default_factory=dict)
@@ -88,7 +88,7 @@ class FakeRig:
 
     def as_daemon(self, argv: list[str]) -> Ran:
         self.walled.append(argv)
-        return self.browser
+        return self.daemon
 
     def guard(self, tool: str, tool_input: dict[str, Any]) -> Ran:
         return self.guard_answer
@@ -434,12 +434,25 @@ def test_the_check_drill_fails_on_any_way_out_of_the_checkout(check: dict[str, s
 def test_the_browser_drill_passes_only_on_the_checks_opened_page_inside_the_daemons_walls(
     browser: Ran, ok: bool
 ) -> None:
-    rig = FakeRig(browser=browser)
+    rig = FakeRig(daemon=browser)
 
     result = browser_drill.tester_browser(rig)
 
     assert result.ok is ok
     assert rig.walled == [[str(FACTORY_BIN), "qa-browser", browser_check.FLAG, "qa-ui-function"]]
+
+
+@pytest.mark.parametrize(("printed", "ok"), [(Ran(0, "644\n"), True), (Ran(0, "640\n"), False), (Ran(1, ""), False)],
+                         ids=["others-read", "group-only", "not-written"])  # fmt: skip
+def test_the_worktree_drill_needs_a_file_written_inside_the_daemons_walls_to_be_readable_by_others(
+    printed: Ran, ok: bool
+) -> None:
+    rig = FakeRig(daemon=printed)
+
+    result = worktree_drill.worktree_readable(rig)
+
+    assert result.ok is ok
+    assert len(rig.walled) == 1 and str(rig.worktree_a) in rig.walled[0][-1]
 
 
 def test_a_drill_inside_the_daemons_walls_takes_every_wall_and_nothing_it_runs() -> None:

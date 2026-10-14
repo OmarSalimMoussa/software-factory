@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 
-from runtime.system.install_drills import browser_drill, drills
+from runtime.system.install_drills import browser_drill, drills, worktree_drill
 from runtime.system.install_drills.evidence import Result, Rig
 
 DRILLS: tuple[Callable[[Rig], Result], ...] = (
@@ -36,6 +36,7 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
     drills.warden_runs_commands,
     drills.check_walled_in,
     browser_drill.tester_browser,
+    worktree_drill.worktree_readable,
 )
 
 
