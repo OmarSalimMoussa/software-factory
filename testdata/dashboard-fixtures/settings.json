@@ -40,7 +40,7 @@
    "name_hint": "Lower-case letters, digits and dashes, such as work.",
    "token": "Token",
    "token_hint": "What `claude setup-token` printed. It is never shown again.",
-   "button": "Add account"
+   "button": "Add and switch"
   }
  },
  "settings": {
@@ -1059,6 +1059,22 @@
       "high": 60,
       "step": 1,
       "hint": "From 1 to 60.",
+      "options": null,
+      "when": "At once"
+     },
+     {
+      "key": "watch.account_check_seconds",
+      "label": "Seconds a switch of accounts waits for an agent's answer",
+      "control": "number",
+      "value": 180,
+      "saved": 180,
+      "default": 180,
+      "applied": 180,
+      "pending": null,
+      "low": 30,
+      "high": 900,
+      "step": 1,
+      "hint": "From 30 to 900.",
       "options": null,
       "when": "At once"
      },

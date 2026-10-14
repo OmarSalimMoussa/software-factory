@@ -28,7 +28,7 @@ def _answered(job: Install) -> None:
     assert isinstance(job.host, DryHost)
     folder = job.places.state / "secrets"
     job.host.paths |= {job.places.totp_secret, folder / "deploy.key", folder / "factory-read.key.pub",
-                       folder / "github.token", folder / "claude-accounts" / "active"}  # fmt: skip
+                       folder / "github.token", folder / "claude.token"}  # fmt: skip
     job.host.files[job.owner.home / layout.OWNER_SERVER_KEYS] = "{}"
 
 
@@ -235,8 +235,8 @@ WARDEN_OWNED = "(600, software-warden:software-warden)"
         # A first install asks for the token and a name; the dry run shows it with its placeholder answers.
         (True, {}, ["The token `claude setup-token` printed, for the agents' sessions:",
                     "A name for this Claude account (Enter for main):"],
-         ["claude-accounts/<answer>.token", "claude.token", "claude-accounts/active"]),
-        (False, {"claude.token": "sk-ant-oat01-kept-from-before-a1b2\n", "claude-accounts/active": "work\n"}, [], []),
+         ["claude-accounts/<answer>.token", "claude.token"]),
+        (False, {"claude.token": "sk-ant-oat01-kept-from-before-a1b2\n"}, [], []),
     ],
 )  # fmt: skip
 def test_the_secrets_step_keeps_the_agents_claude_accounts(
@@ -281,7 +281,7 @@ def test_the_install_asks_once_for_a_factory_token_that_github_lets_read_the_rel
     assert isinstance(host, DryHost)
     host.dry = False  # decides like a real install; a dry host still changes nothing
     host.paths |= {job.places.totp_secret, folder / "deploy.key", folder / "factory-read.key.pub",
-                   folder / "github.token", folder / "claude-accounts" / "active"}  # fmt: skip
+                   folder / "github.token", folder / "claude.token"}  # fmt: skip
     if kept:
         host.files[folder / "factory.token"] = "github_pat_read_only\n"
     checked: list[str] = []

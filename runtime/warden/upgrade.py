@@ -15,9 +15,10 @@ from typing import Any
 
 from runtime.queue import approvals, formats, turn
 from runtime.queue.book import Queue
-from runtime.shared import store
+from runtime.shared import claude_accounts, store
 from runtime.shared.models import SEVERITIES
 from runtime.slots import leases
+from runtime.system import layout
 from runtime.warden import imports
 from runtime.warden.context import Context
 from runtime.warden.delivery import deploys, prod_push
@@ -36,7 +37,7 @@ def migrate(ctx: Context) -> list[str]:
     done: list[str] = []
     steps: list[Callable[[Context], str]] = [
         _inbox_cursor, _leases, _errors_filed, _turn, _merges, _released, _typed_verdicts, _approvals_routed,
-        _release_offer, _briefs_home,
+        _release_offer, _briefs_home, _active_account,
     ]  # fmt: skip
     for step in steps:
         try:
@@ -87,6 +88,15 @@ def _briefs_home(ctx: Context) -> str:
     if old:
         store.write_json(ctx.places.cards, raw, mode=0o600)
     return f"{specs} specs and {len(old)} cards off their artifact briefs" if specs or old else ""
+
+
+def _active_account(ctx: Context) -> str:
+    """The file that named the active Claude account goes: the active one is whichever the agents' Claude holds."""
+    path = claude_accounts.folder(layout.secrets(ctx.places.state)) / "active"
+    if not path.exists():
+        return ""
+    path.unlink()
+    return "the active account's file, read from the agents' sign-in now"
 
 
 def _inbox_cursor(ctx: Context) -> str:

@@ -53,6 +53,6 @@ def section(snap: Snap) -> dict[str, Any]:
             "name_hint": "Lower-case letters, digits and dashes, such as work.",
             "token": "Token",
             "token_hint": "What `claude setup-token` printed. It is never shown again.",
-            "button": "Add account",
+            "button": "Add and switch",
         },
     }

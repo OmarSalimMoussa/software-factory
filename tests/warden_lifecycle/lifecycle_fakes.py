@@ -10,9 +10,11 @@ from typing import Any, cast
 from runtime.queue import approvals, route, statuses
 from runtime.shared import settings as settings_mod
 from runtime.shared import store
+from runtime.shared.claude_accounts import UNIT_TOKEN
 from runtime.shared.models import PENDING, WORKING, Session, Task
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
+from runtime.system import layout
 from runtime.warden.context import Caller, Clock, Context, GitHub, StackResult
 from runtime.warden.sessions import registry
 from runtime.warden.sessions.backstop import Proc
@@ -55,6 +57,9 @@ class FakeLauncher:
         self.restarts = 0
         self.upgrades: list[str] = []
         self.on_restart: Callable[[], None] = lambda: None  # what else happens while the daemon restarts
+        # The token the daemon signed in with at its last restart, and how each token's first call answers.
+        self.held: str | None = None
+        self.answers: dict[str, str | None] = {}
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
         self.started.append((request_id, launch))
@@ -94,7 +99,19 @@ class FakeLauncher:
     def restart_daemon(self) -> None:
         self.restarts += 1
         self.procs.clear()  # stopping the daemon stops every session it hosts
+        self.held = self._loaded()
         self.on_restart()
+
+    def _loaded(self) -> str | None:
+        unit = layout.secrets(self.places.state) / UNIT_TOKEN
+        return unit.read_text().strip() if unit.exists() else None
+
+    def signed_in(self) -> str | None:
+        return self.held if self.restarts else self._loaded()
+
+    def answered(self, session_id: str, since: float) -> str | None:
+        held = self.signed_in()
+        return self.answers.get(held, "ok") if held is not None else None
 
 
 class Queue:

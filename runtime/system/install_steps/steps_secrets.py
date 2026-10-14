@@ -157,7 +157,7 @@ def _claude_account(ctx: Install, folder: Path) -> None:
     """The agents' first Claude account, asked for only when none exists. The owner adds and switches the rest with
     `factory account`."""
     host, accounts = ctx.host, claude_accounts.folder(folder)
-    if host.exists(accounts / claude_accounts.ACTIVE):
+    if host.exists(folder / claude_accounts.UNIT_TOKEN):
         host.say("the agents' Claude accounts are kept")
         return
     lone = folder / claude_accounts.UNIT_TOKEN
@@ -181,7 +181,6 @@ def _claude_account(ctx: Install, folder: Path) -> None:
     host.mkdir(accounts, mode=0o700, owner=WARDEN_USER)
     host.write(claude_accounts.token_file(folder, name), token + "\n", mode=0o600, owner=WARDEN_USER)
     host.write(lone, token + "\n", mode=0o600, owner=WARDEN_USER)
-    host.write(accounts / claude_accounts.ACTIVE, name + "\n", mode=0o600, owner=WARDEN_USER)
 
 
 def _server_keys(ctx: Install, folder: Path) -> None:

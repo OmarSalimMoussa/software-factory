@@ -143,12 +143,14 @@ limits:
 - **On the dashboard:** open Settings. Under Claude account, press Switch on the account you want.
 - **In a terminal:** run `factory account use <name>`.
 
-The factory makes that account active, restarts the agents' Claude daemon, and brings back every agent that was
-working or waiting, where it left off. You see each step as it runs. Until the daemon is back, no agent starts; until
-the switch ends, another switch is refused. An agent that cannot come back says why in the last step, and the warden
-then resumes it as it would after a crash.
+The factory gives the agents that account's token, restarts their Claude daemon, and brings one agent back first.
+Only its answer proves the token signs in: when no answer comes, or the account is at its plan limit, the factory goes
+back to the account before and says why. Then it brings back every other agent that was working or waiting, where it
+left off. You see each step as it runs. Until the daemon is back, no agent starts; while a merge is in its last turn,
+or another switch runs, a switch waits. The active account is the one whose token the agents' Claude holds.
 
-Add an account with Add account on the same page, or with `factory account add <name>`, which asks for the token
+Add an account with Add and switch on the same page, which switches to it at once, or with
+`factory account add <name>`, which asks for the token
 that `claude setup-token` prints without showing it. `factory account list` shows every account and marks the active
 one. `factory account remove <name>` forgets an account the agents do not use. The factory never shows a token again,
 only its last four characters. Only you can do any of this: these commands reach the warden on the dashboard's own

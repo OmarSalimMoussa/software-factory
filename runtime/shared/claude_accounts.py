@@ -13,7 +13,6 @@ from pathlib import Path
 
 DEFAULT = "main"
 UNIT_TOKEN = "claude.token"
-ACTIVE = "active"
 SHOWN = 4  # the characters of a token that may be shown
 _FOLDER, _SUFFIX = "claude-accounts", ".token"
 _NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,30}")

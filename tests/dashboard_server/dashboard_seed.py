@@ -270,5 +270,4 @@ def seed(root: Path, now: float = T0) -> Places:
         store.write_text(path, f"sk-ant-oat01-seeded-token-{name}\n", mode=0o600)
         os.utime(path, (now - days * 86400, now - days * 86400))
     store.write_text(secrets / claude_accounts.UNIT_TOKEN, "sk-ant-oat01-seeded-token-main\n", mode=0o600)
-    store.write_text(claude_accounts.folder(secrets) / claude_accounts.ACTIVE, "main\n", mode=0o600)
     return places

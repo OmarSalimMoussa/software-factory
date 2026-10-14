@@ -158,7 +158,7 @@ def test_an_upgrade_without_a_signed_in_github_cli_keeps_the_keys_and_asks_nothi
     host.dry = False
     host.paths |= {job.places.totp_secret, upgrades.token_path(job.places)}
     host.paths |= {folder / name for name in ("deploy.key", "factory-read.key.pub", "github.token", "factory.token")}
-    host.files[folder / "claude-accounts" / "active"] = "main\n"
+    host.files[folder / "claude.token"] = "sk-ant-oat01-kept-from-before-a1b2\n"
 
     steps_secrets.secrets(job)
 

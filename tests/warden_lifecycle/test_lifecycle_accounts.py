@@ -150,8 +150,9 @@ def test_a_switch_restarts_the_daemon_and_brings_each_working_session_back_witho
     op = _switch(world, "work")
 
     assert [(s["text"], s["state"]) for s in op["steps"]] == [
-        ("Making work the active account", "done"),
+        ("Signing the agents in as work", "done"),
         ("Restarting the agents' Claude daemon", "done"),
+        ("Checking that work answers", "done"),
         ("Bringing back the sessions", "done"),
     ]
     assert (op["state"], world.launcher.restarts, during) == ("done", 1, {"start": "switching", "switch": "switching"})
@@ -160,7 +161,7 @@ def test_a_switch_restarts_the_daemon_and_brings_each_working_session_back_witho
     assert [world.session(sid).resume_tries for sid in ("0c0c0c0c", "5e550001", "5e550002")] == [0, 0, 0]
     tester, benched = world.session("a9a9a9a9"), world.session("5e550003")
     assert (tester.state, tester.retired, benched.state) == (RETIRED, WITH_PARENT, DEPRIORITIZED)
-    assert (claude_accounts.folder(_secrets(world)) / claude_accounts.ACTIVE).read_text() == "work\n"
+    assert [r["name"] for r in accounts.listing(world.owner()) if r["active"]] == ["work"]
     assert (_secrets(world) / claude_accounts.UNIT_TOKEN).read_text() == WORK + "\n"
     assert permits.switching(world.ctx()) is None
 
@@ -179,3 +180,42 @@ def test_a_session_that_cannot_come_back_says_why_and_the_crash_watch_resumes_it
     world.launcher.lost = False
     crashwatch.watch(world.ctx())
     assert (world.session("5e550001").state, world.session("5e550001").resume_tries) == (WORKING, 1)
+
+
+@pytest.mark.parametrize(
+    ("answer", "why"),
+    [("OAuth token has expired", "it did not sign in: OAuth token has expired"),
+     ("limit", "it is at its plan limit"), (None, "no answer came")],
+    ids=["no-sign-in", "plan-limit", "silent"],
+)  # fmt: skip
+def test_a_switch_whose_first_agent_cannot_answer_goes_back_to_the_old_account(
+    world: World, answer: str | None, why: str
+) -> None:
+    _accounts(world)
+    world.queue.add("t-0001", status="building")
+    world.seat("0c0c0c0c", role="orchestrator", family="orch")
+    world.seat("5e550001", task="t-0001")
+    for sid in ("0c0c0c0c", "5e550001"):
+        world.run(sid)
+    world.launcher.answers[WORK] = answer
+
+    op = _switch(world, "work")
+
+    assert op["state"] == "failed" and f"work: {why}, so the agents are back on main" in op["steps"][2]["detail"]
+    assert world.launcher.restarts == 2 and world.launcher.signed_in() == MAIN
+    assert [r["name"] for r in accounts.listing(world.owner()) if r["active"]] == ["main"]
+    assert sorted(world.launcher.procs) == ["0c0c0c0c", "5e550001"]
+
+
+def test_add_and_switch_moves_the_agents_to_the_new_account_and_a_merge_turn_holds_a_switch_back(world: World) -> None:
+    d = _dispatcher(world)
+    _ask(d, "account.add", {"name": "main"}, MAIN.encode())
+    world.queue.add("t-0001", status="turn")
+    world.seat("5e550001", task="t-0001", merge_turn=True)
+    held = _ask(d, "account.add", {"name": "work", "switch": True}, WORK.encode())
+    assert held["ok"] and "but the switch waits" in held["message"] and world.launcher.signed_in() == MAIN
+
+    world.seat("5e550001", task="t-0001")
+    started = accounts.use(world.owner(), {"name": "work"}, None)
+    ops.join(started["op"])
+    assert world.launcher.signed_in() == WORK

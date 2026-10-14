@@ -33,6 +33,8 @@ UPKEEP = ""
 _SLUG = re.compile(r"[^A-Za-z0-9]")
 # A reply Claude Code wrote itself for a failed request names this model.
 _SYNTHETIC = "<synthetic>"
+# A failed call's words when the account is at its plan's limit.
+_LIMIT = re.compile(r"usage limit|rate.?limit|\b429\b", re.IGNORECASE)
 _FAMILIES = {"intake": "intake", "triage": "intake", "critic": "design", "qa": "qa"}
 
 
@@ -101,6 +103,24 @@ def _tokens(usage: object) -> dict[str, int]:
     if not all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in tokens.values()):
         raise TypeError("a token count is not a whole number")
     return tokens
+
+
+def call_outcome(line: str, since: float) -> str | None:
+    """How one transcript line's model call after ``since`` went: ok, limit (the plan's), or the error's first line;
+    None for a line that is no such call."""
+    try:
+        entry = json.loads(line)
+        at = datetime.fromisoformat(str(entry["timestamp"]).replace("Z", "+00:00")).timestamp()
+    # telemetry: expected — a line still being written, or one that is not a call, holds no outcome: `None`
+    except (ValueError, TypeError, KeyError):
+        return None
+    if entry.get("type") != "assistant" or at < since:
+        return None
+    message = entry.get("message") if isinstance(entry.get("message"), dict) else {}
+    if not entry.get("isApiErrorMessage") and message.get("model") != _SYNTHETIC:
+        return "ok"
+    text = " ".join(b.get("text", "") for b in message.get("content") or [] if isinstance(b, dict)).strip()
+    return "limit" if _LIMIT.search(text) else (text.splitlines()[0][:200] if text else "the call failed")
 
 
 def _record(entry: dict[str, Any], payer: Payer, model_seen: str, ctx: Context) -> CostRecord:

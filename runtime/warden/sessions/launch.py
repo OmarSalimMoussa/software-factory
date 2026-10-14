@@ -24,12 +24,13 @@ from typing import Any
 
 from runtime.shared import store
 from runtime.shared.models import PENDING, WORKING, Session
-from runtime.shared.paths import AGENT_USER, UPGRADE_UNIT, Places
+from runtime.shared.paths import AGENT_USER, UPGRADE_UNIT, Places, stored_signin
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.system.layout import DAEMON_UNIT
 from runtime.warden.context import Context, StackResult
 from runtime.warden.sessions import reap, registry, session_settings
+from runtime.warden.spend import cost
 
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
@@ -157,10 +158,25 @@ class Units:
         if done.returncode != 0:
             raise LaunchError(f"the agents' Claude daemon did not restart: {done.stderr.strip()[-300:]}")
 
+    def signed_in(self) -> str | None:
+        """The token the agents' Claude daemon last signed in with: it writes its stored sign-in as it starts."""
+        try:
+            held = json.loads(stored_signin(agent_home()).read_text(encoding="utf-8"))
+        # telemetry: expected — the daemon has not signed in yet: no token is held, `None`
+        except FileNotFoundError:
+            return None
+        token = held.get("claudeAiOauth", {}).get("accessToken") if isinstance(held, dict) else None
+        return token if isinstance(token, str) and token else None
+
+    def answered(self, session_id: str, since: float) -> str | None:
+        """How a session's first model call since ``since`` went (cost.call_outcome); None while it has made none."""
+        found = sorted((agent_home() / ".claude" / "projects").glob(f"*/{session_id}.jsonl"))
+        lines = found[0].read_text(encoding="utf-8", errors="replace").splitlines() if found else []
+        return next((said for line in lines if (said := cost.call_outcome(line, since)) is not None), None)
+
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
         request_id = f"stack-{uuid.uuid4().hex}"
         self._request(request_id, {"kind": "stack", "slot": slot, "verb": verb, "session": session})
-        # The stack runner hid every secret it knows before printing (runtime/system/runners/stack_run.py).
         code, output = self._wait(STACK_UNIT.format(request_id), request_id)
         log = self.places.evidence / "stack" / f"{request_id}.log"
         store.write_text(log, output, mode=0o600)

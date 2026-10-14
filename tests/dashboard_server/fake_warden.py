@@ -14,8 +14,10 @@ from typing import Any
 
 from runtime.shared import settings as settings_module
 from runtime.shared import store
+from runtime.shared.claude_accounts import UNIT_TOKEN
 from runtime.shared.paths import Places
 from runtime.shared.protocol import MAX_LINE
+from runtime.system import layout
 from runtime.warden.context import Caller, Clock, StackResult
 from runtime.warden.dispatch import OWNER_SOCKET, Dispatcher, Doors, resolve
 from runtime.warden.owner import codes
@@ -35,8 +37,9 @@ class FixedClock(Clock):
 
 
 class Launcher:
-    def __init__(self) -> None:
+    def __init__(self, places: Places) -> None:
         self.calls: list[tuple[str, Any]] = []
+        self.places = places
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
         self.calls.append(("start", request_id))
@@ -59,6 +62,13 @@ class Launcher:
 
     def restart_daemon(self) -> None:
         self.calls.append(("restart", None))
+
+    def signed_in(self) -> str | None:
+        unit = layout.secrets(self.places.state) / UNIT_TOKEN
+        return unit.read_text().strip() if unit.exists() else None
+
+    def answered(self, session_id: str, since: float) -> str | None:
+        return "ok"
 
 
 class GitHub:
@@ -91,7 +101,7 @@ class FakeWarden:
                  on_event: Callable[[str, dict[str, Any]], None] | None = None) -> None:  # fmt: skip
         self.places, self.clock = places, clock
         self.events: list[tuple[str, dict[str, Any]]] = []
-        self.launcher = Launcher()
+        self.launcher = Launcher(places)
 
         def post(kind: str, data: dict[str, Any]) -> None:
             self.events.append((kind, data))

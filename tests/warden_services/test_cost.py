@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tomllib
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -112,3 +113,25 @@ def test_every_model_the_factory_allows_out_of_the_box_has_a_price_so_no_call_co
     shipped = tomllib.loads((Path(__file__).resolve().parents[2] / "settings.toml").read_text())
 
     assert set(shipped["prices"]) == set(shipped["models"]["allowed"])
+
+
+def _line(model: str, text: str, at: str = "2026-10-09T12:00:05Z", **extra: object) -> str:
+    message = {"model": model, "content": [{"type": "text", "text": text}], "usage": {}}
+    return json.dumps({"type": "assistant", "timestamp": at, "message": message, **extra})
+
+
+@pytest.mark.parametrize(
+    ("line", "outcome"),
+    [
+        (_line("claude-opus-5-5", "Carrying on."), "ok"),
+        (_line("<synthetic>", "API Error: 401 OAuth token has expired", isApiErrorMessage=True),
+         "API Error: 401 OAuth token has expired"),
+        (_line("<synthetic>", "Claude AI usage limit reached|1791000000", isApiErrorMessage=True), "limit"),
+        (_line("claude-opus-5-5", "Carrying on.", at="2026-10-09T11:59:00Z"), None),
+        ('{"type": "user"', None),
+    ],
+    ids=["answered", "no-sign-in", "plan-limit", "before-the-switch", "half-written"],
+)  # fmt: skip
+def test_a_calls_outcome_after_a_moment_says_whether_it_signed_in(line: str, outcome: str | None) -> None:
+    since = datetime(2026, 10, 9, 12, 0, tzinfo=UTC).timestamp()
+    assert cost.call_outcome(line, since) == outcome

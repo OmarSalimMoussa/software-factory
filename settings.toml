@@ -150,6 +150,7 @@ bench_min_run_minutes = 20  # a working run keeps its place this long before any
 container_events_minutes = 5  # how often the warden reads which slot containers stopped when nothing asked
 start_grace_seconds = 120  # a started session that has not appeared by then is retired as crashed
 respawn_poll_seconds = 1  # how often the warden looks whether a session it respawned runs again
+account_check_seconds = 180  # how long a switch of Claude accounts waits for the first agent back to answer
 reap_retry_minutes = 10  # a reap that could not empty a retired session's slot is tried again after this
 message_seconds = 10    # how long the warden holds the owner's message out to a session before letting go
 loop_minutes = 30

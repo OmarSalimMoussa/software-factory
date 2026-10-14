@@ -95,8 +95,9 @@ function changeRepo() {
 }
 
 /* The Claude account section: the server lists the accounts and words every label. Switch runs as an operation, Remove
-   asks first, and Add account sends the token once; the page never draws a token back. */
-UI.acct = {name: '', token: ''};
+   asks first, and Add and switch sends the token once, then switches the agents to it; the page never draws a token
+   back. */
+UI.acct = {name: '', token: '', note: '', bad: false};
 const acctData = () => { const env = UI.data['/api/settings']; return env ? partData(env, 'accounts') : null; };
 const acctRow = r => `<div class="set-row" data-row="acct:${esc(r.name)}"><div class="acct-id"><span class="k">${esc(r.name)}</span>${r.chip ? pill(r.chip, 'good') : ''}<span class="help"><span class="mono">${esc(r.token)}</span> · ${esc(r.added)}</span></div><div class="ctl">${r.switch ? `<button class="btn sm" data-acct-use="${esc(r.switch.url)}" aria-label="${esc(r.switch.aria)}" data-write>${icon('arrow-path', 'sm')}${esc(r.switch.label)}</button>` : ''}${r.remove ? `<button class="btn sm quiet" data-acct-remove="${esc(r.name)}" data-write>${esc(r.remove.label)}</button>` : ''}</div></div>`;
 function acctSection(env) {
@@ -106,7 +107,7 @@ function acctSection(env) {
       <label class="a-nl" for="acct-name">${esc(a.add.name)}</label><input class="a-ni" id="acct-name" data-acct="name" autocomplete="off" spellcheck="false" aria-describedby="acct-name-hint"><span class="help a-nh" id="acct-name-hint">${esc(a.add.name_hint)}</span>
       <label class="a-tl" for="acct-token">${esc(a.add.token)}</label><input class="a-ti" id="acct-token" type="password" data-acct="token" autocomplete="off" spellcheck="false" aria-describedby="acct-token-hint"><span class="help a-th" id="acct-token-hint">${esc(a.add.token_hint)}</span>
       <button class="btn primary a-b" data-acct-add data-write>${esc(a.add.button)}</button></div>
-      <div class="code-note" id="acct-note" role="status"></div></div></div>`);
+      <div class="code-note${UI.acct.bad ? ' bad' : ''}" id="acct-note" role="status">${esc(UI.acct.note)}</div></div></div>`);
 }
 const useAccount = (url, btn) => act(url, {}, {btn, icon: 'arrow-path'});
 function removeAccount(name) {
@@ -115,10 +116,11 @@ function removeAccount(name) {
 }
 async function addAccount(btn) {
   if (UI.down) { writesOff(); return; }
-  const note = $('#acct-note'), say = (text, bad) => { note.textContent = text; note.className = 'code-note' + (bad ? ' bad' : ''); };
+  /* The note lives in the page's state, so a redraw while the answer is on its way draws it too. */
+  const say = (text, bad) => { Object.assign(UI.acct, {note: text, bad: !!bad}); const n = $('#acct-note'); if (n) { n.textContent = text; n.className = 'code-note' + (bad ? ' bad' : ''); } };
   btn.disabled = true; say('');
   let ans;
-  try { ans = await post(acctData().add.url, {name: $('#acct-name').value, token: $('#acct-token').value}); }
+  try { ans = await post(acctData().add.url, {name: $('#acct-name').value, token: $('#acct-token').value, switch: true}); }
   catch (e) {
     if (e instanceof NeedsDevice) askDevice();
     else if (e instanceof TimedOut) say('No answer came in time, so it may have been added: check the list before you try again.', true);
@@ -127,8 +129,8 @@ async function addAccount(btn) {
     return;
   } finally { if (btn.isConnected) btn.disabled = false; }
   if (!ans.ok) { say(ans.reason, true); return; }
-  UI.acct = {name: '', token: ''};
+  UI.acct = {name: '', token: '', note: '', bad: false};
   /* Left focused, a field holds the page's redraw back; the new account shows once it is let go. */
   ['#acct-name', '#acct-token'].forEach(s => { const f = $(s); f.value = ''; f.blur(); });
-  toast(ans.message); refreshParts(ans.refresh);
+  toast(ans.message); if (ans.op) runOp(ans.op); refreshParts(ans.refresh);
 }
