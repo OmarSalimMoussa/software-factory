@@ -22,8 +22,9 @@ from urllib.parse import parse_qsl, urlsplit
 
 from runtime.dashboard import auth, cache, pictures
 from runtime.dashboard.client import Warden, WardenDown
-from runtime.dashboard.views import ops, proposals, routes, writes
+from runtime.dashboard.views import ops, routes, writes
 from runtime.dashboard.views.kit import PartError, Snap, clock
+from runtime.dashboard.views.tasks import proposals
 from runtime.shared import error_reports, store
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import Places

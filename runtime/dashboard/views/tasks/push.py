@@ -7,7 +7,7 @@ from typing import Any
 from runtime.dashboard.views.home import env_card
 from runtime.dashboard.views.kit import Parts, Query, Snap, epoch, span, when
 from runtime.dashboard.views.shell import health, prod_runs_staging
-from runtime.dashboard.views.task import built_from
+from runtime.dashboard.views.tasks.task import built_from
 from runtime.dashboard.views.words import taskwords
 from runtime.shared.models import ON_STAGING
 

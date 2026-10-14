@@ -15,7 +15,7 @@ from seed_kit import FIXTURES, iso
 
 from runtime.dashboard.views import agents, ops
 from runtime.dashboard.views.kit import PartError, Snap
-from runtime.dashboard.views.task import qa_line
+from runtime.dashboard.views.tasks.task import qa_line
 from runtime.dashboard.views.words.settingwords import LABELS
 from runtime.shared import models, store
 from runtime.shared import operations as kinds

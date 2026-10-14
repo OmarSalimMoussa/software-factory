@@ -14,17 +14,15 @@ from runtime.dashboard.views import (
     guard,
     home,
     library,
-    push,
     reflect,
     replay,
     search,
     settings,
     shell,
     spend,
-    task,
-    work,
 )
 from runtime.dashboard.views.kit import Parts, Query, Snap
+from runtime.dashboard.views.tasks import push, task, work
 
 
 @dataclass(frozen=True, slots=True)
