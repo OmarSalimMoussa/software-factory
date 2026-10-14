@@ -1,7 +1,12 @@
-"""The one order every list of tasks follows: the queue, proposals, approved starts and bench.
+"""The two orders tasks follow: the queue's, and the order runs take places in.
 
-Severe first (oldest first), then boosted (latest boost first), then the owner's order among approved runs, then the
-goal item's rank in GOAL.md, then the score (higher first), then age (older first).
+The queue's order, for the queue and its proposals and for merge turns: severe first (oldest first), then boosted
+(latest boost first), then the owner's order among approved runs, then the goal item's rank in GOAL.md, then the
+score (higher first), then age (older first).
+
+The seat order, for starts, revivals and benches: severe first (oldest first), then the goal item's rank, then the
+owner's order among approved runs, then the score, then age. A bench reads only its first part, severity and the goal
+item, which nothing changes when a run starts: so a run never benches the run that benched it.
 """
 
 from __future__ import annotations
@@ -33,19 +38,28 @@ def _later_first(iso: str) -> str:
     return "".join(chr(0x10FFFF - ord(c)) for c in iso)
 
 
-def rank(task: Task, ranking: Ranking) -> tuple[int, str, str, int, int, float, str]:
+def _parts(task: Task, ranking: Ranking) -> tuple[int, str, int, int, float]:
+    """Both orders' shared parts, each turned so that what comes first sorts first."""
     severe = 0 if task.severity == "severe" else 1
-    severe_age = task.created if severe == 0 else ""
-    boost = _later_first(task.boosted_at) if task.boosted_at else "\U0010ffff"
     owner = ranking.approved.index(task.id) if task.id in ranking.approved else _FAR
     score = -task.score if task.score is not None else float("inf")
-    return (severe, severe_age, boost, owner, goal_rank(task.goal_item, ranking.goals), score, task.created)
+    return (severe, task.created if severe == 0 else "", goal_rank(task.goal_item, ranking.goals), owner, score)
+
+
+def rank(task: Task, ranking: Ranking) -> tuple[int, str, str, int, int, float, str]:
+    severe, age, goal, owner, score = _parts(task, ranking)
+    boost = _later_first(task.boosted_at) if task.boosted_at else "\U0010ffff"
+    return (severe, age, boost, owner, goal, score, task.created)
 
 
 def ordered(tasks: Sequence[Task], ranking: Ranking) -> list[Task]:
     return sorted(tasks, key=lambda t: rank(t, ranking))
 
 
-def outranks(a: Task, b: Task, ranking: Ranking) -> bool:
-    """Whether ``a`` comes before ``b`` in the one order (bench uses it to choose who makes room)."""
-    return rank(a, ranking) < rank(b, ranking)
+def seat_rank(task: Task, ranking: Ranking) -> tuple[int, str, int, int, float, str]:
+    return (*_parts(task, ranking), task.created)
+
+
+def may_bench(new: Task, seated: Task, ranking: Ranking) -> bool:
+    """Whether ``new`` may push ``seated`` out of its place: only for severe work, or work for a higher goal item."""
+    return seat_rank(new, ranking)[:3] < seat_rank(seated, ranking)[:3]

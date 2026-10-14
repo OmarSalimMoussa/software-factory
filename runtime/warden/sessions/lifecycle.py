@@ -2,8 +2,8 @@
 
 States are working, waiting, bench-pending, deprioritized, reviving and retired. A pending state is written before
 the warden acts, so the crash watch and the backstop never misread a session in between. Retired is final: nothing
-revives or resumes it. Only the owner retires a deprioritized session; a bench makes room only for a task that
-outranks the one it replaces. Each move is a line in history.jsonl with who made it and why.
+revives or resumes it. Only the owner retires a deprioritized session; a bench makes room only for severe work or
+a higher goal item (order.may_bench). Each move is a line in history.jsonl with who made it and why.
 """
 
 from __future__ import annotations
@@ -391,7 +391,9 @@ def begin_bench(ctx: Context, s: Session, by: str, why: str, benched_for: str) -
 def make_room(ctx: Context, sessions: dict[str, Session], task: Task) -> Session:
     choices = permits.benchable(ctx, sessions, IMPL, task.id)
     if not choices:
-        raise Refused("cap", "no implementer can make room for the outage fix: each outranks it or holds a merge turn")
+        raise Refused(
+            "cap", "no implementer can make room for the outage fix: each is severe work too or holds a merge turn"
+        )
     begin_bench(ctx, choices[0], WARDEN, f"benched for the outage fix {task.id}", task.id)
     registry.write(ctx.places, sessions)
     return choices[0]

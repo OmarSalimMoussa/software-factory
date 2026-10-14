@@ -138,7 +138,7 @@ def check_cap(settings: Settings, sessions: Iterable[Session], role: str) -> Non
     if len(held) >= cap:
         names = ", ".join(s.name for s in held)
         raise Refused("cap", f"{len(held)} of {cap} {role}s hold a place ({names}); the warden benches one only "
-                            "for higher-ranked work, so this run waits for a place")  # fmt: skip
+                            "for severe work or a higher goal item, so this run waits for a place")  # fmt: skip
 
 
 def cap_full(settings: Settings, sessions: Iterable[Session], role: str) -> bool:
@@ -146,13 +146,13 @@ def cap_full(settings: Settings, sessions: Iterable[Session], role: str) -> bool
 
 
 def check_revive_order(ctx: Context, sessions: dict[str, Session], role: str, task: Task, skip: str = "") -> None:
-    """Deprioritized sessions come back before new runs they outrank, and among themselves in the one order."""
+    """Deprioritized sessions come back before new runs behind them in the seat order, and in that order."""
     approved = ranking(ctx)
     for other in sessions.values():
         if other.id == skip or other.role != role or other.state != DEPRIORITIZED or other.parent:
             continue
-        if order.outranks(read_task(ctx, other.task), task, approved):
-            raise Refused("revive-first", f"{other.name} comes back first: it outranks {task.id}, and the warden "
+        if order.seat_rank(read_task(ctx, other.task), approved) < order.seat_rank(task, approved):
+            raise Refused("revive-first", f"{other.name} comes back first: it is ahead of {task.id}, and the warden "
                                           "revives it when a place frees")  # fmt: skip
 
 
@@ -255,21 +255,23 @@ def needed_role(ctx: Context, task_id: str) -> str:
 
 
 def benchable(ctx: Context, sessions: dict[str, Session], role: str, for_task: str) -> list[Session]:
-    """The sessions a bench for ``for_task`` may push out, in the order to push them: waiting before working, then
-    lowest-ranked first. Never one in its merge turn, and only one the new task outranks."""
+    """Who a bench for ``for_task`` may push out, waiting before working, then last in the seat order first: never one
+    in its merge turn, and a working one only after its minimum run time, unless the new task is severe."""
     new, approved = read_task(ctx, for_task), ranking(ctx)
+    least = 0 if new.severity == SEVERE else ctx.settings().get_int("watch.bench_min_run_minutes") * 60
     found = [(s, read_task(ctx, s.task)) for s in registry.seated(sessions.values(), role)
-             if s.state in (WORKING, WAITING) and not s.merge_turn and s.task != for_task]  # fmt: skip
-    found = [(s, t) for s, t in found if order.outranks(new, t, approved)]
-    found.sort(key=lambda pair: order.rank(pair[1], approved), reverse=True)
+             if s.state in (WORKING, WAITING) and not s.merge_turn and s.task != for_task
+             and (s.state == WAITING or ctx.clock.age(s.since) >= least)]  # fmt: skip
+    found = [(s, t) for s, t in found if order.may_bench(new, t, approved)]
+    found.sort(key=lambda pair: order.seat_rank(pair[1], approved), reverse=True)
     found.sort(key=lambda pair: pair[0].state != WAITING)  # stable: keeps the rank order within each state
     return [s for s, _ in found]
 
 
 def in_order(ctx: Context, sessions: list[Session]) -> list[Session]:
-    """The orchestrator first, then the rest in their tasks' one order."""
+    """The orchestrator first, then the rest in their tasks' seat order."""
     approved = ranking(ctx)
-    ranked = sorted((s for s in sessions if s.task), key=lambda s: order.rank(read_task(ctx, s.task), approved))
+    ranked = sorted((s for s in sessions if s.task), key=lambda s: order.seat_rank(read_task(ctx, s.task), approved))
     return [s for s in sessions if not s.task] + ranked
 
 

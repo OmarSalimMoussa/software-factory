@@ -88,11 +88,12 @@ merged for a while, a regression walk of the scenarios that waited longest.
 
 ## Starting and steering runs
 
-- **The warden starts approved runs itself,** in the owner's order, with the brief you proposed them with: it
-  picks the model from the approved rung, checks the approval, the cap and the vitals, brings deprioritized sessions
-  back before runs they outrank, and benches the lowest-ranked run (a waiting one before a working one, never one in
-  its merge turn) when a higher one needs its place. `factory status` says why each one still waits. A designed
-  build's implementer starts the same way once you approve its spec or the owner says Go.
+- **The warden starts approved runs itself,** severe work first, then by goal item, then in the owner's order, with
+  the brief you proposed them with: it picks the model from the approved rung, checks the approval, the cap and the
+  vitals, and brings deprioritized sessions back before runs behind them. It benches a run only for severe work or
+  a higher goal item (a waiting one before a working one, never one in its merge turn or its first minutes).
+  `factory status` says why each one still waits. A designed build's implementer starts the same way once you
+  approve its spec or the owner says Go.
 - **Disputed findings.** An implementer that disputes a tester's finding with evidence asks you to rule. If the
   evidence holds, `factory qa waive <task> <finding> --why "<why>"`: it no longer counts toward qa-clean.
 - **Questions.** Answer from `GOAL.md`, the task's log and the owner's past rulings. When none answers:

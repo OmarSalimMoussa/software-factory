@@ -1031,6 +1031,22 @@
       "when": "At once"
      },
      {
+      "key": "watch.bench_min_run_minutes",
+      "label": "Minutes an agent works before it can be pushed out",
+      "control": "number",
+      "value": 20,
+      "saved": 20,
+      "default": 20,
+      "applied": 20,
+      "pending": null,
+      "low": 0,
+      "high": 240,
+      "step": 1,
+      "hint": "From 0 to 240.",
+      "options": null,
+      "when": "At once"
+     },
+     {
       "key": "watch.outage_after",
       "label": "Failed prod probes in a row that mean an outage",
       "control": "number",

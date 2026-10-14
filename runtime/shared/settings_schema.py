@@ -139,6 +139,7 @@ SCHEMA: dict[str, Spec] = {
     "watch.resume_backoff_seconds": Spec("int", 5, 600),
     "watch.daemon_settle_seconds": Spec("int", 0, 300),
     "watch.bench_grace_seconds": Spec("int", 10, 300),
+    "watch.bench_min_run_minutes": Spec("int", 0, 240),
     "watch.reap_retry_minutes": Spec("int", 1, 1440),
     "watch.start_grace_seconds": Spec("int", 30, 600),  # contract: a start's process must appear within this
     "watch.respawn_poll_seconds": Spec("int", 1, 30),

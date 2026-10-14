@@ -58,6 +58,31 @@ def test_a_bench_makes_room_only_for_a_task_that_outranks_the_one_it_replaces(wo
     assert world.session("5e550001").state == BENCH_PENDING
 
 
+@pytest.mark.parametrize(
+    ("new", "since", "benched"),
+    [
+        ({"goal_item": "G2"}, "2026-10-09T11:00:00Z", False),
+        ({"goal_item": "G1"}, "2026-10-09T11:00:00Z", True),
+        ({"goal_item": "G1"}, "2026-10-09T11:55:00Z", False),
+        ({"goal_item": "G2", "severity": "severe"}, "2026-10-09T11:55:00Z", True),
+    ],
+    ids=["approval-alone", "higher-goal", "too-soon", "severe-at-once"],
+)
+def test_only_severe_work_or_a_higher_goal_item_benches_a_run_and_not_in_its_first_minutes(
+    world: World, new: dict[str, str], since: str, benched: bool
+) -> None:
+    world.seat("0c0c0c0c", role="orchestrator", family="orch")
+    world.queue.add("t-0001", goal_item="G2", status="building")
+    world.seat("5e550001", task="t-0001", since=since)
+    world.approve("t-0002", **new)
+    _approved(world, "t-0002")
+
+    schedule.run_pass(world.ctx())
+
+    # An approved run outranked every running one, and lost that rank once it started: each start benched the last.
+    assert (world.session("5e550001").state == BENCH_PENDING) is benched
+
+
 @pytest.mark.parametrize("turn", [False, True], ids=["waiting-first", "never-a-merge-turn"])
 def test_a_bench_takes_a_waiting_session_first_and_never_a_merge_turn(world: World, turn: bool) -> None:
     world.seat("0c0c0c0c", role="orchestrator", family="orch")  # runs start in a working factory

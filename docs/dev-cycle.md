@@ -64,8 +64,9 @@ A task's surfaces are the union of what intake proposed and what the branch's di
 
 ## Sessions
 
-Working and waiting sessions hold a cap slot. An approved task that outranks a running one can push it out: the
-session is told to pause, commits its work, and comes back later with its full context. Only finishing, the owner's
+Working and waiting sessions hold a cap slot. Only severe work, or work for a higher goal item, can push a running
+session out, and a working one only after `watch.bench_min_run_minutes` unless the new work is severe. The session
+is told to pause, commits its work, and comes back later with its full context. Only finishing, the owner's
 Stop, or a crash retires a session, and a retired session never comes back: its task returns to Proposed, and a new
 session starts from its branch. The warden sees a session finish from its task's status (an implementer's task
 checked, a designer's spec gone to build): it stops the session, empties its slot and frees its place.

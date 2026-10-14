@@ -29,10 +29,15 @@ def test_switching_yolo_tells_the_orchestrator_and_switching_it_again_changes_no
     assert [kind for kind, _ in world.events] == [inbox.YOLO_ON, inbox.YOLO_OFF] and yolo.state(world.places) is None
 
 
-def test_yolo_approves_proposals_while_fewer_runs_wait_than_the_factory_runs_at_once(world: World) -> None:
-    world.with_settings(caps__implementers=1)
-    for _ in range(2):
-        propose(world.ctx(), world.task().id, 1, "why", "", PICTURE, "")
+def test_yolo_approves_only_into_a_free_place_of_the_runs_own_role(world: World) -> None:
+    world.with_settings(caps__implementers=2, caps__designers=1, routing__max_proposals=4)
+    builds = [world.task().id for _ in range(2)]
+    designs = [world.task().id for _ in range(2)]
+    for task_id in builds:
+        propose(world.ctx(), task_id, 1, "why", "", PICTURE, "")
+    for task_id in designs:
+        propose(world.ctx(), task_id, 3, "why", "it needs a design", PICTURE, "")
+    world.session("s-impl", "implementer", "impl-x", world.task().id, "/wt/x")
     yolo.run_pass(world.ctx())
     assert proposals.read(world.places).approved == []
 
@@ -40,9 +45,9 @@ def test_yolo_approves_proposals_while_fewer_runs_wait_than_the_factory_runs_at_
     yolo.run_pass(world.ctx())
     yolo.run_pass(world.ctx())
 
-    found = proposals.read(world.places)
-    assert len(found.approved) == 1 and len([e for e in found.open if e and e != "none"]) == 1
-    notes = [e["text"] for e in world.queue().read_log(found.approved[0])]
+    approved = proposals.read(world.places).approved
+    assert sorted(approved) == sorted([builds[0], designs[0]])
+    notes = [e["text"] for e in world.queue().read_log(approved[0])]
     assert any(note.endswith(", by YOLO mode") for note in notes)
 
 

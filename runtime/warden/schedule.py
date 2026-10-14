@@ -1,9 +1,10 @@
 """The warden's scheduling pass, once a tick: what should run, set against what runs.
 
-Each role's candidates, in the one order: its deprioritized sessions, the owner's approved runs, and the designed
+Each role's candidates, in the seat order: its deprioritized sessions, the owner's approved runs, and the designed
 builds waiting for their implementer. The first one that fits is brought back or started when the vitals and the
-role's cap allow. When the cap is full, the lowest-ranked seated session that candidate outranks is benched (a
-waiting one before a working one, never one in its merge turn), and the role waits for that bench to settle. A run
+role's cap allow. When the cap is full, the last seated session in the seat order that the candidate may bench is
+benched (a waiting one before a working one, never one in its merge turn or its minimum run time), and the role
+waits for that bench to settle. A run
 starts with the brief the orchestrator wrote when it proposed it; nothing waits on an event, and the orchestrator
 starts nothing. Why each candidate still waits is kept for `factory status` and the dashboard.
 """
@@ -66,7 +67,7 @@ def _candidates(ctx: Context, sessions: dict[str, Session], role: str) -> list[t
         if task.status in ("approved", "building") and permits.needed_role(ctx, task_id) == role:
             found.append((task, None))
     ranking = permits.ranking(ctx)
-    return sorted(found, key=lambda pair: order.rank(pair[0], ranking))
+    return sorted(found, key=lambda pair: order.seat_rank(pair[0], ranking))
 
 
 def _role(ctx: Context, role: str, waiting: dict[str, str]) -> None:
@@ -94,7 +95,7 @@ def _role(ctx: Context, role: str, waiting: dict[str, str]) -> None:
 
 
 def _make_room(ctx: Context, sessions: dict[str, Session], role: str, task: Task) -> bool:
-    """Bench the lowest-ranked seated session ``task`` outranks: a waiting one before a working one."""
+    """Bench the last seated session in the seat order that ``task`` may bench: a waiting one before a working one."""
     choices = permits.benchable(ctx, sessions, role, task.id)
     if not choices:
         return False

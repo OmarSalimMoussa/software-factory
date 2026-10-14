@@ -59,10 +59,6 @@ DONE_AT = {
 }
 
 
-def _age(ctx: Context, since: str) -> float:
-    return ctx.clock.now() - datetime.fromisoformat(since).timestamp()
-
-
 class SessionsWatch:
     """The sessions pass, once a tick. Benches settle in a thread of their own, as reaps do: emptying a slot runs the
     product's scripts for up to slots.verb_minutes, and probes, outages and check-ins must not wait on it. ``start``
@@ -85,7 +81,7 @@ class SessionsWatch:
 
 def finish_benches(ctx: Context, procs: dict[str, Proc]) -> None:
     grace = ctx.settings().get_int("watch.bench_grace_seconds")
-    due = [s for s in lifecycle.read(ctx).values() if s.state == BENCH_PENDING and _age(ctx, s.since) >= grace]
+    due = [s for s in lifecycle.read(ctx).values() if s.state == BENCH_PENDING and ctx.clock.age(s.since) >= grace]
     for s in due:
         try:
             _settle(ctx, s, procs)
@@ -212,7 +208,7 @@ def _judge(ctx: Context, facts: _Pass, sessions: dict[str, Session], sid: str, s
     if sid in backstop.processes() or not facts.hosting:
         return None
     if sid.startswith(PENDING):
-        if _age(ctx, s.since) < facts.grace:
+        if ctx.clock.age(s.since) < facts.grace:
             return None
         why = f"its session never appeared within {facts.grace} s of its start"
         return lifecycle.retire(ctx, registry.subtree(sessions, sid), s, CRASHED, WARDEN, why), None

@@ -67,6 +67,9 @@ class Clock:
     def iso(self) -> str:
         return datetime.fromtimestamp(self.now(), UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    def age(self, iso: str) -> float:
+        return self.now() - datetime.fromisoformat(iso).timestamp()
+
     def sleep(self, seconds: float) -> None:
         time.sleep(seconds)
 
