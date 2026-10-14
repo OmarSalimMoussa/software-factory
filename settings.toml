@@ -116,6 +116,7 @@ wake_note_minutes = 10  # a slot command that fails this soon after the laptop w
 api_timeout_seconds = 30  # one call to a slot's API or health address
 api_max_kib = 256       # the largest slot API answer a session sees
 verb_minutes = 30       # the longest one scripts/dev verb may run before it is stopped
+owner_address = ""      # the test address Open on the Done tab signs you in to slot 0 as; empty: the button waits
 
 [budget]
 slice_memory_high = "11G"
@@ -148,6 +149,7 @@ daemon_settle_seconds = 15  # how long the agent's Claude daemon gets, once it s
 bench_grace_seconds = 60  # time a pushed-out session gets to commit before it pauses
 bench_min_run_minutes = 20  # a working run keeps its place this long before anything but severe work benches it
 container_events_minutes = 5  # how often the warden reads which slot containers stopped when nothing asked
+done_minutes = 5        # how often the Done tab's list, and the commit slot 0 runs, are read
 start_grace_seconds = 120  # a started session that has not appeared by then is retired as crashed
 respawn_poll_seconds = 1  # how often the warden looks whether a session it respawned runs again
 account_check_seconds = 180  # how long a switch of Claude accounts waits for the first agent back to answer
@@ -213,6 +215,7 @@ lock_minutes = 60       # how long coded actions stay locked; Pause and Stop are
 device_days = 30        # how long a device stays admitted after one code
 hosts = ["127.0.0.1", "localhost"]  # Host and Origin the dashboard answers; the installer adds the tailnet name
 page_size = 50
+done_commits = 100      # commits the Done tab's Commits view lists
 history_page_size = 10  # agents on one page of the Agents page's History
 probe_strip = 10        # probes the outage band shows
 working_now_max = 6

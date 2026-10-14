@@ -69,6 +69,8 @@ first, and seal the commit from your checkout the same way.
 - **Also needs you** holds the rest: a spec to sign off (open its brief, select text to comment on, press Go or Send
   feedback), a stuck task (Extend, To a designer or Park), and questions from sessions.
 - **Boost** any queued task or request on the Work page to make it the next proposal.
+- **Done**, on the Work page, lists each finished task and how far it has reached: local, GitHub, staging, prod.
+  Its Open button opens slot 0 on this laptop, signed in as the test address you set under Settings, Slots.
 - **Talk to the orchestrator** in its chat. What you ask becomes a request in your words. What you say about the
   factory itself goes to `SELF_REFLECT.md`.
 

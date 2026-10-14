@@ -1,7 +1,8 @@
-"""Fakes for the warden loop's tests: the clock, GitHub and the health addresses."""
+"""Fakes for the warden loop's tests: the clock, GitHub, the health addresses, and git for a product checkout."""
 
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -95,3 +96,22 @@ def answers(*replies: Answer | Exception) -> Callable[[str, float], Answer]:
 
 def healthy(commit: str) -> Answer:
     return Answer(200, f'{{"build_commit": "{commit}"}}'.encode())
+
+
+def git(cwd: Path, *args: str) -> str:
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def commit(checkout: Path, change: Callable[[Path], None]) -> str:
+    change(checkout)
+    git(checkout, "add", "-A")
+    git(checkout, "commit", "-q", "-m", "change")
+    return git(checkout, "rev-parse", "HEAD")
+
+
+def write(rel: str) -> Callable[[Path], None]:
+    def change(root: Path) -> None:
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text("changed\n")
+
+    return change

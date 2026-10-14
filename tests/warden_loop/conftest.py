@@ -6,11 +6,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from loop_fakes import FakeClock, FakeGitHub, FakeStack, World
+from loop_fakes import FakeClock, FakeGitHub, FakeStack, World, commit, git, write
 
 from runtime.shared import settings as settings_mod
 from runtime.shared.paths import Places
 from runtime.warden.context import Caller, Context
+from runtime.warden.delivery import github_push
 
 ROOT = Path(__file__).resolve().parents[2]
 FACTORY_TOML = ROOT / "testdata" / "fixture-product" / "factory.toml"
@@ -38,3 +39,27 @@ def world(tmp_path: Path) -> World:
         post_event=lambda kind, data: events.append((kind, data)),
     )
     return World(ctx, github, clock, events, checkout)
+
+
+@pytest.fixture
+def github_repo(world: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A bare repo standing in for GitHub, reached through the real url, and the agent's checkout cloned from it."""
+    remote = tmp_path / "github.git"
+    config = tmp_path / "gitconfig"
+    config.write_text(
+        f'[url "{remote}"]\n\tinsteadOf = git@github.com:owner/name.git\n'
+        "[user]\n\tname = Tester\n\temail = tester@example.invalid\n[init]\n\tdefaultBranch = master\n"
+    )
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(config))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    git(tmp_path, "init", "-q", "--bare", str(remote))
+    world.checkout.mkdir(exist_ok=True)
+    git(world.checkout, "init", "-q")
+    # The settings name the hook scripts a push refuses to change.
+    shutil.copy(ROOT / "testdata" / "fixture-product" / "factory.toml", world.checkout / "factory.toml")
+    commit(world.checkout, write(".github/workflows/ci.yml"))
+    git(world.checkout, "push", "-q", str(remote), "master")
+    key = github_push.deploy_key(world.ctx.places)
+    key.parent.mkdir(parents=True)
+    key.write_text("not a real key\n")
+    return remote

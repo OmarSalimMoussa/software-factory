@@ -90,6 +90,8 @@ PAGES = [
     ("/api/work?tab=requests", ["work-requests.json"]),
     ("/api/work?tab=parked", ["work-parked.json"]),
     ("/api/work?tab=checks", ["work-checks.json"]),
+    ("/api/work?tab=done", ["work-done.json"]),
+    ("/api/work?tab=done&view=commits", ["work-done-commits.json"]),
     ("/api/task/t-0017", ["task/t-0017.json"]),
     ("/api/task/t-0027", ["task/t-0027.json"]),
     ("/api/task/t-0013", ["task/t-0013.json"]),

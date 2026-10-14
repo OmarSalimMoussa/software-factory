@@ -116,6 +116,7 @@ SCHEMA: dict[str, Spec] = {
     "slots.api_timeout_seconds": Spec("int", 1, 300),  # contract: one slot API or health call
     "slots.api_max_kib": Spec("int", 16, 8192),  # contract: the largest slot API answer a session sees
     "slots.verb_minutes": Spec("int", 1, 240),  # contract: added by builder 3, one scripts/dev verb
+    "slots.owner_address": Spec("str"),
     "budget.slice_memory_high": Spec("size", when=MINUTE),
     "budget.slice_memory_max": Spec("size", when=MINUTE),
     "budget.slice_cpu_weight": Spec("int", 1, 10000, when=MINUTE),
@@ -143,6 +144,7 @@ SCHEMA: dict[str, Spec] = {
     "watch.bench_min_run_minutes": Spec("int", 0, 240),
     "watch.account_check_seconds": Spec("int", 30, 900),
     "watch.container_events_minutes": Spec("int", 1, 60),
+    "watch.done_minutes": Spec("int", 1, 60),
     "watch.reap_retry_minutes": Spec("int", 1, 1440),
     "watch.start_grace_seconds": Spec("int", 30, 600),  # contract: a start's process must appear within this
     "watch.respawn_poll_seconds": Spec("int", 1, 30),
@@ -184,6 +186,7 @@ SCHEMA: dict[str, Spec] = {
     "dashboard.device_days": Spec("int", 1, 365),
     "dashboard.hosts": Spec("list", 1, when=AT_INSTALL),
     "dashboard.page_size": Spec("int", 10, 500),
+    "dashboard.done_commits": Spec("int", 10, 1000),
     "dashboard.history_page_size": Spec("int", 5, 100),
     "dashboard.probe_strip": Spec("int", 3, 60),
     "dashboard.working_now_max": Spec("int", 1, 24),

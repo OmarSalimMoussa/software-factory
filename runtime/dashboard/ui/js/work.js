@@ -1,9 +1,13 @@
 'use strict';
-/* Work: what is queued and in what order, requests by inbox, parked work and checks; and each task's own panel. */
+/* Work: what is queued and in what order, requests by inbox, parked work, what is done and checks; and each task's
+   own panel. */
 
 PAGE.work = {
-  url: () => `/api/work?tab=${encodeURIComponent(UI.workTab)}` + (UI.workTab === 'requests' ? `&inbox=${encodeURIComponent(UI.reqInbox)}&outcome=${encodeURIComponent(UI.reqOut)}` : ''),
-  load: url => UI.workTab === 'requests' && UI.reqPages > 1 ? loadPaged(url, UI.reqPages, 'requests') : fetchEnv('page', url),
+  url: () => `/api/work?tab=${encodeURIComponent(UI.workTab)}` + (UI.workTab === 'requests' ? `&inbox=${encodeURIComponent(UI.reqInbox)}&outcome=${encodeURIComponent(UI.reqOut)}` : UI.workTab === 'done' ? `&view=${encodeURIComponent(UI.doneView)}` : ''),
+  load: url => {
+    const pages = {requests: UI.reqPages, done: UI.donePages}[UI.workTab];
+    return pages > 1 ? loadPaged(url, pages, UI.workTab) : fetchEnv('page', url);
+  },
   render: pWork,
   tabLabel: () => { const env = UI.data[PAGE.work.url()], p = env && env.parts.tabs; const t = p && p.ok ? p.data.find(x => x[0] === UI.workTab) : null; return t ? t[1] : null; }
 };
@@ -21,6 +25,9 @@ const WORK_TAB = {
       <div class="seg" role="group" aria-label="Outcome">${d.outcomes.map(([k, l]) => `<button data-out="${esc(k)}" aria-pressed="${UI.reqOut === k}">${esc(l)}</button>`).join('')}</div></div>
       <div class="card rows">${d.rows.length ? d.rows.map(r => r.broken ? brokenRow(r) : reqRow(r)).join('') : '<div class="empty">No requests match.</div>'}${showMore('requests', d.more)}</div>`,
   parked: d => `<div class="card rows">${d.rows.length ? d.rows.map(p => p.broken ? brokenRow(p) : `<div class="row req-row" data-open-doc="${esc(p.id)}"><span class="faint">${icon('clock', 'sm')}</span><div style="min-width:0"><div class="tt">${esc(p.title)}</div><div class="ts">${esc(p.why)} · ${esc(p.requests)}</div></div><span class="c-hide faint">${esc(p.date)}</span><span class="c-hide"></span><button class="btn sm" data-unpark="${esc(p.id)}" data-write>Unpark</button></div>`).join('') : '<div class="empty">Nothing parked.</div>'}</div>`,
+  done: d => `${d.master ? masterHTML(d.master) : ''}
+      <div class="toolbar"><div class="seg" role="group" aria-label="Show">${d.views.map(([k, l]) => `<button data-done-view="${esc(k)}" aria-pressed="${d.view === k}">${esc(l)}</button>`).join('')}</div><span class="faint">${esc(d.note)}</span></div>
+      <div class="card rows">${d.rows.length ? d.rows.map(d.view === 'tasks' ? doneRow : commitRow).join('') : `<div class="empty">${esc(d.empty)}</div>`}${showMore('done', d.more)}</div>`,
   checks: d => `<div class="legend">${d.legend.map(l => `<span><i style="background:${toneColor(l.tone)}"></i>${esc(l.label)}</span>`).join('')}</div>
       <div class="card rows">${d.rows.length ? d.rows.map(c => c.broken ? brokenRow(c) : `<div class="row check-row" data-open-doc="${esc(c.id)}"><div><div class="tt">${esc(c.merge)}</div><div class="ts"><span class="chip mono">${esc(c.sha)}</span>${esc(c.age)}</div></div><div class="scen">${c.results.map(x => `<i class="${x.cls}" title="${esc(x.scenario)}"></i>`).join('')}</div><div class="status" style="justify-content:flex-end"><i class="dot ${c.tone}"></i>${esc(c.summary)}</div></div>`).join('') : '<div class="empty">No check of the default branch has run yet.</div>'}</div>`
 };
@@ -42,6 +49,21 @@ function taskRow(t, flip) {
     <span class="rung c-rung">${t.rung === null ? '' : `<b>${t.rung}</b>`}${esc(t.rung_word)}</span>
     <span class="status c-status"><i class="dot ${t.status.tone}"></i>${esc(t.status.word)}</span>
     <span class="cost c-cost">${t.cost === '$0' ? '<span class="faint">$0</span>' : esc(t.cost)}</span>${action ? action() : '<span></span>'}</div>`;
+}
+function masterHTML(m) {
+  const b = m.button;
+  return `<div class="card master"><div style="min-width:0"><div class="label">${esc(m.label)}</div><div><span class="mono">${esc(m.sha)}</span> · ${esc(m.github)}</div><div class="faint">${esc(m.slot)}</div></div>
+    <button class="btn" ${b.url ? `data-slot-open="${esc(b.url)}" data-write` : 'disabled'} title="${esc(b.title)}">${esc(b.label)}${b.url ? ' ↗' : ''}</button></div>`;
+}
+const doneRow = t => `<div class="row done-row" data-task="${esc(t.id)}"><div style="min-width:0"><div class="tt">${esc(t.title)}</div><div class="ts">${esc(t.sub)}</div></div>
+    <span class="stages">${t.stages.map(s => `<span class="chip ${s.tone}" title="${esc(s.title)}">${esc(s.label)}</span>`).join('')}</span></div>`;
+const commitRow = c => `<div class="row commit-row" ${c.task ? `data-task="${esc(c.task)}"` : ''}><span class="chip mono">${esc(c.sha)}</span><div style="min-width:0"><div class="tt">${esc(c.subject)}</div>${c.note ? `<div class="ts">${esc(c.note)}</div>` : ''}</div><span class="faint c-hide">${esc(c.age)}</span></div>`;
+async function openSlot(btn) {
+  // A tab opened after the answer arrives is a popup the browser blocks: open it on the press, then point it there.
+  const tab = window.open('', '_blank');
+  const ans = await act(btn.dataset.slotOpen, {}, {btn});
+  if (!tab) return;
+  if (ans && ans.ok && ans.open) { tab.opener = null; tab.location.href = ans.open; } else tab.close();
 }
 function reqRow(r) {
   const o = r.outcome;
@@ -74,7 +96,8 @@ function taskBody(t) {
     ${t.built_from ? `<div class="section"><div class="label">Built from</div><div class="card" style="overflow:hidden"><div class="origin" style="border:0">${builtFromHTML(t.built_from, t.id)}</div></div></div>` : ''}
     <div class="section"><div class="label">Requests</div>${t.requests.length ? `<div class="card rows">${t.requests.map(r => `<div class="row" style="grid-template-columns:minmax(0,1fr) auto;min-height:48px" data-open-doc="${esc(r.id)}"><span class="tt" style="font-weight:500">${esc(r.text)}</span><span class="faint">${esc(r.age)}</span></div>`).join('')}</div>` : '<div class="muted">No requests linked yet.</div>'}</div>
     <div class="section"><div class="label">Log</div>${t.log.length ? `<ul class="timeline">${t.log.map(l => `<li><i class="dot accent"></i><span>${esc(l.text)}</span><span class="faint" style="font-size:12px">${esc(l.at)}</span></li>`).join('')}</ul>` : '<div class="muted">Nothing is logged yet.</div>'}</div>
-    <div class="section"><div class="label">Branch</div>${t.branch ? `<div><span class="chip mono">${esc(t.branch)}</span></div>` : '<div class="muted">No branch yet.</div>'}</div>`;
+    <div class="section"><div class="label">Branch</div>${t.branch ? `<div><span class="chip mono">${esc(t.branch)}</span></div>` : '<div class="muted">No branch yet.</div>'}</div>
+    ${t.commits.length ? `<div class="section"><div class="label">Commits</div><div class="card rows">${t.commits.map(c => `<div class="row commit-row" style="cursor:default"><span class="chip mono">${esc(c.sha)}</span><div class="tt" style="font-weight:500">${esc(c.subject)}</div><span class="faint c-hide">${esc(c.note || '')}</span></div>`).join('')}</div></div>` : ''}`;
 }
 function taskFoot(t) {
   const id = esc(t.id), v = `data-version="${esc(t.version)}" data-close="1" data-write`;

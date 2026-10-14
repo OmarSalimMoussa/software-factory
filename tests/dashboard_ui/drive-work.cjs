@@ -1,6 +1,6 @@
 'use strict';
 /* Work: back links and browser history restore tab, filter and scroll; stacked panels; the task panel; boost, approved
-   order, requests with a broken row and Show more, parked, checks and the last triage line. */
+   order, requests with a broken row and Show more, parked, done with Open, checks and the last triage line. */
 const {drive, ready, settle, until, texts} = require('./lib.cjs');
 
 drive('work', async t => {
@@ -55,7 +55,7 @@ drive('work', async t => {
   await t.shot(p, 'task-1440.png');
   await p.keyboard.press('Escape'); await settle(p);
   // groups are separate cards with title bands, and status dots stay small
-  t.check((await p.$$('#taskrows > .group')).length >= 4, 'fewer than 4 task groups');
+  t.check((await p.$$('#taskrows > .group')).length >= 3, 'fewer than 3 task groups');
   t.check(await p.$eval('.group-h', e => getComputedStyle(e).backgroundColor) !== 'rgb(255, 255, 255)', 'group header is white');
   t.check(await p.$$eval('.task-row .status .dot', els => Math.max(...els.map(e => e.getBoundingClientRect().width))) <= 10, 'a status dot is oversized');
   t.check((await p.textContent('.triage-line')).includes('Last triage, 2 h ago'), 'no last-triage line');
@@ -103,6 +103,24 @@ drive('work', async t => {
   await p.click('[data-worktab="checks"]'); await ready(p);
   t.check((await p.$$('.scen i')).length === 80, 'check strips wrong');
   t.check((await p.$$('.legend span')).length === 3, 'check legend wrong');
+  // Done: each finished task with how far it reached; its commits; Open opens slot 0's sign-in link in a new tab
+  await p.click('[data-worktab="done"]'); await ready(p);
+  t.check((await p.$$('.done-row')).length === 4, 'the done tasks are not listed');
+  t.check((await p.$$eval('.done-row:first-child .stages .chip', els => els.map(e => e.className))).join() === 'chip good,chip good,chip good,chip ', 'the stages are wrong');
+  await t.shot(p, 'work-done-1440.png');
+  await p.context().route('http://127.0.0.1:8100/**', r => r.fulfill({body: 'signed in'}));
+  const [slot] = await Promise.all([p.context().waitForEvent('page'), p.click('[data-slot-open]')]);
+  t.check(await slot.waitForURL('http://127.0.0.1:8100/sign-in/once').then(() => true, () => false), 'Open did not open slot 0 signed in');
+  await slot.close();
+  await p.click('[data-done-view="commits"]'); await ready(p);
+  t.check((await p.$$('#page .commit-row')).length === 11, 'the commits are not listed');
+  await p.$eval('#page .commit-row[data-task="t-0013"]', e => e.click()); await settle(p);
+  t.check(await until(p, () => document.querySelectorAll('#sheet .commit-row').length === 2), 'the task panel does not list its commits');
+  await p.keyboard.press('Escape'); await settle(p);
+  const phone = await t.open(390, 844, 'work');
+  await phone.click('[data-worktab="done"]'); await ready(phone);
+  await t.wide(phone, 'done 390');
+  await t.shot(phone, 'work-done-390.png');
   // no stray scroll bars: only the page scrolls
   const bars = () => p.evaluate(() => [...document.querySelectorAll('*')].filter(e => e.id !== 'main' && e.id !== 'sheet-body' && ((/(auto|scroll)/.test(getComputedStyle(e).overflowX) && e.scrollWidth > e.clientWidth) || (/(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight))).map(e => e.className));
   await p.click('[data-worktab="tasks"]'); await ready(p);

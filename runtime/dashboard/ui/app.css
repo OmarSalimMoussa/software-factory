@@ -265,6 +265,11 @@ svg.ring .fg{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoff
 .group>.row:last-child{border-bottom:0}
 .req-row{grid-template-columns:30px minmax(0,1fr) 120px 150px 80px}
 .check-row{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) 150px}
+.master{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px}
+.master .label{margin-bottom:4px}
+.done-row{grid-template-columns:minmax(0,1fr) auto}
+.commit-row{grid-template-columns:auto minmax(0,1fr) 120px}
+.stages{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .scen{display:flex;flex-wrap:wrap;gap:3px}
 .scen i{width:10px;height:10px;border-radius:3px;background:var(--good)}
 .scen i.f{background:var(--bad)} .scen i.b{background:var(--idle)}
@@ -710,6 +715,11 @@ body.has-savebar .toasts{bottom:84px}
   .req-row{grid-template-columns:24px minmax(0,1fr) 40px;padding:10px 14px}
   .req-row .c-hide{display:none}
   .check-row{grid-template-columns:minmax(0,1fr);padding:12px 14px}
+  .done-row{grid-template-columns:minmax(0,1fr);gap:8px;padding:12px 14px}
+  .done-row .stages{justify-content:flex-start}
+  .commit-row{grid-template-columns:auto minmax(0,1fr);padding:10px 14px}
+  .commit-row .c-hide{display:none}
+  .master{flex-direction:column;align-items:stretch}
   .lib{grid-template-columns:minmax(0,1fr);height:auto}
   .lib .split{display:none}
   .results .rows{max-height:none}

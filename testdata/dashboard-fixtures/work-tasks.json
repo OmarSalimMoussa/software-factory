@@ -20,6 +20,11 @@
    3
   ],
   [
+   "done",
+   "Done",
+   4
+  ],
+  [
    "checks",
    "Checks",
    4
@@ -417,121 +422,6 @@
        "word": "Queued"
       },
       "cost": "$0",
-      "action": null,
-      "boosted": false,
-      "can_up": false,
-      "can_down": false
-     }
-    ]
-   },
-   {
-    "key": "staging",
-    "title": "On staging, waiting to push to prod",
-    "hint": null,
-    "empty": "Staging runs what prod runs.",
-    "count": 4,
-    "flip": "row",
-    "rows": [
-     {
-      "id": "t-0016",
-      "rank": null,
-      "rank_mark": "·",
-      "title": "Billing page shows credit after a refund",
-      "severity": {
-       "text": "major",
-       "tone": "warn"
-      },
-      "surfaces": [
-       "API"
-      ],
-      "requests": "2 requests",
-      "goal": "G1",
-      "rung": 1,
-      "rung_word": "Sonnet",
-      "status": {
-       "tone": "good",
-       "word": "On staging"
-      },
-      "cost": "$4.80",
-      "action": null,
-      "boosted": false,
-      "can_up": false,
-      "can_down": false
-     },
-     {
-      "id": "t-0015",
-      "rank": null,
-      "rank_mark": "·",
-      "title": "Invoice list loads slowly with 200 items",
-      "severity": {
-       "text": "minor",
-       "tone": ""
-      },
-      "surfaces": [
-       "API"
-      ],
-      "requests": "3 requests",
-      "goal": "G2",
-      "rung": 2,
-      "rung_word": "Opus",
-      "status": {
-       "tone": "good",
-       "word": "On staging"
-      },
-      "cost": "$9.60",
-      "action": null,
-      "boosted": false,
-      "can_up": false,
-      "can_down": false
-     },
-     {
-      "id": "t-0013",
-      "rank": null,
-      "rank_mark": "·",
-      "title": "Invoice page: the Approve button jumps",
-      "severity": {
-       "text": "minor",
-       "tone": ""
-      },
-      "surfaces": [
-       "UI"
-      ],
-      "requests": "2 requests",
-      "goal": "G2",
-      "rung": 1,
-      "rung_word": "Sonnet",
-      "status": {
-       "tone": "good",
-       "word": "On staging"
-      },
-      "cost": "$7.15",
-      "action": null,
-      "boosted": false,
-      "can_up": false,
-      "can_down": false
-     },
-     {
-      "id": "t-0012",
-      "rank": null,
-      "rank_mark": "·",
-      "title": "Usage page: totals per day",
-      "severity": {
-       "text": "minor",
-       "tone": ""
-      },
-      "surfaces": [
-       "UI",
-       "API"
-      ],
-      "requests": "3 requests",
-      "goal": "G4",
-      "rung": 3,
-      "rung_word": "spec",
-      "status": {
-       "tone": "good",
-       "word": "On staging"
-      },
-      "cost": "$26.40",
       "action": null,
       "boosted": false,
       "can_up": false,

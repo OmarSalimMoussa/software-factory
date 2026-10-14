@@ -138,7 +138,7 @@ function refreshParts(names) {
 
 /* ---------- state ---------- */
 const UI = {page: null, shell: null, pages: [], data: {}, back: null, hist: false, lastOk: 0, down: null, downSaid: null, fails: 0, halted: false, device: false,
-  workTab: 'tasks', reqInbox: 'all', reqOut: 'all', reqPages: 1, sliceKey: 'family', spendRange: 14, slicePages: 1, reflectKind: 'all', reflectPages: 1,
+  workTab: 'tasks', reqInbox: 'all', reqOut: 'all', reqPages: 1, doneView: 'tasks', donePages: 1, sliceKey: 'family', spendRange: 14, slicePages: 1, reflectKind: 'all', reflectPages: 1,
   agentsClosed: new Set(), gPending: false, gs: {q: '', at: 0}, edits: new Map(), failed: new Set(), dirty: false, pendingScroll: null, sigs: {}};
 const PAGE = {};
 

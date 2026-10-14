@@ -32,7 +32,7 @@ from runtime.warden.owner import ops
 
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 # What `git revert` writes into the message of the commit that takes a merge back.
-_REVERTS = re.compile(r"This reverts commit ([0-9a-f]{40})")
+REVERTS = re.compile(r"This reverts commit ([0-9a-f]{40})")
 # A task whose merge passed its check of the default branch. A closed task's merge ships only on a saved check of
 # that merge that passed: a task may be closed before its check.
 SHIPPABLE = frozenset({"checked", ON_STAGING, "promoted"})
@@ -124,19 +124,11 @@ def _cleared(ctx: Context, git: Git, sha: str | None) -> tuple[str, str, int]:
     """Fetch GitHub's branch and the checkout's, and check the commit as a push must: the commit cleared to ship
     (``sha``, or the newest shippable), GitHub's tip, and how many commits it adds. Refused, saying why, otherwise."""
     settings = ctx.settings()
-    checkout, branch = settings.get_str("repo.path"), settings.get_str("repo.default_branch")
+    branch = settings.get_str("repo.default_branch")
     url = f"git@github.com:{settings.get_str('repo.github')}.git"
     prefixes = protected_prefixes(settings)
     git.run("fetch", "--no-tags", "--quiet", url, f"+refs/heads/{branch}:refs/github/{branch}")
-    # The checkout belongs to the agent, so git must be told it may read it; a fetch reads it only through
-    # upload-pack, the side of git built to serve untrusted repositories. A checked commit need not be a branch
-    # tip, so the checkout must hand over any commit it has. Both settings go on upload-pack's own command line
-    # (run through a shell): git drops a fetch's -c options when it starts a local upload-pack, which checks the
-    # owner of the git folder, not of the checkout.
-    trust = shlex.quote(f"safe.directory={Path(checkout) / '.git'}")
-    upload_pack = f"git -c {trust} -c uploadpack.allowAnySHA1InWant=true upload-pack"
-    git.run("fetch", "--no-tags", "--quiet", "--upload-pack", upload_pack, checkout,
-            f"+refs/heads/{branch}:refs/checkout/{branch}", *([sha] if sha else []))  # fmt: skip
+    fetch_checkout(ctx, git, *([sha] if sha else []))
     remote = git.run("rev-parse", f"refs/github/{branch}").strip()
     if sha is None:
         sha = _newest_shippable(ctx, git, remote, f"refs/checkout/{branch}")
@@ -162,10 +154,27 @@ def _cleared(ctx: Context, git: Git, sha: str | None) -> tuple[str, str, int]:
     return sha, remote, int(git.run("rev-list", "--count", f"{remote}..{sha}"))
 
 
+def fetch_checkout(ctx: Context, git: Git, *wanted: str) -> str:
+    """Fetch the agents' checkout's default branch, and any commit ``wanted`` names, into the mirror without the
+    network; the branch's tip. The caller holds pushing."""
+    settings = ctx.settings()
+    checkout, branch = settings.get_str("repo.path"), settings.get_str("repo.default_branch")
+    # The checkout belongs to the agent, so git must be told it may read it; a fetch reads it only through
+    # upload-pack, the side of git built to serve untrusted repositories. A checked commit need not be a branch
+    # tip, so the checkout must hand over any commit it has. Both settings go on upload-pack's own command line
+    # (run through a shell): git drops a fetch's -c options when it starts a local upload-pack, which checks the
+    # owner of the git folder, not of the checkout.
+    trust = shlex.quote(f"safe.directory={Path(checkout) / '.git'}")
+    upload_pack = f"git -c {trust} -c uploadpack.allowAnySHA1InWant=true upload-pack"
+    git.run("fetch", "--no-tags", "--quiet", "--upload-pack", upload_pack, checkout,
+            f"+refs/heads/{branch}:refs/checkout/{branch}", *wanted)  # fmt: skip
+    return git.run("rev-parse", f"refs/checkout/{branch}").strip()
+
+
 def _going(ctx: Context, git: Git, remote: str, head: str) -> list[dict[str, str]]:
     """What a push of ``head`` takes to GitHub: each task whose merge it adds, each task whose earlier merge it takes
     back, and the factory's upgrade when one of its pins is in the range. A merge it adds and takes back is left out."""
-    reverted = set(_REVERTS.findall(git.run("log", "--format=%B", f"{remote}..{head}")))
+    reverted = set(REVERTS.findall(git.run("log", "--format=%B", f"{remote}..{head}")))
     found = merges(ctx.places)
     added = git.run("rev-list", "--reverse", "--first-parent", "--merges", f"{remote}..{head}").split()
     going = [{"kind": "task", "task": found.get(m, "")} for m in added if m not in reverted]
@@ -201,7 +210,7 @@ def _unchecked_merges(ctx: Context, git: Git, remote: str, head: str) -> list[st
     """The merges on the default branch between GitHub's branch and ``head`` that are not cleared to ship: one the
     warden never saw land for a task, or whose task's check has not passed. A merge reverted within the range ships
     nothing of its own."""
-    reverted = set(_REVERTS.findall(git.run("log", "--format=%B", f"{remote}..{head}")))
+    reverted = set(REVERTS.findall(git.run("log", "--format=%B", f"{remote}..{head}")))
     found = merges(ctx.places)
     queue = Queue.of(ctx)
     passed = {c.commit for c in queue.checks()[0] if all(r.result == "pass" for r in c.rows)}

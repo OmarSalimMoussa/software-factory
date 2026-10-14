@@ -37,8 +37,21 @@ SURFACE_OF = {
 }
 
 
+_DONE = [
+    ("t-0016", "Billing page shows credit after a refund", 1, "G1", "major", ["API"]),
+    ("t-0015", "Invoice list loads slowly with 200 items", 2, "G2", "minor", ["API"]),
+    ("t-0013", "Invoice page: the Approve button jumps", 1, "G2", "minor", ["UI"]),
+    ("t-0012", "Usage page: totals per day", 3, "G4", "minor", ["UI", "API"]),
+]
+
+
 def seed_tasks(repo: Path, now: float) -> tuple[list[Task], dict[str, list[dict[str, str]]]]:
     rows = [r for g in fixture("work-tasks.json")["tasks"]["groups"] for r in g["rows"] if not r.get("broken")]
+    rows += [
+        {"id": i, "title": title, "status": {"word": "On staging"}, "rung": rung, "goal": goal}
+        | {"severity": {"text": severity}, "surfaces": surfaces}
+        for i, title, rung, goal, severity, surfaces in _DONE
+    ]
     rows += [
         {
             "id": p["id"],

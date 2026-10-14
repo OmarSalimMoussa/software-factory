@@ -26,7 +26,7 @@ class SlotUnread(Exception):
     """The slot's stack gave no commit; the message says why, in words the agent can act on."""
 
 
-def _address(line: str, port: int) -> bool:
+def loopback(line: str, port: int) -> bool:
     """Whether ``line`` is a loopback http address on the slot's own port."""
     try:
         url = urlsplit(line)
@@ -36,7 +36,7 @@ def _address(line: str, port: int) -> bool:
         return False
 
 
-def _running(ctx: Context, slot: int, session: str) -> str:
+def running(ctx: Context, slot: int, session: str) -> str:
     """The build_commit the slot's health address answers; SlotUnread naming why there is none."""
     settings = ctx.settings()
     result = ctx.launcher.run_stack(slot, ["health"], session)
@@ -44,7 +44,7 @@ def _running(ctx: Context, slot: int, session: str) -> str:
     if result.exit != 0 or not lines:
         raise SlotUnread(f"scripts/dev health exited {result.exit} with no address: bring the slot up first")
     port = leases.port(settings, slot)
-    if not _address(lines[-1], port):
+    if not loopback(lines[-1], port):
         raise SlotUnread(f"scripts/dev health must end with the slot's health address, http://127.0.0.1:{port}/…")
     try:
         raw = http_get(
@@ -61,7 +61,7 @@ def _running(ctx: Context, slot: int, session: str) -> str:
 def off_head(ctx: Context, slot: int, session: str, head: str) -> str | None:
     """Why the slot's stack is not known to run ``head``, in words the agent can act on; None when it runs it."""
     try:
-        commit = _running(ctx, slot, session)
+        commit = running(ctx, slot, session)
     # telemetry: surfaced — what the slot lacks goes back as the reason, `str(exc)`, which the caller refuses with
     except SlotUnread as exc:
         return str(exc)

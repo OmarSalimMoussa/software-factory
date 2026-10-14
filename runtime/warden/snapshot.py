@@ -28,7 +28,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import gc, public
 from runtime.warden.context import Context
-from runtime.warden.delivery import ci_watch, deploys, github_push, outage, prod_push
+from runtime.warden.delivery import ci_watch, deploys, done, github_push, outage, prod_push
 from runtime.warden.folds import Cost, History, Refusals, Streaks, kept
 from runtime.warden.health import probes
 from runtime.warden.owner import accounts, briefs, codes, factory_upgrade, messages, reflections, settings_save, yolo
@@ -281,6 +281,7 @@ READERS: dict[str, Reader] = {
     },
     "ci": lambda ctx, args: ci_watch.read(ctx.places),
     "staging_push": lambda ctx, args: github_push.waiting(ctx.places),
+    "done": lambda ctx, args: done.read(ctx.places),
     "yolo": lambda ctx, args: yolo.state(ctx.places),
     "upgrade": lambda ctx, args: factory_upgrade.view(ctx),
     "plan": lambda ctx, args: plan.reading(ctx),

@@ -22,7 +22,7 @@ from runtime.shared import claude_accounts, models, store, totp
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import Places
 from runtime.warden import public
-from runtime.warden.delivery import deploys, github_push
+from runtime.warden.delivery import deploys, done, github_push
 
 T0 = 1_791_546_000.0  # 2026-10-09 11:40:00 UTC
 TEST_TOKEN = "1"  # the device token the UI drives send as their owner cookie
@@ -191,6 +191,29 @@ def _seed_health(places: Places, now: float) -> None:
     )
 
 
+def _seed_done(places: Places, now: float) -> None:
+    """What Done lists: the tasks on staging, newest merge first, on GitHub and staging and not yet on prod; and the
+    branch's latest commits, the oldest from before the factory, with no task."""
+    tasks, commits = [], []
+    for task, count, hours in (("t-0016", 1, 2), ("t-0015", 3, 5), ("t-0013", 2, 26), ("t-0012", 4, 30)):
+        at = int(now) - hours * 3600
+        rows = [
+            {"sha": hashlib.sha1(f"{task}-{n}".encode()).hexdigest(), "at": at - (count - n) * 600}
+            | {"subject": f"Part {n} of {task}", "slice": f"{n}/{count}" if count > 1 else None}
+            for n in range(count, 0, -1)
+        ]
+        merge = hashlib.sha1(task.encode()).hexdigest()
+        reached = {"github": True, "staging": True, "prod": False}
+        tasks.append({"task": task, "merge": merge, "at": at, "commits": rows, **reached})
+        commits += [{**row, "task": task} for row in rows]
+    first = {"sha": "0f1e2d3" + "0" * 33, "at": int(now) - 40 * 86400, "subject": "First commit", "slice": None}
+    commits.append({**first, "task": None})
+    head = tasks[0]["merge"]
+    slot0 = {"commit": STAGING, "behind": 2, "why": None}
+    listed = {"at": iso(now - 300), "local": head, "github": head, "ahead": 0, "slot0": slot0}
+    store.write_json(done.path(places), {**listed, "tasks": tasks, "commits": commits})
+
+
 def seed(root: Path, now: float = T0) -> Places:
     """Write the afternoon under ``root``; the warden's Places for it."""
     places = Places.under(root)
@@ -200,11 +223,13 @@ def seed(root: Path, now: float = T0) -> Places:
     places.defaults.write_text(defaults_text(repo))
     places.state.mkdir(parents=True, exist_ok=True)
     places.totp_secret.write_text(totp.new_secret())
-    # Rows per page as the UI's drives page them, the implementers' cap raised from its default, and an estimate as
-    # soon as a rung has one landed run.
+    # Rows per page as the UI's drives page them, the implementers' cap raised from its default, an estimate as soon
+    # as a rung has one landed run, and the test address Open signs in as.
     store.write_text(
         places.overrides,
-        "[caps]\nimplementers = 4\n\n[dashboard]\npage_size = 25\n\n[routing]\n" "estimate_min_runs = 1\n",
+        "[caps]\nimplementers = 4\n\n[dashboard]\npage_size = 25\n\n[routing]\n"
+        "estimate_min_runs = 1\n\n"
+        '[slots]\nowner_address = "owner@example.com"\n',
     )
     settings = settings_module.load(places.defaults, places.overrides)
     public.write_settings(places, settings)
@@ -228,6 +253,7 @@ def seed(root: Path, now: float = T0) -> Places:
     for record in seed_cost(sessions, tasks, now):
         store.append_jsonl(places.cost, models.dump(record))
     _seed_health(places, now)
+    _seed_done(places, now)
     entries = []
     for e in fixture("reflect.json")["reflect"]["entries"]:
         at = iso(fixture_time(e["when"], now))

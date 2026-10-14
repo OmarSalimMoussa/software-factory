@@ -170,6 +170,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("watch.bench_min_run_minutes", "Minutes an agent works before it can be pushed out"),
             ("watch.account_check_seconds", "Seconds a switch of accounts waits for an agent's answer"),
             ("watch.container_events_minutes", "Minutes between checks for slot containers that stopped"),
+            ("watch.done_minutes", "Minutes between reads of what is done"),
             ("watch.start_grace_seconds", "Seconds a starting agent gets to appear"),
             ("watch.respawn_poll_seconds", "Look for an agent coming back every, seconds"),
             ("watch.reap_retry_minutes", "Try a failed clean-up again after, minutes"),
@@ -205,6 +206,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("dashboard.stale_seconds", "Seconds before data counts as old"),
             ("dashboard.page_margin_seconds", "Seconds a page waits beyond the dashboard's own wait"),
             ("dashboard.page_size", "Rows per page"),
+            ("dashboard.done_commits", "Commits the Done tab lists"),
             ("dashboard.history_page_size", "Agents per page of History"),
             ("dashboard.probe_strip", "Probes the outage band shows"),
             ("dashboard.working_now_max", "Agents under Working now"),
@@ -234,6 +236,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("slots.api_timeout_seconds", "Seconds a slot call may take"),
             ("slots.api_max_kib", "Largest slot answer, KiB"),
             ("slots.verb_minutes", "Minutes one stack command may take"),
+            ("slots.owner_address", "Test address Open signs you in to slot 0 as"),
         ],
     ),
     (

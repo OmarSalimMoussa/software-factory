@@ -253,8 +253,9 @@ class App:
         if write.settle and snap is not None:
             proposals.settle(snap, ref, write.settle)
         reply: dict[str, Any] = {"ok": True, "refresh": write.refresh, "message": write.message(answer, snap)}
-        if isinstance(answer.get("op"), str):
-            reply["op"] = answer["op"]
+        for key in ("op", "open"):  # an operation the page follows; an address it opens in a new tab
+            if isinstance(answer.get(key), str):
+                reply[key] = answer[key]
         return _json(200, reply)
 
     def _admit(self, body: dict[str, Any], key: str, host: str) -> Reply:

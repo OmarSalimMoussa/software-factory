@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import logging
 import shutil
-import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
-from loop_fakes import World
+from loop_fakes import World, commit, git, write
 
 from runtime.queue import formats, records, turn
 from runtime.shared import models, store, upgrades
@@ -20,25 +19,6 @@ from runtime.warden.health import probes
 from runtime.warden.owner import ops
 
 ROOT = Path(__file__).resolve().parents[2]
-
-
-def git(cwd: Path, *args: str) -> str:
-    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
-
-
-def commit(checkout: Path, change: Callable[[Path], None]) -> str:
-    change(checkout)
-    git(checkout, "add", "-A")
-    git(checkout, "commit", "-q", "-m", "change")
-    return git(checkout, "rev-parse", "HEAD")
-
-
-def write(rel: str) -> Callable[[Path], None]:
-    def change(root: Path) -> None:
-        (root / rel).parent.mkdir(parents=True, exist_ok=True)
-        (root / rel).write_text("changed\n")
-
-    return change
 
 
 def move(src: str, dst: str) -> Callable[[Path], None]:
@@ -62,30 +42,6 @@ def ship(world: World, sha: str | None = None) -> dict[str, Any]:
     ops.join(op)
     assert ops.get(world.ctx, {"id": op}, None)["op"]["state"] == ops.DONE
     return asked
-
-
-@pytest.fixture
-def github_repo(world: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A bare repo standing in for GitHub, reached through the real url, and the agent's checkout cloned from it."""
-    remote = tmp_path / "github.git"
-    config = tmp_path / "gitconfig"
-    config.write_text(
-        f'[url "{remote}"]\n\tinsteadOf = git@github.com:owner/name.git\n'
-        "[user]\n\tname = Tester\n\temail = tester@example.invalid\n[init]\n\tdefaultBranch = master\n"
-    )
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(config))
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    git(tmp_path, "init", "-q", "--bare", str(remote))
-    world.checkout.mkdir(exist_ok=True)
-    git(world.checkout, "init", "-q")
-    # The settings name the hook scripts a push refuses to change.
-    shutil.copy(ROOT / "testdata" / "fixture-product" / "factory.toml", world.checkout / "factory.toml")
-    commit(world.checkout, write(".github/workflows/ci.yml"))
-    git(world.checkout, "push", "-q", str(remote), "master")
-    key = github_push.deploy_key(world.ctx.places)
-    key.parent.mkdir(parents=True)
-    key.write_text("not a real key\n")
-    return remote
 
 
 def test_the_warden_trusts_github_by_the_host_keys_it_pinned_and_no_other(world: World, github_repo: Path) -> None:
@@ -268,8 +224,8 @@ def test_push_back_goes_only_to_the_build_before_prods_current_one_in_the_deploy
         prod_push.push_back(world.ctx, {"expected_sha": OLD}, None)
     assert refused.value.rule == "no-previous"
 
-    for env, commit in ((probes.PROD, OLD), (probes.STAGING, STAGING), (probes.PROD, PROD), (probes.PROD, PROD)):
-        deploys.record(places, env, commit, at)
+    for env, build in ((probes.PROD, OLD), (probes.STAGING, STAGING), (probes.PROD, PROD), (probes.PROD, PROD)):
+        deploys.record(places, env, build, at)
     assert deploys.builds(places, probes.PROD) == {
         "current": {"at": at, "env": probes.PROD, "commit": PROD},
         "previous": {"at": at, "env": probes.PROD, "commit": OLD},
@@ -342,8 +298,8 @@ def test_a_merge_reverted_in_the_range_ships_nothing_of_its_own(world: World, gi
 def test_push_back_goes_to_what_prod_ran_when_the_last_push_began_even_if_that_push_never_answered(
     world: World, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    for commit in (OLD, PROD):
-        deploys.record(world.ctx.places, probes.PROD, commit, world.clock.iso())
+    for build in (OLD, PROD):
+        deploys.record(world.ctx.places, probes.PROD, build, world.clock.iso())
     probe(world, probes.STAGING, True, STAGING)
     probe(world, probes.PROD, True, PROD)
     monkeypatch.setattr(prod_push, "_steps", lambda *args: [])  # the push starts, and its build never answers

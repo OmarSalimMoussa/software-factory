@@ -1,4 +1,5 @@
-"""Work: the tasks in their one order, the requests by inbox, parked work and the checks of the default branch."""
+"""Work: the tasks in their one order, the requests by inbox, parked work, what is done and the checks of the default
+branch."""
 
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ from runtime.dashboard.views.kit import (
     plural,
     when,
 )
-from runtime.dashboard.views.shell import prod_runs_staging
+from runtime.dashboard.views.tasks import done as done_tab
 from runtime.dashboard.views.words import taskwords
 from runtime.queue.formats import outcome
 from runtime.shared import order
@@ -27,8 +28,8 @@ from runtime.shared.models import ON_STAGING
 # A row keeps its key as it moves between these groups and Home's proposals, so it slides instead of jumping.
 _FLIP = {"approved": "appr", "proposed": "prop"}
 
-WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "factory", "probes", "goal")
-TABS = (("tasks", "Tasks"), ("requests", "Requests"), ("parked", "Parked"), ("checks", "Checks"))
+WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "factory", "probes", "goal", "done")
+TABS = (("tasks", "Tasks"), ("requests", "Requests"), ("parked", "Parked"), ("done", "Done"), ("checks", "Checks"))
 INBOXES = (("all", "All inboxes"), ("agents", "Agents"), ("owner", "You"), ("users", "Users"))
 OUTCOMES = [["all", "Any outcome"], ["waiting", "Waiting"], ["task", "Task"], ["noise", "Noise"], ["parked", "Parked"]]
 _FROM = {"agents": ("A", "impl", "from agents"), "owner": ("Y", "orch", "from you"), "users": ("U", "qa", "from users")}
@@ -50,7 +51,6 @@ _GROUPS = {
         "the next proposal, ahead of its own picks.",
         "The queue is empty.",
     ),
-    "staging": ("On staging, waiting to push to prod", None, ""),
 }
 
 
@@ -81,7 +81,8 @@ def _row(snap: Snap, task: dict[str, Any], rank: int | None, action: str | None,
 def groups(snap: Snap) -> list[dict[str, Any]]:
     queue = snap.get("queue")
     found = snap.get("proposals")
-    tasks = taskwords.tasks(snap)
+    finished = done_tab.ids(snap)
+    tasks = {i: t for i, t in taskwords.tasks(snap).items() if i not in finished}
     approved = [t for t in found["approved"] if t in tasks and tasks[t]["status"] == "approved"]
     proposed = [t for t in found["open"] if t and t in tasks and tasks[t]["status"] == "proposed"]
     model_tasks = {t.id: t for t in (taskwords.as_task(raw) for raw in tasks.values())}
@@ -93,22 +94,20 @@ def groups(snap: Snap) -> list[dict[str, Any]]:
         return [tasks[t.id] for t in order.ordered(chosen, ranking)]
 
     rows: dict[str, list[dict[str, Any]]] = {
-        "progress": [_row(snap, t, None, None, []) for t in ranked(taskwords.IN_PROGRESS)],
+        # A task on staging that Done does not list yet is still in progress.
+        "progress": [_row(snap, t, None, None, []) for t in ranked((*taskwords.IN_PROGRESS, ON_STAGING))],
         "approved": [_row(snap, tasks[i], n, "order", approved) for n, i in enumerate(approved, 1)],
         "proposed": [_row(snap, tasks[i], n, "approve", []) for n, i in enumerate(proposed, 1)],
         "queue": [broken(b["file"], b["error"]) for b in queue["broken"] if b["file"].startswith("tasks/")]
         + [_row(snap, t, n, _boost(t, snap), []) for n, t in enumerate(ranked(("queued",)), 1)],
-        "staging": [_row(snap, t, None, None, []) for t in ranked((ON_STAGING,))],
     }
     # The approved group shows only while something approved waits, as the prototype draws it.
-    # No task on staging is no proof staging runs prod's build: a push back or a pin leaves it different.
-    staging_empty = "Staging runs what prod runs." if prod_runs_staging(snap) else "No task waits on staging."
     return [
         {
             "key": key,
             "title": title,
             "hint": hint,
-            "empty": staging_empty if key == "staging" else empty,
+            "empty": empty,
             "count": len(rows[key]),
             "flip": _FLIP.get(key, "row"),
             "rows": rows[key],
@@ -255,9 +254,10 @@ def tabs(snap: Snap) -> list[list[Any]]:
     queue = snap.get("queue")
     built = groups(snap)
     counts = {
-        "tasks": sum(len(g["rows"]) for g in built if g["key"] != "staging"),
+        "tasks": sum(len(g["rows"]) for g in built),
         "requests": len(queue["requests"]),
         "parked": len(parked(snap)["rows"]),
+        "done": len(done_tab.ids(snap)),
         "checks": len(queue["checks"]),
     }
     return [[key, label, counts[key]] for key, label in TABS]
@@ -275,6 +275,7 @@ def parts(snap: Snap, query: Query) -> Parts:
         "tasks": lambda: {"groups": groups(snap)},
         "requests": lambda: requests(snap, query),
         "parked": lambda: parked(snap),
+        "done": lambda: done_tab.done(snap, query),
         "checks": lambda: checks(snap),
     }
     return {"header": lambda: header(snap), "tabs": lambda: tabs(snap), tab: build[tab]}

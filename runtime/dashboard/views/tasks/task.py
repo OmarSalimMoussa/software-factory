@@ -1,5 +1,5 @@
 """A task's own panel: what it is, its route and progress, its testers and their evidence, what it was built from,
-its requests, its log and its branch."""
+its requests, its log, its branch and, once it is done, its commits."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from runtime.dashboard.views.words import taskwords
 from runtime.queue.formats import TASK_ID
 from runtime.shared.models import OPEN_SEVERITIES, RETIRED
 
-WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "cards", "logs", "qa", "specs")
+WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "cards", "logs", "qa", "specs", "done")
 _IMAGE = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")
 UI_TESTERS = ("qa-ui-function", "qa-ux", "qa-visual")
 
@@ -201,8 +201,18 @@ def sheet(snap: Snap, task_id: str) -> dict[str, Any]:
         ],
         "log": [{"at": when(epoch(e["at"])), "text": e["text"]} for e in log],
         "branch": task["branch"] or None,
+        "commits": _commits(snap, task_id),
         "actions": actions,
     }
+
+
+def _commits(snap: Snap, task_id: str) -> list[dict[str, Any]]:
+    """The commits of the merge that made the task done; none until Done lists it."""
+    found = snap.get("done")
+    row = next((t for t in found["tasks"] if t["task"] == task_id), None) if found is not None else None
+    commits = row["commits"] if row is not None else []
+    return [{"sha": c["sha"][:7], "subject": c["subject"], "note": f"slice {c['slice']}" if c["slice"] else None}
+            for c in commits]  # fmt: skip
 
 
 def _id(query: Query) -> str:

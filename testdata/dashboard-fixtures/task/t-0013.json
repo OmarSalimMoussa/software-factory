@@ -129,6 +129,18 @@
    }
   ],
   "branch": "worktree-t-0013",
+  "commits": [
+   {
+    "sha": "78c8337",
+    "subject": "Part 2 of t-0013",
+    "note": "slice 2/2"
+   },
+   {
+    "sha": "092936e",
+    "subject": "Part 1 of t-0013",
+    "note": "slice 1/2"
+   }
+  ],
   "actions": [
    "library"
   ]

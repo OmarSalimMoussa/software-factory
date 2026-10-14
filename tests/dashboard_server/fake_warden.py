@@ -17,6 +17,7 @@ from runtime.shared import store
 from runtime.shared.claude_accounts import UNIT_TOKEN
 from runtime.shared.paths import Places
 from runtime.shared.protocol import MAX_LINE
+from runtime.slots import leases
 from runtime.system import layout
 from runtime.warden.context import Caller, Clock, StackResult
 from runtime.warden.dispatch import OWNER_SOCKET, Dispatcher, Doors, resolve
@@ -55,7 +56,10 @@ class Launcher:
         self.calls.append(("message", (session_id, text)))
 
     def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
-        return StackResult(exit=0, tail="", log="stack.log")
+        """Slot 0's sign-in prints a one-time link on its own port; every other verb prints nothing."""
+        settings = settings_module.load(self.places.defaults, self.places.overrides)
+        link = f"http://127.0.0.1:{leases.port(settings, slot)}/sign-in/once"
+        return StackResult(exit=0, tail=link if verb[:1] == ["sign-in"] else "", log="stack.log")
 
     def start_upgrade(self, commit: str) -> None:
         self.calls.append(("upgrade", commit))

@@ -61,7 +61,7 @@ document.addEventListener('focusin', e => { if (e.target.id === 'gq' && e.target
 
 /* A changed filter draws from what is already known, if anything, then asks the server. */
 function viewChanged() { if (UI.data[PAGE[UI.page].url()]) render({keep: true}); loadPage(); }
-const MORE = {requests: 'reqPages', slice: 'slicePages', reflect: 'reflectPages'};
+const MORE = {requests: 'reqPages', done: 'donePages', slice: 'slicePages', reflect: 'reflectPages'};
 function moreRows(what, btn) { btn.disabled = true; if (what === 'library') UI.lib.pages++; else UI[MORE[what]]++; loadPage(); }
 const agentsTree = () => { const env = UI.data[PAGE.agents.url()]; return env ? partData(env, 'tree') : null; };
 
@@ -85,7 +85,7 @@ document.addEventListener('click', e => {
   if (d.replay) { openReplay(d.replay); return; }
   if (d.brief) { openBrief(d.brief); return; }
   if (d.histPage) { UI.agentsUrl = d.histPage; showKnown(); return; }
-  if (d.go) { const back = !!t.closest('#page, #sheet') && !t.closest('.more-grid'); if (d.tab) { UI.workTab = d.tab; UI.reqPages = 1; } closeSheet(); go(d.go, {back}); return; }
+  if (d.go) { const back = !!t.closest('#page, #sheet') && !t.closest('.more-grid'); if (d.tab) { UI.workTab = d.tab; UI.reqPages = UI.donePages = 1; } closeSheet(); go(d.go, {back}); return; }
   if (d.libOpen) { openInLibrary(d.libOpen); return; }
   if (d.gs !== undefined) { pickGs(+d.gs); return; }
   if (d.more) { moreRows(d.more, t); return; }
@@ -109,7 +109,9 @@ document.addEventListener('click', e => {
   if (d.hist) { openHist(d.hist); return; }
   if (d.openDoc) { e.stopPropagation(); openDoc(d.openDoc); return; }
   if (d.libsel) { if (isPhone()) { UI.lib.sel = d.libsel; openDoc(d.libsel); return; } selectDoc(d.libsel); return; }
-  if (d.worktab) { UI.workTab = d.worktab; UI.reqPages = 1; viewChanged(); return; }
+  if (d.worktab) { UI.workTab = d.worktab; UI.reqPages = UI.donePages = 1; viewChanged(); return; }
+  if (d.doneView) { UI.doneView = d.doneView; UI.donePages = 1; viewChanged(); return; }
+  if (d.slotOpen) { openSlot(t); return; }
   if (d.inbox) { UI.reqInbox = d.inbox; UI.reqPages = 1; viewChanged(); return; }
   if (d.out) { UI.reqOut = d.out; UI.reqPages = 1; viewChanged(); return; }
   if (d.range) { UI.spendRange = +d.range; UI.slicePages = 1; viewChanged(); return; }
