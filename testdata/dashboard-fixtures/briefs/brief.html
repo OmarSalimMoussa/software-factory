@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign-in from the build step</title>
+<style>
+:root { --bg: #ffffff; --fg: #17201f; --muted: #5d6b69; --accent: #0f6b62 }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #141a19; --fg: #e6eceb; --muted: #a2b0ae; --accent: #4fb8aa } }
+:root[data-theme="dark"] { --bg: #141a19; --fg: #e6eceb; --muted: #a2b0ae; --accent: #4fb8aa }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px 16px }
+h1 { font-size: 24px } .muted { color: var(--muted) } b { color: var(--accent) }
+</style>
+</head>
+<body>
+<h1>Partners sign in from the build step</h1>
+<p>A partner who reaches the build step signed out sees the sign-in form in place, and lands back on the same step once signed in.</p>
+<pre class="mermaid">
+flowchart LR
+  A["Build step"] --> B{"Signed in?"}
+  B -- "no" --> C["Sign-in, in place"]
+  C --> A
+</pre>
+<p class="muted">The form keeps what the partner typed in the step while they sign in.</p>
+<p><b>The call to make:</b> show the form in place, not on its own page. I recommend in place.</p>
+</body>
+</html>

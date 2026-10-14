@@ -60,6 +60,6 @@
    }
   ],
   "html": "<h1>Clearer empty states</h1><p>An empty Projects or Invoices page says what it is for and offers the one next step, with a picture of what will appear.</p>",
-  "art_url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000014"
+  "brief_url": "/api/brief/t-0014"
  }
 }

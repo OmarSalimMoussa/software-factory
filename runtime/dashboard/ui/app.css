@@ -863,3 +863,23 @@ body.has-savebar .toasts{bottom:84px}
   .rp-pill{font-size:12px;max-width:60%}
   .rp-card{font-size:14px}
 }
+
+/* ---------- a task's brief: its page in a frame, the owner's comment threads beside it ---------- */
+.brief-h{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.brief-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.brief{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;height:calc(100vh - 180px);min-height:420px}
+.brief-frame{position:relative;min-width:0;height:100%}
+.brief-frame iframe{display:block;width:100%;height:100%;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.brief-cmt{position:absolute;z-index:2;box-shadow:var(--pop-shadow)}
+.brief-threads{overflow:auto;display:grid;gap:8px;align-content:start;min-width:0}
+.brief-t{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:grid;gap:6px;font-size:13px;cursor:pointer;min-width:0;overflow-wrap:anywhere}
+.brief-t.on{border-color:var(--warn)}
+.brief-t.done{opacity:.6}
+.brief-t.compose{cursor:default;border-color:var(--accent)}
+.brief-t q{color:var(--muted);font-style:italic}
+.brief-t textarea{width:100%;min-height:72px;resize:vertical;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--bg);color:var(--fg);padding:8px;font:inherit}
+.brief-r{border-left:2px solid var(--line);padding-left:8px}
+.brief-tf{display:flex;gap:6px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.brief-none{padding:8px 2px}
+@media (max-width:760px){.brief{grid-template-columns:minmax(0,1fr);height:auto}.brief-frame{height:70vh}}
+

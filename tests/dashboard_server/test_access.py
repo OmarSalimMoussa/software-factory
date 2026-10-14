@@ -10,7 +10,7 @@ import pytest
 from dashboard_rig import HOST, OWNER, Rig
 from dashboard_seed import T0
 
-from runtime.dashboard import auth, pictures
+from runtime.dashboard import auth, brief_frame, pictures
 from runtime.dashboard.server import serve
 from runtime.shared import store, totp
 
@@ -88,12 +88,17 @@ def test_pages_and_pictures_carry_their_policies(rig: Rig) -> None:
             ("/", auth.PAGE_POLICY, "text/html; charset=utf-8"),
             ("/api/picture/task/t-0027", pictures.POLICY, "image/svg+xml"),
             (evidence, pictures.POLICY, "image/svg+xml"),
+            ("/api/brief-page/t-0023/1", brief_frame.POLICY, "text/html; charset=utf-8"),
         ):
             with urllib.request.urlopen(urllib.request.Request(base + path, headers={"Cookie": "owner=1"})) as answer:
                 assert answer.headers["Content-Security-Policy"] == policy
                 assert answer.headers["X-Content-Type-Options"] == "nosniff"
                 assert answer.headers["Content-Type"] == media
         assert rig.get("/api/evidence/t-0017/../../totp.key").status == 404
+        brief = rig.get("/api/brief-page/t-0023/1").body.decode()
+        assert (
+            brief.index(brief_frame.SCRIPT) < brief.rindex("</body>") and "sandbox allow-scripts" in brief_frame.POLICY
+        )
     finally:
         server.shutdown()
         server.server_close()

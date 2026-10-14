@@ -75,7 +75,7 @@ def index(snap: Snap) -> list[Doc]:
                 s["status"],
                 None,
                 epoch(s["updated"]),
-                " ".join([s["title"], task_id, s["brief"]]),
+                " ".join([s["title"], task_id]),
                 s,
             )
         )

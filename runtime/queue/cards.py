@@ -16,7 +16,7 @@ from runtime.shared.models import WAITING, WORKING, Card, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
-from runtime.warden.owner import ops
+from runtime.warden.owner import briefs, ops
 from runtime.warden.sessions import lifecycle, limits, registry
 from runtime.warden.sessions.launch import LaunchError
 
@@ -54,26 +54,26 @@ def _add(ctx: Context, card: Card, picture: bytes | None) -> Card:
     return card
 
 
-def needs_owner(ctx: Context, task_id: str, ask: str, brief: str, question: str, picture: bytes | None) -> Card:
-    """A spec's sign-off (with its artifact link) or a question (with a text answer); both carry a picture."""
+def needs_owner(ctx: Context, task_id: str, ask: str, question: str, picture: bytes | None) -> Card:
+    """A spec's sign-off, on the task's latest saved brief, or a question with a text answer; both carry a picture."""
     if picture is None:
         raise Refused("picture", "a card for the owner carries a picture: --picture <file.svg|file.png>")
-    if bool(brief) == bool(question):
-        raise Refused("needs-owner", "ask for a spec's sign-off with --brief <artifact> --ask, or ask --question")
+    if bool(ask) == bool(question):
+        raise Refused("needs-owner", "ask for a spec's sign-off with <task> --ask, or ask --question")
     queue = Queue.of(ctx)
     by = tasks.actor(ctx)
     with ctx.lock, queue.lock():
-        task = queue.task(task_id) if task_id or brief else None
+        task = queue.task(task_id) if task_id or ask else None
         now = ctx.clock.iso()
         if question:
             title = task.title if task else "A question"
             card = Card("", "question", task_id, title, formats.one_line(question), now, asked_by=ctx.caller.session)
             return _waiting(ctx, _add(ctx, card, picture))
         assert task is not None
-        if not brief.startswith(formats.ARTIFACT):
-            raise Refused("brief", f"the brief is a {formats.ARTIFACT} artifact link")
-        if not ask.strip():
-            raise Refused("needs-owner", "say in one line what the owner signs off: --ask '…'")
+        saved = briefs.read(ctx.places, task_id)["versions"]
+        if not saved:
+            raise Refused("brief", f"save the brief of {task_id} first: factory brief save {task_id} <file.html>")
+        brief = f"v{len(saved)}"
         spec = queue.spec(task_id)
         if spec is None:
             raise Refused("spec", f"save the spec of {task_id} first: factory spec save {task_id} <file>")
@@ -149,20 +149,6 @@ def spent(ctx: Context, s: Session, limit: str, why: str) -> bool:
             return False
         to_decide(ctx, s.task, why, limit)
     return True
-
-
-def comments(ctx: Context, task_id: str, count: object) -> Card:
-    """The designer's latest count of the owner's comments on the spec's artifact (R14)."""
-    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
-        raise Refused("comments", "the comment count is a whole number from 0")
-    with ctx.lock:
-        cards = read(ctx.places)
-        card = next((c for c in reversed(cards) if c.task == task_id and c.kind == "spec" and not c.answered), None)
-        if card is None:
-            raise Refused("card", f"{task_id} has no spec waiting for the owner")
-        card.comments, card.comments_at = count, ctx.clock.iso()
-        write(ctx.places, cards)
-    return card
 
 
 def settle(ctx: Context, cards: list[Card], card: Card, answer: str) -> None:

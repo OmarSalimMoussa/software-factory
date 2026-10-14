@@ -60,6 +60,6 @@
    }
   ],
   "html": "<p>Routed to rung 1, but the cause spanned two services; the intake verdict named only one.</p>",
-  "art_url": null
+  "brief_url": null
  }
 }

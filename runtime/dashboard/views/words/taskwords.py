@@ -59,8 +59,8 @@ _WORDS = {
     "closed": "Closed",
 }
 NEED_ACTIONS: dict[str, dict[str, Any]] = {
-    "artifact": {"label": "Open artifact", "icon": "arrow-top-right-on-square", "primary": False},
-    "feedback": {"label": "Check feedback", "icon": "chat-bubble-left-right", "primary": False},
+    "brief": {"label": "Open brief", "icon": "document-text", "primary": False},
+    "feedback": {"label": "Send feedback", "icon": "chat-bubble-left-right", "primary": False},
     "go": {"label": "Go", "icon": "check", "primary": True},
     "extend": {"label": "Extend", "icon": None, "primary": False},
     "designer": {"label": "To a designer", "icon": None, "primary": False},

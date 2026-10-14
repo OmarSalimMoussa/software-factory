@@ -320,6 +320,8 @@ const busyPage = () => anyPop() || ($('#page').contains(document.activeElement) 
 function render(opts = {}) {
   const P = PAGE[UI.page]; if (!P) return;
   const env = UI.data[P.url()], main = $('#main'), top = main.scrollTop, first = opts.flip ? flipFirst() : null;
+  // A page that can redraw in place (the brief keeps its frame) does so once it is drawn.
+  if (env && P.update && P.update(env)) return;
   const inner = {}; $$('#page [data-keep-scroll]').forEach(el => inner[el.dataset.keepScroll] = el.scrollTop);
   const was = opts.flip ? Object.fromEntries($$('#page .row[data-flip]').map(el => [el.dataset.flip, el.innerHTML])) : null;
   const back = UI.back ? `<button class="backlink" data-action="back">${icon('chevron-left', 'sm')}Back to ${esc(UI.back.label)}</button>` : '';

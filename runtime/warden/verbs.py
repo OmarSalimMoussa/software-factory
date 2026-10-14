@@ -78,7 +78,9 @@ VERBS: dict[str, Verb] = {
     "propose": _v("runtime.queue.verbs:propose", ORCH),
     "propose.none": _v("runtime.queue.verbs:propose_none", ORCH),
     "spec.save": _v("runtime.queue.verbs:spec_save", DESIGN),
-    "card.comments": _v("runtime.queue.verbs:card_comments", DESIGN),
+    "brief.save": _v("runtime.warden.owner.briefs:save", DESIGN),
+    "brief.comments": _v("runtime.warden.owner.briefs:comments", DESIGN),
+    "brief.reply": _v("runtime.warden.owner.briefs:reply", DESIGN),
     "needs-owner": _v("runtime.queue.verbs:needs_owner", ORCH, DESIGN),
     "turn.next": _v("runtime.queue.turn:next_turn", ORCH),
     "queue.check": _v("runtime.queue.verbs:check_save", ORCH),  # contract: a saved check of the default branch
@@ -101,6 +103,9 @@ VERBS: dict[str, Verb] = {
     # contract: added by 2A. The dashboard cannot read the warden's state, so pictures and evidence come as bytes.
     "picture": _o("runtime.warden.snapshot:picture"),
     "evidence": _o("runtime.warden.snapshot:evidence"),
+    "brief.page": _o("runtime.warden.owner.briefs:page"),
+    "brief.comment": _o("runtime.warden.owner.briefs:comment"),
+    "brief.resolve": _o("runtime.warden.owner.briefs:resolve"),
     "op.get": _o("runtime.warden.owner.ops:get"),
     "device.admit": _o("runtime.warden.owner.codes:admit_device", coded=True),
     "device.verify": _o(

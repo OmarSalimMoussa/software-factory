@@ -1,6 +1,6 @@
 ---
 name: designer
-description: Use when running as a designer - a background session the warden started for one approved task at rung 3 or 4 - to read the default branch, write the spec, revise it with design critics until a round raises nothing new, publish its brief, and hand it back for the orchestrator's or the owner's sign-off.
+description: Use when running as a designer - a background session the warden started for one approved task at rung 3 or 4 - to read the default branch, write the spec, revise it with design critics until a round raises nothing new, save its brief, and hand it back for the orchestrator's or the owner's sign-off.
 ---
 <!-- doc-refs: external -->
 
@@ -58,23 +58,33 @@ the queue's format with the reason: fix it and save again.
 
 ## 4. The brief
 
-The first thing anyone sees is a brief: one Claude artifact page (load the `artifact-design` skill first), picture
-first, few words. The outcome in one sentence; a diagram whenever the design touches the system; a mock-up of the
-real screens, in the look `GOAL.md` shows, in both themes, whenever it touches what people see; and the calls to
-make, each with your recommendation.
+The first thing anyone sees is a brief: one HTML page in your worktree's `.factory` folder, picture first, few words.
+The outcome in one sentence; a diagram whenever the design touches the system; a mock-up of the real screens, in the
+look `GOAL.md` shows, in both themes, whenever it touches what people see; and the calls to make, each with your
+recommendation. Save each version with `factory brief save <task> <file.html>`: it stays on this machine with the
+task, and the owner reads it on the dashboard.
+
+- **One page, nothing beside it.** Pictures go inline, as SVG or `data:` images. Styles and scripts are inline too;
+  the only code you may load comes from cdnjs.cloudflare.com, cdn.jsdelivr.net or unpkg.com, pinned to a version.
+  The page reaches no other address.
+- **Diagrams** are Mermaid in `<pre class="mermaid">`: the dashboard draws them.
+- **Both themes.** Define colours as variables for light, then again for dark under
+  `@media (prefers-color-scheme: dark)` and under `:root[data-theme="dark"]`, which the dashboard sets.
+- Never publish a brief as a Claude artifact: the guard refuses it, and a page kept in the Claude account is lost to
+  the factory when its account changes.
 
 ## 5. Hand it back
 
-- **Rung 3:** tell the orchestrator the task, the spec's path and the brief's link. It signs off and starts the
-  build. If the design turned out to be a large change people will see, or a large or costly backend change, say so:
-  it goes to the owner one rung up.
-- **Rung 4:** publish the full spec as a Claude artifact, with mock-ups and animations that look exactly like the
-  product, under the same goal line the proposal carried. Then
-  `factory needs-owner <task> --brief <artifact link> --picture <a mock-up file> --ask "<what they decide>"`. The
-  owner's card offers Open artifact, Go and Check feedback. Tell the orchestrator, and end your turn.
-- **Check feedback** wakes you. Read the comments on your artifact, then report how many you read:
-  `factory card comments <task> <n>`. Answer each one, on the artifact: revise the spec, save it, update the
-  artifact. The card stays until the owner presses Go.
+- **Rung 3:** tell the orchestrator the task and the spec's path; the brief is saved with the task. It signs off
+  and starts the build. If the design turned out to be a large change people will see, or a large or costly backend
+  change, say so: it goes to the owner one rung up.
+- **Rung 4:** the brief is the full spec, with mock-ups and animations that look exactly like the product, under
+  the same goal line the proposal carried. Save it, then
+  `factory needs-owner <task> --picture <a mock-up file> --ask "<what they decide>"`: the card signs off the brief's
+  latest version. The owner's card offers Open brief, Go and Send feedback. Tell the orchestrator, and end your turn.
+- **Send feedback** wakes you. Read the owner's comments with `factory brief comments <task>`: each quotes the text
+  it is about. Answer each one with `factory brief reply <task> <comment> '<your answer>'`, revise the spec and save
+  it, then save the brief again. The card stays until the owner presses Go.
 - **Go** means the spec is approved and the build starts. The warden ends your session then: nothing is left for you
   to do.
 

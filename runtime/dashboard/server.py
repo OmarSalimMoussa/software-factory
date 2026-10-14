@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
-from runtime.dashboard import auth, cache, pictures
+from runtime.dashboard import auth, brief_frame, cache, pictures
 from runtime.dashboard.client import Warden, WardenDown
 from runtime.dashboard.views import ops, routes, writes
 from runtime.dashboard.views.kit import PartError, Snap, clock
@@ -111,6 +111,11 @@ class App:
         if image is not None:
             return Reply(
                 image.status, image.body, {"Content-Type": image.media, "Content-Security-Policy": pictures.POLICY}
+            )
+        brief = brief_frame.fetch(self.warden, path)
+        if brief is not None:
+            return Reply(
+                brief.status, brief.body, {"Content-Type": brief.media, "Content-Security-Policy": brief_frame.POLICY}
             )
         if found := routes.OP.match(path):
             return self._op(found.group(1))

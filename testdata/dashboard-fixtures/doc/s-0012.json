@@ -60,6 +60,6 @@
    }
   ],
   "html": "<h1>Usage page: totals per day</h1><p>Usage shows each day's spend as a bar, with the month's total on top and the days listed below.</p>",
-  "art_url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000012"
+  "brief_url": "/api/brief/t-0012"
  }
 }

@@ -60,6 +60,6 @@
    }
   ],
   "html": "<h1>Partner sign-in from the import step</h1><p>When an import needs a partner sign-in, the import step asks for it in place and carries on once it is saved.</p>",
-  "art_url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000023"
+  "brief_url": "/api/brief/t-0023"
  }
 }

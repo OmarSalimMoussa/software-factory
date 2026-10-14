@@ -116,7 +116,7 @@ function needsSection(env) {
 }
 const needButton = (n, a, c) => {
   const look = `${a.icon ? icon(a.icon, 'sm') : ''}${esc(a.label)}`;
-  if (a.key === 'artifact') return n.art_url ? `<a class="btn" href="${esc(n.art_url)}" target="_blank" rel="noopener">${look}</a>` : `<button class="btn" disabled>${look}</button>`;
+  if (a.key === 'brief') return n.brief_url ? `<button class="btn" data-brief="${esc(n.brief_url)}">${look}</button>` : `<button class="btn" disabled>${look}</button>`;
   return `<button class="btn${a.primary ? ' primary' : ''}" data-need-act="${esc(a.key)}" data-id="${esc(n.id)}" data-write ${c}>${look}</button>`;
 };
 const needButtons = (n, close) => n.actions.map(a => needButton(n, a, close ? 'data-close="1"' : '')).join('');
@@ -142,7 +142,7 @@ function needAct(id, what, btn, close) {
 }
 function openPic(id) {
   const n = needOf(id); if (!n) return;
-  if (n.kind === 'spec') openSheet(n.title, `<div class="ts">${n.chips.map(chip).join('')}${goalChip(n)}</div><div class="mock">${picture(n.picture, n.picture_label)}</div><div class="muted">The designer's mock-up of the finished screen, under the same goal as your first sign-off. The artifact holds every state, in both themes.</div>`, needButtons(n, true));
+  if (n.kind === 'spec') openSheet(n.title, `<div class="ts">${n.chips.map(chip).join('')}${goalChip(n)}</div><div class="mock">${picture(n.picture, n.picture_label)}</div><div class="muted">The designer's mock-up of the finished screen, under the same goal as your first sign-off. The brief holds every state, in both themes.</div>`, needButtons(n, true));
   else openSheet(n.title, `<div class="mock">${picture(n.picture, n.picture_label)}</div><div>${esc(n.sub)}</div>`, needButtons(n, true));
 }
 

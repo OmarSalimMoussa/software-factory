@@ -50,6 +50,6 @@
    }
   ],
   "html": "<h1>qa-backend: the invoice list takes 4 s with 200 items</h1><p>qa-backend: the invoice list takes 4 s with 200 items.</p><p>Became part of <span class=\"doclink\" data-open-doc=\"t-0015\" tabindex=\"0\">t-0015</span>.</p>",
-  "art_url": null
+  "brief_url": null
  }
 }

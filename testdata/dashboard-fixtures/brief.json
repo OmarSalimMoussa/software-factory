@@ -1,0 +1,60 @@
+{
+ "brief": {
+  "task": "t-0023",
+  "title": "Partner sign-in from the import step",
+  "empty": null,
+  "sub": "t-0023 · 1 version",
+  "versions": [
+   {
+    "label": "v1",
+    "when": "Oct 9, 09:40",
+    "url": "/api/brief/t-0023?v=1",
+    "on": true
+   }
+  ],
+  "shown": 1,
+  "frame": "/api/brief-page/t-0023/1",
+  "comment_url": "/api/brief/t-0023/comment",
+  "resolve_url": "/api/brief/t-0023/resolve",
+  "threads": [
+   {
+    "id": "c1",
+    "on": "v1",
+    "quote": "in place, not on its own page",
+    "prefix": "show the form ",
+    "suffix": ". I recommend",
+    "note": "What happens on a phone?",
+    "when": "Oct 9, 11:10",
+    "state": "waiting for the designer",
+    "tone": "warn",
+    "replies": [],
+    "can_resolve": true
+   },
+   {
+    "id": "c2",
+    "on": "v1",
+    "quote": "keeps what the partner typed",
+    "prefix": "The form ",
+    "suffix": " in the step",
+    "note": "Even a pasted file?",
+    "when": "Oct 9, 10:10",
+    "state": "answered",
+    "tone": "good",
+    "replies": [
+     {
+      "who": "Designer",
+      "text": "Yes: the file waits in the step.",
+      "when": "Oct 9, 10:40"
+     }
+    ],
+    "can_resolve": true
+   }
+  ],
+  "card": {
+   "version": "9974a33d2d46",
+   "feedback_url": "/api/needs/n1/feedback",
+   "feedback_label": "Send feedback · 1",
+   "go_url": "/api/needs/n1/go"
+  }
+ }
+}

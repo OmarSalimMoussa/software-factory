@@ -102,7 +102,7 @@
      "spec": "s-0012",
      "summary": "Usage shows each day's spend as a bar, with the month's total on top and the days listed below.",
      "picture": "/api/picture/spec/s-0012",
-     "art_url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000012",
+     "brief_url": "/api/brief/t-0012",
      "approved_by": "the orchestrator (rung 3)"
     }
    }

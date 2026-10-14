@@ -47,9 +47,9 @@ drive('library', async t => {
   t.check((await p.$$('.res')).length === 25, 'first page of results should hold 25');
   await p.click('[data-more="library"]'); await settle(p);
   t.check((await p.$$('.res')).length === 50, 'Show more did not add a page');
-  // a spec carries its artifact link
+  // a spec carries the link to its brief
   await p.evaluate(() => openDoc('s-0012')); await settle(p);
-  t.check(await p.$('#reader .spec-full a[href^="https://claude.ai/"]'), 'spec has no artifact link');
+  t.check(await p.$('#reader .spec-full [data-brief^="/api/brief/"]'), 'spec has no brief link');
   // narrower: one divider and no sideways scroll; phone: none, and the reader opens in a panel
   await p.setViewportSize({width: 1100, height: 800}); await settle(p);
   t.check(!(await p.$eval('[data-split="f"]', e => !!e.offsetParent)), 'filters divider shown at 1100');

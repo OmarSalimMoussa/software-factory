@@ -31,7 +31,7 @@ from runtime.warden.context import Context
 from runtime.warden.delivery import ci_watch, deploys, github_push, outage, prod_push
 from runtime.warden.folds import Cost, History, Refusals, Streaks, kept
 from runtime.warden.health import probes
-from runtime.warden.owner import accounts, codes, factory_upgrade, messages, reflections, settings_save, yolo
+from runtime.warden.owner import accounts, briefs, codes, factory_upgrade, messages, reflections, settings_save, yolo
 from runtime.warden.sessions import doing, lifecycle, permits, registry
 from runtime.warden.spend import plan
 
@@ -185,6 +185,13 @@ def _thread(ctx: Context, args: dict[str, Any]) -> Any:
     return messages.thread(ctx, lifecycle.find(ctx, lifecycle.read(ctx), ref))
 
 
+def _brief(ctx: Context, args: dict[str, Any]) -> Any:
+    task = args.get("task")
+    if not isinstance(task, str) or not TASK_ID.match(task):
+        raise Refused("snapshot", "task names the task whose brief to read")
+    return briefs.read(ctx.places, task)
+
+
 def _history(ctx: Context, args: dict[str, Any]) -> Any:
     book = kept(History, ctx.places.history)
     book.read(ctx.places.history)
@@ -259,7 +266,10 @@ READERS: dict[str, Reader] = {
     "settings": _settings,
     "sessions": _sessions,
     "proposals": _proposals,
-    "cards": lambda ctx, args: [models.dump(c) for c in cards.read(ctx.places)],
+    "cards": lambda ctx, args: [
+        {**models.dump(c), "open_comments": briefs.open_threads(ctx.places, c.task) if c.kind == "spec" else 0}
+        for c in cards.read(ctx.places)
+    ],
     "outage": lambda ctx, args: (lambda o: None if o is None else models.dump(o))(outage.read(ctx.places)),
     "factory": _factory,
     "probes": _probes,
@@ -288,6 +298,7 @@ READERS: dict[str, Reader] = {
     "docker": lambda ctx, args: store.read_json_or(gc.disk_path(ctx.places), None),
     "reflections": lambda ctx, args: reflections.entries(ctx.places),
     "history": _history,
+    "brief": _brief,
     "thread": _thread,
     "cost": _cost,
     "accounts": lambda ctx, args: accounts.listing(ctx),

@@ -109,8 +109,20 @@ def _triage_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> C
 
 
 def _needs_owner_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
-    args = {k: getattr(ns, k) for k in ("task", "brief", "ask", "question") if getattr(ns, k)}
+    args = {k: getattr(ns, k) for k in ("task", "ask", "question") if getattr(ns, k)}
     return Call("needs-owner", args, read_file(ns.picture))
+
+
+def _brief_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
+    if ns.what == "save":
+        if len(ns.rest) != 1:
+            raise CliError("factory brief save <task> <file.html>")
+        return Call("brief.save", {"task": ns.task}, read_file(ns.rest[0]))
+    if ns.what == "comments":
+        return Call("brief.comments", {"task": ns.task})
+    if len(ns.rest) != 2:
+        raise CliError('factory brief reply <task> <comment> "<your answer>"')
+    return Call("brief.reply", {"task": ns.task, "thread": ns.rest[0], "text": ns.rest[1]})
 
 
 def _check_call(ns: argparse.Namespace, _: Callable[[str], bytes]) -> Call:
@@ -232,7 +244,7 @@ _CALLS: dict[str, Callable[[argparse.Namespace, Callable[[str], bytes]], Call]] 
     "route": lambda ns, _: Call("route", {"task": ns.task}),
     "propose": _propose_call,
     "spec": lambda ns, read: Call("spec.save", {"task": ns.task, "slices": ns.slices}, read(ns.file)),
-    "card": lambda ns, _: Call("card.comments", {"task": ns.task, "count": ns.count}),
+    "brief": _brief_call,
     "needs-owner": _needs_owner_call,
     "turn": lambda ns, _: Call("turn.next", {}),
     "cause": lambda ns, _: Call("cause", {"tried": ns.tried}),

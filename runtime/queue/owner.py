@@ -151,13 +151,15 @@ def go(ctx: Context, card_id: str, by: str = "you") -> dict[str, Any]:
 
 
 def feedback(ctx: Context, card_id: str) -> dict[str, Any]:
-    """Check feedback hands the designer the owner's comments on the artifact; the warden delivers it, so nothing
-    goes through the orchestrator."""
+    """Send feedback hands the designer the owner's comments on the brief; the warden delivers it, so nothing goes
+    through the orchestrator."""
     _, card = cards.find(ctx.places, card_id, "spec")
-    words = f"The owner left comments on the spec of {card.task} ({card.brief}); read and answer them."
+    words = (f"The owner left comments on the brief of {card.task}: read them with `factory brief comments "
+             f"{card.task}`, answer each with `factory brief reply`, then save the revised spec and "
+             "brief.")  # fmt: skip
     op = cards.wake(ctx, card, words, lambda: None)
     if op is None:
-        raise Refused("feedback", "the designer who asked is not running now; its comments wait on the artifact")
+        raise Refused("feedback", "the designer who asked is not running now; your comments wait on the brief")
     return {"card": card_id, "op": op}
 
 

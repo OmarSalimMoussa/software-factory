@@ -49,7 +49,7 @@ def test_each_proposal_decision_posts_its_event(
 
 def test_a_question_card_carries_the_answer_back_to_the_session_that_asked(world: World) -> None:
     task = world.task()
-    asked = cards.needs_owner(world.ctx("designer", "s-design"), task.id, "", "", "Keep the old link?", PICTURE)
+    asked = cards.needs_owner(world.ctx("designer", "s-design"), task.id, "", "Keep the old link?", PICTURE)
     owner.answer(world.owner(), asked.id, "Yes,\nkeep it")
     assert world.events[-1] == ("answered", {"card": asked.id, "task": task.id, "session": "s-design",
                                              "answer": "Yes, keep it"})  # fmt: skip
@@ -60,7 +60,7 @@ def test_a_question_card_carries_the_answer_back_to_the_session_that_asked(world
 def test_a_card_for_the_owner_needs_a_picture(world: World) -> None:
     task = world.task()
     with pytest.raises(Refused, match="picture"):
-        cards.needs_owner(world.ctx("designer", "s-design"), task.id, "", "", "Keep the old link?", None)
+        cards.needs_owner(world.ctx("designer", "s-design"), task.id, "", "Keep the old link?", None)
 
 
 def test_the_asking_session_waits_and_the_answer_reaches_it_once_and_it_works_again(
@@ -69,7 +69,7 @@ def test_the_asking_session_waits_and_the_answer_reaches_it_once_and_it_works_ag
     task = world.task()
     world.session("s-impl", "implementer", "impl-t-0001", task.id)
     monkeypatch.setattr(backstop, "processes", lambda: {"s-impl": Proc(1, "s-impl", "impl-t-0001", "", "busy")})
-    asked = cards.needs_owner(world.ctx("implementer", "s-impl"), task.id, "", "", "Keep the old link?", PICTURE)
+    asked = cards.needs_owner(world.ctx("implementer", "s-impl"), task.id, "", "Keep the old link?", PICTURE)
     assert registry.read(world.places)["s-impl"].state == WAITING
 
     let_go, heard = threading.Event(), world.launcher.message_session

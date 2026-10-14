@@ -22,7 +22,7 @@ from runtime.dashboard.views import (
     spend,
 )
 from runtime.dashboard.views.kit import Parts, Query, Snap
-from runtime.dashboard.views.tasks import push, task, work
+from runtime.dashboard.views.tasks import brief, push, task, work
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +54,7 @@ PAGES: list[tuple[re.Pattern[str], Page, dict[str, str]]] = [
     (re.compile(r"^/api/search$"), _page(search), {}),
     (re.compile(r"^/api/push$"), _page(push), {}),
     (re.compile(r"^/api/replay$"), _page(replay), {}),
+    (re.compile(rf"^/api/brief/{_ID}$"), _page(brief), {}),
 ]
 OP = re.compile(r"^/api/ops/(op-[0-9]{14}-[0-9a-f]{8})$")
 

@@ -80,7 +80,7 @@ def _seed_queue(repo: Path, now: float) -> list[models.Task]:
             "G2",
             3,
             status,
-            "https://claude.ai/code/artifact/00000000-0000-4000-8000-0000000" "00012",
+            "v1",
             iso(now - 86400),
             title,
             "Usage shows each day's spend as a bar.",
@@ -118,13 +118,29 @@ def _seed_cards(places: Places, tasks: list[models.Task], now: float) -> None:
                 ask=ask,
                 created=iso(now - 3600),
                 picture=picture,
-                brief="https://claude.ai/code/artifact/x" if kind == "spec" else "",
-                comments=3 if kind == "spec" else 0,
+                brief="v1" if kind == "spec" else "",
                 asked_by="impl-retry-upload",
-                comments_at=iso(now - 7200) if kind == "spec" else "",
             )
         )
     store.write_json(places.cards, [models.dump(c) for c in cards])
+
+
+def _seed_briefs(places: Places, now: float) -> None:
+    page = (FIXTURES / "briefs" / "brief.html").read_text()
+    for task_id in ("t-0012", "t-0014", "t-0023"):
+        threads = []
+        if task_id == "t-0023":
+            threads = [
+                {"id": "c1", "version": 1, "quote": "in place, not on its own page", "prefix": "show the form ",
+                 "suffix": ". I recommend", "note": "What happens on a phone?", "at": iso(now - 1800),
+                 "state": "open", "replies": []},
+                {"id": "c2", "version": 1, "quote": "keeps what the partner typed", "prefix": "The form ",
+                 "suffix": " in the step", "note": "Even a pasted file?", "at": iso(now - 5400), "state": "answered",
+                 "replies": [{"by": "designer", "text": "Yes: the file waits in the step.", "at": iso(now - 3600)}]},
+            ]  # fmt: skip
+        store.write_text(places.state / "briefs" / task_id / "v1.html", page, mode=0o600)
+        store.write_json(places.state / "briefs" / task_id / "brief.json",
+                         {"versions": [{"n": 1, "at": iso(now - 7200)}], "threads": threads}, mode=0o600)  # fmt: skip
 
 
 def _seed_health(places: Places, now: float) -> None:
@@ -208,6 +224,7 @@ def seed(root: Path, now: float = T0) -> Places:
         )
     store.write_json(places.proposals, {"open": ["t-0027", "t-0024", "t-0025"], "approved": []})
     _seed_cards(places, tasks, now)
+    _seed_briefs(places, now)
     for record in seed_cost(sessions, tasks, now):
         store.append_jsonl(places.cost, models.dump(record))
     _seed_health(places, now)

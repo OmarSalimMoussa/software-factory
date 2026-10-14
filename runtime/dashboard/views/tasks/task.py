@@ -12,6 +12,7 @@ from runtime.dashboard.views.kit import (
     Query,
     Snap,
     ago,
+    brief_url,
     epoch,
     first_line,
     model_label,
@@ -111,7 +112,7 @@ def built_from(snap: Snap, task: dict[str, Any]) -> dict[str, Any] | None:
             "spec": spec_id(task["id"]),
             "summary": first_line(spec["body"], 300),
             "picture": picture,
-            "art_url": spec["brief"] or None,
+            "brief_url": brief_url(task["id"]) if spec["brief"] else None,
             "approved_by": "you" if go else "the orchestrator (rung 3)",
         }
     n = taskwords.rung(task, snap.settings)

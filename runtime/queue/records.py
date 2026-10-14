@@ -10,7 +10,7 @@ from typing import Any
 
 from runtime.queue import formats
 from runtime.queue.formats import (
-    ARTIFACT,
+    BRIEF,
     CHECK_KEYS,
     CHECK_RESULTS,
     CHECK_TABLE,
@@ -79,8 +79,8 @@ def parse_spec(text: str, rel: str = "") -> Spec:
         problems.append(f"task {spec.task!r} is not a task id")
     if spec.status not in SPEC_STATUSES:
         problems.append(f"status {spec.status!r} is not one of {', '.join(SPEC_STATUSES)}")
-    if spec.brief and not spec.brief.startswith(ARTIFACT):
-        problems.append(f"brief must be a {ARTIFACT} artifact link")
+    if spec.brief and not BRIEF.match(spec.brief):
+        problems.append(f"brief {spec.brief!r} is not a brief's version, such as v3")
     if spec.goal_item and not GOAL_ITEM.match(spec.goal_item):
         problems.append(f"goal_item {spec.goal_item!r} is not a goal item's name, such as G-build-sop")
     if not ISO.match(spec.updated):

@@ -164,11 +164,9 @@ class Card:
     ask: str
     created: str
     picture: str = ""
-    brief: str = ""
-    comments: int = 0
+    brief: str = ""  # a spec's sign-off: the version of its task's brief, such as v3
     answered: str = ""
     asked_by: str = ""  # contract: R15, the session a question's answer goes back to
-    comments_at: str = ""  # contract: R14, when the designer last counted the comments
     limit: str = ""  # a decide card's spent limit, by its rounds.* name: what the owner's Extend raises
 
 

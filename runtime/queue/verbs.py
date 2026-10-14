@@ -149,14 +149,9 @@ def spec_save(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
     return ok(task=spec.task, status=spec.status)
 
 
-def card_comments(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
-    card = cards.comments(ctx, _text(args, "task"), args.get("count"))
-    return ok(card=card.id, comments=card.comments)
-
-
 def needs_owner(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
-    optional = {k: _text(args, k, required=False) for k in ("task", "ask", "brief", "question")}
-    card = cards.needs_owner(ctx, optional["task"], optional["ask"], optional["brief"], optional["question"], data)
+    optional = {k: _text(args, k, required=False) for k in ("task", "ask", "question")}
+    card = cards.needs_owner(ctx, optional["task"], optional["ask"], optional["question"], data)
     return ok(card=card.id, kind=card.kind)
 
 

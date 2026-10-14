@@ -95,6 +95,6 @@
    }
   ],
   "html": "<h1>Export of a long report times out</h1><p>Cause: <code>two services: the export job and the store copy</code>.</p><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li><span class=\"doclink\" data-open-doc=\"r-1036\" tabindex=\"0\">r-1036</span></li><li><span class=\"doclink\" data-open-doc=\"r-1031\" tabindex=\"0\">r-1031</span></li><li><span class=\"doclink\" data-open-doc=\"r-1012\" tabindex=\"0\">r-1012</span></li><li><span class=\"doclink\" data-open-doc=\"r-1007\" tabindex=\"0\">r-1007</span></li></ul>",
-  "art_url": null
+  "brief_url": null
  }
 }

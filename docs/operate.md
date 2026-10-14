@@ -66,7 +66,7 @@ first, and seal the commit from your checkout the same way.
 
 - **Home** shows what needs you: up to three proposals, each with a picture and why now. Approve, reorder or say not
   now. Nothing starts until you approve it, except the fix for a clear prod outage.
-- **Also needs you** holds the rest: a spec to sign off (open the artifact, comment on it, press Go or Check
+- **Also needs you** holds the rest: a spec to sign off (open its brief, select text to comment on, press Go or Send
   feedback), a stuck task (Extend, To a designer or Park), and questions from sessions.
 - **Boost** any queued task or request on the Work page to make it the next proposal.
 - **Talk to the orchestrator** in its chat. What you ask becomes a request in your words. What you say about the

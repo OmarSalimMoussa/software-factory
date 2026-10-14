@@ -36,7 +36,7 @@ def migrate(ctx: Context) -> list[str]:
     done: list[str] = []
     steps: list[Callable[[Context], str]] = [
         _inbox_cursor, _leases, _errors_filed, _turn, _merges, _released, _typed_verdicts, _approvals_routed,
-        _release_offer,
+        _release_offer, _briefs_home,
     ]  # fmt: skip
     for step in steps:
         try:
@@ -58,6 +58,35 @@ def _release_offer(ctx: Context) -> str:
         return ""
     path.unlink()
     return "the release offer, asked again"
+
+
+# A spec's or card's brief that was a Claude artifact; a brief now lives on this machine, under its version.
+_ARTIFACT_BRIEF = re.compile(r"(?m)^brief: https://claude\.ai/\S*$")
+
+
+def _briefs_home(ctx: Context) -> str:
+    """A spec or card whose brief is a Claude artifact names no brief, and a card drops the comment count its
+    designer kept: the brief's own threads count now."""
+    queue = Queue.of(ctx)
+    specs = 0
+    with queue.lock():
+        for name in queue.files.names("specs"):
+            rel = f"specs/{name}"
+            text = queue.files.read(rel).decode()
+            if _ARTIFACT_BRIEF.search(text):
+                queue.write({rel: _ARTIFACT_BRIEF.sub("brief:", text)})
+                specs += 1
+    raw = store.read_json_or(ctx.places.cards, [])
+    old = [
+        c for c in raw if isinstance(c, dict) and ("comments" in c or str(c.get("brief", "")).startswith("https://"))
+    ]
+    for card in old:
+        card.pop("comments", None)
+        card.pop("comments_at", None)
+        card["brief"] = "" if str(card.get("brief", "")).startswith("https://") else card.get("brief", "")
+    if old:
+        store.write_json(ctx.places.cards, raw, mode=0o600)
+    return f"{specs} specs and {len(old)} cards off their artifact briefs" if specs or old else ""
 
 
 def _inbox_cursor(ctx: Context) -> str:

@@ -42,6 +42,9 @@ BENCH_NOTE = (
     "you come back with your full context"
 )
 _BANNED_TOOLS = frozenset({"Workflow", "RemoteTrigger"})
+# What keeps work in the Claude account, off this machine: an agent on another account could not read it back.
+_ACCOUNT_TOOLS = frozenset({"Artifact", "ArtifactData", "ArtifactComments", "DesignSync", "PushNotification"})
+_ACCOUNT_PREFIX = "mcp__claude_ai_"
 # Claude Code's own worktrees hold branches own-branch never sees, and a subagent's starts from the default branch.
 _WORKTREE_TOOLS = frozenset({"EnterWorktree", "ExitWorktree"})
 _SCHEDULE_TOOLS = frozenset({"CronCreate", "ScheduleWakeup"})
@@ -109,6 +112,9 @@ def _tool(call: Call) -> Decision:
     """Banned tools, schedules, Claude Code's own worktree tools, and the path of an edit."""
     if call.tool in _BANNED_TOOLS and not call.off("banned-tools"):
         return Refusal("banned-tools", f"{call.tool} starts work the factory cannot count or stop; ask your parent")
+    if (call.tool in _ACCOUNT_TOOLS or call.tool.startswith(_ACCOUNT_PREFIX)) and not call.off("banned-tools"):
+        return Refusal("banned-tools", f"{call.tool} keeps work in the Claude account, off this machine; a brief goes "
+                                       "to factory brief save")  # fmt: skip
     isolated = call.tool == "Agent" and bool(call.tool_input.get("isolation"))
     if (call.tool in _WORKTREE_TOOLS or isolated) and not call.off("worktree-tools"):
         return Refusal("worktree-tools", "the warden makes every worktree; stay in yours, and start subagents in it")

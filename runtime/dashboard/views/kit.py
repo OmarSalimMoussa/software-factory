@@ -163,6 +163,11 @@ def model_word(model: str) -> str:
     return model_label(model).split(" ")[0]
 
 
+def brief_url(task_id: str) -> str:
+    """The address of the page that shows a task's brief."""
+    return f"/api/brief/{task_id}"
+
+
 def plural(n: int, one: str, many: str | None = None) -> str:
     return f"{n} {one if n == 1 else (many or one + 's')}"
 

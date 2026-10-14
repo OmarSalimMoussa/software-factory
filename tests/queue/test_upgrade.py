@@ -8,8 +8,8 @@ import json
 from queue_kit import World
 
 from runtime.qa import findings
-from runtime.queue import approvals, formats, intake, turn
-from runtime.queue.book import Queue, task_rel
+from runtime.queue import approvals, cards, formats, intake, records, turn
+from runtime.queue.book import Queue, spec_rel, task_rel
 from runtime.shared import store
 from runtime.slots import leases
 from runtime.warden import inbox, upgrade
@@ -76,3 +76,21 @@ def test_a_release_offer_that_names_no_install_is_asked_for_again(world: World) 
 
     assert "the release offer, asked again" in upgrade.migrate(ctx)
     assert not path.exists() and upgrade.migrate(ctx) == []
+
+
+def test_a_spec_or_card_whose_brief_is_a_claude_artifact_names_no_brief_once_brought_over(world: World) -> None:
+    task = world.task()
+    spec = records.Spec(task.id, "G1", 4, "review", "v1", "2026-10-09T10:00:00Z", "A spec", "What changes.")
+    world.write_raw(spec_rel(task.id), records.dump_spec(spec).replace("brief: v1", "brief: https://claude.ai/x"))
+    card = {"id": "n1", "kind": "spec", "task": task.id, "title": "A spec", "ask": "Go?", "created": "x",
+            "picture": "", "brief": "https://claude.ai/x", "comments": 3, "answered": "", "asked_by": "s",
+            "comments_at": "x", "limit": ""}  # fmt: skip
+    store.write_json(world.places.cards, [card])
+    ctx = dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden"))
+
+    assert "1 specs and 1 cards off their artifact briefs" in upgrade.migrate(ctx)
+
+    found = Queue.of(world.ctx()).spec(task.id)
+    assert found is not None and found.brief == ""
+    assert [c.brief for c in cards.read(world.places)] == [""]
+    assert upgrade.migrate(ctx) == []

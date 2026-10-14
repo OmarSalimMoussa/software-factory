@@ -10,7 +10,7 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from runtime.dashboard.views.kit import Snap, ago, broken, epoch, plural, spelled, version
+from runtime.dashboard.views.kit import Snap, brief_url, broken, plural, spelled, version
 from runtime.dashboard.views.words import agentwords, taskwords
 
 _settled: dict[int, dict[str, Any]] = {}
@@ -160,7 +160,7 @@ def needs(snap: Snap) -> dict[str, Any]:
             "chips": [],
             "picture": f"/api/picture/card/{card['id']}" if card["picture"] else None,
             "picture_label": None,
-            "art_url": None,
+            "brief_url": None,
             "comments": None,
             "actions": [],
             "done": done.get(card["id"]) if card["answered"] else None,
@@ -170,11 +170,11 @@ def needs(snap: Snap) -> dict[str, Any]:
             row.update(
                 chips=[{"text": "Second sign-off", "tone": "warn"}, {"text": "designer's mock-ups", "tone": "violet"}],
                 picture_label="See the designer's mock-ups",
-                art_url=card["brief"] or None,
-                actions=["artifact", "feedback", "go"],
+                brief_url=brief_url(card["task"]) if card["brief"] else None,
+                actions=["brief", "feedback", "go"],
             )
-            if card["comments_at"]:
-                row["comments"] = f"{plural(card['comments'], 'comment')}, {ago(epoch(card['comments_at']), snap.now)}"
+            if card["open_comments"]:
+                row["comments"] = f"{plural(card['open_comments'], 'comment')} waiting for the designer"
         elif card["kind"] == "decide":
             row.update(
                 title=f"{card['title']} needs your decision",

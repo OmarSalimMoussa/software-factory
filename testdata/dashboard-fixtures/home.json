@@ -225,18 +225,18 @@
     ],
     "picture": "/api/picture/card/n1",
     "picture_label": "See the designer's mock-ups",
-    "art_url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000023",
+    "brief_url": "/api/brief/t-0023",
     "comments": "3 comments, 2 h ago",
     "actions": [
      {
-      "key": "artifact",
-      "label": "Open artifact",
-      "icon": "arrow-top-right-on-square",
+      "key": "brief",
+      "label": "Open brief",
+      "icon": "document-text",
       "primary": false
      },
      {
       "key": "feedback",
-      "label": "Check feedback",
+      "label": "Send feedback",
       "icon": "chat-bubble-left-right",
       "primary": false
      },
@@ -260,7 +260,7 @@
     "chips": [],
     "picture": "/api/picture/card/n2",
     "picture_label": "See how the task moved",
-    "art_url": null,
+    "brief_url": null,
     "comments": null,
     "actions": [
      {
@@ -300,7 +300,7 @@
     ],
     "picture": null,
     "picture_label": null,
-    "art_url": null,
+    "brief_url": null,
     "comments": null,
     "actions": [
      {

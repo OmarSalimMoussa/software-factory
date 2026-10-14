@@ -52,7 +52,7 @@ def test_yolo_approves_only_into_a_free_place_of_the_runs_own_role(world: World)
 
 
 def test_yolo_answers_a_question_asked_of_the_owner_as_the_owner(world: World) -> None:
-    asked = cards.needs_owner(world.ctx("designer", "s-design"), world.task().id, "", "", "Keep the link?", PICTURE)
+    asked = cards.needs_owner(world.ctx("designer", "s-design"), world.task().id, "", "Keep the link?", PICTURE)
     _switch(world, True)
 
     yolo.run_pass(world.ctx())

@@ -83,6 +83,7 @@ document.addEventListener('click', e => {
   if (d.origin) { const box = document.getElementById('origin-' + d.origin), open = box.hidden; box.hidden = !open; t.setAttribute('aria-expanded', String(open)); if (open && !box.innerHTML) box.innerHTML = builtFromHTML(UI.origins[d.origin], d.origin); return; }
   if (d.rp !== undefined) { replayClick(t); return; }
   if (d.replay) { openReplay(d.replay); return; }
+  if (d.brief) { openBrief(d.brief); return; }
   if (d.go) { const back = !!t.closest('#page, #sheet') && !t.closest('.more-grid'); if (d.tab) { UI.workTab = d.tab; UI.reqPages = 1; } closeSheet(); go(d.go, {back}); return; }
   if (d.libOpen) { openInLibrary(d.libOpen); return; }
   if (d.gs !== undefined) { pickGs(+d.gs); return; }

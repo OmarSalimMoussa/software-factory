@@ -34,7 +34,8 @@ USER = re.compile(r"^user-[A-Za-z0-9-]{1,64}$")
 OUTCOME = re.compile(r"^(?:(task|joined) (t-\d{4,})|(noise|parked) (\S.*))$")
 PICTURE = re.compile(r"^pictures/[a-z0-9-]+\.(svg|png)$")
 SHA = re.compile(r"^[0-9a-f]{7,40}$")
-ARTIFACT = "https://claude.ai/"
+# The version of its task's brief a spec was signed off on (runtime/warden/owner/briefs.py), such as v3.
+BRIEF = re.compile(r"^v[1-9][0-9]*$")
 # What routing reads from the change itself (routing spec, "The dispatch ladder"). Only the last two need the
 # owner's second sign-off; the others push the run to a designer.
 OWNER_CLASSES = ("none", "migration", "new-service", "design", "large-visible", "large-backend")

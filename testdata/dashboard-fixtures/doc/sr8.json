@@ -60,6 +60,6 @@
    }
   ],
   "html": "<p>A regression check ran before the slot had rebuilt, and passed on the old build.</p>",
-  "art_url": null
+  "brief_url": null
  }
 }

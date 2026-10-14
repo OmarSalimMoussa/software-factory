@@ -18,6 +18,7 @@ from runtime.dashboard.views.kit import (
     Query,
     Snap,
     ago,
+    brief_url,
     plural,
     when,
 )
@@ -53,7 +54,7 @@ def reader(snap: Snap, ref: str) -> dict[str, Any]:
     if doc is None:
         raise PartError("This file is gone. It may have been removed.")
     known = {d.id for d in every}
-    raw, art = doc.raw, None
+    raw, brief = doc.raw, None
     if doc.kind == "task":
         fm = [
             _fm("Id", _value(raw["id"])),
@@ -89,7 +90,7 @@ def reader(snap: Snap, ref: str) -> dict[str, Any]:
             _fm("Rung", _value("not planned" if raw["rung"] is None else str(raw["rung"]))),
             _fm("Status", _status(raw["status"])),
         ]
-        text, art = f"# {body['title']}\n\n{body['body']}", raw["brief"] or None
+        text, brief = f"# {body['title']}\n\n{body['body']}", brief_url(raw["task"]) if raw["brief"] else None
     elif doc.kind == "check":
         fm = [
             _fm("Result", _status(doc.status)),
@@ -118,7 +119,7 @@ def reader(snap: Snap, ref: str) -> dict[str, Any]:
         "when": f"{when(doc.at, utc=True)} · {ago(doc.at, snap.now)}",
         "fm": fm,
         "html": markdown.render(text, known, doc.id),
-        "art_url": art,
+        "brief_url": brief,
     }
 
 

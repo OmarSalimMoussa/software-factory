@@ -24,7 +24,7 @@ from runtime.warden.sessions import permits, registry
 from runtime.warden.sessions.permits import IMPL
 
 ANSWER = "Be proactive and solve it yourself."
-# The choices each card the orchestrator decides offers it: the owner's own, but Check feedback, which is theirs alone.
+# The choices each card the orchestrator decides offers it: the owner's own, but Send feedback, which is theirs alone.
 CHOICES = {"spec": ("go",), "decide": ("extend", "designer", "park")}
 
 

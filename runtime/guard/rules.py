@@ -36,7 +36,7 @@ RULES: dict[str, str] = {
     "product-drivers": "a browser or computer-use tool outside a UI tester; the owner's Chrome, always",
     "qa-browser": "code run inside the browser server; a browser call that names a file",
     "qa-evidence": "a path or address into the factory's state, the testers' evidence or sign-ins, or the dashboard",
-    "banned-tools": "workflows and remote triggers",
+    "banned-tools": "workflows, remote triggers, and tools that keep work in the Claude account",
     "worktree-tools": "entering or leaving a worktree with Claude Code's own tools, or starting an isolated subagent",
     "schedules": "any schedule kept by an agent: the warden drives the loop",
     "unreadable-command": "a command the guard cannot read, or one naming what runs through a variable, alias or pipe",

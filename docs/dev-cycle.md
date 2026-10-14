@@ -15,8 +15,8 @@ nothing starts without the owner's approval, except the fix for a clear prod out
    goal, plans each on the cheapest rung that can do it, and proposes it with a small picture and why now.
 4. **Approval.** The owner approves, reorders or says not now on the dashboard. Only an approved run starts.
 5. **Design, at rung 3 or 4.** A designer writes the spec, runs critics until a round raises nothing new, and
-   publishes a brief. The orchestrator signs off rung 3. Rung 4 goes to the owner as a Claude artifact with mock-ups;
-   the owner comments on it and presses Go.
+   saves a brief, one page kept on this machine with the task. The orchestrator signs off rung 3. Rung 4 goes to the
+   owner, who reads the brief on the dashboard, selects text to comment on, and presses Go.
 6. **Build.** An implementer works in its own worktree and slot, reproduces a bug before fixing it, and builds every
    slice tests first.
 7. **QA.** `factory qa-ready` records the head; every tester the change's surfaces require runs at once. A round is

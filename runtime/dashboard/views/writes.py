@@ -48,6 +48,15 @@ def _text(body: Body, key: str) -> str:
     return value.strip()
 
 
+def _brief_comment(body: Body, task: str) -> dict[str, Any]:
+    """The text the owner selected in one version, a little of what comes before and after it, and their note."""
+    shown, around = body.get("version"), [body.get("prefix"), body.get("suffix")]
+    if isinstance(shown, bool) or not isinstance(shown, int) or not all(isinstance(a, str) for a in around):
+        raise PartError("Select text in the brief first.")
+    return {"task": task, "version": shown, "quote": _text(body, "quote"), "prefix": around[0], "suffix": around[1],
+            "note": _text(body, "note")}  # fmt: skip
+
+
 def _direction(body: Body) -> str:
     if body.get("dir") not in (-1, 1):
         raise PartError("dir is -1 to move up or 1 to move down.")
@@ -224,6 +233,10 @@ WRITES: list[tuple[re.Pattern[str], Write]] = [
     _needs("go", "needs.go", lambda b, r, s: {"card": r}),
     _w(f"needs/{_P}/feedback", "needs.feedback", lambda b, r, s: {"card": r},
        lambda a, s: "The designer is reading your comments.", ["home"], _need_check, ("cards",)),
+    _w(f"brief/{_P}/comment", "brief.comment", lambda b, r, s: _brief_comment(b, r), lambda a, s: "Comment saved.",
+       ["brief", "home"]),
+    _w(f"brief/{_P}/resolve", "brief.resolve", lambda b, r, s: {"task": r, "thread": _text(b, "thread")},
+       lambda a, s: "Resolved.", ["brief", "home"]),
     _needs("extend", "needs.extend", lambda b, r, s: {"card": r}),
     _needs("designer", "needs.designer", lambda b, r, s: {"card": r}),
     _needs("park", "needs.park", lambda b, r, s: {"card": r}),

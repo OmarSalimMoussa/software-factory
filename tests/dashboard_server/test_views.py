@@ -110,6 +110,7 @@ PAGES = [
     ("/api/guard", ["guard.json"]),
     ("/api/push", ["push.json"]),
     (REPLAY_URL, ["replay.json"]),
+    ("/api/brief/t-0023", ["brief.json"]),
 ]
 
 

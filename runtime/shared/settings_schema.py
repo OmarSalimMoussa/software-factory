@@ -153,6 +153,7 @@ SCHEMA: dict[str, Spec] = {
     "watch.refusal_window_minutes": Spec("int", 5, 1440),
     "watch.socket_read_seconds": Spec("int", 1, 120),  # contract: added by 1B-3, a request line must arrive by then
     "queue.max_upload_kib": Spec("int", 16, 8192),
+    "queue.max_brief_kib": Spec("int", 256, 12288),
     "checks.run_minutes": Spec("int", 1, 240),
     "checks.test_seconds": Spec("int", 1, 600),
     "checks.output_kib": Spec("int", 4, 1024),

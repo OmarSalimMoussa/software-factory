@@ -60,6 +60,6 @@
    }
   ],
   "html": "<p>Three check runs were not enough after a rebase onto a moved migration.</p>",
-  "art_url": null
+  "brief_url": null
  }
 }

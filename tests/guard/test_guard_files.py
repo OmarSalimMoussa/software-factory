@@ -174,6 +174,21 @@ def test_a_factory_alone_refusal_names_what_made_the_call_more_than_one_command(
     assert decision.reason.startswith(cause) and "run factory on its own" in decision.reason
 
 
+@pytest.mark.parametrize(
+    ("tool", "rule"),
+    [
+        ("Workflow", "banned-tools"),
+        ("RemoteTrigger", "banned-tools"),
+        ("Artifact", "banned-tools"),
+        ("ArtifactComments", "banned-tools"),
+        ("mcp__claude_ai_Google_Drive__search", "banned-tools"),
+        ("Read", None),
+    ],
+)
+def test_tools_that_run_or_keep_work_outside_the_factory_are_refused(kit: Kit, tool: str, rule: str | None) -> None:
+    assert kit.rule(tool, {"file_path": str(kit.worktree / "a.md")}) == rule
+
+
 def test_a_subagents_factory_call_names_it_right_after_the_program(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("orchestrator", worktree=kit.repo)
