@@ -220,6 +220,7 @@
    100,
    200
   ],
-  "budget": 150
+  "budget": 150.0,
+  "budget_label": "Daily budget"
  }
 }

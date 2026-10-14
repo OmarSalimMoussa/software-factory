@@ -829,6 +829,8 @@
     "cost": "$1.90"
    }
   ],
-  "more": false
+  "label": "1–10 of 14",
+  "newer": null,
+  "older": "/api/agents?history_from=h4"
  }
 }

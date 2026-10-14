@@ -882,4 +882,15 @@ body.has-savebar .toasts{bottom:84px}
 .brief-tf{display:flex;gap:6px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .brief-none{padding:8px 2px}
 @media (max-width:760px){.brief{grid-template-columns:minmax(0,1fr);height:auto}.brief-frame{height:70vh}}
-
+.pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:10px;flex-wrap:wrap}
+/* ---------- Spend: the range's tokens, and each slice row's own ---------- */
+.tokens{margin-top:16px;display:grid;gap:12px;padding:18px 20px}
+.tok-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.tok{background:var(--sunken);border-radius:var(--r-sm);padding:9px 11px;display:grid;gap:2px}
+.tok .k{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.tok .k i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.tok .v{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.tok-bar{height:8px;border-radius:4px;background:var(--sunken);overflow:hidden;display:flex}
+.tok-bar i{display:block;height:100%}
+.tok-read{background:var(--accent)} .tok-write{background:var(--warn)} .tok-in{background:var(--f-impl)} .tok-out{background:var(--f-design)}
+.bar-detail{grid-column:1/-1;font-size:12px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}

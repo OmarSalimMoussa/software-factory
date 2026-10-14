@@ -140,8 +140,8 @@ def seed_cost(sessions: list[Session], tasks: list[Task], now: float) -> list[Co
                     model="claude-sonnet-5-5",
                     input=1000,
                     output=100,
-                    cache_read=0,
-                    cache_write=0,
+                    cache_read=40000,
+                    cache_write=2000,
                     usd=float(usd),
                 )
             )
@@ -158,8 +158,8 @@ def seed_cost(sessions: list[Session], tasks: list[Task], now: float) -> list[Co
                     model=s.model,
                     input=2000,
                     output=300,
-                    cache_read=0,
-                    cache_write=0,
+                    cache_read=80000,
+                    cache_write=4000,
                     usd=COSTS[s.id],
                 )
             )

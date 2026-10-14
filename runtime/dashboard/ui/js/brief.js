@@ -71,7 +71,7 @@ document.addEventListener('click', e => {
   const t = e.target.closest('[data-brief-v],[data-brief-act],[data-brief-resolve],[data-brief-cmt],[data-brief-cancel],[data-brief-save],[data-brief-t]');
   if (!t || UI.page !== 'brief' || !BR.data) return;
   const d = t.dataset;
-  if (d.briefV) { Object.assign(BR, {sel: null, active: null, missing: []}); UI.brief = d.briefV; loadPage(); return; }
+  if (d.briefV) { Object.assign(BR, {sel: null, active: null, missing: []}); UI.brief = d.briefV; showKnown(); return; }
   if (d.briefAct) { act(d.briefAct, {version: d.v}, {btn: t, quiet: true}); return; }
   if (d.briefResolve) { e.stopPropagation(); act(BR.data.resolve_url, {thread: d.briefResolve}, {btn: t}); return; }
   if (d.briefCmt !== undefined) { BR.compose = BR.sel; BR.sel = null; briefPlaceComment(); briefTell({type: 'clear'}); briefRedraw(); const n = $('#brief-note'); if (n) n.focus(); return; }

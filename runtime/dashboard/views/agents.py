@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from runtime.dashboard.views.kit import (
     FAMILIES,
@@ -13,7 +14,6 @@ from runtime.dashboard.views.kit import (
     epoch,
     iso,
     money,
-    page,
     plural,
     span,
     when,
@@ -94,8 +94,22 @@ def history(snap: Snap, query: Query) -> dict[str, Any]:
             done.append(broken(line["name"], f"{line['name']} retired, but the registry has no record of it"))
         elif not in_tree(snap, sessions[line["session"]]):
             done.append(sessions[line["session"]])
-    chunk, more = page([*failed, *done], query, snap.settings.get_int("dashboard.page_size"), "history_page")
-    return {"rows": [r if r.get("broken") else history_row(snap, r) for r in chunk], "more": more}
+    rows, size = [*failed, *done], snap.settings.get_int("dashboard.history_page_size")
+    # A page starts at a row, not a count: agents that end meanwhile push the numbers on, never the rows.
+    keys = [r["id"] for r in rows]
+    at = query.get("history_from", "")
+    start = keys.index(at) if at in keys else 0
+    chunk = rows[start : start + size]
+
+    def link(index: int) -> str:
+        return "/api/agents" if index <= 0 else f"/api/agents?history_from={quote(keys[index])}"
+
+    return {
+        "rows": [r if r.get("broken") else history_row(snap, r) for r in chunk],
+        "label": f"{start + 1}–{start + len(chunk)} of {len(rows)}" if rows else None,
+        "newer": link(start - size) if start > 0 else None,
+        "older": link(start + size) if start + size < len(rows) else None,
+    }
 
 
 def capacity(snap: Snap) -> list[dict[str, Any]]:

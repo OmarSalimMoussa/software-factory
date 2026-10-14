@@ -23,31 +23,36 @@
     "name": "Orchestrator",
     "value": 143.3,
     "color": "--f-orch",
-    "tag": null
+    "tag": null,
+    "detail": "in 23.0k · cache read 920.0k · cache written 46.0k · out 2.8k · 93% from cache"
    },
    {
     "name": "Intake and triage",
     "value": 49.1,
     "color": "--f-intake",
-    "tag": null
+    "tag": null,
+    "detail": "in 47.0k · cache read 1.9M · cache written 94.0k · out 6.4k · 93% from cache"
    },
    {
     "name": "Designers and critics",
     "value": 152.7,
     "color": "--f-design",
-    "tag": null
+    "tag": null,
+    "detail": "in 39.0k · cache read 1.6M · cache written 78.0k · out 5.2k · 93% from cache"
    },
    {
     "name": "Implementers",
     "value": 372.6,
     "color": "--f-impl",
-    "tag": null
+    "tag": null,
+    "detail": "in 15.0k · cache read 600.0k · cache written 30.0k · out 1.6k · 93% from cache"
    },
    {
     "name": "Testers",
     "value": 276.5,
     "color": "--f-qa",
-    "tag": null
+    "tag": null,
+    "detail": "in 29.0k · cache read 1.2M · cache written 58.0k · out 3.7k · 93% from cache"
    }
   ],
   "more": false

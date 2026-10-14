@@ -10,6 +10,7 @@ PAGE.spend = {
     <div class="seg" role="group" aria-label="Range">${[[1, 'Today'], [7, '7 days'], [14, '14 days']].map(([d, l]) => `<button data-range="${d}" aria-pressed="${UI.spendRange === d}">${l}</button>`).join('')}</div></div>
     ${part(env, 'plan', planCard)}
     <div class="spend-hero">${part(env, 'hero', heroHTML)}${part(env, 'chart', chartHTML)}</div>
+    ${part(env, 'tokens', tokensHTML)}
     <section class="section"><div class="sec-h">${sl ? `<div class="tabs" role="tablist" style="border:0">${sl.tabs.map(([k, l]) => `<button role="tab" data-slice="${esc(k)}" aria-selected="${UI.sliceKey === k}">${esc(l)}</button>`).join('')}</div>` : ''}</div>
     ${part(env, 'slice', s => `<div class="card bars">${s.rows.length ? barList(s.rows) : '<div class="empty">Nothing was spent in this range.</div>'}${showMore('slice', s.more)}</div>`)}</section>`;
   }
@@ -29,7 +30,7 @@ function heroHTML(h) {
     ${h.unknown ? `<div class="unknown">${icon('exclamation-triangle', 'sm')}${esc(h.unknown)}</div>` : ''}</div>`;
 }
 function chartHTML(c) {
-  return `<div class="card chart"><div class="sec-h"><div class="label">By family, per day</div><div class="legend">${c.families.map(f => `<span><i style="background:${cv(f.color)}"></i>${esc(f.label)}</span>`).join('')}<span><i style="background:none;border-top:2px dashed var(--warn);height:0;border-radius:0"></i>Daily budget</span></div></div>${stackChart(c)}</div>`;
+  return `<div class="card chart"><div class="sec-h"><div class="label">By family, per day</div><div class="legend">${c.families.map(f => `<span><i style="background:${cv(f.color)}"></i>${esc(f.label)}</span>`).join('')}<span><i style="background:none;border-top:2px dashed var(--warn);height:0;border-radius:0"></i>${esc(c.budget_label)}</span></div></div>${stackChart(c)}</div>`;
 }
 /* Segments are square; each bar is clipped once to a shape rounded only at its top, so the joins between families stay flat. */
 function stackChart(c) {
@@ -49,5 +50,11 @@ function stackChart(c) {
 }
 function barList(rows) {
   const mx = Math.max(0, ...rows.filter(r => !r.broken && r.value != null).map(r => r.value)) || 1;
-  return rows.map(r => r.broken ? brokenRow(r) : `<div class="bar-row"><div class="name"><i class="dot" style="background:${cv(r.color)}"></i><span>${esc(r.name)}</span>${r.tag ? chip(r.tag) : ''}</div><div class="hbar">${r.value == null ? '' : `<i style="width:${r.value / mx * 100}%;background:${cv(r.color)}"></i>`}</div><span class="cost">${money(r.value)}</span></div>`).join('');
+  return rows.map(r => r.broken ? brokenRow(r) : `<div class="bar-row"><div class="name"><i class="dot" style="background:${cv(r.color)}"></i><span>${esc(r.name)}</span>${r.tag ? chip(r.tag) : ''}</div><div class="hbar">${r.value == null ? '' : `<i style="width:${r.value / mx * 100}%;background:${cv(r.color)}"></i>`}</div><span class="cost">${money(r.value)}</span>${r.detail ? `<div class="bar-detail faint">${esc(r.detail)}</div>` : ''}</div>`).join('');
+}
+/* What the range's input was made of, the cache's share first: the server counts and words it all. */
+function tokensHTML(t) {
+  return `<div class="card tokens"><div class="sec-h"><div class="label">${esc(t.label)}</div><span class="muted">${esc(t.hits || t.calls)}</span></div>
+    <div class="tok-stats">${t.stats.map(s => `<div class="tok"><span class="k"><i class="tok-${esc(s.key)}"></i>${esc(s.label)}</span><span class="v">${esc(s.value)}</span></div>`).join('')}</div>
+    <div class="tok-bar" role="img" aria-label="${esc(t.hits || t.calls)}">${t.bar.map(b => `<i class="tok-${esc(b.key)}" style="width:${b.pct}%"></i>`).join('')}</div></div>`;
 }

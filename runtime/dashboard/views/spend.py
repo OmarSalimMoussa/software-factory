@@ -47,6 +47,61 @@ def _cells(snap: Snap, days: list[str], slice_: str) -> dict[str, list[float]]:
     return found
 
 
+def _used(snap: Snap, days: list[str], slice_: str) -> dict[str, list[int]]:
+    """Each key's [calls, input, output, cache read, cache written] over ``days``."""
+    found: dict[str, list[int]] = {}
+    for day in days:
+        for key, counts in snap.get("cost")["tokens"]["days"].get(day, {}).get(slice_, {}).items():
+            row = found.setdefault(key, [0] * 5)
+            for n, count in enumerate(counts):
+                row[n] += count
+    return found
+
+
+def _count(n: int) -> str:
+    """1234 as 1.2k, 48_200_000 as 48.2M."""
+    for size, unit in ((1_000_000_000, "B"), (1_000_000, "M"), (1_000, "k")):
+        if n >= size:
+            return f"{n / size:.1f}{unit}"
+    return str(n)
+
+
+def _hits(counts: list[int]) -> str | None:
+    """The share of input read from the cache; unknown with no input at all."""
+    _, fresh, _, read, written = counts
+    seen = fresh + read + written
+    return f"{round(read / seen * 100)}%" if seen else None
+
+
+def _detail(counts: list[int] | None) -> str | None:
+    if not counts:
+        return None
+    hits = _hits(counts)
+    words = [f"in {_count(counts[1])}", f"cache read {_count(counts[3])}", f"cache written {_count(counts[4])}",
+             f"out {_count(counts[2])}"]  # fmt: skip
+    return " · ".join(words + ([f"{hits} from cache"] if hits else []))
+
+
+def tokens(snap: Snap, query: Query) -> dict[str, Any]:
+    """The range's tokens: what the cache served (hits), what it took in (misses), what went uncached, and out."""
+    days = _days(snap, query)
+    total = [sum(row[n] for row in _used(snap, days, "family").values()) for n in range(5)]
+    seen = total[1] + total[3] + total[4]
+    share = (lambda n: round(n / seen * 100, 1)) if seen else (lambda n: 0.0)
+    return {
+        "label": f"Tokens, {RANGES[str(len(days))].lower()}",
+        "hits": f"cache hits {_hits(total)}" if seen else None,
+        "stats": [
+            {"key": "read", "label": "Read from cache · hits", "value": _count(total[3])},
+            {"key": "write", "label": "Written to cache · misses", "value": _count(total[4])},
+            {"key": "in", "label": "Input, not cached", "value": _count(total[1])},
+            {"key": "out", "label": "Output", "value": _count(total[2])},
+        ],
+        "bar": [{"key": k, "pct": share(total[n])} for k, n in (("read", 3), ("write", 4), ("in", 1))],
+        "calls": plural(total[0], "call"),
+    }
+
+
 def plan(snap: Snap) -> dict[str, Any]:
     reading = snap.get("plan")
     settings = snap.settings
@@ -137,13 +192,16 @@ def chart(snap: Snap, query: Query) -> dict[str, Any]:
         unknown = int(sum(cell[1] for cell in cells.values()))
         rows.append({"label": label, "values": values, "total": round(sum(values), 2),
                      "unknown": f"{plural(unknown, 'call')} of unknown price" if unknown else None})  # fmt: skip
-    top, ticks = _scale(max([r["total"] for r in rows] + [budget]))
+    # The chart is scaled to what was spent: a budget far above it would flatten every bar, so it is named instead.
+    top, ticks = _scale(max(r["total"] for r in rows))
+    shown = budget <= top
     return {
         "families": [{"key": k, "label": label, "color": color} for k, (label, color) in FAMILIES.items()],
         "days": rows,
         "max": top,
         "ticks": ticks,
-        "budget": budget,
+        "budget": budget if shown else None,
+        "budget_label": "Daily budget" if shown else f"Daily budget ${budget:,.0f}, above the chart",
     }
 
 
@@ -157,11 +215,13 @@ def slice_rows(snap: Snap, query: Query) -> dict[str, Any]:
     key = query.get("slice", "family")
     days = _days(snap, query)
     rows: list[dict[str, Any]] = []
+    used = {k: _used(snap, days, k) for k in ("family", "agent", "model")}
     if key == "family":
         for fam, cell in _cells(snap, days, "family").items():
             label, color = FAMILIES.get(fam, (fam, "--idle"))
             value, tag = _value(cell)
-            rows.append({"name": label, "value": value, "color": color, "tag": tag})
+            rows.append({"name": label, "value": value, "color": color, "tag": tag,
+                         "detail": _detail(used["family"].get(fam))})  # fmt: skip
     elif key == "agent":
         sessions = snap.get("sessions")
         by_agent = {r["agent_id"] or r["id"]: r for r in sessions.values()}
@@ -169,9 +229,8 @@ def slice_rows(snap: Snap, query: Query) -> dict[str, Any]:
             row = by_agent.get(agent)
             name = f"{agentwords.name(snap, row)} · {agentwords.role(row)}" if row else "An agent the factory forgot"
             value, tag = _value(cell)
-            rows.append(
-                {"name": name, "value": value, "color": FAMILIES[row["family"]][1] if row else "--idle", "tag": tag}
-            )
+            rows.append({"name": name, "value": value, "color": FAMILIES[row["family"]][1] if row else "--idle",
+                         "tag": tag, "detail": _detail(used["agent"].get(agent))})  # fmt: skip
     elif key == "task":
         for task in taskwords.tasks(snap).values():
             spent = taskwords.cost_cell(snap, task)
@@ -186,6 +245,7 @@ def slice_rows(snap: Snap, query: Query) -> dict[str, Any]:
                     "color": "--good" if merged else "--accent",
                     "tag": tag
                     or ({"text": "merged", "tone": "good"} if merged else {"text": "in progress", "tone": ""}),
+                    "detail": _detail(_task_tokens(snap, task)),
                 }
             )
     elif key == "model":
@@ -199,6 +259,7 @@ def slice_rows(snap: Snap, query: Query) -> dict[str, Any]:
                     "value": value,
                     "color": color,
                     "tag": tag,
+                    "detail": _detail(used["model"].get(model)),
                 }
             )
     else:
@@ -206,6 +267,13 @@ def slice_rows(snap: Snap, query: Query) -> dict[str, Any]:
     rows.sort(key=lambda r: -1.0 if r["value"] is None else r["value"], reverse=True)
     chunk, more = page(rows, query, snap.settings.get_int("dashboard.page_size"))
     return {"tabs": SLICES, "rows": chunk, "more": more}
+
+
+def _task_tokens(snap: Snap, task: dict[str, Any]) -> list[int] | None:
+    """A task's tokens from start to merge, with the intake runs of its requests rolled in."""
+    found = snap.get("cost")["tokens"]["task"]
+    rows = [found[k] for k in (task["id"], *task["requests"]) if k in found]
+    return [sum(row[n] for row in rows) for n in range(5)] if rows else None
 
 
 def wants(query: Query) -> dict[str, Any]:
@@ -218,5 +286,6 @@ def parts(snap: Snap, query: Query) -> Parts:
         "plan": lambda: plan(snap),
         "hero": lambda: hero(snap, query),
         "chart": lambda: chart(snap, query),
+        "tokens": lambda: tokens(snap, query),
         "slice": lambda: slice_rows(snap, query),
     }

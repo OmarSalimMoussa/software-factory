@@ -102,6 +102,10 @@ def _tokens(usage: object) -> dict[str, int]:
     tokens = {ours: usage[theirs] for ours, theirs in names.items()}
     if not all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in tokens.values()):
         raise TypeError("a token count is not a whole number")
+    if not any(tokens.values()) and isinstance(usage.get("iterations"), list):
+        # Some calls carry their counts only in their parts, and read zero at the top.
+        parts = [_tokens(part) for part in usage["iterations"]]
+        tokens = {name: sum(part[name] for part in parts) for name in tokens}
     return tokens
 
 
@@ -131,7 +135,8 @@ def _record(entry: dict[str, Any], payer: Payer, model_seen: str, ctx: Context) 
     if model == _SYNTHETIC or not model:
         model = model_seen or payer.model
     at = datetime.fromisoformat(str(entry["timestamp"]).replace("Z", "+00:00")).astimezone(UTC)
-    usd = _price(ctx.settings().price(model) if model else None, tokens)
+    # A call that worked and counted nothing was not counted: its price is unknown, never $0.
+    usd = _price(ctx.settings().price(model) if model else None, tokens) if failed or any(tokens.values()) else None
     return CostRecord(at=at.strftime("%Y-%m-%dT%H:%M:%SZ"), session=payer.session, subagent=payer.subagent,
                       role=payer.role, family=payer.family, task=payer.task, model=model, usd=usd, failed=failed,
                       **tokens)  # fmt: skip

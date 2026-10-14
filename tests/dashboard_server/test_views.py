@@ -4,21 +4,23 @@ of values, at every depth. Unknown values (None) may stand anywhere."""
 from __future__ import annotations
 
 import json
+import tomllib
 from pathlib import Path
 from typing import Any
 
 import pytest
 from dashboard_rig import Rig
-from dashboard_seed import STAGING
+from dashboard_seed import STAGING, T0
 from seed_agents import REPLAY_URL
 from seed_kit import FIXTURES, iso
 
-from runtime.dashboard.views import agents, ops
+from runtime.dashboard.views import agents, ops, spend
 from runtime.dashboard.views.kit import PartError, Snap
 from runtime.dashboard.views.tasks.task import qa_line
 from runtime.dashboard.views.words.settingwords import LABELS
 from runtime.shared import models, store
 from runtime.shared import operations as kinds
+from runtime.shared import settings as settings_module
 from runtime.shared.models import OPEN_SEVERITIES
 from runtime.shared.settings_schema import SCHEMA
 from runtime.warden.delivery import deploys
@@ -131,6 +133,24 @@ def test_a_file_found_by_search_carries_the_look_of_its_kind(rig: Rig) -> None:
     assert tasks[0]["icon"] == {"kind": "ktile", "key": "queue-list", "tone": "info"}
 
 
+def test_a_daily_budget_far_above_the_spend_is_named_beside_the_chart_not_drawn_on_it() -> None:
+    defaults = tomllib.loads((Path(__file__).resolve().parents[2] / "settings.toml").read_text())
+    today = iso(T0)[:10]
+    cost = {"days": {today: {"family": {"impl": [12.0, 0]}}}, "totals": {}, "tokens": {"days": {}, "task": {}}}
+    snap = Snap(
+        T0,
+        {"cost": cost},
+        {},
+        settings_module.build(defaults, {"cost.daily_budget_usd": 10000, "repo.path": "/r", "repo.github": "o/n"}),
+    )
+
+    chart = spend.chart(snap, {"range": "1"})
+
+    # A $10,000 line on the chart's scale flattened every day's bar.
+    assert (chart["budget"], chart["budget_label"]) == (None, "Daily budget $10,000, above the chart")
+    assert chart["max"] < 100
+
+
 @pytest.mark.parametrize(
     ("paused", "icon"), [("2026-10-09T00:00:00Z", "pause-circle"), (None, "stop-circle")], ids=["paused", "stopped"]
 )
@@ -238,7 +258,7 @@ def test_a_history_line_that_cannot_be_read_is_one_failed_row(rig: Rig) -> None:
     rows = rig.parts("/api/agents")["history"]["data"]["rows"]
     failed = [row for row in rows if row.get("broken")]
     assert failed == [{"broken": True, "id": "history line 6", "error": "line 6 of history.jsonl cannot be read"}]
-    assert len(rows) == 25 and all(row.get("why") for row in rows if not row.get("broken"))
+    assert len(rows) == 10 and all(row.get("why") for row in rows if not row.get("broken"))
 
 
 @pytest.mark.parametrize(

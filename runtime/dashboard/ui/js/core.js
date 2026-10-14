@@ -138,7 +138,7 @@ function refreshParts(names) {
 
 /* ---------- state ---------- */
 const UI = {page: null, shell: null, pages: [], data: {}, back: null, hist: false, lastOk: 0, down: null, downSaid: null, fails: 0, halted: false, device: false,
-  workTab: 'tasks', reqInbox: 'all', reqOut: 'all', reqPages: 1, histPages: 1, sliceKey: 'family', spendRange: 14, slicePages: 1, reflectKind: 'all', reflectPages: 1,
+  workTab: 'tasks', reqInbox: 'all', reqOut: 'all', reqPages: 1, sliceKey: 'family', spendRange: 14, slicePages: 1, reflectKind: 'all', reflectPages: 1,
   agentsClosed: new Set(), gPending: false, gs: {q: '', at: 0}, edits: new Map(), failed: new Set(), dirty: false, pendingScroll: null, sigs: {}};
 const PAGE = {};
 
@@ -354,6 +354,9 @@ async function loadPage(opts = {}) {
     if (soon) UI.soonT = setTimeout(() => loadPage({flip: true}), soon);
   } catch (e) { loadFailed(e, 'This page', () => loadPage()); }
 }
+/* A view of a page already loaded draws at once, since loading it again may find nothing new to draw; one not loaded
+   keeps the current view until it arrives. */
+function showKnown() { if (UI.data[PAGE[UI.page].url()]) render(); loadPage(); }
 /* Paged lists load every page shown so far, so a refresh never drops rows the owner asked for. */
 async function loadPaged(url, pages, partName, rowsKey = 'rows', param = 'page') {
   const sep = url.includes('?') ? '&' : '?';

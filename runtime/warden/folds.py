@@ -80,11 +80,14 @@ class History(Fold):
 
 class Cost(Fold):
     """Every call's cost by day and family, agent and model, and in total by agent, task and model. Each total is
-    [dollars, calls with unknown price]: an unknown price is counted, never added as zero."""
+    [dollars, calls with unknown price]: an unknown price is counted, never added as zero. Beside them, the same
+    slices' tokens: [calls, input, output, cache read, cache written], and each task's in total."""
 
     def reset(self) -> None:
         self.days: dict[str, dict[str, dict[str, list[float]]]] = {}
         self.totals: dict[str, dict[str, list[float]]] = {"agent": {}, "task": {}, "model": {}}
+        self.tokens: dict[str, dict[str, dict[str, list[int]]]] = {}
+        self.task_tokens: dict[str, list[int]] = {}
 
     def step(self, raw: dict[str, Any]) -> None:
         record = models.load(models.CostRecord, raw)
@@ -100,9 +103,21 @@ class Cost(Fold):
         ]
         for cell in cells:
             cell[0 if record.usd is not None else 1] += record.usd if record.usd is not None else 1
+        counts = (1, record.input, record.output, record.cache_read, record.cache_write)
+        used = self.tokens.setdefault(record.at[:10], {"family": {}, "agent": {}, "model": {}})
+        for row in (
+            used["family"].setdefault(record.family, [0] * 5),
+            used["agent"].setdefault(agent, [0] * 5),
+            used["model"].setdefault(record.model, [0] * 5),
+            self.task_tokens.setdefault(record.task, [0] * 5),
+        ):
+            for n, count in enumerate(counts):
+                row[n] += count  # fmt: skip
 
     def answer(self, days: int) -> dict[str, Any]:
-        return {"days": {d: self.days[d] for d in sorted(self.days)[-days:]}, "totals": self.totals}
+        recent = sorted(self.days)[-days:]
+        return {"days": {d: self.days[d] for d in recent}, "totals": self.totals,
+                "tokens": {"days": {d: self.tokens[d] for d in recent}, "task": self.task_tokens}}  # fmt: skip
 
 
 class Streaks(Fold):

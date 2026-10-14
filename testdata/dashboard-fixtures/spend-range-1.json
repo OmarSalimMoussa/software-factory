@@ -64,6 +64,7 @@
    100,
    200
   ],
-  "budget": 150
+  "budget": null,
+  "budget_label": "Daily budget $150, above the chart"
  }
 }

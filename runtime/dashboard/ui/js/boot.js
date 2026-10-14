@@ -61,9 +61,9 @@ document.addEventListener('focusin', e => { if (e.target.id === 'gq' && e.target
 
 /* A changed filter draws from what is already known, if anything, then asks the server. */
 function viewChanged() { if (UI.data[PAGE[UI.page].url()]) render({keep: true}); loadPage(); }
-const MORE = {requests: 'reqPages', history: 'histPages', slice: 'slicePages', reflect: 'reflectPages'};
+const MORE = {requests: 'reqPages', slice: 'slicePages', reflect: 'reflectPages'};
 function moreRows(what, btn) { btn.disabled = true; if (what === 'library') UI.lib.pages++; else UI[MORE[what]]++; loadPage(); }
-const agentsTree = () => { const env = UI.data['/api/agents']; return env ? partData(env, 'tree') : null; };
+const agentsTree = () => { const env = UI.data[PAGE.agents.url()]; return env ? partData(env, 'tree') : null; };
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
@@ -84,6 +84,7 @@ document.addEventListener('click', e => {
   if (d.rp !== undefined) { replayClick(t); return; }
   if (d.replay) { openReplay(d.replay); return; }
   if (d.brief) { openBrief(d.brief); return; }
+  if (d.histPage) { UI.agentsUrl = d.histPage; showKnown(); return; }
   if (d.go) { const back = !!t.closest('#page, #sheet') && !t.closest('.more-grid'); if (d.tab) { UI.workTab = d.tab; UI.reqPages = 1; } closeSheet(); go(d.go, {back}); return; }
   if (d.libOpen) { openInLibrary(d.libOpen); return; }
   if (d.gs !== undefined) { pickGs(+d.gs); return; }

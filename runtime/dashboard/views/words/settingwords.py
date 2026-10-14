@@ -205,6 +205,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("dashboard.stale_seconds", "Seconds before data counts as old"),
             ("dashboard.page_margin_seconds", "Seconds a page waits beyond the dashboard's own wait"),
             ("dashboard.page_size", "Rows per page"),
+            ("dashboard.history_page_size", "Agents per page of History"),
             ("dashboard.probe_strip", "Probes the outage band shows"),
             ("dashboard.working_now_max", "Agents under Working now"),
             ("dashboard.wrong_codes_to_lock", "Wrong codes before signing in locks"),

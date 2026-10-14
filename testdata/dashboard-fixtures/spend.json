@@ -16,5 +16,46 @@
     "resets": "resets in 3 d 19 h · Oct 13, 09:30 UTC"
    }
   ]
+ },
+ "tokens": {
+  "label": "Tokens, last 14 days",
+  "hits": "cache hits 93%",
+  "stats": [
+   {
+    "key": "read",
+    "label": "Read from cache · hits",
+    "value": "6.1M"
+   },
+   {
+    "key": "write",
+    "label": "Written to cache · misses",
+    "value": "306.0k"
+   },
+   {
+    "key": "in",
+    "label": "Input, not cached",
+    "value": "153.0k"
+   },
+   {
+    "key": "out",
+    "label": "Output",
+    "value": "19.7k"
+   }
+  ],
+  "bar": [
+   {
+    "key": "read",
+    "pct": 93.0
+   },
+   {
+    "key": "write",
+    "pct": 4.7
+   },
+   {
+    "key": "in",
+    "pct": 2.3
+   }
+  ],
+  "calls": "111 calls"
  }
 }

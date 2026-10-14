@@ -23,19 +23,22 @@
     "name": "Opus 5.5",
     "value": 576.64,
     "color": "--f-design",
-    "tag": null
+    "tag": null,
+    "detail": "in 8.0k · cache read 320.0k · cache written 16.0k · out 1.2k · 93% from cache"
    },
    {
     "name": "Sonnet 5.5",
     "value": 338.03,
     "color": "--f-impl",
-    "tag": null
+    "tag": null,
+    "detail": "in 26.0k · cache read 1.0M · cache written 52.0k · out 3.9k · 93% from cache"
    },
    {
     "name": "Haiku 5.5",
     "value": 79.53,
     "color": "--f-qa",
-    "tag": null
+    "tag": null,
+    "detail": "in 2.0k · cache read 80.0k · cache written 4.0k · out 300 · 93% from cache"
    },
    {
     "name": "A model with no price set",
@@ -44,7 +47,8 @@
     "tag": {
      "text": "2 calls",
      "tone": "warn"
-    }
+    },
+    "detail": "in 20 · cache read 0 · cache written 0 · out 2 · 0% from cache"
    }
   ],
   "more": false

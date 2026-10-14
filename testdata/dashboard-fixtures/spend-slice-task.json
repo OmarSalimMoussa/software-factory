@@ -26,7 +26,8 @@
     "tag": {
      "text": "merged",
      "tone": "good"
-    }
+    },
+    "detail": "in 16.0k · cache read 640.0k · cache written 32.0k · out 2.4k · 93% from cache"
    },
    {
     "name": "Export of a long report times out",
@@ -35,7 +36,8 @@
     "tag": {
      "text": "in progress",
      "tone": ""
-    }
+    },
+    "detail": "in 2.0k · cache read 80.0k · cache written 4.0k · out 300 · 93% from cache"
    },
    {
     "name": "Partner sign-in from the import step",
@@ -44,7 +46,8 @@
     "tag": {
      "text": "in progress",
      "tone": ""
-    }
+    },
+    "detail": "in 10.0k · cache read 400.0k · cache written 20.0k · out 1.5k · 93% from cache"
    },
    {
     "name": "Sign-in sends people back to the sign-in page",
@@ -53,7 +56,8 @@
     "tag": {
      "text": "in progress",
      "tone": ""
-    }
+    },
+    "detail": "in 12.0k · cache read 480.0k · cache written 24.0k · out 1.8k · 93% from cache"
    },
    {
     "name": "Invoice list loads slowly with 200 items",
@@ -62,7 +66,8 @@
     "tag": {
      "text": "merged",
      "tone": "good"
-    }
+    },
+    "detail": "in 12.0k · cache read 480.0k · cache written 24.0k · out 1.8k · 93% from cache"
    },
    {
     "name": "Clearer empty states on Projects and Invoices",
@@ -71,7 +76,8 @@
     "tag": {
      "text": "in progress",
      "tone": ""
-    }
+    },
+    "detail": "in 6.0k · cache read 240.0k · cache written 12.0k · out 900 · 93% from cache"
    },
    {
     "name": "Invoice page: the Approve button jumps",
@@ -80,7 +86,8 @@
     "tag": {
      "text": "merged",
      "tone": "good"
-    }
+    },
+    "detail": "in 4.0k · cache read 160.0k · cache written 8.0k · out 600 · 93% from cache"
    },
    {
     "name": "Retry an upload that drops midway",
@@ -89,7 +96,8 @@
     "tag": {
      "text": "in progress",
      "tone": ""
-    }
+    },
+    "detail": "in 10.0k · cache read 400.0k · cache written 20.0k · out 1.5k · 93% from cache"
    },
    {
     "name": "Billing page shows credit after a refund",
@@ -98,7 +106,8 @@
     "tag": {
      "text": "merged",
      "tone": "good"
-    }
+    },
+    "detail": "in 4.0k · cache read 160.0k · cache written 8.0k · out 600 · 93% from cache"
    },
    {
     "name": "Staging is down after the last deploy",
@@ -107,7 +116,8 @@
     "tag": {
      "text": "in progress",
      "tone": ""
-    }
+    },
+    "detail": "in 2.0k · cache read 80.0k · cache written 4.0k · out 300 · 93% from cache"
    },
    {
     "name": "Long project names wrap badly",
@@ -116,7 +126,8 @@
     "tag": {
      "text": "in progress",
      "tone": ""
-    }
+    },
+    "detail": "in 2.0k · cache read 80.0k · cache written 4.0k · out 300 · 93% from cache"
    }
   ],
   "more": false

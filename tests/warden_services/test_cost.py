@@ -79,6 +79,23 @@ def test_an_unpriced_model_costs_unknown_and_a_failed_call_is_recorded(ctx: Cont
     ]
 
 
+def test_a_call_whose_counts_sit_in_its_parts_is_counted_from_them_and_one_that_counted_nothing_costs_unknown(
+    ctx: Context, root: Path
+) -> None:
+    registry.write(ctx.places, {"s1": session("s1")})
+    zero = {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
+    part = {**zero, "output_tokens": 4427, "cache_read_input_tokens": 375722, "cache_creation_input_tokens": 4514}
+    parted, empty = json.loads(call("msg_1", "req_1")), json.loads(call("msg_2", "req_2"))
+    parted["message"]["usage"] = {**zero, "iterations": [part]}
+    empty["message"]["usage"] = zero
+    (root / "-srv-checkout-wt-s1" / "s1.jsonl").write_text(json.dumps(parted) + "\n" + json.dumps(empty) + "\n")
+
+    cost.run_pass(ctx, [root])
+
+    got = [(r["output"], r["cache_read"], r["usd"] is None) for r in records(ctx.places)]
+    assert got == [(4427, 375722, False), (0, 0, True)]
+
+
 @pytest.mark.parametrize(
     ("kind", "row", "role", "family", "task"),
     [

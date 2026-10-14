@@ -1,7 +1,7 @@
 'use strict';
 /* Agents: aligned columns, a tree that slides open and shut, Stop with what it stops, History read-only and paged,
    Pause and Resume from the orchestrator's panel, and stopping the whole factory behind the code. */
-const {drive, settle, until, frames, heights} = require('./lib.cjs');
+const {drive, settle, until, frames, heights, texts} = require('./lib.cjs');
 
 drive('agents', async t => {
   const p = await t.open(1440, 900, 'agents');
@@ -28,11 +28,17 @@ drive('agents', async t => {
   t.check((await state('impl-project-names')).includes('deprioritized'), 'deprioritized not shown');
   t.check((await p.textContent('.capbars')).includes('1 deprioritized'), 'capacity does not count the deprioritized agent');
   await t.shot(p, 'agents-1440.png');
-  // History: aligned columns, a broken row that says so, Show more, a read-only panel
-  t.check((await p.$$('#history .hist-row')).length === 24 && await p.$('#history .row.broken'), 'History first page wrong');
+  // History: aligned columns, a broken row that says so, ten to a page with Newer and Older, a read-only panel
+  const histRows = () => p.$$eval('#history > .row', rs => rs.map(r => r.textContent.trim().slice(0, 40)));
+  const first = await histRows(), label = async () => (await texts(p, '.pager .faint'))[0];
+  t.check(first.length === 10 && await p.$('#history .row.broken'), 'History first page wrong: ' + first.length);
   const hc = await p.$$eval('#history .hist-row', rs => [...new Set(rs.map(r => Math.round(r.children[2].getBoundingClientRect().left)))]); t.check(hc.length === 1, 'History columns not aligned');
-  await p.click('[data-more="history"]'); await settle(p);
-  t.check((await p.$$('#history .hist-row')).length === 32 && !(await p.$('[data-more="history"]')), 'History Show more failed');
+  t.check(/^1–10 of \d+$/.test(await label()) && await p.$('.pager [data-hist-page]:disabled'), 'History pager wrong on the first page: ' + await label());
+  const shows = start => until(p, s => (document.querySelector('.pager .faint')?.textContent || '').startsWith(s), start);
+  await p.click('.pager [data-hist-page]:last-child');
+  t.check(await shows('11–20 of') && (await histRows())[0] !== first[0], 'Older did not show the next ten: ' + await label());
+  await p.click('.pager [data-hist-page]:nth-child(2)');
+  t.check(await shows('1–10 of') && (await histRows())[0] === first[0], 'Newer did not come back: ' + await label());
   await p.click('#history .hist-row'); await settle(p);
   t.check(!(await p.$('#sheet [data-stop], #sheet [data-stopnow]')), 'a History record offers an action');
   t.check((await p.textContent('#sheet-body')).includes('can never be resumed'), 'History record does not say it is final');

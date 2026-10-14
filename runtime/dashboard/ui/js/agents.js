@@ -2,8 +2,7 @@
 /* Agents: who is doing what, as a tree under the orchestrator; History of every retired agent; Stop, Pause and Resume. */
 
 PAGE.agents = {
-  url: () => '/api/agents',
-  load: url => UI.histPages > 1 ? loadPaged(url, UI.histPages, 'history', 'rows', 'history_page') : fetchEnv('page', url),
+  url: () => UI.agentsUrl || '/api/agents',
   render: pAgents
 };
 const partData = (env, name) => { const p = env.parts[name]; return p && p.ok ? p.data : null; };
@@ -16,7 +15,7 @@ function pAgents(env) {
     <section class="section"><div class="sec-h"><div class="label">Hierarchy</div><div style="display:flex;gap:6px"><button class="btn sm quiet" data-tree="open">Expand all</button><button class="btn sm quiet" data-tree="close">Collapse all</button></div></div>
     ${part(env, 'tree', t => `<div class="card tree">${t ? node(t) : '<div class="empty">No orchestrator is running yet.</div>'}</div>`)}</section>
     <section class="section"><div class="sec-h"><div class="label">History ${hint('Agents that finished, that you stopped, or that crashed. Each leaves the live tree a few minutes after it ends. None can be resumed.')}</div></div>
-    ${part(env, 'history', d => `<div class="card rows" id="history">${d.rows.length ? d.rows.map(r => r.broken ? brokenRow(r) : histRow(r)).join('') : '<div class="empty">No agent has ended yet.</div>'}${showMore('history', d.more)}</div>`)}</section>`;
+    ${part(env, 'history', d => `<div class="card rows" id="history">${d.rows.length ? d.rows.map(r => r.broken ? brokenRow(r) : histRow(r)).join('') : '<div class="empty">No agent has ended yet.</div>'}</div>${d.label ? `<div class="pager"><span class="faint">${esc(d.label)}</span><button class="btn sm" data-hist-page="${esc(d.newer || '')}"${d.newer ? '' : ' disabled'}>${icon('chevron-left', 'sm')}Newer</button><button class="btn sm" data-hist-page="${esc(d.older || '')}"${d.older ? '' : ' disabled'}>Older${icon('chevron-right', 'sm')}</button></div>` : ''}`)}</section>`;
 }
 const capCard = c => `<div class="card cap"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="label">${esc(c.label)}</span><span class="big" style="font-size:24px">${c.value}<small> / ${c.max}</small></span></div><div class="slots">${Array.from({length: Math.max(c.max, c.value)}, (_, i) => `<i class="${i < c.value ? 'on' : ''}"></i>`).join('')}</div><div class="faint" style="font-size:12px;min-height:16px">${c.note ? icon('clock', 'sm') + ' ' + esc(c.note) : ''}</div></div>`;
 function bannerHTML(b) {

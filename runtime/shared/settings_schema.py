@@ -184,6 +184,7 @@ SCHEMA: dict[str, Spec] = {
     "dashboard.device_days": Spec("int", 1, 365),
     "dashboard.hosts": Spec("list", 1, when=AT_INSTALL),
     "dashboard.page_size": Spec("int", 10, 500),
+    "dashboard.history_page_size": Spec("int", 5, 100),
     "dashboard.probe_strip": Spec("int", 3, 60),
     "dashboard.working_now_max": Spec("int", 1, 24),
     "dashboard.max_threads": Spec("int", 2, 64, when="Next warden start"),
