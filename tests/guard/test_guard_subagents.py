@@ -100,6 +100,16 @@ def test_a_batch_of_starts_past_the_cap_refuses_only_the_starts_past_it(
     assert (kit.rule("Agent", _agent("critic-security"), tool_use_id=current) == "subagents-at-once") is refused
 
 
+def test_a_quiet_tester_holds_its_place_through_its_start_up_and_items(tmp_path: Path) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.settings(caps__subagents_at_once=1, qa__setup_seconds=180, qa__seconds_per_item=120, qa__stale_seconds=600)
+    kit.transcript(_running("qa-backend", ago=180 + 120 - 30))
+    assert kit.rule("Agent", _agent("qa-security")) == "subagents-at-once"
+    kit.transcript(_running("qa-backend", ago=180 + 120 + 30))
+    assert kit.rule("Agent", _agent("qa-security")) != "subagents-at-once"
+
+
 def test_a_subagent_quiet_past_the_stale_limit_or_stopped_frees_its_place(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("designer")
@@ -193,12 +203,16 @@ def test_a_critic_round_is_the_critics_started_between_two_saved_revisions(tmp_p
 def test_a_testers_time_runs_out_and_its_shell_timeouts_are_cut_but_its_report_goes(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer")
-    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=100), "user", "Scenarios and checks: 1")])
+    kit.settings(qa__setup_seconds=30, qa__seconds_per_item=120)
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=130), "user", "Scenarios and checks: 1")])
     cut = kit.decide("Bash", {"command": "sleep 600", "timeout": 600_000}, **TESTER)
     assert isinstance(cut, Rewrite) and cut.updated_input["timeout"] <= 20_000
-    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=130), "user", "Scenarios and checks: 1")])
-    assert kit.rule("Read", {"file_path": "/x"}, **TESTER) == "tester-time"
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=160), "user", "Scenarios and checks: 1")])
+    refused = kit.decide("Read", {"file_path": "/x"}, **TESTER)
+    assert isinstance(refused, Refusal) and "factory qa result" in refused.reason
     assert kit.decide("SubagentHandback", {"message": "2 of 3"}, **TESTER) is None
+    walker = kit.decide("Read", {"file_path": "/x"}, agent_id=TESTER_ID, agent_type="qa-regression")
+    assert isinstance(walker, Refusal) and walker.reason.endswith("hand back your report now")
 
 
 def test_a_testers_slot_api_session_carries_its_id_and_the_implementers_keeps_its_name(tmp_path: Path) -> None:
@@ -209,6 +223,33 @@ def test_a_testers_slot_api_session_carries_its_id_and_the_implementers_keeps_it
     tester = kit.decide(SLOT_API, asked, **TESTER)
     assert isinstance(tester, Rewrite) and tester.updated_input["session"] == f"ada@notes.test.{TESTER_ID}"
     assert kit.decide(SLOT_API, asked) is None
+
+
+@pytest.mark.parametrize(
+    ("tool", "tool_input", "goes"),
+    [
+        (
+            "Bash",
+            {"command": "factory qa finding --head abc1234 --severity minor --where x --body .factory/f.md"},
+            True,
+        ),
+        ("Bash", {"command": "factory qa result --head abc1234"}, True),
+        ("Write", {"file_path": ".factory/f.md", "content": "Save fails."}, True),
+        ("Write", {"file_path": "notes.md", "content": "Save fails."}, False),
+        ("Bash", {"command": "factory qa result --head abc1234; sleep 60"}, False),
+        ("Bash", {"command": "factory qa step --head abc1234"}, False),
+        ("mcp__qa-browser__browser_snapshot", {}, False),
+    ],
+    ids=["finding", "result", "finding-file", "other-file", "result-and-more", "step", "browser"],
+)
+def test_a_tester_out_of_time_still_records_its_report(
+    tmp_path: Path, tool: str, tool_input: dict[str, Any], goes: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(hours=1), "user", "Scenarios and checks: 1")])
+    asked = {**tool_input, "file_path": str(kit.worktree / tool_input["file_path"])} if tool == "Write" else tool_input
+    assert (kit.rule(tool, asked, **TESTER) != "tester-time") is goes
 
 
 @pytest.mark.parametrize(
@@ -233,14 +274,27 @@ def test_a_tester_holding_a_desktop_stops_at_its_desktop_time(
 
 @pytest.mark.parametrize(
     ("running", "age", "level", "refused"),
-    [(3, 60, "green", False), (4, 60, "green", True), (4, 86400, "green", False), (0, 60, "amber", True)],
-    ids=["under-the-cap", "at-the-cap", "rows-older-than-any-tester-runs", "amber"],
+    [
+        (3, 60, "green", False),
+        (4, 60, "green", True),
+        (4, 10 * 120 + 180 + 300 - 60, "green", True),
+        (4, 86400, "green", False),
+        (0, 60, "amber", True),
+    ],
+    ids=[
+        "under-the-cap",
+        "at-the-cap",
+        "rows-within-a-testers-longest-run",
+        "rows-older-than-any-tester-runs",
+        "amber",
+    ],
 )
 def test_browser_testers_are_capped_across_the_machine_and_start_only_on_green_vitals(
     tmp_path: Path, running: int, age: int, level: str, refused: bool
 ) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer")
+    kit.settings(qa__max_items=10, qa__seconds_per_item=120, qa__setup_seconds=180, qa__stale_seconds=300)
     for n in range(running):  # other implementers' browser testers
         kit.session("implementer", sid=f"other-{n}")
         kit.session("qa-ux", sid=f"tester-{n}", parent=f"other-{n}", agent_id=f"a{n}",

@@ -49,6 +49,7 @@ extend_by = 2
 
 [qa]
 seconds_per_item = 120
+setup_seconds = 180     # added once to each tester's time, for its start-up and sign-in
 max_items = 10
 desktop_seconds = 300
 evidence_days = 14

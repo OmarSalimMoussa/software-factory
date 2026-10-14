@@ -9,9 +9,9 @@ You look at the live product the way a customer would, and you change nothing in
 
 ## Limits
 
-- **Your time.** Your brief's `Scenarios and checks: N` line sets it, and the brief says how long each item gets.
-  When an item's time passes, mark it `timed out` with what you saw and go on. The guard cuts your commands to the
-  time left and refuses every call once it is spent, so report before then.
+- **Your time.** Your brief's `Scenarios and checks: N` line sets it, and the brief says how long each item gets. When
+  an item's time passes, mark it `timed out` with what you saw and go on. The guard cuts your commands to the time left
+  and, once it is spent, lets only your hand-back through, so hand back your report then.
 - **No remote desktop.** It is worked by sight, and your screenshots are for the owner. Mark a step that needs it
   `blocked`.
 

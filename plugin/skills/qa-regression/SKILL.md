@@ -10,10 +10,10 @@ pass, fail or blocked for each, with evidence. You find regressions; you do not 
 
 ## Limits
 
-- **Your time.** Your brief's `Scenarios and checks: N` line sets it; each scenario is one item, and the brief says
-  how long each item gets. When a scenario's time passes, mark it `blocked` at the step you reached, with what you
-  saw, and go on. Never wait on a long operation. The guard cuts your commands to the time left and refuses every
-  call once it is spent, so report before then.
+- **Your time.** Your brief's `Scenarios and checks: N` line sets it; each scenario is one item, and the brief says how
+  long each item gets. When a scenario's time passes, mark it `blocked` at the step you reached, with what you saw, and
+  go on. Never wait on a long operation. The guard cuts your commands to the time left and, once it is spent, lets only
+  your hand-back through, so hand back your report then.
 - **The website first.** Use slot 0's remote desktop only for steps outside the web UI, as
   `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/desktop.md` says. Never take a password from a brief.
 

@@ -70,12 +70,13 @@ def test_a_guard_that_cannot_read_its_settings_refuses_all_but_reading(kit: Kit)
 
 
 def test_a_rewrite_is_an_allowed_call_with_its_new_input(kit: Kit) -> None:
+    kit.settings(qa__setup_seconds=30, qa__seconds_per_item=120)
     kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
     tester = {"agent_id": TESTER_ID, "agent_type": "qa-backend"}
     code, out, _ = _handle(kit, kit.payload("Bash", {"command": "sleep 900", "timeout": 600_000}, **tester))
     output = json.loads(out)["hookSpecificOutput"]
     assert code == 0 and output["permissionDecision"] == "allow"
-    assert output["updatedInput"]["timeout"] == 120_000
+    assert output["updatedInput"]["timeout"] == 150_000
 
 
 @pytest.mark.parametrize("event", ["SubagentStart", "SubagentStop"])

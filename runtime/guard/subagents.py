@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from runtime.guard import branches, browser, factory_calls, shell, transcript
+from runtime.guard import branches, browser, factory_calls, scratch, shell, transcript
 from runtime.guard.facts import (
     DESIGNER,
     IMPLEMENTER,
@@ -23,19 +23,21 @@ from runtime.guard.facts import (
     read_desktops,
     read_ready,
     read_vitals,
+    resolve,
 )
 from runtime.guard.wire import HANDBACK, REFUSED
 from runtime.shared.models import RETIRED, WITH_PARENT
 from runtime.shared.settings import model_role
 from runtime.shared.settings_schema import SCHEMA
-from runtime.warden.verbs import VERBS
+from runtime.warden.verbs import VERBS, VERDICTS
 
 INTAKE = "intake"
 SLOT_API = "mcp__slot-api__slot_api"
 TESTER, CRITIC = "qa-", "critic-"
 # Claude Code's own timeouts when a call names none, in milliseconds.
 _TIMED_TOOLS = {"Bash": ("timeout", 120_000), "Monitor": ("timeout_ms", 300_000)}
-TIME_UP = "your time is up: report what you have"
+REPORT = "record what you found with `factory qa finding`, run `factory qa result`, then hand back"
+_REPORTS = frozenset({"qa.finding", "qa.result"})
 
 
 def check_slot_session(call: Call) -> Decision:
@@ -97,8 +99,7 @@ def _browsers(call: Call, kind: str) -> Decision:
         return None
     alive = {sid for sid, s in call.sessions.items() if s.state in ("working", "waiting")}
     # No tester runs past its items' time and a lost hand-back's quiet: an older row holds no browser, whatever it says.
-    longest = call.settings.get_int("qa.max_items") * call.settings.get_int("qa.seconds_per_item")
-    longest += call.settings.get_int("qa.stale_seconds")
+    longest = _budget(call, call.settings.get_int("qa.max_items")) + call.settings.get_int("qa.stale_seconds")
     running = [s for s in call.sessions.values() if s.parent in alive and s.state == "working" and s.role in personas
                and (call.now - _when(s.started)).total_seconds() < longest]  # fmt: skip
     cap = call.settings.get_int("caps.browsers_at_once")
@@ -163,7 +164,7 @@ def _running(call: Call, agent: transcript.AgentCall) -> bool:
     if agent.subagent_type.startswith(TESTER):
         try:
             items = transcript.declared_items(agent.prompt, call.settings.get_int("qa.max_items"))
-            budget = items * call.settings.get_int("qa.seconds_per_item")
+            budget = _budget(call, items)
         # telemetry: expected — a tester started with no brief, while that rule was off, has no time budget
         except transcript.BriefError:
             budget = 0
@@ -274,14 +275,15 @@ def check_send(call: Call) -> Decision:
 
 
 def check_tester_time(call: Call) -> Decision:
-    """A tester's own calls: refused once its time per scenario is spent, or its desktop time once it drives the
-    remote desktop; shell and browser waits cut to the time left. Its hand-back always goes: that is how it reports."""
+    """A tester's own calls: refused once its time is spent, or its desktop time once it drives the remote desktop;
+    shell and browser waits cut to the time left. Its report always goes: a file in its scratch folder, `factory qa
+    finding`, `factory qa result` and its hand-back."""
     tester = call.in_subagent and call.agent_type.startswith(TESTER)
     if not tester or call.tool == HANDBACK or call.off("tester-time"):
         return None
     left = _time_left(call)
     if isinstance(left, Refusal):
-        return left
+        return None if _reports(call) else left
     timed = _TIMED_TOOLS.get(call.tool)
     if timed is None:
         return browser.cap_wait(call, left)
@@ -292,6 +294,18 @@ def check_tester_time(call: Call) -> Decision:
     if call.tool == "Bash":
         updated["run_in_background"] = False
     return Rewrite(updated) if updated != call.tool_input else None
+
+
+def _reports(call: Call) -> bool:
+    if call.tool == "Write":
+        return scratch.in_scratch(call, resolve(str(call.tool_input.get("file_path", "")), call.cwd, call.home))
+    words = factory_calls.plain_words(str(call.tool_input.get("command", ""))) if call.tool == "Bash" else None
+    return words is not None and factory_calls.verb_of(words) in _REPORTS
+
+
+def _budget(call: Call, items: int) -> int:
+    """A tester's seconds: its start-up once, then each item's."""
+    return call.settings.get_int("qa.setup_seconds") + items * call.settings.get_int("qa.seconds_per_item")
 
 
 def check_intake_time(call: Call) -> Decision:
@@ -320,16 +334,20 @@ def _time_left(call: Call) -> float | Refusal:
     try:
         brief, started = transcript.first_brief(path)
         items = transcript.declared_items(brief, call.settings.get_int("qa.max_items"))
-    # telemetry: surfaced — the `Refusal` tells the tester to report what it has
+    # telemetry: surfaced — `_time_up` tells the tester to report what it has
     except transcript.BriefError as exc:
-        return Refusal("tester-time", f"your time budget cannot be read ({exc}); report what you have")
-    budget = float(items * call.settings.get_int("qa.seconds_per_item"))
+        return _time_up(call, f"your time budget cannot be read ({exc})")
+    budget = float(_budget(call, items))
     desktop_s = call.settings.get_int("qa.desktop_seconds")
     spent = (call.now - started).total_seconds()
     # Desktop time is a tester's that holds a slot's desktop lease: a mouse step on a web page is no desktop use.
     if call.agent_id in read_desktops(call.places).values():
         if spent >= desktop_s:
-            return Refusal("tester-time", f"the remote desktop is for a tester's first {desktop_s} s; report what you "
-                                          "have")  # fmt: skip
+            return _time_up(call, f"the remote desktop is for a tester's first {desktop_s} s")
         budget = min(budget, desktop_s)
-    return budget - spent if budget > spent else Refusal("tester-time", TIME_UP)
+    return budget - spent if budget > spent else _time_up(call, "your time is up")
+
+
+def _time_up(call: Call, why: str) -> Refusal:
+    """A tester that records a verdict reports through `factory`; the others hand their report back."""
+    return Refusal("tester-time", f"{why}: {REPORT if call.agent_type in VERDICTS else 'hand back your report now'}")

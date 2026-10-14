@@ -32,10 +32,14 @@ def _rule(call: Call) -> str:
     return "subagent-writes" if call.in_subagent else "orchestrator-writes"
 
 
+def in_scratch(call: Call, path: Path) -> bool:
+    return inside(Path(os.path.realpath(path)), Path(os.path.realpath(call.worktree)) / SCRATCH)
+
+
 def _refused_at(call: Call, path: Path) -> Refusal | None:
     """A write to ``path`` inside a checkout of the product, outside the session's scratch folder."""
     real = Path(os.path.realpath(path))
-    if inside(real, Path(os.path.realpath(call.worktree)) / SCRATCH):
+    if in_scratch(call, real):
         return None
     if not any(inside(real, root) for root in writes.product_roots(call)):
         return None

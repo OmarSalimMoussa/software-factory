@@ -19,7 +19,11 @@ UI_TESTER = {"agent_id": TESTER_ID, "agent_type": "qa-ui-function"}
 def kit(tmp_path: Path) -> Kit:
     made = Kit(tmp_path)
     made.session("implementer")
-    made.settings(dashboard__hosts=["127.0.0.1", "localhost", "laptop.tail1.ts.net"])
+    made.settings(
+        dashboard__hosts=["127.0.0.1", "localhost", "laptop.tail1.ts.net"],
+        qa__setup_seconds=60,
+        qa__seconds_per_item=120,
+    )
     made.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=10), "user", "Scenarios and checks: 5")])
     return made
 
@@ -96,5 +100,5 @@ def test_a_browser_wait_is_cut_to_the_testers_time_left(
     kit: Kit, tool: str, field: str, long: float, short: float, unit: int
 ) -> None:
     decision = kit.decide("mcp__qa-browser__" + tool, {"text": "Ready", field: long}, **UI_TESTER)
-    assert isinstance(decision, Rewrite) and 0 < decision.updated_input[field] * unit <= 5 * 120 - 10
+    assert isinstance(decision, Rewrite) and 5 * 120 - 10 < decision.updated_input[field] * unit <= 60 + 5 * 120 - 10
     assert kit.decide("mcp__qa-browser__" + tool, {"text": "Ready", field: short}, **UI_TESTER) is None

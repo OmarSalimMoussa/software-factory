@@ -57,6 +57,7 @@ SCHEMA: dict[str, Spec] = {
     "rounds.check_runs": Spec("int", 1, 6),
     "rounds.extend_by": Spec("int", 1, 4),
     "qa.seconds_per_item": Spec("int", 30, 600),
+    "qa.setup_seconds": Spec("int", 0, 600),
     "qa.max_items": Spec("int", 1, 20),
     "qa.prod_every_hours": Spec("int", 1, 168),
     "qa.desktop_seconds": Spec("int", 60, 900),
