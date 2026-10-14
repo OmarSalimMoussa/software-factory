@@ -2,14 +2,16 @@
 
 factory.toml loads and names a ghcr.io registry; the two workflows are the factory's templates, byte for byte (read
 from the factory this check runs in, so a product is held to that commit's copy); ``.github/factory-ref`` pins the
-factory; every hook factory.toml names is tracked and executable; the build plan can be made (images, their order and
-build args); every built service runs the image CI builds for the commit; the smoke test reaches built services; the
-deploy files are tracked and hold compose.yml, the env template and every relative bind mount; every product image a
-tracked file names is built; every [env.set] key is in the env template; and every published port binds 127.0.0.1.
+factory; every hook factory.toml names is tracked and executable; the build plan can be made, and each image's ignore
+file leaves out .claude folders; every built service runs the image CI builds for the commit; the smoke test reaches
+built services; the deploy files are tracked and hold compose.yml, the env template and every relative bind mount;
+every product image a tracked file names is built; every [env.set] key is in the env template; and every published
+port binds 127.0.0.1.
 """
 
 from __future__ import annotations
 
+import posixpath
 import re
 from pathlib import Path
 from typing import Any
@@ -34,6 +36,8 @@ WORKFLOWS = ("ci.yml", PROMOTE_WORKFLOW)
 REGISTRY = "ghcr.io/"
 LOOPBACK = "127.0.0.1"
 _ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
+LEFT_OUT = "**/.claude"
+_WILDCARD = re.compile(r"[*?\[]")
 
 
 def _first_difference(mine: bytes, template: bytes) -> int:
@@ -85,10 +89,12 @@ def hook_problems(repo: Repo, config: Config) -> list[str]:
 def image_problems(repo: Repo, config: Config, compose: Compose) -> list[str]:
     out: list[str] = []
     try:
-        plan_mod.images(repo.root, config, compose, "0" * plan_mod.SHORT)
+        images = plan_mod.images(repo.root, config, compose, "0" * plan_mod.SHORT)
     # telemetry: surfaced — the build plan's problems go into `out`, which the check reports
     except plan_mod.PlanError as exc:
         out += [f"the build plan cannot be made: {p}" for p in exc.problems]
+    else:
+        out += ignore_problems(repo, images)
     # The env file names the commit's tag; on the server it is the tag of the images CI pushed.
     tags = [key for key, value in config.env.set if value == "{commit}"]
     for service in compose.built():
@@ -147,6 +153,33 @@ def env_problems(repo: Repo, config: Config) -> list[str]:
     keys = {m.group(1) for line in repo.read(template).splitlines() if (m := _ENV_LINE.match(line))}
     return [f"[env.set] writes {key}, which {template} does not list: add a {key}= line to it"
             for key, _ in config.env.set if key not in keys]  # fmt: skip
+
+
+def ignore_problems(repo: Repo, images: tuple[plan_mod.Image, ...]) -> list[str]:
+    """Each image's ignore file: the Dockerfile's own, else its context's, as Docker picks it."""
+    built: dict[str, list[str]] = {}
+    for image in images:
+        own = f"{image.dockerfile}.dockerignore"
+        ignore = own if own in repo.tracked else posixpath.normpath(posixpath.join(image.context, ".dockerignore"))
+        built.setdefault(ignore, []).append(image.name)
+    out = []
+    for ignore, names in built.items():
+        fails = (
+            f"so the build of {', '.join(names)} reads the agents' .claude folders and fails on the ones it cannot read"
+        )
+        if ignore not in repo.tracked:
+            out.append(f"{ignore} is missing (or not committed), {fails}: add it with the line {LEFT_OUT}")
+            continue
+        lines = [line.strip() for line in repo.read(ignore).splitlines()]
+        if LEFT_OUT not in {line.rstrip("/") for line in lines}:
+            out.append(f"{ignore} does not leave out {LEFT_OUT}, {fails}: add the line {LEFT_OUT}")
+        out += [
+            f"{ignore} lets {line} back in, and a wildcard or .claude there makes Docker look inside .claude folders, "
+            f"{fails}: name each file or folder to keep in full"
+            for line in lines
+            if line.startswith("!") and (_WILDCARD.search(line) or ".claude" in line)
+        ]
+    return out
 
 
 def port_problems(compose: Compose) -> list[str]:

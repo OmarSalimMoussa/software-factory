@@ -58,6 +58,9 @@ deploy. Each hook is committed and executable.
   image. One level only: a base image never builds from a third.
 - **Build arguments are literals**, or name `[build].commit_arg` or `[build].tag_arg`, which CI fills with the
   commit. CI has no product env to fill anything else.
+- **Every image leaves out `**/.claude`** in its ignore file: the Dockerfile's own `<Dockerfile>.dockerignore` when
+  it has one, else its context's `.dockerignore`. Agents' worktrees live there, and Claude Code leaves folders there
+  that the user building the slots cannot read.
 - **Every published port binds 127.0.0.1.** The edge is the only way in.
 - **A service that uses the shared services** (Postgres, Langfuse, GlitchTip) joins the external network named
   `${FACTORY_SERVICES_NETWORK}`, which the factory creates for each workspace and slot.

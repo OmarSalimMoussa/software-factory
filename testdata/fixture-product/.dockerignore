@@ -1,0 +1,3 @@
+# The image needs only the app; caches and agents' folders stay out.
+**/__pycache__
+**/.claude
