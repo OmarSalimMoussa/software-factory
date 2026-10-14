@@ -12,6 +12,7 @@ import pytest
 from guard_kit import NOW, TESTER_ID, Kit, agent_use, bash_use, entry, result
 
 from runtime.guard.facts import Refusal, Rewrite
+from runtime.guard.subagents import SLOT_API
 from runtime.shared import store
 
 TESTER = {"agent_id": TESTER_ID, "agent_type": "qa-backend"}
@@ -198,6 +199,16 @@ def test_a_testers_time_runs_out_and_its_shell_timeouts_are_cut_but_its_report_g
     kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=130), "user", "Scenarios and checks: 1")])
     assert kit.rule("Read", {"file_path": "/x"}, **TESTER) == "tester-time"
     assert kit.decide("SubagentHandback", {"message": "2 of 3"}, **TESTER) is None
+
+
+def test_a_testers_slot_api_session_carries_its_id_and_the_implementers_keeps_its_name(tmp_path: Path) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
+    asked = {"method": "GET", "path": "/me", "session": "ada@notes.test"}
+    tester = kit.decide(SLOT_API, asked, **TESTER)
+    assert isinstance(tester, Rewrite) and tester.updated_input["session"] == f"ada@notes.test.{TESTER_ID}"
+    assert kit.decide(SLOT_API, asked) is None
 
 
 @pytest.mark.parametrize(

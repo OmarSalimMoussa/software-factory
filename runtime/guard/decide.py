@@ -131,6 +131,7 @@ _BY_TOOL: dict[str, Callable[[Call], Decision]] = {
     "Monitor": commands.check_bash,
     "Agent": subagents.check_agent,
     "SendMessage": subagents.check_send,
+    subagents.SLOT_API: subagents.check_slot_session,
 }
 
 

@@ -102,7 +102,7 @@ def read_launcher(path: Path) -> tuple[str, dict[str, Any]]:
     """One launcher as --agents takes it: its name, and its front matter's fields with its body as the prompt.
 
     Launchers use a small part of YAML: plain or quoted values, lists of plain items, and mcpServers' list of
-    one-key maps. Anything else raises ValueError naming the file and line.
+    one-key maps and names. Anything else raises ValueError naming the file and line.
     """
     lines = path.read_text().split("\n")
     heads = [n for n, line in enumerate(lines) if line.strip() == "---"]

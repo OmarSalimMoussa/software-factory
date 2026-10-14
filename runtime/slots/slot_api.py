@@ -29,7 +29,7 @@ METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD")
 PATH = re.compile(r"^/[\x21-\x7e]*$")
 HEADER_NAME = re.compile(r"^[A-Za-z0-9-]{1,64}$")
 BLOCKED_HEADERS = frozenset({"host", "connection", "transfer-encoding", "content-length", "proxy-authorization"})
-SESSION = re.compile(r"^[A-Za-z0-9@._+-]{1,128}$")
+SESSION = re.compile(r"^[A-Za-z0-9@._+-]{1,200}$")
 TOOL = {
     "name": "slot_api",
     "description": "Send one HTTP request to your own stack slot's API and read the answer.",

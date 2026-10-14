@@ -31,10 +31,19 @@ from runtime.shared.settings_schema import SCHEMA
 from runtime.warden.verbs import VERBS
 
 INTAKE = "intake"
+SLOT_API = "mcp__slot-api__slot_api"
 TESTER, CRITIC = "qa-", "critic-"
 # Claude Code's own timeouts when a call names none, in milliseconds.
 _TIMED_TOOLS = {"Bash": ("timeout", 120_000), "Monitor": ("timeout_ms", 300_000)}
 TIME_UP = "your time is up: report what you have"
+
+
+def check_slot_session(call: Call) -> Decision:
+    """A subagent's slot-api session carries its id, so no tester ends another's session of the same name."""
+    name = call.tool_input.get("session")
+    if not call.in_subagent or not isinstance(name, str) or not name:
+        return None
+    return Rewrite({**call.tool_input, "session": f"{name}.{call.agent_id}"})
 
 
 def check_agent(call: Call) -> Decision:

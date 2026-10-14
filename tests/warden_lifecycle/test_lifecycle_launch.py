@@ -55,12 +55,16 @@ def test_a_session_gets_its_role_agents_with_their_tool_servers(world: World) ->
     lifecycle.start(world.ctx(), {"role": "implementer", "task": "t-0001"}, None)
     request = world.launcher.started[0][1]
     agents = json.loads(request["agents"])
-    servers = {name: [next(iter(s.values()))["args"] for s in a.get("mcpServers", [])] for name, a in agents.items()}
-    # The UI testers drive their own browser; the API testers and the implementer reach the slot's API.
+    servers = {
+        name: [s if isinstance(s, str) else next(iter(s.values()))["args"] for s in a.get("mcpServers", [])]
+        for name, a in agents.items()
+    }
+    # The UI testers drive their own browser. The implementer reaches the slot's API, and its API testers through its
+    # own server: a copy of their own would share its process and close it when they finish.
     assert servers == {
         "implementer": [["slot-api"]],
-        "qa-backend": [["slot-api"]],
-        "qa-security": [["slot-api"]],
+        "qa-backend": ["slot-api"],
+        "qa-security": ["slot-api"],
         "qa-ui-function": [["qa-browser", "qa-ui-function"]],
         "qa-ux": [["qa-browser", "qa-ux"]],
         "qa-visual": [["qa-browser", "qa-visual"]],
