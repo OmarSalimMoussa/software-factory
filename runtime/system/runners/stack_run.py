@@ -96,6 +96,26 @@ def prune(hours: str, timeout: int) -> int:
     return 1 if status else 0
 
 
+def events(since: str, until: str, timeout: int) -> int:
+    if not (since.isdigit() and until.isdigit()):
+        print("events: name the span in whole seconds since the epoch", flush=True)
+        return lf.REFUSED
+    span = ["--since", since, "--until", until, "--format", "{{json .}}", "--filter", "type=container"]
+    wanted = [word for event in ("kill", "die", "oom") for word in ("--filter", f"event={event}")]
+    done = _docker(["events", *span, "--filter", f"label={SLOT_LABEL}", *wanted], timeout)
+    if done.returncode != 0:
+        print(f"events: docker events failed: {done.stderr.strip()[-300:]}", flush=True)
+        return 1
+    for line in done.stdout.splitlines():
+        raw = json.loads(line)
+        actor = raw["Actor"]
+        attributes = actor.get("Attributes", {})
+        print(json.dumps({"action": raw["Action"], "at": raw["timeNano"], "id": actor["ID"][:12],
+                          "name": attributes.get("name", ""), "slot": attributes.get(SLOT_LABEL, ""),
+                          "exit": attributes.get("exitCode", "")}), flush=True)  # fmt: skip
+    return 0
+
+
 def size_bytes(text: str) -> int:
     found = _SIZE.match(text.strip())
     if found is None:
@@ -165,6 +185,20 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
     return 0
 
 
+def _own_verb(slot: int, verb: list[str], timeout: int) -> int | None:
+    """The exit of one of the stack unit's own verbs; None for a product verb."""
+    if verb[0] == lf.SWEEP:
+        return sweep(slot, timeout)
+    if verb[0] == lf.PRUNE:
+        return prune(verb[1] if len(verb) == 2 else "", timeout)
+    if verb[0] == lf.DISK:
+        return disk(timeout)
+    if verb[0] == lf.EVENTS:
+        since, until = verb[1:3] if len(verb) == 3 else ("", "")
+        return events(since, until, timeout)
+    return None
+
+
 def main(argv: list[str]) -> int:
     state, request_id = Path(argv[0]), argv[1]
     try:
@@ -172,12 +206,9 @@ def main(argv: list[str]) -> int:
         settings, sessions = lf.published(state)
         slot, verb, session = lf.stack_parts(raw, settings)
         timeout = settings.get_int("slots.verb_minutes") * 60
-        if verb[0] == lf.SWEEP:
-            return sweep(slot, timeout)
-        if verb[0] == lf.PRUNE:
-            return prune(verb[1] if len(verb) == 2 else "", timeout)
-        if verb[0] == lf.DISK:
-            return disk(timeout)
+        own = _own_verb(slot, verb, timeout)
+        if own is not None:
+            return own
         checkout = lf.checkout_for(session, settings, sessions)
     # telemetry: surfaced — the refusal is `print`ed to the unit's log, and the exit says it was refused
     except lf.BadRequest as exc:

@@ -37,8 +37,8 @@ _CHECK_WORD = re.compile(r"^[a-z0-9][a-z0-9,-]{0,511}$")
 # The verbs of the product's scripts/dev (factory spec, "scripts/dev"; plan R24 for reports).
 # The product's tests run in the check unit (`factory check`), never on a slot.
 DEV_VERBS = frozenset({"up", "down", "empty", "health", "sign-in", "seed", "desktop", "reports", "verbs"})
-SWEEP, PRUNE, DISK = leases.SWEEP, "factory-prune", "factory-disk"
-OWN_VERBS = frozenset({SWEEP, PRUNE, DISK})
+SWEEP, PRUNE, DISK, EVENTS = leases.SWEEP, leases.PRUNE, leases.DISK, leases.EVENTS
+OWN_VERBS = frozenset({SWEEP, PRUNE, DISK, EVENTS})
 _INSTALL = Path(__file__).resolve().parents[3]  # the runner runs from the install it belongs to
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 _SESSION_REF = re.compile(r"^[0-9a-f][0-9a-f-]{5,35}$")  # a short id or a uuid, as `claude stop`, `rm`, `respawn` take

@@ -57,8 +57,14 @@ def _email(value: object) -> str:
     return value
 
 
-def _answer(n: int, result: StackResult) -> dict[str, Any]:
-    return ok(slot=n, exit=result.exit, tail=result.tail)
+def _answer(ctx: Context, n: int, result: StackResult) -> dict[str, Any]:
+    """The verb's exit and output; a failure soon after the laptop woke says so, since its network may have lagged."""
+    woke = store.read_json_or(ctx.places.woke, None) if result.exit != 0 else None
+    minutes = int(ctx.clock.age(woke["at"]) // 60) if woke is not None else None
+    if minutes is None or minutes >= ctx.settings().get_int("slots.wake_note_minutes"):
+        return ok(slot=n, exit=result.exit, tail=result.tail)
+    note = f"this machine woke from sleep {minutes} min ago: if this failed reaching the network, try it again"
+    return ok(slot=n, exit=result.exit, tail=result.tail, note=note)
 
 
 def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
@@ -91,7 +97,7 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     if op == "desktop":
         _desktop_lease(ctx, n, verb)
     result = ctx.launcher.run_stack(n, verb, session.id)
-    return _answer(n, result)
+    return _answer(ctx, n, result)
 
 
 def _desktops(ctx: Context) -> dict[str, str]:

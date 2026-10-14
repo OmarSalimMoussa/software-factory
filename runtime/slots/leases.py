@@ -19,9 +19,11 @@ from runtime.shared.settings import Settings
 from runtime.warden.context import Context
 
 KEYS = ("holder", "since", "note")
-# The stack unit's own verb, beside the product's scripts/dev verbs: remove every container, volume, network and
-# image labelled with the request's slot, and every container still on one of its networks.
-SWEEP = "factory-sweep-slot"
+# The stack unit's own verbs, beside the product's scripts/dev verbs. SWEEP removes every container, volume, network
+# and image labelled with the request's slot, and every container still on one of its networks. PRUNE <hours> removes
+# the build cache and the images no container uses that are older than that; DISK prints the bytes Docker's data
+# takes, alone on its last line. EVENTS <since> <until> prints each slot container's kill, death and out-of-memory.
+SWEEP, PRUNE, DISK, EVENTS = "factory-sweep-slot", "factory-prune", "factory-disk", "factory-events"
 
 
 @dataclass(frozen=True, slots=True)

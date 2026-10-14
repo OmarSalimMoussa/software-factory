@@ -1,7 +1,8 @@
 """Pause the alerts before the laptop sleeps (the system-sleep hook, as root) or the warden stops (as the warden).
 
-Run as ``/usr/bin/python3 -I <install>/runtime/system/pause_checks.py pre|post|stop``. Waking (``post``) needs
-nothing: the next check-in resumes a paused check. ``stop`` is the warden's ExecStopPost, which systemd runs after
+Run as ``/usr/bin/python3 -I <install>/runtime/system/pause_checks.py pre|post|stop``. Waking (``post``) only
+notes when: the next check-in resumes a paused check, and a slot command that fails soon after says the machine just
+woke. ``stop`` is the warden's ExecStopPost, which systemd runs after
 every exit, crashes included: only a stop someone asked for pauses, so a warden that crashes and restarts keeps the
 alerts on and the owner hears of it. Stdlib only.
 """
@@ -9,12 +10,13 @@ alerts on and the owner hears of it. Stdlib only.
 from __future__ import annotations
 
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 # `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from runtime.shared import environment, settings
+from runtime.shared import environment, settings, store
 from runtime.shared.paths import Places
 from runtime.system import healthchecks
 
@@ -24,8 +26,10 @@ PAUSING = ("pre", "stop")
 CLEAN = "success"
 
 
-def main(argv: list[str], result: str | None) -> int:
+def main(argv: list[str], result: str | None, places: Places) -> int:
     """``result`` is systemd's word for how the warden ended, when it stopped; None when systemd gave none."""
+    if argv[:1] == ["post"]:
+        store.write_json(places.woke, {"at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")}, mode=0o644)
     if not argv or argv[0] not in PAUSING:
         return 0
     if argv[0] == "stop" and result != CLEAN:
@@ -33,7 +37,6 @@ def main(argv: list[str], result: str | None) -> int:
         print(f"pause_checks: the warden ended by {cause}, not a stop; "
               "the alerts stay on", file=sys.stderr)  # fmt: skip
         return 0
-    places = Places.system()
     try:
         effective = settings.load(places.defaults, places.overrides)
     except settings.SettingsError as exc:
@@ -46,4 +49,4 @@ def main(argv: list[str], result: str | None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:], environment.systemd_result()))
+    sys.exit(main(sys.argv[1:], environment.systemd_result(), Places.system()))

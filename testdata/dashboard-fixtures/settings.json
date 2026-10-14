@@ -1047,6 +1047,22 @@
       "when": "At once"
      },
      {
+      "key": "watch.container_events_minutes",
+      "label": "Minutes between checks for slot containers that stopped",
+      "control": "number",
+      "value": 5,
+      "saved": 5,
+      "default": 5,
+      "applied": 5,
+      "pending": null,
+      "low": 1,
+      "high": 60,
+      "step": 1,
+      "hint": "From 1 to 60.",
+      "options": null,
+      "when": "At once"
+     },
+     {
       "key": "watch.outage_after",
       "label": "Failed prod probes in a row that mean an outage",
       "control": "number",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from queue_kit import World
 
+from runtime.shared import store
 from runtime.shared.models import RETIRED
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
@@ -65,6 +66,25 @@ def test_only_checked_words_reach_scripts_dev(world: World, args: dict[str, obje
     with pytest.raises(Refused):
         slot(world.ctx("implementer", "s-1", agent_id), args, None)
     assert world.launcher.stacks == []
+
+
+@pytest.mark.parametrize(
+    ("exit_code", "woke", "noted"),
+    [(1, "2026-10-09T11:55:00Z", True), (1, "2026-10-09T11:00:00Z", False), (0, "2026-10-09T11:55:00Z", False)],
+    ids=["failed-after-a-wake", "failed-long-after", "worked"],
+)
+def test_a_slot_command_that_fails_soon_after_the_laptop_wakes_says_so(
+    world: World, exit_code: int, woke: str, noted: bool
+) -> None:
+    _implementer(world, 1)
+    slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)
+    store.write_json(world.places.woke, {"at": woke})
+    world.launcher.stack = lambda n, verb: StackResult(exit_code, "Failed to resolve 'pypi.org'\n", "/log")
+
+    answer = slot(world.ctx("implementer", "s-1"), {"op": "up"}, None)
+
+    # A build cut off by the laptop's sleep read as a factory DNS fault, and was reported as one.
+    assert ("woke from sleep 5 min ago" in answer.get("note", "")) is noted
 
 
 def test_the_orchestrator_frees_only_a_finished_sessions_slot(world: World) -> None:

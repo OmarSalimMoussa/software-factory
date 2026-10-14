@@ -15,15 +15,12 @@ from pathlib import Path
 
 from runtime.shared import store
 from runtime.shared.paths import Places
+from runtime.slots import leases
 from runtime.warden.context import Context
 from runtime.warden.owner import reflections
 
 log = logging.getLogger("factory.warden")
 
-# The stack unit's own verbs, beside the product's scripts/dev verbs. PRUNE <hours> removes the build cache and the
-# images no container uses that are older than that; DISK prints the bytes Docker's data takes, alone on its last line.
-PRUNE = "factory-prune"
-DISK = "factory-disk"
 # A slot number for the stack unit's request; the prune and the reading are not about any one slot.
 _NO_SLOT = 0
 _SESSION = "gc"
@@ -53,7 +50,7 @@ def prune_evidence(places: Places, now: float, days: int) -> int:
 
 
 def _disk(ctx: Context) -> int | None:
-    done = ctx.launcher.run_stack(_NO_SLOT, [DISK], _SESSION)
+    done = ctx.launcher.run_stack(_NO_SLOT, [leases.DISK], _SESSION)
     last = (done.tail.strip().splitlines() or [""])[-1].strip()
     if done.exit != 0 or not last.isdigit():
         log.warning("warden: the Docker disk reading failed (exit %d)", done.exit)
@@ -69,7 +66,7 @@ def prune(ctx: Context) -> int | None:
     used: int | None = None
     # Old images first; over the budget after that, every unused image.
     for hours in (settings.get_int("gc.images_keep_days") * 24, 0):
-        done = ctx.launcher.run_stack(_NO_SLOT, [PRUNE, str(hours)], _SESSION)
+        done = ctx.launcher.run_stack(_NO_SLOT, [leases.PRUNE, str(hours)], _SESSION)
         if done.exit != 0:
             log.warning("warden: the Docker prune failed (exit %d)", done.exit)
         used = _disk(ctx)

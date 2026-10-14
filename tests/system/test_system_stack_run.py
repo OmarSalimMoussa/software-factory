@@ -11,6 +11,7 @@ import pytest
 from system_fakes import FIXTURE, settings
 
 from runtime.shared.paths import Places
+from runtime.system.runners import launch_file as lf
 from runtime.system.runners import stack_run
 from standard import envfile
 from standard.services import provision
@@ -140,3 +141,28 @@ def test_the_sweep_removes_the_containers_still_on_a_slots_network_before_the_ne
     assert status == 0
     assert removals == ["container rm -f c-web", "container rm -f agent-7 agent-8", "network rm n-slot2"]
     assert "removed 2 container(s) still on slot 2's network n-slot2: agent-7, agent-8" in capsys.readouterr().out
+
+
+def test_the_events_verb_prints_each_slot_containers_stop_as_one_line(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seen = {
+        "Action": "die",
+        "timeNano": 1791000000000000000,
+        "Actor": {"ID": "0123456789abcdef", "Attributes": {"name": "web", "software.slot": "2", "exitCode": "137"}},
+    }
+    asked: list[list[str]] = []
+
+    def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+        asked.append(args)
+        return subprocess.CompletedProcess(args, 0, json.dumps(seen) + "\n", "")
+
+    monkeypatch.setattr(stack_run, "_docker", docker)
+
+    assert stack_run.events("1791000000", "1791000300", 30) == 0
+    assert stack_run.events("yesterday", "1791000300", 30) == lf.REFUSED
+
+    printed = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.startswith("{")]
+    assert printed == [{"action": "die", "at": 1791000000000000000, "id": "0123456789ab", "name": "web", "slot": "2",
+                        "exit": "137"}]  # fmt: skip
+    assert asked[0][:5] == ["events", "--since", "1791000000", "--until", "1791000300"] and len(asked) == 1

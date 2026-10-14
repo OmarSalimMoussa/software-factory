@@ -112,6 +112,7 @@ SCHEMA: dict[str, Spec] = {
     "slots.count": Spec("int", 1, 6, when="At the next slot claim"),
     "slots.port_base": Spec("int", 1024, 65000, when=NEXT_START),
     "slots.log_tail_lines": Spec("int", 0, 500),
+    "slots.wake_note_minutes": Spec("int", 0, 120),
     "slots.api_timeout_seconds": Spec("int", 1, 300),  # contract: one slot API or health call
     "slots.api_max_kib": Spec("int", 16, 8192),  # contract: the largest slot API answer a session sees
     "slots.verb_minutes": Spec("int", 1, 240),  # contract: added by builder 3, one scripts/dev verb
@@ -140,6 +141,7 @@ SCHEMA: dict[str, Spec] = {
     "watch.daemon_settle_seconds": Spec("int", 0, 300),
     "watch.bench_grace_seconds": Spec("int", 10, 300),
     "watch.bench_min_run_minutes": Spec("int", 0, 240),
+    "watch.container_events_minutes": Spec("int", 1, 60),
     "watch.reap_retry_minutes": Spec("int", 1, 1440),
     "watch.start_grace_seconds": Spec("int", 30, 600),  # contract: a start's process must appear within this
     "watch.respawn_poll_seconds": Spec("int", 1, 30),
