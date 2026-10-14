@@ -70,6 +70,7 @@ def kit(tmp_path: Path) -> Kit:
         ("set -a; GIT_CONFIG_COUNT=1; git commit -m x", "git-bypass"),
         ("git push origin HEAD:main", "git-bypass"),
         ("git -C . push origin HEAD:main", "git-bypass"),
+        ("git --attr-source HEAD push origin HEAD:main", "git-bypass"),
         ("git push --no-verify origin HEAD:main", "git-bypass"),
         ("while true; do git push origin HEAD:main; done", "git-bypass"),
         ("git send-pack origin HEAD:main", "git-bypass"),

@@ -23,6 +23,11 @@ from runtime.guard.facts import read_settings
 from runtime.guard.writes import is_protected, protected_paths
 from runtime.shared.paths import INSTALL, SLICE, Places
 
+UNNAMED = (
+    "commit-check: git asks before it records the branch this merges, so the merge turn is checked when the merge is "
+    "committed; the merge is staged: finish it with `git commit --no-edit`"
+)
+
 
 class HookError(Exception):
     """What the hook must read cannot be read; the commit is refused with the reason."""
@@ -147,7 +152,9 @@ def main(argv: list[str]) -> int:
         if hook == "pre-push" or branch != default or not merging:
             return 0
         if in_slice:
-            turn = turn_refusal(Places.system(), _git("rev-parse", "MERGE_HEAD").strip())
+            # pre-merge-commit runs before git records MERGE_HEAD; refused, the merge stays staged for `git commit`.
+            head = _optional_git("rev-parse", "-q", "--verify", "MERGE_HEAD")
+            turn = turn_refusal(Places.system(), head) if head else UNNAMED
             if turn:
                 print(turn, file=sys.stderr)
                 return 1

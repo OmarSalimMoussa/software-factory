@@ -71,6 +71,22 @@ def test_the_orchestrator_leaves_finished_branches_to_the_warden(kit: Kit) -> No
 
 
 @pytest.mark.parametrize(
+    ("command", "merges"),
+    [
+        ("git merge --no-ff --no-commit impl-a", True),
+        ("git merge --ff-only --no-ff impl-a", True),
+        ("git merge impl-a", False),
+        ("git merge --no-ff --ff impl-a", False),  # git takes the last: a fast-forward, which no hook sees
+        ("git merge --no-ff --ff-o impl-a", False),  # and any start of a flag it can tell apart
+        ("git --attr-source HEAD merge impl-a", False),
+    ],
+)
+def test_the_orchestrator_merges_only_with_a_merge_commit(kit: Kit, command: str, merges: bool) -> None:
+    kit.session("orchestrator", worktree=kit.repo)
+    assert (kit.bash(command, cwd=str(kit.repo)) is None) is merges
+
+
+@pytest.mark.parametrize(
     ("command", "rule"),
     [
         ("gh workflow run deploy-prod.yml", "prod-frozen"),

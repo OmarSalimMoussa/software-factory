@@ -8,10 +8,11 @@ from runtime.guard import shell
 from runtime.guard.facts import ORCHESTRATOR, Call, Decision, Refusal
 
 # git's own options that come before the subcommand and take a value as the next word (`git -C <dir> log`).
-GIT_VALUED = frozenset({"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"})
+GIT_VALUED = frozenset({"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--attr-source"})
 READS = frozenset({"status", "log", "diff", "show", "branch", "rev-parse", "remote", "ls-files", "blame"})
 # Commands that move a branch without a merge commit, so no merge hook runs; an implementer rebases its own branch.
 _REWRITES = frozenset({"cherry-pick", "rebase", "pull", "am"})
+_FAST_FORWARDS = ("--ff", "--ff-only", "--no-ff")
 # Configuration that runs a command or loads more configuration, given with `git -c`.
 _RUNS_CODE = ("alias.", "include.", "includeif.", "core.hookspath", "core.fsmonitor", "core.sshcommand")
 # git commit's flags whose value is the next word, which is never a flag of its own (`-m -n` is a message).
@@ -86,7 +87,9 @@ def _push(call: Call, args: list[str], sub: str, rest: list[str]) -> str:
 def _merge(call: Call, args: list[str], sub: str, rest: list[str]) -> str:
     if sub != "merge" or call.role != ORCHESTRATOR or {"--abort", "--continue", "--quit"} & set(rest):
         return ""
-    return "" if "--no-ff" in rest else "merge with --no-ff, so each task lands as one merge commit"
+    # git takes the last of these, or any start of one (`--ff-o`): a later one fast-forwards with no hook run.
+    last = [word for word in rest if len(word) > 2 and any(flag.startswith(word) for flag in _FAST_FORWARDS)][-1:]
+    return "" if last == ["--no-ff"] else "merge with --no-ff, so each task lands as one merge commit"
 
 
 def _default_branch(call: Call, args: list[str], sub: str, rest: list[str]) -> str:

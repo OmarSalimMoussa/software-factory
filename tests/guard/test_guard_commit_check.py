@@ -5,16 +5,28 @@ again."""
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
+from guard_kit import Kit
 
-from runtime.guard.commit_check import HookError, is_factory_repo, passed, refusal, turn_refusal
+from runtime.guard.commit_check import UNNAMED, HookError, is_factory_repo, passed, refusal, turn_refusal
 from runtime.guard.writes import ALWAYS_PROTECTED
 from runtime.shared import store
 from runtime.shared.paths import INSTALL, Places
 
 HOOKS = Path(__file__).resolve().parents[2] / "checks" / "git-hooks"
+# The hook as the factory's slice runs it, with this test's warden files.
+_IN_SLICE = """import sys
+from pathlib import Path
+sys.path.insert(0, {root!r})
+from runtime.guard import commit_check
+from runtime.shared.paths import Places
+commit_check._in_slice = lambda: True
+commit_check.Places.system = classmethod(lambda cls: Places.under(Path({state!r})))
+sys.exit(commit_check.main(sys.argv[1:]))
+"""
 
 
 @pytest.mark.parametrize(
@@ -105,3 +117,53 @@ def test_only_the_branch_holding_the_merge_turn_merges(tmp_path: Path, monkeypat
     store.write_json(places.public_turn, {"task": "t-0001", "branch": "impl-a"})
     assert turn_refusal(places, heads["impl-a"]) == ""
     assert "only impl-a" in turn_refusal(places, heads["impl-b"])
+
+
+_STAGED = [["merge", "--no-ff", "--no-commit", "impl-a"], ["commit", "-m", "Merge impl-a: it works"]]
+_AT_ONCE = [["merge", "--no-ff", "impl-a", "-m", "Merge impl-a: it works"], ["commit", "--no-edit"]]
+
+
+@pytest.mark.parametrize(
+    ("commands", "turn", "passed", "said"),
+    [
+        (_STAGED, "impl-a", True, None),
+        (_AT_ONCE, "impl-a", True, None),
+        (_STAGED, "impl-b", True, "only impl-b, which holds the merge turn"),
+        (_STAGED, "impl-a", False, "never passed `factory check`"),
+    ],
+    ids=["staged-then-committed", "at-once-then-finished", "another-branchs-turn", "a-tree-that-never-passed"],
+)
+def test_inside_the_slice_a_merge_is_checked_when_it_is_committed(
+    tmp_path: Path, commands: list[list[str]], turn: str, passed: bool, said: str | None
+) -> None:
+    kit = Kit(tmp_path / "factory")
+    repo = tmp_path / "repo"
+    git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+    for name, branch in (("a.txt", ""), ("b.txt", "impl-a")):
+        if branch:
+            subprocess.run([*git, "checkout", "-q", "-b", branch], check=True)
+        (repo / name).write_text(name)
+        subprocess.run([*git, "add", name], check=True)
+        subprocess.run([*git, "commit", "-q", "-m", name], check=True)
+    subprocess.run([*git, "checkout", "-q", "main"], check=True)
+    wrapper = tmp_path / "hook.py"
+    wrapper.write_text(_IN_SLICE.format(root=str(HOOKS.parents[1]), state=str(kit.root)))
+    hooks = tmp_path / "hooks"
+    hooks.mkdir()
+    for hook in ("pre-commit", "pre-merge-commit"):
+        (hooks / hook).write_text(f'#!/bin/sh\nexec {sys.executable} {wrapper} "$(basename "$0")"\n')
+        (hooks / hook).chmod(0o755)
+    subprocess.run([*git, "config", "core.hooksPath", str(hooks)], check=True)
+    head = subprocess.run([*git, "rev-parse", "impl-a"], capture_output=True, text=True, check=True).stdout.strip()
+    tree = subprocess.run([*git, "rev-parse", "impl-a^{tree}"], capture_output=True, text=True, check=True).stdout
+    store.write_json(kit.places.public_turn, {"task": "t-0001", "branch": turn})
+    store.write_json(kit.places.public_check_passes, {"trees": [tree.strip()] if passed else []})
+
+    first, second = (subprocess.run([*git, *args], capture_output=True, text=True, check=False) for args in commands)
+
+    # git asks pre-merge-commit before it records MERGE_HEAD: a merge that commits at once is told how to finish.
+    assert (first.returncode, UNNAMED in first.stderr) == ((1, True) if commands is _AT_ONCE else (0, False))
+    assert (second.returncode == 0, said is None or said in second.stderr) == (said is None, True), second.stderr
+    parents = subprocess.run([*git, "rev-list", "--parents", "-n1", "main"], capture_output=True, text=True, check=True)
+    assert (head in parents.stdout.split()[1:]) is (said is None)
