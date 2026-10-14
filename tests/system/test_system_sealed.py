@@ -95,9 +95,9 @@ def test_a_command_the_installer_starts_sees_only_what_it_declares(
         account = host.account(me)
         assert account is not None
         declared = {**user_env(account), "GIT_DIR": "/srv/repo"}
-        # env -i: nothing of root's environment reaches the user's command, the installer's own variables included.
-        assert argv == ["runuser", "-u", me, "--", "env", "-i", *(f"{k}={v}" for k, v in declared.items()),
-                        "git", "status"]  # fmt: skip
+        # env -i -C /: nothing of root's environment reaches the user's command, nor the folder the install began in.
+        assert argv == ["runuser", "-u", me, "--", "env", "-i", "-C", "/",
+                        *(f"{k}={v}" for k, v in declared.items()), "git", "status"]  # fmt: skip
     else:
         assert argv == ["git", "status"] and env["GIT_DIR"] == "/srv/repo"
 

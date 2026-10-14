@@ -30,7 +30,9 @@ class RealHost(Host):
     def __init__(self, journal: Journal | None = None) -> None:
         self.journal = journal or Journal()
 
-    def _spawn(self, argv: list[str], user: str, env: Mapping[str, str] | None) -> tuple[list[str], dict[str, str]]:
+    def _spawn(
+        self, argv: list[str], user: str, env: Mapping[str, str] | None, cwd: Path | None = None
+    ) -> tuple[list[str], dict[str, str]]:
         """The command line and the environment it starts with: as root, this process's own with the fixed PATH; as
         another user, ``runuser`` starts it with only what ``as_user`` declares."""
         root = {**environment.handed_on(), "PATH": layout.ROOT_PATH}
@@ -39,7 +41,7 @@ class RealHost(Host):
         account = self.account(user)
         if account is None:
             raise CommandError(argv, -1, f"there is no user {user}")
-        return as_user(account, argv, env), root
+        return as_user(account, argv, env, cwd), root
 
     @staticmethod
     def _started(command: list[str], **how: Any) -> subprocess.CompletedProcess[str]:
@@ -56,7 +58,7 @@ class RealHost(Host):
         self, argv: list[str], *, user: str = "", cwd: Path | None = None, stdin: str | None = None,
         env: Mapping[str, str] | None = None, timeout: float | None = None,
     ) -> str:  # fmt: skip
-        command, child_env = self._spawn(argv, user, env)
+        command, child_env = self._spawn(argv, user, env, cwd)
         began = time.monotonic()
         # Without input of its own, a command reads nothing: never the owner's terminal.
         feed: dict[str, Any] = {"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}
@@ -74,7 +76,7 @@ class RealHost(Host):
 
     def query(self, argv: list[str], *, user: str = "", cwd: Path | None = None) -> tuple[int, str]:
         try:
-            command, child_env = self._spawn(argv, user, None)
+            command, child_env = self._spawn(argv, user, None, cwd)
         # telemetry: expected — a user the install has not made yet, as a dry run on a new machine finds
         except CommandError as exc:
             self.journal.command(shown(argv), user, exc.code, exc.output, 0)

@@ -163,11 +163,13 @@ class Host(ABC):
         """Whether the owner did what ``text`` asks (``yes``), or chose ``no``."""
 
 
-def as_user(account: Account, argv: list[str], env: Mapping[str, str] | None) -> list[str]:
-    """``argv`` run by root as ``account``, with that user's home, runtime folder and session bus."""
+def as_user(account: Account, argv: list[str], env: Mapping[str, str] | None, cwd: Path | None = None) -> list[str]:
+    """``argv`` run by root as ``account`` in ``cwd`` or /, with the user's home, runtime folder and session bus."""
     merged = {**user_env(account), **(env or {})}
-    # -i: nothing of root's environment reaches the user's command, the install's own variables included.
-    return ["runuser", "-u", account.name, "--", "env", "-i", *(f"{k}={v}" for k, v in merged.items()), *argv]
+    # -i: nothing of root's environment reaches the user's command, the install's own variables included. -C: never the
+    # folder the install was started in, which may be one the user cannot enter; find -exec fails going back to it.
+    return ["runuser", "-u", account.name, "--", "env", "-i", "-C", str(cwd or "/"),
+            *(f"{k}={v}" for k, v in merged.items()), *argv]  # fmt: skip
 
 
 def user_env(account: Account) -> dict[str, str]:
