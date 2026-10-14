@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from runtime.shared import store
+from runtime.shared import lanes, store
 from runtime.shared.paths import Places, stored_signin
 from runtime.shared.settings import Settings
 
@@ -153,4 +153,20 @@ def agents(settings: Settings, places: Places, role: str, model: str, effort: st
         if unrendered:
             raise ValueError(f"{path}: {', '.join(unrendered)} not rendered from the settings")
         found[name] = definition
+        found |= _lanes(settings, path, name, definition)
+    return found
+
+
+def _lanes(settings: Settings, path: Path, kind: str, definition: dict[str, Any]) -> dict[str, Any]:
+    """A browser tester's lanes after the first: its definition, starting its browser under the lane's name."""
+    extra = lanes.names(settings, kind)[1:]
+    servers = definition.get("mcpServers", [])
+    at = [n for n, server in enumerate(servers) if isinstance(server, dict) and lanes.BROWSER in server]
+    if extra and (len(at) != 1 or servers[at[0]][lanes.BROWSER].get("args") != [lanes.BROWSER, kind]):
+        raise ValueError(f'{path}: a browser tester starts one {lanes.BROWSER} with ["{lanes.BROWSER}", "{kind}"]')
+    found: dict[str, Any] = {}
+    for lane in extra:
+        copy = json.loads(json.dumps(definition))
+        copy["mcpServers"][at[0]][lanes.BROWSER]["args"] = [lanes.BROWSER, lane]
+        found[lane] = copy
     return found

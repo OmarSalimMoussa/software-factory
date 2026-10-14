@@ -121,6 +121,20 @@ def test_qa_clean_waits_for_every_required_tester_on_the_head(ready_world: World
     assert world.queue().task("t-0001").status == "qa-clean"
 
 
+def test_qa_clean_waits_for_a_second_tester_of_a_kind_still_testing(ready_world: World) -> None:
+    world, impl = ready_world, ready_world.ctx("implementer", IMPL_ID)
+    world.session("ag-ux2", "qa-ux", "impl-t-0001.qa-ux-ab12cd", "t-0001", agent_id="ag-ux2", parent=IMPL_ID)
+    qa.qa_ready(impl, {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
+    for agent in ("ag-ux", "ag-vis", "ag-fn", "ag-be"):
+        _result(world, agent)
+
+    # Its kind has a verdict from the first tester: the second, in its own browser lane, has not given its own.
+    with pytest.raises(Refused, match="impl-t-0001.qa-ux-ab12cd still testing"):
+        qa.qa_clean(impl, {}, None)
+    _result(world, "ag-ux2")
+    qa.qa_clean(impl, {}, None)
+
+
 def _no_answer(url: str, timeout: int, limit: int) -> bytes:
     raise ConnectionRefusedError("refused")
 

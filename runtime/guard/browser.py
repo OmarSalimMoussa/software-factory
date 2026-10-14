@@ -15,8 +15,9 @@ from runtime.guard import shell
 from runtime.guard.facts import Call, Decision, Refusal, Rewrite, inside, public, resolve
 from runtime.qa.wrapper import SERVER_CODE
 from runtime.qa.wrapper_tools import WAIT_UNTIL
+from runtime.shared import lanes
 
-BROWSER = "mcp__qa-browser__"
+BROWSER = f"mcp__{lanes.BROWSER}__"
 CHROME = "mcp__claude-in-chrome__"
 # The remote desktop is a video in the tester's browser, so a click at a point is a desktop step; a web page is
 # driven by its element references.

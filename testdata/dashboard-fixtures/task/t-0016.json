@@ -80,7 +80,7 @@
      "tone": "good",
      "note": null,
      "shots": [],
-     "replay": null
+     "replays": []
     }
    ],
    "empty": "A small backend fix runs no testers."

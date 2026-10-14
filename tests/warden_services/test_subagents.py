@@ -21,6 +21,16 @@ def _caller(session: str) -> Caller:
     return Caller(kind="agent", session=session, role=IMPL, uid=1000, pid=1)
 
 
+def test_a_browser_lane_registers_as_its_kind_and_keeps_the_lane_it_started_as(doors: Doors, places: Places) -> None:
+    registry.write(places, {"s-a": _session("s-a")})
+    ctx = doors.context(_caller("s-a"))
+
+    subagents.started(ctx, {"agent_id": "a1b2c3", "kind": "qa-ux-2"}, None)
+
+    row = registry.read(places)["a1b2c3"]
+    assert (row.role, row.started_as, row.model) == ("qa-ux", "qa-ux-2", ctx.settings().model("qa_ux")[0])
+
+
 def test_a_subagent_id_is_honoured_only_from_its_parent_and_never_once_retired(doors: Doors, places: Places) -> None:
     registry.write(places, {"s-a": _session("s-a"), "s-b": _session("s-b")})
     subagents.started(doors.context(_caller("s-a")), {"agent_id": "a1b2c3", "kind": "qa-ux"}, None)

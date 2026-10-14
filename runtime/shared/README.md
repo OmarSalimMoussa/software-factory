@@ -1,5 +1,5 @@
 # Shared
 
 What every part of the factory shares: its records, its settings, where things live, the wire format between the
-command, the dashboard and the warden, safe file writes, the one order of tasks, the Claude accounts, six-digit codes
-and the factory's own error reports.
+command, the dashboard and the warden, safe file writes, the one order of tasks, the Claude accounts, six-digit codes,
+the factory's own error reports, and the browser lanes that give testers of one kind a browser each.

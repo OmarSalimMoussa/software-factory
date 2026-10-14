@@ -26,7 +26,7 @@ from typing import Any
 
 from runtime.qa import wrapper
 from runtime.qa.wrapper_tools import TOOLS, ToolError, Tools, first_link
-from runtime.shared import environment, store
+from runtime.shared import environment, lanes, store
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import AGENT_USER, Places
 from runtime.shared.settings import Settings
@@ -111,14 +111,14 @@ def prune(root: Path, days: int, now: datetime) -> None:
 
 def prepare(role: str, session_id: str, root: Path, settings: Settings, now: datetime) -> Path:
     """The run's folder, with who ran it and Playwright's settings written in it; returns the settings file."""
-    if role not in settings.get_list("subagents.browser_personas"):
+    if lanes.kind_of(role) not in settings.get_list("subagents.browser_personas"):
         raise BrowserError(f"{role!r} is not a tester with a browser")
     prune(root, settings.get_int("qa.evidence_days"), now)
     folder = run_folder(root, session_id, now)
     meta = {"role": role, "session_id": session_id, "started": now.strftime("%Y-%m-%dT%H:%M:%SZ")}
     (folder / "run.json").write_text(json.dumps(meta), encoding="utf-8")
     config = folder / "playwright.json"
-    config.write_text(json.dumps(playwright_settings(folder, role, settings)), encoding="utf-8")
+    config.write_text(json.dumps(playwright_settings(folder, lanes.kind_of(role), settings)), encoding="utf-8")
     return config
 
 

@@ -235,7 +235,7 @@ def qa_result(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
         else (f"{counts['blockers']} blockers, {counts['majors']} majors")
     )
     doing.record(ctx.places, ctx.caller.agent_id, verdict=verdict)
-    taken = evidence.intake(ctx, qa_browser.runs_root(), session.id, session.task, full, tester.role,
+    taken = evidence.intake(ctx, qa_browser.runs_root(), session.id, session.task, full, tester.started_as,
                             ctx.caller.agent_id, str(records[-1]["at"]))  # fmt: skip
     return ok(head=full, tester=tester.role, evidence=taken, **counts)
 
@@ -252,8 +252,13 @@ def qa_clean(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
         raise Refused("qa-clean", f"your head moved past {head[:9]}: run qa-ready on it and test it again")
     task = tasks.read(ctx, session.task)
     latest: dict[str, str] = {}  # each tester's newest head with a verdict
+    reported: set[str] = set()
     for result in store.read_jsonl(_results_path(ctx, session)):
         latest[str(result["tester"])] = str(result["head"])
+        reported |= {str(result["agent"])} if result["head"] == head else set()
+    # Two testers of one kind may test at once, each in its own browser lane: one's verdict is not the other's.
+    testers = [s for s in registry.read(ctx.places).values() if s.parent == session.id and s.role.startswith("qa-")]
+    testing = sorted(s.name for s in testers if s.state != RETIRED and s.agent_id not in reported)
     missing: list[str] = []
     open_: list[str] = []
     for tester in records[-1].get("testers", []):
@@ -262,8 +267,10 @@ def qa_clean(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
             missing.append(tester)
         elif findings.open_count(ctx, task.id, tested, tester):
             open_.append(tester)
-    said = ([f"no result from {', '.join(missing)} on what changed since it tested"] if missing else []) + (
-        [f"open blockers or majors from {', '.join(open_)}"] if open_ else []
+    said = (
+        ([f"no result from {', '.join(missing)} on what changed since it tested"] if missing else [])
+        + ([f"open blockers or majors from {', '.join(open_)}"] if open_ else [])
+        + ([f"{', '.join(testing)} still testing: wait for its report"] if testing else [])
     )
     if said:
         raise Refused("qa-clean", f"not clean on {head[:9]}: {'; '.join(said)}")

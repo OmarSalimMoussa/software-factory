@@ -125,7 +125,9 @@ class World:
     def write_raw(self, rel: str, text: str) -> None:
         self.queue().files.write(rel, text.encode())
 
-    def session(self, sid: str, role: str, name: str, task: str = "", worktree: str = "", agent_id: str = "") -> None:
+    def session(
+        self, sid: str, role: str, name: str, task: str = "", worktree: str = "", agent_id: str = "", parent: str = ""
+    ) -> None:
         sessions = registry.read(self.places)
         sessions[sid] = Session(
             sid,
@@ -135,12 +137,13 @@ class World:
             "m",
             "high",
             task,
-            "",
+            parent,
             worktree,
             "working",
             "2026-10-09T12:00:00Z",
             "orchestrator",
             agent_id=agent_id,
+            started_as=role if agent_id else "",
         )
         registry.write(self.places, sessions)
 

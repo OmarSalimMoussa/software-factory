@@ -11,6 +11,7 @@ import dataclasses
 import re
 from typing import Any
 
+from runtime.shared import lanes
 from runtime.shared.models import RETIRED, WORKING, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
@@ -48,12 +49,13 @@ def started(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str,
             raise Refused("session", "only a live session the warden started registers a subagent")
         if agent_id in sessions:
             return ok(session=agent_id)
-        model, effort = _model(ctx, kind)
+        role = lanes.kind_of(kind)
+        model, effort = _model(ctx, role)
         now = ctx.clock.iso()
         sessions[agent_id] = Session(
-            id=agent_id, name=f"{parent.name}.{kind}-{agent_id[:6]}", role=kind, family=family_of(kind, parent.family),
+            id=agent_id, name=f"{parent.name}.{role}-{agent_id[:6]}", role=role, family=family_of(role, parent.family),
             model=model, effort=effort, task=parent.task, parent=parent.id, worktree=parent.worktree,
-            state=WORKING, started=now, started_by=parent.id, agent_id=agent_id, since=now,
+            state=WORKING, started=now, started_by=parent.id, agent_id=agent_id, started_as=kind, since=now,
         )  # fmt: skip
         registry.write(ctx.places, sessions)
     return ok(session=agent_id)

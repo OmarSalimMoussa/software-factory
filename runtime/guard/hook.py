@@ -122,7 +122,7 @@ def _run(payload: dict[str, object], event: object, places: Places, home: Path, 
         if call.in_subagent and call.session is not None and call.agent_id not in call.sessions:
             # Its start was never registered (the warden was busy or down then): every factory call it makes would
             # be refused, so the guard registers it again on each of its calls until the warden holds it.
-            said = report_subagent({"agent_id": call.agent_id, "agent_type": call.agent_type}, "SubagentStart", places)
+            said = report_subagent(call.payload, "SubagentStart", places)
             if said:
                 print(said, file=sys.stderr)
         decision = decide.decide_tool(call)

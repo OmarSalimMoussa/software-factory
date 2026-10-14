@@ -24,11 +24,11 @@ from pathlib import Path
 from typing import IO, Any
 
 from runtime.cli import commands
-from runtime.shared import protocol
+from runtime.shared import lanes, protocol
 from runtime.shared.models import SEVERITIES
 from runtime.shared.paths import Places, stored_signin
 
-LOCAL = ("qa-browser", "slot-api")
+LOCAL = (lanes.BROWSER, "slot-api")
 UNREACHABLE = 3
 
 
@@ -311,7 +311,7 @@ def show(answer: dict[str, Any], out: IO[str], err: IO[str]) -> int:
 
 
 def _local(argv: list[str], places: Places) -> int:
-    if argv[0] == "qa-browser":
+    if argv[0] == lanes.BROWSER:
         from runtime.qa import browser_check, qa_browser
 
         if argv[1:2] == [browser_check.FLAG]:

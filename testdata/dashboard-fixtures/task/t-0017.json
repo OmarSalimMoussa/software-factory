@@ -86,7 +86,12 @@
      "shots": [
       "/api/evidence/t-0017/page.svg"
      ],
-     "replay": null
+     "replays": [
+      {
+       "label": "Replay",
+       "url": "/api/replay?task=t-0017&head=eeeeeeeeeeee&tester=qa-ui-function&run=20261009T120000Z-abc123"
+      }
+     ]
     },
     {
      "name": "qa-ux",
@@ -95,7 +100,7 @@
      "tone": "good",
      "note": null,
      "shots": [],
-     "replay": null
+     "replays": []
     },
     {
      "name": "qa-visual",
@@ -106,7 +111,7 @@
      "shots": [
       "/api/evidence/t-0017/phone.svg"
      ],
-     "replay": null
+     "replays": []
     },
     {
      "name": "qa-security",
@@ -115,7 +120,7 @@
      "tone": "good",
      "note": null,
      "shots": [],
-     "replay": null
+     "replays": []
     }
    ],
    "empty": "Testers start once every slice is built."

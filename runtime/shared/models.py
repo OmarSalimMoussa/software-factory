@@ -95,6 +95,7 @@ class Session:
     rung: int | None = None
     chat_link: str = ""
     agent_id: str = ""  # a subagent's id in its parent's transcript
+    started_as: str = ""  # a subagent's type as started: its role, or a browser lane of it (shared/lanes.py)
     # contract: when the session entered its state; the bench grace and a pending start's grace count from it.
     since: str = ""
     extensions: dict[str, int] = field(default_factory=dict)

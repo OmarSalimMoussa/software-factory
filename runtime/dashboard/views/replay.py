@@ -210,8 +210,10 @@ def _beat(beat: dict[str, Any], frames: list[dict[str, Any]], base: str) -> dict
     return out
 
 
-def tester_runs(task_id: str, head: str, evidence: list[dict[str, Any]]) -> dict[str, str]:
-    """Each tester's last run on ``head``, as the address of its replay page."""
-    return {
-        str(e["tester"]): url(task_id, head, str(e["tester"]), str(e["run"])) for e in evidence if e["head"] == head
-    }
+def tester_runs(task_id: str, head: str, evidence: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """Each tester kind's runs on ``head``, one per tester of the kind, as the addresses of their replay pages."""
+    runs: dict[str, list[str]] = {}
+    for e in evidence:
+        if e["head"] == head:
+            runs.setdefault(str(e["tester"]), []).append(url(task_id, head, str(e["tester"]), str(e["run"])))
+    return runs

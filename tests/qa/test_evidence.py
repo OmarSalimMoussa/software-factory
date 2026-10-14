@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from queue_kit import World
 
-from runtime.qa import evidence
+from runtime.qa import evidence, qa_browser
 
 SESSION = "0b6f1c3e-1d2a-4c5b-9e8f-7a6b5c4d3e2f"
 HEAD = "c" * 40
@@ -36,3 +37,14 @@ def test_a_testers_runs_are_copied_without_following_links_or_a_replay_and_taken
     assert not (target / "secret").exists() and not (target / "replay").exists()
     assert world.launcher.commands == [["rm", "-rf", "--", str(run)]]
     assert evidence.intake(world.ctx(), runs, SESSION, "t-0001", HEAD, "qa-ux", "ag-ux", "2026-10-09T12:00:00Z") == []
+
+
+def test_two_testers_of_one_kind_at_once_each_take_only_their_own_lanes_run(world: World, tmp_path: Path) -> None:
+    runs, at = tmp_path / "runs", datetime(2026, 10, 9, 12, 5, tzinfo=UTC)
+    first, second = (qa_browser.prepare(lane, SESSION, runs, world.ctx().settings(), at).parent for lane in
+                     ("qa-ux", "qa-ux-2"))  # fmt: skip
+
+    taken = evidence.intake(world.ctx(), runs, SESSION, "t-0001", HEAD, "qa-ux-2", "ag-2", "2026-10-09T12:00:00Z")
+
+    assert taken == [second.name] and first.is_dir()
+    assert (world.places.evidence / "t-0001" / HEAD[:12] / "qa-ux" / second.name / "run.json").is_file()

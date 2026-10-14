@@ -59,16 +59,16 @@ def test_a_session_gets_its_role_agents_with_their_tool_servers(world: World) ->
         name: [s if isinstance(s, str) else next(iter(s.values()))["args"] for s in a.get("mcpServers", [])]
         for name, a in agents.items()
     }
-    # The UI testers drive their own browser. The implementer reaches the slot's API, and its API testers through its
-    # own server: a copy of their own would share its process and close it when they finish.
+    # The UI testers drive their own browser, each lane its own: two definitions alike would share one browser. The
+    # implementer reaches the slot's API, and its API testers through its own server, for the same reason.
+    lanes = ["", *(f"-{n}" for n in range(2, world.settings.get_int("caps.browsers_at_once") + 1))]
     assert servers == {
         "implementer": [["slot-api"]],
         "qa-backend": ["slot-api"],
         "qa-security": ["slot-api"],
-        "qa-ui-function": [["qa-browser", "qa-ui-function"]],
-        "qa-ux": [["qa-browser", "qa-ux"]],
-        "qa-visual": [["qa-browser", "qa-visual"]],
-    }
+        **{f"{kind}{lane}": [["qa-browser", f"{kind}{lane}"]] for kind in ("qa-ui-function", "qa-ux", "qa-visual")
+           for lane in lanes},
+    }  # fmt: skip
     assert (agents["implementer"]["model"], agents["implementer"]["effort"]) == (request["model"], request["effort"])
     assert launch.session_argv(request)[-2:] == [
         "--",

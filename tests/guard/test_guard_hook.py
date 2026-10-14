@@ -127,8 +127,9 @@ def test_a_subagent_the_warden_never_registered_is_registered_again_on_its_calls
         warden = threading.Thread(target=answer)
         warden.start()
         payload = {"hook_event_name": "PreToolUse", "session_id": SID, "agent_id": TESTER_ID,
-                   "agent_type": "qa-ux", "tool_name": "Read", "tool_input": {"file_path": "/x"}}  # fmt: skip
+                   "agent_type": "qa-ux-2", "tool_name": "Read", "tool_input": {"file_path": "/x"}}  # fmt: skip
         _handle(kit, payload)
         warden.join(5)
 
-    assert [(a["verb"], a["args"]) for a in asked] == [("subagent.start", {"agent_id": TESTER_ID, "kind": "qa-ux"})]
+    # The lane goes as started, so the tester's evidence is its own lane's runs.
+    assert [(a["verb"], a["args"]) for a in asked] == [("subagent.start", {"agent_id": TESTER_ID, "kind": "qa-ux-2"})]

@@ -14,8 +14,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from runtime.shared import lanes, store
 from runtime.shared import settings as settings_module
-from runtime.shared import store
 from runtime.shared.models import PENDING, RETIRED
 from runtime.shared.paths import Places
 from runtime.shared.settings import Settings
@@ -191,7 +191,7 @@ class Call:
 
     @property
     def agent_type(self) -> str:
-        return str(self.payload.get("agent_type") or "")
+        return lanes.kind_of(str(self.payload.get("agent_type") or ""))
 
     @property
     def in_subagent(self) -> bool:

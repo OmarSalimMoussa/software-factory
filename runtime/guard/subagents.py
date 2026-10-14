@@ -26,6 +26,7 @@ from runtime.guard.facts import (
     resolve,
 )
 from runtime.guard.wire import HANDBACK, REFUSED
+from runtime.shared import lanes
 from runtime.shared.models import RETIRED, WITH_PARENT
 from runtime.shared.settings import model_role
 from runtime.shared.settings_schema import SCHEMA
@@ -51,7 +52,7 @@ def check_slot_session(call: Call) -> Decision:
 def check_agent(call: Call) -> Decision:
     """A subagent start: its kind and model, the number running, a tester's brief, readiness and rounds; then its
     brief gains the factory's notes on calling factory and on when to reflect, as its kind may."""
-    kind = str(call.tool_input.get("subagent_type") or "general-purpose")
+    kind = lanes.kind_of(_started_as(call))
     current = str(call.payload.get("tool_use_id", ""))
     refused = transcript.refused_ids(call.transcript, REFUSED)
     found = transcript.agent_calls(call.transcript)
@@ -59,7 +60,7 @@ def check_agent(call: Call) -> Decision:
     # Starts sent in one message are all in the transcript at the first one's hook: only those before this one count.
     earlier = found[: ids.index(current)] if current in ids else found
     calls = [c for c in earlier if c.tool_use_id not in refused]
-    for rule in (_kind, _model, _at_once, _brief, _qa, _critic_rounds):
+    for rule in (_kind, _lane, _model, _at_once, _brief, _qa, _critic_rounds):
         decision = rule(call, kind, calls)
         if decision is not None:
             return decision
@@ -73,9 +74,27 @@ def _kind(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
         return Refusal("subagent-kinds", "a subagent starts no agents of its own; report to your parent")
     key = f"subagents.{call.role}"
     allowed = call.settings.get_list(key) if key in SCHEMA else []
-    if kind not in allowed:
-        return Refusal("subagent-kinds", f"the {call.role} may start {', '.join(allowed) or 'no subagent'}, not {kind}")
+    name = _started_as(call)
+    if kind not in allowed or name not in lanes.names(call.settings, kind):
+        return Refusal("subagent-kinds", f"the {call.role} may start {', '.join(allowed) or 'no subagent'}, not {name}")
     return None
+
+
+def _started_as(call: Call) -> str:
+    return str(call.tool_input.get("subagent_type") or "general-purpose")
+
+
+def _lane(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
+    """Two testers in one browser lane would share its browser, and the first to finish would close it on the other."""
+    name = _started_as(call)
+    if call.off("subagents-at-once") or kind not in call.settings.get_list("subagents.browser_personas"):
+        return None
+    taken = {c.subagent_type for c in calls if _running(call, c)}
+    if name not in taken:
+        return None
+    free = [lane for lane in lanes.names(call.settings, kind) if lane not in taken]
+    then = f"start it as {free[0]}" if free else "wait for one to report"
+    return Refusal("subagents-at-once", f"a {name} is running and its browser is that tester's; {then}")
 
 
 def _model(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:

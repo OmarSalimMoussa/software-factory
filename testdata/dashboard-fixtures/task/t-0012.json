@@ -84,7 +84,7 @@
      "tone": "good",
      "note": null,
      "shots": [],
-     "replay": null
+     "replays": []
     }
    ],
    "empty": "Testers start once every slice is built."

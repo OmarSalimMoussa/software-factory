@@ -119,11 +119,12 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    `git commit -m "Merge <branch>: <the outcome in one line>"`. The commit's hook lets only the branch holding the
    turn land, with the pass for its tree. The warden finds the merge and records it.
 3. **Check.** Rebuild slot 0 with what the merge touched (`factory slot up [service…]`). Pick the scenarios whose
-   `protects` names a path the merge changed (`git diff --name-only <merge>^1 <merge>`), the one that waited
-   longest, and the merged spec's own checks. Load the seeds they need (`factory slot seed load <name>`). Start the
-   `qa-regression` testers at once, the scenarios split between them, each signed in as its own test address. A
-   check of slot 0's health is read in the tester's browser: no tester's shell reaches a slot. Save each tester's
-   report to a file and run `factory queue check <merge sha> --body <that file>`.
+   `protects` names a path the merge changed (`git diff --name-only <merge>^1 <merge>`), the one that waited longest,
+   and the merged spec's own checks. Load the seeds they need (`factory slot seed load <name>`). Start the
+   `qa-regression` testers at once, the scenarios split between them, each signed in as its own test address. Start
+   each in its own lane, `qa-regression`, then `qa-regression-2` and on: two in one lane share one browser, and the
+   first to finish closes it. A check of slot 0's health is read in the tester's browser: no tester's shell reaches a
+   slot. Save each tester's report to a file and run `factory queue check <merge sha> --body <that file>`.
 4. **A failure** reverts the merge only when that merge is the one change to the scenario's code since its last
    pass: `git revert -m 1 <merge> --no-edit`, then `factory queue task status <task> building --note "<why>; reverted
    as <the revert's sha>"`. The warden tells its implementer, or starts a new one once it has ended. Any other

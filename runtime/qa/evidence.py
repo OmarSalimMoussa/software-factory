@@ -19,11 +19,11 @@ from typing import Any
 
 from runtime.qa.qa_browser import RUN, SESSION
 from runtime.qa.replay.build import FOLDER as REPLAY
-from runtime.shared import store
+from runtime.shared import lanes, store
 from runtime.shared.paths import Places
 from runtime.warden.context import Context
 
-TESTER = re.compile(r"^qa-[a-z-]+$")
+TESTER = re.compile(r"^qa-[a-z0-9-]+$")
 
 
 def index_path(places: Places) -> Path:
@@ -64,11 +64,12 @@ def _copy_tree(source: Path, target: Path) -> list[str]:
 
 
 def intake(
-    ctx: Context, runs: Path, session_id: str, task: str, head: str, tester: str, agent: str, since: str
+    ctx: Context, runs: Path, session_id: str, task: str, head: str, started_as: str, agent: str, since: str
 ) -> list[str]:
-    """Take every run of ``tester`` (the subagent ``agent``) in the session since ``since``; the runs taken."""
-    if not SESSION.match(session_id) or not TESTER.match(tester):
+    """Take the runs the subagent ``agent``, started as ``started_as``, made in the session since ``since``."""
+    if not SESSION.match(session_id) or not TESTER.match(started_as):
         raise ValueError("evidence is taken for a Claude Code session and a tester kind")
+    tester = lanes.kind_of(started_as)
     taken = {(e["session"], e["run"]) for e in store.read_jsonl(index_path(ctx.places))}
     found: list[str] = []
     folder = runs / session_id
@@ -76,7 +77,7 @@ def intake(
         if not RUN.match(run.name) or run.is_symlink() or (session_id, run.name) in taken:
             continue
         meta = _meta(run)
-        if meta.get("role") != tester or str(meta.get("started", "")) < since:
+        if meta.get("role") != started_as or str(meta.get("started", "")) < since:
             continue
         target = ctx.places.evidence / task / head[:12] / tester / run.name
         files = _copy_tree(run, target)

@@ -34,15 +34,18 @@ def spec_id(task_id: str) -> str:
     return "s-" + task_id.removeprefix("t-")
 
 
-def _latest_round(snap: Snap, task_id: str) -> tuple[str, list[str], dict[str, dict[str, Any]], list[str]]:
-    """The head of the last ready record, its testers, each tester's last result on it, and its screenshots: the
+def _latest_round(snap: Snap, task_id: str) -> tuple[str, list[str], dict[str, list[dict[str, Any]]], list[str]]:
+    """The head of the last ready record, its testers, each tester kind's results on it, and its screenshots: the
     pictures at the top of each run, never its replay's frames."""
     qa = snap.get("qa").get(task_id, {"ready": [], "results": [], "evidence": []})
     if not qa["ready"]:
         return "", [], {}, []
     last = qa["ready"][-1]
     head = str(last["head"])
-    results = {str(r["tester"]): r for r in qa["results"] if r["head"] == head}
+    results: dict[str, list[dict[str, Any]]] = {}
+    for r in qa["results"]:
+        if r["head"] == head:
+            results.setdefault(str(r["tester"]), []).append(r)
     files = []
     for entry in qa["evidence"]:
         if entry["head"] == head:
@@ -56,25 +59,31 @@ def _shots(files: list[str], tester: str) -> list[str]:
     return [line.split("\t", 1)[1] for line in files if line.split("\t", 1)[0] == tester]
 
 
+def _replays(urls: list[str]) -> list[dict[str, str]]:
+    """A button per tester of a kind: the runs of two in their own lanes read Replay 1 and Replay 2."""
+    return [{"label": "Replay" if len(urls) == 1 else f"Replay {n}", "url": url} for n, url in enumerate(urls, 1)]
+
+
 def testers(snap: Snap, task: dict[str, Any]) -> dict[str, Any]:
     settings = snap.settings
     # The testers a round needs are the warden's, from the task and its diff, recorded when QA was readied.
     head, names, results, files = _latest_round(snap, task["id"])
     runs = replay.tester_runs(task["id"], head, snap.get("qa")[task["id"]]["evidence"]) if head else {}
     worker = taskwords.worker(snap, task["id"])
-    live = {
+    reported = {r["agent"] for kind in results.values() for r in kind}
+    testing = {
         s["role"]
         for s in snap.get("sessions").values()
-        if worker and s["parent"] == worker["id"] and s["state"] != RETIRED
+        if worker and s["parent"] == worker["id"] and s["state"] != RETIRED and s["agent_id"] not in reported
     }
     rows = []
     for name in names:
-        result = results.get(name)
-        if result is None:
-            state, tone, note = ("running", "accent", None) if name in live else ("waiting", "", None)
-        elif any(result[f"{s}s"] for s in OPEN_SEVERITIES):
+        found = {s: sum(r[f"{s}s"] for r in results.get(name, [])) for s in OPEN_SEVERITIES}
+        if name in testing or name not in results:
+            state, tone, note = ("running", "accent", None) if name in testing else ("waiting", "", None)
+        elif any(found.values()):
             state, tone = "fail", "bad"
-            note = ", ".join(plural(result[f"{s}s"], s) for s in OPEN_SEVERITIES)
+            note = ", ".join(plural(found[s], s) for s in OPEN_SEVERITIES)
         else:
             state, tone, note = "pass", "good", None
         model = settings.model(name.replace("-", "_"))[0]
@@ -86,7 +95,7 @@ def testers(snap: Snap, task: dict[str, Any]) -> dict[str, Any]:
                 "tone": tone,
                 "note": note,
                 "shots": _shots(files, name),
-                "replay": runs.get(name),
+                "replays": _replays(runs.get(name, [])),
             }
         )
     if not head:
@@ -128,14 +137,14 @@ def built_from(snap: Snap, task: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def qa_line(names: list[str], results: dict[str, dict[str, Any]], files: list[str]) -> dict[str, Any]:
+def qa_line(names: list[str], results: dict[str, list[dict[str, Any]]], files: list[str]) -> dict[str, Any]:
     """What a fix's testers found on its last round: each UI tester's screenshots with their verdicts, or one line."""
     if not names:
         return {"tone": None, "note": "No testers: a small backend fix is covered by its own tests.", "shots": []}
     if set(names) & set(UI_TESTERS):
-        shots = [_shot(t, u, _verdict(results.get(t))) for t in names for u in _shots(files, t)]
+        shots = [_shot(t, u, _verdict(results.get(t, []))) for t in names for u in _shots(files, t)]
         return {"tone": None, "note": None, "shots": shots}
-    said = ", ".join(f"{t} {_verdict(results.get(t))}" for t in names)
+    said = ", ".join(f"{t} {_verdict(results.get(t, []))}" for t in names)
     return {"tone": "good", "note": said, "shots": []}
 
 
@@ -143,10 +152,10 @@ def _shot(tester: str, url: str, verdict: str) -> dict[str, Any]:
     return {"tester": tester, "url": url, "verdict": verdict, "tone": "good" if verdict == "pass" else "bad"}
 
 
-def _verdict(result: dict[str, Any] | None) -> str:
-    if result is None:
+def _verdict(results: list[dict[str, Any]]) -> str:
+    if not results:
         return "no result"
-    return "fail" if any(result[f"{s}s"] for s in OPEN_SEVERITIES) else "pass"
+    return "fail" if any(r[f"{s}s"] for r in results for s in OPEN_SEVERITIES) else "pass"
 
 
 def sheet(snap: Snap, task_id: str) -> dict[str, Any]:

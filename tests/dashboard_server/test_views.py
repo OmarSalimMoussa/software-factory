@@ -174,13 +174,15 @@ _CLEAN = {f"{severity}s": 0 for severity in OPEN_SEVERITIES}
     ("names", "results", "tone", "shots"),
     [
         ([], {}, None, []),
-        (["qa-backend"], {"qa-backend": _CLEAN}, "good", []),
-        (["qa-visual", "qa-ux"], {"qa-visual": _CLEAN, "qa-ux": {**_CLEAN, "majors": 1}}, None, ["good", "bad"]),
+        (["qa-backend"], {"qa-backend": [_CLEAN]}, "good", []),
+        (["qa-visual", "qa-ux"], {"qa-visual": [_CLEAN], "qa-ux": [{**_CLEAN, "majors": 1}]}, None, ["good", "bad"]),
+        # Two testers of one kind, each in its own browser lane: the kind fails when either found a major.
+        (["qa-ux"], {"qa-ux": [{**_CLEAN, "majors": 1}, _CLEAN]}, None, ["bad"]),
     ],
-    ids=["untested", "backend-tested", "screenshots"],
+    ids=["untested", "backend-tested", "screenshots", "two-lanes"],
 )
 def test_a_fixs_qa_line_carries_its_tone_and_each_screenshot_its_verdicts(
-    names: list[str], results: dict[str, dict[str, Any]], tone: str | None, shots: list[str]
+    names: list[str], results: dict[str, list[dict[str, Any]]], tone: str | None, shots: list[str]
 ) -> None:
     line = qa_line(names, results, [f"{name}\t/api/picture/qa/{name}.png" for name in names])
 

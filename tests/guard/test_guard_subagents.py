@@ -87,6 +87,39 @@ def test_the_orchestrator_keeps_one_place_for_intake(
     assert (kit.rule("Agent", _agent(kind)) == "subagents-at-once") is refused
 
 
+LANE_TAKEN = "is running and its browser is that tester's"
+
+
+@pytest.mark.parametrize(
+    ("running", "kind", "refused"),
+    [
+        (["qa-regression"], "qa-regression", f"a qa-regression {LANE_TAKEN}; start it as qa-regression-2"),
+        (["qa-regression"], "qa-regression-2", None),
+        (["qa-regression", "qa-regression-2", "qa-regression-3", "qa-regression-4"], "qa-regression-3",
+         f"a qa-regression-3 {LANE_TAKEN}; wait for one to report"),
+        (["triage"], "triage", None),
+        ([], "qa-regression-5", "the orchestrator may start intake, triage, qa-regression, qa-prod, Explore, not "
+                                "qa-regression-5"),
+    ],
+    ids=["same-lane", "next-lane", "every-lane", "no-browser", "past-the-lanes"],
+)  # fmt: skip
+def test_testers_of_one_browser_kind_at_once_each_take_a_lane_of_their_own(
+    tmp_path: Path, running: list[str], kind: str, refused: str | None
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("orchestrator", worktree=kit.repo)
+    kit.transcript(_running(*running))
+    decision = kit.decide("Agent", _agent(kind))
+    assert (decision.reason if isinstance(decision, Refusal) else None) == refused
+
+
+def test_a_tester_in_a_lane_is_its_kind_to_every_rule(tmp_path: Path) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
+    assert kit.bash("factory qa result --head abc1234", agent_id=TESTER_ID, agent_type="qa-ui-function-2") is None
+
+
 @pytest.mark.parametrize(("current", "refused"), [("t0", False), ("t3", False), ("t4", True)])
 def test_a_batch_of_starts_past_the_cap_refuses_only_the_starts_past_it(
     tmp_path: Path, current: str, refused: bool

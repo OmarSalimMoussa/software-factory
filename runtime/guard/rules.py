@@ -14,7 +14,7 @@ RULES: dict[str, str] = {
     "factory-alone": "a call running `factory` that is not one plain `factory …` command, or names outside files",
     "queue-status": "a task status set by anyone but the orchestrator; any write to the queue but through `factory`",
     "subagent-kinds": "a subagent kind not on the role's list; any start from inside a subagent",
-    "subagents-at-once": "more subagents than the cap; for the orchestrator, one place is kept for intake",
+    "subagents-at-once": "past the cap, or two testers in one browser lane; the orchestrator keeps a place for intake",
     "model": "an Agent call asking for any model but that kind's configured one",
     "tester-brief": "a tester brief without one `Scenarios and checks: N` line",
     "tester-time": "a tester's calls after its time, but for its report; command timeouts are cut to the time left",
