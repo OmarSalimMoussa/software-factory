@@ -14,6 +14,7 @@ from pathlib import Path
 
 from runtime.shared import store, upgrades
 from runtime.shared.paths import Places
+from runtime.shared.protocol import Refused
 from runtime.warden import checks
 from runtime.warden.context import Context
 
@@ -78,5 +79,8 @@ def ask_pending(ctx: Context) -> None:
         for commit in waiting:
             if not github_push.ask_push(ctx, {"sha": commit}, None)["commits"]:
                 pushed.append(commit)
+    except Refused as refused:
+        if refused.rule != "unchecked":
+            raise
     finally:
         store.write_json(_pushed_path(places), {"pushed": pushed, "tried_at": ctx.clock.now()}, mode=0o600)

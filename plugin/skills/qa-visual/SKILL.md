@@ -31,8 +31,9 @@ owner watches your run as a replay of those steps. To wait for the page to show 
 with the words and a ceiling inside the item's time. One call does the whole wait; never poll.
 
 Screenshot every changed screen in every state, in the light and the dark theme, at each width your brief lists
-(never naming a file). Resize with the resize tool, then read `window.innerWidth` to prove the width took. At phone
-width, run the edge check in `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/phone-width.md` on each screen. Screenshot a
+(never naming a file). Switch the theme with `browser_color_scheme`. Resize with the resize tool, then read
+`window.innerWidth` to prove the width took. At phone width, run the edge check in
+`${CLAUDE_PLUGIN_ROOT}/../procedures/qa/phone-width.md` on each screen. Screenshot a
 single element by its ref to judge edges and spacing. When contrast is in doubt, read the computed colours with the
 page-script tool and work out the ratio. Report each screenshot's file name, never a path, and never open a file
 your browser's answers link to.

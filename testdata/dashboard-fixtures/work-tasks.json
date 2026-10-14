@@ -384,8 +384,8 @@
       ],
       "requests": "3 requests",
       "goal": "G2",
-      "rung": 1,
-      "rung_word": "Sonnet",
+      "rung": null,
+      "rung_word": "not routed",
       "status": {
        "tone": "ring",
        "word": "Queued"

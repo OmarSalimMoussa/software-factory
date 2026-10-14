@@ -232,7 +232,8 @@ def test_push_to_prod_runs_its_steps_and_asks_for_a_qa_prod_pass(world: World, b
     assert [step["state"] for step in op["steps"]] == [ops.DONE] * 5, op
     # A product may report a short build; its prod workflow checks out the full commit.
     assert world.github.dispatched == [world.github.full_sha(build)]
-    assert world.events == [(inbox.QA_PROD_DUE, {"sha": build, "kind": "push", "since": world.clock.iso()})]
+    where = {"prod": "https://notes.example.com", "staging": "https://staging.notes.example.com", "health": "/healthz"}
+    assert world.events == [(inbox.QA_PROD_DUE, {"sha": build, "kind": "push", "since": world.clock.iso(), **where})]
     assert prod_push.watching(world.ctx)
 
 
@@ -478,6 +479,18 @@ def test_the_warden_asks_for_a_pins_push_only_now_and_then_and_it_counts_once_gi
     pins.ask_pending(world.ctx)
     pins.ask_pending(world.ctx)
     assert tries == [pin, pin] and git(github_repo, "rev-parse", "master") == pin
+
+
+def test_a_pin_on_a_head_not_yet_checked_waits_quietly(
+    world: World, github_repo: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    _pin(world)  # its parent never passed factory check
+
+    with caplog.at_level(logging.WARNING):
+        pins.ask_pending(world.ctx)
+
+    # The routine wait was logged as an error with its trace, 21 times in one evening.
+    assert caplog.records == [] and github_push.waiting(world.ctx.places) is None
 
 
 def test_a_git_failure_names_git_s_own_reason_not_its_closing_advice(

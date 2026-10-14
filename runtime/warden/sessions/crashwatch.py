@@ -274,7 +274,8 @@ def _owed(ctx: Context) -> str:
 
 
 def watch_orchestrator(ctx: Context) -> None:
-    """Restart the orchestrator when no loop pass came for its silent setting (longer while it is busy)."""
+    """Restart the orchestrator when no loop pass and no inbox wait came for its silent setting (longer while it is
+    busy)."""
     settings = ctx.settings()
     with ctx.lock:
         sessions = lifecycle.read(ctx)
@@ -284,7 +285,8 @@ def watch_orchestrator(ctx: Context) -> None:
             return
         busy = running[orchestrator.id].status != IDLE
         limit = settings.get_int(f"watch.orchestrator_{'busy_' if busy else ''}silent_minutes") * 60
-        heard = max(loop.last_tick(ctx.places) or 0.0, datetime.fromisoformat(orchestrator.since).timestamp())
+        heard = max(loop.last_tick(ctx.places) or 0.0, inbox.last_wait(ctx.places) or 0.0,
+                    datetime.fromisoformat(orchestrator.since).timestamp())  # fmt: skip
         silent = ctx.clock.now() - heard
         if silent < limit:
             return

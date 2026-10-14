@@ -28,6 +28,7 @@ from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
 from runtime.warden.delivery import deploys
 from standard import config
+from standard.config_records import Config
 
 STAGING, PROD = "staging", "prod"
 ENVS = (STAGING, PROD)
@@ -66,9 +67,8 @@ def http_get(url: str, timeout: float) -> Answer:
     return Answer(found.status, found.body)
 
 
-def address(ctx: Context, env: str) -> str:
-    """``env``'s health address, from factory.toml in the main checkout (repo.path), read without following a
-    symlink as GOAL.md is."""
+def _product(ctx: Context) -> Config:
+    """factory.toml in the main checkout (repo.path), read without following a symlink as GOAL.md is."""
     settings = ctx.settings()
     repo = Path(settings.get_str("repo.path"))
     try:
@@ -82,7 +82,21 @@ def address(ctx: Context, env: str) -> str:
         raise NoAddress(exc.reason) from exc
     except (OSError, UnicodeDecodeError) as exc:
         raise NoAddress(f"{config.FILE} cannot be read ({type(exc).__name__})") from exc
+    return product
+
+
+def address(ctx: Context, env: str) -> str:
+    """``env``'s health address."""
+    product = _product(ctx)
     return f"https://{product.workspace(env).domain}{product.deploy.health}"
+
+
+def origins(ctx: Context) -> dict[str, str]:
+    """Prod's and staging's addresses, and the health path both answer on."""
+    product = _product(ctx)
+    return {env: f"https://{product.workspace(env).domain}" for env in ("prod", "staging")} | {
+        "health": product.deploy.health
+    }
 
 
 def take(ctx: Context, env: str, fetch: Fetch) -> Probe:

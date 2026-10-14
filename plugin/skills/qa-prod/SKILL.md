@@ -18,8 +18,8 @@ You look at the live product the way a customer would, and you change nothing in
 ## Where
 
 Staging's and prod's addresses are in your brief. Use your own browser: the `qa-browser` tools, a private browser
-that starts and ends with you. It is signed in only if the owner saved a sign-in for you; when the sign-in page
-shows, check the signed-out pages and report each signed-in page `blocked`, "no saved sign-in". Read pages with the
+that starts and ends with you. Prod and staging have no test sign-in: check the signed-out pages and report each
+signed-in page `blocked`, "no test sign-in". Read pages with the
 snapshot tool and take a screenshot of each (never naming a file; report its file name, never open it). With no
 `qa-browser` tools, report "no browser" as your whole result.
 

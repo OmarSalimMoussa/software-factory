@@ -236,8 +236,14 @@ def qa_prod_path(places: Places) -> Path:
 
 def post_qa_prod(ctx: Context, sha: str, kind: str, since: str) -> None:
     """Ask the orchestrator for a read-only walk of prod at ``sha``, looking at issues first seen since ``since``; the
-    loop asks again qa.prod_every_hours after the last ask."""
-    ctx.post_event(inbox.QA_PROD_DUE, {"sha": sha, "kind": kind, "since": since})
+    loop asks again qa.prod_every_hours after the last ask. The tester's brief takes prod's and staging's addresses
+    from it."""
+    try:
+        where = probes.origins(ctx)
+    # telemetry: surfaced — the event says why it has no addresses, in `where`, and the brief carries it on
+    except probes.NoAddress as exc:
+        where = {"addresses": f"unknown: {exc}"}
+    ctx.post_event(inbox.QA_PROD_DUE, {"sha": sha, "kind": kind, "since": since, **where})
     store.write_json(qa_prod_path(ctx.places), {"at": ctx.clock.now(), "iso": ctx.clock.iso()})
 
 

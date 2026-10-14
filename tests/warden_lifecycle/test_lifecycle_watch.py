@@ -140,6 +140,19 @@ def test_a_silent_orchestrator_is_restarted_as_the_same_session(world: World) ->
     assert world.session("0c0c0c0c").state == WORKING
 
 
+def test_an_orchestrator_waiting_on_its_inbox_is_alive_however_long_since_its_last_loop_pass(world: World) -> None:
+    world.seat("0c0c0c0c", role="orchestrator", family="orch", since=NOW)
+    world.run("0c0c0c0c")
+    world.later(world.settings.get_int("watch.orchestrator_busy_silent_minutes") * 60 - 60)
+    inbox.post_event(world.places, world.clock, inbox.TRIAGE_DUE, {"waiting": 3})
+    inbox.wait(world.ctx(), {}, None)
+    world.later(120)
+
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
+
+    assert world.launcher.resumed == []
+
+
 def test_a_restarted_orchestrator_is_told_the_events_it_has_not_acted_on(world: World) -> None:
     world.seat("0c0c0c0c", role="orchestrator", family="orch")
     inbox.post_event(world.places, world.clock, inbox.TRIAGE_DUE, {"waiting": 3})

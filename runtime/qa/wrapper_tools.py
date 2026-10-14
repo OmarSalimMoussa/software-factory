@@ -6,6 +6,8 @@
   ceiling, in one call: a tester never polls.
 - ``browser_open_desktop`` sets the browser to the desktop's size (``qa.desktop_viewport``), then opens the desktop's
   live view: a screenshot is not shrunk before the tester sees it, so a point in it is the point on the desktop.
+- ``browser_color_scheme`` shows the page in its light or dark colours: fixed code the wrapper runs in the browser
+  server, whose own code tool is hidden from testers.
 """
 
 from __future__ import annotations
@@ -16,9 +18,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from runtime.qa.wrapper import ServerError
+from runtime.qa.wrapper import SERVER_CODE, ServerError
 
 SIGN_IN, WAIT_UNTIL, OPEN_DESKTOP = "browser_sign_in", "browser_wait_until", "browser_open_desktop"
+COLOUR = "browser_color_scheme"
+SCHEMES = ("light", "dark")
 # Playwright's answers name the page after an action on a line of their own.
 PAGE_URL = re.compile(r"Page URL: (\S+)")
 # A link as the sign-in prints it, and as a transcript keeps that output: inside JSON, where a line break is the two
@@ -62,6 +66,16 @@ TOOLS: list[dict[str, Any]] = [
             "required": ["url"],
         },
     },
+    {
+        "name": COLOUR,
+        "description": "Show this page in its light or dark colours, as a person's system setting would. It holds "
+        "across reloads until you switch it back.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"scheme": {"type": "string", "enum": list(SCHEMES)}},
+            "required": ["scheme"],
+        },
+    },
 ]
 
 
@@ -85,6 +99,7 @@ class Tools:
             SIGN_IN: self._sign_in,
             WAIT_UNTIL: self._wait_until,
             OPEN_DESKTOP: self._open_desktop,
+            COLOUR: self._color_scheme,
         }
         try:
             return tools[name](arguments, cancelled), False
@@ -134,6 +149,15 @@ class Tools:
         width, height = self.desktop
         self.call("browser_resize", {"width": width, "height": height})
         return self.call("browser_navigate", {"url": url})
+
+    def _color_scheme(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
+        scheme = arguments.get("scheme")
+        if scheme not in SCHEMES:
+            raise ToolError("say light or dark")
+        self.call(
+            SERVER_CODE, {"code": f"async (page) => {{ await page.emulateMedia({{ colorScheme: '{scheme}' }}); }}"}
+        )
+        return f"The page now shows its {scheme} colours, and keeps them across reloads until you switch back."
 
 
 def first_link(text: str) -> str:

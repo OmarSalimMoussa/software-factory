@@ -99,6 +99,7 @@ def test_the_trace_starts_before_the_first_call_and_the_tester_can_neither_see_n
         "browser_sign_in",
         "browser_wait_until",
         "browser_open_desktop",
+        "browser_color_scheme",
     ]
     assert stopped["error"]["message"] == "there is no tool browser_stop_tracing"
     assert closed["error"]["message"] == "there is no tool browser_close"  # closing would end the trace
@@ -297,6 +298,15 @@ def test_the_desktop_opens_at_its_own_size() -> None:
     ]
 
 
+def test_the_colour_scheme_tool_runs_only_its_own_fixed_code_in_the_browser_server() -> None:
+    browser = Browser([])
+    said, failed = browser.answer("browser_color_scheme", {"scheme": "dark"})
+    assert browser.calls == [
+        ("browser_run_code_unsafe", {"code": "async (page) => { await page.emulateMedia({ colorScheme: 'dark' }); }"})
+    ]
+    assert not failed and "dark colours" in said
+
+
 @pytest.mark.parametrize(
     ("name", "args", "says"),
     [
@@ -305,6 +315,7 @@ def test_the_desktop_opens_at_its_own_size() -> None:
         ("browser_wait_until", {"text": "Ready", "minutes": 0}, "above zero"),
         ("browser_wait_until", {"text": "Ready", "minutes": 1}, "the page names no address to reload"),
         ("browser_open_desktop", {"url": "file:///etc/passwd"}, "starting http:// or https://"),
+        ("browser_color_scheme", {"scheme": "blue"}, "say light or dark"),
     ],
 )
 def test_a_factory_tool_that_cannot_do_what_was_asked_fails_and_says_why(

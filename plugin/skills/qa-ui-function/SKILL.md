@@ -51,9 +51,9 @@ in every state, and you prove each finding with a screenshot.
   button with no effect.
 - **Console and network:** no new console errors, no unexpected 4xx or 5xx, no dead links. `factory ready-check`
   names your slot: after your items, `factory errors --where slot <n>` shows no new issue your steps raised.
-- **Widths and themes:** both themes, at each width your brief lists. Resize with the resize tool, then read
-  `window.innerWidth` to prove the width took. At phone width, run the edge check in
-  `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/phone-width.md` on each screen and use every control there.
+- **Widths and themes:** both themes, switched with `browser_color_scheme`, at each width your brief lists.
+  Resize with the resize tool, then read `window.innerWidth` to prove the width took. At phone width, run the
+  edge check in `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/phone-width.md` on each screen and use every control there.
 
 ## Report
 

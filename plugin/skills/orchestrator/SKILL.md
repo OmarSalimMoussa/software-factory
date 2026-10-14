@@ -37,7 +37,7 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 | `severe request` | Start intake on it at once (one subagent place is always kept for intake). Route its task next. |
 | `prod red`, `staging red` | As "When something is red" says. |
 | `triage due` | Start one `triage` subagent on the batch the event names (its request ids). When it hands back, `factory triage apply`; give each new task a light intake pass. |
-| `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed, giving it the event's `since`. |
+| `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed, giving it the event's `since`, `prod` and `staging` addresses and `health` path. |
 | `approved` | The warden starts it when a place frees. Fill the free proposal slot. |
 | `not-now`, `dropped`, `boosted`, `proposal-slot-free` | Fill the free proposal slots. |
 | `go` | The owner said Go to a spec: the warden starts its build when a place frees and ends its designer. Nothing to do. |

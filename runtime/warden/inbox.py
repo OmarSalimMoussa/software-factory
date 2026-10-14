@@ -168,9 +168,20 @@ def read(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     return _answer(_hand(ctx.places, ctx.clock, "acked"))
 
 
+def _waited_path(places: Places) -> Path:
+    return places.state / "inbox-waited.json"
+
+
+def last_wait(places: Places) -> float | None:
+    """When the orchestrator last began a wait, for its silence watch; None before its first."""
+    raw = store.read_json_or(_waited_path(places), None)
+    return float(raw["at"]) if raw is not None else None
+
+
 def wait(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """Acknowledge what was handed over, then block until a new event arrives or watch.inbox_wait_seconds pass."""
     acknowledge(ctx.places, ctx.clock)
+    store.write_json(_waited_path(ctx.places), {"at": ctx.clock.now()}, mode=0o600)
     end = time.monotonic() + ctx.settings().get_int("watch.inbox_wait_seconds")
     with _posted:
         while not (events := _hand(ctx.places, ctx.clock, "handed")) and (left := end - time.monotonic()) > 0:

@@ -39,7 +39,7 @@ function taskRow(t, flip) {
   return `<div class="row task-row ${t.boosted ? 'boosted' : ''}" data-task="${id}" data-flip="${flip}-${id}">${r}
     <div style="min-width:0"><div class="tt">${esc(t.title)}</div><div class="ts">${chip(t.severity)}${t.surfaces.map(s => `<span class="chip">${esc(s)}</span>`).join('')}<span>${esc(t.requests)}</span></div></div>
     <span class="c-goal">${t.goal ? `<span class="gid" style="font-size:13px">${esc(t.goal)}</span>` : ''}</span>
-    <span class="rung c-rung"><b>${t.rung}</b>${esc(t.rung_word)}</span>
+    <span class="rung c-rung">${t.rung === null ? '' : `<b>${t.rung}</b>`}${esc(t.rung_word)}</span>
     <span class="status c-status"><i class="dot ${t.status.tone}"></i>${esc(t.status.word)}</span>
     <span class="cost c-cost">${t.cost === '$0' ? '<span class="faint">$0</span>' : esc(t.cost)}</span>${action ? action() : '<span></span>'}</div>`;
 }

@@ -20,6 +20,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import IO, Any
 
+SERVER_CODE = "browser_run_code_unsafe"
 # The devtools capability holds the trace's tools; the wrapper needs the capability on, the tester keeps its usual
 # tools, so every tool the capability adds is hidden. Closing the browser would end the trace, and the next call
 # would open an untraced browser, so that is hidden too: the browser closes with the session.
@@ -37,6 +38,7 @@ HIDDEN = frozenset(
         "browser_video_hide_actions",
         "browser_video_show_actions",
         "browser_close",
+        SERVER_CODE,  # the guard refuses it; browser_color_scheme does what testers needed it for
     }
 )
 OWN = "factory-"  # the ids of the wrapper's own requests to the server

@@ -13,6 +13,7 @@ from pathlib import Path, PurePosixPath
 
 from runtime.guard import shell
 from runtime.guard.facts import Call, Decision, Refusal, Rewrite, inside, public, resolve
+from runtime.qa.wrapper import SERVER_CODE
 from runtime.qa.wrapper_tools import WAIT_UNTIL
 
 BROWSER = "mcp__qa-browser__"
@@ -21,8 +22,6 @@ CHROME = "mcp__claude-in-chrome__"
 # driven by its element references.
 DESKTOP = ("mcp__computer-use__", "mcp__remote-devices__computer", BROWSER + "browser_mouse_")
 DRIVERS = (BROWSER, *DESKTOP)
-# Runs code in the browser server's own process, beside the session and out of the guard's sight.
-SERVER_CODE = "browser_run_code_unsafe"
 WAIT = "browser_wait_for"
 # Each browser wait the guard cuts to a tester's time left: the input that sets its length, and seconds per unit.
 _WAITS = {BROWSER + WAIT: ("time", 1), BROWSER + WAIT_UNTIL: ("minutes", 60)}
