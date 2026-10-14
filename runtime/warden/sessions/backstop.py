@@ -161,8 +161,8 @@ def unpermitted(sessions: dict[str, Session], proc: Proc) -> bool:
 
 
 def drilled(places: Places, now: float) -> frozenset[str]:
-    """The install's drill sessions, by id or name, whose permits have not ended: the backstop leaves them alone. Only
-    root and the warden can reach the file. None when it cannot be read, so its sessions are stopped."""
+    """The install's drill sessions, by id, short id or name, whose permits have not ended: the backstop leaves them
+    alone. Only root and the warden can reach the file. None when it cannot be read, so its sessions are stopped."""
     try:
         permits = store.read_json_or(places.drill_permits, {})
     except store.StoreError as exc:
@@ -215,7 +215,9 @@ def sweep(ctx: Context, procs: dict[str, Proc]) -> list[Proc]:
             return []
         bind_running(ctx.places, ctx.clock, sessions, procs)
         drills = drilled(ctx.places, ctx.clock.now())
-        strays = [p for p in procs.values() if unpermitted(sessions, p) and not {p.session, p.name} & drills]
+        strays = [
+            p for p in procs.values() if unpermitted(sessions, p) and not {p.session, p.session[:8], p.name} & drills
+        ]
         for proc in strays:
             log.warning("backstop: stopping session %s (pid %d), which runs without a permit", proc.session, proc.pid)
             stop(ctx, proc)

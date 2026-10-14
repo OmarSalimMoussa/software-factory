@@ -32,7 +32,7 @@ from runtime.system.install_drills.evidence import Ran
 from runtime.system.job import Install, refuse
 from runtime.warden.owner import messages
 from runtime.warden.sessions import backstop, registry, session_settings
-from runtime.warden.sessions.launch import LaunchError, Units
+from runtime.warden.sessions.launch import BACKGROUNDED, LaunchError, Units
 from runtime.warden.spend import cost
 
 # What the drill is, said first: a command that probes the sandbox's walls looks like an attack without it.
@@ -213,7 +213,7 @@ class RealRig:
         with self.lock:
             self.sessions[sid] = _session(sid, f"{_DRILL_NAME}-{sid[:8]}", self.worktree_a)
             registry.write(self.view, dict(self.sessions))
-            self._permit(sid)
+        self._permit(sid)
         body = session_settings.render(self.settings, self.places, "implementer", self.worktree_a, layout.AGENT_HOME)
         for key, value in (extra or {}).items():
             body[key] = {**body.get(key, {}), **value}
@@ -233,13 +233,13 @@ class RealRig:
         self._log(prompt, ran, self._debug(sid))
         return ran
 
-    def _permit(self, key: str) -> None:
-        """The warden's backstop leaves the session alone for one drill's time. The caller holds self.lock."""
-        self.permits[key] = time.time() + self.timeout
-        store.write_json(self.places.drill_permits, self.permits, mode=0o644)
+    def _permit(self, *keys: str) -> None:
+        """The warden's backstop leaves the session alone for one drill's time, known by any of ``keys``."""
+        with self.lock:
+            self.permits.update(dict.fromkeys(keys, time.time() + self.timeout))
+            store.write_json(self.places.drill_permits, self.permits, mode=0o644)
 
     def _debug(self, sid: str) -> Path:
-        """Where the session writes Claude Code's own debug log: its sandbox decisions and mounts."""
         return layout.DRILLS / "debug" / f"{sid}.txt"
 
     def _log(self, prompt: str, ran: Ran, debug: Path) -> None:
@@ -332,8 +332,7 @@ class RealRig:
     def real_session(self, name: str, prompt: str) -> Ran:
         request_id = f"{_DRILL_NAME}-{uuid.uuid4().hex[:12]}"
         model, role, checkout = self.settings["install.drill"], "implementer", self.ctx.checkout()
-        with self.lock:
-            self._permit(name)
+        self._permit(name)
         written = session_settings.write(self.settings, self.places, request_id, role, checkout, layout.AGENT_HOME)
         agents = session_settings.agents(self.settings, self.places, role, model["model"], model["effort"])
         request = {
@@ -347,7 +346,10 @@ class RealRig:
             "settings": str(written),
             "agents": json.dumps(agents),
         }
-        return self._launch(lambda units: units.start_waiting(request_id, request))
+        ran = self._launch(lambda units: units.start_waiting(request_id, request))
+        if started := BACKGROUNDED.search(ran.out):
+            self._permit(started.group(1))  # a respawned session's record lacks its name at first
+        return ran
 
     def session_records(self) -> dict[str, str]:
         found = backstop.read_processes(layout.AGENT_HOME / ".claude" / "sessions", backstop.PROC)
