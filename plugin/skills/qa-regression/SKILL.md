@@ -24,7 +24,8 @@ pass, fail or blocked for each, with evidence. You find regressions; you do not 
 2. Drive the product through its own screens in your own browser: the `qa-browser` tools, a private browser that
    starts and ends with you. Sign in as the address your brief gives you, as
    `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/sign-in.md` says: other testers run beside you as other addresses, so
-   your data never clashes with theirs. With no `qa-browser` tools, report every scenario `blocked`, "no browser".
+   your data never clashes with theirs. Open every slot address in that browser, its health address too: your shell
+   cannot reach slot 0, by design. With no `qa-browser` tools, report every scenario `blocked`, "no browser".
 3. Set up each precondition through the UI. If you cannot reach it, the scenario is `blocked`, not passed: say what
    stopped you. A step that needs a `factory slot` command other than `sign-in` or `desktop up` is the
    orchestrator's: report the scenario blocked at that step.
