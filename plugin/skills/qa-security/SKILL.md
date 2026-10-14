@@ -21,8 +21,9 @@ report what gets through, with evidence.
 
 The brief gives what changed and the files touched; read the diff for dangerous patterns. Drive the API with the
 `slot-api` tools, which reach your implementer's slot and nothing else. Set up two accounts that must not see each
-other's data, each signed in as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/sign-in.md` says, so every probe can try one
-account's credentials on the other's data. With no `slot-api` tools, report "no slot-api" as your whole result.
+other's data, each signed in as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/sign-in.md` says under its own `session`, so
+every probe can try one account's credentials on the other's data. With no `slot-api` tools, report "no slot-api" as
+your whole result.
 
 ## What you look for
 

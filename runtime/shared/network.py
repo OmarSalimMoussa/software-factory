@@ -9,6 +9,7 @@ turns a failed status into one too, for a caller that takes only success.
 from __future__ import annotations
 
 import http.client
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -17,6 +18,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
+_FOLD = re.compile(r"\r?\n[ \t]*")
 
 
 class StatusError(OSError):
@@ -41,7 +43,11 @@ class _Stay(urllib.request.HTTPRedirectHandler):
 
 
 def _headers(found: Message | None) -> dict[str, str]:
-    return {k.lower(): v for k, v in found.items()} if found is not None else {}
+    """Headers by lowercase name; a repeated one keeps each unfolded value on a line: a cookie's date holds a comma."""
+    headers: dict[str, list[str]] = {}
+    for name, value in found.items() if found is not None else []:
+        headers.setdefault(name.lower(), []).append(_FOLD.sub(" ", value))
+    return {name: "\n".join(values) for name, values in headers.items()}
 
 
 def call(

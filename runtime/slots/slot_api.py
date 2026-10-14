@@ -4,6 +4,8 @@ own slot's API and nothing else (factory spec, "Reaching a slot").
 A sandboxed command cannot reach the host's loopback, so Claude Code starts this tool outside the sandbox. Before each
 request it asks the warden which slot is the caller's, then sends it to ``http://127.0.0.1:<that slot's port><path>``:
 no other host, no redirects, a path only, and an answer cut at the warden's size. Nothing but MCP goes to stdout.
+A request that names a session sends the cookies the slot set in that session before, by RFC 6265's paths; an answer
+shows every header line, each Set-Cookie value hidden.
 """
 
 from __future__ import annotations
@@ -11,10 +13,14 @@ from __future__ import annotations
 import json
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
+from dataclasses import dataclass
+from email.utils import parsedate_to_datetime
 from typing import IO, Any
+from urllib.parse import urlsplit
 
 from runtime.shared import network
 
@@ -23,6 +29,7 @@ METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD")
 PATH = re.compile(r"^/[\x21-\x7e]*$")
 HEADER_NAME = re.compile(r"^[A-Za-z0-9-]{1,64}$")
 BLOCKED_HEADERS = frozenset({"host", "connection", "transfer-encoding", "content-length", "proxy-authorization"})
+SESSION = re.compile(r"^[A-Za-z0-9@._+-]{1,128}$")
 TOOL = {
     "name": "slot_api",
     "description": "Send one HTTP request to your own stack slot's API and read the answer.",
@@ -33,6 +40,12 @@ TOOL = {
             "path": {"type": "string", "description": "the path and query, starting with /"},
             "headers": {"type": "object", "additionalProperties": {"type": "string"}},
             "body": {"type": "string"},
+            "session": {
+                "type": "string",
+                "description": "a name such as your test address: the cookies the slot sets are kept under it and "
+                "sent with each later request that names it; with none, or with a Cookie header of your own, no "
+                "cookie is kept or sent",
+            },
         },
         "required": ["method", "path"],
     },
@@ -41,6 +54,22 @@ TOOL = {
 
 class SlotApiError(ValueError):
     """A request the tool will not send; the message says why."""
+
+
+@dataclass(slots=True)
+class Session:
+    name: str
+    cookies: dict[tuple[str, str], str]  # (name, path): value
+
+    def header(self, path: str) -> str:
+        found = sorted(((p, n, v) for (n, p), v in self.cookies.items() if _within(path, p)), key=lambda c: -len(c[0]))
+        return "; ".join(f"{n}={v}" for _, n, v in found)
+
+
+def _within(path: str, cookie_path: str) -> bool:
+    if path == cookie_path:
+        return True
+    return path.startswith(cookie_path) and (cookie_path.endswith("/") or path[len(cookie_path)] == "/")
 
 
 def build(port: int, arguments: dict[str, Any]) -> urllib.request.Request:
@@ -60,19 +89,54 @@ def build(port: int, arguments: dict[str, Any]) -> urllib.request.Request:
     body = arguments.get("body")
     if body is not None and not isinstance(body, str):
         raise SlotApiError("body is text")
-    data = body.encode() if body is not None else None
+    try:
+        data = body.encode() if body is not None else None
+    except UnicodeEncodeError as exc:
+        raise SlotApiError(f"body holds a character UTF-8 cannot carry, at {exc.start}") from exc
     return urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data, headers=headers, method=method)
 
 
-def send(request: urllib.request.Request, timeout: int, limit: int) -> str:
+def send(request: urllib.request.Request, timeout: int, limit: int, session: Session | None) -> str:
+    """The answer: its status, every header (each cookie kept in ``session``, its value hidden) and its body."""
     answer = network.call(request, timeout, limit=limit + 1)
-    status, raw = answer.status, answer.body
-    kind, location = answer.headers.get("content-type", ""), answer.headers.get("location", "")
+    path = urlsplit(request.full_url).path
+    head = [f"HTTP {answer.status}"]
+    for name, value in answer.headers.items():
+        head += [f"{name}: {_cookie(v, session, path) if name == 'set-cookie' else v}" for v in value.split("\n")]
+    if session is not None:
+        names = ", ".join(dict.fromkeys(name for name, _ in session.cookies))
+        head.append(f"[session {session.name} holds: {names or 'no cookies'}]")
+    raw = answer.body
     text = raw[:limit].decode(errors="replace") + ("\n[cut: the answer is longer]" if len(raw) > limit else "")
-    head = (
-        f"HTTP {status}" + (f"\nContent-Type: {kind}" if kind else "") + (f"\nLocation: {location}" if location else "")
-    )
-    return f"{head}\n\n{text}"
+    return "\n".join(head) + f"\n\n{text}"
+
+
+def _cookie(line: str, session: Session | None, path: str) -> str:
+    """One Set-Cookie line, its value hidden; ``session`` keeps the cookie, or drops it when the line expires it. Its
+    path is the line's, or else the request's up to its last /, as RFC 6265 has it."""
+    pair, *attributes = line.split(";")
+    name, sign, value = (part.strip() for part in pair.partition("="))
+    if session is not None and sign and name:
+        found = {k.strip().lower(): v.strip() for k, _, v in (a.partition("=") for a in attributes)}
+        where = found.get("path", "")
+        key = (name, where if where.startswith("/") else path[: path.rindex("/")] or "/")
+        if _expired(found):
+            session.cookies.pop(key, None)
+        else:
+            session.cookies[key] = value
+    return ";".join([f"{name}=(hidden)", *attributes])
+
+
+def _expired(attributes: dict[str, str]) -> bool:
+    """Max-Age at or below zero, or else an Expires in the past, as a browser reads them."""
+    age = attributes.get("max-age", "")
+    if age.lstrip("-").isdigit():
+        return int(age) <= 0
+    try:
+        return "expires" in attributes and parsedate_to_datetime(attributes["expires"]).timestamp() <= time.time()
+    # telemetry: expected — an Expires that is no date leaves the cookie kept, as a browser does
+    except (TypeError, ValueError):
+        return False
 
 
 def handle(message: dict[str, Any], call: Callable[[dict[str, Any]], str]) -> dict[str, Any] | None:
@@ -128,8 +192,12 @@ def serve(lines: IO[str], out: IO[str], call: Callable[[dict[str, Any]], str]) -
 def caller(which: Callable[[], dict[str, Any]]) -> Callable[[dict[str, Any]], str]:
     """Each request asks the warden for the caller's slot first: a session claims, releases or changes its slot while
     the tool runs, and Claude Code never starts again a server that exited."""
+    sessions: dict[tuple[int, str], Session] = {}
 
     def call(arguments: dict[str, Any]) -> str:
+        name = arguments.get("session")
+        if name is not None and (not isinstance(name, str) or not SESSION.match(name)):
+            raise SlotApiError("session is one word of letters, digits and @._+-, such as your test address")
         try:
             found = which()
         except ValueError as exc:
@@ -137,7 +205,13 @@ def caller(which: Callable[[], dict[str, Any]]) -> Callable[[dict[str, Any]], st
         if not found.get("ok"):
             raise SlotApiError(f"you hold no slot: {found.get('reason', 'the warden refused')}")
         port, timeout, limit = int(found["port"]), int(found["timeout_seconds"]), int(found["max_kib"]) * 1024
-        return send(build(port, arguments), timeout, limit)
+        request = build(port, arguments)
+        session = None if name is None else sessions.setdefault((port, name), Session(name, {}))
+        if request.has_header("Cookie"):
+            session = None
+        elif session is not None and (cookies := session.header(urlsplit(request.full_url).path)):
+            request.add_header("Cookie", cookies)
+        return send(request, timeout, limit, session)
 
     return call
 
