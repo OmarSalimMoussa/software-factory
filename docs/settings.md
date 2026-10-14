@@ -29,7 +29,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `slots` | How many, the first port, the output lines an agent sees |
 | `budget` | The slice's memory and CPU, and the memory a test run needs |
 | `vitals`, `watch` | Amber and red levels; probe, loop, grace and silence times |
-| `errors` | How often the warden reads prod's new GlitchTip issues into requests, and how many pages one read covers |
+| `errors` | How often the warden reads prod's, staging's and slot 0's new GlitchTip issues into requests, and how many pages one read covers |
 | `reports` | How often the warden asks the product for users' new reports |
 | `telemetry` | What `factory errors` and `factory traces` give an agent: how many items, how large, how long a call |
 | `cost`, `prices` | The daily budget (past it, only severe work starts that day), the plan-limit levels, and dollars per million tokens per model |

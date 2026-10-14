@@ -55,11 +55,12 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
     ctx = dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden"))
     done = upgrade.migrate(ctx)
 
-    assert len(done) == 8, done
+    assert len(done) == 9, done
     assert inbox.unacknowledged(places) == []
     assert leases.read(places, 1) is not None
     filed = json.loads(errors_import.path(places, "prod").read_text())["filed"]
     assert filed == {"7": {"request": req.id, "at": req.at}} and not (places.state / "errors-seen.json").exists()
+    assert errors_import.note(places) is None  # each record reads, and none has read yet
     assert turn.holder(places) == {"task": in_turn.id, "branch": "b", "base": FULL}
     assert turn.merges(places) == {FULL: merged.id}
     assert prod_push.released(places) == "c" * 40
@@ -94,3 +95,16 @@ def test_a_spec_or_card_whose_brief_is_a_claude_artifact_names_no_brief_once_bro
     assert found is not None and found.brief == ""
     assert [c.brief for c in cards.read(world.places)] == [""]
     assert upgrade.migrate(ctx) == []
+
+
+def test_an_errors_record_that_has_read_reads_on_and_one_that_never_read_takes_what_is_open_as_known(
+    world: World,
+) -> None:
+    places = world.places
+    for env, polled in (("prod", 1_791_000_000.0), ("slot0", None)):
+        store.write_json(
+            errors_import.path(places, env), {"filed": {}, "polled": polled, "failing": False, "note": None}
+        )
+    upgrade.migrate(dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden")))
+    since = {env: json.loads(errors_import.path(places, env).read_text())["since"] for env in ("prod", "slot0")}
+    assert since["prod"] is not None and since["slot0"] is None

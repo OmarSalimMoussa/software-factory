@@ -57,9 +57,9 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 ## A loop pass
 
 `factory tick` records the pass. The warden does its own part on its own timers: probes, the user-report pull, sweeps,
-and filing each new prod or staging error-tracker issue as a request from `glitchtip` (again when one comes back
-after its fix shipped). Then: staging's health in `factory status`; and when no implementer is live and nothing
-merged for a while, a regression walk of the scenarios that waited longest.
+and filing each new prod, staging or slot 0 error-tracker issue as a request from `glitchtip` (again when one comes
+back after its fix reached there). Then: staging's health in `factory status`; and when no implementer is live and
+nothing merged for a while, a regression walk of the scenarios that waited longest.
 
 ## Requests and triage
 

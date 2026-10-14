@@ -5,9 +5,9 @@ watch.probe_seconds (prod every tick while a push to prod is in flight or just l
 answer with; moves the outage along; and
 posts to the orchestrator's inbox: loop due once watch.loop_minutes pass after its last pass, staging red the moment
 staging fails, and triage due when intake.batch_size requests wait or the oldest has waited
-intake.batch_max_wait_hours. Last, it files prod's and staging's new GlitchTip issues (errors_import) as requests,
-on its own timer; the users' reports come in a pass of the warden's own (runtime/queue/reports.py), off the tick. A
-step that fails never stops the steps after it. The orchestrator's `factory tick` acknowledges each pass.
+intake.batch_max_wait_hours. Last, it files prod's, staging's and slot 0's new GlitchTip issues (errors_import) as
+requests, on its own timer; the users' reports come in a pass of the warden's own (runtime/queue/reports.py), off the
+tick. A step that fails never stops the steps after it. The orchestrator's `factory tick` acknowledges each pass.
 """
 
 from __future__ import annotations

@@ -53,7 +53,8 @@ the share is made once and then kept.
   can connect to it.
 - **Its own network**, `<product>-slot<n>-services`. It joins the shared Postgres, Langfuse and GlitchTip and
   nothing else, so two slots never share a network.
-- **Its own GlitchTip projects**, `slot<n>-<name>` for each name in factory.toml's `[services].errors`.
+- **Its own GlitchTip projects**, `slot<n>-<name>` for each name in factory.toml's `[services].errors`. Slot 0
+  runs master, so the warden files each new issue of its projects as a request, as it does prod's and staging's.
 - **Its traces** in the product's one Langfuse project, under the environment `slot<n>`.
 - **Its env file**, written from the product's env template. It holds the slot's own values: the workspace
   `slot<n>`, the origin `http://127.0.0.1:<port>` and the commit `dev-slot<n>`, plus the shared services' keys.

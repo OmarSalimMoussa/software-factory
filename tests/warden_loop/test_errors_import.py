@@ -1,4 +1,4 @@
-"""Prod's unresolved GlitchTip issues become requests from glitchtip: each issue once, and only prod's."""
+"""Prod's, staging's and slot 0's unresolved GlitchTip issues become requests from glitchtip: each issue once."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from runtime.shared.network import Answer
 from runtime.warden.health import errors_import, telemetry
 
 GLITCHTIP = "https://box.test:8200"
+LAPTOP = {"url": "http://127.0.0.1:8200", "org": "notes", "token": "tok-laptop"}
 SERVER = {
     "glitchtip": {"url": GLITCHTIP, "org": "notes", "token": "tok-read"},
     "langfuse": {"url": "https://box.test:3100", "public_key": "pk-lf-1", "secret_key": "sk-lf-1"},
@@ -36,39 +37,65 @@ FIRST = f'<{GLITCHTIP}/x>; rel="previous"; results="false", <{GLITCHTIP}/x>; rel
 LAST = f'<{GLITCHTIP}/x>; rel="previous"; results="true"; cursor="c1", <{GLITCHTIP}/x>; rel="next"; results="false"'
 
 
+TWO_PAGES = {
+    "": ([issue(1, "prod-app"), issue(2, "staging-app")], FIRST),
+    "c2": ([issue(3, "prod-web"), issue(4, "slot1-app"), issue(5, "slot0-app")], LAST),
+}
+
+
+@dataclasses.dataclass
+class GlitchTips:
+    """The pages the server's and the laptop's GlitchTip both answer, and the URLs they were asked."""
+
+    pages: dict[str, Any]
+    asked: list[str]
+
+
 @pytest.fixture
-def asked(world: World, monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """The server set-up ran and the product's queue is in place; GlitchTip answers two pages. The URLs it was asked."""
+def glitchtips(world: World, monkeypatch: pytest.MonkeyPatch) -> GlitchTips:
+    """The server and the laptop are set up; at first each GlitchTip answers one page with no issue."""
     store.write_json(telemetry.server_json(world.ctx.places), SERVER)
-    pages = {
-        "": ([issue(1, "prod-app"), issue(2, "staging-app")], FIRST),
-        "c2": ([issue(3, "prod-web"), issue(4, "slot1-app")], LAST),
-    }
-    found: list[str] = []
+    store.write_json(telemetry.laptop_glitchtip_json(world.ctx.places), LAPTOP)
+    found = GlitchTips({"": ([], LAST)}, [])
 
     def http_get(url: str, headers: dict[str, str], timeout: float) -> Answer:
-        assert headers["Authorization"] == "Bearer tok-read"
-        found.append(url)
-        body, header = pages[parse_qs(urlsplit(url).query).get("cursor", [""])[0]]
+        assert headers["Authorization"] == ("Bearer tok-laptop" if url.startswith(LAPTOP["url"]) else "Bearer tok-read")
+        found.asked.append(url)
+        body, header = found.pages[parse_qs(urlsplit(url).query).get("cursor", [""])[0]]
         return Answer(200, {"link": header}, json.dumps(body).encode())
 
     monkeypatch.setattr(telemetry, "http_get", http_get)
     return found
 
 
-def test_each_prod_and_staging_issue_is_filed_once_across_polls(world: World, asked: list[str]) -> None:
-    errors_import.poll(world.ctx)
+def _next_poll(world: World) -> None:
     world.clock.t += world.ctx.settings().get_int("errors.poll_minutes") * 60
     errors_import.poll(world.ctx)
+
+
+@pytest.fixture
+def asked(world: World, glitchtips: GlitchTips) -> list[str]:
+    """Each environment has read once with no issue open; now each GlitchTip answers two pages. The URLs asked since."""
+    errors_import.poll(world.ctx)
+    glitchtips.pages.update(TWO_PAGES)
+    glitchtips.asked.clear()
+    world.clock.t += world.ctx.settings().get_int("errors.poll_minutes") * 60
+    return glitchtips.asked
+
+
+def test_each_prod_staging_and_slot_zero_issue_is_filed_once_across_polls(world: World, asked: list[str]) -> None:
+    errors_import.poll(world.ctx)
+    _next_poll(world)
     requests, broken = Queue.of(world.ctx).requests()
-    assert not broken and len(asked) == 8  # both polls read both pages, for each environment
+    assert not broken and len(asked) == 12  # both polls read both pages, for each environment
     assert sorted(r.where for r in requests) == [
         "prod-app:app.notes in show",
         "prod-web:app.notes in show",
+        "slot0-app:app.notes in show",
         "staging-app:app.notes in show",
-    ]  # a slot's issue is no environment's
+    ]  # slot 1's issue is no environment's
     assert {(r.inbox, r.from_role, r.severity) for r in requests} == {("agents", "glitchtip", "normal")}
-    assert all(url.startswith(f"{GLITCHTIP}/api/0/organizations/notes/issues/?") for url in asked)
+    assert {url.split("/api/0/organizations/notes/issues/?")[0] for url in asked} == {GLITCHTIP, LAPTOP["url"]}
 
 
 @pytest.mark.parametrize(
@@ -80,19 +107,38 @@ def test_a_fatal_or_frequent_issue_is_severe(level: str | None, count: str | Non
     assert errors_import.severity(found, 100) == severity
 
 
-def test_an_issue_seen_after_its_fix_reached_prod_is_filed_again(world: World, asked: list[str]) -> None:
+@pytest.mark.parametrize(
+    ("env", "project", "reached"), [("prod", "prod-app", "promoted"), ("slot0", "slot0-app", "checked")]
+)
+def test_an_issue_seen_after_its_fix_reached_its_environment_is_filed_again(
+    world: World, asked: list[str], env: str, project: str, reached: str
+) -> None:
     errors_import.poll(world.ctx)
     queue = Queue.of(world.ctx)
-    first = next(r for r in queue.requests()[0] if r.where.startswith("prod-app"))
+    first = next(r for r in queue.requests()[0] if r.where.startswith(project))
     task = Task(id="t-0001", title="Notes show", requests=[first.id], goal_item="G1", severity="major",
-                surfaces=["api"], status="promoted", created=first.at, body="Fix it.", run=1, slices=1)  # fmt: skip
+                surfaces=["api"], status=reached, created=first.at, body="Fix it.", run=1, slices=1)  # fmt: skip
     with queue.lock():
         joined = dataclasses.replace(first, outcome="task t-0001")
         queue.write({task_rel(task.id): formats.dump_task(task), request_rel(first): formats.dump_request(joined)})
-        queue.log(task.id, "2026-10-09T10:30:00Z", "warden", "promoted", "on prod", to="promoted")
+        queue.log(task.id, "2026-10-09T10:30:00Z", "warden", reached, f"on {env}", to=reached)
 
-    world.clock.t += world.ctx.settings().get_int("errors.poll_minutes") * 60
-    errors_import.poll(world.ctx)  # the issue was last seen at 11:00, after the fix reached prod at 10:30
+    _next_poll(world)  # the issue was last seen at 11:00, after the fix reached its environment at 10:30
 
-    again = [r for r in Queue.of(world.ctx).requests()[0] if r.where.startswith("prod-app")]
-    assert len(again) == 2 and "came back after its fix shipped" in again[-1].body
+    again = [r for r in Queue.of(world.ctx).requests()[0] if r.where.startswith(project)]
+    assert len(again) == 2 and f"came back after its fix reached {env}" in again[-1].body
+
+
+def test_the_first_read_takes_open_issues_as_known_and_files_one_only_once_seen_again(
+    world: World, glitchtips: GlitchTips
+) -> None:
+    glitchtips.pages.update(TWO_PAGES)
+    errors_import.poll(world.ctx)
+    assert Queue.of(world.ctx).requests()[0] == []
+
+    seen_again = {**issue(5, "slot0-app"), "lastSeen": "2026-10-09T12:00:00Z"}
+    glitchtips.pages["c2"] = ([issue(3, "prod-web"), seen_again], LAST)
+    _next_poll(world)
+
+    filed = Queue.of(world.ctx).requests()[0]
+    assert [(r.where, "is new" in r.body) for r in filed] == [("slot0-app:app.notes in show", True)]

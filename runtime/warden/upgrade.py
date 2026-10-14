@@ -36,8 +36,8 @@ def migrate(ctx: Context) -> list[str]:
     """Bring every old shape over; what each step did."""
     done: list[str] = []
     steps: list[Callable[[Context], str]] = [
-        _inbox_cursor, _leases, _errors_filed, _turn, _merges, _released, _typed_verdicts, _approvals_routed,
-        _release_offer, _briefs_home, _active_account, _older_skills,
+        _inbox_cursor, _leases, _errors_filed, _errors_since, _turn, _merges, _released, _typed_verdicts,
+        _approvals_routed, _release_offer, _briefs_home, _active_account, _older_skills,
     ]  # fmt: skip
     for step in steps:
         try:
@@ -144,6 +144,18 @@ def _errors_filed(ctx: Context) -> str:
         store.write_json(errors_import.path(ctx.places, env), {"filed": issues, **imports.fresh()})
     old.unlink()
     return "the errors imports' records"
+
+
+def _errors_since(ctx: Context) -> str:
+    """An errors record that has read before reads on from now; one that never read takes what is open as known."""
+    changed = []
+    for env in errors_import.ENVS:
+        raw = store.read_json_or(errors_import.path(ctx.places, env), None)
+        if isinstance(raw, dict) and "since" not in raw:
+            since = ctx.clock.iso() if raw.get("polled") is not None else None
+            store.write_json(errors_import.path(ctx.places, env), {**raw, "since": since})
+            changed.append(env)
+    return f"when the {', '.join(changed)} errors imports began" if changed else ""
 
 
 def _turn(ctx: Context) -> str:

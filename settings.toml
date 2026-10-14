@@ -185,7 +185,7 @@ output_kib = 64         # the most of a check's report a session sees; the end i
 max_upload_kib = 512    # a picture, spec or triage plan sent with a factory command
 max_brief_kib = 8192    # a designer's brief, one HTML page with its pictures inline
 
-[errors]                # prod's and staging's unresolved GlitchTip issues, filed as requests from glitchtip
+[errors]                # prod's, staging's and slot 0's unresolved GlitchTip issues, filed as requests from glitchtip
 poll_minutes = 5        # how often the warden reads them
 max_pages = 5           # pages of issues one read covers, newest first
 severe_events = 100     # an issue seen this many times is severe and goes to intake at once, as a fatal one does
