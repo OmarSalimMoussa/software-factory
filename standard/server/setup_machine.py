@@ -226,8 +226,9 @@ def _tailscale(host: Host, config: Config) -> Check:
     done = host.read(TAILSCALE)
     name = config.server.tailnet
     todo = (
-        f"on the server, `sudo tailscale up --hostname={name.split('.')[0]}` so it joins the tailnet as {name} "
-        "(MagicDNS and HTTPS certificates on in the tailnet's DNS settings), then run the set-up again"
+        f"on the server, `sudo tailscale up --hostname={name.split('.')[0]} --advertise-tags=tag:server` so it joins "
+        f"the tailnet as {name}, tagged apart from your own devices (tag:server in the policy's tagOwners; MagicDNS "
+        "and HTTPS certificates on in the tailnet's DNS settings), then run the set-up again"
     )
     install = (("install Tailscale", ["sudo", "-n", "sh", "-c", "curl -fsSL https://tailscale.com/install.sh | sh"]),)
     if done.returncode == 3:

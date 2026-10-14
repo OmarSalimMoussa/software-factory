@@ -31,8 +31,10 @@ On a new server, run the set-up with `--fresh`. It does what an existing server 
 2. A 4 GB swapfile, so running out of memory slows the server down instead of killing a database.
 3. Docker and its compose plugin, from Docker's own package repository.
 4. Tailscale, installed only. Joining the tailnet is your step: on the server, run
-   `sudo tailscale up --hostname=<first part of [server] tailnet>`, then run the set-up again. The tailnet needs
-   MagicDNS and HTTPS certificates turned on in its DNS settings.
+   `sudo tailscale up --hostname=<first part of [server] tailnet> --advertise-tags=tag:server`, then run the set-up
+   again. The tag keeps the server apart from your own devices in the tailnet's rules, so the tailnet's policy must
+   list `tag:server` under `tagOwners`. Joining with the tag also turns the server's key expiry off, so it never drops
+   off the tailnet. The tailnet also needs MagicDNS and HTTPS certificates turned on in its DNS settings.
 
 The set-up never installs git: the server runs images, never a checkout.
 
