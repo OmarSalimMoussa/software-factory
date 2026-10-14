@@ -113,6 +113,18 @@ def test_a_server_refuses_every_marked_key_left_at_the_template_value(tmp_path: 
     write(tmp_path, template, server=False)  # a laptop slot keeps the laptop value
 
 
+def test_a_server_refuses_a_placeholder_in_any_key(tmp_path: Path) -> None:
+    template = TEMPLATE + "MODEL_KEY=REPLACE_ME\nAGENT_KEY='<agent-key>'\nMOTTO=<b>bold</b>\n"
+
+    with pytest.raises(EnvError) as refused:
+        write(tmp_path, template, server=True)
+
+    named = {p.split(" ", 1)[0] for p in refused.value.problems if "placeholder" in p}
+    assert named == {"MODEL_KEY", "AGENT_KEY"}
+    assert not any("<agent-key>" in p for p in refused.value.problems)  # the refusal names keys, never values
+    write(tmp_path, template, server=False)  # a laptop slot runs with a placeholder, and slot up names it
+
+
 def test_the_file_is_private_and_replaced_whole(tmp_path: Path) -> None:
     write(tmp_path)
     write(tmp_path)

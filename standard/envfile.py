@@ -5,7 +5,7 @@ write. Every other key keeps a value set by hand; one that still holds the defau
 takes the template's current value, so a changed default reaches every workspace and slot. The defaults of the last
 write are kept beside the file (``<file>.defaults``); a file written before that record existed keeps every value.
 Generated secrets are filled once, then kept. A key the template no longer has is dropped. On a server, a key under a
-`# server: <why>` line must be set by hand.
+`# server: <why>` line must be set by hand, and no key may hold a placeholder.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ SERVER_MARKER = "# server:"
 _ASSIGN = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 _HEX = re.compile(r"^(.*?)generate-with-openssl-rand-hex-([0-9]+)$")
 _FERNET = "generate-with-python-fernet"
+_PLACEHOLDER = re.compile(r"REPLACE_ME|^<[^<>]+>$")
 _MAX_HEX_BYTES = 256
 
 
@@ -93,7 +94,7 @@ def write(
         value, note = _value(line, rendered, services, held, defaults, existing is None)
         if note:
             notes.append(note)
-        if server and line.server_why and line.key not in rendered and line.key not in services:
+        if server and line.key not in rendered and line.key not in services:
             refusals += _unset_on_a_server(line, value)
         out.append(f"{line.key}={value}")
     extra = [key for key in services if key not in keys]
@@ -122,11 +123,18 @@ def _clashes(rendered: dict[str, str], services: dict[str, str]) -> list[str]:
 
 
 def _unset_on_a_server(line: _Line, value: str) -> list[str]:
-    if value == "":
+    if line.server_why and value == "":
         return [f"{line.key} is empty; a server workspace sets it by hand: {line.server_why}"]
-    if value == line.value:
+    if line.server_why and value == line.value:
         return [f"{line.key} still holds the template's value; a server workspace sets it by hand: {line.server_why}"]
+    if placeholders({line.key: value}):
+        return [f"{line.key} holds a placeholder (REPLACE_ME or one <name>); a server workspace sets it by hand"]
     return []
+
+
+def placeholders(values: dict[str, str]) -> list[str]:
+    """The keys whose value, quotes aside, holds REPLACE_ME or is one <name>: a value a person must supply."""
+    return [key for key, value in values.items() if _PLACEHOLDER.search(value.strip().strip("'\""))]
 
 
 def generate(marker: str) -> str | None:
