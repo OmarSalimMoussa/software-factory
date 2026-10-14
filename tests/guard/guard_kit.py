@@ -53,7 +53,7 @@ class Kit:
         (self.places.plugin / "factory-calls.md").write_text("Run factory on its own.\n")
         self.settings()
         self.transcript([])
-        store.write_json(self.public / "vitals.json", {"level": "green"})  # the warden's last reading
+        store.write_json(self.public / "vitals.json", {"level": "green", "why": ""})  # the warden's last reading
 
     @property
     def public(self) -> Path:

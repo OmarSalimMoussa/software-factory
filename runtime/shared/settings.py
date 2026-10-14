@@ -255,19 +255,26 @@ def build(defaults: dict[str, Any], overrides: Mapping[str, Any]) -> Settings:
                 problems.append(f"{key} is missing")
             continue
         problems += problems_for(key, value, tree)
-    if not problems and tree["vitals"]["memory_red_gib"] >= tree["vitals"]["memory_amber_gib"]:
-        problems.append("vitals.memory_red_gib must be below vitals.memory_amber_gib")
-    if not problems and tree["cost"]["plan_amber_percent"] >= tree["cost"]["plan_red_percent"]:
-        problems.append("cost.plan_amber_percent must be below cost.plan_red_percent")
-    if not problems:
-        problems += [
-            f"sandbox.writable_caches: {path!r} must be a folder inside the agent's home, such as .cache/uv, and not "
-            f"under {', '.join(sorted(_UNWRITABLE))}"
-            for path in tree["sandbox"]["writable_caches"] if not _home_folder(path)
-        ]  # fmt: skip
+    problems = problems or _between(tree)
     if problems:
         raise SettingsError(problems)
     return Settings(tree, defaults, dict(overrides))
+
+
+_BELOW = (
+    ("vitals.memory_red_gib", "vitals.memory_amber_gib"),
+    ("vitals.battery_red", "vitals.battery_amber"),
+    ("cost.plan_amber_percent", "cost.plan_red_percent"),
+)
+
+
+def _between(tree: dict[str, Any]) -> list[str]:
+    problems = [f"{low} must be below {high}" for low, high in _BELOW if _leaf(tree, low) >= _leaf(tree, high)]
+    return problems + [
+        f"sandbox.writable_caches: {path!r} must be a folder inside the agent's home, such as .cache/uv, and not "
+        f"under {', '.join(sorted(_UNWRITABLE))}"
+        for path in tree["sandbox"]["writable_caches"] if not _home_folder(path)
+    ]  # fmt: skip
 
 
 def load(defaults_path: Path, overrides_path: Path | None) -> Settings:

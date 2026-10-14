@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.dashboard.views.home import memory_free
+from runtime.dashboard.views.home import memory_free, on_mains
 from runtime.dashboard.views.kit import Parts, Query, Snap
 from runtime.dashboard.views.words import agentwords
 from runtime.shared.models import RETIRED
@@ -44,7 +44,7 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
         out.append({"label": "Power", "value": "unknown", "pct": None, "tone": ""})
     else:
         battery = power["figure"]
-        mains = power["level"] == "green"
+        mains = on_mains(power)
         out.append(
             {
                 "label": "Power",

@@ -167,6 +167,7 @@ def test_while_sessions_run_unseen_the_crash_watch_resumes_and_retires_none(worl
     blind = {
         "at": NOW,
         "level": "red",
+        "why": "sessions: 1 unseen",
         "readings": [{"name": "sessions", "level": "red", "value": "1 unseen", "figure": None}],
     }
     store.write_json(world.ctx().places.vitals, blind)

@@ -73,28 +73,28 @@ def ranking(ctx: Context) -> order.Ranking:
     return order.Ranking(approved_order(ctx), tasks.goal_ranks(ctx))
 
 
-def vitals_level(ctx: Context) -> str:
+def vitals_level(ctx: Context) -> tuple[str, str]:
     try:
         raw = store.read_json(ctx.places.vitals)
     # telemetry: expected — no vitals yet: none has been read, so the level is unknown
     except FileNotFoundError:
-        return "unknown"
+        return "unknown", "none read yet"
     except store.StoreError as exc:
         raise Refused("vitals", f"the vitals cannot be read ({exc}); see factory status") from exc
-    level = raw.get("level") if isinstance(raw, dict) else None
-    if level not in LEVELS:
-        raise Refused("vitals", "the vitals record names no level; see factory status")
-    return str(level)
+    level, why = (raw.get("level"), raw.get("why")) if isinstance(raw, dict) else (None, None)
+    if level not in LEVELS or not isinstance(why, str):
+        raise Refused("vitals", "the vitals record names no level and readings; see factory status")
+    return str(level), why
 
 
 def check_vitals(ctx: Context, severe: bool) -> None:
     """Red blocks every start; amber, or vitals not read yet, block all but severe work. So does a day whose known
     spend, at API prices, reached cost.daily_budget_usd."""
-    level = vitals_level(ctx)
+    level, why = vitals_level(ctx)
     if level == "red":
-        raise Refused("vitals", "the machine's vitals are red, so nothing starts; see factory status")
+        raise Refused("vitals", f"the machine's vitals are red ({why}), so nothing starts")
     if level != "green" and not severe:
-        raise Refused("vitals", f"the machine's vitals are {level}, so only severe work starts; see factory status")
+        raise Refused("vitals", f"the machine's vitals are {level} ({why}), so only severe work starts")
     budget = ctx.settings().get_float("cost.daily_budget_usd")
     spent = cost.spent_days(ctx).get(ctx.clock.iso()[:10], [0.0, 0])[0]
     if spent >= budget and not severe:

@@ -80,10 +80,11 @@ def test_a_deprioritized_run_that_outranks_an_approved_one_comes_back_first(worl
 def test_a_designed_build_starts_its_implementer_and_a_run_that_cannot_start_says_why(world: World) -> None:
     world.approve("t-0001", run=3, slices=2, status="building")
     proposals.set_designed_builds(world.places, ["t-0001"])
-    world.vitals("amber")
+    world.vitals("amber", "power: on battery, 25%")
 
     schedule.run_pass(world.ctx())
-    assert _live(world, "t-0001") == [] and "only severe work starts" in schedule.waits(world.places)["t-0001"]
+    assert _live(world, "t-0001") == []
+    assert "amber (power: on battery, 25%), so only severe work starts" in schedule.waits(world.places)["t-0001"]
 
     world.vitals("green")
     schedule.run_pass(world.ctx())

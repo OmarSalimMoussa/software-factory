@@ -40,12 +40,14 @@ def _supply(root: Path, name: str, **files: str) -> None:
         ({}, vitals.GREEN),  # a desktop or a VM lists no supply
         ({"hidpp_battery_0": {"type": "Battery", "scope": "Device", "capacity": "5"}}, vitals.GREEN),
         ({"AC": {"type": "Mains", "online": "1"}, "BAT0": {"type": "Battery", "capacity": "50"}}, vitals.GREEN),
-        ({"AC": {"type": "Mains", "online": "0"}, "BAT0": {"type": "Battery", "capacity": "50"}}, vitals.AMBER),
-        ({"BAT0": {"type": "Battery", "capacity": "5"}}, vitals.RED),
+        ({"AC": {"type": "Mains", "online": "0"}, "BAT0": {"type": "Battery", "capacity": "30"}}, vitals.GREEN),
+        ({"BAT0": {"type": "Battery", "capacity": "29"}}, vitals.AMBER),
+        ({"BAT0": {"type": "Battery", "capacity": "15"}}, vitals.AMBER),
+        ({"BAT0": {"type": "Battery", "capacity": "14"}}, vitals.RED),
     ],
-    ids=["none-listed", "a-mouse-battery", "on-mains", "on-battery", "battery-low"],
+    ids=["none-listed", "a-mouse-battery", "on-mains", "on-battery", "below-amber", "at-red", "below-red"],
 )
-def test_a_machine_with_no_battery_of_its_own_is_on_mains(
+def test_power_is_green_on_mains_or_a_charged_battery_and_turns_amber_then_red_as_it_drains(
     world: World, tmp_path: Path, supplies: dict[str, dict[str, str]], level: str
 ) -> None:
     root = tmp_path / "power_supply"
@@ -53,6 +55,15 @@ def test_a_machine_with_no_battery_of_its_own_is_on_mains(
     for name, files in supplies.items():
         _supply(root, name, **files)
     assert vitals.power(root, world.ctx.settings()).level == level
+
+
+def test_the_machines_level_names_the_readings_that_set_it() -> None:
+    memory = vitals.Reading("memory", vitals.GREEN, "8.0 GiB free")
+    power = vitals.Reading("power", vitals.AMBER, "on battery, 25%")
+    cpu = vitals.Reading("cpu", vitals.AMBER, "pressure 70% over a minute")
+    assert vitals.why([memory]) == ""
+    assert vitals.why([memory, power, cpu]) == "power: on battery, 25%; cpu: pressure 70% over a minute"
+    assert vitals.why([power, vitals.Reading("install", vitals.RED, "differs")]) == "install: differs"
 
 
 def test_a_reading_the_kernel_does_not_have_is_missing_and_blocks_nothing(world: World) -> None:

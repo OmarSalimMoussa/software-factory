@@ -22,7 +22,7 @@ from runtime.guard.facts import (
     Rewrite,
     read_desktops,
     read_ready,
-    read_vitals_level,
+    read_vitals,
 )
 from runtime.guard.wire import HANDBACK, REFUSED
 from runtime.shared.models import RETIRED, WITH_PARENT
@@ -87,8 +87,7 @@ def _browsers(call: Call, kind: str) -> Decision:
     if kind not in personas:
         return None
     alive = {sid for sid, s in call.sessions.items() if s.state in ("working", "waiting")}
-    # A tester can run no longer than the most items at their seconds, and the quiet a lost hand-back leaves: a row
-    # older than that holds no browser, whatever its state says.
+    # No tester runs past its items' time and a lost hand-back's quiet: an older row holds no browser, whatever it says.
     longest = call.settings.get_int("qa.max_items") * call.settings.get_int("qa.seconds_per_item")
     longest += call.settings.get_int("qa.stale_seconds")
     running = [s for s in call.sessions.values() if s.parent in alive and s.state == "working" and s.role in personas
@@ -97,10 +96,10 @@ def _browsers(call: Call, kind: str) -> Decision:
     if len(running) >= cap:
         return Refusal("subagents-at-once", f"{len(running)} browser testers run on this machine, its cap of {cap}; "
                                             "wait for one to report")  # fmt: skip
-    level = read_vitals_level(call.places)
+    level, why = read_vitals(call.places)
     if level != "green":
-        return Refusal("subagents-at-once", f"the machine's vitals are {level}: a browser tester starts once they "
-                                            "are green; test what needs no browser first")  # fmt: skip
+        return Refusal("subagents-at-once", f"the machine's vitals are {level} ({why}): a browser tester starts once "
+                                            "they are green; test what needs no browser first")  # fmt: skip
     return None
 
 

@@ -47,6 +47,11 @@ def worst(readings: list[Reading]) -> str:
     return max((r.level for r in readings if r.level != MISSING), key=LEVELS.index, default=GREEN)
 
 
+def why(readings: list[Reading]) -> str:
+    level = worst(readings)
+    return "" if level == GREEN else "; ".join(f"{r.name}: {r.value}" for r in readings if r.level == level)
+
+
 def memory(meminfo: str, settings: Settings) -> Reading:
     found = re.search(r"^MemAvailable:\s+(\d+) kB", meminfo, re.MULTILINE)
     if found is None:
@@ -95,8 +100,13 @@ def power(supplies: Path, settings: Settings) -> Reading:
         return Reading("power", GREEN, "no battery is listed, so on mains power")
     if battery is None:
         return Reading("power", AMBER, "on battery")
-    level = RED if battery < settings.get_int("vitals.battery_red") else AMBER
-    return Reading("power", level, f"on battery, {battery}%", float(battery))
+    return Reading("power", _charge(battery, settings), f"on battery, {battery}%", float(battery))
+
+
+def _charge(battery: int, settings: Settings) -> str:
+    if battery < settings.get_int("vitals.battery_red"):
+        return RED
+    return AMBER if battery < settings.get_int("vitals.battery_amber") else GREEN
 
 
 def _files(root: Path) -> list[Path]:
@@ -112,8 +122,7 @@ def install_digest(root: Path) -> str:
     return digest.hexdigest()
 
 
-# The install's file stamps and the hash they were read at, by install folder: the hash is read again only when a
-# file's inode, size or change time moved, not every tick.
+# By install folder, its files' stamps and their hash: the hash is read again only when a stamp moved, not every tick.
 _HASHED: dict[str, tuple[str, str]] = {}
 
 
@@ -259,8 +268,8 @@ def refresh(ctx: Context, proc: Path = PROC, supplies: Path = POWER) -> dict[str
         records(proc, launch.agent_uid(), settings.get_int("watch.start_grace_seconds")),
         firewall(ctx.places.firewall_stamp, ctx.clock.now(), settings),
     ]
-    level = worst(readings)
-    snapshot = {"at": ctx.clock.iso(), "level": level, "readings": [asdict(r) for r in readings]}
+    level, said = worst(readings), why(readings)
+    snapshot = {"at": ctx.clock.iso(), "level": level, "why": said, "readings": [asdict(r) for r in readings]}
     store.write_json(ctx.places.vitals, snapshot)
-    public.write_vitals_level(ctx.places, level)
+    public.write_vitals(ctx.places, level, said)
     return snapshot

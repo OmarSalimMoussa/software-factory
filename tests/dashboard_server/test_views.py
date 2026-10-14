@@ -428,3 +428,29 @@ def test_a_replay_not_built_says_why_in_its_place(rig: Rig, replay: dict[str, An
     data = rig.parts(REPLAY_URL)["replay"]["data"]
     assert (data["title"], data["says"]) == ("Sign-in sends people back to the sign-in page", says)
     assert "rows" not in data
+
+
+@pytest.mark.parametrize(
+    ("level", "figure", "home", "guard"),
+    [
+        ("green", None, "Mains", "On mains"),
+        ("green", 62.0, "62%", "Battery 62%"),
+        ("amber", 25.0, "25%", "Battery 25%"),
+        ("amber", None, "on battery", "On battery"),
+        ("unknown", None, "unknown", "unknown"),
+    ],
+    ids=["mains", "charged-battery", "low-battery", "battery-unread", "supplies-unread"],
+)
+def test_power_reads_mains_only_when_the_reading_has_no_charge(
+    rig: Rig, level: str, figure: float | None, home: str, guard: str
+) -> None:
+    vitals = store.read_json(rig.places.vitals)
+    power = next(r for r in vitals["readings"] if r["name"] == "power")
+    words = {"amber": "on battery", "unknown": "cannot read the power supplies: OSError"}
+    power.update(level=level, figure=figure, value=words.get(level, "") if figure is None else "")
+    store.write_json(rig.places.vitals, vitals)
+
+    laptop = rig.parts("/api/home")["envs"]["data"]["laptop"]
+    rows = rig.parts("/api/guard")["vitals"]["data"]
+    assert [r["value"] for r in laptop["rows"] if r["label"] == "Power"] == [home]
+    assert [r["value"] for r in rows if r["label"] == "Power"] == [guard]

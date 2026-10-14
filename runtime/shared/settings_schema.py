@@ -125,6 +125,7 @@ SCHEMA: dict[str, Spec] = {
     "vitals.memory_amber_gib": Spec("float", 0.5, 256),
     "vitals.memory_red_gib": Spec("float", 0.25, 256),
     "vitals.cpu_pressure_amber": Spec("float", 1, 100),
+    "vitals.battery_amber": Spec("int", 0, 100),
     "vitals.battery_red": Spec("int", 0, 100),
     "vitals.firewall_stale_seconds": Spec("int", 30, 3600),
     "watch.tick_seconds": Spec("int", 5, 120),

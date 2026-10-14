@@ -174,7 +174,7 @@ def _seed_health(places: Places, now: float) -> None:
         ("daemon", "green", "inside the slice", None),
     ]
     rows = [{"name": n, "level": lv, "value": v, "figure": f} for n, lv, v, f in readings]
-    store.write_json(places.vitals, {"at": iso(now), "level": "green", "readings": rows})
+    store.write_json(places.vitals, {"at": iso(now), "level": "green", "why": "", "readings": rows})
     store.write_json(
         places.state / "docker-disk.json", {"at": iso(now), "bytes": 38 * 1024**3, "budget_bytes": 60 * 1024**3}
     )

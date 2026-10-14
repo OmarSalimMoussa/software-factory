@@ -189,8 +189,8 @@ class World:
     def run(self, sid: str) -> None:
         self.procs[sid] = Proc(pid=4000 + len(self.procs), session=sid, name=self.session(sid).name, chat_link="")
 
-    def vitals(self, level: str) -> None:
-        store.write_json(self.places.vitals, {"at": "2026-10-09T12:00:00Z", "level": level, "readings": []})
+    def vitals(self, level: str, why: str = "") -> None:
+        store.write_json(self.places.vitals, {"at": "2026-10-09T12:00:00Z", "level": level, "why": why, "readings": []})
 
     def later(self, seconds: float) -> None:
         self.clock.at += seconds

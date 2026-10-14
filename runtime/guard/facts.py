@@ -92,13 +92,13 @@ def read_switches(places: Places) -> frozenset[str]:
     return frozenset(off)
 
 
-def read_vitals_level(places: Places) -> str:
-    """The machine's vitals level the warden last published; "unknown" before its first reading."""
-    raw = store.read_json_or(public(places) / "vitals.json", {"level": "unknown"})
-    level = raw.get("level") if isinstance(raw, dict) else None
-    if not isinstance(level, str):
-        raise store.StoreError(f"{public(places) / 'vitals.json'}: holds no level")
-    return level
+def read_vitals(places: Places) -> tuple[str, str]:
+    """The vitals level the warden last published, and the readings that set it; "unknown" before its first."""
+    raw = store.read_json_or(public(places) / "vitals.json", {"level": "unknown", "why": "none read yet"})
+    found = (raw.get("level"), raw.get("why")) if isinstance(raw, dict) else (None, None)
+    if not all(isinstance(part, str) for part in found):
+        raise store.StoreError(f"{public(places) / 'vitals.json'}: holds no level and readings")
+    return str(found[0]), str(found[1])
 
 
 def read_desktops(places: Places) -> dict[str, str]:

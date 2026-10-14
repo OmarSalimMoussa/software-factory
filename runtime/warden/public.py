@@ -30,9 +30,9 @@ def write_switches(places: Places, off: Iterable[str]) -> None:
     store.write_json(folder(places) / "switches.json", record)
 
 
-def write_vitals_level(places: Places, level: str) -> None:
-    """The machine's vitals level, for the guard's start of a browser tester."""
-    store.write_json(folder(places) / "vitals.json", {"level": level})
+def write_vitals(places: Places, level: str, why: str) -> None:
+    """The machine's vitals level and the readings that set it, for the guard's start of a browser tester."""
+    store.write_json(folder(places) / "vitals.json", {"level": level, "why": why})
 
 
 def desktops_path(places: Places) -> Path:

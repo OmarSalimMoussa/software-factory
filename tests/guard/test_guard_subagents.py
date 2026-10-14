@@ -234,9 +234,13 @@ def test_browser_testers_are_capped_across_the_machine_and_start_only_on_green_v
         kit.session("implementer", sid=f"other-{n}")
         kit.session("qa-ux", sid=f"tester-{n}", parent=f"other-{n}", agent_id=f"a{n}",
                     started=(NOW - timedelta(seconds=age)).isoformat())  # fmt: skip
-    store.write_json(kit.public / "vitals.json", {"level": level})
+    why = "" if level == "green" else "power: on battery, 25%"
+    store.write_json(kit.public / "vitals.json", {"level": level, "why": why})
     brief = "Scenarios and checks: 1\nWalk the sign-in."
-    assert (kit.rule("Agent", {"subagent_type": "qa-ux", "prompt": brief}) == "subagents-at-once") is refused
+    decision = kit.decide("Agent", {"subagent_type": "qa-ux", "prompt": brief})
+    refusal = decision if isinstance(decision, Refusal) else None
+    assert (refusal is not None and refusal.rule == "subagents-at-once") is refused
+    assert refusal is None or why in refusal.reason  # it names the reading that holds the tester back
 
 
 @pytest.mark.parametrize("kind", ["intake", "Explore", "qa-backend"])

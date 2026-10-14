@@ -269,6 +269,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("vitals.memory_amber_gib", "Free memory that turns amber, GiB"),
             ("vitals.memory_red_gib", "Free memory that turns red, GiB"),
             ("vitals.cpu_pressure_amber", "CPU pressure that turns amber, %"),
+            ("vitals.battery_amber", "Battery that turns amber, %"),
             ("vitals.battery_red", "Battery that turns red, %"),
             ("vitals.firewall_stale_seconds", "Firewall last loaded longer ago than this turns red, seconds"),
         ],

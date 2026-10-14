@@ -91,9 +91,10 @@ def laptop(snap: Snap) -> dict[str, Any]:
     state, label, tone = _LAPTOP[vitals["level"]]
     cpu, power = readings["cpu"], readings["power"]
     cpu_pct, power_pct = cpu["figure"], power["figure"]
-    mains = power["level"] == "green"
+    mains = on_mains(power)
     used = memory_used(snap)
     cpu_words = f"{cpu_pct:.0f}%" if cpu_pct is not None else "not reported" if cpu["level"] == "missing" else "unknown"
+    power_words = "Mains" if mains else f"{power_pct:.0f}%" if power_pct is not None else power["value"]
     return {
         "state": state,
         "tone": tone,
@@ -104,10 +105,15 @@ def laptop(snap: Snap) -> dict[str, Any]:
             {
                 "label": "Power",
                 "pct": 100 if mains else (round(power_pct) if power_pct is not None else None),
-                "value": "Mains" if mains else (f"{power_pct:.0f}%" if power_pct is not None else power["value"]),
+                "value": "unknown" if power["level"] == "unknown" else power_words,
             },
         ],
     }
+
+
+def on_mains(power: dict[str, Any]) -> bool:
+    """On battery, the power reading's figure is the charge, at any level; on mains it has none."""
+    return power["level"] == "green" and power["figure"] is None
 
 
 def memory_free(snap: Snap) -> tuple[float, int] | None:

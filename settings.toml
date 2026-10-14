@@ -129,6 +129,7 @@ test_reserve_mib = 4096
 memory_amber_gib = 8.0
 memory_red_gib = 4.0
 cpu_pressure_amber = 60.0
+battery_amber = 30
 battery_red = 15
 firewall_stale_seconds = 180  # the firewall loaded longer ago than this is red: every start waits
 

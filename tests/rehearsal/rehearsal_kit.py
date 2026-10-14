@@ -348,7 +348,7 @@ def build(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Rehearsal:
     public.write_switches(places, public.read_switches(places))
     registry.write(places, registry.read(places))
     settings_save.render_plugin(places, settings())
-    store.write_json(places.vitals, {"at": clock.iso(), "level": "green", "readings": []})
+    store.write_json(places.vitals, {"at": clock.iso(), "level": "green", "why": "", "readings": []})
     key = github_push.deploy_key(places)
     key.parent.mkdir(parents=True)
     key.write_text("not a real key\n")

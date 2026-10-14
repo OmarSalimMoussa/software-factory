@@ -226,6 +226,20 @@ def test_a_writable_cache_must_be_a_folder_of_the_agents_home_no_session_could_e
         settings(**{"sandbox.writable_caches": [".npm", cache]})
 
 
+@pytest.mark.parametrize(
+    ("low", "high"),
+    [
+        ("vitals.memory_red_gib", "vitals.memory_amber_gib"),
+        ("vitals.battery_red", "vitals.battery_amber"),
+        ("cost.plan_amber_percent", "cost.plan_red_percent"),
+    ],
+)
+def test_a_lower_limit_must_stay_below_the_one_above_it(low: str, high: str) -> None:
+    section, key = high.split(".")
+    with pytest.raises(SettingsError, match=f"{low} must be below {high}"):
+        settings(**{low: settings().tree()[section][key]})
+
+
 WARDEN_OWNED = "(600, software-warden:software-warden)"
 
 
