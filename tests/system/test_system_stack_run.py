@@ -26,7 +26,6 @@ Path(__file__).with_name("ran.json").write_text(json.dumps(
     {{"verb": sys.argv[1:], "env_file": str(env_file), "written": env_file.is_file()}}))
 (env_file.parent / "seeds").mkdir(exist_ok=True)
 (env_file.parent / "seeds" / "users.json").write_text("[]")
-print("connecting with", os.environ.get("DATABASE_URL", "postgresql://n:pw@db:5432/n"), "on port 8102")
 sys.exit(int(os.environ["DEV_EXIT"]))
 """
 SERVICES = (
@@ -141,14 +140,3 @@ def test_the_sweep_removes_the_containers_still_on_a_slots_network_before_the_ne
     assert status == 0
     assert removals == ["container rm -f c-web", "container rm -f agent-7 agent-8", "network rm n-slot2"]
     assert "removed 2 container(s) still on slot 2's network n-slot2: agent-7, agent-8" in capsys.readouterr().out
-
-
-def test_what_a_verb_prints_reaches_no_one_with_a_secret_in_it(
-    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setenv("DEV_EXIT", "0")
-
-    _verb(tmp_path, checkout, Shared(checkout), monkeypatch, "empty")  # empty removes the env file as it ends
-
-    out = capsys.readouterr().out
-    assert "connecting with [redacted] on port 8102" in out and "pw@db" not in out

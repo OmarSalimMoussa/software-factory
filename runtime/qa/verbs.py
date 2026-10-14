@@ -8,7 +8,6 @@ runs; the guard reads the records from public/ to let testers start, and counts 
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +15,7 @@ from runtime.qa import evidence, findings, plan, qa_browser, steps
 from runtime.queue import tasks
 from runtime.queue.formats import SHA
 from runtime.queue.statuses import IMPL
-from runtime.shared import store
+from runtime.shared import slices, store
 from runtime.shared.models import RETIRED, Session, Task
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import health, leases
@@ -31,10 +30,6 @@ def _implementer(ctx: Context) -> Session:
     if session is None or session.role != IMPL or session.state == RETIRED:
         raise Refused("qa", "QA belongs to a live implementer's run")
     return session
-
-
-# A slice's commit ends its message with this trailer: `Slice: 2/4`.
-_SLICE = re.compile(r"(\d+)/\d+")
 
 
 def _git(ctx: Context, cwd: str, *argv: str) -> str:
@@ -106,9 +101,9 @@ def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     lease = leases.held_by(ctx.places, ctx.settings(), session.name)
     if lease is None:
         raise Refused("slot", "claim a slot and rebuild it at your head first: factory slot claim, then slot up")
-    running = health.running_commit(ctx, lease.slot, session.id)
-    if running is None or not (head.startswith(running) or running.startswith(head)):
-        raise Refused("qa-ready", f"your slot runs {running or 'nothing readable'}, not {head[:9]}: rebuild it")
+    why = health.off_head(ctx, lease.slot, session.id, head)
+    if why is not None:
+        raise Refused("qa-ready", why)
     testers = testers_for(ctx, session, task)
     with ctx.lock:
         records = ready_records(ctx, session)
@@ -133,23 +128,30 @@ def _ready_slices(ctx: Context, session: Session, asked: str, task: Task, slices
 
 
 def _slice_commits(ctx: Context, session: Session, head: str, count: int | None) -> list[str]:
-    """The commit each slice ended with, found by its `Slice: <n>/<N>` trailer on the branch: the newest per slice,
-    in slice order. Refused, naming what is missing, unless every slice of the task's count has one."""
+    """The commit each slice ended with, found by its `Slice: <n>/<N>` line on the branch: the newest per slice, in
+    slice order. Refused, naming what is wrong, unless every slice of the task's count has one."""
     default = ctx.settings().get_str("repo.default_branch")
-    log = _git(ctx, session.worktree, "log", "--format=%H%x09%(trailers:key=Slice,valueonly,separator=%x20)",
-               f"{default}..{head}")  # fmt: skip
+    # One record per commit: the sha, a unit separator, the whole message, a record separator.
+    log = _git(ctx, session.worktree, "log", "--format=%H%x1f%B%x1e", f"{default}..{head}")
     found: dict[int, str] = {}
-    for line in log.splitlines():
-        commit, _, trailer = line.partition("\t")
-        mark = _SLICE.fullmatch(trailer.strip())
-        if mark and int(mark.group(1)) not in found:
-            found[int(mark.group(1))] = commit
+    for record in log.split("\x1e"):
+        commit, _, message = record.strip().partition("\x1f")
+        try:
+            place = slices.mark(message)
+        except slices.SliceError as exc:
+            raise Refused("qa-ready", f"{commit[:9]} cannot be read as one slice: {exc}") from None
+        if place is None:
+            continue
+        if count and place[1] != count:
+            raise Refused("qa-ready", f"{commit[:9]} says Slice: {place[0]}/{place[1]}, but the task has {count} "
+                                      "slices; name the commits with --slices")  # fmt: skip
+        found.setdefault(place[0], commit)
     want = count if count else max(found, default=0)
     missing = [str(n) for n in range(1, want + 1) if n not in found]
     if not want or missing:
         named = f"Slice: {', '.join(missing) or 1}/{want or 'N'}"
-        raise Refused("qa-ready", f"no commit on your branch carries the trailer {named}; end each slice's commit "
-                                  "with it, or name the commits with --slices")  # fmt: skip
+        raise Refused("qa-ready", f"no commit on your branch has the line {named}; end each slice's commit with it, "
+                                  "or name the commits with --slices")  # fmt: skip
     return [found[n] for n in range(1, want + 1)]
 
 
@@ -170,10 +172,10 @@ def ready_check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
     if not records:
         raise Refused("ready-check", "not ready: no slices recorded")
     latest = records[-1]
-    running = health.running_commit(ctx, int(latest["slot"]), session.id)
     head = str(latest["head"])
-    if running is None or not (head.startswith(running) or running.startswith(head)):
-        raise Refused("ready-check", f"not ready: the slot runs {running or 'nothing readable'}, not {head[:9]}")
+    why = health.off_head(ctx, int(latest["slot"]), session.id, head)
+    if why is not None:
+        raise Refused("ready-check", f"not ready: {why}")
     return ok(head=head, slot=latest["slot"], testers=latest.get("testers", []))
 
 

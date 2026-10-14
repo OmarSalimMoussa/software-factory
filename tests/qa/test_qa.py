@@ -121,9 +121,27 @@ def test_qa_clean_waits_for_every_required_tester_on_the_head(ready_world: World
     assert world.queue().task("t-0001").status == "qa-clean"
 
 
-def test_qa_ready_needs_the_slot_running_the_head(ready_world: World, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(health, "http_get", lambda url, timeout, limit: b'{"build_commit": "bbbbbbb"}')
-    with pytest.raises(Refused, match="your slot runs bbbbbbb"):
+def _no_answer(url: str, timeout: int, limit: int) -> bytes:
+    raise ConnectionRefusedError("refused")
+
+
+@pytest.mark.parametrize(
+    ("printed", "answer", "refusal"),
+    [
+        ("http://127.0.0.1:8101/health", lambda *_: b'{"build_commit": "bbbbbbb"}', "your slot runs bbbbbbb"),
+        ("http://127.0.0.1:8101/health", lambda *_: b'{"build_commit": "dev-slot1"}', "the stand-in its env file"),
+        ("http://127.0.0.1:8101/health", _no_answer, "gave no commit (ConnectionRefusedError)"),
+        # A bracketed host that is no address made the probe raise, and the warden answered "the warden failed".
+        ("http://[redacted]:8101/health", lambda *_: b"{}", "must end with the slot's health address"),
+        ("", lambda *_: b"{}", "health exited 0 with no address"),
+    ],
+)
+def test_qa_ready_needs_the_slot_running_the_head(
+    ready_world: World, monkeypatch: pytest.MonkeyPatch, printed: str, answer: object, refusal: str
+) -> None:
+    ready_world.launcher.stack = lambda n, verb: StackResult(0, f"{printed}\n", "/log")
+    monkeypatch.setattr(health, "http_get", answer)
+    with pytest.raises(Refused, match=re.escape(refusal)):
         qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
     assert not (ready_world.places.state / "public" / "ready" / f"{IMPL_ID}.json").exists()
 
@@ -134,17 +152,30 @@ def test_only_a_registered_tester_reports_a_result(ready_world: World) -> None:
         _result(ready_world, "")
 
 
+def _log(*commits: tuple[str, str]) -> str:
+    """git log's answer for --format=%H%x1f%B%x1e, newest first: each commit's sha and whole message."""
+    return "".join(f"{sha}\x1f{message}\n\x1e\n" for sha, message in commits)
+
+
+A, B, C = "a" * 40, "b" * 40, "c" * 40
+COAUTHOR = "Co-Authored-By: Claude <noreply@anthropic.com>"
+
+
 @pytest.mark.parametrize(
     ("log", "found"),
     [
-        (f"{'b' * 40}\t2/2\n{'a' * 40}\t1/2\n", ["a" * 40, "b" * 40]),
-        (f"{'c' * 40}\t2/2\n{'b' * 40}\t2/2\n{'a' * 40}\t1/2\n", ["a" * 40, "c" * 40]),  # the newest per slice
-        (f"{'a' * 40}\t1/2\n", None),
+        (_log((B, "Pay\n\nSlice: 2/2"), (A, "Cart\n\nSlice: 1/2")), [A, B]),
+        (_log((C, "Pay again\n\nSlice: 2/2"), (B, "Pay\n\nSlice: 2/2"), (A, "Cart\n\nSlice: 1/2")), [A, C]),
+        # The line sat in its own paragraph above the attribution, where git's trailer reader never looks.
+        (_log((B, f"Pay\n\nSlice: 2/2\n\n{COAUTHOR}"), (A, f"Cart\n\nSlice: 1/2\n\n{COAUTHOR}")), [A, B]),
+        (_log((A, "Cart\n\nSlice: 1/2")), "Slice: 2/2"),
+        (_log((B, "Pay\n\nSlice: 2/2\nSlice: 1/2"), (A, "Cart\n\nSlice: 1/2")), "2 different Slice lines"),
+        (_log((B, "Pay\n\nSlice: 2/3"), (A, "Cart\n\nSlice: 1/2")), "the task has 2 slices"),
     ],
-    ids=["both-slices", "a-slice-redone", "a-slice-missing"],
+    ids=["both-slices", "a-slice-redone", "attribution-after", "a-slice-missing", "two-places", "wrong-count"],
 )
-def test_qa_ready_finds_each_slices_commit_by_its_trailer(
-    ready_world: World, log: str, found: list[str] | None
+def test_qa_ready_finds_each_slices_commit_by_its_slice_line(
+    ready_world: World, log: str, found: list[str] | str
 ) -> None:
     task = ready_world.queue().task("t-0001")
     ready_world.queue().write_task(dataclasses.replace(task, slices=2))
@@ -152,8 +183,8 @@ def test_qa_ready_finds_each_slices_commit_by_its_trailer(
     ready_world.launcher.git = lambda argv: (0, answers[argv[3]])
     impl = ready_world.ctx("implementer", IMPL_ID)
 
-    if found is None:
-        with pytest.raises(Refused, match="Slice: 2/2"):
+    if isinstance(found, str):
+        with pytest.raises(Refused, match=re.escape(found)):
             qa.qa_ready(impl, {"head": HEAD[:12]}, None)
         return
     qa.qa_ready(impl, {"head": HEAD[:12]}, None)

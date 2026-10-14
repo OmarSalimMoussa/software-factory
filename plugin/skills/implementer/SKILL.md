@@ -34,8 +34,8 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 
 - **Build it yourself;** your only subagents are testers and `Explore`. You never drive the product: no browser and
   no walking a flow. That is your testers' work.
-- **Every slice before any tester.** QA is one loop at the end. End each slice with a commit whose message ends
-  with the trailer `Slice: <n>/<N>` (`git commit -m "<what>" -m "Slice: 2/4"`): the warden finds the slices by it.
+- **Every slice before any tester.** QA is one loop at the end. End each slice with a commit whose message has the
+  line `Slice: <n>/<N>` (`git commit -m "<what>" -m "Slice: 2/4"`): the warden finds the slices by it.
 - **Tests first,** at the seam a caller sees. A bug is reproduced in a failing test before you fix it (the
   `debugging` skill).
 - **Run only what covers your change:** the tests your diff picks (`factory check --only tests`), and the product's
@@ -49,7 +49,7 @@ Run factory on its own: no pipe, redirect, heredoc, cd or && in the same call; w
 ## 3. QA rounds
 
 1. **Ready.** With every slice committed, rebuild your slot at the head (`factory slot up`), then
-   `factory qa-ready <head>`. The warden finds each slice's commit by its trailer, checks it is on your branch, and
+   `factory qa-ready <head>`. The warden finds each slice's commit by its Slice line, checks it is on your branch, and
    that your slot runs the head. No tester starts without it.
 2. **Who.** `factory qa plan` prints the testers your change requires, with the reason for each. You may add a
    tester, never drop one. A change with no required tester goes straight to `factory qa-clean`.

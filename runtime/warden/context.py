@@ -34,7 +34,7 @@ class Caller:
 @dataclass(frozen=True, slots=True)
 class StackResult:
     exit: int
-    tail: str  # the last slots.log_tail_lines lines, every slot secret redacted
+    tail: str  # the last slots.log_tail_lines lines
     log: str  # where the full output was saved, for the owner
 
 

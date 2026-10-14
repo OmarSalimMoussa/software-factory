@@ -42,7 +42,7 @@ def stored_signin(home: Path) -> Path:
 
 
 # contract: added by FB5. The stack user's own folder of slots: each slot's env file and provisioning state, which
-# the stack user's runs write and the warden reads only to redact.
+# the stack user's runs write.
 STACK_SLOTS = Path("/home/software-stack/slots")
 # contract: added by FB5. The laptop's shared services: their compose file and services.env, root's, read by the stack
 # user. Not in the state folder, whose 0700 the stack user's Docker could not pass to bind a file from it.

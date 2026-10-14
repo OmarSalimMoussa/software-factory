@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import secrets
 import subprocess
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -39,16 +38,6 @@ SERVICE_KEYS = (
     "LANGFUSE_INIT_PROJECT_SECRET_KEY",
     "GLITCHTIP_OWNER_PASSWORD",
 )
-# The keys the factory writes into an env file that name no secret: a network, an address, an environment and a
-# release.
-PUBLIC_KEYS = frozenset(
-    {"FACTORY_SERVICES_NETWORK", "LANGFUSE_HOST", "LANGFUSE_TRACING_ENVIRONMENT", "SENTRY_ENVIRONMENT",
-     "SENTRY_RELEASE", "SENTRY_INGEST_URL"}
-)  # fmt: skip
-# A value made only of digits or a boolean word carries no secret; hiding it would erase every port and flag.
-_NOT_SECRET = re.compile(r"^(\d+|true|false|yes|no|on|off)$", re.IGNORECASE)
-REDACTED = "[redacted]"
-_SHORTEST_SECRET = 6
 # Terse errors name no statement text, so a failed ALTER ROLE never prints the password it carried.
 PSQL = [
     *("docker", "exec", "-i", POSTGRES, "psql", "-U", "postgres", "-d", "postgres", "-X", "-q"),
@@ -62,23 +51,6 @@ def shell(container: str) -> list[str]:
 
 class ProvisionError(Exception):
     """A shared service refused, or a command failed; the message says which and why."""
-
-
-def secret_values(config: Config, values: Mapping[str, str]) -> list[str]:
-    """Every value of an env file that could be a secret: none of factory.toml's [env.set] keys (made from the
-    workspace's public facts: its name, port, address and folders), none of the factory's public keys, and no number
-    or boolean word."""
-    public = frozenset(key for key, _ in config.env.set) | PUBLIC_KEYS
-    found = ((key, value.strip().strip("'\"")) for key, value in values.items())
-    return [value for key, value in found if key not in public and value and not _NOT_SECRET.match(value)]
-
-
-def redact(text: str, secrets: Iterable[str]) -> str:
-    # Longest first, so a secret that contains another is replaced whole. A value of a few characters guards
-    # nothing and would blank those letters out of every word, so it is left.
-    for secret in sorted({s for s in secrets if len(s) >= _SHORTEST_SECRET}, key=len, reverse=True):
-        text = text.replace(secret, REDACTED)
-    return text
 
 
 def real_run(argv: list[str], stdin: str | None = None) -> subprocess.CompletedProcess[str]:

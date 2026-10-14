@@ -2,7 +2,7 @@
 
 The slot is always worked out from the caller's lease, never from an argument: slot 0 is the orchestrator's, an
 implementer has the slot it claimed, and its testers share it. A stack command before ``claim`` is refused. The
-answer carries scripts/dev's exit status and the redacted tail of its output; the full log stays the owner's.
+answer carries scripts/dev's exit status and the tail of its output; the full log stays the owner's.
 
 A tester only reads its slot, signs in and opens its desktop: seeds and the stack are its parent's. One tester holds
 a slot's desktop at a time, from its `desktop up` until it hands back (its row retires) or its parent takes the

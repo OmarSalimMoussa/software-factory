@@ -125,15 +125,11 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
     """``scripts/dev <verb>`` on a slot provisioned first; its exit status, or 1 when provisioning or the drop after
     ``empty`` failed."""
     workspace, port = f"slot{slot}", leases.port(settings, slot)
-    origin, commit = f"http://127.0.0.1:{port}", f"dev-slot{slot}"
+    origin, commit = f"http://127.0.0.1:{port}", leases.stand_in(slot)
     env_dir, state = places.slot_env_dir(slot), places.slot_state_dir(slot)
-    # Everything this prints reaches agents and the evidence log: each secret it knows is hidden first, here, where
-    # the values are, and not later from a file `empty` may already have removed.
-    hidden: list[str] = []
     try:
         config = product_config.load(checkout)
         services = provision.read_services_env(places.services / stack.ENV_FILE)
-        hidden += services.values()
         for folder in (env_dir, state):
             folder.mkdir(mode=0o700, parents=True, exist_ok=True)
         values = provision.workspace(config, services, run, workspace=workspace, origin=origin, commit=commit,
@@ -144,20 +140,17 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
                                                   docker_socket=layout.rootless_socket(os.getuid()))  # fmt: skip
         notes = envfile.write(config, template=checkout / config.env.template, target=env_file,
                               placeholders=placeholders, services=values, server=False)  # fmt: skip
-        written, problems = envfile.parse_values(env_file.read_text(encoding="utf-8"), str(env_file))
+        _, problems = envfile.parse_values(env_file.read_text(encoding="utf-8"), str(env_file))
         if problems:
             raise envfile.EnvError(problems)
-        hidden += provision.secret_values(config, {**written, **values})
     # telemetry: surfaced — why the slot could not be provisioned is `print`ed to the run's log
     except (product_config.ConfigError, provision.ProvisionError, envfile.EnvError, OSError, ValueError) as exc:
-        said = provision.redact(str(exc), hidden)
-        print(f"stack-run: slot {slot} could not be provisioned, so {verb[0]} did not run: {said}", flush=True)
+        print(f"stack-run: slot {slot} could not be provisioned, so {verb[0]} did not run: {exc}", flush=True)
         return 1
     for note in notes:
         print(f"stack-run: {note}", flush=True)
     env = {**environment.handed_on(), **leases.env(places, settings, slot, env_file)}
-    status, said = lf.run_captured([str(checkout / "scripts" / "dev"), *verb], checkout, env, timeout)
-    print(provision.redact(said, hidden), end="", flush=True)
+    status = lf.run([str(checkout / "scripts" / "dev"), *verb], checkout, env, timeout)
     if verb[0] != EMPTY or status != 0:
         return status
     try:
