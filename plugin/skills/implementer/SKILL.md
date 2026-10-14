@@ -44,7 +44,8 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
   (`factory slot seed load <name>`) and any setup a scenario names. A tester that needs a service stopped asks you.
 - **New behaviour gets a standing scenario** in `qa/scenarios/`, or an update to the one that covers it: three labels
   (`protects`, `needs`, `runs`) and at most `qa.max_steps` steps, each opening with a short bold name and holding an
-  `Expect:` line: the owner's replay shows both.
+  `Expect:` line: the owner's replay shows both. A scenario that signs in as a test address names its role in
+  `needs` (`person <role>`), so its tester is handed that person.
 
 ## 3. QA rounds
 

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from checks.runner.repo import Repo
-from checks.standard import deploy_shape, repo_shape
+from checks.standard import deploy_shape, qa_scenarios, repo_shape
 
 Break = Callable[[Path], None]
 
@@ -59,6 +59,30 @@ def test_a_broken_shape_fails_naming_the_problem(
     commit(fixture_product, "damage")
     problems = repo_shape.run(Repo.open(fixture_product), {})
     assert any(said in p for p in problems), problems
+
+
+@pytest.mark.parametrize(
+    ("needs", "sign_in", "said"),
+    [
+        ("nothing", "`factory slot sign-in\n  qa@notes.test`", "signs in as qa@notes.test but needs names no person"),
+        ("seed notes", "`factory slot sign-in qa@notes.test`", "signs in as qa@notes.test"),
+        ("seed notes, person admin", "`factory slot sign-in qa@notes.test`", None),
+        ("nothing", "`factory slot sign-in <your address>`", None),
+    ],
+    ids=["over-a-line-break", "beside-a-seed", "named", "a-placeholder"],
+)
+def test_a_scenario_that_signs_in_as_a_named_address_needs_that_person(
+    fixture_product: Path, commit: Callable[[Path, str], None], needs: str, sign_in: str, said: str | None
+) -> None:
+    front = f"---\nprotects: app/notes.py\nneeds: {needs}\nruns: in-turn\n---\n"
+    _add("qa/scenarios/sign-in.md", f"{front}# Sign in\n\nSign in: {sign_in}.\n\n1. Open it.\n")(fixture_product)
+    commit(fixture_product, "a scenario")
+    for changed in (None, ["qa/scenarios/sign-in.md"]):  # every file, or a branch that changed this one
+        found = qa_scenarios.run(Repo.open(fixture_product, changed), {})
+        mine = "\n".join(p for p in found if "sign-in.md" in p)
+        assert (said or "") in mine and bool(mine) is (said is not None), mine
+    # A branch that changed no scenario is not failed on one it never touched.
+    assert not [p for p in qa_scenarios.run(Repo.open(fixture_product, ["app/notes.py"]), {}) if "sign-in.md" in p]
 
 
 def _remove(rel: str) -> Break:

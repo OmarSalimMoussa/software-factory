@@ -147,7 +147,7 @@ runs: in-turn
 - `protects`: the paths whose change could break it. A merge that touches one runs it.
 - `needs`: what must be set up first, comma-separated: `nothing`, `seed <name>`, `person <role>` (someone the tester
   signs in as; the scenarios README says which test address plays each role) or `session setup` (a step the
-  starting session runs).
+  starting session runs). A scenario that signs in as a named address lists a `person`.
 - `runs`: `in-turn` on the default branch, `desktop` on the slot's remote desktop, or `waiting` (never run until
   what it needs exists).
 
