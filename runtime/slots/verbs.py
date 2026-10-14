@@ -93,6 +93,8 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     if op == "release":
         failed = leases.empty(ctx, n, session.id)
         return ok(slot=n, released=not failed, **({"failed": failed} if failed else {}))
+    if op == leases.RUN and session.role != IMPL:
+        raise Refused("slot", "slot run is an implementer's, on its own slot")
     verb = _verb(op, args)
     if op == "desktop":
         _desktop_lease(ctx, n, verb)
@@ -144,7 +146,11 @@ def _verb(op: object, args: dict[str, Any]) -> list[str]:
         return _seed_verb(args)
     if op == "desktop":
         return _desktop_verb(args)
-    raise Refused("args", f"{op!r} is not a slot verb: claim, up, down, release, free, list, sign-in, seed, desktop")
+    if op == leases.RUN:
+        return _run_verb(args)
+    raise Refused(
+        "args", f"{op!r} is not a slot verb: claim, up, down, release, free, list, sign-in, seed, desktop, run"
+    )
 
 
 def _seed_verb(args: dict[str, Any]) -> list[str]:
@@ -163,6 +169,16 @@ def _desktop_verb(args: dict[str, Any]) -> list[str]:
     if words[:1] == ["up"] and len(words) == 2:
         return ["desktop", "up", _email(words[1])]
     raise Refused("args", "desktop up <email> | desktop down")
+
+
+def _run_verb(args: dict[str, Any]) -> list[str]:
+    """The command is handed on as its own words, never through a shell, so any word may follow the service."""
+    service, command = args.get("service"), args.get("command")
+    if not isinstance(command, list) or not all(isinstance(word, str) and "\0" not in word for word in command):
+        command = []
+    if not isinstance(service, str) or not WORD.match(service) or not command:
+        raise Refused("args", "run <service> -- <command> [word…]")
+    return [leases.RUN, service, "--", *command]
 
 
 def _list(ctx: Context, session: Session) -> list[dict[str, Any]]:

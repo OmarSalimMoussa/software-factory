@@ -186,6 +186,8 @@ def _slot_call(ns: argparse.Namespace) -> Call:
         args.update({"seed": ns.seed, **({"as": ns.as_email} if ns.as_email else {})})
     elif ns.op == "desktop":
         args["desktop"] = ns.desktop
+    elif ns.op == "run":
+        args.update({"service": ns.service, "command": ns.command})
     return Call("slot", args)
 
 

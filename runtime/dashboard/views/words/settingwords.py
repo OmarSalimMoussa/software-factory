@@ -237,6 +237,8 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("slots.api_timeout_seconds", "Seconds a slot call may take"),
             ("slots.api_max_kib", "Largest slot answer, KiB"),
             ("slots.verb_minutes", "Minutes one stack command may take"),
+            ("slots.run_seconds", "Seconds one command run in a slot may take"),
+            ("slots.tail_max_kib", "Most output an agent sees, KiB"),
             ("slots.owner_address", "Test address Open signs you in to slot 0 as"),
             ("slots.keys_from", "Your env file slots take keys from"),
             ("slots.keys", "Keys every slot takes from it"),

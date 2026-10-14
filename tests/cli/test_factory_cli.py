@@ -91,6 +91,7 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["slot", "sign-in", "tester-1@example.com"],
         ["slot", "seed", "load", "basic", "--as", "tester-1@example.com"],
         ["slot", "desktop", "up", "tester-1@example.com"],
+        ["slot", "run", "web", "--", "du", "-sh", "/app"],
         ["qa", "plan"],
         ["qa", "result", "--head", "abc1234"],
         ["qa", "step", "--head", "abc1234", "--step", "sign-in:2"],
@@ -106,6 +107,11 @@ def test_every_command_asks_for_a_verb_the_warden_and_the_guard_know(argv: list[
     call = _build(argv)
     assert call.verb in VERBS
     assert verb_of(["factory", *argv]) == call.verb
+
+
+def test_a_slot_run_hands_on_every_word_after_the_double_dash() -> None:
+    call = _build(["slot", "run", "web", "--", "python", "-c", "print(1)", "--verbose"])
+    assert call.args == {"op": "run", "service": "web", "command": ["python", "-c", "print(1)", "--verbose"]}
 
 
 def test_task_facts_arrive_typed() -> None:

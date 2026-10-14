@@ -33,6 +33,7 @@ from standard.config_records import Config
 from standard.services import provision, stack
 
 SLOT_LABEL = "software.slot"
+RUN_LABEL = "software.run"
 EMPTY = "empty"
 # docker system df prints go-units sizes: decimal steps of 1000, such as 0B, 512kB, 1.25GB.
 _SIZE = re.compile(r"^([\d.]+)\s*([kKMGTPEZY]?)B$")
@@ -142,9 +143,12 @@ def disk(timeout: int) -> int:
 
 
 def product_verb(places: Places, settings: Settings, slot: int, verb: list[str], checkout: Path, *,
-                 run: provision.Run, timeout: int) -> int:  # fmt: skip
-    """``scripts/dev <verb>`` on a slot provisioned first; its exit status, or 1 when provisioning or the drop after
-    ``empty`` failed."""
+                 run: provision.Run, timeout: int, request: str) -> int:  # fmt: skip
+    """``scripts/dev <verb>`` on a slot provisioned first, as stack request ``request``; its exit status, or 1 when
+    provisioning or the drop after ``empty`` failed."""
+    if verb[0] == leases.RUN and (why := _no_run(checkout, timeout)):
+        print(f"stack-run: slot {slot} ran nothing: {why}", flush=True)
+        return lf.REFUSED
     workspace, port = f"slot{slot}", leases.port(settings, slot)
     origin, commit = f"http://127.0.0.1:{port}", leases.stand_in(slot)
     env_dir, state = places.slot_env_dir(slot), places.slot_state_dir(slot)
@@ -172,8 +176,11 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
         return 1
     for note in notes:
         print(f"stack-run: {note}", flush=True)
-    env = {**environment.handed_on(), **leases.env(places, settings, slot, env_file)}
+    label = f"{RUN_LABEL}={request}"
+    env = {**environment.handed_on(), **leases.env(places, settings, slot, env_file), leases.RUN_LABEL_ENV: label}
     status = lf.run([str(checkout / "scripts" / "dev"), *verb], checkout, env, timeout)
+    if verb[0] == leases.RUN and status == lf.TIMED_OUT:
+        _stop_run(slot, label, timeout)
     held = envfile.placeholders(written)
     if held and verb[0] != EMPTY:
         print(f"stack-run: slot {slot} runs with a placeholder in {', '.join(held)}, so a call that needs one fails "
@@ -216,6 +223,44 @@ def _given_path(env_file: Path) -> Path:
     return env_file.with_name(f"{env_file.name}.slot-keys")
 
 
+def _no_run(checkout: Path, timeout: int) -> str:
+    """Why the product cannot run a command in a slot; empty when its scripts/dev lists the optional run verb."""
+    try:
+        done = subprocess.run(
+            [str(checkout / "scripts" / "dev"), "verbs"],
+            cwd=checkout,
+            env=environment.handed_on(),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    # telemetry: surfaced — the `exc` class is returned, for the caller to print to the run's log
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return f"scripts/dev verbs could not run ({type(exc).__name__})"
+    if done.returncode != 0:
+        return f"scripts/dev verbs exited {done.returncode}"
+    return "" if leases.RUN in done.stdout.split() else "this product's scripts/dev has no run verb"
+
+
+def _stop_run(slot: int, label: str, timeout: int) -> None:
+    """Remove the container a run past its time left, by the label it was given: stopping scripts/dev stops none."""
+    try:
+        found = _docker(["container", "ls", "-aq", "--filter", f"label={label}"], timeout)
+        ids = found.stdout.split()
+        done = _docker(["container", "rm", "-f", *ids], timeout) if found.returncode == 0 and ids else found
+    # telemetry: surfaced — what is left of the run is `print`ed to the run's log
+    except subprocess.TimeoutExpired:
+        print(f"stack-run: docker did not answer in time; the run's container may still be on slot {slot}", flush=True)
+        return
+    if done.returncode != 0:
+        print(f"stack-run: the run's container may still be on slot {slot}: {done.stderr.strip()[-300:]}", flush=True)
+    elif ids:
+        print(f"stack-run: removed the run's {len(ids)} container(s) on slot {slot}", flush=True)
+    else:
+        print(f"stack-run: no container labelled {label} was found; the run's may still be on slot {slot}", flush=True)
+
+
 def _own_verb(slot: int, verb: list[str], timeout: int) -> int | None:
     """The exit of one of the stack unit's own verbs; None for a product verb."""
     if verb[0] == lf.SWEEP:
@@ -236,7 +281,11 @@ def main(argv: list[str]) -> int:
         raw = lf.read(state, request_id, (lf.STACK,))
         settings, sessions = lf.published(state)
         slot, verb, session = lf.stack_parts(raw, settings)
-        timeout = settings.get_int("slots.verb_minutes") * 60
+        timeout = (
+            settings.get_int("slots.run_seconds")
+            if verb[0] == leases.RUN
+            else settings.get_int("slots.verb_minutes") * 60
+        )
         own = _own_verb(slot, verb, timeout)
         if own is not None:
             return own
@@ -250,7 +299,9 @@ def main(argv: list[str]) -> int:
         print("stack-run: docker did not answer in time", flush=True)
         return lf.TIMED_OUT
     places = Places.for_runner(Path(__file__).resolve().parents[3], state)
-    return product_verb(places, settings, slot, verb, checkout, run=provision.real_run, timeout=timeout)
+    return product_verb(
+        places, settings, slot, verb, checkout, run=provision.real_run, timeout=timeout, request=request_id
+    )
 
 
 if __name__ == "__main__":

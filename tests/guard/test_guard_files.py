@@ -78,6 +78,9 @@ def test_the_orchestrators_worktree_is_the_main_checkout(tmp_path: Path) -> None
         ("factory status", None),
         ("factory qa plan", None),
         ("factory slot up web", None),
+        # A slot run's command runs in the slot's container, which has no such file; before the -- it is a file here.
+        ("factory slot run web -- cat {home}/.claude/.credentials.json", None),
+        ("factory slot run {home}/.claude/.credentials.json -- ls", "factory-alone"),
         ("factory spec save t-0001 {worktree}/spec.md", "factory-verbs"),
     ],
 )

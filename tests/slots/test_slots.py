@@ -58,6 +58,9 @@ def test_the_slot_comes_from_the_lease_never_from_an_argument(world: World) -> N
         ({"op": "up"}, "agent-qa-1"),  # a tester signs in and opens the desktop; the stack is its parent's
         ({"op": "seed", "seed": ["load", "cart"]}, "agent-qa-1"),
         ({"op": "desktop", "desktop": ["down"]}, "agent-qa-1"),
+        ({"op": "run", "service": "web", "command": ["ls"]}, "agent-qa-1"),
+        ({"op": "run", "service": "--rm", "command": ["ls"]}, ""),
+        ({"op": "run", "service": "web", "command": []}, ""),
     ],
 )
 def test_only_checked_words_reach_scripts_dev(world: World, args: dict[str, object], agent_id: str) -> None:
@@ -66,6 +69,20 @@ def test_only_checked_words_reach_scripts_dev(world: World, args: dict[str, obje
     with pytest.raises(Refused):
         slot(world.ctx("implementer", "s-1", agent_id), args, None)
     assert world.launcher.stacks == []
+
+
+def test_an_implementer_runs_any_command_in_its_own_slot_and_no_one_else_runs_one(world: World) -> None:
+    _implementer(world, 1)
+    world.session("s-orch", "orchestrator", "orchestrator")
+    slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)
+    world.launcher.stack = lambda n, verb: StackResult(0, "4.0K /app\n", "/log")
+    command = ["sh", "-c", "du -sh /app; rm -f /tmp/x"]
+
+    answer = slot(world.ctx("implementer", "s-1"), {"op": "run", "service": "web", "command": command}, None)
+
+    assert answer["tail"] == "4.0K /app\n" and world.launcher.stacks == [(1, ["run", "web", "--", *command])]
+    with pytest.raises(Refused, match="slot run is an implementer's"):
+        slot(world.ctx(), {"op": "run", "service": "web", "command": command}, None)
 
 
 @pytest.mark.parametrize(

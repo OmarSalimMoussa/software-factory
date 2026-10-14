@@ -93,6 +93,30 @@ def test_a_stack_run_keeps_what_the_runner_printed_and_hands_back_its_tail(world
     assert not list((world.places.state / "runs").iterdir())
 
 
+@pytest.mark.parametrize(
+    ("verb", "out", "tail"),
+    [
+        (["up"], "start\nline 1\n" + "é" * 1500 + "!", "[1991 bytes above are cut]\n" + "é" * 511 + "!"),
+        (["run", "web", "--", "ls"], "\n".join(f"line {n}" for n in range(9)), None),
+    ],
+    ids=["one-long-line-cut-at-a-character", "run-whole"],
+)
+def test_a_stack_answer_holds_at_most_tail_max_kib_and_a_run_all_of_its_output(
+    world: World, verb: list[str], out: str, tail: str | None
+) -> None:
+    world.settings = world.settings.with_changes({"slots.log_tail_lines": 3, "slots.tail_max_kib": 1})
+
+    def systemctl(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        request = argv[-1].split("@", 1)[1].removesuffix(".service")
+        store.write_text(world.places.state / "runs" / f"{request}.log", out)
+        store.write_text(world.places.state / "runs" / f"{request}.exit", "0\n")
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    result = launch.Units(world.places, lambda: world.settings, systemctl).run_stack(2, verb, "5e550001")
+
+    assert result.tail == (out if tail is None else tail)
+
+
 def test_a_resume_respawns_the_session_with_its_start_options_and_then_hands_it_the_message(world: World) -> None:
     s = world.seat("1234abcd-0000", worktree=world.settings.get_str("repo.path"))
     respawn.resume(world.ctx(), s, "carry on")

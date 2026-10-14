@@ -104,6 +104,7 @@ stack.
 - `FACTORY_SLOT`: the slot's number.
 - `FACTORY_PORT`: the loopback port the slot's stack publishes.
 - `FACTORY_SLOT_DIR`: the slot's folder in the factory's state, which the script may read.
+- `FACTORY_RUN_LABEL`: a label, `key=value`, for the container `run` starts, so the factory can find it.
 - `FACTORY_ENV_FILE`: the slot's env file. The factory writes it before each call with every key the product's
   compose reads: the template's keys, `[env.set]`, and the shared services' keys. Hand it to compose as its env file.
 
@@ -120,6 +121,7 @@ stack.
 | `verbs` | Lists the verbs it supports |
 | `deps` | Optional: installs what the checks and tests read (package trees, tools); `factory check` runs it first |
 | `reports --since <cursor>` | Optional: prints erased reports, then new user reports, as JSON lines |
+| `run <service> -- <command…>` | Optional: runs one command in a new container of the service, labelled `FACTORY_RUN_LABEL`, with the slot's settings and network, and prints its output. The factory stops it at `slots.run_seconds` and removes its container |
 
 Everything a slot creates (containers, volumes, networks, images) carries a label naming its slot, so the warden
 can find and remove it when the session that held the slot retires. A container the stack starts while it runs, such

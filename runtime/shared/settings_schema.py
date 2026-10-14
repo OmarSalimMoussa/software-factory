@@ -117,6 +117,8 @@ SCHEMA: dict[str, Spec] = {
     "slots.api_timeout_seconds": Spec("int", 1, 300),  # contract: one slot API or health call
     "slots.api_max_kib": Spec("int", 16, 8192),  # contract: the largest slot API answer a session sees
     "slots.verb_minutes": Spec("int", 1, 240),  # contract: added by builder 3, one scripts/dev verb
+    "slots.run_seconds": Spec("int", 10, 3600),
+    "slots.tail_max_kib": Spec("int", 1, 1024),
     "slots.owner_address": Spec("str"),
     "slots.keys_from": Spec("str", when=AT_INSTALL),  # read by root (software-slot-keys.service)
     "slots.keys": Spec("list", when=AT_INSTALL),

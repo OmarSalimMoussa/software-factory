@@ -17,6 +17,7 @@ from standard import envfile
 from standard.services import provision
 
 SLOT = 2
+REQUEST = "stack-7f3a"
 # scripts/dev as a stand-in: it records what it was told and whether the env file was there, keeps its seeds beside
 # the env file, then exits as asked.
 DEV = f"""#!{sys.executable}
@@ -74,7 +75,9 @@ def checkout(tmp_path: Path) -> Path:
 def _verb(tmp_path: Path, checkout: Path, shared: Shared, monkeypatch: pytest.MonkeyPatch, verb: str) -> int:
     monkeypatch.setattr(provision, "workspace", shared.workspace)
     monkeypatch.setattr(provision, "drop", shared.drop)
-    return stack_run.product_verb(Places.under(tmp_path), settings(), SLOT, [verb], checkout, run=_never, timeout=60)
+    return stack_run.product_verb(
+        Places.under(tmp_path), settings(), SLOT, [verb], checkout, run=_never, timeout=60, request=REQUEST
+    )
 
 
 @pytest.mark.parametrize(
@@ -225,3 +228,57 @@ def test_the_events_verb_prints_each_slot_containers_stop_as_one_line(
     assert printed == [{"action": "die", "at": 1791000000000000000, "id": "0123456789ab", "name": "web", "slot": "2",
                         "exit": "137"}]  # fmt: skip
     assert asked[0][:5] == ["events", "--since", "1791000000", "--until", "1791000300"] and len(asked) == 1
+
+
+# scripts/dev listing the verbs in verbs.txt beside it; its run records its label, then sleeps the seconds it ends with.
+RUN_DEV = f"""#!{sys.executable}
+import os, sys, time
+from pathlib import Path
+if sys.argv[1] == "verbs":
+    sys.exit(print(Path(__file__).with_name("verbs.txt").read_text()))
+Path(__file__).with_name("ran.json").write_text(os.environ["FACTORY_RUN_LABEL"])
+time.sleep(float(sys.argv[-1]))
+"""
+
+
+@pytest.mark.parametrize(
+    ("verbs", "seconds", "status", "said"),
+    [
+        ("up down verbs", "0", lf.REFUSED, "slot 2 ran nothing: this product's scripts/dev has no run verb"),
+        ("up run verbs", "0", 0, ""),
+        ("up run verbs", "30", lf.TIMED_OUT, "removed the run's 1 container(s) on slot 2"),
+    ],
+    ids=["no-run-verb", "ran", "past-its-time"],
+)
+def test_a_run_needs_the_products_run_verb_and_one_past_its_time_leaves_no_container(
+    tmp_path: Path,
+    checkout: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    verbs: str,
+    seconds: str,
+    status: int,
+    said: str,
+) -> None:
+    (checkout / "scripts" / "dev").write_text(RUN_DEV)
+    (checkout / "scripts" / "verbs.txt").write_text(verbs)
+    (tmp_path / "bin").mkdir()
+    (tmp_path / "bin" / "docker").write_text(DOCKER)
+    (tmp_path / "bin" / "docker").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path / 'bin'}:/usr/bin:/bin")
+    monkeypatch.setenv("DOCKER_LOG", str(tmp_path / "docker.log"))
+    monkeypatch.setattr(provision, "workspace", Shared(checkout).workspace)
+    run = ["run", "web", "--", "sleep", seconds]
+
+    answer = stack_run.product_verb(
+        Places.under(tmp_path), settings(), SLOT, run, checkout, run=_never, timeout=1, request=REQUEST
+    )
+
+    log = tmp_path / "docker.log"
+    calls = log.read_text().splitlines() if log.exists() else []
+    ran = checkout / "scripts" / "ran.json"
+    assert answer == status and said in capsys.readouterr().out
+    assert (ran.read_text() if ran.exists() else None) == (None if status == lf.REFUSED else f"software.run={REQUEST}")
+    # Only the run's own container goes: another run, or a job the stack started, carries no such label.
+    gone = [f"container ls -aq --filter label=software.run={REQUEST}", "container rm -f c-web"]
+    assert calls == (gone if status == lf.TIMED_OUT else [])

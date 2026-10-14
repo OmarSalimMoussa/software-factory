@@ -24,6 +24,8 @@ KEYS = ("holder", "since", "note")
 # the build cache and the images no container uses that are older than that; DISK prints the bytes Docker's data
 # takes, alone on its last line. EVENTS <since> <until> prints each slot container's kill, death and out-of-memory.
 SWEEP, PRUNE, DISK, EVENTS = "factory-sweep-slot", "factory-prune", "factory-disk", "factory-events"
+RUN = "run"  # the product's optional verb: run <service> -- <command…> runs one command in a slot's service
+RUN_LABEL_ENV = "FACTORY_RUN_LABEL"
 
 
 @dataclass(frozen=True, slots=True)

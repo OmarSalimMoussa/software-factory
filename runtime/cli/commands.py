@@ -173,3 +173,6 @@ def _slot(sub: Any) -> None:
     seed.add_argument("seed", nargs="+")
     seed.add_argument("--as", dest="as_email", default="")
     ops.add_parser("desktop").add_argument("desktop", nargs="+")
+    run = ops.add_parser("run", usage="factory slot run <service> -- <command> [word ...]")
+    run.add_argument("service")
+    run.add_argument("command", nargs="+")

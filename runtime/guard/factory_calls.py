@@ -16,6 +16,7 @@ from pathlib import Path
 
 from runtime.guard import shell
 from runtime.guard.facts import ORCHESTRATOR, Call, Decision, Refusal, Rewrite, inside, resolve
+from runtime.slots import leases
 from runtime.warden.verbs import VERBS
 
 FACTORY = "factory"
@@ -141,8 +142,10 @@ def check_alone(call: Call, command: str, found: list[shell.Invocation], cwd: Pa
             "factory-alone", f"{why}: run factory on its own, one plain call, and read its answer as printed"
         )
     worktree = Path(os.path.realpath(call.worktree))
-    # Its arguments are read outside the sandbox, so a file it names must be the session's own.
-    for word in words[1:]:
+    # Its arguments are read outside the sandbox, so a file it names must be the session's own; a slot run's command,
+    # after its --, runs in the slot's container and reads nothing here.
+    ran = words[1:3] == ["slot", leases.RUN] and "--" in words
+    for word in words[1 : words.index("--") if ran else None]:
         for candidate in [word, word.split("=", 1)[1] if "=" in word else ""]:
             if not candidate or "://" in candidate or any(c.isspace() for c in candidate):
                 continue

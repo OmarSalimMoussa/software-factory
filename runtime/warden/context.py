@@ -34,7 +34,7 @@ class Caller:
 @dataclass(frozen=True, slots=True)
 class StackResult:
     exit: int
-    tail: str  # the last slots.log_tail_lines lines
+    tail: str  # the last slots.log_tail_lines lines, or a run's whole output, cut to slots.tail_max_kib
     log: str  # where the full output was saved, for the owner
 
 

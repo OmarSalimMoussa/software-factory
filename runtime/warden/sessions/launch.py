@@ -27,6 +27,7 @@ from runtime.shared.models import PENDING, WORKING, Session
 from runtime.shared.paths import AGENT_USER, UPGRADE_UNIT, Places, stored_signin
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
+from runtime.slots import leases
 from runtime.system.layout import DAEMON_UNIT
 from runtime.warden.context import Context, StackResult
 from runtime.warden.sessions import reap, registry, session_settings
@@ -180,9 +181,19 @@ class Units:
         code, output = self._wait(STACK_UNIT.format(request_id), request_id)
         log = self.places.evidence / "stack" / f"{request_id}.log"
         store.write_text(log, output, mode=0o600)
-        lines = self.settings().get_int("slots.log_tail_lines")
-        tail = "\n".join(output.splitlines()[-lines:]) if lines else ""
-        return StackResult(exit=code, tail=tail, log=str(log))
+        settings = self.settings()
+        lines = settings.get_int("slots.log_tail_lines")
+        kept = output if verb[0] == leases.RUN else "\n".join(output.splitlines()[-lines:]) if lines else ""
+        return StackResult(exit=code, tail=_last(kept, settings.get_int("slots.tail_max_kib") * 1024), log=str(log))
+
+
+def _last(text: str, most: int) -> str:
+    """The end of ``text`` in at most ``most`` UTF-8 bytes, cut at a character, saying how much went above it."""
+    data = text.encode()
+    if len(data) <= most:
+        return text
+    kept = data[-most:].decode(errors="ignore")
+    return f"[{len(data) - len(kept.encode())} bytes above are cut]\n{kept}"
 
 
 def _options(ctx: Context, request_id: str, role: str, model: str, effort: str, place: Path) -> dict[str, str]:

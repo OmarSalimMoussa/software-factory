@@ -15,6 +15,7 @@ from typing import Any
 from checks.runner import catalog
 from checks.runner.repo import GitError, Repo
 from runtime.queue import goal
+from runtime.slots import leases
 
 ID = "repo-shape"
 RULE = "The repo has the standard shape: files, headings, verbs, queue/ ignored"
@@ -23,7 +24,7 @@ VALUES = None
 
 HEADINGS = ("Who it is for", "The goal", "How it looks and feels", "How it speaks")
 VERBS = ("up", "down", "empty", "health", "sign-in", "seed", "desktop", "verbs", "test")
-OPTIONAL_VERBS = ("reports", "deps")
+OPTIONAL_VERBS = ("reports", "deps", leases.RUN)
 _DONE_WHEN = re.compile(r"^\S.*\. Done when \S.*\.$")
 
 
