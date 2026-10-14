@@ -238,6 +238,8 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("slots.api_max_kib", "Largest slot answer, KiB"),
             ("slots.verb_minutes", "Minutes one stack command may take"),
             ("slots.owner_address", "Test address Open signs you in to slot 0 as"),
+            ("slots.keys_from", "Your env file slots take keys from"),
+            ("slots.keys", "Keys every slot takes from it"),
         ],
     ),
     (

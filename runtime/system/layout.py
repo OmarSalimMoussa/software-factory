@@ -79,6 +79,7 @@ FIREWALL_REFRESH = "software-firewall-refresh.service"
 FIREWALL_TIMER = "software-firewall-refresh.timer"
 AGENT_RUN = "software-agent-run@.service"
 STACK_RUN = "software-stack-run@.service"
+SLOT_KEYS_UNIT = "software-slot-keys.service"
 CHECK_RUN = "software-check-run@.service"
 UPGRADE_RUN = paths.UPGRADE_UNIT.format("")
 SERVICES = (WARDEN_UNIT, DASHBOARD_UNIT, DAEMON_UNIT)

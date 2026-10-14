@@ -22,13 +22,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from runtime.shared import environment
-from runtime.shared.paths import Places
+from runtime.shared.paths import SLOT_KEYS, Places
 from runtime.shared.settings import Settings
 from runtime.slots import leases
 from runtime.system import layout
 from runtime.system.runners import launch_file as lf
 from standard import config as product_config
 from standard import envfile
+from standard.config_records import Config
 from standard.services import provision, stack
 
 SLOT_LABEL = "software.slot"
@@ -155,14 +156,16 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
         values = provision.workspace(config, services, run, workspace=workspace, origin=origin, commit=commit,
                                      state=state)  # fmt: skip
         env_file = env_dir / config.env.file
+        keys, given, notes = _slot_keys(places, config, values, env_file, checkout / config.env.template)
         placeholders = envfile.placeholder_values(workspace=workspace, origin=origin, port=port, commit=commit,
                                                   dir=checkout, env_dir=env_dir,
                                                   docker_socket=layout.rootless_socket(os.getuid()))  # fmt: skip
-        notes = envfile.write(config, template=checkout / config.env.template, target=env_file,
-                              placeholders=placeholders, services=values, server=False)  # fmt: skip
-        _, problems = envfile.parse_values(env_file.read_text(encoding="utf-8"), str(env_file))
+        notes += envfile.write(config, template=checkout / config.env.template, target=env_file,
+                               placeholders=placeholders, services=values | keys, server=False)  # fmt: skip
+        written, problems = envfile.parse_values(env_file.read_text(encoding="utf-8"), str(env_file))
         if problems:
             raise envfile.EnvError(problems)
+        envfile.atomic_write(_given_path(env_file), "".join(f"{name}\n" for name in given), 0o600)
     # telemetry: surfaced — why the slot could not be provisioned is `print`ed to the run's log
     except (product_config.ConfigError, provision.ProvisionError, envfile.EnvError, OSError, ValueError) as exc:
         print(f"stack-run: slot {slot} could not be provisioned, so {verb[0]} did not run: {exc}", flush=True)
@@ -171,18 +174,46 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
         print(f"stack-run: {note}", flush=True)
     env = {**environment.handed_on(), **leases.env(places, settings, slot, env_file)}
     status = lf.run([str(checkout / "scripts" / "dev"), *verb], checkout, env, timeout)
+    held = envfile.placeholders(written)
+    if held and verb[0] != EMPTY:
+        print(f"stack-run: slot {slot} runs with a placeholder in {', '.join(held)}, so a call that needs one fails "
+              "here; the owner gives slots their keys at install (slots.keys)", flush=True)  # fmt: skip
     if verb[0] != EMPTY or status != 0:
         return status
     try:
         provision.drop(config, services, run, workspace=workspace, state=state)
         env_file.unlink(missing_ok=True)
         envfile.defaults_path(env_file).unlink(missing_ok=True)
+        _given_path(env_file).unlink(missing_ok=True)
     # telemetry: surfaced — what is left of the slot is `print`ed to the run's log, and the exit says so
     except (provision.ProvisionError, OSError) as exc:
         print(f"stack-run: slot {slot} is empty, but its database or env file is still there: {exc}", flush=True)
         return 1
     print(f"stack-run: slot {slot}'s database and env file are gone", flush=True)
     return 0
+
+
+def _slot_keys(
+    places: Places, config: Config, values: dict[str, str], env_file: Path, template: Path
+) -> tuple[dict[str, str], list[str], list[str]]:
+    """The owner's keys to write (software-slot-keys.service), their names, and a note on any the factory sets itself.
+    A key the last write gave and this one does not takes the template's value, so a withdrawn key leaves the slot."""
+    keys = places.services / SLOT_KEYS
+    copied = envfile.parse_values(keys.read_text(encoding="utf-8"), str(keys))[0] if keys.exists() else {}
+    own = values.keys() | {key for key, _ in config.env.set}
+    given = {name: value for name, value in copied.items() if name not in own}
+    record = _given_path(env_file)
+    before = record.read_text(encoding="utf-8").split() if record.exists() else []
+    defaults = envfile.parse_values(template.read_text(encoding="utf-8"), str(template))[0]
+    gone = [name for name in before if name in defaults and name not in given and name not in own]
+    back = {name: envfile.generate(defaults[name]) or defaults[name] for name in gone}
+    taken = sorted(copied.keys() & own)
+    said = [f"slots.keys names {', '.join(taken)}, which the factory sets for each slot: the slot keeps its own"]
+    return given | back, sorted(given), said if taken else []
+
+
+def _given_path(env_file: Path) -> Path:
+    return env_file.with_name(f"{env_file.name}.slot-keys")
 
 
 def _own_verb(slot: int, verb: list[str], timeout: int) -> int | None:

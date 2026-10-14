@@ -26,7 +26,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `replay` | How a tester's run is replayed for the owner: the builder's timings, how long the picture stays hidden after a sign-in link is typed, and the player's pace |
 | `intake` | Batch size and wait, the fast lane's time, the score's weights |
 | `routing` | Slices per rung, open proposals at once, the estimate's window, tries to confirm a cause |
-| `slots` | How many, the first port, the output lines an agent sees |
+| `slots` | How many, the first port, the output lines an agent sees, the keys slots take from your env file |
 | `budget` | The slice's memory and CPU, and the memory a test run needs |
 | `vitals`, `watch` | Amber and red levels; probe, loop, grace and silence times |
 | `errors` | How often the warden reads prod's, staging's and slot 0's new GlitchTip issues into requests, and how many pages one read covers |

@@ -118,6 +118,8 @@ api_timeout_seconds = 30  # one call to a slot's API or health address
 api_max_kib = 256       # the largest slot API answer a session sees
 verb_minutes = 30       # the longest one scripts/dev verb may run before it is stopped
 owner_address = ""      # the test address Open on the Done tab signs you in to slot 0 as; empty: the button waits
+keys_from = ""          # the owner's env file slots take keys from, set at install; empty: the template's values
+keys = []               # the keys copied from it into every slot before each stack command, such as a model's key
 
 [budget]
 slice_memory_high = "11G"

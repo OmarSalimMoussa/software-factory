@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 from system_fakes import FIXTURE, settings
 
-from runtime.shared.paths import Places
+from runtime.shared.paths import SLOT_KEYS, Places
 from runtime.system.runners import launch_file as lf
 from runtime.system.runners import stack_run
 from standard import envfile
@@ -114,6 +114,65 @@ def test_a_slot_that_cannot_be_provisioned_runs_no_verb(
     assert status == 1
     assert not (checkout / "scripts" / "ran.json").exists()
     assert "slot 2 could not be provisioned, so up did not run: GlitchTip" in capsys.readouterr().out
+
+
+FACTORY_URL = "postgresql://n:pw@db:5432/n"
+
+
+@pytest.mark.parametrize(
+    ("copied", "value", "said"),
+    [
+        ("NOTES_SYNC_KEY=sk-real\n", "sk-real", None),
+        (None, "REPLACE_ME", "slot 2 runs with a placeholder in NOTES_SYNC_KEY, so a call that needs one fails"),
+        (
+            "DATABASE_URL=postgresql://mine\n",
+            "REPLACE_ME",
+            "slots.keys names DATABASE_URL, which the factory sets for each slot: the slot keeps its own",
+        ),
+    ],
+    ids=["copied", "none-copied", "factory-key"],
+)
+def test_a_slot_takes_the_owners_copied_keys_and_names_a_placeholder_left(
+    tmp_path: Path,
+    checkout: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    copied: str | None,
+    value: str,
+    said: str | None,
+) -> None:
+    monkeypatch.setenv("DEV_EXIT", "0")
+    places = Places.under(tmp_path)
+    with (checkout / "notes.env.template").open("a") as template:
+        template.write("NOTES_SYNC_KEY=REPLACE_ME\n")
+    if copied is not None:
+        (places.services / SLOT_KEYS).write_text(copied)
+
+    assert _verb(tmp_path, checkout, Shared(checkout), monkeypatch, "up") == 0
+
+    written = envfile.parse_values((places.slot_env_dir(SLOT) / "notes.env").read_text(), "notes.env")[0]
+    out = capsys.readouterr().out
+    assert (written["NOTES_SYNC_KEY"], written["DATABASE_URL"]) == (value, FACTORY_URL)
+    assert (said in out) if said else "placeholder" not in out
+
+
+def test_a_key_the_owner_withdraws_leaves_the_slot_at_its_next_command(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("DEV_EXIT", "0")
+    places = Places.under(tmp_path)
+    with (checkout / "notes.env.template").open("a") as template:
+        template.write("NOTES_SYNC_KEY=REPLACE_ME\n")
+    (places.services / SLOT_KEYS).write_text("NOTES_SYNC_KEY=sk-real\n")
+    _verb(tmp_path, checkout, Shared(checkout), monkeypatch, "up")
+    (places.services / SLOT_KEYS).unlink()
+
+    _verb(tmp_path, checkout, Shared(checkout), monkeypatch, "up")
+
+    # A value no one supplies is kept as set by hand: a withdrawn key stayed in every slot, and nothing said so.
+    written = envfile.parse_values((places.slot_env_dir(SLOT) / "notes.env").read_text(), "notes.env")[0]
+    assert written["NOTES_SYNC_KEY"] == "REPLACE_ME"
+    assert "placeholder in NOTES_SYNC_KEY" in capsys.readouterr().out
 
 
 # docker as a stand-in: logs each call and answers a listing; slot 2's network still holds two unlabelled containers.

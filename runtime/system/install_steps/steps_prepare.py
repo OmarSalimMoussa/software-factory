@@ -17,6 +17,7 @@ from runtime.system.host import Account, Host
 from runtime.system.install_steps import steps_wire
 from runtime.system.job import Install, github_name, github_origin, refuse
 from runtime.warden.sessions import registry
+from standard import envfile
 
 # What the owner sets up before an install; the packages step installs the rest (nftables among them).
 _MACHINE_TOOLS = ("git", "tar", "systemctl", "systemd-run", "runuser", "loginctl", "useradd", "tailscale")
@@ -206,6 +207,17 @@ def settle_settings(ctx: Install) -> None:
     if not str(repo).startswith(f"{layout.AGENT_HOME}/") or ".." in repo.parts:
         raise refuse(f"The setting repo.path must be a folder inside {layout.AGENT_HOME}, the agents' home: set it "
                      "with --set repo.path=..., then install again")  # fmt: skip
+    keys_from = ctx.settings.get_str("slots.keys_from")
+    if keys_from and not PurePosixPath(keys_from).is_absolute():
+        raise refuse(
+            "The setting slots.keys_from must be the full path of your env file: set it with --set "
+            "slots.keys_from=..., then install again"
+        )
+    if bad := [name for name in ctx.settings.get_list("slots.keys") if not envfile.KEY.fullmatch(name)]:
+        raise refuse(
+            f"slots.keys names {', '.join(bad)}, which no env file can hold: set it with --set "
+            "slots.keys=[...], then install again"
+        )
 
 
 # The settings an install acts on as root: the rest the running factory applies itself.

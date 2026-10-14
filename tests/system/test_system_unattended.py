@@ -150,6 +150,23 @@ def test_the_product_s_checkout_must_be_a_folder_of_the_agents_home(tmp_path: Pa
         steps_prepare.settle_settings(job)
 
 
+@pytest.mark.parametrize(
+    ("given", "refusal"),
+    [
+        ('keys_from = "product.env"', "slots.keys_from must be the full path of your env file"),
+        ('keys = ["MODEL KEY"]', "slots.keys names MODEL KEY, which no env file can hold"),
+    ],
+    ids=["relative-file", "not-a-key"],
+)
+def test_the_keys_slots_take_are_named_plainly_at_install(tmp_path: Path, given: str, refusal: str) -> None:
+    job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    job.host.files[job.places.overrides] = f'[repo]\npath = "/home/software-agent/shop"\n[slots]\n{given}\n'
+    steps_prepare.check_machine(job)
+    with pytest.raises(Refused, match=refusal):
+        steps_prepare.settle_settings(job)
+
+
 def test_an_upgrade_without_a_signed_in_github_cli_keeps_the_keys_and_asks_nothing(tmp_path: Path) -> None:
     job = dry_job(tmp_path)
     job.unattended, job.settings = True, settings()

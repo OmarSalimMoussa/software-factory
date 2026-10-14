@@ -57,8 +57,9 @@ the share is made once and then kept.
   runs master, so the warden files each new issue of its projects as a request, as it does prod's and staging's.
 - **Its traces** in the product's one Langfuse project, under the environment `slot<n>`.
 - **Its env file**, written from the product's env template. It holds the slot's own values: the workspace
-  `slot<n>`, the origin `http://127.0.0.1:<port>` and the commit `dev-slot<n>`, plus the shared services' keys.
-  `scripts/dev` finds it in `FACTORY_ENV_FILE`, beside `FACTORY_SLOT`, `FACTORY_PORT` and `FACTORY_SLOT_DIR`.
+  `slot<n>`, the origin `http://127.0.0.1:<port>` and the commit `dev-slot<n>`, plus the shared services' keys and
+  your slot keys. `scripts/dev` finds it in `FACTORY_ENV_FILE`, beside `FACTORY_SLOT`, `FACTORY_PORT` and
+  `FACTORY_SLOT_DIR`.
 
 The env file and the database user's password live in the stack user's own folder, `/home/software-stack/slots/<n>/`,
 which no other user can open. When the share cannot be made, the command does not run, and its output says why.
@@ -66,6 +67,17 @@ which no other user can open. When the share cannot be made, the command does no
 Every slot runs as the one stack user, with one Docker. So the code of any slot can read every slot's env file and
 the shared services' keys. These are throwaway development values: never put a prod key, a personal account or
 anything else you would not hand an agent into the env template's defaults, `[env.set]` or the shared services.
+
+## Slot keys
+
+A key the product needs from a person, such as a model provider's API key, comes from your own env file. Name the
+file and the keys when you install, as `--set slots.keys_from="<full path>"` and `--set slots.keys=["<KEY>", …]`;
+root reads them from its own record of the install, so nothing the factory runs can change them. Before each stack
+command, `software-slot-keys.service` copies just those keys into `/var/lib/software-factory-services/slot-keys.env`,
+and the slot's env file takes them from there. A key your file lacks, holds as a placeholder, or stops naming goes
+back to the template's value at the slot's next command, and that command's output names it. A key the factory sets
+for each slot stays the factory's. Name only keys you would hand an agent, such as one with a spending cap: any
+slot's code can read them.
 
 Releasing a slot runs the product's `empty`. When `empty` succeeds, the factory also drops the slot's database, its
 database user and its network, and removes its env file. The slot's GlitchTip projects stay, with their history.

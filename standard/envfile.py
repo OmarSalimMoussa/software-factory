@@ -23,7 +23,8 @@ from standard.config_records import Config
 
 SERVICE_BLOCK = "# Written by the factory for this workspace at every deploy; do not edit."
 SERVER_MARKER = "# server:"
-_ASSIGN = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_ASSIGN = re.compile(rf"^({KEY.pattern})=(.*)$")
 _HEX = re.compile(r"^(.*?)generate-with-openssl-rand-hex-([0-9]+)$")
 _FERNET = "generate-with-python-fernet"
 _PLACEHOLDER = re.compile(r"REPLACE_ME|^<[^<>]+>$")
@@ -277,8 +278,9 @@ def _existing(path: Path, problems: list[str]) -> dict[str, str] | None:
     return values
 
 
-def atomic_write(target: Path, text: str, mode: int) -> None:
-    """Replace ``target`` whole: a reader sees the old file or the new one, never part of either."""
+def atomic_write(target: Path, text: str, mode: int, group: int | None = None) -> None:
+    """Replace ``target`` whole: a reader sees the old file or the new one, never part of either, and already in
+    ``group`` when one is named."""
     target.parent.mkdir(parents=True, exist_ok=True)
     # mkstemp creates the file 0600, so a secret is never readable by others, even before the chmod.
     handle, temp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.")
@@ -288,6 +290,8 @@ def atomic_write(target: Path, text: str, mode: int) -> None:
             file.flush()
             os.fsync(file.fileno())
         os.chmod(temp, mode)
+        if group is not None:
+            os.chown(temp, -1, group)
         os.replace(temp, target)
     except BaseException:
         Path(temp).unlink(missing_ok=True)

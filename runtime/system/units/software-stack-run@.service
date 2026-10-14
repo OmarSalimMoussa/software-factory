@@ -3,6 +3,8 @@
 [Unit]
 Description=software factory: stack request %i
 CollectMode=inactive-or-failed
+Wants=@slot_keys_unit@
+After=@slot_keys_unit@
 
 [Service]
 Type=oneshot
