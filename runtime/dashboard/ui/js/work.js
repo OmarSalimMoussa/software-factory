@@ -59,11 +59,15 @@ const doneRow = t => `<div class="row done-row" data-task="${esc(t.id)}"><div st
     <span class="stages">${t.stages.map(s => `<span class="chip ${s.tone}" title="${esc(s.title)}">${esc(s.label)}</span>`).join('')}</span></div>`;
 const commitRow = c => `<div class="row commit-row" ${c.task ? `data-task="${esc(c.task)}"` : ''}><span class="chip mono">${esc(c.sha)}</span><div style="min-width:0"><div class="tt">${esc(c.subject)}</div>${c.note ? `<div class="ts">${esc(c.note)}</div>` : ''}</div><span class="faint c-hide">${esc(c.age)}</span></div>`;
 async function openSlot(btn) {
-  // A tab opened after the answer arrives is a popup the browser blocks: open it on the press, then point it there.
+  // Opened on the press, as a popup opened after an answer may be blocked; a retry from the toast opens its own.
   const tab = window.open('', '_blank');
-  const ans = await act(btn.dataset.slotOpen, {}, {btn});
-  if (!tab) return;
-  if (ans && ans.ok && ans.open) { tab.opener = null; tab.location.href = ans.open; } else tab.close();
+  const go = ans => {
+    const to = tab && !tab.closed ? tab : window.open(ans.open, '_blank');
+    if (!to) { alertToast('slot-open', 'The browser blocked the new tab. Press Open again.'); return; }
+    to.opener = null; if (to === tab) tab.location.href = ans.open;
+  };
+  const ans = await act(btn.dataset.slotOpen, {}, {btn, onOk: go});
+  if (tab && !(ans && ans.ok)) tab.close();
 }
 function reqRow(r) {
   const o = r.outcome;

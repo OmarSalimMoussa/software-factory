@@ -3,13 +3,14 @@ its commits and how far the merge has reached; the branch's latest commits, each
 slot 0 runs, against the branch's tip.
 
 Every ``watch.done_minutes`` the warden's mirror fetches the agents' checkout, which needs no network, under the
-push lock, and the tick writes the finished list for the dashboard to draw. GitHub's branch is the one the mirror
-last fetched for a push: unknown before the first. Staging and prod are the builds their health answers named. A
-merge's commits never change, so each merge's are read once and kept.
+push lock, and a pass of its own writes the finished list for the dashboard to draw. GitHub's branch is the one the
+mirror last fetched for a push: unknown before the first. Staging and prod are the builds their health answers named.
+A merge's commits never change, so each merge's are read once and kept.
 """
 
 from __future__ import annotations
 
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -40,11 +41,17 @@ def read(places: Places) -> dict[str, Any] | None:
     return found
 
 
+def _tried_path(places: Places) -> Path:
+    return places.state / "done-tried.json"
+
+
 def refresh(ctx: Context) -> None:
-    """The tick's step: write the list again once ``watch.done_minutes`` have passed since the last."""
-    last = read(ctx.places)
-    if last is not None and ctx.clock.age(last["at"]) < ctx.settings().get_int("watch.done_minutes") * 60:
+    """Write the list again once ``watch.done_minutes`` have passed since the last try, whether or not it worked: it
+    waits for a push to end and runs slot 0's health script, so it runs in a thread of its own."""
+    tried = store.read_json_or(_tried_path(ctx.places), None)
+    if tried is not None and ctx.clock.age(tried["at"]) < ctx.settings().get_int("watch.done_minutes") * 60:
         return
+    store.write_json(_tried_path(ctx.places), {"at": ctx.clock.iso()})
     branch = ctx.settings().get_str("repo.default_branch")
     with pushing:
         git = Git(ctx)
@@ -54,7 +61,7 @@ def refresh(ctx: Context) -> None:
     lines = git.run("log", "--first-parent", "--merges", "--format=%H %ct", local).splitlines()
     landed = [(sha, int(at)) for sha, at in (line.split() for line in lines) if sha in recorded]
     kept = _kept(ctx.places, git, [sha for sha, _ in landed])
-    reverted = set(REVERTS.findall(git.run("log", "--format=%B", "--grep=This reverts commit", local)))
+    reverted = _taken_back(git, local)
     newest: dict[str, tuple[str, int]] = {}
     for sha, at in landed:
         newest.setdefault(recorded[sha], (sha, at))
@@ -77,6 +84,22 @@ def refresh(ctx: Context) -> None:
         "commits": [{**c, "task": owner.get(c["sha"])} for c in latest],
     }
     store.write_json(path(ctx.places), done, mode=0o600)
+
+
+def _taken_back(git: Git, local: str) -> set[str]:
+    """The commits a revert took back and no later revert brought back: a revert of a revert undoes the first."""
+    reverts: dict[str, list[str]] = {}
+    for record in git.run("log", f"--format=%H{_FIELD}%B{_END}", "--grep=This reverts commit", local).split(_END):
+        if record.strip():
+            sha, body = record.lstrip("\n").split(_FIELD, 1)
+            for target in REVERTS.findall(body):
+                reverts.setdefault(target, []).append(sha)
+
+    @cache
+    def undone(commit: str) -> bool:
+        return any(not undone(revert) for revert in reverts.get(commit, []))
+
+    return {commit for commit in reverts if undone(commit)}
 
 
 def _full(git: Git, name: str) -> str | None:

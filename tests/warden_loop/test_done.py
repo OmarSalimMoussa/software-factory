@@ -11,6 +11,7 @@ from loop_fakes import World, git, write
 
 from runtime.queue import turn
 from runtime.shared import store
+from runtime.shared.protocol import Refused
 from runtime.slots import health, leases
 from runtime.warden.context import StackResult
 from runtime.warden.delivery import deploys, done, github_push
@@ -107,3 +108,23 @@ def test_the_list_is_read_again_once_its_period_has_passed(world: World, github_
     done.refresh(world.ctx)
 
     assert [t["task"] for t in listed(world)["tasks"]] == ["t-0002", "t-0001"]
+
+
+def test_a_revert_of_a_revert_brings_the_task_back(world: World, github_repo: Path) -> None:
+    first = merge(world, "t-0001", 1)
+    git(world.checkout, "revert", "-m", "1", "--no-edit", first)
+    git(world.checkout, "revert", "--no-edit", "HEAD")
+
+    done.refresh(world.ctx)
+
+    assert [t["task"] for t in listed(world)["tasks"]] == ["t-0001"]
+
+
+def test_a_read_that_failed_waits_its_period_before_it_is_tried_again(world: World) -> None:
+    with pytest.raises(Refused):  # no deploy key, so no mirror: a factory not installed yet
+        done.refresh(world.ctx)
+    done.refresh(world.ctx)
+    world.clock.t += world.ctx.settings().get_int("watch.done_minutes") * 60
+
+    with pytest.raises(Refused):
+        done.refresh(world.ctx)

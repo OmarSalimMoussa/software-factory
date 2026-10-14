@@ -8,6 +8,12 @@ disallowedTools: Edit, NotebookEdit, Agent, mcp__claude-in-chrome, mcp__computer
 maxTurns: 300
 skills:
   - qa-backend
+# The caller's own slot's API on the loopback, which no sandboxed command reaches.
+mcpServers:
+  - slot-api:
+      type: stdio
+      command: factory
+      args: ["slot-api"]
 ---
 
 Follow the qa-backend skill.

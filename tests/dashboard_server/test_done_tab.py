@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -12,14 +13,27 @@ from runtime.shared import settings, store
 from runtime.warden.delivery import done
 
 
-@pytest.mark.parametrize("listed", [True, False], ids=["done-lists-it", "not-read-yet"])
-def test_a_task_leaves_the_tasks_tab_once_done_lists_it(rig: Rig, listed: bool) -> None:
+@pytest.mark.parametrize(
+    ("listed", "reverted", "on_done"),
+    [(True, False, True), (False, False, False), (True, True, False)],
+    ids=["done-lists-it", "not-read-yet", "reverted-since"],
+)
+def test_a_task_is_on_done_or_on_tasks_never_both(
+    rig: Rig, tmp_path: Path, listed: bool, reverted: bool, on_done: bool
+) -> None:
     if not listed:
         done.path(rig.places).unlink()
+    if reverted:  # the revert sent it back to building before the warden read the branch again
+        task = tmp_path / "repo" / "queue" / "tasks" / "t-0013.md"
+        task.write_text(task.read_text().replace("status: on-staging", "status: building"))
 
     groups = rig.parts("/api/work?tab=tasks")["tasks"]["data"]["groups"]
+    rows = rig.parts("/api/work?tab=done")["done"]["data"]["rows"]
 
-    assert ("t-0013" in {row["id"] for g in groups for row in g["rows"]}) is not listed
+    assert ("t-0013" in {row["id"] for row in rows}, "t-0013" in {r["id"] for g in groups for r in g["rows"]}) == (
+        on_done,
+        not on_done,
+    )
 
 
 @pytest.mark.parametrize(

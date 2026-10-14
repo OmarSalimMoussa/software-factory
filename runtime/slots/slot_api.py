@@ -1,8 +1,8 @@
 """`factory slot-api`: a tiny MCP server, over standard input and output, that gives a session HTTP access to its
 own slot's API and nothing else (factory spec, "Reaching a slot").
 
-A sandboxed command cannot reach the host's loopback, so Claude Code starts this tool outside the sandbox. It asks
-the warden which slot is the caller's, then sends each request to ``http://127.0.0.1:<that slot's port><path>``:
+A sandboxed command cannot reach the host's loopback, so Claude Code starts this tool outside the sandbox. Before each
+request it asks the warden which slot is the caller's, then sends it to ``http://127.0.0.1:<that slot's port><path>``:
 no other host, no redirects, a path only, and an answer cut at the warden's size. Nothing but MCP goes to stdout.
 """
 
@@ -55,8 +55,8 @@ def build(port: int, arguments: dict[str, Any]) -> urllib.request.Request:
     for name, value in headers.items():
         if not HEADER_NAME.match(str(name)) or name.lower() in BLOCKED_HEADERS:
             raise SlotApiError(f"the header {name!r} cannot be sent")
-        if not isinstance(value, str) or any(c in value for c in "\r\n\0"):
-            raise SlotApiError(f"the header {name} holds one line of text")
+        if not isinstance(value, str) or any(c in value for c in "\r\n\0") or any(ord(c) > 255 for c in value):
+            raise SlotApiError(f"the header {name} holds one line of Latin-1 text")
     body = arguments.get("body")
     if body is not None and not isinstance(body, str):
         raise SlotApiError("body is text")
@@ -125,12 +125,24 @@ def serve(lines: IO[str], out: IO[str], call: Callable[[dict[str, Any]], str]) -
             out.flush()
 
 
+def caller(which: Callable[[], dict[str, Any]]) -> Callable[[dict[str, Any]], str]:
+    """Each request asks the warden for the caller's slot first: a session claims, releases or changes its slot while
+    the tool runs, and Claude Code never starts again a server that exited."""
+
+    def call(arguments: dict[str, Any]) -> str:
+        try:
+            found = which()
+        except ValueError as exc:
+            raise SlotApiError(f"the warden's answer could not be read ({type(exc).__name__}): try again") from exc
+        if not found.get("ok"):
+            raise SlotApiError(f"you hold no slot: {found.get('reason', 'the warden refused')}")
+        port, timeout, limit = int(found["port"]), int(found["timeout_seconds"]), int(found["max_kib"]) * 1024
+        return send(build(port, arguments), timeout, limit)
+
+    return call
+
+
 def main(which: Callable[[], dict[str, Any]]) -> int:
-    """Ask the warden for the caller's slot once, then serve until Claude Code closes standard input."""
-    found = which()
-    if not found.get("ok"):
-        print(f"slot-api: no slot: {found.get('reason', 'the warden refused')}", file=sys.stderr)
-        return 2
-    port, timeout, limit = int(found["port"]), int(found["timeout_seconds"]), int(found["max_kib"]) * 1024
-    serve(sys.stdin, sys.stdout, lambda arguments: send(build(port, arguments), timeout, limit))
+    """Serve until Claude Code closes standard input."""
+    serve(sys.stdin, sys.stdout, caller(which))
     return 0

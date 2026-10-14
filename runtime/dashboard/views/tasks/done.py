@@ -14,10 +14,21 @@ _STATE = {True: ("good", "has it"), False: ("", "does not have it yet"), None: (
 _NOTE = {"tasks": "newest merge first", "commits": "newest first"}
 
 
+# A closed task whose merge stayed is done too.
+_FINISHED = (*taskwords.LANDED, "closed")
+
+
+def listed(snap: Snap) -> list[dict[str, Any]]:
+    """The warden's done tasks whose status still says they landed: a revert moves a task back before the warden
+    reads the branch again."""
+    found = snap.get("done")
+    status = {i: t["status"] for i, t in taskwords.tasks(snap).items()}
+    return [] if found is None else [row for row in found["tasks"] if status.get(row["task"]) in _FINISHED]
+
+
 def ids(snap: Snap) -> set[str]:
     """The tasks Done lists, which the Tasks tab leaves out."""
-    found = snap.get("done")
-    return set() if found is None else {t["task"] for t in found["tasks"]}
+    return {row["task"] for row in listed(snap)}
 
 
 def _stages(row: dict[str, Any]) -> list[dict[str, str]]:
@@ -28,10 +39,10 @@ def _stages(row: dict[str, Any]) -> list[dict[str, str]]:
     return stages
 
 
-def _task_row(snap: Snap, row: dict[str, Any], titles: dict[str, str]) -> dict[str, Any]:
+def _task_row(snap: Snap, row: dict[str, Any], title: str) -> dict[str, Any]:
     return {
         "id": row["task"],
-        "title": titles.get(row["task"], row["task"]),
+        "title": title,
         "sub": f"merged {ago(row['at'], snap.now)} · {plural(len(row['commits']), 'commit')}",
         "stages": _stages(row),
     }
@@ -91,8 +102,8 @@ def done(snap: Snap, query: Query) -> dict[str, Any]:
     if found is None:
         return {**base, "master": None, "rows": [], "more": False, "empty": "The warden has not read what is done yet."}
     if view == "tasks":
-        titles = {t["id"]: t["title"] for t in taskwords.tasks(snap).values()}
-        rows = [_task_row(snap, row, titles) for row in found["tasks"]]
+        tasks = taskwords.tasks(snap)
+        rows = [_task_row(snap, row, tasks[row["task"]]["title"]) for row in listed(snap)]
         empty = "No task is done yet."
     else:
         rows = [_commit_row(snap, c) for c in found["commits"]]

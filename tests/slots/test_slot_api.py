@@ -7,6 +7,7 @@ import json
 
 import pytest
 
+from runtime.slots import slot_api
 from runtime.slots.slot_api import SlotApiError, build, serve
 
 
@@ -19,6 +20,7 @@ from runtime.slots.slot_api import SlotApiError, build, serve
         {"method": "GET", "path": "@evil.example/"},
         {"method": "GET", "path": "/", "headers": {"Host": "evil.example"}},
         {"method": "GET", "path": "/", "headers": {"X-A": "1\r\nX-B: 2"}},
+        {"method": "GET", "path": "/", "headers": {"X-Name": "\u540d\u524d"}},
         {"method": "CONNECT", "path": "/"},
     ],
 )
@@ -49,3 +51,17 @@ def test_the_server_speaks_mcp_over_stdio() -> None:
     assert [r["id"] for r in replies] == [1, 2, 3]
     assert replies[1]["result"]["tools"][0]["name"] == "slot_api"
     assert replies[2]["result"]["isError"] is True  # no method named
+
+
+def test_each_request_goes_to_the_slot_the_caller_holds_at_that_moment(monkeypatch: pytest.MonkeyPatch) -> None:
+    held = {"ok": True, "timeout_seconds": 30, "max_kib": 256}
+    answers = iter([{"ok": False, "reason": "claim a slot first"}, {**held, "port": 8101}, {**held, "port": 8102}])
+    monkeypatch.setattr(slot_api, "send", lambda request, timeout, limit: request.full_url)
+    call = slot_api.caller(lambda: next(answers))
+
+    with pytest.raises(SlotApiError, match="claim a slot first"):
+        call({"method": "GET", "path": "/"})
+    assert [call({"method": "GET", "path": "/"}) for _ in range(2)] == [
+        "http://127.0.0.1:8101/",
+        "http://127.0.0.1:8102/",
+    ]

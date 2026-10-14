@@ -11,7 +11,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import schedule
 from runtime.warden.owner import ops
-from runtime.warden.sessions import crashwatch, lifecycle, revive
+from runtime.warden.sessions import crashwatch, lifecycle, older_skills, revive
 
 
 def rule(call: Any, *args: Any) -> str:
@@ -151,6 +151,23 @@ def test_pause_benches_every_session_and_resume_brings_them_back_in_order(world:
     assert world.launcher.resumed == ["0c0c0c0c", "1a1a1a1a", "2b2b2b2b"]
     assert {world.session(s).state for s in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {WORKING}
     assert [kind for kind, _ in world.events] == ["paused", "benched", "benched", "benched", "resumed"]
+
+
+def test_a_session_alive_when_a_new_factory_is_installed_is_told_once_to_load_its_skills_again(world: World) -> None:
+    world.seat("0c0c0c0c", role="orchestrator", family="orch", state=DEPRIORITIZED)
+    # The new tree is in place, and the warden starts on it, before the install writes its record.
+    store.write_text(world.places.install / "COMMIT", "a" * 40 + "\n")
+    older_skills.note_install(world.places)
+    world.seat("1a1a1a1a", role="orchestrator", family="orch", state=DEPRIORITIZED)
+    older_skills.note_install(world.places)  # the same install, noted at a second start: the newer session is not
+
+    revive.revive_session(world.ctx(), "0c0c0c0c", "warden")
+    revive.revive_session(world.ctx(), "1a1a1a1a", "warden")
+    world.seat("0c0c0c0c", role="orchestrator", family="orch", state=DEPRIORITIZED)
+    revive.revive_session(world.ctx(), "0c0c0c0c", "warden")
+
+    told = [(sid, older_skills.RELOAD in said) for sid, said in world.launcher.messages]
+    assert told == [("0c0c0c0c", True), ("1a1a1a1a", False), ("0c0c0c0c", False)]
 
 
 def test_a_stopped_run_that_never_was_a_proposal_goes_back_to_the_queue(world: World) -> None:

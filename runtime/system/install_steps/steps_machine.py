@@ -296,6 +296,9 @@ def agent_checkout(ctx: Install) -> None:
     if code == 0 and kind.strip() and kind.strip() != "directory":
         raise refuse(f"{queue} is a {kind.strip()}, not a folder: remove it, then install again")
     ctx.host.mkdir(queue, mode=0o755, owner=WARDEN_USER)
+    # The checkout's own config, which every worktree shares, gives the agents an identity to commit as.
+    for key, value in (("user.name", steps_wire.GIT_NAME), ("user.email", steps_wire.GIT_EMAIL)):
+        ctx.host.run(["git", "-C", str(ctx.checkout()), "config", key, value], user=AGENT_USER)
     # A slot's containers read the worktrees as users outside the agent's group, so what agents wrote before their
     # umask let others read it is opened up here. Run as the agent, it changes only the agent's own files; it never
     # follows a link, and never enters a folder another user owns (a container's, say), which it could not read.

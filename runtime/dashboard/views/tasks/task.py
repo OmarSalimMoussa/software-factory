@@ -20,7 +20,7 @@ from runtime.dashboard.views.kit import (
     version,
     when,
 )
-from runtime.dashboard.views.tasks import proposals
+from runtime.dashboard.views.tasks import done, proposals
 from runtime.dashboard.views.words import taskwords
 from runtime.queue.formats import TASK_ID
 from runtime.shared.models import OPEN_SEVERITIES, RETIRED
@@ -208,8 +208,7 @@ def sheet(snap: Snap, task_id: str) -> dict[str, Any]:
 
 def _commits(snap: Snap, task_id: str) -> list[dict[str, Any]]:
     """The commits of the merge that made the task done; none until Done lists it."""
-    found = snap.get("done")
-    row = next((t for t in found["tasks"] if t["task"] == task_id), None) if found is not None else None
+    row = next((t for t in done.listed(snap) if t["task"] == task_id), None)
     commits = row["commits"] if row is not None else []
     return [{"sha": c["sha"][:7], "subject": c["subject"], "note": f"slice {c['slice']}" if c["slice"] else None}
             for c in commits]  # fmt: skip

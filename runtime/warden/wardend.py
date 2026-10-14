@@ -25,7 +25,7 @@ from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, Places
 from runtime.shared.settings import Settings
 from runtime.warden import gc, imports, inbox, loop, public, schedule, server, upgrade
 from runtime.warden.context import Caller, Clock, Context
-from runtime.warden.delivery import github, pins, prod_push
+from runtime.warden.delivery import done, github, pins, prod_push
 from runtime.warden.dispatch import Dispatcher, Doors, resolve
 from runtime.warden.owner import factory_upgrade, ops, reflections, settings_save, yolo
 from runtime.warden.sessions import crashwatch, launch, reap, registry
@@ -85,6 +85,11 @@ def _push_pins(ctx: Context) -> None:
     loop.run_once(ctx, "the product pin's push", lambda: pins.ask_pending(ctx))
 
 
+def _refresh_done(ctx: Context) -> None:
+    # In its own thread: it waits for a push to end, and runs slot 0's health script.
+    loop.run_once(ctx, "the done list", lambda: done.refresh(ctx))
+
+
 def _build_replays(ctx: Context, transcripts: Sequence[Path]) -> None:
     # In its own thread: a replay reads a trace of thousands of frames.
     loop.run_once(ctx, "the replays build", lambda: pending.build_pending(ctx, transcripts))
@@ -106,6 +111,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
         ("branch", imports.Background(_ask_branch, imports.in_thread("branch")).run_pass),
         ("releases", imports.Background(_check_releases, imports.in_thread("releases")).run_pass),
         ("pins", imports.Background(_push_pins, imports.in_thread("pins")).run_pass),
+        ("done", imports.Background(_refresh_done, imports.in_thread("done")).run_pass),
         (
             "replays",
             imports.Background(partial(_build_replays, transcripts=transcripts), imports.in_thread("replays")).run_pass,

@@ -52,8 +52,7 @@ def tick(world: World, tmp_path: Path) -> list[str]:
 
 
 @pytest.fixture
-def ticking(world: World, github_repo: Path) -> World:
-    """A world whose every tick step can run: its checkout is a git repo the warden's mirror can read."""
+def ticking(world: World) -> World:
     world.ctx.post_event = inbox.poster(world.ctx.places, world.clock)
     world.checkout.mkdir(parents=True, exist_ok=True)
     (world.checkout / "GOAL.md").write_bytes((ROOT / "testdata" / "fixture-product" / "GOAL.md").read_bytes())

@@ -24,7 +24,7 @@ from runtime.warden.context import Context
 from runtime.warden.delivery import deploys, prod_push
 from runtime.warden.health import errors_import, probes
 from runtime.warden.owner import factory_upgrade
-from runtime.warden.sessions import registry
+from runtime.warden.sessions import older_skills, registry
 
 log = logging.getLogger(__name__)
 # The first line of an issue's request body as glitchtip files it (errors_import.request_text).
@@ -37,7 +37,7 @@ def migrate(ctx: Context) -> list[str]:
     done: list[str] = []
     steps: list[Callable[[Context], str]] = [
         _inbox_cursor, _leases, _errors_filed, _turn, _merges, _released, _typed_verdicts, _approvals_routed,
-        _release_offer, _briefs_home, _active_account,
+        _release_offer, _briefs_home, _active_account, _older_skills,
     ]  # fmt: skip
     for step in steps:
         try:
@@ -49,6 +49,11 @@ def migrate(ctx: Context) -> list[str]:
             log.info("warden: brought the state over: %s", said)
             done.append(said)
     return done
+
+
+def _older_skills(ctx: Context) -> str:
+    found = older_skills.note_install(ctx.places)
+    return f"{found} sessions load their skills again as they come back" if found else ""
 
 
 def _release_offer(ctx: Context) -> str:

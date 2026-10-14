@@ -100,7 +100,9 @@ def factory_repo(ctx: Install) -> str:
     return str(ctx.release["repo"]) if ctx.release else github_name(ctx.factory_origin) or ""
 
 
-PIN_AUTHOR = ["-c", "user.name=software factory", "-c", "user.email=factory@software.invalid"]
+# The factory's git identity: the agents commit as it, and root's pin commit names it on its own command line.
+GIT_NAME, GIT_EMAIL = "software factory", "factory@software.invalid"
+PIN_AUTHOR = ["-c", f"user.name={GIT_NAME}", "-c", f"user.email={GIT_EMAIL}"]
 
 
 def product_pin(ctx: Install) -> None:

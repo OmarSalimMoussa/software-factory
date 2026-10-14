@@ -10,6 +10,12 @@ skills:
   - debugging
   - taking-review
   - verifying-claims
+# The caller's own slot's API on the loopback, which no sandboxed command reaches.
+mcpServers:
+  - slot-api:
+      type: stdio
+      command: factory
+      args: ["slot-api"]
 ---
 
 Before your first reply, load the implementer, debugging, taking-review and verifying-claims skills with the Skill tool,
