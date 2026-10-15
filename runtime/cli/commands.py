@@ -37,7 +37,6 @@ def _sessions(sub: Any) -> None:
     sub.add_parser("doing").add_argument("text")
     sub.add_parser("tick")
     sub.add_parser("inbox").add_argument("--wait", action="store_true")
-    sub.add_parser("push").add_argument("sha", nargs="?")
     decide = sub.add_parser("decide")
     decide.add_argument("card")
     decide.add_argument("choice")

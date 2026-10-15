@@ -1,9 +1,10 @@
-"""Pushes to the default branch, which CI deploys to staging: the orchestrator asks, and the owner pushes.
+"""Pushes to the default branch, which CI deploys to staging: the warden offers, and the owner pushes.
 
-The orchestrator's `factory push` checks its commit and leaves it waiting; only the owner's Push to staging sends it,
-checked again. The warden pushes from its own mirror with the deploy key, which no agent can read. It fetches the
-checked commit from the agent's checkout and refuses a range that touches a path only the owner's hand may change.
-The owner's push to prod, and back, is prod_push.py's; the two share one lock, so one push runs at a time.
+The warden looks for the newest commit cleared to ship on its own and leaves it waiting; only the owner's Push to
+staging sends it, checked again. No agent asks for a push or waits on one. The warden pushes from its own mirror
+with the deploy key, which no agent can read. It fetches the checked commit from the agent's checkout and refuses a
+range that touches a path only the owner's hand may change. The owner's push to prod, and back, is prod_push.py's;
+the two share one lock, so one push runs at a time.
 """
 
 from __future__ import annotations
@@ -28,9 +29,8 @@ from runtime.warden import checks, inbox
 from runtime.warden.context import Context
 from runtime.warden.delivery import deploys, pins
 from runtime.warden.health import probes
-from runtime.warden.owner import ops
+from runtime.warden.owner import ops, reflections
 
-FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 # What `git revert` writes into the message of the commit that takes a merge back.
 REVERTS = re.compile(r"This reverts commit ([0-9a-f]{40})")
 # A task whose merge passed its check of the default branch. A closed task's merge ships only on a saved check of
@@ -38,6 +38,7 @@ REVERTS = re.compile(r"This reverts commit ([0-9a-f]{40})")
 SHIPPABLE = frozenset({"checked", ON_STAGING, "promoted"})
 # One push at a time, of either kind: the check that none runs and the start happen together.
 pushing = threading.Lock()
+_LOOKED: dict[str, float] = {}  # when each warden last looked, by its state folder: a look fetches from GitHub
 
 
 def mirror_path(places: Places) -> Path:
@@ -67,25 +68,34 @@ def waiting_path(places: Places) -> Path:
     return places.state / "staging-push.json"
 
 
-def ask_push(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Clear the default branch's newest shippable commit, or the one ``sha`` names, and leave it waiting for the
-    owner: nothing reaches GitHub until the owner presses Push to staging. A waiting push that already holds the
-    commit is kept, since the branch only moves forward. Shippable: its tree passed factory check, and every merge it
-    adds to GitHub's branch is one whose check passed (its task checked or further), or was reverted in the range."""
-    sha = args.get("sha")
-    if sha is not None and (not isinstance(sha, str) or not FULL_SHA.match(sha)):
-        raise Refused("push", "name the commit by its full 40-character sha, or name none to push the newest")
+def offer(ctx: Context) -> None:
+    """Every watch.branch_retry_minutes, or once a task is checked, leave the newest shippable commit waiting for the
+    owner's Push to staging (or say in SELF_REFLECT what stops it); a push GitHub already holds goes."""
+    key, now = str(ctx.places.state), ctx.clock.now()
+    if key in _LOOKED and now - _LOOKED[key] < ctx.settings().get_int("watch.branch_retry_minutes") * 60:
+        return
+    _LOOKED[key] = now
     with pushing:
         git = Git(ctx)
-        sha, remote, count = _cleared(ctx, git, sha)
-        if not count:
-            return ok(sha=sha, commits=0, message=f"GitHub already holds {sha[:12]}")
+        try:
+            sha, remote, count = _cleared(ctx, git, None)
+        except Refused as refused:
+            if refused.rule in ("push", "protected-path"):
+                reflections.incident(ctx, f"The staging push is not offered: {refused.reason}")
+            elif refused.rule != "unchecked":
+                raise
+            return
         held = waiting(ctx.places)
-        if held is None or not git.knows(held["sha"]) or not git.is_ancestor(sha, held["sha"]):
+        if held is not None and (not git.knows(held["sha"]) or git.is_ancestor(held["sha"], remote)):
+            waiting_path(ctx.places).unlink()
+            held = None
+        if count and (held is None or not git.is_ancestor(sha, held["sha"])):
             held = {"sha": sha, "commits": count, "items": _going(ctx, git, remote, sha), "asked_at": ctx.clock.iso()}
             store.write_json(waiting_path(ctx.places), held, mode=0o600)
-    said = f"{held['commits']} commits wait for the owner, who pushes them to staging from Home"
-    return ok(sha=held["sha"], commits=held["commits"], waiting=True, message=said)
+
+
+def look_soon(places: Places) -> None:
+    _LOOKED.pop(str(places.state), None)
 
 
 def owner_push(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
@@ -109,7 +119,7 @@ def _push(ctx: Context, sha: str) -> str:
         if held is not None and held["sha"] == sha:
             waiting_path(ctx.places).unlink()
         elif held is not None:
-            # A newer push was asked for while this one ran: it waits on, with what it adds beyond this one.
+            # A newer push was offered while this one ran: it waits on, with what it adds beyond this one.
             more = int(git.run("rev-list", "--count", f"{sha}..{held['sha']}"))
             held.update(commits=more, items=_going(ctx, git, sha, held["sha"]))
             store.write_json(waiting_path(ctx.places), held, mode=0o600)

@@ -30,7 +30,7 @@ def check(call: Call, inv: shell.Invocation, cwd: Path) -> Decision:
     words = inv.argv[1:]
     dispatch = words[:1] == ["api"] and any("dispatches" in a for a in words) and git_rules.api_writes(words)
     if inv.program == "gh" and (tuple(words[:2]) in _WORKFLOW_STARTS or dispatch):
-        return Refusal("prod-frozen", "workflows start only from CI and the owner; ship with `factory push`")
+        return Refusal("prod-frozen", "workflows start only from CI and the owner, who pushes from Home")
     args = git_rules.git_args(inv)
     if args is not None and git_rules.subcommand(args)[0] == "push" and _ships_elsewhere(call, args):
         return Refusal("prod-frozen", "tags and other branches never leave this machine; only the owner promotes")

@@ -2,27 +2,19 @@
 for, and the one way a change to .github/factory-ref or the CI workflows ships.
 
 A push lets a pin's own paths through when nothing but pins changes them in the range; a pin's tree
-counts as checked when its parent's tree passed, since it changes nothing a check reads. The warden asks the owner
-to push a pin once it may ship, as the orchestrator asks, asking again every watch.branch_retry_minutes until GitHub
-holds it.
+counts as checked when its parent's tree passed, since it changes nothing a check reads, so the warden's offer of
+the staging push (github_push.py) takes a pin once it may ship.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from pathlib import Path
 
-from runtime.shared import store, upgrades
+from runtime.shared import upgrades
 from runtime.shared.paths import Places
-from runtime.shared.protocol import Refused
 from runtime.warden import checks
-from runtime.warden.context import Context
 
 Git = Callable[..., str]
-
-
-def _pushed_path(places: Places) -> Path:
-    return places.state / "pins-pushed.json"
 
 
 def _changed(git: Git, commit: str) -> set[str]:
@@ -63,24 +55,3 @@ def tree_passes(git: Git, places: Places, commit: str) -> bool:
         return False
     parent = git("rev-parse", f"{commit}^").strip()
     return checks.passed(places, git("rev-parse", f"{parent}^{{tree}}").strip()) or tree_passes(git, places, parent)
-
-
-def ask_pending(ctx: Context) -> None:
-    from runtime.warden.delivery import github_push  # it reads this module's rules when it pushes
-
-    places = ctx.places
-    record = store.read_json_or(_pushed_path(places), {"pushed": [], "tried_at": None})
-    waiting = [p["commit"] for p in upgrades.read_pins(places) if p["commit"] not in record["pushed"]]
-    every = ctx.settings().get_int("watch.branch_retry_minutes") * 60
-    if not waiting or (record["tried_at"] is not None and ctx.clock.now() - record["tried_at"] < every):
-        return
-    pushed = list(record["pushed"])
-    try:
-        for commit in waiting:
-            if not github_push.ask_push(ctx, {"sha": commit}, None)["commits"]:
-                pushed.append(commit)
-    except Refused as refused:
-        if refused.rule != "unchecked":
-            raise
-    finally:
-        store.write_json(_pushed_path(places), {"pushed": pushed, "tried_at": ctx.clock.now()}, mode=0o600)

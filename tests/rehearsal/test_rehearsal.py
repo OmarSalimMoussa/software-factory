@@ -13,7 +13,7 @@ from runtime.queue import format_check, turn
 from runtime.queue.book import Queue
 from runtime.shared.models import BENCH_PENDING, FINISHED, RETIRED, WORKING
 from runtime.warden import checks, loop
-from runtime.warden.delivery import deploys
+from runtime.warden.delivery import deploys, github_push
 from runtime.warden.owner import ops
 from runtime.warden.sessions import crashwatch, registry
 
@@ -170,7 +170,7 @@ def _merged_and_pushed(r: Rehearsal, orch: str, impl: str, worktree: Path, branc
     assert r.session(impl, ["check"])["passed"]
 
     # The orchestrator merges; the warden finds the merge. The passing check of master marks the task checked, the
-    # orchestrator asks for the push of the newest checked commit, and the owner pushes it from Home.
+    # warden offers the push of the newest checked commit, and the owner pushes it from Home.
     git(r.repo, "merge", "-q", "--no-ff", branch, "-m", f"Merge {branch}: new notes show first")
     merge = git(r.repo, "rev-parse", "HEAD")
     assert checks.passed(r.places, git(r.repo, "rev-parse", "HEAD^{tree}"))
@@ -179,8 +179,9 @@ def _merged_and_pushed(r: Rehearsal, orch: str, impl: str, worktree: Path, branc
     assert registry.read(r.places)[impl].state == BENCH_PENDING
     report = r.body(r.repo, "check.md", REPORT.encode())
     assert r.session(orch, ["queue", "check", merge, "--body", report])["checked"] == TASK
-    pushed = r.session(orch, ["push"])
-    assert (pushed["sha"], pushed["commits"], pushed["waiting"]) == (merge, 2, True)
+    github_push.offer(r.warden())
+    held = github_push.waiting(r.places)
+    assert held is not None and (held["sha"], held["commits"]) == (merge, 2)
     assert git(r.github, "rev-parse", "master") != merge
     ops.join(r.dashboard("staging.push", {"sha": merge})["op"])
     assert git(r.github, "rev-parse", "master") == merge

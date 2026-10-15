@@ -61,7 +61,7 @@ def refusal(
     if not in_slice:
         return ""
     if hook == "pre-push":
-        return "commit-check: only the warden pushes; the orchestrator ships with `factory push <sha>`"
+        return "commit-check: only the owner pushes, from Home; your work stays local"
     if factory:
         return "commit-check: the factory never works on its own repo; only the owner changes it, by hand"
     hits = protected_hits(paths, prefixes) if on_default or not merging else []

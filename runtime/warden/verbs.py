@@ -55,7 +55,6 @@ VERBS: dict[str, Verb] = {
     "tick": _v("runtime.warden.loop:tick", ORCH),
     "inbox": _v("runtime.warden.inbox:read", ORCH),
     "inbox.wait": _v("runtime.warden.inbox:wait", ORCH),
-    "push": _v("runtime.warden.delivery.github_push:ask_push", ORCH),
     "decide": _v("runtime.warden.owner.yolo:orchestrator_decide", ORCH),
     "check": _v("runtime.warden.checks:check", ORCH, IMPL),
     "promote": _v("runtime.warden.delivery.prod_push:promote_cli", OWNER),

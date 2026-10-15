@@ -70,7 +70,6 @@ def test_the_orchestrators_worktree_is_the_main_checkout(tmp_path: Path) -> None
         ("factory queue task new --title x", "factory-verbs"),
         ("factory promote", "factory-verbs"),
         ("factory snapshot", "factory-verbs"),
-        ("factory push abc1234", "factory-verbs"),
         ("factory no-such-verb", "factory-verbs"),
         # The factory command runs outside the sandbox: a browser it started would too. Only the install checks it.
         ("factory qa-browser --check qa-ux", "factory-verbs"),

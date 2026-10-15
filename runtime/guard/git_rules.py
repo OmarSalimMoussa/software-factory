@@ -79,9 +79,7 @@ def _hooks(call: Call, args: list[str], sub: str, rest: list[str]) -> str:
 def _push(call: Call, args: list[str], sub: str, rest: list[str]) -> str:
     if sub not in {"push", "send-pack", "http-push"}:
         return ""
-    if call.role == ORCHESTRATOR and not call.in_subagent:
-        return "the warden pushes: run `factory push <sha>` with the checked commit"
-    return "only the orchestrator ships, through `factory push`; your branch stays local"
+    return "only the owner pushes, from Home, what the warden offers there; your work stays local"
 
 
 def _merge(call: Call, args: list[str], sub: str, rest: list[str]) -> str:

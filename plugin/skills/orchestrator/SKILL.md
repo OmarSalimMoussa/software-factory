@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-description: Use when running as the orchestrator - the factory's one standing session, in the product's main checkout on the default branch - to keep staging green, propose the next tasks to the owner, start the runs the owner approves through the warden, give merge turns, merge, check the default branch and push it to staging.
+description: Use when running as the orchestrator - the factory's one standing session, in the product's main checkout on the default branch - to keep staging green, propose the next tasks to the owner, start the runs the owner approves through the warden, give merge turns, merge and check the default branch.
 ---
 <!-- doc-refs: external -->
 
@@ -50,7 +50,7 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 | `benched` | A session was benched for higher work and keeps its context; the warden starts what it made room for. |
 | `crashed` | A session kept dying and was retired. Its task is back in Proposed with its branch kept: propose it again. |
 | `paused`, `resumed` | Pause: start nothing, end your turn. Resume: run the start steps again. |
-| `yolo on` | The owner is away and the factory runs on its own. Each proposal you make is approved as places free, so propose only what moves the goal most. A question you ask the owner is answered "Be proactive and solve it yourself." Nothing is pushed: keep checking, and ask with `factory push`; the owner pushes later. |
+| `yolo on` | The owner is away and the factory runs on its own. Each proposal you make is approved as places free, so propose only what moves the goal most. A question you ask the owner is answered "Be proactive and solve it yourself." |
 | `yolo off` | The owner approves and decides again. |
 | `yours to decide` | With YOLO mode on, a card the owner would decide is yours: read its task, then `factory decide <card> <choice>` with one of the event's `choices` (`go` on a spec; `extend`, `designer` or `park` on a stuck task). |
 | `goal-changed` | Reread `GOAL.md` and fill the proposal slots again. |
@@ -137,11 +137,10 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    stopped it and what would fix it>; reverted as <the revert's sha>"`. The warden benches its implementer, writes
    it to SELF_REFLECT and puts it on Home for the owner's Fixed: move on to other work. A blocker an implementer
    reports before its merge is blocked the same way, with nothing to revert.
-5. **Ship.** `factory push` asks the owner to push the newest commit that is safe to ship: its tree passed, and every
-   merge it adds passed its check (or was reverted). It waits on Home until the owner pushes it, and CI then deploys
-   staging; carry on meanwhile, and ask again after each check that passes: the one waiting push holds them all.
-   Staging regressing after a push: revert, `factory check`, `factory push` at once
-   (`${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md`). Prod moves only when the owner pushes it.
+5. **Staging is the owner's.** The warden offers the newest commit that is safe to ship on Home, and the owner
+   pushes it when they choose: never ask for a push or wait for one. Staging regressing after a push: revert and
+   `factory check` at once (`${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md`); the revert is offered the same way.
+   Prod moves only when the owner pushes it.
 
 ## When something is red
 
@@ -156,6 +155,6 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
 ## Never
 
 Read or write product code. Edit `GOAL.md`, the factory, or another session's worktree. Start, resume or stop a
-session other than with `factory`. Start any run yourself, except the outage fix. Push other than
-with `factory push`, or reach prod in any way. Merge without `--no-ff` or without a pass. Let the default branch
+session other than with `factory`. Start any run yourself, except the outage fix. Push, or
+reach prod in any way. Merge without `--no-ff` or without a pass. Let the default branch
 move during a merge turn. Keep a schedule of your own: the warden drives the loop.

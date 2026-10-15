@@ -20,12 +20,13 @@ from runtime.shared import operations, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import PROMOTE_JOB, Places
 from runtime.shared.protocol import Refused, ok
+from runtime.shared.releases import FULL_SHA
 from runtime.shared.settings import Settings
 from runtime.warden import inbox
 from runtime.warden.context import Context
 from runtime.warden.delivery import deploys
 from runtime.warden.delivery.github import GitHubError
-from runtime.warden.delivery.github_push import FULL_SHA, Git, pushing
+from runtime.warden.delivery.github_push import Git, pushing
 from runtime.warden.health import probes
 from runtime.warden.owner import ops
 

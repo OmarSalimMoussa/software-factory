@@ -14,6 +14,7 @@ from runtime.shared.models import REQUEST_SEVERITIES
 from runtime.shared.protocol import Refused, ok
 from runtime.warden import inbox
 from runtime.warden.context import Context
+from runtime.warden.delivery import github_push
 from runtime.warden.sessions import registry
 
 Args = dict[str, Any]
@@ -160,6 +161,8 @@ def check_save(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
     record = documents.save_check(ctx, turn.full_commit(ctx, _text(args, "commit")), data)
     failed = [r.scenario for r in record.rows if r.result != "pass"]
     checked = turn.check_saved(ctx, record.commit, not failed)
+    if checked:
+        github_push.look_soon(ctx.places)
     return ok(check=record.id, scenarios=len(record.rows), not_passed=failed, checked=checked or None)
 
 

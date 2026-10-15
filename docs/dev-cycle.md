@@ -32,9 +32,9 @@ nothing starts without the owner's approval, except the fix for a clear prod out
    checked. A scenario the environment blocked (a key, a seed, a site testers cannot reach) reverts the merge too,
    and blocks the task: it waits on Home for the owner's **Fixed, carry on**, its implementer benched and written to
    SELF_REFLECT, while other work goes on. The owner's Fixed sends it back to its implementer.
-10. **Staging.** `factory push` asks for the push of the newest commit whose merges all passed their check. It waits
-    on Home until the owner pushes it, and CI then deploys staging. A regression there is reverted at once, and the
-    revert waits for the owner's push the same way.
+10. **Staging.** The warden offers the push of the newest commit whose merges all passed their check. It waits on
+    Home until the owner pushes it, and CI then deploys staging; no agent asks for a push or waits on one. A
+    regression there is reverted at once, and the revert waits for the owner's push the same way.
 11. **Prod.** Only the owner pushes to prod, from the dashboard, at exactly the commit staging
     runs. Pushing back redeploys the commit prod ran before.
 

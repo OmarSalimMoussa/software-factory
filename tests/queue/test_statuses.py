@@ -13,6 +13,7 @@ from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
 from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, REVIVING, Task
 from runtime.shared.protocol import Refused
+from runtime.warden.delivery import github_push
 from runtime.warden.owner import reflections
 from runtime.warden.sessions import backstop, lifecycle, permits, registry, respawn, revive
 
@@ -229,8 +230,10 @@ def test_a_revert_said_while_its_implementer_comes_back_follows_it_once_it_is_ba
 
 
 def test_a_check_named_by_a_short_sha_checks_the_merge_it_ran_on(
-    world: World, caplog: pytest.LogCaptureFixture
+    world: World, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    looked: list[object] = []
+    monkeypatch.setattr(github_push, "look_soon", looked.append)
     task = world.task(branch="impl-t-0001")
     world.queue().write_task(dataclasses.replace(task, status="merged", run=1))
     merge = "abc1234" + "0" * 33
@@ -249,4 +252,5 @@ def test_a_check_named_by_a_short_sha_checks_the_merge_it_ran_on(
         verbs.check_save(world.ctx(), {"commit": "fedcba9"}, report)
     answer = verbs.check_save(world.ctx(), {"commit": "abc1234"}, report)
     assert answer["checked"] == task.id and world.queue().task(task.id).status == "checked"
+    assert looked == [world.places]
     assert [c.commit for c in world.queue().checks()[0]] == [merge]
