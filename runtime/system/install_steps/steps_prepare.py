@@ -4,6 +4,7 @@ sealed copy, settle the settings, then stop the running factory."""
 from __future__ import annotations
 
 import json
+import shlex
 import tomllib
 from pathlib import PurePosixPath
 from typing import Any
@@ -30,14 +31,22 @@ LOOKUP_MARK = "--- the factory looks up a tool ---"
 LOOKUP_END = "--- the factory found it ---"
 
 
+def lookup_argv(shell: str, name: str) -> list[str]:
+    # An alias or function of that name is the terminal's word for it, not the program to copy.
+    asked = (
+        f"echo '{LOOKUP_MARK}'; unalias -a 2>/dev/null; unset -f {name} 2>/dev/null; "
+        f"command -v {name} && echo '{LOOKUP_END}'"
+    )
+    return [shell, "-lc", f"exec {shlex.quote(shell)} -ic {shlex.quote(asked)}"]
+
+
 def login_path(host: Host, account: Account, name: str) -> tuple[int, str]:
-    """Where ``account``'s own shell finds ``name`` when started as at a terminal: a login shell that reads its rc files
-    too, where nvm, mise and fnm put their tools on PATH. "" when it finds none; the shell's exit code beside it."""
-    lookup = f"echo '{LOOKUP_MARK}'; command -v {name} && echo '{LOOKUP_END}'"
-    code, out = host.query([account.shell, "-lic", lookup], user=account.name)
+    """Where ``account``'s shell finds ``name`` as a terminal's does: a login, then an interactive shell that reads the
+    rc files, which a login bash reads only when its profile does. "" when no program's path; the shell's exit code."""
+    code, out = host.query(lookup_argv(account.shell, name), user=account.name)
     found, end, _ = out.rpartition(LOOKUP_MARK)[2].partition(LOOKUP_END)
     answer = found.split() if end else []
-    return code, answer[-1] if answer else ""
+    return code, answer[-1] if answer and answer[-1].startswith("/") else ""
 
 
 def login_tool(host: Host, account: Account, name: str) -> tuple[int, str]:

@@ -51,8 +51,8 @@ def ci_link(number: int) -> str:
 
 
 def lookup(name: str) -> str:
-    """The command that asks the owner's login shell, started as at a terminal, where it finds ``name``."""
-    return f"/bin/bash -lic echo '{steps_prepare.LOOKUP_MARK}'; command -v {name} && echo '{steps_prepare.LOOKUP_END}'"
+    """The command that asks the owner's shell, started as a terminal window starts it, where it finds ``name``."""
+    return " ".join(steps_prepare.lookup_argv("/bin/bash", name))
 
 
 def found_at(path: str) -> str:

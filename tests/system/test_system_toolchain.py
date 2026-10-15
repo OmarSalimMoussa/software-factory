@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -195,3 +197,45 @@ def test_a_shell_with_no_terminal_never_has_its_job_control_warning_read_as_the_
     job.host.answers[lookup("uv")] = (code, answer + NO_TERMINAL)
 
     assert steps_prepare.login_path(job.host, job.owner, "uv") == (code, found)
+
+
+@dataclass
+class _RealShell(DryHost):
+    """Runs each query in a real shell, as an owner whose home is ``home``."""
+
+    home: Path = Path("/nonexistent")
+
+    def query(self, argv: list[str], *, user: str = "", cwd: Path | None = None) -> tuple[int, str]:
+        env = {"HOME": str(self.home), "PATH": "/usr/bin:/bin", "TERM": "dumb"}
+        done = subprocess.run(argv, env=env, capture_output=True, text=True, stdin=subprocess.DEVNULL, check=False)
+        return done.returncode, done.stdout + done.stderr
+
+
+READS_BASHRC = '. "$HOME/.bashrc"\n'
+
+
+@pytest.mark.parametrize(
+    ("files", "bashrc_adds"),
+    [
+        ({".bash_profile": ""}, ""),
+        ({".bash_profile": READS_BASHRC}, ""),
+        ({".profile": READS_BASHRC}, ""),
+        ({".bash_profile": ""}, "alias probe-node=probe-node\n"),
+        ({".bash_profile": ""}, "probe-node() { :; }\n"),
+    ],
+    ids=["empty-bash-profile", "bash-profile-reads-bashrc", "ubuntus-profile-reads-bashrc", "alias", "function"],
+)
+def test_the_program_the_owners_bashrc_puts_on_path_is_found_whatever_their_profile_holds(
+    tmp_path: Path, files: dict[str, str], bashrc_adds: str
+) -> None:
+    home, tools = tmp_path / "home", tmp_path / "home" / ".nvm" / "bin"
+    tools.mkdir(parents=True)
+    (tools / "probe-node").write_text("#!/bin/sh\n")
+    (tools / "probe-node").chmod(0o755)
+    (home / ".bashrc").write_text(f'export PATH="{tools}:$PATH"\n{bashrc_adds}')
+    for name, text in files.items():
+        (home / name).write_text(text)
+    job = dry_job(tmp_path)
+    found = steps_prepare.login_path(_RealShell(home=job.owner.home), job.owner, "probe-node")
+
+    assert found == (0, str(tools / "probe-node"))
