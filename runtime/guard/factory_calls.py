@@ -14,6 +14,7 @@ import re
 import shlex
 from pathlib import Path
 
+from runtime.cli.factory import LOCAL
 from runtime.guard import shell
 from runtime.guard.facts import ORCHESTRATOR, Call, Decision, Refusal, Rewrite, inside, resolve
 from runtime.slots import leases
@@ -74,10 +75,14 @@ def _not_theirs(call: Call, verb: str, inv: shell.Invocation) -> Decision:
     """The refusal when ``factory <verb>`` is not this caller's to run."""
     entry = VERBS.get(verb)
     actor = f"a subagent of the {call.role}" if call.in_subagent else f"the {call.role}"
+    if entry is None and verb not in LOCAL:
+        typed = [w for w in inv.argv[1:] if not w.startswith("-")][:2]
+        ask = f"factory {typed[0]} --help" if len(typed) > 1 else "factory --help"
+        return Refusal("factory-verbs", f"`factory {' '.join(typed)}` is not a factory command; `{ask}` lists them")
     if entry is None or entry.owner_socket or call.role not in entry.roles:
         return Refusal("factory-verbs", f"`factory {verb}` is not for {actor}; see `factory --help`")
     if call.in_subagent and call.agent_type not in entry.kinds:
-        return Refusal("factory-verbs", f"`factory {verb}` is not a {call.agent_type} subagent's to run; report to "
+        return Refusal("factory-verbs", f"`factory {verb}` is not the {call.agent_type} subagent's to run; report to "
                                         "your parent instead")  # fmt: skip
     words = [w for w in inv.argv[2:] if not w.startswith("-")]
     if verb == "start" and words[:1] and words[0] not in _STARTS:

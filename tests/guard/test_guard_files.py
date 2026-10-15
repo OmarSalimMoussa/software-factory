@@ -124,6 +124,29 @@ def test_each_role_and_its_subagents_run_only_their_verbs(
     assert kit.bash(command, cwd=str(kit.repo if role == "orchestrator" else kit.worktree), **caller) == rule
 
 
+NOT_A_COMMAND = "is not a factory command"
+
+
+@pytest.mark.parametrize(
+    ("command", "said"),
+    [
+        ("factory queue show t-0057", f"`factory queue show` {NOT_A_COMMAND}; `factory queue --help` lists them"),
+        ("factory no-such-verb", f"`factory no-such-verb` {NOT_A_COMMAND}; `factory --help` lists them"),
+        ("factory inbox --wait", "`factory inbox.wait` is not the intake subagent's to run; report to your parent "
+                                 "instead"),
+        ("factory queue task show t-0057", None),
+        ("factory queue next", None),
+    ],
+)  # fmt: skip
+def test_intake_reads_the_queue_and_hears_a_command_that_does_not_exist_named_as_such(
+    tmp_path: Path, command: str, said: str | None
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("orchestrator", worktree=kit.repo)
+    decision = kit.decide("Bash", {"command": command}, cwd=str(kit.repo), agent_id=TESTER_ID, agent_type="intake")
+    assert (decision.reason if isinstance(decision, Refusal) else None) == said
+
+
 @pytest.mark.parametrize(
     ("command", "rule"),
     [
