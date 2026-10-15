@@ -83,18 +83,24 @@ def test_the_holder_restarts_the_services_it_names(world: World) -> None:
     assert world.launcher.stacks == [(1, ["restart", "web", "worker"])]
 
 
-def test_an_implementer_runs_any_command_in_its_own_slot_and_no_one_else_runs_one(world: World) -> None:
+def test_an_implementer_and_its_security_tester_run_any_command_in_its_slot_and_no_one_else_runs_one(
+    world: World,
+) -> None:
     _implementer(world, 1)
     world.session("s-orch", "orchestrator", "orchestrator")
     slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)
     world.launcher.stack = lambda n, verb: StackResult(0, "4.0K /app\n", "/log")
     command = ["sh", "-c", "du -sh /app; rm -f /tmp/x"]
+    run = {"op": "run", "service": "web", "command": command}
 
-    answer = slot(world.ctx("implementer", "s-1"), {"op": "run", "service": "web", "command": command}, None)
+    answer = slot(world.ctx("implementer", "s-1"), run, None)
+    slot(world.ctx("implementer", "s-1", "agent-sec-1", "qa-security"), run, None)
 
-    assert answer["tail"] == "4.0K /app\n" and world.launcher.stacks == [(1, ["run", "web", "--", *command])]
+    assert answer["tail"] == "4.0K /app\n" and world.launcher.stacks == [(1, ["run", "web", "--", *command])] * 2
     with pytest.raises(Refused, match="slot run is an implementer's"):
-        slot(world.ctx(), {"op": "run", "service": "web", "command": command}, None)
+        slot(world.ctx(), run, None)
+    with pytest.raises(Refused, match="a qa-backend may run"):
+        slot(world.ctx("implementer", "s-1", "agent-api-1", "qa-backend"), run, None)
 
 
 @pytest.mark.parametrize(

@@ -9,7 +9,7 @@ A slot is one running copy of the product on the laptop. The factory decides who
 | `factory slot up [service…]` | the holder | Builds and starts the slot's stack, or only the named services. A running service whose image is unchanged keeps running |
 | `factory slot restart <service…>` | the holder | Restarts the named services, which must be running |
 | `factory slot down` | the holder | Stops it, keeping its data |
-| `factory slot run <service> -- <command…>` | the holder | Runs one command in a new container of the service and answers with its output. Bring the service up first, so the run is not spent building it |
+| `factory slot run <service> -- <command…>` | the holder and its security tester | Runs one command in a new container of the service and answers with its output. Bring the service up first, so the run is not spent building it |
 | `factory slot release` | the holder | Gives the slot back once your work is checked |
 | `factory slot free <n>` | the orchestrator | Frees a slot whose work is finished |
 | `factory slot list` | anyone | Who holds which slot, since when, and why |

@@ -79,9 +79,11 @@ class World:
     launcher: FakeLauncher
     events: list[tuple[str, dict[str, Any]]]
 
-    def ctx(self, role: str = "orchestrator", session: str = "s-orch", agent_id: str = "") -> Context:
+    def ctx(
+        self, role: str = "orchestrator", session: str = "s-orch", agent_id: str = "", agent_kind: str = ""
+    ) -> Context:
         kind = "dashboard" if role == "owner" else "agent"
-        caller = Caller(kind, session if kind == "agent" else "", role, agent_id)
+        caller = Caller(kind, session if kind == "agent" else "", role, agent_id, agent_kind)
         return Context(
             self.places,
             lambda: self.settings,

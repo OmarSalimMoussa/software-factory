@@ -26,6 +26,11 @@ other's data, each signed in as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/sign-in.
 every probe can try one account's credentials on the other's data. With no `slot-api` tools, report "no slot-api" as
 your whole result.
 
+To probe from inside the slot, run one command in a new container of a service:
+`factory slot run <service> -- <command>`. It has the service's image, settings and network, so it reaches what that
+service reaches, such as an internal port or socket, and shows what the image holds. It stops at `slots.run_seconds`
+and its container is removed after; no command opens a shell in a running container.
+
 ## What you look for
 
 From the OWASP Top 10:2025, the OWASP API Security Top 10 and the OWASP Top 10 for LLM Applications 2025:
