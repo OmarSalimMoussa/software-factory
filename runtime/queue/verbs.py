@@ -226,5 +226,9 @@ def owner_park(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
     return ok(**owner.decide(ctx, _text(args, "card"), "park"))
 
 
+def owner_fixed(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
+    return ok(**owner.fixed(ctx, _text(args, "card")))
+
+
 def owner_answer(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
     return ok(**owner.answer(ctx, _text(args, "card"), _text(args, "answer")))

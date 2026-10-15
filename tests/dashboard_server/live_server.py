@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from dashboard_seed import seed
+from dashboard_seed import blocked, seed
 from fake_warden import FakeWarden, GitHub
 from seed_kit import FIXTURES, iso
 
@@ -182,8 +182,9 @@ class Live:
     def switch(self, body: dict[str, Any]) -> None:
         now = self.clock.now()
         scenario = body.pop("scenario", None)
-        if scenario == "outage":
-            self._outage(now)
+        scenes = {"outage": self._outage, "blocked": self._blocked}
+        if scenario in scenes:
+            scenes[scenario](now)
         elif scenario in ("near-limit", "stale-plan"):
             plan = store.read_json(self.places.plan)
             if scenario == "near-limit":
@@ -210,6 +211,10 @@ class Live:
         if "down" in body and self.warden is not None:
             self.warden.stop() if body["down"] else self.warden.start()
         self.switches.update(body)
+
+    def _blocked(self, now: float) -> None:
+        """A seed its scenario needs is missing: t-0020 waits, its implementer benched, for the owner's Fixed."""
+        blocked(self.repo, self.places, "t-0020", "The approved-workflow seed is missing", iso(now))
 
     def _outage(self, now: float) -> None:
         """Prod failed two probes; the fix the factory started runs as run-t-0031."""

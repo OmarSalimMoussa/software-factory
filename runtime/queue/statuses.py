@@ -63,6 +63,9 @@ MOVES: tuple[Move, ...] = (
     _m(RUNNING, {"decide"}, "limits", WARDEN),
     _m({"decide"}, set(RUNNING), "extend", OWNER),  # back to the status the spent limit stopped it in
     _m({"decide"}, {"parked"}, "park", OWNER),
+    # A key, seed or site the environment lacks: off the default branch until the owner's Fixed (queue/turn.py).
+    _m({"building", "qa", "qa-clean", "turn", "merged"}, {"blocked"}, "blocked", ORCH),
+    _m({"blocked"}, {"building", "approved"}, "unblocked", OWNER),
     _m({"decide"}, {"proposed"}, "to-designer", OWNER),
     _m(OPEN, {"proposed"}, "rung-up", ORCH),
     _m(OPEN, {"proposed"}, "void", WARDEN),

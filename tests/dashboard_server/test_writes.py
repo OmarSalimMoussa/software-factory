@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from dashboard_rig import Rig
+from dashboard_seed import blocked
 
 from runtime.shared import store
 from runtime.warden.owner import ops
@@ -37,6 +39,22 @@ def test_an_approval_answers_with_its_toast_and_its_place_settles(rig: Rig) -> N
     assert slots[0]["kind"] == "settled" and slots[0]["state"] == "approved"
     rig.clock.t += 15
     assert rig.parts("/api/home")["proposals"]["data"]["slots"][0] == {"kind": "choosing"}
+
+
+def test_a_blocked_task_asks_the_owner_only_to_say_it_is_fixed_and_then_goes_back_to_its_builder(
+    rig: Rig, tmp_path: Path
+) -> None:
+    blocked(tmp_path / "repo", rig.places, "t-0020", "The seed is missing", "2026-10-09T11:00:00Z")
+
+    card = next(c for c in rig.parts("/api/home")["needs"]["data"]["cards"] if c["id"] == "n4")
+    assert (card["title"], card["sub"], [a["label"] for a in card["actions"]]) == (
+        "Long project names wrap badly is blocked", "The seed is missing", ["Fixed, carry on"],
+    )  # fmt: skip
+    task = tmp_path / "repo" / "queue" / "tasks" / "t-0020.md"
+    reply = rig.post("/api/needs/n4/fixed", {"version": card["version"], "idempotency_key": "fixed-0001"})
+
+    assert json.loads(reply.body)["message"] == "Back to its builder, who carries on when a place frees."
+    assert "status: building" in task.read_text()
 
 
 def test_a_move_sends_the_warden_its_own_order_once_the_device_saw_the_same(rig: Rig) -> None:

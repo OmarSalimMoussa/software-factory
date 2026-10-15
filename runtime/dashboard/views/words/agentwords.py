@@ -23,7 +23,10 @@ _ENDED = {
     "crashed": ("stop", "crashed"),
 }
 _KID_ORDER = ("intake", "impl", "design", "qa", "orch")
-OWN_WAIT = {"merged": "Merged · ends when its check passes, comes back if it fails"}
+OWN_WAIT = {
+    "merged": "Merged · ends when its check passes, comes back if it fails",
+    "blocked": "Blocked · comes back when you mark it fixed",
+}
 WHY = {
     "finished": ("finished", "good"),
     WITH_PARENT: ("stopped with its parent", "bad"),

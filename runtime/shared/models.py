@@ -41,11 +41,11 @@ SURFACES = ("ui", "api", "access", "desktop", "none")
 QA_CLEAN, ON_STAGING = "qa-clean", "on-staging"
 TASK_STATUSES = (
     "queued", "parked", "proposed", "approved", "designing", "review", "building", "deprioritized", "qa",
-    QA_CLEAN, "turn", "merged", "checked", ON_STAGING, "promoted", "decide", "closed",
+    QA_CLEAN, "turn", "merged", "checked", ON_STAGING, "promoted", "decide", "blocked", "closed",
 )  # fmt: skip
 SEVERITIES = ("blocker", "major", "minor")
 OPEN_SEVERITIES = SEVERITIES[:2]
-CARD_KINDS = ("spec", "decide", "question")
+CARD_KINDS = ("spec", "decide", "question", "blocked")
 
 
 class RecordError(ValueError):
@@ -162,10 +162,10 @@ class Approval:
 
 @dataclass(slots=True)
 class Card:
-    """Something that needs the owner, other than a proposal: a spec's sign-off, a decision, a question."""
+    """Something that needs the owner, other than a proposal: a spec's sign-off, a decision, a question, a block."""
 
     id: str
-    kind: str  # spec, decide, question
+    kind: str  # spec, decide, question, blocked
     task: str
     title: str
     ask: str

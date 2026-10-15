@@ -4,8 +4,10 @@
 tells its implementer; while a task holds it no other task may. The holder and its branch are published for the
 merge hook, which refuses any other branch. The warden finds the merge itself, each tick: the first-parent merge on
 the default branch, since the turn was given, whose second parent is on the holder's branch. A saved check of that
-merge with no failure moves the task to checked. The orchestrator keeps the merge itself and the call to revert;
-the warden sends a reverted task back to its implementer, or, once that has ended, to a new one.
+merge with no failure moves the task to checked. The warden benches the merged task's implementer, which holds no
+place while the check runs. The orchestrator keeps the merge itself and the call to revert or block; the warden sends
+a reverted task, or a blocked one at the owner's Fixed, back to its implementer, or, once that has ended, to a new
+one.
 """
 
 from __future__ import annotations
@@ -14,13 +16,14 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import formats, proposals, statuses, tasks
+from runtime.queue import cards, formats, proposals, statuses, tasks
 from runtime.queue.book import Queue
 from runtime.shared import order, store
 from runtime.shared.models import RETIRED, WAITING, WORKING, Session, Task
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.warden.context import Context
+from runtime.warden.owner import reflections
 from runtime.warden.sessions import lifecycle, permits, registry, revive
 from runtime.warden.sessions.launch import LaunchError
 
@@ -30,10 +33,13 @@ GIVEN = (
     "You have the merge turn. Rebase on {default}, rerun the tests you picked, then factory check; once it passes, "
     "ask the orchestrator to merge, with the tree it names."
 )
-REVERTED = (
-    "Your work was taken back off {default}: {note}\n\nBring it back first: `git merge --ff-only {default}`, "
-    "`git revert <the revert's sha>`, then the fix. A rebase alone would leave the work reverted."
+_BRING_BACK = (
+    "Bring it back first: `git merge --ff-only {default}`, `git revert <the revert's sha>`, then the fix. A rebase "
+    "alone would leave the work reverted."
 )
+REVERTED = "Your work was taken back off {default}: {note}\n\n" + _BRING_BACK
+BLOCKED = "Your task was blocked: {note}\n\nThe owner fixed what blocked it: carry on."
+BLOCKED_OFF = BLOCKED + " It was taken back off {default}. " + _BRING_BACK
 
 
 def _path(places: Places) -> Path:
@@ -188,13 +194,42 @@ def send_back(ctx: Context, task_id: str, note: str) -> Task:
     if not note.strip():
         raise Refused("note", "a revert says why, and names the revert's commit, in --note")
     told = REVERTED.format(default=ctx.settings().get_str("repo.default_branch"), note=note.strip())
+    return _back(ctx, task_id, "reverted", tasks.actor(ctx), note.strip(), told)
+
+
+def block(ctx: Context, task_id: str, note: str) -> Task:
+    """The environment stopped the task: it waits benched, off the default branch, for the owner's Fixed."""
+    if not note.strip():
+        raise Refused("note", "a block names what stopped the task, and the revert's commit once merged, in --note")
+    queue = Queue.of(ctx)
+    with ctx.lock, queue.lock():
+        task = queue.task(task_id)
+        moved = tasks.transition(ctx, queue, task, "blocked", "blocked", tasks.actor(ctx), note.strip())
+        cards.blocked(ctx, moved, note)
+    _bench(ctx, task_id, f"blocked: {formats.one_line(note)}")
+    reflections.incident(ctx, f"{task_id} is blocked until the owner fixes what stopped it: {note}", f"task {task_id}")
+    return moved
+
+
+def unblock(ctx: Context, task_id: str) -> Task:
+    """The owner fixed what blocked the task: it goes back as a revert does, told what stopped it."""
+    block = next((e for e in reversed(Queue.of(ctx).read_log(task_id)) if e["event"] == "blocked"), None)
+    if block is None:
+        raise Refused("task-status", f"{task_id} was never blocked")
+    word = BLOCKED_OFF if block.get("from") == MERGED else BLOCKED
+    told = word.format(default=ctx.settings().get_str("repo.default_branch"), note=block["text"])
+    return _back(ctx, task_id, "unblocked", statuses.OWNER, "the owner fixed what blocked it", told)
+
+
+def _back(ctx: Context, task_id: str, event: str, by: str, note: str, told: str) -> Task:
+    """Back to its implementer, or to a new one once that has ended, told ``told`` first."""
     queue = Queue.of(ctx)
     with ctx.lock, queue.lock():
         task = queue.task(task_id)
         impl = _implementer(ctx, task_id)
         designed = task.run is not None and task.run >= 3
         to = "building" if impl is not None or designed else "approved"
-        moved = tasks.transition(ctx, queue, task, to, "reverted", tasks.actor(ctx), note.strip())
+        moved = tasks.transition(ctx, queue, task, to, event, by, note)
         if impl is None and designed and task_id not in proposals.designed_builds(ctx.places):
             proposals.set_designed_builds(ctx.places, [*proposals.designed_builds(ctx.places), task_id])
         # The latest revert's word alone is held: an earlier one's revert is part of this one's history.

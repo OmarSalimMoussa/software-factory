@@ -130,7 +130,8 @@ function needCard(n) {
     <div class="need-a prop-a">${needButtons(n)}</div></div>`;
   if (n.kind === 'question') return `<div class="card need pic question" data-need="${id}">${n.picture ? pic : `<span class="sk blank" aria-hidden="true">${icon('chat-bubble-left-right')}</span>`}<div class="prop-main"><div class="prop-top">${n.chips.map(chip).join('')}${goalChip(n)}${n.task ? pill(n.task, 'accent', 'mono') : ''}</div><div class="prop-t" style="cursor:default">${esc(n.title)}</div><div class="prop-why">${esc(n.sub)}</div><label class="need-q"><input id="answer-${id}" data-answer="${id}" value="${esc(UI.answers[n.id] || '')}" placeholder="Your answer" aria-label="Your answer" autocomplete="off"></label></div>
     <div class="need-a prop-a">${needButtons(n)}</div></div>`;
-  return `<div class="card need pic decide" data-need="${id}">${pic}<div class="prop-main"><div class="prop-t" style="cursor:default">${esc(n.title)}</div><div class="prop-why" style="white-space:normal">${esc(n.sub)}</div><div class="need-s" style="margin:0">${n.task ? pill(n.task, 'accent', 'mono') : ''}${goalChip(n)}${n.chips.map(chip).join('')}</div></div>
+  const lead = n.icon ? `<span class="sk blank" aria-hidden="true">${icon(n.icon)}</span>` : pic;
+  return `<div class="card need pic decide" data-need="${id}">${lead}<div class="prop-main"><div class="prop-t" style="cursor:default">${esc(n.title)}</div><div class="prop-why" style="white-space:normal">${esc(n.sub)}</div><div class="need-s" style="margin:0">${n.task ? pill(n.task, 'accent', 'mono') : ''}${goalChip(n)}${n.chips.map(chip).join('')}</div></div>
     <div class="need-a prop-a">${needButtons(n)}</div></div>`;
 }
 const needOf = id => (homePart('needs') || {cards: []}).cards.find(n => n.id === id);

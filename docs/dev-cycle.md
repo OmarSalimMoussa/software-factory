@@ -29,7 +29,9 @@ nothing starts without the owner's approval, except the fix for a clear prod out
 9. **Check the default branch.** Slot 0 rebuilds what the merge touched, and regression testers walk the scenarios
    it could break, in parallel. A failure reverts the merge only when that merge is the one change to the
    scenario's code since its last pass; any other failure becomes a request. A check with no failure marks the task
-   checked.
+   checked. A scenario the environment blocked (a key, a seed, a site testers cannot reach) reverts the merge too,
+   and blocks the task: it waits on Home for the owner's **Fixed, carry on**, its implementer benched and written to
+   SELF_REFLECT, while other work goes on. The owner's Fixed sends it back to its implementer.
 10. **Staging.** `factory push` asks for the push of the newest commit whose merges all passed their check. It waits
     on Home until the owner pushes it, and CI then deploys staging. A regression there is reverted at once, and the
     revert waits for the owner's push the same way.

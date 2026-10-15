@@ -12,7 +12,7 @@ from collections.abc import Callable
 from runtime.queue import formats, pictures, records, statuses, tasks
 from runtime.queue.book import Queue, spec_rel
 from runtime.shared import models, operations, store
-from runtime.shared.models import WAITING, WORKING, Card, Session
+from runtime.shared.models import WAITING, WORKING, Card, Session, Task
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
@@ -151,6 +151,20 @@ def spent(ctx: Context, s: Session, limit: str, why: str) -> bool:
             return False
         to_decide(ctx, s.task, why, limit)
     return True
+
+
+def blocked(ctx: Context, task: Task, why: str) -> Card:
+    return _add(ctx, Card("", "blocked", task.id, task.title, formats.one_line(why), ctx.clock.iso()), None)
+
+
+def unblocked(ctx: Context, task_id: str, status: str) -> None:
+    """The task left blocked, by the owner's Fixed or any other move: its card is answered with where it went."""
+    found = read(ctx.places)
+    open_cards = [c for c in found if c.kind == "blocked" and c.task == task_id and not c.answered]
+    for card in open_cards:
+        card.answered = status
+    if open_cards:
+        write(ctx.places, found)
 
 
 def settle(ctx: Context, cards: list[Card], card: Card, answer: str) -> None:

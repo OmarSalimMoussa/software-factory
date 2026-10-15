@@ -8,11 +8,12 @@ import logging
 import pytest
 from queue_kit import World
 
-from runtime.queue import documents, proposals, records, statuses, tasks, turn, verbs
+from runtime.queue import cards, documents, owner, proposals, records, statuses, tasks, turn, verbs
 from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
 from runtime.shared import store
-from runtime.shared.models import REVIVING, Task
+from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, REVIVING, Task
 from runtime.shared.protocol import Refused
+from runtime.warden.owner import reflections
 from runtime.warden.sessions import backstop, lifecycle, permits, registry, respawn, revive
 
 TASK = Task("t-0001", "T", ["r-2026-10-09-0001"], "G1", "major", ["ui"], "queued", "2026-10-09T12:00:00Z", "")
@@ -140,6 +141,64 @@ def test_a_reverted_task_goes_back_to_its_implementer_or_once_that_ended_to_a_ne
     if implementer == "retired":  # the scheduler starts it as it starts any approved run or designed build
         waiting = proposals.designed_builds(world.places) if run >= 3 else proposals.read(world.places).approved
         assert waiting == [task.id]
+
+
+BLOCK = "qa-ux cannot reach the review: the slots have no OPENROUTER_API_KEY; reverted as 0abc123"
+
+
+def _blocked(world: World, monkeypatch: pytest.MonkeyPatch, status: str, implementer: str) -> Task:
+    task = world.task(branch="impl-t-0001")
+    world.queue().write_task(dataclasses.replace(task, status=status, run=1))
+    world.session("s-impl", "implementer", "impl-t-0001", task.id)
+    sessions = registry.read(world.places)
+    sessions["s-impl"].state = implementer
+    registry.write(world.places, sessions)
+    monkeypatch.setattr(backstop, "processes", lambda: {})
+    with pytest.raises(Refused, match="--note"):
+        tasks.set_status(world.ctx(), task.id, "blocked", "", " ")
+    with pytest.raises(Refused, match="a block moves"):
+        tasks.set_status(world.ctx(), task.id, "building", "blocked", BLOCK)
+    tasks.set_status(world.ctx(), task.id, "blocked", "", BLOCK)
+    return task
+
+
+@pytest.mark.parametrize(
+    ("status", "implementer", "benched", "off_master"),
+    [("merged", DEPRIORITIZED, DEPRIORITIZED, True), ("qa", "working", BENCH_PENDING, False)],
+    ids=["merged-then-reverted", "in-qa"],
+)
+def test_a_blocked_task_waits_benched_for_the_owners_fixed_then_goes_back_to_its_implementer(
+    world: World, monkeypatch: pytest.MonkeyPatch, status: str, implementer: str, benched: str, off_master: bool
+) -> None:
+    task = _blocked(world, monkeypatch, status, implementer)
+
+    assert (world.queue().task(task.id).status, registry.read(world.places)["s-impl"].state) == ("blocked", benched)
+    [card] = cards.read(world.places)
+    assert (card.kind, card.task, card.ask, card.answered) == ("blocked", task.id, BLOCK, "")
+    assert [e["text"] for e in reflections.entries(world.places)] == [
+        f"{task.id} is blocked until the owner fixes what stopped it: {BLOCK}"
+    ]
+    assert not lifecycle.held_path(world.ctx(), task.id).exists()
+    with pytest.raises(Refused):
+        tasks.set_status(world.ctx(), task.id, "building", "", "the orchestrator unblocks it")
+
+    owner.fixed(world.owner(), card.id)
+
+    told = lifecycle.held_path(world.ctx(), task.id).read_text()
+    assert BLOCK in told and ("taken back off master" in told) == off_master
+    assert world.queue().task(task.id).status == "building"
+    assert [c.answered for c in cards.read(world.places)] == ["building"]
+    assert world.events[-1] == ("unblocked", {"task": task.id, "card": card.id})
+    with pytest.raises(Refused):
+        owner.fixed(world.owner(), card.id)
+
+
+def test_a_blocked_task_the_owner_drops_takes_its_card_with_it(world: World, monkeypatch: pytest.MonkeyPatch) -> None:
+    task = _blocked(world, monkeypatch, "merged", DEPRIORITIZED)
+
+    owner.drop(world.owner(), task.id, "the outside site is gone for good")
+
+    assert [c.answered for c in cards.read(world.places)] == ["closed"]
 
 
 def test_a_revert_said_while_its_implementer_comes_back_follows_it_once_it_is_back(

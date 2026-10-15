@@ -87,6 +87,15 @@ drive('home', async t => {
   const push = await lastCall('/api/push'); t.check(push && push.body.expected_staging_sha === 'a1b2c3d' && !('code' in push.body), 'push did not send the expected staging build');
   await p.close();
 
+  // a blocked task asks only for Fixed, and Fixed sends it back to its builder
+  await t.srv.reset(); await t.srv.set({scenario: 'blocked'});
+  const b = await t.open(1440, 900);
+  t.check((await b.textContent('#needs [data-need="n4"]')).includes('is blocked') && await b.$('#needs [data-need="n4"] .sk.blank'), 'the blocked card is not drawn');
+  const bh = [...new Set(await heights(b, '#needs .need'))]; t.check(bh.length === 1, 'the blocked card differs in height: ' + bh);
+  await b.click('[data-need-act="fixed"][data-id="n4"]'); await settle(b);
+  t.check((await b.textContent('#needs')).includes('Back to its builder'), 'Fixed not shown done');
+  await b.close();
+
   // the outage band: probes, the fix the factory started, Watch and Stop; the stopped fix waits first in Proposed next
   await t.srv.reset(); await t.srv.set({scenario: 'outage'});
   const o = await t.open(1440, 900);

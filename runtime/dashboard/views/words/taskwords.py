@@ -27,6 +27,7 @@ _AT = {
     "building": 5,
     "deprioritized": 5,
     "decide": 5,
+    "blocked": 5,
     "qa": 6,
     QA_CLEAN: 6,
     "turn": 7,
@@ -40,7 +41,7 @@ TONES = {
     "queued": "ring", "parked": "ring", "proposed": "warn", "approved": "good", "designing": "accent",
     "review": "warn", "building": "accent", "deprioritized": "warn", "decide": "warn", "qa": "accent",
     QA_CLEAN: "accent", "turn": "accent", "merged": "accent", "checked": "good", ON_STAGING: "good",
-    "promoted": "good", "closed": "ring",
+    "promoted": "good", "blocked": "bad", "closed": "ring",
 }  # fmt: skip
 _WORDS = {
     "queued": "Queued",
@@ -56,6 +57,7 @@ _WORDS = {
     ON_STAGING: "On staging",
     "promoted": "On prod",
     "decide": "Needs your decision",
+    "blocked": "Blocked until you fix it",
     "closed": "Closed",
 }
 NEED_ACTIONS: dict[str, dict[str, Any]] = {
@@ -66,6 +68,7 @@ NEED_ACTIONS: dict[str, dict[str, Any]] = {
     "designer": {"label": "To a designer", "icon": None, "primary": False},
     "park": {"label": "Park", "icon": None, "primary": False},
     "answer": {"label": "Send answer", "icon": "check", "primary": True},
+    "fixed": {"label": "Fixed, carry on", "icon": "check", "primary": True},
 }
 _TASK_FIELDS = frozenset(f.name for f in dataclasses.fields(Task))
 LANDED = ("merged", "checked", ON_STAGING, "promoted")
@@ -80,6 +83,7 @@ IN_PROGRESS = (
     "merged",
     "checked",
     "decide",
+    "blocked",
 )
 _TESTER_WORDS = (
     ("UI", ("qa-ui-function", "qa-ux", "qa-visual")),

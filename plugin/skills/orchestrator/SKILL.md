@@ -44,6 +44,7 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 | `pushed` | The owner pushed what waited to staging, and CI deploys it. Nothing to do: a regression there comes as `staging red`. |
 | `decided-extend`, `park`, `to-designer` | The owner decided a stuck task; the warden told its session or ended it. `to-designer`: propose it at rung 3. |
 | `limit-extended` | The owner gave a session more of a limit; the warden told it. Nothing to do. |
+| `unblocked` | The owner fixed what blocked a task; the warden brings its implementer back when a place frees. Nothing to do. |
 | `answered` | The owner answered a question you asked: act on it. A session's own answer reaches it from the warden. |
 | `stopped` | The owner stopped a run. Its task is back in Proposed with its branch kept: nothing to undo. |
 | `benched` | A session was benched for higher work and keeps its context; the warden starts what it made room for. |
@@ -131,6 +132,11 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    pass: `git revert -m 1 <merge> --no-edit`, then `factory queue task status <task> building --note "<why>; reverted
    as <the revert's sha>"`. The warden tells its implementer, or starts a new one once it has ended. Any other
    failure becomes a request. A saved check with no failure moves the task to `checked` by itself.
+   **Blocked**, with nothing failed: a scenario the environment stopped (a key, a seed, an account, a site a tester
+   cannot reach). Revert the merge the same way, then `factory queue task status <task> blocked --note "<what
+   stopped it and what would fix it>; reverted as <the revert's sha>"`. The warden benches its implementer, writes
+   it to SELF_REFLECT and puts it on Home for the owner's Fixed: move on to other work. A blocker an implementer
+   reports before its merge is blocked the same way, with nothing to revert.
 5. **Ship.** `factory push` asks the owner to push the newest commit that is safe to ship: its tree passed, and every
    merge it adds passed its check (or was reverted). It waits on Home until the owner pushes it, and CI then deploys
    staging; carry on meanwhile, and ask again after each check that passes: the one waiting push holds them all.

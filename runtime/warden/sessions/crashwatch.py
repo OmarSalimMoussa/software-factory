@@ -57,7 +57,9 @@ _SETTLING: set[str] = set()
 # A session whose task has moved past its part is finished; a process that ends before that crashed.
 DONE_AT = {
     IMPL: frozenset({"checked", ON_STAGING, "promoted", "closed"}),
-    DESIGN: frozenset({"building", "qa", QA_CLEAN, "turn", "merged", "checked", ON_STAGING, "promoted", "closed"}),
+    DESIGN: frozenset(
+        {"building", "qa", QA_CLEAN, "turn", "merged", "blocked", "checked", ON_STAGING, "promoted", "closed"}
+    ),
 }
 
 

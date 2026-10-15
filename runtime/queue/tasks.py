@@ -27,6 +27,7 @@ from runtime.warden.sessions import registry
 LANDED = frozenset({"merged", "checked", "on-staging", "promoted", "closed"})
 SCORED = frozenset({"queued", "parked", "proposed"})
 REVERTED = "reverted"  # the event that takes a landed task back to its builder
+BLOCKED = "blocked"
 _FACTS: dict[str, type] = {
     "title": str,
     "goal_item": str,
@@ -69,7 +70,7 @@ def transition(
     **fields: Any,
 ) -> Task:
     """Write the task with its new status and ``fields``; the caller holds ctx.lock and the queue lock."""
-    from runtime.queue import turn  # the turn moves tasks through this module
+    from runtime.queue import cards, turn  # both move tasks through this module
 
     moved = dataclasses.replace(statuses.move(task, to, event, by), **fields)
     if to == "turn" and turn.holder(ctx.places) is not None:
@@ -78,6 +79,8 @@ def transition(
     extra = {"from": task.status, "to": to, **({"commit": commit} if commit else {})}
     queue.log(moved.id, ctx.clock.iso(), by, event, text, **extra)
     follow(ctx, task, moved)
+    if task.status == BLOCKED and to != BLOCKED:
+        cards.unblocked(ctx, moved.id, to)
     return moved
 
 
@@ -125,7 +128,7 @@ def _hold_turn(ctx: Context, task_id: str, held: bool) -> None:
 
 def set_status(ctx: Context, task_id: str, to: str, event: str, note: str) -> Task:
     """The orchestrator's move of a task (a merge turn, a spec it approved, a close); refused off the table. A revert
-    goes where the warden finds its implementer (runtime/queue/turn.py)."""
+    goes where the warden finds its implementer, and a block benches it (runtime/queue/turn.py)."""
     from runtime.queue import turn  # the turn moves tasks through this module
 
     queue = Queue.of(ctx)
@@ -137,11 +140,15 @@ def set_status(ctx: Context, task_id: str, to: str, event: str, note: str) -> Ta
             if len(found) != 1:
                 raise Refused("task-status", f"{task_id} {task.status} → {to} needs --event: one of {found or 'none'}")
             event = found[0]
-        if event != REVERTED:
+        if event not in (REVERTED, BLOCKED):
             moved = transition(ctx, queue, task, to, event, actor(ctx), note or f"{event}: now {to}")
             if event == "spec-approved":
                 documents.approve_spec(ctx, queue, task_id)
             return moved
+    if event == BLOCKED and to == BLOCKED:
+        return turn.block(ctx, task_id, note)
+    if event == BLOCKED:
+        raise Refused("task-status", f"a block moves {task_id} to blocked; the owner's Fixed sends it back")
     if to != "building":
         raise Refused("task-status", f"a revert sends {task_id} back to building; the warden finds who builds it")
     return turn.send_back(ctx, task_id, note)

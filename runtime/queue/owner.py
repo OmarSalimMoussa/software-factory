@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.queue import approvals, cards, documents, formats, intake, proposals, route, tasks
+from runtime.queue import approvals, cards, documents, formats, intake, proposals, route, tasks, turn
 from runtime.queue.book import Queue, request_rel, task_rel
 from runtime.queue.formats import dump_request, one_line
 from runtime.queue.statuses import OWNER
@@ -195,6 +195,14 @@ def decide(ctx: Context, card_id: str, choice: str, by: str = "you") -> dict[str
         lifecycle.retire_session(ctx, live.id, STOPPED, lifecycle.OWNER)
     ctx.post_event(kind, {"task": card.task, "card": card_id})
     return {"card": card_id, "task": card.task, "status": to, "op": op}
+
+
+def fixed(ctx: Context, card_id: str) -> dict[str, Any]:
+    """The owner fixed what blocked a task: it goes back to its implementer, which comes back when a place frees."""
+    _, card = cards.find(ctx.places, card_id, "blocked")
+    moved = turn.unblock(ctx, card.task)
+    ctx.post_event(inbox.UNBLOCKED, {"task": card.task, "card": card_id})
+    return {"card": card_id, "task": card.task, "status": moved.status}
 
 
 def _before_decide(queue: Queue, task_id: str) -> str:

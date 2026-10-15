@@ -37,11 +37,11 @@ APPROVED, NOT_NOW, DROPPED, BOOSTED, GO = "approved", "not-now", "dropped", "boo
 DECIDED_EXTEND, LIMIT_EXTENDED, TO_DESIGNER, PARK = "decided-extend", "limit-extended", "to-designer", "park"
 STOPPED, PAUSED, RESUMED, SLOT_FREE = "stopped", "paused", "resumed", "proposal-slot-free"
 ANSWERED, ORCHESTRATOR_STARTED, PUSHED = "answered", "orchestrator-started", "pushed"
-YOLO_ON, YOLO_OFF = "yolo on", "yolo off"
+YOLO_ON, YOLO_OFF, UNBLOCKED = "yolo on", "yolo off", "unblocked"
 YOURS = "yours to decide"  # with YOLO mode on, a card the owner would decide is handed to the orchestrator
 OWNER_DECISIONS = (
     APPROVED, NOT_NOW, DROPPED, BOOSTED, GO, DECIDED_EXTEND, LIMIT_EXTENDED, TO_DESIGNER, PARK, STOPPED, PAUSED,
-    RESUMED, SLOT_FREE, GOAL_CHANGED, ANSWERED, ORCHESTRATOR_STARTED, PUSHED, YOLO_ON, YOLO_OFF,
+    RESUMED, SLOT_FREE, GOAL_CHANGED, ANSWERED, ORCHESTRATOR_STARTED, PUSHED, YOLO_ON, YOLO_OFF, UNBLOCKED,
 )  # fmt: skip
 KINDS = frozenset(
     {

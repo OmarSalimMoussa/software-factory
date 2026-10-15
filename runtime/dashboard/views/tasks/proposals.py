@@ -25,6 +25,7 @@ DONE_WORDS = {
     "designer": "Sent to a designer at rung 3.",
     "park": "Parked until the goal changes.",
     "answer": "Your answer is on its way to the session.",
+    "fixed": "Back to its builder, who carries on when a place frees.",
 }
 
 
@@ -164,6 +165,7 @@ def needs(snap: Snap) -> dict[str, Any]:
             "comments": None,
             "actions": [],
             "done": done.get(card["id"]) if card["answered"] else None,
+            "icon": None,
             "version": need_version(card),
         }
         if card["kind"] == "spec":
@@ -175,6 +177,13 @@ def needs(snap: Snap) -> dict[str, Any]:
             )
             if card["open_comments"]:
                 row["comments"] = f"{plural(card['open_comments'], 'comment')} waiting for the designer"
+        elif card["kind"] == "blocked":
+            row.update(
+                title=f"{card['title']} is blocked",
+                chips=[{"text": "Blocked", "tone": "bad"}],
+                icon="no-symbol",
+                actions=["fixed"],
+            )
         elif card["kind"] == "decide":
             row.update(
                 title=f"{card['title']} needs your decision",

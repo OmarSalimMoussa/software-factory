@@ -44,7 +44,7 @@ _STAGES = (
     ("designing", "designing", "--f-design", ("designing",)),
     ("building", "building", "--f-impl", ("building", "deprioritized", "turn", "merged", "checked")),
     ("qa", "in QA", "--f-qa", ("qa", QA_CLEAN)),
-    ("needs", "need you", "--warn", ("review", "decide")),
+    ("needs", "need you", "--warn", ("review", "decide", "blocked")),
 )
 
 

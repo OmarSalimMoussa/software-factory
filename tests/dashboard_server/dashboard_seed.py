@@ -8,6 +8,7 @@ shapes.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import os
 from pathlib import Path
@@ -297,3 +298,15 @@ def seed(root: Path, now: float = T0) -> Places:
         os.utime(path, (now - days * 86400, now - days * 86400))
     store.write_text(secrets / claude_accounts.UNIT_TOKEN, "sk-ant-oat01-seeded-token-main\n", mode=0o600)
     return places
+
+
+def blocked(repo: Path, places: Places, task_id: str, why: str, at: str) -> None:
+    """The orchestrator's block of ``task_id``: its status, its log's line and the card for the owner's Fixed."""
+    path = repo / "queue" / "tasks" / f"{task_id}.md"
+    task = formats.parse_task(path.read_text())
+    path.write_text(formats.dump_task(dataclasses.replace(task, status="blocked")))
+    entry = {"at": at, "actor": "orchestrator", "event": "blocked", "text": why, "from": task.status, "to": "blocked"}
+    with (repo / "queue" / "tasks" / f"{task_id}.log.jsonl").open("ab") as log:
+        log.write(records.dump_log(entry))
+    card = models.Card("n4", "blocked", task_id, task.title, why, at)
+    store.write_json(places.cards, [*store.read_json(places.cards), models.dump(card)])

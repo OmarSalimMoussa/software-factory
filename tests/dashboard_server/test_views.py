@@ -173,9 +173,10 @@ def test_an_agent_out_of_the_work_says_so_with_its_icon(rig: Rig, agent: str, ic
     [
         ("t-0002", "merged", "Pushed out for “Task two” · comes back first"),
         ("t-0001", "merged", "Merged · ends when its check passes, comes back if it fails"),
+        ("t-0001", "blocked", "Blocked · comes back when you mark it fixed"),
         ("t-0001", "building", "Sent back to it · comes back when a place frees"),
     ],
-    ids=["for-another", "merged", "sent-back"],
+    ids=["for-another", "merged", "blocked", "sent-back"],
 )
 def test_a_benched_agent_says_what_it_waits_for(benched_for: str, status: str, says: str) -> None:
     tasks = [{"id": "t-0001", "title": "Task one", "status": status}, {"id": "t-0002", "title": "Task two"}]
