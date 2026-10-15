@@ -24,7 +24,7 @@ from runtime.shared import settings as settings_module
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, Places
 from runtime.shared.settings import Settings
 from runtime.warden import gc, imports, inbox, loop, public, schedule, server, upgrade
-from runtime.warden.context import Caller, Clock, Context
+from runtime.warden.context import Caller, CheckPlaces, Clock, Context
 from runtime.warden.delivery import done, github, pins, prod_push
 from runtime.warden.dispatch import Dispatcher, Doors, resolve
 from runtime.warden.owner import factory_upgrade, ops, reflections, settings_save, yolo
@@ -157,9 +157,10 @@ def main() -> int:
     owner, agent_home = _owner(places), launch.agent_home()
     doors = Doors(places, settings, clock, launch.Units(places, settings),
                   github.RestGitHub(places, settings, github.transport), inbox.poster(places, clock),
-                  threading.RLock())  # fmt: skip
+                  threading.RLock(), CheckPlaces())  # fmt: skip
     dispatcher = Dispatcher(doors, resolve(VERBS))
     ops.recover(places, clock)
+    launch.forget_checks(places)
     public.write_settings(places, current)
     public.write_switches(places, public.read_switches(places))
     # The unit runners refuse every request until public/sessions.json exists, the first start's git call included.

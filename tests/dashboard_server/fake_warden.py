@@ -19,7 +19,7 @@ from runtime.shared.paths import Places
 from runtime.shared.protocol import MAX_LINE
 from runtime.slots import leases
 from runtime.system import layout
-from runtime.warden.context import Caller, Clock, StackResult
+from runtime.warden.context import Caller, CheckPlaces, Clock, StackResult
 from runtime.warden.dispatch import OWNER_SOCKET, Dispatcher, Doors, resolve
 from runtime.warden.owner import codes
 from runtime.warden.sessions import backstop, launch, respawn
@@ -113,7 +113,7 @@ class FakeWarden:
                 on_event(kind, data)
 
         self.doors = Doors(places, self._settings, clock, self.launcher, github or GitHub(), post,
-                           threading.RLock())  # fmt: skip
+                           threading.RLock(), CheckPlaces())  # fmt: skip
         owner = {name: verb for name, verb in VERBS.items() if verb.owner_socket}
         self.dispatcher = Dispatcher(self.doors, resolve(owner), owner)
         self.server: socketserver.UnixStreamServer | None = None

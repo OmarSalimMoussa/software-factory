@@ -282,3 +282,14 @@ def test_a_session_start_is_waited_on_and_leaves_no_request_or_output_behind(wor
 
     assert not list((world.places.state / "public" / "launch").iterdir())
     assert not list((world.places.state / "runs").iterdir())
+
+
+def test_a_starting_warden_drops_every_check_request_and_result_a_warden_left(world: World) -> None:
+    launched, runs = world.places.state / "public" / "launch", world.places.state / "runs"
+    left = [launched / "check-1.json", runs / "check-1.log", runs / "check-1.exit", launched / "pending-1.json"]
+    for path in left:
+        store.write_text(path, "{}\n")
+
+    launch.forget_checks(world.places)
+
+    assert [path for path in left if path.exists()] == [launched / "pending-1.json"]

@@ -76,6 +76,26 @@ class Clock:
         time.sleep(seconds)
 
 
+class CheckPlaces:
+    """The sessions whose checks run tests now: the factory's memory holds only so many at once."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._held: list[str] = []
+
+    def take(self, places: int, holder: str) -> list[str] | None:
+        """A place for ``holder``, answering None; when all ``places`` are held, none, answering who holds them."""
+        with self._lock:
+            if len(self._held) >= places:
+                return list(self._held)
+            self._held.append(holder)
+            return None
+
+    def give_back(self, holder: str) -> None:
+        with self._lock:
+            self._held.remove(holder)
+
+
 @dataclass
 class Context:
     places: Places
@@ -86,3 +106,4 @@ class Context:
     github: GitHub
     post_event: Callable[[str, dict[str, Any]], None]  # an event for the orchestrator's inbox
     lock: threading.RLock = field(default_factory=threading.RLock)
+    check_places: CheckPlaces = field(default_factory=CheckPlaces)

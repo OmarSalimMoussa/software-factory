@@ -27,8 +27,8 @@ def _unit(name: str, **changes: object) -> str:
     ("changes", "lines"),
     [
         ({}, ["MemoryHigh=11G", "MemoryMax=12G", "CPUWeight=50"]),
-        ({"budget.slice_memory_high": "6G", "budget.slice_memory_max": "7G", "budget.slice_cpu_weight": 20},
-         ["MemoryHigh=6G", "MemoryMax=7G", "CPUWeight=20"]),
+        ({"budget.slice_memory_high": "13G", "budget.slice_memory_max": "14G", "budget.slice_cpu_weight": 20},
+         ["MemoryHigh=13G", "MemoryMax=14G", "CPUWeight=20"]),
     ],
 )  # fmt: skip
 def test_the_slice_takes_its_budget_from_the_settings(changes: dict[str, object], lines: list[str]) -> None:
@@ -92,11 +92,13 @@ def test_the_warden_reads_transcripts_but_writes_only_its_state_and_the_agents_q
     assert f"ReadWritePaths=/var/lib/software-factory {layout.AGENT_HOME}" in lines
 
 
-def test_a_check_runs_as_the_agent_in_the_slice_under_its_memory_ceiling_and_without_the_sign_in_token() -> None:
+def test_a_check_runs_as_the_agent_in_the_slice_under_its_memory_ceiling_ending_with_its_warden() -> None:
     lines = _unit("software-check-run@.service", **{"budget.test_memory_ceiling_mib": 4096}).splitlines()
 
     assert {"User=software-agent", "Slice=software-factory.slice", "MemoryMax=4096M", "MemorySwapMax=0",
-            "OOMPolicy=continue", "TemporaryFileSystem=/var/lib/software-factory:ro"} <= set(lines)  # fmt: skip
+            "OOMPolicy=continue", "TemporaryFileSystem=/var/lib/software-factory:ro",
+            "BindsTo=software-warden.service", "After=software-warden.service",
+            "ConditionPathExists=/var/lib/software-factory/public/launch/%i.json"} <= set(lines)  # fmt: skip
     assert any(line.startswith("ExecStart=") and "runners/check_run.py" in line for line in lines)
     assert not any(line.startswith("LoadCredential") for line in lines)
 

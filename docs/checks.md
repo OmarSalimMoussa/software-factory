@@ -18,7 +18,9 @@ own: it only supplies the values a check compares against, in `check-values/`.
 - Tests run through the product's `scripts/dev test [path…]`. The factory picks the paths from the diff with
   `check-values/test-map.toml`. On the laptop the whole run stops after `checks.run_minutes`, and the script gets
   `FACTORY_TEST_SECONDS` (`checks.test_seconds`): the product's test runner stops any one test that runs longer.
-  The check's unit holds the memory ceiling, `budget.test_memory_ceiling_mib`.
+  The check's unit holds the memory ceiling, `budget.test_memory_ceiling_mib`. Only as many checks run tests at
+  once as fit under `budget.slice_memory_high` after `budget.test_reserve_mib`: one, by default. A check that
+  finds every place taken is refused at once, names who holds it, and costs no run.
 - `tools` runs ruff, mypy and import-linter at the versions the product pins. When the product has a `uv.lock`, the
   check first syncs the product's environment (`uv sync --frozen --all-extras`); a failed sync fails the check. Each
   tool then runs from the product's `.venv`, so mypy loads the product's own plugins. A tool the product does not

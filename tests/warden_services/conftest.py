@@ -9,7 +9,7 @@ from warden_fakes import OWNER_CALLER, FakeClock, FakeGitHub, FakeLauncher, defa
 
 from runtime.shared import settings, totp
 from runtime.shared.paths import Places
-from runtime.warden.context import Context
+from runtime.warden.context import CheckPlaces, Context
 from runtime.warden.dispatch import Doors
 
 
@@ -36,7 +36,7 @@ def doors(places: Places, launcher: FakeLauncher) -> Doors:
         return settings.load(places.defaults, places.overrides)
 
     return Doors(places, fresh, FakeClock(), launcher, FakeGitHub(),
-                 lambda kind, data: events.append((kind, data)), threading.RLock())  # fmt: skip
+                 lambda kind, data: events.append((kind, data)), threading.RLock(), CheckPlaces())  # fmt: skip
 
 
 @pytest.fixture

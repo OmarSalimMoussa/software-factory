@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 
 import pytest
@@ -13,8 +14,11 @@ from runtime.queue.book import task_rel
 from runtime.shared.models import Task
 from runtime.shared.protocol import Refused
 from runtime.warden import checks
+from runtime.warden.sessions.launch import LaunchError
 
 WORKTREE = "/home/agent/repo/.claude/worktrees/impl-a"
+OTHER = "/home/agent/repo/.claude/worktrees/impl-b"
+THIRD = "/home/agent/repo/.claude/worktrees/impl-c"
 
 
 def _git(state: dict[str, str]) -> object:
@@ -140,3 +144,80 @@ def test_on_the_default_branch_a_check_covers_what_changed_since_the_newest_comm
 
     checks.check(ctx, {}, None)
     assert world.launcher.checks == [(str(world.repo), args)]
+
+
+def test_a_check_that_runs_tests_needs_a_place_in_the_factorys_memory_and_one_refused_costs_no_run(
+    world: World, git: dict[str, str]
+) -> None:
+    _implementer(world, "turn")
+    world.session("s-two", "implementer", "impl-b", worktree=OTHER)
+    world.session("s-three", "implementer", "impl-c", task=world.task().id, worktree=THIRD)
+    turn, two, off_turn = (world.ctx("implementer", s) for s in ("s-impl", "s-two", "s-three"))
+    alongside: list[int] = []
+
+    def run(checkout: str, argv: list[str]) -> tuple[int, str]:
+        if checkout == OTHER:  # while impl-b's tests run
+            with pytest.raises(Refused, match="impl-b is running tests"):
+                checks.check(turn, {}, None)
+            with pytest.raises(Refused, match="merge turn"):
+                checks.check(off_turn, {}, None)
+            alongside.append(checks.check(turn, {"only": ["size-ceilings"]}, None)["exit"])
+        return 0, ""
+
+    world.launcher.check = run
+    checks.check(two, {"only": ["tests"]}, None)
+
+    assert alongside == [0]
+    assert world.launcher.checks == [(OTHER, ["--only", "tests"]), (WORKTREE, ["--only", "size-ceilings"])]
+    limit = world.settings.get_int("rounds.check_runs")
+    assert f"{limit - 1} whole runs left" in checks.check(turn, {}, None)["output"]
+
+
+@pytest.mark.parametrize("ends", ["failed", "could-not-start"])
+def test_a_checks_place_is_given_back_however_its_run_ends(world: World, git: dict[str, str], ends: str) -> None:
+    world.session("s-impl", "implementer", "impl-a", worktree=WORKTREE)
+    world.session("s-two", "implementer", "impl-b", worktree=OTHER)
+
+    def run(checkout: str, argv: list[str]) -> tuple[int, str]:
+        if ends == "could-not-start":
+            raise LaunchError("software-check-run left no result")
+        return 1, ""
+
+    world.launcher.check = run
+    with contextlib.suppress(LaunchError):
+        checks.check(world.ctx("implementer", "s-impl"), {"only": ["tests"]}, None)
+    world.launcher.check = lambda checkout, argv: (0, "")
+
+    assert checks.check(world.ctx("implementer", "s-two"), {"only": ["tests"]}, None)["exit"] == 0
+
+
+def test_a_ceiling_saved_since_the_install_adds_no_place_before_an_install_applies_it(
+    world: World, git: dict[str, str]
+) -> None:
+    world.session("s-impl", "implementer", "impl-a", worktree=WORKTREE)
+    world.session("s-two", "implementer", "impl-b", worktree=OTHER)
+    world.with_settings(
+        budget__test_memory_ceiling_mib=3584
+    )  # two places, once an install gives the units that ceiling
+
+    def run(checkout: str, argv: list[str]) -> tuple[int, str]:
+        if checkout == WORKTREE:
+            with pytest.raises(Refused, match="impl-a is running tests"):
+                checks.check(world.ctx("implementer", "s-two"), {"only": ["tests"]}, None)
+        return 0, ""
+
+    world.launcher.check = run
+    checks.check(world.ctx("implementer", "s-impl"), {"only": ["tests"]}, None)
+
+    assert world.launcher.checks == [(WORKTREE, ["--only", "tests"])]
+
+
+def test_a_budget_saved_with_no_room_for_the_installed_ceiling_refuses_every_test_run(
+    world: World, git: dict[str, str]
+) -> None:
+    world.session("s-impl", "implementer", "impl-a", worktree=WORKTREE)
+    world.with_settings(budget__slice_memory_high="10G", budget__test_memory_ceiling_mib=4096)  # one place, saved
+
+    with pytest.raises(Refused, match="installed test ceiling, 6656 MiB"):
+        checks.check(world.ctx("implementer", "s-impl"), {"only": ["tests"]}, None)
+    assert world.launcher.checks == []

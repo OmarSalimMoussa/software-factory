@@ -5,6 +5,12 @@
 [Unit]
 Description=software factory: check request %i
 CollectMode=inactive-or-failed
+# Only the warden that started a check reads its report, and that warden counts the check's test run: when it
+# stops, so does the check. When it restarts, systemd starts the check again, but the new warden has dropped its
+# request first.
+BindsTo=@warden_unit@
+After=@warden_unit@
+ConditionPathExists=@public@/launch/%i.json
 
 [Service]
 Type=oneshot

@@ -9,6 +9,7 @@ install applies from here; of the warden's folder, only the settings the running
 from __future__ import annotations
 
 import hashlib
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ from typing import Any
 from runtime.shared import store
 from runtime.shared.paths import Places
 from runtime.shared.releases import FULL_SHA
+from runtime.shared.settings import Settings, build
 from standard.config import FACTORY_REF
 
 RUNNING, DONE, FAILED = "running", "done", "failed"
@@ -35,6 +37,13 @@ def read_settings(places: Places) -> dict[str, Any] | None:
     if raw is not None and not isinstance(raw, dict):
         raise store.StoreError(f"{settings_path(places)}: not an object of settings")
     return raw
+
+
+def installed_settings(places: Places) -> Settings:
+    record = read_settings(places)
+    if record is None:
+        raise store.StoreError(f"{settings_path(places)} is missing: install again")
+    return build(tomllib.loads(places.defaults.read_text(encoding="utf-8")), record)
 
 
 def token_path(places: Places) -> Path:

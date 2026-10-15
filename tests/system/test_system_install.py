@@ -240,6 +240,15 @@ def test_a_lower_limit_must_stay_below_the_one_above_it(low: str, high: str) -> 
         settings(**{low: settings().tree()[section][key]})
 
 
+@pytest.mark.parametrize(
+    "changes",
+    [{"budget.slice_memory_high": "10G"}, {"budget.test_memory_ceiling_mib": 8192}, {"budget.test_reserve_mib": 6144}],
+)
+def test_a_budget_with_no_room_for_one_check_running_tests_is_refused(changes: dict[str, object]) -> None:
+    with pytest.raises(SettingsError, match="no check could run the tests"):
+        settings(**changes)
+
+
 WARDEN_OWNED = "(600, software-warden:software-warden)"
 
 

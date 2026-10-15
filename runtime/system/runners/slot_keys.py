@@ -13,7 +13,6 @@ import grp
 import os
 import stat
 import sys
-import tomllib
 from pathlib import Path
 
 # `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
@@ -59,17 +58,10 @@ def copy(settings: Settings, target: Path, group: int) -> tuple[int, str]:
     return 0, f"slot keys: {', '.join(kept) or 'none'} copied{lacking}"
 
 
-def installed(places: Places) -> Settings:
-    record = upgrades.read_settings(places)
-    if record is None:
-        raise store.StoreError(f"{upgrades.settings_path(places)} is missing: install again")
-    return settings_module.build(tomllib.loads(places.defaults.read_text(encoding="utf-8")), record)
-
-
 def main(argv: list[str]) -> int:
     places = Places.for_runner(Path(__file__).resolve().parents[3], Path(argv[0]))
     try:
-        settings = installed(places)
+        settings = upgrades.installed_settings(places)
     # telemetry: surfaced — why the keys were not copied is `print`ed to the unit's journal, and the exit says so
     except (OSError, ValueError, store.StoreError, settings_module.SettingsError) as exc:
         print(f"slot keys: not copied: {exc}", flush=True)

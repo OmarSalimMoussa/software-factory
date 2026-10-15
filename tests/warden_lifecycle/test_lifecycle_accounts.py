@@ -15,7 +15,7 @@ from runtime.shared import claude_accounts, protocol
 from runtime.shared.models import DEPRIORITIZED, RETIRED, WAITING, WITH_PARENT, WORKING
 from runtime.shared.protocol import Refused
 from runtime.system import layout
-from runtime.warden.context import Caller
+from runtime.warden.context import Caller, CheckPlaces
 from runtime.warden.dispatch import OWNER_SOCKET, Dispatcher, Doors, resolve
 from runtime.warden.owner import accounts, ops, reflections
 from runtime.warden.sessions import crashwatch, lifecycle, permits
@@ -30,7 +30,7 @@ def _dispatcher(world: World) -> Dispatcher:
         name: verb for name, verb in VERBS.items() if name.startswith("account.") or name in ("op.get", "snapshot")
     }
     doors = Doors(world.places, lambda: world.settings, world.clock, cast(Any, world.launcher), cast(Any, None),
-                  lambda kind, data: world.events.append((kind, data)), world.lock)  # fmt: skip
+                  lambda kind, data: world.events.append((kind, data)), world.lock, CheckPlaces())  # fmt: skip
     return Dispatcher(doors, resolve(wanted), wanted)
 
 

@@ -14,15 +14,18 @@ changed since the newest commit there whose tree passed.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 from checks.runner import catalog
 from runtime.queue.book import Queue
-from runtime.shared import store
+from runtime.shared import store, upgrades
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
+from runtime.shared.settings import places_for_test_runs
 from runtime.warden.context import Context
 from runtime.warden.sessions import registry
 
@@ -102,8 +105,8 @@ def _only(args: dict[str, Any]) -> list[str] | None:
     return only
 
 
-def _count_run(ctx: Context, session: Session) -> int:
-    """Count an implementer's whole run on its merge turn; the runs left after it. Refused off the turn or past it."""
+def _count_run(ctx: Context, session: Session, spend: bool) -> int:
+    """An implementer's whole run on its merge turn, counted if ``spend``; the runs left. Refused off or past it."""
     with ctx.lock:
         task = Queue.of(ctx).task(session.task)
         if task.status != TURN:
@@ -120,8 +123,9 @@ def _count_run(ctx: Context, session: Session) -> int:
                                             "decides now: stop and wait")  # fmt: skip
             raise Refused("check-runs", f"{done} check runs already this merge turn (limit {limit}); tell the "
                                         "orchestrator what fails")  # fmt: skip
-        runs[task.id] = done + 1
-        store.write_json(_runs_path(ctx.places), runs)
+        if spend:
+            runs[task.id] = done + 1
+            store.write_json(_runs_path(ctx.places), runs)
     return limit - done - 1
 
 
@@ -133,6 +137,33 @@ def _since(ctx: Context, checkout: str) -> list[str]:
         if tree in trees:
             return ["--since", commit]
     return ["--all"]
+
+
+@contextmanager
+def _place(ctx: Context, session: Session, only: list[str] | None, counted: bool) -> Iterator[int | None]:
+    """A place held while a check runs tests, asked after the merge turn; none free refuses it. Yields the runs left."""
+    if only is not None and "tests" not in only:
+        yield None
+        return
+    if counted:
+        _count_run(ctx, session, spend=False)
+    ceiling = upgrades.installed_settings(ctx.places).get_int("budget.test_memory_ceiling_mib")
+    places = places_for_test_runs(ctx.settings().__getitem__, ceiling)
+    if places < 1:
+        raise Refused(
+            "check-places",
+            "the factory's memory holds no check's tests: budget.slice_memory_high less budget.test_reserve_mib is "
+            f"below the installed test ceiling, {ceiling} MiB. Raise the first, lower the second, or install again",
+        )
+    held = ctx.check_places.take(places, session.name)
+    if held is not None:
+        who = f"{', '.join(held)} {'is' if len(held) == 1 else 'are'} running tests"
+        room = f"the factory's memory holds {places} such check{'' if places == 1 else 's'} at a time"
+        raise Refused("check-places", f"{who}, and {room}: run again when one ends")
+    try:
+        yield _count_run(ctx, session, spend=True) if counted else None
+    finally:
+        ctx.check_places.give_back(session.name)
 
 
 def _tail(text: str, kib: int) -> str:
@@ -159,13 +190,13 @@ def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
     records = whole and not (args.get("all") and not on_default)
     if records and passed(ctx.places, tree):
         return ok(exit=0, passed=True, tree=tree, output=f"factory check: tree {tree} already passed; nothing to run")
-    left = _count_run(ctx, session) if whole and session.role == IMPL else None
-    argv = ["--only", ",".join(only)] if only is not None else []
-    if args.get("all"):
-        argv.append("--all")
-    elif on_default:
-        argv += _since(ctx, checkout)
-    code, output = ctx.launcher.run_check(checkout, argv)
+    with _place(ctx, session, only, whole and session.role == IMPL) as left:
+        argv = ["--only", ",".join(only)] if only is not None else []
+        if args.get("all"):
+            argv.append("--all")
+        elif on_default:
+            argv += _since(ctx, checkout)
+        code, output = ctx.launcher.run_check(checkout, argv)
     recorded = False
     if records and code == 0:
         after_commit, after_tree, _, after_dirty = _state(ctx, checkout)

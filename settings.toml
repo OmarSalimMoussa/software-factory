@@ -128,7 +128,8 @@ slice_memory_high = "11G"
 slice_memory_max = "12G"
 slice_cpu_weight = 50
 test_memory_ceiling_mib = 6656
-test_reserve_mib = 4096
+test_reserve_mib = 4096 # kept for every other session: as many checks run tests at once
+                        # as fit under slice_memory_high after it, in test_memory_ceiling_mib each
 
 [vitals]
 memory_amber_gib = 8.0

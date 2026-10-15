@@ -30,12 +30,12 @@ from settings_text import set_line
 
 from runtime.cli import factory as cli
 from runtime.qa import qa_browser
-from runtime.shared import protocol, store
+from runtime.shared import protocol, store, upgrades
 from runtime.shared.paths import SCRATCH, Places
 from runtime.slots import health
 from runtime.system.runners import launch_file
 from runtime.warden import inbox, public, server, wardend
-from runtime.warden.context import Caller, Clock, Context
+from runtime.warden.context import Caller, CheckPlaces, Clock, Context
 from runtime.warden.delivery import github_push
 from runtime.warden.dispatch import AGENT_SOCKET, OWNER_SOCKET, Dispatcher, Doors, resolve
 from runtime.warden.health.probes import Answer
@@ -340,6 +340,7 @@ def build(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Rehearsal:
     github = _product(tmp, repo, places, monkeypatch)
     places.install.mkdir(parents=True)
     places.defaults.write_text(_settings_text(repo))
+    store.write_json(upgrades.settings_path(places), {})
     for part in ("plugin", "procedures", "rules"):
         shutil.copytree(ROOT / part, places.install / part)
     settings = wardend.FreshSettings(places)
@@ -370,7 +371,7 @@ def build(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Rehearsal:
     (tmp / "bin" / "docker").chmod(0o755)
     systemd = Systemd(places, agent_home, tmp / "bin")
     doors = Doors(places, settings, clock, launch.Units(places, settings, run=systemd), FakeGitHub(),
-                  inbox.poster(places, clock), threading.RLock())  # fmt: skip
+                  inbox.poster(places, clock), threading.RLock(), CheckPlaces())  # fmt: skip
     # The dashboard's snapshot is being rebuilt beside this rehearsal; every other verb resolves as wardend's do.
     handlers = resolve({name: verb for name, verb in VERBS.items() if not verb.handler.startswith(SNAPSHOT)})
     peers = server.Peers(AGENT_UID, OWNER_UID, DASHBOARD_UID, kernel.records, kernel.proc)

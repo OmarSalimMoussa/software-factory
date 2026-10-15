@@ -19,7 +19,7 @@ from runtime.shared import protocol, store
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
-from runtime.warden.context import Caller, Clock, Context, GitHub, Launcher
+from runtime.warden.context import Caller, CheckPlaces, Clock, Context, GitHub, Launcher
 from runtime.warden.owner import codes
 from runtime.warden.sessions import subagents
 from runtime.warden.verbs import VERBS, Verb
@@ -43,10 +43,11 @@ class Doors:
     github: GitHub
     post_event: Callable[[str, dict[str, Any]], None]
     lock: threading.RLock
+    check_places: CheckPlaces
 
     def context(self, caller: Caller) -> Context:
         return Context(self.places, self.settings, caller, self.clock, self.launcher, self.github,
-                       self.post_event, self.lock)  # fmt: skip
+                       self.post_event, self.lock, self.check_places)  # fmt: skip
 
 
 def resolve(verbs: Mapping[str, Verb]) -> dict[str, Handler]:

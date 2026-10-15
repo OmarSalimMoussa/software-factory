@@ -36,6 +36,7 @@ from runtime.warden.spend import cost
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
 CHECK_UNIT = "software-check-run@{}.service"
+CHECK_REQUEST = "check-"
 # What `claude --bg` prints for the session it started; the install drills it on the Claude Code it installs.
 BACKGROUNDED = re.compile(r"^backgrounded · ([0-9a-f]{8})\b", re.MULTILINE)
 
@@ -44,6 +45,13 @@ Run = Callable[[list[str]], subprocess.CompletedProcess[str]]
 
 class LaunchError(Exception):
     """A unit could not be started, or the command it ran failed; the message says which and why."""
+
+
+def forget_checks(places: Places) -> None:
+    """Drops the check requests and results a warden left: none has a reader, and a restarted check then finds none."""
+    for folder in (places.state / "public" / "launch", places.state / "runs"):
+        for path in folder.glob(f"{CHECK_REQUEST}*"):
+            path.unlink()
 
 
 def agent_home() -> Path:
@@ -146,7 +154,7 @@ class Units:
 
     def run_check(self, checkout: str, args: list[str]) -> tuple[int, str]:
         """`factory check` with ``args`` on ``checkout``, in the check-run unit; its exit status and its report."""
-        request_id = f"check-{uuid.uuid4().hex}"
+        request_id = f"{CHECK_REQUEST}{uuid.uuid4().hex}"
         self._request(request_id, {"kind": "check", "checkout": checkout, "args": args})
         return self._wait(CHECK_UNIT.format(request_id), request_id)
 

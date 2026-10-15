@@ -14,9 +14,10 @@ from typing import Any
 from runtime.queue import formats, intake, tasks
 from runtime.queue.book import Queue, request_rel
 from runtime.shared import settings as settings_mod
+from runtime.shared import store, upgrades
 from runtime.shared.models import Request, Session, Task
 from runtime.shared.paths import Places
-from runtime.warden.context import Caller, Clock, Context, StackResult
+from runtime.warden.context import Caller, CheckPlaces, Clock, Context, StackResult
 from runtime.warden.sessions import registry
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -78,6 +79,7 @@ class World:
     clock: FakeClock
     launcher: FakeLauncher
     events: list[tuple[str, dict[str, Any]]]
+    check_places: CheckPlaces = field(default_factory=CheckPlaces)
 
     def ctx(
         self, role: str = "orchestrator", session: str = "s-orch", agent_id: str = "", agent_kind: str = ""
@@ -92,6 +94,7 @@ class World:
             self.launcher,
             None,  # type: ignore[arg-type]  # the queue never asks GitHub
             lambda kind, data: self.events.append((kind, data)),
+            check_places=self.check_places,
         )
 
     def owner(self) -> Context:
@@ -158,6 +161,9 @@ def make_world(tmp_path: Path) -> World:
     (repo / "GOAL.md").write_text(GOAL)
     defaults = tomllib.loads((ROOT / "settings.toml").read_text())
     overrides = {"repo.path": str(repo), "repo.github": "acme/product"}
+    places.install.mkdir(parents=True)
+    places.defaults.write_text((ROOT / "settings.toml").read_text())
+    store.write_json(upgrades.settings_path(places), overrides)
     return World(places, repo, settings_mod.build(defaults, overrides), FakeClock(), FakeLauncher(), [])
 
 

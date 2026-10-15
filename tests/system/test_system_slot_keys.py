@@ -66,7 +66,7 @@ def test_the_keys_come_from_roots_record_of_the_install_never_the_wardens_settin
     places.install.mkdir(parents=True)
     places.defaults.write_text((Path(__file__).resolve().parents[2] / "settings.toml").read_text())
     with pytest.raises(store.StoreError, match="install again"):
-        slot_keys.installed(places)
+        upgrades.installed_settings(places)
     record = {
         "repo.path": "/home/software-agent/shop",
         "repo.github": "acme/shop",
@@ -76,7 +76,7 @@ def test_the_keys_come_from_roots_record_of_the_install_never_the_wardens_settin
     upgrades.settings_path(places).parent.mkdir(parents=True)
     upgrades.settings_path(places).write_text(json.dumps(record))
 
-    installed = slot_keys.installed(places)
+    installed = upgrades.installed_settings(places)
 
     assert (installed.get_str("slots.keys_from"), installed.get_list("slots.keys")) == (
         "/home/owner/app.env",

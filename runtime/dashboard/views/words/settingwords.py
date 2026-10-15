@@ -263,7 +263,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("budget.slice_memory_max", "Factory memory cap"),
             ("budget.slice_cpu_weight", "Factory CPU weight"),
             ("budget.test_memory_ceiling_mib", "Memory one check may use, MiB"),
-            ("budget.test_reserve_mib", "Memory kept free for tests, MiB"),
+            ("budget.test_reserve_mib", "Memory kept for other agents, MiB"),
         ],
     ),
     (

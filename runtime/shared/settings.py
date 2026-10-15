@@ -36,6 +36,7 @@ _PRICE_KEYS = ("input", "output", "cache_read", "cache_write")
 # key would act outside its sandbox the next time something read it, so no writable cache lies under these.
 _UNWRITABLE = frozenset({".claude", ".config", ".local", ".ssh", "bin"})
 _WEIGHT_KEYS = ("severity", "goal", "requests", "users", "age")
+_KIB = {"K": 1, "M": 1024, "G": 1024**2, "T": 1024**3}
 
 
 def _leaf(tree: Mapping[str, Any], key: str) -> Any:
@@ -64,7 +65,14 @@ def _home_folder(path: object) -> bool:
 
 
 def _size_ok(value: object) -> bool:
-    return isinstance(value, str) and value[:-1].isdigit() and value[-1:] in ("K", "M", "G", "T")
+    return isinstance(value, str) and value[:-1].isdigit() and value[-1:] in _KIB
+
+
+def places_for_test_runs(setting: Callable[[str], Any], ceiling: int) -> int:
+    """How many checks run tests at once: the factory's memory before it slows, less the reserve, in test ceilings."""
+    high: str = setting("budget.slice_memory_high")
+    reserve: int = setting("budget.test_reserve_mib")
+    return (int(high[:-1]) * _KIB[high[-1]] // 1024 - reserve) // ceiling
 
 
 def _list_problems(key: str, spec: Spec, value: Any) -> list[str]:
@@ -270,6 +278,11 @@ _BELOW = (
 
 def _between(tree: dict[str, Any]) -> list[str]:
     problems = [f"{low} must be below {high}" for low, high in _BELOW if _leaf(tree, low) >= _leaf(tree, high)]
+    if places_for_test_runs(lambda key: _leaf(tree, key), _leaf(tree, "budget.test_memory_ceiling_mib")) < 1:
+        problems.append(
+            "budget.test_memory_ceiling_mib and budget.test_reserve_mib must fit under budget.slice_memory_high, "
+            "or no check could run the tests"
+        )
     return problems + [
         f"sandbox.writable_caches: {path!r} must be a folder inside the agent's home, such as .cache/uv, and not "
         f"under {', '.join(sorted(_UNWRITABLE))}"
