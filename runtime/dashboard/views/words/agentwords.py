@@ -23,6 +23,7 @@ _ENDED = {
     "crashed": ("stop", "crashed"),
 }
 _KID_ORDER = ("intake", "impl", "design", "qa", "orch")
+OWN_WAIT = {"merged": "Merged · ends when its check passes, comes back if it fails"}
 WHY = {
     "finished": ("finished", "good"),
     WITH_PARENT: ("stopped with its parent", "bad"),
@@ -65,7 +66,7 @@ def by_id(snap: Snap) -> dict[str, dict[str, Any]]:
 def doing(snap: Snap, row: dict[str, Any]) -> str:
     state = row["state"]
     if state == DEPRIORITIZED:
-        return _pushed_out(snap, row["benched_for"])
+        return _pushed_out(snap, row["benched_for"], row["task"])
     if state == BENCH_PENDING:
         return "Moving to the bench, committing its work"
     if state == REVIVING:
@@ -77,11 +78,15 @@ def doing(snap: Snap, row: dict[str, Any]) -> str:
     return "Waiting for you" if state == WAITING else "Working"
 
 
-def _pushed_out(snap: Snap, benched_for: str) -> str:
+def _pushed_out(snap: Snap, benched_for: str, own: str) -> str:
     if benched_for == PAUSED:
         return "Paused with the factory · comes back when you resume"
     task = next((t for t in snap.get("queue")["tasks"] if t["id"] == benched_for), None)
-    return f"Pushed out for “{task['title']}” · comes back first" if task else "Pushed out · comes back first"
+    if task is None:
+        return "Pushed out · comes back first"
+    if benched_for == own:
+        return OWN_WAIT.get(task["status"], "Sent back to it · comes back when a place frees")
+    return f"Pushed out for “{task['title']}” · comes back first"
 
 
 def dot(row: dict[str, Any]) -> tuple[str, str]:

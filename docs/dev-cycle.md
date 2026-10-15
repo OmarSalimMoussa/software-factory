@@ -68,8 +68,10 @@ Working and waiting sessions hold a cap slot. Only severe work, or work for a hi
 session out, and a working one only after `watch.bench_min_run_minutes` unless the new work is severe. The session
 is told to pause, commits its work, and comes back later with its full context. Only finishing, the owner's
 Stop, or a crash retires a session, and a retired session never comes back: its task returns to Proposed, and a new
-session starts from its branch. The warden sees a session finish from its task's status (an implementer's task
-checked, a designer's spec gone to build): it stops the session, empties its slot and frees its place.
+session starts from its branch. An implementer is benched as its merge lands, and holds no place while the default
+branch is checked: it comes back only if its task is sent back to it. The warden sees a session finish from its
+task's status (an implementer's task checked, a designer's spec gone to build): it stops the session, empties its
+slot and frees its place, on the bench or off it.
 
 A session whose process ends is resumed, each time after a longer wait, and retired as crashed only after
 `watch.resume_tries` resumes within `watch.crash_window_minutes`. Nothing resumes until the agent's Claude daemon is

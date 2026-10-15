@@ -152,8 +152,20 @@ def find_merge(ctx: Context) -> None:
             known = merges(ctx.places)
             store.write_json(merges_path(ctx.places), {**known, commit: found["task"]}, mode=0o600)
             tasks.move(ctx, found["task"], MERGED, "merged", statuses.WARDEN, f"merged as {commit}", commit=commit)
+            _bench(ctx, found["task"], f"merged as {commit[:12]}: benched until its check")
             log.info("warden: %s merged as %s", found["task"], commit)
             return
+
+
+def _bench(ctx: Context, task_id: str, why: str) -> None:
+    """The task's implementer gives up its place: benched, it comes back only when the task is sent back to it."""
+    with ctx.lock:
+        sessions = registry.read(ctx.places)
+        impl = _implementer(ctx, task_id)
+        if impl is None or impl.state not in (WORKING, WAITING):
+            return
+        lifecycle.begin_bench(ctx, sessions[impl.id], lifecycle.WARDEN, why, task_id)
+        registry.write(ctx.places, sessions)
 
 
 def check_saved(ctx: Context, commit: str, passed: bool) -> str:

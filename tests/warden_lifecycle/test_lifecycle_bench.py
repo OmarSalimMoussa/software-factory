@@ -156,6 +156,25 @@ def test_pause_benches_every_session_and_resume_brings_them_back_in_order_each_w
     assert [kind for kind, _ in world.events] == ["paused", "benched", "benched", "benched", "resumed"]
 
 
+def test_a_paused_session_whose_task_moves_past_its_part_on_its_way_to_the_bench_ends_and_the_pause_completes(
+    world: World,
+) -> None:
+    world.queue.add("t-0001", status="review", run=3)
+    world.seat("0c0c0c0c", role="orchestrator", family="orch")
+    world.seat("de510001", role="designer", task="t-0001", state=WAITING)
+    for sid in ("0c0c0c0c", "de510001"):
+        world.run(sid)
+    op_id = revive.owner_pause(world.owner(), {}, None)["op"]
+    world.queue.move(world.ctx(), "t-0001", "building", "go", "owner")  # the owner's Go, within the bench's grace
+
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
+    assert (world.session("de510001").state, world.session("de510001").retired) == (RETIRED, "finished")
+    world.later(world.settings.get_int("watch.bench_grace_seconds"))
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
+
+    assert ops.get(world.owner(), {"id": op_id}, None)["op"]["state"] == ops.DONE
+
+
 def test_a_session_alive_when_a_new_factory_is_installed_is_told_once_to_load_its_skills_again(world: World) -> None:
     world.seat("0c0c0c0c", role="orchestrator", family="orch", state=DEPRIORITIZED)
     # The new tree is in place, and the warden starts on it, before the install writes its record.

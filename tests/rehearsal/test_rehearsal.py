@@ -11,7 +11,7 @@ from rehearsal_kit import Rehearsal, at_once, build, git
 
 from runtime.queue import format_check, turn
 from runtime.queue.book import Queue
-from runtime.shared.models import FINISHED, RETIRED, WORKING
+from runtime.shared.models import BENCH_PENDING, FINISHED, RETIRED, WORKING
 from runtime.warden import checks, loop
 from runtime.warden.delivery import deploys
 from runtime.warden.owner import ops
@@ -96,7 +96,7 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
     assert [e["at"] for e in log] == sorted(e["at"] for e in log)
     assert git(r.github, "rev-parse", "master") == merge
 
-    # Its task is past its part: the next session watch retires the implementer, though its process is alive.
+    # Benched at its merge, the implementer ends once its task is checked: the next session watch retires it.
     crashwatch.SessionsWatch(start=at_once).run_pass(r.warden())
     sessions = registry.read(r.places)
     assert (sessions[impl].state, sessions[impl].retired, sessions[impl].task) == (RETIRED, FINISHED, TASK)
@@ -176,6 +176,7 @@ def _merged_and_pushed(r: Rehearsal, orch: str, impl: str, worktree: Path, branc
     assert checks.passed(r.places, git(r.repo, "rev-parse", "HEAD^{tree}"))
     turn.find_merge(r.warden())
     assert not registry.read(r.places)[impl].merge_turn
+    assert registry.read(r.places)[impl].state == BENCH_PENDING
     report = r.body(r.repo, "check.md", REPORT.encode())
     assert r.session(orch, ["queue", "check", merge, "--body", report])["checked"] == TASK
     pushed = r.session(orch, ["push"])

@@ -1,9 +1,9 @@
 """Every session's lifecycle: start, bench, revive, retire, and the owner's stop, pause and resume.
 
 States are working, waiting, bench-pending, deprioritized, reviving and retired. A pending state is written before
-the warden acts, so the crash watch and the backstop never misread a session in between. Retired is final: nothing
-revives or resumes it. Only the owner retires a deprioritized session; a bench makes room only for severe work or
-a higher goal item (order.may_bench). Each move is a line in history.jsonl with who made it and why.
+the warden acts, so the crash watch and the backstop never misread a session in between. Retired is final. Only the
+owner retires a benched session its task still needs; a bench makes room for severe work or a higher goal item
+(order.may_bench), or frees a merged or blocked task's place. Each move is a history.jsonl line saying who and why.
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ def retire(ctx: Context, tree: list[Session], root: Session, kind: str, by: str,
     """Retire ``root`` as ``kind`` and the rest of ``tree`` with it; checks every one before changing any."""
     tree = [s for s in tree if s.state != RETIRED]
     for s in tree:
-        if s.state in (models.DEPRIORITIZED, models.BENCH_PENDING, models.REVIVING) and by != OWNER:
+        if by != OWNER and (s.state == models.REVIVING or (s.state in models.OFF_SEAT and kind != models.FINISHED)):
             raise Refused("deprioritized", f"{s.name} is {s.state} and comes back with its context; only the owner "
                                            "retires it")  # fmt: skip
     for s in tree:

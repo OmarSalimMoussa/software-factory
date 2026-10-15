@@ -25,6 +25,7 @@ BENCH_PENDING, REVIVING = "bench-pending", "reviving"
 PENDING = "pending-"
 STATES = (WORKING, WAITING, BENCH_PENDING, DEPRIORITIZED, REVIVING, RETIRED)
 HOLDS_SLOT = (WORKING, WAITING, BENCH_PENDING, REVIVING)
+OFF_SEAT = (BENCH_PENDING, DEPRIORITIZED)
 # Settled: a session in any other state is working, waiting or between the two, and an install under it would lose
 # its work.
 RESTING = (DEPRIORITIZED, RETIRED)

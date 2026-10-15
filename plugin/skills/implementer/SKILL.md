@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Use when running as an implementer - a background session the warden started for one approved task (a spec or a bug) - to build every slice in your own worktree and slot, loop with the required testers until a round finds nothing new, check on your merge turn, and stay until the default branch is checked.
+description: Use when running as an implementer - a background session the warden started for one approved task (a spec or a bug) - to build every slice in your own worktree and slot, loop with the required testers until a round finds nothing new, check on your merge turn, and hand your place on once your branch is merged.
 ---
 <!-- doc-refs: external -->
 
@@ -90,12 +90,13 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
    orchestrator.
 4. Ask the orchestrator to merge, with the tree the pass names.
 
-## 5. Until the default branch is checked
+## 5. After your merge
 
-Stay until the orchestrator says the check passed, and fix what the check sends back. Work that was reverted (the
-warden's message, or your first one, says so) comes back first: `git merge --ff-only <default branch>`,
-`git revert <the revert's sha>`, then the fix. Once your task is
-checked, the warden ends your session and empties your slot itself.
+The warden benches you as your merge lands, so another run can take your place: commit anything left and end your
+turn. Once the default branch's check passes, the warden ends your session and empties your slot itself. If the
+check sends your work back, you come back as soon as a place frees, told why. Work that was reverted (the warden's
+message, or your first one, says so) comes back first: `git merge --ff-only <default branch>`,
+`git revert <the revert's sha>`, then the fix.
 
 ## Paused and revived
 

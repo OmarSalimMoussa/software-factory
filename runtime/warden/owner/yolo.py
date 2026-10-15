@@ -58,7 +58,8 @@ def _free(ctx: Context, role: str) -> int:
     """The places of ``role`` that no run holds, was benched from or waits for."""
     sessions = registry.read(ctx.places).values()
     held = len(registry.seated(sessions, role))
-    held += sum(1 for s in sessions if s.role == role and s.state == DEPRIORITIZED and not s.parent)
+    benched = [s for s in sessions if s.role == role and s.state == DEPRIORITIZED and not s.parent]
+    held += sum(1 for s in benched if permits.has_work(ctx, s))
     live = {s.task for s in sessions if s.role == role and s.state != RETIRED and not s.parent}
     waiting = list(proposals.read(ctx.places).approved) + (
         proposals.designed_builds(ctx.places) if role == IMPL else []

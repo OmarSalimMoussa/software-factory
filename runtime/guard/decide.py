@@ -38,8 +38,8 @@ UNPERMITTED_CARD = (
 )
 RETIRED_NOTE = "This session is retired and can never run again: every call is refused. Stop now."
 BENCH_NOTE = (
-    "you are paused for higher-ranked work: commit your work in progress (`git add`, then `git commit`) and stop; "
-    "you come back with your full context"
+    "you are benched: commit your work in progress (`git add`, then `git commit`) and stop; you come back with your "
+    "full context when there is work for you"
 )
 _BANNED_TOOLS = frozenset({"Workflow", "RemoteTrigger"})
 # What keeps work in the Claude account, off this machine: an agent on another account could not read it back.

@@ -17,6 +17,7 @@ from seed_kit import FIXTURES, iso
 from runtime.dashboard.views import agents, ops, spend
 from runtime.dashboard.views.kit import PartError, Snap
 from runtime.dashboard.views.tasks.task import qa_line
+from runtime.dashboard.views.words import agentwords
 from runtime.dashboard.views.words.settingwords import LABELS
 from runtime.shared import models, store
 from runtime.shared import operations as kinds
@@ -165,6 +166,22 @@ def test_the_agents_banner_carries_the_icon_of_the_factorys_state(paused: str | 
 @pytest.mark.parametrize(("agent", "icon"), [("impl-project-names", "clock"), ("qa-sec-1", "lock-closed")])
 def test_an_agent_out_of_the_work_says_so_with_its_icon(rig: Rig, agent: str, icon: str) -> None:
     assert rig.parts(f"/api/agent/{agent}")["agent"]["data"]["life_note"]["icon"] == icon
+
+
+@pytest.mark.parametrize(
+    ("benched_for", "status", "says"),
+    [
+        ("t-0002", "merged", "Pushed out for “Task two” · comes back first"),
+        ("t-0001", "merged", "Merged · ends when its check passes, comes back if it fails"),
+        ("t-0001", "building", "Sent back to it · comes back when a place frees"),
+    ],
+    ids=["for-another", "merged", "sent-back"],
+)
+def test_a_benched_agent_says_what_it_waits_for(benched_for: str, status: str, says: str) -> None:
+    tasks = [{"id": "t-0001", "title": "Task one", "status": status}, {"id": "t-0002", "title": "Task two"}]
+    row = {"state": models.DEPRIORITIZED, "benched_for": benched_for, "task": "t-0001"}
+
+    assert agentwords.doing(Snap(0.0, {"queue": {"tasks": tasks}}, {}), row) == says
 
 
 _CLEAN = {f"{severity}s": 0 for severity in OPEN_SEVERITIES}

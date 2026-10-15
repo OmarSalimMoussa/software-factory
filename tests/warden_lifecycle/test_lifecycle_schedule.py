@@ -77,6 +77,44 @@ def test_a_deprioritized_run_that_outranks_an_approved_one_comes_back_first(worl
     assert _live(world, "t-0002") == [] and "hold a place" in schedule.waits(world.places)["t-0002"]
 
 
+def test_an_implementer_benched_at_its_merge_holds_no_place_and_comes_back_when_its_task_is_sent_back(
+    world: World,
+) -> None:
+    world.queue.add("t-0001", goal_item="G1", status="merged", severity="severe")
+    world.seat("5e550001", task="t-0001", state=DEPRIORITIZED, benched_for="t-0001")
+    world.approve("t-0002", goal_item="G2")
+    _approved(world, "t-0002")
+
+    schedule.run_pass(world.ctx())
+    assert world.session("5e550001").state == DEPRIORITIZED and _live(world, "t-0002") == [WORKING]
+
+    world.queue.move(world.ctx(), "t-0001", "building", "reverted", "orchestrator")  # its check failed
+    world.cap(2)
+    schedule.run_pass(world.ctx())
+    assert world.session("5e550001").state == WORKING and world.launcher.resumed == ["5e550001"]
+
+
+def test_a_merge_bench_holds_no_start_back_while_a_place_is_free(world: World) -> None:
+    world.cap(2)
+    world.queue.add("t-0001", status="merged")
+    world.seat("5e550001", task="t-0001", state=BENCH_PENDING, benched_for="t-0001", since="2026-10-09T12:00:00Z")
+    world.approve("t-0002")
+    _approved(world, "t-0002")
+
+    schedule.run_pass(world.ctx())
+
+    assert _live(world, "t-0002") == [WORKING]
+
+
+def test_a_designer_benched_while_its_spec_waits_for_review_comes_back_when_a_place_frees(world: World) -> None:
+    world.queue.add("t-0001", status="review", run=3)
+    world.seat("de510001", role="designer", task="t-0001", state=DEPRIORITIZED, benched_for="t-0002")
+
+    schedule.run_pass(world.ctx())
+
+    assert world.session("de510001").state == WORKING
+
+
 def test_a_designed_build_starts_its_implementer_and_a_run_that_cannot_start_says_why(world: World) -> None:
     world.approve("t-0001", run=3, slices=2, status="building")
     proposals.set_designed_builds(world.places, ["t-0001"])

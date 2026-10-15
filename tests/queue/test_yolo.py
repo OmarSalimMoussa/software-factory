@@ -10,6 +10,7 @@ from queue_kit import PICTURE, World
 from runtime.queue import cards, formats, proposals
 from runtime.queue.book import task_rel
 from runtime.queue.propose import propose
+from runtime.shared.models import DEPRIORITIZED
 from runtime.shared.protocol import Refused
 from runtime.warden import inbox
 from runtime.warden.owner import yolo
@@ -29,8 +30,17 @@ def test_switching_yolo_tells_the_orchestrator_and_switching_it_again_changes_no
     assert [kind for kind, _ in world.events] == [inbox.YOLO_ON, inbox.YOLO_OFF] and yolo.state(world.places) is None
 
 
+def _benched(world: World, sid: str, status: str) -> None:
+    task = world.task()
+    world.write_raw(task_rel(task.id), formats.dump_task(dataclasses.replace(task, status=status, run=1)))
+    world.session(sid, "implementer", f"impl-{sid}", task.id)
+    sessions = registry.read(world.places)
+    sessions[sid] = dataclasses.replace(sessions[sid], state=DEPRIORITIZED, benched_for=task.id)
+    registry.write(world.places, sessions)
+
+
 def test_yolo_approves_only_into_a_free_place_of_the_runs_own_role(world: World) -> None:
-    world.with_settings(caps__implementers=2, caps__designers=1, routing__max_proposals=4)
+    world.with_settings(caps__implementers=3, caps__designers=1, routing__max_proposals=4)
     builds = [world.task().id for _ in range(2)]
     designs = [world.task().id for _ in range(2)]
     for task_id in builds:
@@ -38,6 +48,8 @@ def test_yolo_approves_only_into_a_free_place_of_the_runs_own_role(world: World)
     for task_id in designs:
         propose(world.ctx(), task_id, 3, "why", "it needs a design", PICTURE, "")
     world.session("s-impl", "implementer", "impl-x", world.task().id, "/wt/x")
+    _benched(world, "s-pushed-out", "deprioritized")  # holds its place to come back to
+    _benched(world, "s-merged", "merged")  # holds none: it waits on its check
     yolo.run_pass(world.ctx())
     assert proposals.read(world.places).approved == []
 

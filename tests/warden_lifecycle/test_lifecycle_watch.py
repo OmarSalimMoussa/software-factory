@@ -38,6 +38,44 @@ def test_the_crash_watch_never_reads_a_session_out_of_its_place_as_crashed(world
     assert world.launcher.resumed == [] and world.launcher.stopped == []
 
 
+@pytest.mark.parametrize("state", [BENCH_PENDING, DEPRIORITIZED])
+def test_an_implementer_benched_at_its_merge_waits_for_its_check_and_ends_once_it_passes(
+    world: World, state: str
+) -> None:
+    world.queue.add("t-0001", status="merged")
+    world.seat("5e550001", task="t-0001", state=state, benched_for="t-0001", since=NOW)
+    if state == BENCH_PENDING:
+        world.run("5e550001")
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
+    assert world.session("5e550001").state == state
+
+    world.queue.move(world.ctx(), "t-0001", "checked", "checked")
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
+
+    ended = world.session("5e550001")
+    assert (ended.state, ended.retired) == (RETIRED, FINISHED)
+    assert world.launcher.stopped == (["5e550001"] if state == BENCH_PENDING else [])  # stopped once, never benched
+
+
+def test_a_session_whose_bench_is_settling_is_ended_only_once_it_settled(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world.queue.add("t-0001", status="merged")
+    world.seat("5e550001", task="t-0001", state=BENCH_PENDING, benched_for="t-0001")
+    seen: list[str] = []
+
+    def settle(ctx: object, s: object, procs: object) -> None:
+        world.queue.move(world.ctx(), "t-0001", "checked", "checked")
+        crashwatch.SessionsWatch(start=lambda work: None).run_pass(world.ctx())
+        seen.append(world.session("5e550001").state)
+
+    monkeypatch.setattr(crashwatch, "_settle", settle)
+    crashwatch.finish_benches(world.ctx(), {})
+    crashwatch.SessionsWatch(start=lambda work: None).run_pass(world.ctx())
+
+    assert seen == [BENCH_PENDING] and world.session("5e550001").retired == FINISHED
+
+
 @pytest.mark.parametrize(
     ("state", "stopped"),
     [(WORKING, False), (WAITING, False), (BENCH_PENDING, False), (REVIVING, False), (DEPRIORITIZED, True),

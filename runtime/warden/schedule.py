@@ -57,7 +57,7 @@ def _candidates(ctx: Context, sessions: dict[str, Session], role: str) -> list[t
     live = {s.task for s in sessions.values() if s.role == role and s.state != RETIRED and not s.parent}
     found: list[tuple[Task, Session | None]] = []
     for s in sessions.values():
-        if s.role == role and s.state == DEPRIORITIZED and not s.parent and s.task:
+        if s.role == role and s.state == DEPRIORITIZED and not s.parent and permits.has_work(ctx, s):
             found.append((permits.read_task(ctx, s.task), s))
     ids = list(approved) + (proposals.designed_builds(ctx.places) if role == IMPL else [])
     for task_id in dict.fromkeys(ids):
@@ -72,7 +72,9 @@ def _candidates(ctx: Context, sessions: dict[str, Session], role: str) -> list[t
 
 def _role(ctx: Context, role: str, waiting: dict[str, str]) -> None:
     sessions = lifecycle.read(ctx)
-    if any(s.role == role and s.state in (BENCH_PENDING, REVIVING) and not s.parent for s in sessions.values()):
+    moving = [s for s in sessions.values() if s.role == role and s.state in (BENCH_PENDING, REVIVING) and not s.parent]
+    # A merge's or a block's bench makes room for no one, and a place it holds counts in the cap meanwhile.
+    if any(s.state == REVIVING or s.benched_for != s.task for s in moving):
         waiting.update({t.id: "waits while another run settles its place" for t, _ in _candidates(ctx, sessions, role)})
         return
     for task, benched in _candidates(ctx, sessions, role):

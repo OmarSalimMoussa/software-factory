@@ -151,6 +151,8 @@ def check_revive_order(ctx: Context, sessions: dict[str, Session], role: str, ta
     for other in sessions.values():
         if other.id == skip or other.role != role or other.state != DEPRIORITIZED or other.parent:
             continue
+        if not has_work(ctx, other):
+            continue
         if order.seat_rank(read_task(ctx, other.task), approved) < order.seat_rank(task, approved):
             raise Refused("revive-first", f"{other.name} comes back first: it is ahead of {task.id}, and the warden "
                                           "revives it when a place frees")  # fmt: skip
@@ -276,6 +278,11 @@ def in_order(ctx: Context, sessions: list[Session]) -> list[Session]:
 
 
 # ---- the queue's tasks and the slots' leases ----------------------------------------------------------------------
+
+
+def has_work(ctx: Context, s: Session) -> bool:
+    """Whether a benched session's task has work for it: one benched at its merge waits for the task's return."""
+    return bool(s.task) and read_task(ctx, s.task).status not in statuses.WAITS
 
 
 def read_task(ctx: Context, task_id: str) -> Task:

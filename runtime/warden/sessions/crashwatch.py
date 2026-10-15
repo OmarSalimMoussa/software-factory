@@ -28,6 +28,7 @@ from runtime.shared.models import (
     CRASHED,
     DEPRIORITIZED,
     FINISHED,
+    OFF_SEAT,
     ON_STAGING,
     PENDING,
     QA_CLEAN,
@@ -52,6 +53,7 @@ RESTARTED = "The warden restarted you after your process ended: rerun your start
 SILENT = "The warden restarted you: your loop was silent for {minutes} min. Rerun your startup checks, then carry on."
 OWED = " Events you have not acted on yet: {kinds}. `factory inbox` lists them."
 IDLE = "idle"
+_SETTLING: set[str] = set()
 # A session whose task has moved past its part is finished; a process that ends before that crashed.
 DONE_AT = {
     IMPL: frozenset({"checked", ON_STAGING, "promoted", "closed"}),
@@ -71,6 +73,7 @@ class SessionsWatch:
     def run_pass(self, ctx: Context) -> None:
         procs = backstop.processes()
         backstop.sweep(ctx, procs)
+        _retire_benched(ctx)  # before the benches settle: a finished one is stopped once, never benched
         if self._benches is None or not self._benches.is_alive():
             # In its own thread: a failure is reported there, once while it lasts, as a pass's is.
             self._benches = self._start(lambda: loop.run_once(ctx, "the benches' settling",
@@ -83,10 +86,17 @@ def finish_benches(ctx: Context, procs: dict[str, Proc]) -> None:
     grace = ctx.settings().get_int("watch.bench_grace_seconds")
     due = [s for s in lifecycle.read(ctx).values() if s.state == BENCH_PENDING and ctx.clock.age(s.since) >= grace]
     for s in due:
+        with ctx.lock:
+            current = lifecycle.read(ctx).get(s.id)
+            if current is None or current.state != BENCH_PENDING:
+                continue
+            _SETTLING.add(s.id)
         try:
             _settle(ctx, s, procs)
         except (LaunchError, Refused, store.StoreError) as exc:
             log.warning("bench of session %s not finished (%s); tried again next tick", s.id, type(exc).__name__)
+        finally:
+            _SETTLING.discard(s.id)
 
 
 def _settle(ctx: Context, s: Session, procs: dict[str, Proc]) -> None:
@@ -111,7 +121,8 @@ def _settle(ctx: Context, s: Session, procs: dict[str, Proc]) -> None:
     if s.task and permits.read_task(ctx, s.task).status in ("building", "designing"):
         permits.move_task(ctx, s.task, "deprioritized", "bench")
     revive.pause_progress(ctx, s.id, "on the bench")
-    ctx.post_event(inbox.BENCHED, {"session": s.id, "name": s.name, "task": s.task})
+    if current.benched_for != s.task:
+        ctx.post_event(inbox.BENCHED, {"session": s.id, "name": s.name, "task": s.task})
 
 
 def _finished(ctx: Context, s: Session) -> bool:
@@ -198,6 +209,21 @@ def watch(ctx: Context) -> None:
         _act(ctx, sid, retired, relaunch)
     if facts.hosting and facts.daemon != facts.seen:
         store.write_json(_daemon_path(ctx), {"started": facts.daemon})
+
+
+def _retire_benched(ctx: Context) -> None:
+    """An off-seat session ends once its task is past its part; one being settled waits, so no slot empties twice."""
+    for sid in [s.id for s in lifecycle.read(ctx).values() if s.state in OFF_SEAT and not s.parent]:
+        with ctx.lock:
+            sessions = lifecycle.read(ctx)
+            s = sessions.get(sid)
+            if s is None or s.state not in OFF_SEAT or sid in _SETTLING or not _finished(ctx, s):
+                continue
+            why = "finished: its task moved past its part"
+            retired = lifecycle.retire(ctx, registry.subtree(sessions, sid), s, FINISHED, WARDEN, why)
+            registry.write(ctx.places, sessions)
+        lifecycle.after_retire(ctx, retired)
+        revive.pause_progress(ctx, sid, "finished")
 
 
 def _judge(ctx: Context, facts: _Pass, sessions: dict[str, Session], sid: str, s: Session) -> _Outcome | None:

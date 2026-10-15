@@ -18,6 +18,7 @@ OWNER, ORCH, IMPL, DESIGN, WARDEN = "owner", "orchestrator", "implementer", "des
 ACTORS = (OWNER, ORCH, IMPL, DESIGN, WARDEN)
 RUNNING = frozenset({"designing", "building", "qa", "qa-clean", "turn"})
 OPEN = RUNNING | {"approved", "review", "deprioritized", "decide"}
+WAITS = frozenset({"merged", "blocked"})  # a benched builder's task waits on its check or the owner, not a place
 NOT_CLOSED = frozenset(TASK_STATUSES) - {"closed"}
 
 
