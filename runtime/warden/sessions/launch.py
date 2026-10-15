@@ -235,8 +235,9 @@ def start_session(
     except LaunchError as exc:
         raise Refused("launch", str(exc)) from exc
     now = ctx.clock.iso()
-    s = Session(id=request_id, parent="", worktree=str(place), state=WORKING, started=now, since=now,
-                note="started", definitions=session_settings.fingerprint(agents), **fields)  # fmt: skip
+    s = Session(id=request_id, parent="", worktree=str(place), state=WORKING, started=now, since=now, note="started",
+                definitions=session_settings.fingerprint(agents), kinds=session_settings.kinds(agents, fields["role"]),
+                **fields)  # fmt: skip
     carried = options(ctx, request_id, s, agents)
     sessions[request_id] = s
     registry.write(ctx.places, sessions)

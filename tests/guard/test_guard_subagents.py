@@ -88,26 +88,30 @@ def test_the_orchestrator_keeps_one_place_for_intake(
 
 
 LANE_TAKEN = "is running and its browser is that tester's"
+FIRST_LANES = ["intake", "triage", "qa-regression", "qa-prod"]
 
 
 @pytest.mark.parametrize(
-    ("running", "kind", "refused"),
+    ("running", "kind", "has", "refused"),
     [
-        (["qa-regression"], "qa-regression", f"a qa-regression {LANE_TAKEN}; start it as qa-regression-2"),
-        (["qa-regression"], "qa-regression-2", None),
-        (["qa-regression", "qa-regression-2", "qa-regression-3", "qa-regression-4"], "qa-regression-3",
+        (["qa-regression"], "qa-regression", None, f"a qa-regression {LANE_TAKEN}; start it as qa-regression-2"),
+        (["qa-regression"], "qa-regression-2", None, None),
+        (["qa-regression", "qa-regression-2", "qa-regression-3", "qa-regression-4"], "qa-regression-3", None,
          f"a qa-regression-3 {LANE_TAKEN}; wait for one to report"),
-        (["triage"], "triage", None),
-        ([], "qa-regression-5", "the orchestrator may start intake, triage, qa-regression, qa-prod, Explore, not "
-                                "qa-regression-5"),
+        (["triage"], "triage", None, None),
+        ([], "qa-regression-5", None, "the orchestrator may start intake, triage, qa-regression, qa-prod, Explore, "
+                                      "not qa-regression-5"),
+        (["qa-regression"], "qa-regression", FIRST_LANES, f"a qa-regression {LANE_TAKEN}; wait for one to report"),
+        ([], "qa-regression-2", FIRST_LANES, "this orchestrator has no qa-regression-2, a lane added since it started; "
+                                             "wait for a qa-regression to report"),
     ],
-    ids=["same-lane", "next-lane", "every-lane", "no-browser", "past-the-lanes"],
+    ids=["same-lane", "next-lane", "every-lane", "no-browser", "past-the-lanes", "none-it-has", "lane-it-lacks"],
 )  # fmt: skip
 def test_testers_of_one_browser_kind_at_once_each_take_a_lane_of_their_own(
-    tmp_path: Path, running: list[str], kind: str, refused: str | None
+    tmp_path: Path, running: list[str], kind: str, has: list[str] | None, refused: str | None
 ) -> None:
     kit = Kit(tmp_path)
-    kit.session("orchestrator", worktree=kit.repo)
+    kit.session("orchestrator", worktree=kit.repo, kinds=has)
     kit.transcript(_running(*running))
     decision = kit.decide("Agent", _agent(kind))
     assert (decision.reason if isinstance(decision, Refusal) else None) == refused

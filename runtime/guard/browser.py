@@ -1,21 +1,24 @@
 """The guard's rules for driving the product and for what the owner alone sees.
 
 `product-drivers`: only the UI testers drive the product, in their own browser or on the remote desktop; no session
-drives the owner's Chrome. `qa-browser`: no code runs in the browser server itself, and a browser call names no file.
+drives the owner's Chrome. `subagents-at-once`: a lane's browser is its first tester's while it runs.
+`qa-browser`: no code runs in the browser server itself, and a browser call names no file.
 `qa-evidence`: no agent opens the factory's state (the testers' recordings, screenshots and saved sign-ins) or the
 dashboard. The evidence rule reads paths and addresses, never prose: a report may name a screenshot.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 from fnmatch import fnmatchcase
 from pathlib import Path, PurePosixPath
 
-from runtime.guard import shell
-from runtime.guard.facts import Call, Decision, Refusal, Rewrite, inside, public, resolve
+from runtime.guard import shell, transcript
+from runtime.guard.facts import Call, Decision, Refusal, Rewrite, SessionView, inside, public, resolve
 from runtime.qa.wrapper import SERVER_CODE
 from runtime.qa.wrapper_tools import WAIT_UNTIL
 from runtime.shared import lanes
+from runtime.shared.models import WORKING
 
 BROWSER = f"mcp__{lanes.BROWSER}__"
 CHROME = "mcp__claude-in-chrome__"
@@ -43,7 +46,7 @@ _BROWSER_FIELDS = ("paths", "url")
 
 
 def check(call: Call) -> Decision:
-    for rule in (_drivers, _evidence, _server):
+    for rule in (_drivers, _held, _evidence, _server):
         decision = rule(call)
         if decision is not None:
             return decision
@@ -59,6 +62,29 @@ def _drivers(call: Call) -> Decision:
     if call.tool.startswith(DRIVERS) and not (call.in_subagent and call.agent_type in personas):
         return Refusal("product-drivers", "only UI testers drive the product; write code and tests instead")
     return None
+
+
+def _held(call: Call) -> Decision:
+    """Claude Code runs one browser server for a lane's testers: the first that wrote within qa.stale_seconds has it."""
+    me = call.sessions.get(call.agent_id) if call.in_subagent and call.tool.startswith(BROWSER) else None
+    if me is None or call.off("subagents-at-once"):
+        return None
+    holders = [s for s in call.sessions.values() if s.parent == me.parent and s.started_as == me.started_as
+               and s.state == WORKING and (s.started, s.id) < (me.started, me.id) and _lively(call, s)]  # fmt: skip
+    if not holders:
+        return None
+    first = f"this browser is the {me.started_as} tester's started before you, which still runs"
+    return Refusal("subagents-at-once", f"{first}: hand back now, untested, and say you need a lane of your own")
+
+
+def _lively(call: Call, s: SessionView) -> bool:
+    path = transcript.subagent_transcript(call.transcript, s.agent_id)
+    try:
+        last = datetime.fromtimestamp(path.stat().st_mtime, tz=call.now.tzinfo)
+    # telemetry: expected — a tester that has written nothing yet counts from its start
+    except OSError:
+        last = datetime.fromisoformat(s.started.replace("Z", "+00:00"))
+    return (call.now - last).total_seconds() < call.settings.get_int("qa.stale_seconds")
 
 
 def _evidence(call: Call) -> Decision:

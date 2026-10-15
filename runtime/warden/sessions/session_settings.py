@@ -163,6 +163,10 @@ def fingerprint(definitions: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(definitions, sort_keys=True).encode()).hexdigest()
 
 
+def kinds(definitions: dict[str, Any], role: str) -> list[str]:
+    return sorted(set(definitions) - {role})
+
+
 def _lanes(settings: Settings, path: Path, kind: str, definition: dict[str, Any]) -> dict[str, Any]:
     """A browser tester's lanes after the first: its definition, starting its browser under the lane's name."""
     extra = lanes.names(settings, kind)[1:]

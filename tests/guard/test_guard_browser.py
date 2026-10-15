@@ -3,14 +3,15 @@ in the browser server, and no agent opens the factory's state or the dashboard, 
 
 from __future__ import annotations
 
+import os
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
-from guard_kit import NOW, TESTER_ID, Kit, entry
+from guard_kit import NOW, SID, TESTER_ID, Kit, entry
 
-from runtime.guard.facts import Rewrite
+from runtime.guard.facts import Refusal, Rewrite
 
 UI_TESTER = {"agent_id": TESTER_ID, "agent_type": "qa-ui-function"}
 
@@ -80,6 +81,30 @@ def test_only_ui_testers_drive_the_product_and_no_one_drives_the_owners_chrome(
 ) -> None:
     caller = {"agent_id": TESTER_ID, "agent_type": persona} if persona else {}
     assert kit.rule(tool, {}, **caller) == rule
+
+
+@pytest.mark.parametrize(
+    ("earlier", "refused"),
+    [({}, True), ({"started_as": "qa-ui-function-2"}, False), ({"state": "retired"}, False), ({"quiet": 400}, False),
+     ({"parent": "another-session"}, False), ({"ago": 30}, False)],
+    ids=["holds-it", "another-lane", "handed-back", "hand-back-lost", "another-session", "started-after"],
+)  # fmt: skip
+def test_a_lanes_browser_is_its_first_testers_while_that_one_runs(
+    kit: Kit, earlier: dict[str, Any], refused: bool
+) -> None:
+    kit.session("qa-ui-function", sid=TESTER_ID, agent_id=TESTER_ID, parent=SID,
+                started=(NOW - timedelta(seconds=60)).isoformat())  # fmt: skip
+    other = "b7654321fedcba"
+    kit.session("qa-ui-function", sid=other, agent_id=other, parent=earlier.get("parent", SID),
+                state=earlier.get("state", "working"), started_as=earlier.get("started_as", "qa-ui-function"),
+                started=(NOW - timedelta(seconds=earlier.get("ago", 120))).isoformat())  # fmt: skip
+    wrote = (NOW - timedelta(seconds=earlier.get("quiet", 10))).timestamp()
+    os.utime(kit.subagent(other, [entry(NOW, "user", "Scenarios and checks: 1")]), (wrote, wrote))
+
+    decision = kit.decide("mcp__qa-browser__browser_navigate", {"url": "http://127.0.0.1:8101"}, **UI_TESTER)
+
+    said = decision.reason if isinstance(decision, Refusal) else ""
+    assert said.startswith("this browser is the qa-ui-function tester's started before you") is refused
 
 
 def test_no_code_runs_in_the_browser_server(kit: Kit) -> None:

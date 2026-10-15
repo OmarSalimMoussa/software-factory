@@ -63,6 +63,8 @@ class SessionView:
     retired: str
     extensions: dict[str, int]
     started: str  # when it started, as the warden recorded it
+    kinds: list[str]
+    started_as: str
 
 
 _FIELDS = frozenset(f.name for f in dataclasses.fields(SessionView)) - {"id"}

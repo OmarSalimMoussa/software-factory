@@ -77,6 +77,9 @@ def _kind(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     name = _started_as(call)
     if kind not in allowed or name not in lanes.names(call.settings, kind):
         return Refusal("subagent-kinds", f"the {call.role} may start {', '.join(allowed) or 'no subagent'}, not {name}")
+    if name != kind and call.session is not None and name not in call.session.kinds:
+        return Refusal("subagent-kinds", f"this {call.role} has no {name}, a lane added since it started; wait for a "
+                                         f"{kind} to report")  # fmt: skip
     return None
 
 
@@ -92,7 +95,8 @@ def _lane(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     taken = {c.subagent_type for c in calls if _running(call, c)}
     if name not in taken:
         return None
-    free = [lane for lane in lanes.names(call.settings, kind) if lane not in taken]
+    has = call.session.kinds if call.session is not None else []
+    free = [lane for lane in lanes.names(call.settings, kind) if lane not in taken and (lane == kind or lane in has)]
     then = f"start it as {free[0]}" if free else "wait for one to report"
     return Refusal("subagents-at-once", f"a {name} is running and its browser is that tester's; {then}")
 

@@ -72,7 +72,8 @@ def _renew(ctx: Context, s: Session, message: str, agents: dict[str, Any]) -> st
         before = dataclasses.replace(sessions.pop(s.id))
         # Reviving while the copy starts: the crash watch leaves it alone, and the backstop lets its process run.
         row = dataclasses.replace(before, id=request_id, state=REVIVING, renewed=ctx.clock.iso(), copied_from=s.id,
-                                  definitions=session_settings.fingerprint(agents))  # fmt: skip
+                                  definitions=session_settings.fingerprint(agents),
+                                  kinds=session_settings.kinds(agents, s.role))  # fmt: skip
         sessions[request_id] = row
         registry.write(ctx.places, sessions)
     worktree = "" if Path(s.worktree) == repo else Path(s.worktree).name

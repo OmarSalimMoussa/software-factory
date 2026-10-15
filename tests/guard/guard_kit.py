@@ -13,9 +13,10 @@ from typing import Any
 
 from runtime.guard import decide
 from runtime.guard.facts import Decision, Refusal
+from runtime.shared import lanes, store
 from runtime.shared import settings as settings_module
-from runtime.shared import store
 from runtime.shared.paths import Places
+from runtime.shared.settings_schema import SCHEMA
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # The product's settings, as the fixture product sets them: they name the hook scripts the guard protects.
@@ -77,6 +78,8 @@ class Kit:
         extensions: dict[str, int] | None = None,
         retired: str = "",
         started: str = NOW.isoformat(),
+        kinds: list[str] | None = None,
+        started_as: str = "",
     ) -> None:
         path = self.public / "sessions.json"
         rows = store.read_json_or(path, {})
@@ -84,9 +87,16 @@ class Kit:
             "name": f"{role}-a", "role": role, "family": "impl", "task": "t-0001", "parent": parent,
             "worktree": str(worktree if worktree is not None else self.worktree), "state": state,
             "agent_id": agent_id, "retired": retired or ("stopped" if state == "retired" else ""),
-            "extensions": extensions or {}, "started": started,
+            "extensions": extensions or {}, "started": started, "started_as": started_as or (role if parent else ""),
+            "kinds": self._kinds(role) if kinds is None and not parent else kinds or [],
         }  # fmt: skip
         store.write_json(path, rows)
+
+    def _kinds(self, role: str) -> list[str]:
+        tree = store.read_json(self.public / "settings.json")
+        built = settings_module.Settings(tree, tree, {})
+        key = f"subagents.{role}"
+        return [lane for kind in (built.get_list(key) if key in SCHEMA else []) for lane in lanes.names(built, kind)]
 
     def switch_off(self, *rules: str) -> None:
         store.write_json(self.public / "switches.json", {"off": list(rules)})
