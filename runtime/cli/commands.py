@@ -164,7 +164,9 @@ def _slot(sub: Any) -> None:
     slot = sub.add_parser("slot", help="your stack slot")
     ops = slot.add_subparsers(dest="op", required=True)
     ops.add_parser("claim").add_argument("--note", default="")
-    ops.add_parser("up").add_argument("services", nargs="*")
+    up = "build and start the stack, or the named services; a running service whose image is unchanged keeps running"
+    ops.add_parser("up", help=up).add_argument("services", nargs="*")
+    ops.add_parser("restart", help="restart the named services, running ones").add_argument("services", nargs="+")
     for name in ("down", "release", "list"):
         ops.add_parser(name)
     ops.add_parser("free").add_argument("slot", type=int)

@@ -40,9 +40,10 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
   own fast commands its `CLAUDE.md` names. A test that listens on a local socket (tsx does) fails in your shell with
   EPERM, since the sandbox blocks sockets: run it with `factory check --only tests`. The warden runs the full
   `factory check` only on your merge turn.
-- **Your slot:** rebuild only what changed (`factory slot up <service>`). Drive its API with the `slot-api` tools,
-  which reach your slot and nothing else; no command of yours can. To see what code prints inside a service, such as a
-  size or a timing, run it there: `factory slot run <service> -- <command>`. Prepare what your testers need: seeds
+- **Your slot:** rebuild only what changed (`factory slot up <service>`; one whose image is unchanged keeps running,
+  and `factory slot restart <service>` restarts it). Drive its API with the `slot-api` tools, which reach your slot
+  and nothing else; no command of yours can. To see what code prints inside a service, such as a size or a timing,
+  run it there: `factory slot run <service> -- <command>`. Prepare what your testers need: seeds
   (`factory slot seed load <name>`) and any setup a scenario names. A tester that needs a service stopped asks you.
 - **New behaviour gets a standing scenario** in `qa/scenarios/`, or an update to the one that covers it: three labels
   (`protects`, `needs`, `runs`) and at most `qa.max_steps` steps, each opening with a short bold name and holding an

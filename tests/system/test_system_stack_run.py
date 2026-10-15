@@ -242,6 +242,26 @@ time.sleep(float(sys.argv[-1]))
 
 
 @pytest.mark.parametrize(
+    ("verbs", "status", "ran"), [("up run verbs", lf.REFUSED, None), ("up restart verbs", 0, "restart web")]
+)
+def test_a_restart_needs_the_products_restart_verb(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch, verbs: str, status: int, ran: str | None
+) -> None:
+    dev = RUN_DEV.replace('os.environ["FACTORY_RUN_LABEL"]', '" ".join(sys.argv[1:])')
+    dev = dev.replace("float(sys.argv[-1])", "0")
+    (checkout / "scripts" / "dev").write_text(dev)
+    (checkout / "scripts" / "verbs.txt").write_text(verbs)
+    monkeypatch.setattr(provision, "workspace", Shared(checkout).workspace)
+
+    answer = stack_run.product_verb(
+        Places.under(tmp_path), settings(), SLOT, ["restart", "web"], checkout, run=_never, timeout=5, request=REQUEST
+    )
+
+    written = checkout / "scripts" / "ran.json"
+    assert (answer, written.read_text() if written.exists() else None) == (status, ran)
+
+
+@pytest.mark.parametrize(
     ("verbs", "seconds", "status", "said"),
     [
         ("up down verbs", "0", lf.REFUSED, "slot 2 ran nothing: this product's scripts/dev has no run verb"),

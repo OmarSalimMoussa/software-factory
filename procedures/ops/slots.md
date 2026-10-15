@@ -6,7 +6,8 @@ A slot is one running copy of the product on the laptop. The factory decides who
 | Command | Who | Does |
 | --- | --- | --- |
 | `factory slot claim` | an implementer | Takes a free slot (1 and up) and records you as its holder |
-| `factory slot up [service…]` | the holder | Builds and starts the slot's stack, or only the named services |
+| `factory slot up [service…]` | the holder | Builds and starts the slot's stack, or only the named services. A running service whose image is unchanged keeps running |
+| `factory slot restart <service…>` | the holder | Restarts the named services, which must be running |
 | `factory slot down` | the holder | Stops it, keeping its data |
 | `factory slot run <service> -- <command…>` | the holder | Runs one command in a new container of the service and answers with its output. Bring the service up first, so the run is not spent building it |
 | `factory slot release` | the holder | Gives the slot back once your work is checked |
@@ -19,6 +20,7 @@ A slot is one running copy of the product on the laptop. The factory decides who
   refused rather than falling back to slot 0. When a session retires (finished, stopped, crashed) or is benched, the
   warden empties its slot and gives it up itself; a slot that would not empty is tried again.
 - **Output.** The warden answers with the command's exit status and its last lines, or a run's whole output, up to
-  `slots.tail_max_kib`; the full log is kept for the owner. A product whose `scripts/dev` has no `run` says so.
+  `slots.tail_max_kib`; the full log is kept for the owner. A product whose `scripts/dev` has no `run` or `restart`
+  says so.
 - **Memory.** A test run starts only when free memory covers its ceiling and the reserve. Hitting the cap is a leak to
   fix, not a reason to raise it.

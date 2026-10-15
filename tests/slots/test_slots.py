@@ -61,6 +61,9 @@ def test_the_slot_comes_from_the_lease_never_from_an_argument(world: World) -> N
         ({"op": "run", "service": "web", "command": ["ls"]}, "agent-qa-1"),
         ({"op": "run", "service": "--rm", "command": ["ls"]}, ""),
         ({"op": "run", "service": "web", "command": []}, ""),
+        ({"op": "restart", "services": []}, ""),
+        ({"op": "restart", "services": ["--force-recreate"]}, ""),
+        ({"op": "restart", "services": ["web"]}, "agent-qa-1"),
     ],
 )
 def test_only_checked_words_reach_scripts_dev(world: World, args: dict[str, object], agent_id: str) -> None:
@@ -69,6 +72,15 @@ def test_only_checked_words_reach_scripts_dev(world: World, args: dict[str, obje
     with pytest.raises(Refused):
         slot(world.ctx("implementer", "s-1", agent_id), args, None)
     assert world.launcher.stacks == []
+
+
+def test_the_holder_restarts_the_services_it_names(world: World) -> None:
+    _implementer(world, 1)
+    slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)
+
+    slot(world.ctx("implementer", "s-1"), {"op": "restart", "services": ["web", "worker"]}, None)
+
+    assert world.launcher.stacks == [(1, ["restart", "web", "worker"])]
 
 
 def test_an_implementer_runs_any_command_in_its_own_slot_and_no_one_else_runs_one(world: World) -> None:

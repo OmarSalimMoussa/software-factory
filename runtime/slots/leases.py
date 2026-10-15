@@ -24,7 +24,10 @@ KEYS = ("holder", "since", "note")
 # the build cache and the images no container uses that are older than that; DISK prints the bytes Docker's data
 # takes, alone on its last line. EVENTS <since> <until> prints each slot container's kill, death and out-of-memory.
 SWEEP, PRUNE, DISK, EVENTS = "factory-sweep-slot", "factory-prune", "factory-disk", "factory-events"
-RUN = "run"  # the product's optional verb: run <service> -- <command…> runs one command in a slot's service
+# The product's optional slot verbs, which the stack unit runs only once `scripts/dev verbs` lists them: run <service>
+# -- <command…> runs one command in a new container of a slot's service; restart <service…> restarts running ones.
+RUN, RESTART = "run", "restart"
+OPTIONAL = (RUN, RESTART)
 RUN_LABEL_ENV = "FACTORY_RUN_LABEL"
 
 

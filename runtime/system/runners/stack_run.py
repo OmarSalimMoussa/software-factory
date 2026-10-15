@@ -146,7 +146,7 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
                  run: provision.Run, timeout: int, request: str) -> int:  # fmt: skip
     """``scripts/dev <verb>`` on a slot provisioned first, as stack request ``request``; its exit status, or 1 when
     provisioning or the drop after ``empty`` failed."""
-    if verb[0] == leases.RUN and (why := _no_run(checkout, timeout)):
+    if verb[0] in leases.OPTIONAL and (why := _lacks(checkout, verb[0], timeout)):
         print(f"stack-run: slot {slot} ran nothing: {why}", flush=True)
         return lf.REFUSED
     workspace, port = f"slot{slot}", leases.port(settings, slot)
@@ -223,8 +223,8 @@ def _given_path(env_file: Path) -> Path:
     return env_file.with_name(f"{env_file.name}.slot-keys")
 
 
-def _no_run(checkout: Path, timeout: int) -> str:
-    """Why the product cannot run a command in a slot; empty when its scripts/dev lists the optional run verb."""
+def _lacks(checkout: Path, verb: str, timeout: int) -> str:
+    """Why the product cannot run optional ``verb``; empty when its scripts/dev lists it."""
     try:
         done = subprocess.run(
             [str(checkout / "scripts" / "dev"), "verbs"],
@@ -240,7 +240,7 @@ def _no_run(checkout: Path, timeout: int) -> str:
         return f"scripts/dev verbs could not run ({type(exc).__name__})"
     if done.returncode != 0:
         return f"scripts/dev verbs exited {done.returncode}"
-    return "" if leases.RUN in done.stdout.split() else "this product's scripts/dev has no run verb"
+    return "" if verb in done.stdout.split() else f"this product's scripts/dev has no {verb} verb"
 
 
 def _stop_run(slot: int, label: str, timeout: int) -> None:

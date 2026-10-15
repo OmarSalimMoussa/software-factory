@@ -136,8 +136,8 @@ def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> None:
 
 def _verb(op: object, args: dict[str, Any]) -> list[str]:
     """The scripts/dev command line for one slot operation, from checked words only."""
-    if op == "up":
-        return ["up", *_words(args.get("services", []), "services")]
+    if op in ("up", leases.RESTART):
+        return _services_verb(str(op), args)
     if op == "down":
         return ["down"]
     if op == "sign-in":
@@ -149,8 +149,17 @@ def _verb(op: object, args: dict[str, Any]) -> list[str]:
     if op == leases.RUN:
         return _run_verb(args)
     raise Refused(
-        "args", f"{op!r} is not a slot verb: claim, up, down, release, free, list, sign-in, seed, desktop, run"
+        "args",
+        f"{op!r} is not a slot verb: claim, up, down, restart <service…>, release, free, list, sign-in, seed, "
+        "desktop, run",
     )
+
+
+def _services_verb(op: str, args: dict[str, Any]) -> list[str]:
+    services = _words(args.get("services", []), "services")
+    if op == leases.RESTART and not services:
+        raise Refused("args", "restart <service…>: name each service to restart")
+    return [op, *services]
 
 
 def _seed_verb(args: dict[str, Any]) -> list[str]:

@@ -122,6 +122,7 @@ stack.
 | `deps` | Optional: installs what the checks and tests read (package trees, tools); `factory check` runs it first |
 | `reports --since <cursor>` | Optional: prints erased reports, then new user reports, as JSON lines |
 | `run <service> -- <command…>` | Optional: runs one command in a new container of the service, labelled `FACTORY_RUN_LABEL`, with the slot's settings and network, and prints its output. The factory stops it at `slots.run_seconds` and removes its container |
+| `restart <service…>` | Optional: restarts the named services' running containers, as they are |
 
 Everything a slot creates (containers, volumes, networks, images) carries a label naming its slot, so the warden
 can find and remove it when the session that held the slot retires. A container the stack starts while it runs, such

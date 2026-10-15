@@ -24,7 +24,7 @@ VALUES = None
 
 HEADINGS = ("Who it is for", "The goal", "How it looks and feels", "How it speaks")
 VERBS = ("up", "down", "empty", "health", "sign-in", "seed", "desktop", "verbs", "test")
-OPTIONAL_VERBS = ("reports", "deps", leases.RUN)
+OPTIONAL_VERBS = ("reports", "deps", *leases.OPTIONAL)
 _DONE_WHEN = re.compile(r"^\S.*\. Done when \S.*\.$")
 
 

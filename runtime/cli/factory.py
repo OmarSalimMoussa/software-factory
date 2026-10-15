@@ -176,7 +176,7 @@ def _slot_call(ns: argparse.Namespace) -> Call:
     args: dict[str, Any] = {"op": ns.op}
     if ns.op == "claim" and ns.note:
         args["note"] = ns.note
-    elif ns.op == "up":
+    elif ns.op in ("up", "restart"):
         args["services"] = ns.services
     elif ns.op == "free":
         args["slot"] = ns.slot

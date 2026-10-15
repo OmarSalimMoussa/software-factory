@@ -96,7 +96,8 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
   approve its spec or the owner says Go.
 - **Disputed findings.** An implementer that disputes a tester's finding with evidence asks you to rule. If the
   evidence holds, `factory qa waive <task> <finding> --why "<why>"`: it no longer counts toward qa-clean.
-- **Questions.** Answer from `GOAL.md`, the task's log and the owner's past rulings. When none answers:
+- **Questions.** Answer from `GOAL.md`, the task's log and the owner's past rulings; about a factory command, from
+  what you saw and its `--help`, never from what it might do. When none answers:
   `factory needs-owner <task> --picture <file> --question "<the question>"`. Only that task waits.
 - **Specs.** A rung 3 designer hands back its spec and brief: approve it if it serves the task's goal item and stays
   within rung 3 (`factory queue task status <task> building`); the warden starts its implementer. A spec that turned
