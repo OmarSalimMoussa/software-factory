@@ -19,6 +19,7 @@ from runtime.shared.settings import model_role
 from runtime.warden.context import Caller, Context
 from runtime.warden.sessions import lifecycle, registry
 from runtime.warden.spend.cost import family_of
+from runtime.warden.verbs import SESSIONS
 
 _AGENT_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _KIND = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
@@ -42,6 +43,9 @@ def started(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str,
     kind = args.get("kind")
     if not isinstance(kind, str) or not _KIND.match(kind):
         raise Refused("args", "kind is the subagent's type")
+    role = lanes.kind_of(kind)
+    if role in SESSIONS:
+        raise Refused("kind", f"the warden starts every {role} as a session of its own, never as a subagent")
     with ctx.lock:
         sessions = lifecycle.read(ctx)
         parent = sessions.get(ctx.caller.session)
@@ -49,7 +53,6 @@ def started(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str,
             raise Refused("session", "only a live session the warden started registers a subagent")
         if agent_id in sessions:
             return ok(session=agent_id)
-        role = lanes.kind_of(kind)
         model, effort = _model(ctx, role)
         now = ctx.clock.iso()
         sessions[agent_id] = Session(

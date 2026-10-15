@@ -8,7 +8,7 @@ from runtime.shared.protocol import Refused
 from runtime.warden.context import Caller
 from runtime.warden.dispatch import Doors
 from runtime.warden.sessions import registry, subagents
-from runtime.warden.verbs import IMPL
+from runtime.warden.verbs import IMPL, SESSIONS
 
 
 def _session(sid: str) -> Session:
@@ -43,3 +43,15 @@ def test_a_subagent_id_is_honoured_only_from_its_parent_and_never_once_retired(d
     with pytest.raises(Refused) as refused:
         subagents.acting_as(places, _caller("s-a"), "a1b2c3")
     assert refused.value.rule == "retired"
+
+
+@pytest.mark.parametrize("kind", sorted(SESSIONS))
+def test_a_role_the_warden_starts_as_a_session_is_never_registered_as_a_subagent(
+    doors: Doors, places: Places, kind: str
+) -> None:
+    registry.write(places, {"s-a": _session("s-a")})
+
+    with pytest.raises(Refused) as refused:
+        subagents.started(doors.context(_caller("s-a")), {"agent_id": "a1b2c3", "kind": kind}, None)
+
+    assert refused.value.rule == "kind" and "a1b2c3" not in registry.read(places)
