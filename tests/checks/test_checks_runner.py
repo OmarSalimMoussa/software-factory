@@ -101,6 +101,19 @@ def test_a_test_run_on_the_laptop_has_its_time_limits(make_repo: Callable[..., P
     assert len(problems) == 1 and said in problems[0]
 
 
+@pytest.mark.parametrize("limits", [None, (45, 60)], ids=["no-limits", "laptop-limits"])
+def test_a_failed_test_runs_report_holds_what_it_printed_in_order_so_its_summary_ends_it(
+    make_repo: Callable[..., Path], limits: tuple[int, int] | None
+) -> None:
+    script = "echo noise >&2; echo 'FAIL relay/shutdown.test.ts'; echo more noise >&2; echo '1 failed'; exit 1"
+    repo = Repo.open(make_repo({"scripts/dev*": f"#!/bin/sh\n{script}\n"}))
+    repo.test_seconds = limits
+
+    [problem] = tests_check.run(repo, {"always": [], "full": [], "skip_suffixes": [], "readers": {}})
+
+    assert problem.endswith("noise\nFAIL relay/shutdown.test.ts\nmore noise\n1 failed")
+
+
 @pytest.mark.parametrize(
     ("changed", "picked", "unplaced"),
     [
