@@ -110,26 +110,50 @@ def test_a_guard_that_runs_out_of_its_time_refuses_the_call_instead_of_letting_i
     assert handled(kit.payload("Read", {"file_path": "/x"}))[0] == 0
 
 
-def test_a_subagent_the_warden_never_registered_is_registered_again_on_its_calls(kit: Kit) -> None:
+def _asked_warden(kit: Kit, payload: dict[str, object]) -> tuple[tuple[int, str, str], list[tuple[object, object]]]:
+    """What the hook answered ``payload``, and each request it sent the warden meanwhile, which all answer ok."""
     kit.places.socket.parent.mkdir(parents=True, exist_ok=True)
-    asked: list[dict[str, object]] = []
+    asked: list[tuple[object, object]] = []
+    handled = threading.Event()
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
         server.bind(str(kit.places.socket))
         server.listen(1)
-        server.settimeout(5)
+        server.settimeout(0.05)
 
         def answer() -> None:
-            conn, _ = server.accept()
-            with conn:
-                asked.append(json.loads(conn.makefile("rb").readline()))
-                conn.sendall(b'{"ok": true}\n')
+            while not handled.is_set():
+                try:
+                    conn, _ = server.accept()
+                except TimeoutError:
+                    continue
+                with conn:
+                    request = json.loads(conn.makefile("rb").readline())
+                    asked.append((request["verb"], request["args"]))
+                    conn.sendall(b'{"ok": true}\n')
 
         warden = threading.Thread(target=answer)
         warden.start()
-        payload = {"hook_event_name": "PreToolUse", "session_id": SID, "agent_id": TESTER_ID,
-                   "agent_type": "qa-ux-2", "tool_name": "Read", "tool_input": {"file_path": "/x"}}  # fmt: skip
-        _handle(kit, payload)
+        answered = _handle(kit, payload)
+        handled.set()
         warden.join(5)
+    return answered, asked
 
-    # The lane goes as started, so the tester's evidence is its own lane's runs.
-    assert [(a["verb"], a["args"]) for a in asked] == [("subagent.start", {"agent_id": TESTER_ID, "kind": "qa-ux-2"})]
+
+HELPER_ID = "acf8774bffcf0ef6d"
+
+
+@pytest.mark.parametrize(
+    ("agent_id", "agent_type", "asked"),
+    [
+        # The lane goes as started, so the tester's evidence is its own lane's runs.
+        (TESTER_ID, "qa-ux-2", [("subagent.start", {"agent_id": TESTER_ID, "kind": "qa-ux-2"})]),
+        # Claude Code's progress summary of a subagent runs on a copy of it, under a new id typed as the session.
+        (HELPER_ID, "implementer", []),
+    ],
+)
+def test_a_subagent_the_warden_never_registered_is_registered_on_its_calls_but_never_claude_codes_own_helper(
+    kit: Kit, agent_id: str, agent_type: str, asked: list[tuple[object, object]]
+) -> None:
+    kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
+    payload = kit.payload("Read", {"file_path": "/x"}, agent_id=agent_id, agent_type=agent_type)
+    assert _asked_warden(kit, payload) == ((0, "", ""), asked)

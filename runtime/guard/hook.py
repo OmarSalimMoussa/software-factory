@@ -107,7 +107,7 @@ def report_subagent(payload: dict[str, object], event: str, places: Places) -> s
 
 
 def _run(payload: dict[str, object], event: object, places: Places, home: Path, now: datetime) -> Outcome:
-    from runtime.guard import decide
+    from runtime.guard import decide, transcript
     from runtime.guard.facts import Refusal, Rewrite
 
     call = decide.resolve(payload, places, now, home)
@@ -119,9 +119,10 @@ def _run(payload: dict[str, object], event: object, places: Places, home: Path, 
     if event == "Stop":
         decision = decide.check_stop(call)
     elif event == "PreToolUse":
-        if call.in_subagent and call.session is not None and call.agent_id not in call.sessions:
-            # Its start was never registered (the warden was busy or down then): every factory call it makes would
-            # be refused, so the guard registers it again on each of its calls until the warden holds it.
+        unregistered = call.in_subagent and call.session is not None and call.agent_id not in call.sessions
+        # The warden refuses factory calls from a subagent whose start it missed, so register it on each call. Claude
+        # Code's own helpers (a subagent's progress summary) call tools under new ids too, and keep no transcript.
+        if unregistered and transcript.subagent_transcript(call.transcript, call.agent_id).is_file():
             said = report_subagent(call.payload, "SubagentStart", places)
             if said:
                 print(said, file=sys.stderr)
