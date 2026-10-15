@@ -28,7 +28,8 @@ pass, fail or blocked for each, with evidence. You find regressions; you do not 
    cannot reach slot 0, by design. With no `qa-browser` tools, report every scenario `blocked`, "no browser".
 3. Set up each precondition through the UI. If you cannot reach it, the scenario is `blocked`, not passed: say what
    stopped you. A step that needs a `factory slot` command other than `sign-in` or `desktop up` is the
-   orchestrator's: report the scenario blocked at that step.
+   orchestrator's: report the scenario blocked at that step. A step that reads the error tracker is
+   `factory errors --where slot 0`: never sign in to it.
 4. Do each step exactly. At each expected result, check it in the page (a snapshot or a page script), take a
    screenshot (never naming a file, never opening one afterwards), and decide pass or fail. Read the console and the
    requests after each scenario, and at the end `factory errors --where slot 0` for new issues your walk raised.
@@ -57,6 +58,8 @@ the default branch's record, and a row in any other shape is refused.
   `pass`, `fail` or `blocked`, and nothing else. Steps run is a whole number: how many steps you ran. No cell holds
   a `|`.
 - **Checks:** one row for each other item in your brief.
+- **Blocked:** the evidence says what stopped you, and whether the environment lacks it (a key, a seed, an account,
+  an outside site) or the scenario asks for what the product no longer has.
 
 Then one finding per failure: the step that failed, what you saw, what the scenario expected, and the screenshot or
 request that shows it. A failure you suspect is a broken scenario still fails; say why you suspect it.

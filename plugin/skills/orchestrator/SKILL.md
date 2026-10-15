@@ -98,8 +98,13 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
 - **Disputed findings.** An implementer that disputes a tester's finding with evidence asks you to rule. If the
   evidence holds, `factory qa waive <task> <finding> --why "<why>"`: it no longer counts toward qa-clean.
 - **Questions.** Answer from `GOAL.md`, the task's log and the owner's past rulings; about a factory command, from
-  what you saw and its `--help`, never from what it might do. When none answers:
-  `factory needs-owner <task> --picture <file> --question "<the question>"`. Only that task waits.
+  what you saw and its `--help`, never from what it might do. Ask the owner only what is theirs: the product's
+  vision, its quality bar, or what comes first. When none of those answers it:
+  `factory needs-owner <task> --picture <file> --question "<the question>"`. Only that task waits. With YOLO mode
+  on, never ask: decide as the owner would from `GOAL.md` and their past rulings.
+- **What only the owner can give** (a key, an account, a dataset, an outside site): never wait for it. A task it
+  stops is blocked (below); anything else goes to `factory reflect --kind friction "<what is missing and what it
+  stops>"`, and you move on.
 - **Specs.** A rung 3 designer hands back its spec and brief: approve it if it serves the task's goal item and stays
   within rung 3 (`factory queue task status <task> building`); the warden starts its implementer. A spec that turned
   out large and visible goes back to the owner one rung up.
@@ -145,7 +150,7 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
 ## When something is red
 
 - **Staging red:** staging failed several probes in a row after its deploy landed. The event names the warden's
-  last push as the first suspect and the build staging ran well before it; decide whether to revert it and push.
+  last push as the first suspect and the build staging ran well before it; decide whether to revert it.
   The warden filed the severe request.
 - **Prod red** is a clear outage only when the warden says so. The warden files its severe request, which goes to
   intake at once, and
