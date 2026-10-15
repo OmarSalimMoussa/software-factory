@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -18,6 +19,7 @@ from runtime.shared.protocol import Refused
 from runtime.system import drill_probe, install, layout, render
 from runtime.system.install_drills import browser_drill, drills, renew_drill, roster, worktree_drill
 from runtime.system.install_drills.evidence import Ran, Result
+from runtime.warden.owner import settings_save
 
 
 def _stream(command: str, result: str) -> str:
@@ -543,9 +545,14 @@ def test_the_session_drill_needs_the_launch_line_the_record_an_answer_the_stop_a
     ids=["whole", "first-unanswered", "same-id", "old-definitions", "forgot"],
 )
 def test_the_renew_drill_needs_a_copy_under_a_new_id_that_remembers_and_has_the_new_definitions(
-    rig: dict[str, Any], ok: bool, says: str
+    tmp_path: Path, rig: dict[str, Any], ok: bool, says: str
 ) -> None:
-    result = renew_drill.copy_remembers(FakeRig(**{"said": "OK", **rig}))
+    places = Places.under(tmp_path)  # the install's agent launchers, rendered as the warden renders them
+    for part in ("plugin", "procedures", "rules"):
+        shutil.copytree(Path(__file__).resolve().parents[2] / part, places.install / part)
+    settings_save.render_plugin(places, settings())
+
+    result = renew_drill.copy_remembers(FakeRig(**{"said": "OK", "places": places, **rig}))
 
     assert result.ok is ok and says in result.evidence
 
