@@ -15,7 +15,7 @@ from typing import Any
 
 from runtime.queue import statuses
 from runtime.shared import models, store
-from runtime.shared.models import PENDING, RETIRED, WAITING, WORKING, RecordError, Session, Task
+from runtime.shared.models import RETIRED, WAITING, WORKING, RecordError, Session, Task
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import leases
 from runtime.warden import inbox
@@ -43,12 +43,12 @@ def read(ctx: Context) -> dict[str, Session]:
 
 
 def find(ctx: Context, sessions: dict[str, Session], ref: str) -> Session:
-    """A session by id (a start's pending id too), or by name: the live one, else the latest retired one."""
-    if ref.startswith(PENDING) and ref not in sessions:
-        ref = next((r["session"] for r in store.read_jsonl(ctx.places.history) if r.get("was") == ref), ref)
+    """A session by id (or one it had before), or by name: the live one, else the latest retired one."""
+    named = sorted((s for s in sessions.values() if s.name == ref), key=lambda s: (s.state != RETIRED, s.started))
+    if ref not in sessions and not named:
+        ref = registry.following(ctx.places, sessions, ref) or ref
     if ref in sessions:
         return sessions[ref]
-    named = sorted((s for s in sessions.values() if s.name == ref), key=lambda s: (s.state != RETIRED, s.started))
     if not named:
         raise Refused("session", f"no session {ref}")
     return named[-1]
@@ -147,9 +147,9 @@ def release_launch(ctx: Context, sid: str) -> None:
         _launching.discard(sid)
 
 
-def restart(ctx: Context, s: Session, message: str) -> None:
-    """Stop the session's process and resume it with ``message``: for one that went silent. Raises LaunchError when
-    another launch of it is under way."""
+def restart(ctx: Context, s: Session, message: str) -> str:
+    """Stop the session's process and resume it with ``message``: for one that went silent. The id it then runs under;
+    raises LaunchError when another launch of it is under way."""
     with ctx.lock:
         if not claim_launch(ctx, s.id):
             raise LaunchError(f"{s.name} is being launched already")
@@ -159,7 +159,7 @@ def restart(ctx: Context, s: Session, message: str) -> None:
     try:
         if s.id in backstop.processes():
             ctx.launcher.stop_session(s.id)
-        respawn.resume(ctx, s, message)
+        return respawn.resume(ctx, s, message)
     finally:
         release_launch(ctx, s.id)
 
@@ -180,16 +180,17 @@ def deliver(ctx: Context, sid: str, message: str, by: str) -> None:
             sessions = read(ctx)
             end_children(ctx, sessions, sessions[sid], "its parent's process ended")
             registry.write(ctx.places, sessions)
+    back = sid
     if running:
         ctx.launcher.message_session(s.id, message)
     else:
         try:
-            respawn.resume(ctx, s, message)
+            back = respawn.resume(ctx, s, message)
         finally:
             release_launch(ctx, sid)
     with ctx.lock:
         sessions = read(ctx)
-        current = sessions[sid]
+        current = sessions[back]
         if current.state == WAITING:
             move(ctx, current, WORKING, by, "the owner's word reached it")
             registry.write(ctx.places, sessions)

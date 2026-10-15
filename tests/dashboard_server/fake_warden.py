@@ -130,7 +130,7 @@ class FakeWarden:
         places, accept, real, calls = self.places, self.accept, codes.check_code, self.launcher.calls
         backstop.processes = dict
         launch.agent_home = lambda: places.state / "agent-home"
-        respawn.resume = lambda ctx, s, message: calls.append(("resume", (s.id, message)))
+        respawn.resume = lambda ctx, s, message: calls.append(("resume", (s.id, message))) or s.id
         if accept is not None:
 
             def check(ctx: Any, code: object) -> None:

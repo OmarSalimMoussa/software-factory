@@ -20,7 +20,7 @@ from typing import Any
 
 from runtime.shared import claude_accounts, operations, store
 from runtime.shared.claude_accounts import SHOWN, UNIT_TOKEN, AccountError
-from runtime.shared.models import PENDING, REVIVING, WAITING, WORKING
+from runtime.shared.models import PENDING, RETIRED, REVIVING, WAITING, WORKING
 from runtime.shared.protocol import Refused, ok
 from runtime.system import layout
 from runtime.warden.context import Context
@@ -207,8 +207,10 @@ def _check(ctx: Context, name: str, old: str, undo: str, back: list[str]) -> str
         return "no agent was working to check it with: the next one to start shows whether it signs in"
     settings, since = ctx.settings(), ctx.clock.now()
     _bring_back(ctx, back[:1])
+    # It may have come back as a copy, which answers in a transcript of its own id.
+    first = registry.following(ctx.places, lifecycle.read(ctx), back[0]) or back[0]
     deadline = since + settings.get_int("watch.account_check_seconds")
-    while (said := ctx.launcher.answered(back[0], since)) is None and ctx.clock.now() < deadline:
+    while (said := ctx.launcher.answered(first, since)) is None and ctx.clock.now() < deadline:
         ctx.clock.sleep(settings.get_int("watch.respawn_poll_seconds"))
     if said == "ok":
         return "the first agent back answered"
@@ -224,25 +226,31 @@ def _bring_back(ctx: Context, ids: list[str]) -> str:
     stays as it is; the subagents of each ended with it."""
     back: list[str] = []
     failed: list[str] = []
-    for sid in ids:
+    for was in ids:
         with ctx.lock:
             sessions = lifecycle.read(ctx)
-            s = sessions.get(sid)
+            sid = registry.following(ctx.places, sessions, was)
+            s = sessions[sid] if sid is not None else None
             if s is None or s.state not in (WORKING, WAITING):
                 continue
             if sid in backstop.processes():
                 back.append(s.name)
                 continue
             lifecycle.end_children(ctx, sessions, s, "ended when the factory switched Claude accounts")
+            registry.write(ctx.places, sessions)
             try:
-                respawn.resume(ctx, s, NOTE)
+                now = respawn.resume(ctx, s, NOTE)
             # telemetry: surfaced — a session that did not come back is one of the `failed` the owner reads
             except (LaunchError, Refused) as exc:
                 failed.append(f"{s.name} did not come back ({exc})")
-            else:
-                lifecycle.move(ctx, s, s.state, WARDEN, "resumed after the factory switched Claude accounts")
-                back.append(s.name)
-            registry.write(ctx.places, sessions)
+                continue
+            sessions = lifecycle.read(ctx)
+            if sessions[now].state != RETIRED:
+                lifecycle.move(
+                    ctx, sessions[now], s.state, WARDEN, "resumed after the factory switched Claude accounts"
+                )
+                registry.write(ctx.places, sessions)
+            back.append(s.name)
     if failed:
         raise ops.StepError("; ".join(failed) + "; the crash watch resumes them as it would after a crash")
     return f"back: {', '.join(back)}" if back else "no agent was working"

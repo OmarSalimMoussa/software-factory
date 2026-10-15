@@ -96,6 +96,10 @@ class Session:
     chat_link: str = ""
     agent_id: str = ""  # a subagent's id in its parent's transcript
     started_as: str = ""  # a subagent's type as started: its role, or a browser lane of it (shared/lanes.py)
+    definitions: str = ""  # the fingerprint of the agent definitions its process runs with (session_settings)
+    # When it last came back as a copy, and of which session: its transcript repeats that one's lines from before then.
+    renewed: str = ""
+    copied_from: str = ""
     # contract: when the session entered its state; the bench grace and a pending start's grace count from it.
     since: str = ""
     extensions: dict[str, int] = field(default_factory=dict)

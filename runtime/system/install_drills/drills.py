@@ -20,6 +20,7 @@ from runtime.shared.paths import AGENT_USER, WARDEN_USER, stored_signin
 from runtime.system import layout
 from runtime.system.errors import instance
 from runtime.system.install_drills.evidence import (
+    POLL_S,
     Result,
     Rig,
     asked,
@@ -30,6 +31,7 @@ from runtime.system.install_drills.evidence import (
     first_line,
     outcomes,
     probe_command,
+    recorded,
     refused_by,
     sandboxed_probe,
 )
@@ -39,7 +41,6 @@ from standard.services import stack
 
 UNREACHABLE = "cannot be reached"  # how the factory command says it found no warden
 SANDBOX_MARK = "software-drill-sandbox-ok"
-_POLL_S = 1.0
 SESSION_PROMPT, SESSION_REPLY = "This is a drill. Reply with the one word ready, and do nothing else.", "ready"
 HEARD_PROMPT, HEARD_REPLY = "This is a drill. Reply with the one word heard, and do nothing else.", "heard"
 
@@ -135,16 +136,13 @@ def background_session(rig: Rig) -> Result:
                                    f"{first_line(ran.out)}")  # fmt: skip
     short, limit = started.group(1), rig.settings.get_int("install.drill_seconds")
     begun = rig.now()
-    found = {sid: named for sid, named in rig.session_records().items() if sid.startswith(short)}
-    while not found and rig.now() - begun <= limit:
-        rig.wait(_POLL_S)
-        found = {sid: named for sid, named in rig.session_records().items() if sid.startswith(short)}
-    if not found:
+    found = recorded(rig, short, begun + limit)
+    if found is None:
         rig.stop_session(short)
         return Result(name, False, f"no record in the agent's ~/.claude/sessions names session {short}")
-    [(sid, named)] = found.items()
+    sid, named = found
     while not (said := rig.session_said(sid)) and rig.now() - begun <= limit:
-        rig.wait(_POLL_S)
+        rig.wait(POLL_S)
     failed = _stop_and_respawn(rig, short, sid, begun + limit)
     if failed:
         return Result(name, False, failed)
@@ -161,12 +159,12 @@ def _stop_and_respawn(rig: Rig, short: str, sid: str, deadline: float) -> str:
     answer a message; "" when all did as the warden needs. The respawned session is stopped again."""
     stopped = rig.stop_session(short)
     while sid in rig.session_records() and rig.now() <= deadline:
-        rig.wait(_POLL_S)
+        rig.wait(POLL_S)
     if sid in rig.session_records():
         return f"claude stop {short} left it running: {first_line(stopped.out)}"
     back = rig.warden_command(["claude", "respawn", short])
     while sid not in rig.session_records() and rig.now() <= deadline:
-        rig.wait(_POLL_S)
+        rig.wait(POLL_S)
     if sid not in rig.session_records():
         rig.stop_session(short)
         return f"claude respawn {short} did not bring it back under its id: {first_line(back.out)}"
@@ -179,7 +177,7 @@ def _unheard(rig: Rig, sid: str, deadline: float) -> str:
     """Why a message handed to the session as the warden hands one got no answer; "" when it got one."""
     handed = rig.message_session(sid, HEARD_PROMPT)
     while HEARD_REPLY not in rig.session_said(sid).lower() and rig.now() <= deadline:
-        rig.wait(_POLL_S)
+        rig.wait(POLL_S)
     if HEARD_REPLY in rig.session_said(sid).lower():
         return ""
     return f"a message handed over as the warden does got no answer: {first_line(handed.out or rig.session_said(sid))}"
@@ -199,14 +197,14 @@ def backstop_stops_claude(rig: Rig) -> Result:
         while not rig.claude_pids(unit):
             if rig.now() - start > rig.settings.get_int("install.drill_seconds"):
                 return Result(name, False, "inconclusive: the drill's claude never started")
-            rig.wait(_POLL_S)
+            rig.wait(POLL_S)
         seen = rig.now()
         # A tick may have begun just before claude appeared, so the warden has until the end of the next one.
         limit = 2 * rig.settings.get_int("watch.tick_seconds")
         while rig.now() - seen <= limit:
             if not rig.claude_pids(unit):
                 return Result(name, True, f"stopped {rig.now() - seen:.0f} s after it started")
-            rig.wait(_POLL_S)
+            rig.wait(POLL_S)
         return Result(name, False, f"still running {limit} s after it started")
     finally:
         rig.stop(unit)
@@ -367,7 +365,7 @@ def dashboard_unreachable(rig: Rig) -> Result:
     while (as_root := rig.connect("127.0.0.1", port)) != "connected":
         if rig.now() - start > rig.settings.get_int("install.drill_seconds"):
             break
-        rig.wait(_POLL_S)
+        rig.wait(POLL_S)
     agent = rig.as_user(AGENT_USER, probe_command(rig, f"tcp:127.0.0.1:{port}"))
     ok = as_root == "connected" and not breaches(agent.out) and bool(outcomes(agent.out))
     return Result("the dashboard is unreachable from the agent user", ok,

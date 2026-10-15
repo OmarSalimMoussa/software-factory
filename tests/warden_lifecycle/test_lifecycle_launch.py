@@ -8,8 +8,19 @@ import pytest
 from lifecycle_fakes import World
 
 from runtime.shared import store
+from runtime.shared.models import RETIRED, WAITING
 from runtime.shared.protocol import Refused
-from runtime.warden.sessions import doing, launch, lifecycle, respawn, session_settings
+from runtime.warden.sessions import (
+    backstop,
+    doing,
+    launch,
+    lifecycle,
+    older_skills,
+    registry,
+    respawn,
+    session_settings,
+)
+from runtime.warden.sessions.backstop import Proc
 from runtime.warden.sessions.launch import LaunchError
 
 FIXTURE = Path(__file__).resolve().parents[2] / "testdata" / "fixture-product"
@@ -141,6 +152,110 @@ def test_a_resume_that_cannot_bring_the_session_back_fails_and_sends_nothing(
     with pytest.raises(LaunchError, match=said):
         respawn.resume(world.ctx(), s, "carry on")
     assert world.launcher.messages == []
+
+
+@pytest.mark.parametrize("place", ["", "impl-t-0001"], ids=["main-checkout", "worktree"])
+def test_a_resume_with_older_agent_definitions_comes_back_as_a_copy_with_todays_under_the_copys_id(
+    world: World, place: str
+) -> None:
+    repo = Path(world.settings.get_str("repo.path"))
+    s = world.seat("1234abcd-0000", definitions="older", state=WAITING,
+                   worktree=str(repo / ".claude" / "worktrees" / place if place else repo))  # fmt: skip
+    store.write_json(world.places.ready(s.id), {"records": [{"head": "abc"}]})
+
+    back = respawn.resume(world.ctx(), s, "carry on")
+
+    [(request_id, request)] = world.launcher.started
+    assert launch.session_argv(request)[:4] == ["claude", "--bg", "--resume", s.id]
+    assert (request["worktree"], request["prompt"], world.launcher.messages) == (place, "carry on", [])
+    agents = launch.definitions(world.ctx(), s.role, s.model, s.effort)
+    assert json.loads(request["agents"]) == agents
+    row = world.session(back)
+    assert (back, row.name, row.state, row.definitions) == (f"copy-{s.id}", s.name, WAITING,
+                                                            session_settings.fingerprint(agents))  # fmt: skip
+    assert s.id not in registry.read(world.places)
+    assert store.read_json(world.places.ready(back)) == {"records": [{"head": "abc"}]}
+    # Its next revive respawns the copy, under the settings file its copy's start wrote.
+    respawn.resume(world.ctx(), row, "carry on again")
+    assert world.launcher.commands == [["claude", "respawn", back[:8]]]
+    assert (session_settings.folder(world.places) / f"{request_id}.json").exists()
+
+
+def test_a_copy_that_never_runs_leaves_the_session_as_it_was_for_its_next_revive(world: World) -> None:
+    s = world.seat("1234abcd-0000", definitions="older")
+    world.launcher.stays_down = True
+
+    with pytest.raises(LaunchError, match="did not run within"):
+        respawn.resume(world.ctx(), s, "carry on")
+
+    assert registry.read(world.places) == {s.id: s}
+
+
+@pytest.mark.parametrize("trouble", ["start", "move"], ids=["its-start-fails", "a-move-after-it-runs-fails"])
+def test_a_renew_that_fails_any_way_leaves_the_session_as_it_was(
+    world: World, monkeypatch: pytest.MonkeyPatch, trouble: str
+) -> None:
+    s = world.seat("1234abcd-0000", definitions="older", state=WAITING)
+    store.write_json(world.places.ready(s.id), {"records": [{"head": "abc"}]})
+    failed: list[str] = []
+
+    def fail(*args: object) -> None:
+        if not failed:
+            failed.append(trouble)
+            raise OSError("No space left on device")
+
+    if trouble == "start":
+        monkeypatch.setattr(world.launcher, "start_agent", fail)
+    else:
+        monkeypatch.setattr(older_skills, "renamed", fail)
+
+    with pytest.raises(OSError, match="No space"):
+        respawn.resume(world.ctx(), s, "carry on")
+
+    assert registry.read(world.places) == {s.id: s}
+    assert store.read_json(world.places.ready(s.id)) == {"records": [{"head": "abc"}]}
+
+
+@pytest.mark.parametrize("when", ["before-its-copy-runs", "once-its-copy-runs"])
+def test_an_owner_stop_while_a_session_comes_back_as_a_copy_stays(
+    world: World, monkeypatch: pytest.MonkeyPatch, when: str
+) -> None:
+    s = world.seat("1234abcd-0000", definitions="older")
+    world.launcher.stays_down = True
+    sleep = world.clock.sleep
+
+    def owner_stops(seconds: float) -> None:
+        if not world.launcher.stopped:
+            if when == "once-its-copy-runs":
+                world.procs["c0b1e5ed"] = Proc(pid=7000, session="c0b1e5ed", name=s.name, chat_link="")
+                backstop.sweep(world.ctx(), dict(world.procs))
+            [held] = registry.read(world.places)
+            lifecycle.owner_stop(world.owner(), {"session": held}, None)
+        sleep(seconds)
+
+    monkeypatch.setattr(world.clock, "sleep", owner_stops)
+    try:
+        respawn.resume(world.ctx(), s, "carry on")
+    except LaunchError as exc:
+        assert "stopped" in str(exc)
+
+    assert [row.state for row in registry.read(world.places).values()] == [RETIRED]
+
+
+def test_all_a_session_held_under_its_id_follows_its_copy_and_its_old_id_finds_it(world: World) -> None:
+    s = world.seat("1234abcd-0000", definitions="older")
+    world.seat("agent-qa1", role="qa-backend", parent=s.id, agent_id="agent-qa1", state=RETIRED)
+    (world.places.install / "COMMIT").write_text("abc1234\n")
+    older_skills.note_install(world.places)  # it holds an older factory's skills, still to be told
+    for path in world.places.session_files(s.id):
+        store.write_text(path, f"{path.name}\n")
+
+    back = respawn.resume(world.ctx(), s, "carry on")
+
+    for old, new in zip(world.places.session_files(s.id), world.places.session_files(back), strict=True):
+        assert (old.exists(), new.read_text()) == (False, f"{old.name}\n")
+    assert world.session("agent-qa1").parent == back and older_skills.holds(world.places, back)
+    assert lifecycle.find(world.ctx(), registry.read(world.places), s.id).id == back
 
 
 @pytest.mark.parametrize("text", ["x" * 61, "<b>bold</b>", "a & b", "\x1b[31mred"])

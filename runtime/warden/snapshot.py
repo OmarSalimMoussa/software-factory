@@ -150,7 +150,7 @@ def _qa(ctx: Context, args: dict[str, Any]) -> Any:
     for s in sorted(sessions, key=lambda s: s.started):
         ready = store.read_json_or(ctx.places.ready(s.id), {"records": []})
         found[s.task]["ready"] += ready.get("records", []) if isinstance(ready, dict) else []
-        found[s.task]["results"] += store.read_jsonl(ctx.places.state / "qa-results" / f"{s.id}.jsonl")
+        found[s.task]["results"] += store.read_jsonl(ctx.places.results_of(s.id))
     for entry in store.read_jsonl(ctx.places.evidence / "index.jsonl"):
         if entry.get("task") in wanted:
             found[entry["task"]]["evidence"].append(entry)

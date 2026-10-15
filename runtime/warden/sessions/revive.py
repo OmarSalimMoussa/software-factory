@@ -48,24 +48,27 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
         older = older_skills.holds(ctx.places, s.id)
         held = held_word(ctx, s.task)
         said = "\n\n".join(part for part in (older_skills.RELOAD if older else "", note, held) if part)
-        respawn.resume(ctx, s, REVIVED + rebuild + (f"\n\n{said}" if said else ""))
+        back = respawn.resume(ctx, s, REVIVED + rebuild + (f"\n\n{said}" if said else ""))
     # telemetry: surfaced — the session stays deprioritized; `move` records why, and the caller is told
     except (LaunchError, Refused) as exc:
         if slot is not None:
             permits.free_slot(ctx, slot)
         with ctx.lock:
             sessions = read(ctx)
-            move(ctx, sessions[sid], models.DEPRIORITIZED, by, f"revive failed: {exc}")
-            registry.write(ctx.places, sessions)
+            if sessions[sid].state != RETIRED:
+                move(ctx, sessions[sid], models.DEPRIORITIZED, by, f"revive failed: {exc}")
+                registry.write(ctx.places, sessions)
         return str(exc)
     with ctx.lock:
         sessions = read(ctx)
-        s = sessions[sid]
+        s = sessions[back]
+        if s.state == RETIRED:
+            return ""
         s.resume_tries, s.benched_for = 0, ""
         move(ctx, s, WORKING, by, "revived")
         registry.write(ctx.places, sessions)
         if older:
-            older_skills.told(ctx.places, s.id)
+            older_skills.told(ctx.places, back)
         # A word held while it came back (a revert said as it revived) was not in its message: it follows now.
         late = took_held(ctx, s.task, held)
     if late:

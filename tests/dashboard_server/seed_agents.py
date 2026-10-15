@@ -208,7 +208,7 @@ def seed_evidence(places: Places, now: float) -> None:
         store.write_json(places.state / "public" / "ready" / f"{session}.json", ready)
         for tester, blockers in results.items():
             store.append_jsonl(
-                places.state / "qa-results" / f"{session}.jsonl",
+                places.results_of(session),
                 {
                     "head": head,
                     "tester": tester,

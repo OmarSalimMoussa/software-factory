@@ -16,7 +16,7 @@ from runtime.qa import browser_check
 from runtime.shared.paths import FACTORY_BIN, WARDEN_USER, Places
 from runtime.shared.protocol import Refused
 from runtime.system import drill_probe, install, layout, render
-from runtime.system.install_drills import browser_drill, drills, roster, worktree_drill
+from runtime.system.install_drills import browser_drill, drills, renew_drill, roster, worktree_drill
 from runtime.system.install_drills.evidence import Ran, Result
 
 
@@ -30,6 +30,9 @@ def _stream(command: str, result: str) -> str:
         "message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "content": result, "is_error": True}]},
     }
     return json.dumps(use) + "\nnot json\n" + json.dumps(done) + "\n"  # fmt: skip
+
+
+RENEWED = "c0b1e5ab-0000-4000-8000-000000000000"
 
 
 @dataclass
@@ -55,13 +58,19 @@ class FakeRig:
     respawns: bool = True
     hears: bool = True  # whether a message handed over as the warden does gets its answer
     said: str = "Ready"  # what the session answers
+    copies: bool = True
+    copy_said: str = "Pelican, yes"
     # What a command printed inside the daemon's walls, and each command run there.
     daemon: Ran = Ran(0, "npx: installed 1 package\nthe browser opened a page\n")
     walled: list[list[str]] = field(default_factory=list)
     _session: dict[str, str] = field(default_factory=dict)
     _stopped: dict[str, str] = field(default_factory=dict)
 
-    def real_session(self, name: str, prompt: str) -> Ran:
+    def real_session(self, name: str, prompt: str, **more: str) -> Ran:
+        if "resume" in more:
+            sid = RENEWED if self.copies else more["resume"]
+            self._session[sid] = name
+            return Ran(0, f"note: it keeps its own saved options, so a copy started\nbackgrounded · {sid[:8]}\n")
         if self.recorded is not None:
             self._session["5e55abcd-0000-4000-8000-000000000000"] = name if self.recorded == "tag" else self.recorded
         return Ran(0, self.launched)
@@ -70,7 +79,7 @@ class FakeRig:
         return dict(self._session)
 
     def session_said(self, session_id: str) -> str:
-        return self.said
+        return self.copy_said if session_id == RENEWED else self.said
 
     def stop_session(self, short_id: str) -> Ran:
         if self.stops:
@@ -518,6 +527,25 @@ def test_the_session_drill_needs_the_launch_line_the_record_an_answer_the_stop_a
     rig: dict[str, Any], ok: bool, says: str
 ) -> None:
     result = drills.background_session(FakeRig(**rig))
+
+    assert result.ok is ok and says in result.evidence
+
+
+@pytest.mark.parametrize(
+    ("rig", "ok", "says"),
+    [
+        ({}, True, "5e55abcd came back as c0b1e5ab, which said 'Pelican, yes'"),
+        ({"said": "Not logged in"}, False, "the first session never answered as asked: Not logged in"),
+        ({"copies": False}, False, "it came back under its own id, 5e55abcd"),
+        ({"copy_said": "Pelican, no"}, False, "the copy did not remember, or lacks drill-probe: 'Pelican, no'"),
+        ({"copy_said": "Heron, yes"}, False, "the copy did not remember"),
+    ],
+    ids=["whole", "first-unanswered", "same-id", "old-definitions", "forgot"],
+)
+def test_the_renew_drill_needs_a_copy_under_a_new_id_that_remembers_and_has_the_new_definitions(
+    rig: dict[str, Any], ok: bool, says: str
+) -> None:
+    result = renew_drill.copy_remembers(FakeRig(**{"said": "OK", **rig}))
 
     assert result.ok is ok and says in result.evidence
 

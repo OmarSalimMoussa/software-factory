@@ -68,10 +68,14 @@ def _carried(launch: dict[str, Any]) -> list[str]:
 
 
 def session_argv(launch: dict[str, Any]) -> list[str]:
-    """The `claude` command a session request names; the agent-run unit's runner executes exactly this."""
-    argv = ["claude", "--bg", "--name", launch["name"], *_carried(launch)]
-    if launch["worktree"]:
-        argv += ["--worktree", launch["worktree"]]
+    """The `claude` command a session request names; the agent-run unit's runner executes exactly this. One that names
+    a stopped session to ``resume`` starts a copy of it, with its whole conversation, under these options."""
+    if launch.get("resume"):
+        argv = ["claude", "--bg", "--resume", launch["resume"], "--name", launch["name"], *_carried(launch)]
+    else:
+        argv = ["claude", "--bg", "--name", launch["name"], *_carried(launch)]
+        if launch["worktree"]:
+            argv += ["--worktree", launch["worktree"]]
     # Without the --, a prompt that starts with a dash would be read as a flag.
     return [*argv, "--", launch["prompt"]]
 
@@ -196,15 +200,18 @@ def _last(text: str, most: int) -> str:
     return f"[{len(data) - len(kept.encode())} bytes above are cut]\n{kept}"
 
 
-def _options(ctx: Context, request_id: str, role: str, model: str, effort: str, place: Path) -> dict[str, str]:
-    """The sandbox settings and agent definitions a session runs under, rendered from the current settings."""
-    settings = ctx.settings()
-    path = session_settings.write(settings, ctx.places, request_id, role, place, agent_home())
+def definitions(ctx: Context, role: str, model: str, effort: str) -> dict[str, Any]:
+    """The agent definitions a session of ``role`` runs under today; raises LaunchError when they cannot be read."""
     try:
-        agents = session_settings.agents(settings, ctx.places, role, model, effort)
+        return session_settings.agents(ctx.settings(), ctx.places, role, model, effort)
     except (OSError, ValueError) as exc:
-        raise Refused("launch", f"the agent launchers cannot be read ({exc}); the factory needs a reinstall") from exc
-    return {"model": model, "effort": effort, "agent": role, "settings": str(path), "agents": json.dumps(agents)}
+        raise LaunchError(f"the agent launchers cannot be read ({exc}); the factory needs a reinstall") from exc
+
+
+def options(ctx: Context, request_id: str, s: Session, agents: dict[str, Any]) -> dict[str, str]:
+    """What session ``s`` runs under: its model, ``agents``, and sandbox settings written now for ``request_id``."""
+    path = session_settings.write(ctx.settings(), ctx.places, request_id, s.role, Path(s.worktree), agent_home())
+    return {"model": s.model, "effort": s.effort, "agent": s.role, "settings": str(path), "agents": json.dumps(agents)}
 
 
 def start_session(
@@ -223,14 +230,18 @@ def start_session(
     request_id = f"{PENDING}{uuid.uuid4().hex}"
     repo = Path(settings.get_str("repo.path"))
     place = session_settings.worktrees(repo) / worktree if worktree else repo
-    options = _options(ctx, request_id, fields["role"], fields["model"], fields["effort"], place)
+    try:
+        agents = definitions(ctx, fields["role"], fields["model"], fields["effort"])
+    except LaunchError as exc:
+        raise Refused("launch", str(exc)) from exc
     now = ctx.clock.iso()
     s = Session(id=request_id, parent="", worktree=str(place), state=WORKING, started=now, since=now,
-                note="started", **fields)  # fmt: skip
+                note="started", definitions=session_settings.fingerprint(agents), **fields)  # fmt: skip
+    carried = options(ctx, request_id, s, agents)
     sessions[request_id] = s
     registry.write(ctx.places, sessions)
     request = {"name": s.name, "cwd": str(repo), "worktree": worktree, "prompt": prompt,
-               **options}  # fmt: skip
+               **carried}  # fmt: skip
     try:
         ctx.launcher.start_agent(request_id, request)
     except LaunchError as exc:

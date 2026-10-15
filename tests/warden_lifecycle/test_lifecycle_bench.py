@@ -128,11 +128,13 @@ def test_a_benched_session_settles_after_its_grace_and_revives_with_its_id(world
     assert world.queue.tasks["t-0001"].status == "building"
 
 
-def test_pause_benches_every_session_and_resume_brings_them_back_in_order(world: World) -> None:
+def test_pause_benches_every_session_and_resume_brings_them_back_in_order_each_with_todays_definitions(
+    world: World,
+) -> None:
     world.cap(2)
     world.queue.add("t-0001", goal_item="G1", status="building")
     world.queue.add("t-0002", goal_item="G2", status="building")
-    world.seat("2b2b2b2b", task="t-0002")
+    world.seat("2b2b2b2b", task="t-0002", definitions="older")
     world.seat("0c0c0c0c", role="orchestrator", family="orch")
     world.seat("1a1a1a1a", task="t-0001", state=WAITING)
     for sid in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a"):
@@ -148,8 +150,9 @@ def test_pause_benches_every_session_and_resume_brings_them_back_in_order(world:
     back = revive.owner_resume(world.owner(), {}, None)["op"]
     ops.join(back)
     assert ops.get(world.owner(), {"id": back}, None)["op"]["state"] == ops.DONE
-    assert world.launcher.resumed == ["0c0c0c0c", "1a1a1a1a", "2b2b2b2b"]
-    assert {world.session(s).state for s in ("2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {WORKING}
+    assert world.launcher.resumed == ["0c0c0c0c", "1a1a1a1a"]
+    assert [request["resume"] for _, request in world.launcher.started] == ["2b2b2b2b"]
+    assert {world.session(s).state for s in ("copy-2b2b2b2b", "0c0c0c0c", "1a1a1a1a")} == {WORKING}
     assert [kind for kind, _ in world.events] == ["paused", "benched", "benched", "benched", "resumed"]
 
 

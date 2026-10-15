@@ -44,6 +44,14 @@ def holds(places: Places, sid: str) -> bool:
     return noted is not None and sid in noted["sessions"]
 
 
+def renamed(places: Places, was: str, sid: str) -> None:
+    """A session that runs on under a new id is still to be told. The caller holds the warden's lock."""
+    noted = store.read_json_or(_path(places), None)
+    if noted is not None and was in noted["sessions"]:
+        sessions = [sid if s == was else s for s in noted["sessions"]]
+        store.write_json(_path(places), {**noted, "sessions": sessions}, mode=0o600)
+
+
 def told(places: Places, sid: str) -> None:
     """The session was told: it is not told again. The caller holds the warden's lock."""
     noted = store.read_json_or(_path(places), None)

@@ -202,6 +202,23 @@ class Places:
         return self.state / "public" / "ready" / f"{session_id}.json"
 
     @property
+    def qa_results(self) -> Path:
+        return self.state / "qa-results"
+
+    def results_of(self, session_id: str) -> Path:
+        return self.qa_results / f"{session_id}.jsonl"
+
+    def steps_of(self, session_id: str) -> Path:
+        return self.state / "qa-steps" / f"{session_id}.jsonl"
+
+    def doing_of(self, session_id: str) -> Path:
+        return self.state / "doing" / f"{session_id}.json"
+
+    def session_files(self, session_id: str) -> tuple[Path, ...]:
+        """Every file kept under a session's id: each follows the session when it runs on as a copy under a new id."""
+        return self.ready(session_id), self.results_of(session_id), self.steps_of(session_id), self.doing_of(session_id)
+
+    @property
     def slots(self) -> Path:
         return self.state / "slots"
 

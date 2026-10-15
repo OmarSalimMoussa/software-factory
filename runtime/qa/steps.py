@@ -24,7 +24,7 @@ RESULTS = ("pass", "fail", "blocked")
 
 
 def path(ctx: Context, session_id: str) -> Path:
-    return ctx.places.state / "qa-steps" / f"{session_id}.jsonl"
+    return ctx.places.steps_of(session_id)
 
 
 def _mark(ctx: Context, args: dict[str, Any], verb: str) -> tuple[str, int]:

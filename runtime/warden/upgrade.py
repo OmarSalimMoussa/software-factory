@@ -206,7 +206,7 @@ def _typed_verdicts(ctx: Context) -> str:
     found open."""
     sessions = registry.read(ctx.places)
     carried = 0
-    for path in sorted((ctx.places.state / "qa-results").glob("*.jsonl")):
+    for path in sorted(ctx.places.qa_results.glob("*.jsonl")):
         session = sessions.get(path.stem)
         rows = store.read_jsonl(path)
         typed = [r for r in rows if "agent" not in r]

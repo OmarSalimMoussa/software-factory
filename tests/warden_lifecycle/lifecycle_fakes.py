@@ -16,7 +16,7 @@ from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.system import layout
 from runtime.warden.context import Caller, Clock, Context, GitHub, StackResult
-from runtime.warden.sessions import registry
+from runtime.warden.sessions import registry, session_settings
 from runtime.warden.sessions.backstop import Proc
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -63,6 +63,9 @@ class FakeLauncher:
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
         self.started.append((request_id, launch))
+        if launch.get("resume") and not self.stays_down:
+            copy = f"copy-{launch['resume']}"
+            self.procs[copy] = Proc(pid=6000 + len(self.started), session=copy, name=launch["name"], chat_link="")
 
     def agent_command(self, argv: list[str], cwd: str) -> tuple[int, str]:
         self.commands.append(argv)
@@ -110,8 +113,9 @@ class FakeLauncher:
         return self.held if self.restarts else self._loaded()
 
     def answered(self, session_id: str, since: float) -> str | None:
+        """As the real one, which reads the session's own transcript: only a session that runs answers."""
         held = self.signed_in()
-        return self.answers.get(held, "ok") if held is not None else None
+        return self.answers.get(held, "ok") if held is not None and session_id in self.procs else None
 
 
 class Queue:
@@ -166,6 +170,9 @@ class World:
                                     parent="", worktree=f"/w/{sid}", state=WORKING,
                                     started="2026-10-09T11:00:00Z", started_by="orchestrator",
                                     since="2026-10-09T11:00:00Z")  # fmt: skip
+        if not fields.get("parent") and "definitions" not in fields:
+            agents = session_settings.agents(self.settings, self.places, role, base["model"], base["effort"])
+            base["definitions"] = session_settings.fingerprint(agents)
         session = Session(id=sid, role=role, **{**base, **fields})
         sessions[sid] = session
         registry.write(self.places, sessions)

@@ -12,6 +12,7 @@ from queue_kit import PICTURE, World
 from runtime.queue import cards, formats, owner, proposals, turn
 from runtime.queue.book import task_rel
 from runtime.queue.propose import propose
+from runtime.shared import store
 from runtime.shared.models import RETIRED, STOPPED, WAITING, WORKING
 from runtime.shared.protocol import Refused
 from runtime.warden.owner import ops, reflections
@@ -63,14 +64,21 @@ def test_a_card_for_the_owner_needs_a_picture(world: World) -> None:
         cards.needs_owner(world.ctx("designer", "s-design"), task.id, "", "Keep the old link?", None)
 
 
+@pytest.mark.parametrize("now", ["s-impl", "s-copy"], ids=["as-it-asked", "come-back-as-a-copy"])
 def test_the_asking_session_waits_and_the_answer_reaches_it_once_and_it_works_again(
-    world: World, monkeypatch: pytest.MonkeyPatch
+    world: World, monkeypatch: pytest.MonkeyPatch, now: str
 ) -> None:
     task = world.task()
     world.session("s-impl", "implementer", "impl-t-0001", task.id)
-    monkeypatch.setattr(backstop, "processes", lambda: {"s-impl": Proc(1, "s-impl", "impl-t-0001", "", "busy")})
     asked = cards.needs_owner(world.ctx("implementer", "s-impl"), task.id, "", "Keep the old link?", PICTURE)
-    assert registry.read(world.places)["s-impl"].state == WAITING
+    if now != "s-impl":  # it came back as a copy while it waited: its row moved, and the history says where
+        sessions = registry.read(world.places)
+        sessions[now] = dataclasses.replace(sessions.pop("s-impl"), id=now)
+        registry.write(world.places, sessions)
+        store.append_jsonl(world.places.history, {"at": "2026-10-09T12:00:00Z", "session": now, "was": "s-impl",
+                                                  "name": "impl-t-0001", "by": "warden", "why": "renewed"})  # fmt: skip
+    monkeypatch.setattr(backstop, "processes", lambda: {now: Proc(1, now, "impl-t-0001", "", "busy")})
+    assert registry.read(world.places)[now].state == WAITING
 
     let_go, heard = threading.Event(), world.launcher.message_session
     monkeypatch.setattr(world.launcher, "message_session", lambda sid, text: let_go.wait(10) and heard(sid, text))
@@ -85,9 +93,9 @@ def test_the_asking_session_waits_and_the_answer_reaches_it_once_and_it_works_ag
     let_go.set()
     ops.join(answer["op"], 10)
     # Handed over as its next turn, its busy turn left alone; not relayed through the orchestrator as well.
-    assert world.launcher.messages == [("s-impl", f"The owner answered your question on {task.id}: Yes")]
+    assert world.launcher.messages == [(now, f"The owner answered your question on {task.id}: Yes")]
     assert world.launcher.commands == [] and world.events == []
-    assert registry.read(world.places)["s-impl"].state == WORKING
+    assert registry.read(world.places)[now].state == WORKING
 
 
 def _stuck(world: World, monkeypatch: pytest.MonkeyPatch, status: str = "qa") -> str:

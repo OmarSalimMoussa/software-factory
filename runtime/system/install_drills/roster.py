@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 
-from runtime.system.install_drills import browser_drill, drills, worktree_drill
+from runtime.system.install_drills import browser_drill, drills, renew_drill, worktree_drill
 from runtime.system.install_drills.evidence import Result, Rig
 
 DRILLS: tuple[Callable[[Rig], Result], ...] = (
@@ -21,6 +21,7 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
     drills.hosts_refused,
     drills.backstop_stops_claude,
     drills.background_session,
+    renew_drill.copy_remembers,
     drills.bubblewrap_missing,
     drills.factory_alone,
     drills.finished_subagent,
@@ -44,7 +45,7 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
 SESSIONS = frozenset({drills.sandbox_runs, drills.shell_write_other_worktree, drills.secrets_unreadable,
                       drills.sockets_refused, drills.hosts_refused, drills.bubblewrap_missing,
                       drills.factory_in_sandbox, drills.path_shadow, drills.toolchain_answers,
-                      drills.background_session})  # fmt: skip
+                      drills.background_session, renew_drill.copy_remembers})  # fmt: skip
 # Alone, last: each sandboxed command mounts over the shared drill worktree's missing config files, then removes them.
 LAST = (drills.claude_config_by_shell,)
 

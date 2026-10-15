@@ -24,7 +24,7 @@ _UNSAFE = re.compile(r"[\x00-\x1f\x7f<>&\"'`]")
 
 
 def facts_path(places: Places, session_id: str) -> Path:
-    return places.state / "doing" / f"{session_id}.json"
+    return places.doing_of(session_id)
 
 
 def facts(places: Places, session_id: str) -> dict[str, Any]:

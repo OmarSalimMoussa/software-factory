@@ -167,10 +167,12 @@ def _new_lines(path: Path, offset: int) -> tuple[bytes, int]:
     return whole, offset + len(whole)
 
 
-def read_file(ctx: Context, path: Path, payer: Payer, cursor: dict[str, Any]) -> list[CostRecord]:
-    """The calls added to one transcript since its cursor, each once; moves the cursor past them."""
+def read_file(ctx: Context, path: Path, payer: Payer, cursor: dict[str, Any], copied: str = "") -> list[CostRecord]:
+    """The calls added to one transcript since its cursor, each once; moves the cursor past them. Lines older than
+    ``copied``, when a session's copy was made, repeat its original's, counted then."""
     mark = cursor.setdefault(str(path), {"offset": 0, "last": "", "model": ""})
     data, offset = _new_lines(path, mark["offset"])
+    before = datetime.fromisoformat(copied.replace("Z", "+00:00")) if copied else None
     records = []
     for number, line in enumerate(data.splitlines(), 1):
         try:
@@ -178,7 +180,7 @@ def read_file(ctx: Context, path: Path, payer: Payer, cursor: dict[str, Any]) ->
         except ValueError:
             log.warning("warden: cost skipped an unreadable transcript line (%s, line %d of a pass)", path.name, number)
             continue
-        if not isinstance(entry, dict) or entry.get("type") != "assistant":
+        if not isinstance(entry, dict) or entry.get("type") != "assistant" or _copied(entry, before):
             continue
         message = entry.get("message")
         if not isinstance(message, dict) or "usage" not in message:
@@ -199,6 +201,16 @@ def read_file(ctx: Context, path: Path, payer: Payer, cursor: dict[str, Any]) ->
     return records
 
 
+def _copied(entry: dict[str, Any], before: datetime | None) -> bool:
+    if before is None:
+        return False
+    try:
+        return datetime.fromisoformat(str(entry["timestamp"]).replace("Z", "+00:00")) < before
+    # telemetry: expected — a line with no readable time is left to `_record`, which skips and reports it
+    except (KeyError, ValueError):
+        return False
+
+
 def run_pass(ctx: Context, roots: Sequence[Path]) -> int:
     """Read every registered session's and subagent's new calls; returns how many were recorded."""
     sessions = registry.read(ctx.places)
@@ -214,8 +226,12 @@ def run_pass(ctx: Context, roots: Sequence[Path]) -> int:
         if path is None:
             continue
         own = Payer(session.id, "", session.role, session.family, session.task, session.model)
-        records += read_file(ctx, path, own, cursor)
-        for sub in sorted((path.with_suffix("") / "subagents").glob("agent-*.jsonl")):
+        original = transcript_of(roots, session.worktree, session.copied_from) if session.copied_from else None
+        if original is not None:
+            records += read_file(ctx, original, own, cursor)
+        records += read_file(ctx, path, own, cursor, session.renewed)
+        folders = [p.with_suffix("") / "subagents" for p in (path, original) if p is not None]
+        for sub in sorted(sub for folder in folders for sub in folder.glob("agent-*.jsonl")):
             agent_id = sub.name.removeprefix("agent-").removesuffix(".jsonl")
             payer = _subagent_payer(session, agent_id, sub.with_name(f"agent-{agent_id}.meta.json"), by_agent)
             records += read_file(ctx, sub, payer, cursor)

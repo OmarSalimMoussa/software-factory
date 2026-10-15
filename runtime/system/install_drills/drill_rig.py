@@ -329,7 +329,7 @@ class RealRig:
             shutil.rmtree(checkout, ignore_errors=True)
         return checkout, Ran(code, out)
 
-    def real_session(self, name: str, prompt: str) -> Ran:
+    def real_session(self, name: str, prompt: str, **more: str) -> Ran:
         request_id = f"{_DRILL_NAME}-{uuid.uuid4().hex[:12]}"
         model, role, checkout = self.settings["install.drill"], "implementer", self.ctx.checkout()
         self._permit(name)
@@ -345,7 +345,7 @@ class RealRig:
             "agent": role,
             "settings": str(written),
             "agents": json.dumps(agents),
-        }
+        } | more
         ran = self._launch(lambda units: units.start_waiting(request_id, request))
         if started := BACKGROUNDED.search(ran.out):
             self._permit(started.group(1))  # a respawned session's record lacks its name at first

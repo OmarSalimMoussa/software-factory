@@ -180,7 +180,8 @@ To act on one:
    workflows for the new factory; that commit waits on Home for your Push to staging, like any other.
 3. Run the server set-up again from a factory checkout at that commit (`python3 -m standard.server.setup --product
    <path>`). It refuses a checkout at another commit than `.github/factory-ref` names. Older builds stay deployable.
-4. **Restart the factory** on Home: every agent comes back with its work.
+4. **Restart the factory** on Home: every agent comes back with its work. One whose subagents the release
+   changed comes back as a copy that has the new ones, with its whole conversation; its chat link changes.
 
 The dashboard looks for releases every `install.release_check_hours`, with a read-only GitHub token for the
 factory's repo, which the install asks for once, so the first upgrade to a factory that has this button is by hand,

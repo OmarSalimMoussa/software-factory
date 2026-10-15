@@ -121,7 +121,9 @@ def wake(ctx: Context, card: Card, message: str, missed: Callable[[], None]) -> 
     """Tell the session that asked the owner's word; None when no session can hear it. The orchestrator hears
     through its inbox instead, and a session no longer working or waiting has nothing to hear: the card keeps the
     answer either way."""
-    asker = registry.read(ctx.places).get(card.asked_by)
+    sessions = registry.read(ctx.places)
+    sid = registry.following(ctx.places, sessions, card.asked_by)
+    asker = sessions[sid] if sid is not None else None
     if asker is None or asker.role == statuses.ORCH or asker.state not in (WORKING, WAITING):
         return None
     return tell(ctx, asker, message, missed)

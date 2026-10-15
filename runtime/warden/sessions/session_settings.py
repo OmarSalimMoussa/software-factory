@@ -8,11 +8,13 @@ limits.
 
 The agent definitions come from the plugin's rendered launchers, passed as JSON because Claude Code ignores a plugin
 agent's mcpServers and initialPrompt (the browser testers need their browser server). A session gets its own
-launcher and those of the subagent kinds its role may start.
+launcher and those of the subagent kinds its role may start. They are fixed for the life of its process, and a
+respawn keeps them: the registry holds their fingerprint, so a revive can tell when they differ from today's.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -155,6 +157,10 @@ def agents(settings: Settings, places: Places, role: str, model: str, effort: st
         found[name] = definition
         found |= _lanes(settings, path, name, definition)
     return found
+
+
+def fingerprint(definitions: dict[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(definitions, sort_keys=True).encode()).hexdigest()
 
 
 def _lanes(settings: Settings, path: Path, kind: str, definition: dict[str, Any]) -> dict[str, Any]:

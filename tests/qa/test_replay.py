@@ -140,7 +140,7 @@ def test_the_replays_pass_builds_each_run_once_from_the_wardens_own_records(worl
     parent.write_text("")
     given = replay_run.make(_taken(world, ENTRY), parent.with_suffix("") / "subagents" / "agent-a1.jsonl")
     for record in given.records:
-        store.append_jsonl(world.places.state / "qa-steps" / f"{SESSION}.jsonl", record)
+        store.append_jsonl(world.places.steps_of(SESSION), record)
 
     assert pending.build_pending(world.ctx(), [tmp_path / "projects"]) == 1
     replay = json.loads((given.run / "replay" / "replay.json").read_text())

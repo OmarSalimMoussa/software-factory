@@ -56,7 +56,7 @@ def ready_records(ctx: Context, session: Session) -> list[dict[str, Any]]:
 
 
 def _results_path(ctx: Context, session: Session) -> Path:
-    return ctx.places.state / "qa-results" / f"{session.id}.jsonl"
+    return ctx.places.results_of(session.id)
 
 
 def testers_for(ctx: Context, session: Session, task: Task) -> dict[str, list[str]]:

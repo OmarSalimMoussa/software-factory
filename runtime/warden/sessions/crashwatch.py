@@ -291,7 +291,7 @@ def watch_orchestrator(ctx: Context) -> None:
         if silent < limit:
             return
     try:
-        lifecycle.restart(ctx, orchestrator, SILENT.format(minutes=int(silent // 60)) + _owed(ctx))
+        back = lifecycle.restart(ctx, orchestrator, SILENT.format(minutes=int(silent // 60)) + _owed(ctx))
     except LaunchError as exc:
         log.warning("restart of silent orchestrator %s failed (%s)", orchestrator.id, type(exc).__name__)
         return
@@ -299,7 +299,7 @@ def watch_orchestrator(ctx: Context) -> None:
                               "restarted it.")  # fmt: skip
     with ctx.lock:
         sessions = lifecycle.read(ctx)
-        current = sessions.get(orchestrator.id)
+        current = sessions.get(back)
         if current is None or current.state not in (WORKING, WAITING):
             return
         # Its silence counts again from now, so the next tick does not restart it once more.

@@ -63,8 +63,8 @@ class Rig(Protocol):
     def wait(self, seconds: float) -> None: ...
     def now(self) -> float: ...
     def warden_command(self, argv: list[str]) -> Ran: ...
-    def real_session(self, name: str, prompt: str) -> Ran:
-        """A session started as the warden starts one, through the agent-run unit; what `claude --bg` printed."""
+    def real_session(self, name: str, prompt: str, **more: str) -> Ran:
+        """A session started as the warden starts one, with ``more`` in its request; what `claude --bg` printed."""
         ...
 
     def session_records(self) -> dict[str, str]:
@@ -81,6 +81,18 @@ class Rig(Protocol):
         """A check the warden runs, through the check-run unit, on a scratch checkout in the agent's home whose
         ``scripts/dev deps`` runs ``probe`` and fails with what it printed; that checkout and the check's report."""
         ...
+
+
+POLL_S = 1.0
+
+
+def recorded(rig: Rig, short: str, deadline: float) -> tuple[str, str] | None:
+    """The full id and recorded name of the session `claude --bg` printed as ``short``; None if none by ``deadline``."""
+    while True:
+        found = [(sid, named) for sid, named in rig.session_records().items() if sid.startswith(short)]
+        if found or rig.now() > deadline:
+            return found[0] if found else None
+        rig.wait(POLL_S)
 
 
 def refused_by(ran: Ran, rule: str) -> bool:

@@ -140,6 +140,16 @@ def test_a_silent_orchestrator_is_restarted_as_the_same_session(world: World) ->
     assert world.session("0c0c0c0c").state == WORKING
 
 
+def test_a_silent_orchestrator_restarted_as_a_copy_is_given_its_time_again(world: World) -> None:
+    world.seat("0c0c0c0c", role="orchestrator", family="orch", since=NOW, definitions="older")
+    world.run("0c0c0c0c")
+    world.later(world.settings.get_int("watch.orchestrator_busy_silent_minutes") * 60)
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
+    world.later(world.settings.get_int("watch.tick_seconds"))
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
+    assert world.launcher.stopped == ["0c0c0c0c"] and world.session("copy-0c0c0c0c").state == WORKING
+
+
 def test_an_orchestrator_waiting_on_its_inbox_is_alive_however_long_since_its_last_loop_pass(world: World) -> None:
     world.seat("0c0c0c0c", role="orchestrator", family="orch", since=NOW)
     world.run("0c0c0c0c")

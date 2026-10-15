@@ -155,10 +155,11 @@ def test_a_revert_said_while_its_implementer_comes_back_follows_it_once_it_is_ba
     monkeypatch.setattr(permits, "claim_slot", lambda ctx, s: None)
     resumed: list[str] = []
 
-    def resume(ctx: object, s: object, message: str) -> None:
+    def resume(ctx: object, s: object, message: str) -> str:
         resumed.append(message)
         if len(resumed) == 1:  # the orchestrator's revert lands while the revive runs
             tasks.set_status(world.ctx(), task.id, "building", "", "staging regressed; reverted as 0abc123")
+        return "s-impl"
 
     monkeypatch.setattr(respawn, "resume", resume)
 

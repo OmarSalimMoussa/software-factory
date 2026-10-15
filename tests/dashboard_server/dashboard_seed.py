@@ -237,7 +237,7 @@ def seed(root: Path, now: float = T0) -> Places:
     sessions = seed_sessions(now)
     store.write_text(places.history, history_lines(sessions))
     store.write_json(places.registry, {s.id: models.dump(s) for s in sessions})
-    store.write_json(places.state / "doing" / "impl-sign-in-loop.json", {"qa_round": 2})
+    store.write_json(places.doing_of("impl-sign-in-loop"), {"qa_round": 2})
     # A push the orchestrator asked for, waiting for the owner: a checked fix and the factory's upgrade.
     going = [{"kind": "task", "task": "t-0013"}, {"kind": "factory", "task": ""}]
     waiting = {"sha": "f" * 40, "commits": 3, "items": going, "asked_at": iso(now - 600)}

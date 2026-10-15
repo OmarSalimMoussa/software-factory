@@ -166,6 +166,17 @@ def test_a_switch_restarts_the_daemon_and_brings_each_working_session_back_witho
     assert permits.switching(world.ctx()) is None
 
 
+def test_a_first_agent_that_comes_back_as_a_copy_is_the_one_whose_answer_is_checked(world: World) -> None:
+    _accounts(world)
+    world.seat("0c0c0c0c", role="orchestrator", family="orch", definitions="older")
+    world.run("0c0c0c0c")
+
+    op = _switch(world, "work")
+
+    assert (op["state"], world.launcher.restarts) == ("done", 1)
+    assert world.session("copy-0c0c0c0c").state == WORKING
+
+
 def test_a_session_that_cannot_come_back_says_why_and_the_crash_watch_resumes_it_after(world: World) -> None:
     _accounts(world)
     world.queue.add("t-0001", status="building")

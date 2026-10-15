@@ -34,6 +34,7 @@ SESSION = {
     "worktree": "impl-cart", "prompt": "-- build it",
 }  # fmt: skip
 SESSIONS = {"s1": {"worktree": f"{REPO}/.claude/worktrees/impl-cart"}, "s2": {"worktree": "/home/owner/elsewhere"}}
+COPY = {**SESSION, "resume": "0b8f6a52-1c2d-4e5f-8a9b-0c1d2e3f4a5b"}
 
 
 def _parse(raw: dict[str, Any]) -> object:
@@ -66,6 +67,11 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
     assert shape == (REPO, ["--only", "repo-shape"])
     assert lf.checkout_for("s1", settings(), SESSIONS) == REPO / ".claude" / "worktrees" / "impl-cart"
     assert lf.checkout_for("", settings(), SESSIONS) == REPO
+    assert "--worktree" in argv and lf.session_cwd(SESSION, settings()) == REPO
+    copy = lf.session_argv(COPY, STATE)
+    assert copy[3:7] == ["--bg", "--resume", COPY["resume"], "--name"] and "--worktree" not in copy
+    assert lf.session_cwd(COPY, settings()) == REPO / ".claude" / "worktrees" / "impl-cart"
+    assert lf.session_cwd({**COPY, "worktree": ""}, settings()) == REPO
 
 
 @pytest.mark.parametrize(
@@ -89,6 +95,10 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
         {**SESSION, "settings": f"{STATE}/public/session-settings/../launch/r1.json"},
         {**SESSION, "settings": "/tmp/r1.json"},
         {**SESSION, "agents": "[1, 2]"},
+        {**COPY, "resume": "0b8f6a52"},
+        {**COPY, "resume": "--fork-session"},
+        {**COPY, "worktree": "../../.ssh"},
+        {**COPY, "worktree": ".."},
         {"kind": "stack", "slot": 9, "verb": ["up"], "session": "s1"},
         {"kind": "stack", "slot": True, "verb": ["up"], "session": "s1"},
         {"kind": "stack", "slot": 1, "verb": ["rm", "-rf"], "session": "s1"},

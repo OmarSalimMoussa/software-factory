@@ -46,7 +46,7 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
     deploys.record(places, probes.PROD, "c" * 40, "2026-10-09T09:00:00Z")
     world.session("s-impl", "implementer", "impl-t-0001", task=in_turn.id)
     typed = {"head": FULL, "tester": "qa-ux", "blockers": 1, "majors": 0, "minors": 0, "at": "x"}
-    store.append_jsonl(places.state / "qa-results" / "s-impl.jsonl", typed)
+    store.append_jsonl(places.results_of("s-impl"), typed)
     # An approval that names no route, beside the owner's Go on another task.
     store.write_json(places.approvals / f"{merged.id}.json", {"task": merged.id, "rung": 2, "model": "m",
                                                              "by": "owner", "at": "x", "digest": "d"})  # fmt: skip

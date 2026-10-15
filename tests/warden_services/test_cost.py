@@ -66,6 +66,28 @@ def test_one_call_written_on_several_lines_is_counted_once(ctx: Context, root: P
     assert cost.spent_days(ctx) == {"2026-10-09": [pytest.approx(0.03225), 0]}  # what the budget gate reads
 
 
+def test_a_copy_of_a_session_counts_each_call_once_its_originals_last_ones_too(ctx: Context, root: Path) -> None:
+    folder = root / "-srv-checkout-wt-s1"
+    registry.write(ctx.places, {"s0": session("s0", worktree="/srv/checkout/wt-s1")})
+    (folder / "s0.jsonl").write_text(call("msg_1", "req_1", out=10))
+    cost.run_pass(ctx, [root])
+    with (folder / "s0.jsonl").open("a") as out:
+        out.write(call("msg_2", "req_2", out=20))
+    # The original's tester, still unread: it reported after the last pass, as the original stopped.
+    (folder / "s0" / "subagents").mkdir(parents=True)
+    (folder / "s0" / "subagents" / "agent-qa1.jsonl").write_text(call("msg_4", "req_4", out=40))
+    copy = session("s1", renewed="2026-10-09T10:30:00Z", copied_from="s0")
+    registry.write(ctx.places, {"s1": copy})
+    # The copy's transcript repeats the original's lines under their first times, then its own.
+    later = call("msg_3", "req_3", out=30).replace("10:01:02.345Z", "10:30:05.000Z")
+    (folder / "s1.jsonl").write_text(call("msg_1", "req_1", out=10) + call("msg_2", "req_2", out=20) + later)
+
+    cost.run_pass(ctx, [root])
+    cost.run_pass(ctx, [root])
+
+    assert sorted(r["output"] for r in records(ctx.places)) == [10, 20, 30, 40]
+
+
 def test_an_unpriced_model_costs_unknown_and_a_failed_call_is_recorded(ctx: Context, root: Path) -> None:
     registry.write(ctx.places, {"s1": session("s1", state=RETIRED)})
     failed = call("err_1", "req_9", model="<synthetic>", out=0, isApiErrorMessage=True)

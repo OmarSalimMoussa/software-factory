@@ -61,5 +61,18 @@ def subtree(sessions: dict[str, Session], root_id: str) -> list[Session]:
     return out
 
 
+def following(places: Places, sessions: dict[str, Session], sid: str) -> str | None:
+    """The id session ``sid`` is under now: its own, or where the history moved it (a pending id to its session, a
+    session to its copy); None when no row holds it."""
+    if sid in sessions:
+        return sid
+    moved = {str(row["was"]): str(row["session"]) for row in store.read_jsonl(places.history) if "was" in row}
+    seen: set[str] = set()
+    while sid not in sessions and sid in moved and sid not in seen:
+        seen.add(sid)
+        sid = moved[sid]
+    return sid if sid in sessions else None
+
+
 def by_name(sessions: Iterable[Session], name: str) -> Session | None:
     return next((s for s in sessions if s.name == name and s.state != RETIRED), None)

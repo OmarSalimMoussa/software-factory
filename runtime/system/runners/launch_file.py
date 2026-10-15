@@ -108,12 +108,20 @@ def _plugin(state: Path) -> list[str]:
 
 def session_argv(raw: dict[str, Any], state: Path) -> list[str]:
     """A session's `claude --bg` command, built by the warden's own function, with the installed claude."""
-    _value(raw, "worktree", empty=True)
+    worktree = _value(raw, "worktree", empty=True)
+    if "resume" in raw and (not _UUID.match(_value(raw, "resume")) or "/" in worktree or worktree in (".", "..")):
+        raise BadRequest("a resume names one session by its id, and its worktree by name")
     if not isinstance(raw.get("prompt"), str):
         raise BadRequest("prompt must be text")
     _carried_ok(raw, state)
     argv = launch.session_argv(raw)
     return [PROGRAMS["claude"], *_plugin(state), *argv[1:]]
+
+
+def session_cwd(raw: dict[str, Any], settings: Settings) -> Path:
+    """Where a session request runs: a copy in its original's checkout, a new one in the product checkout."""
+    repo = Path(settings.get_str("repo.path"))
+    return session_settings.worktrees(repo) / raw["worktree"] if "resume" in raw and raw["worktree"] else repo
 
 
 def _claude_ok(args: list[str]) -> None:
