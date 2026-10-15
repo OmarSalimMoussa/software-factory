@@ -36,7 +36,7 @@ from runtime.warden.spend import cost
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
 CHECK_UNIT = "software-check-run@{}.service"
-CHECK_REQUEST = "check-"
+CHECK_REQUEST, STACK_REQUEST = "check-", "stack-"
 # What `claude --bg` prints for the session it started; the install drills it on the Claude Code it installs.
 BACKGROUNDED = re.compile(r"^backgrounded · ([0-9a-f]{8})\b", re.MULTILINE)
 
@@ -47,11 +47,13 @@ class LaunchError(Exception):
     """A unit could not be started, or the command it ran failed; the message says which and why."""
 
 
-def forget_checks(places: Places) -> None:
-    """Drops the check requests and results a warden left: none has a reader, and a restarted check then finds none."""
+def forget_requests(places: Places) -> None:
+    """Drops the check and stack requests, inputs and results a warden left: none has a reader, and a restarted check
+    then finds none."""
     for folder in (places.state / "public" / "launch", places.state / "runs"):
-        for path in folder.glob(f"{CHECK_REQUEST}*"):
-            path.unlink()
+        for prefix in (CHECK_REQUEST, STACK_REQUEST):
+            for path in folder.glob(f"{prefix}*"):
+                path.unlink()
 
 
 def agent_home() -> Path:
@@ -115,6 +117,7 @@ class Units:
             raise LaunchError(f"{unit} left no result ({type(exc).__name__}): {done.stderr.strip()[-300:]}") from exc
         finally:
             (self.places.state / "public" / "launch" / f"{request_id}.json").unlink(missing_ok=True)
+            (runs / f"{request_id}.in").unlink(missing_ok=True)
         for name in (f"{request_id}.exit", f"{request_id}.log"):
             (runs / name).unlink(missing_ok=True)
         if not status.isdigit():
@@ -187,8 +190,9 @@ class Units:
         lines = found[0].read_text(encoding="utf-8", errors="replace").splitlines() if found else []
         return next((said for line in lines if (said := cost.call_outcome(line, since)) is not None), None)
 
-    def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
-        request_id = f"stack-{uuid.uuid4().hex}"
+    def run_stack(self, slot: int, verb: list[str], session: str, given: str = "") -> StackResult:
+        request_id = f"{STACK_REQUEST}{uuid.uuid4().hex}"
+        store.write_text(self.places.state / "runs" / f"{request_id}.in", given, mode=0o600)
         self._request(request_id, {"kind": "stack", "slot": slot, "verb": verb, "session": session})
         code, output = self._wait(STACK_UNIT.format(request_id), request_id)
         log = self.places.evidence / "stack" / f"{request_id}.log"

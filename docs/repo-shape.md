@@ -43,6 +43,7 @@ schema.
 | `[deploy]` | The health address, how long a deploy waits, the files a deploy copies, how many builds to keep |
 | `[edge]` | Paths the edge answers 404, and hosts it redirects |
 | `[[release]]` | Optional: what to release after a prod deploy, such as a browser extension |
+| `[reports]` | Optional: the tailnet port and path where prod's report export answers, the header that carries its token, and `token_key`: the key in prod's env file that holds the token |
 
 The scripts factory.toml names are its **hooks**: `[smoke].check` runs in CI after the smoke test, each workspace's
 `after_deploy` scripts run on the server after a deploy, and each release's `package` runs in CI after a prod
@@ -120,7 +121,7 @@ stack.
 | `test [path…]` | Runs the product's tests: all of them, or those under the paths. When `FACTORY_TEST_SECONDS` is set, it stops any one test that runs longer and fails it |
 | `verbs` | Lists the verbs it supports |
 | `deps` | Optional: installs what the checks and tests read (package trees, tools); `factory check` runs it first |
-| `reports --since <cursor>` | Optional: prints erased reports, then new user reports, as JSON lines |
+| `reports --since <cursor>` | Optional: reads prod's report export on its input, and prints erased reports, then new user reports, as JSON lines |
 | `run <service> -- <command…>` | Optional: runs one command in a new container of the service, labelled `FACTORY_RUN_LABEL`, with the slot's settings and network, and prints its output. The factory stops it at `slots.run_seconds` and removes its container |
 | `restart <service…>` | Optional: restarts the named services' running containers, as they are |
 
@@ -128,10 +129,11 @@ Everything a slot creates (containers, volumes, networks, images) carries a labe
 can find and remove it when the session that held the slot retires. A container the stack starts while it runs, such
 as an agent's, needs no label: the warden also removes every container still on one of the slot's networks.
 
-**User reports.** Without the `reports` verb, the users' inbox stays empty. With it, the warden asks for the reports
-after the cursor it last saw, and files each as a request in the users' inbox. Each line is one JSON object with the
-report's id (also the next cursor), when it arrived, an id for the user, where in the product it is about, and the
-user's words. The words stay in `queue/reports/`; tasks describe them in the factory's own words.
+**User reports.** Without the `reports` verb, the users' inbox stays empty. With it, the warden reads prod's report
+export itself, where the server set-up saved it from `[reports]`, so no code agents wrote reaches the tailnet. It hands
+the export to `reports` on its input, with the cursor it last saw, and files each report the verb prints as a request
+in the users' inbox. Each line is one JSON object with the report's id (also the next cursor), when it arrived, an id
+for the user, where in the product it is about, and the user's words. The words stay in `queue/reports/`; tasks describe them in the factory's own words.
 
 **Erased reports.** Before its report lines, `reports` prints one line for each report a user erased:
 `{"erased": "<report id>", "at": "YYYY-MM-DDTHH:MM:SSZ"}`, with no cursor. The factory then deletes that report's

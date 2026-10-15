@@ -116,6 +116,12 @@ def test_a_request_units_exit_recorder_sees_the_runs_folder_and_keeps_the_output
     assert f"StandardOutput=append:{runs}/%i.log" in lines
 
 
+def test_a_stack_verb_reads_its_input_from_the_wardens_own_folder() -> None:
+    lines = _unit("software-stack-run@.service").splitlines()
+
+    assert "StandardInput=file:/var/lib/software-factory/runs/%i.in" in lines
+
+
 def test_managed_settings_hold_only_the_guard_and_the_rulebook_loader() -> None:
     body = json.loads(render.managed_settings(PLACES, settings(), HERE))
 

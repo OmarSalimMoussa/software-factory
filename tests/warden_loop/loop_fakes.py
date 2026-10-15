@@ -65,7 +65,7 @@ class FakeStack:
     verbs: str = "up down health"
     calls: list[tuple[int, list[str], str]] = field(default_factory=list)
 
-    def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
+    def run_stack(self, slot: int, verb: list[str], session: str, given: str = "") -> StackResult:
         self.calls.append((slot, verb, session))
         log = self.logs / f"stack-{len(self.calls)}.log"
         log.write_text(self.verbs if verb == ["verbs"] else "")

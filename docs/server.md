@@ -82,8 +82,9 @@ If one fails, the set-up stops before it changes anything and says what to do.
 - **The tailnet.** The shared services' addresses below. With `--fresh` the set-up adds missing ones; otherwise it
   lists the commands to add them.
 - **The warden's copy.** `~/.config/software-factory/server.json` on your laptop (only you can read it): the
-  GlitchTip address, organization and read-only token, and the Langfuse address and keys. The factory's installer
-  copies it for the warden.
+  GlitchTip address, organization and read-only token, and the Langfuse address and keys. When `factory.toml` has
+  `[reports]`, it also holds where prod's report export answers and its token, read from prod's env file; until prod
+  is deployed, the set-up lists that as a step still to do. The factory's installer copies it for the warden.
 
 ## The shared services
 

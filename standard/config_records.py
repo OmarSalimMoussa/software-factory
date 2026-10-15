@@ -115,6 +115,14 @@ class Release:
 
 
 @dataclass(frozen=True, slots=True)
+class Reports:
+    port: int
+    path: str
+    header: str
+    token_key: str
+
+
+@dataclass(frozen=True, slots=True)
 class Config:
     product: Product
     build: Build
@@ -126,6 +134,7 @@ class Config:
     deploy: Deploy
     edge: Edge
     releases: tuple[Release, ...]
+    reports: Reports | None  # None: the product has no report export
     raw: dict[str, Any]  # the parsed file, for comparing two copies
 
     def workspace(self, name: str) -> Workspace:

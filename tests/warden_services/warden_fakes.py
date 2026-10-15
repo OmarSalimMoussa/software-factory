@@ -52,7 +52,7 @@ class FakeLauncher:
     def start_upgrade(self, commit: str) -> None:
         self.upgrades.append(commit)
 
-    def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
+    def run_stack(self, slot: int, verb: list[str], session: str, given: str = "") -> StackResult:
         self.calls.append(("stack", (slot, verb, session)))
         return self.stack.get(verb[0], StackResult(exit=0, tail="", log="stack.log"))
 

@@ -104,6 +104,25 @@ def test_a_stack_run_keeps_what_the_runner_printed_and_hands_back_its_tail(world
     assert not list((world.places.state / "runs").iterdir())
 
 
+def test_a_stack_runs_input_waits_where_only_the_warden_reads_and_goes_after(world: World) -> None:
+    held: list[tuple[str, int, str]] = []
+    runs = world.places.state / "runs"
+
+    def systemctl(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        request = argv[-1].split("@", 1)[1].removesuffix(".service")
+        given = runs / f"{request}.in"
+        public = (world.places.state / "public" / "launch" / f"{request}.json").read_text()
+        held.append((given.read_text(), given.stat().st_mode & 0o777, public))
+        store.write_text(runs / f"{request}.log", "")
+        store.write_text(runs / f"{request}.exit", "0\n")
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    launch.Units(world.places, lambda: world.settings, systemctl).run_stack(0, ["reports"], "", '{"words": "hi"}')
+    [(given, mode, public)] = held
+    assert (given, mode) == ('{"words": "hi"}', 0o600) and "hi" not in public
+    assert not list(runs.iterdir())
+
+
 @pytest.mark.parametrize(
     ("verb", "out", "tail"),
     [
@@ -284,12 +303,13 @@ def test_a_session_start_is_waited_on_and_leaves_no_request_or_output_behind(wor
     assert not list((world.places.state / "runs").iterdir())
 
 
-def test_a_starting_warden_drops_every_check_request_and_result_a_warden_left(world: World) -> None:
+def test_a_starting_warden_drops_every_check_and_stack_request_a_warden_left(world: World) -> None:
     launched, runs = world.places.state / "public" / "launch", world.places.state / "runs"
     left = [launched / "check-1.json", runs / "check-1.log", runs / "check-1.exit", launched / "pending-1.json"]
+    left += [launched / "stack-1.json", runs / "stack-1.in", runs / "stack-1.log", runs / "stack-1.exit"]
     for path in left:
         store.write_text(path, "{}\n")
 
-    launch.forget_checks(world.places)
+    launch.forget_requests(world.places)
 
     assert [path for path in left if path.exists()] == [launched / "pending-1.json"]

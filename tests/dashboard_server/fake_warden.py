@@ -55,7 +55,7 @@ class Launcher:
     def message_session(self, session_id: str, text: str) -> None:
         self.calls.append(("message", (session_id, text)))
 
-    def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
+    def run_stack(self, slot: int, verb: list[str], session: str, given: str = "") -> StackResult:
         """Slot 0's sign-in prints a one-time link on its own port; every other verb prints nothing."""
         settings = settings_module.load(self.places.defaults, self.places.overrides)
         link = f"http://127.0.0.1:{leases.port(settings, slot)}/sign-in/once"

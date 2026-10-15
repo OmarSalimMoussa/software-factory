@@ -45,6 +45,7 @@ class FakeLauncher:
     check: Callable[[str, list[str]], tuple[int, str]] = lambda checkout, args: (0, "")
     commands: list[list[str]] = field(default_factory=list)
     stacks: list[tuple[int, list[str]]] = field(default_factory=list)
+    inputs: list[str] = field(default_factory=list)
     checks: list[tuple[str, list[str]]] = field(default_factory=list)
     messages: list[tuple[str, str]] = field(default_factory=list)
     stopped: list[str] = field(default_factory=list)
@@ -62,8 +63,9 @@ class FakeLauncher:
     def message_session(self, session_id: str, text: str) -> None:
         self.messages.append((session_id, text))
 
-    def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
+    def run_stack(self, slot: int, verb: list[str], session: str, given: str = "") -> StackResult:
         self.stacks.append((slot, verb))
+        self.inputs.append(given)
         return self.stack(slot, verb)
 
     def run_check(self, checkout: str, args: list[str]) -> tuple[int, str]:

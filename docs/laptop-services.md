@@ -102,6 +102,6 @@ The installer keeps these in the warden's secrets folder:
   `factory traces --where slot <n>`. Only the warden reads it.
 - `factory-dsn`: the address of the factory's own GlitchTip, where the factory's own errors go. Only the warden
   and the dashboard read it.
-- `server.json`: the server's GlitchTip and Langfuse keys, copied from `~/.config/software-factory/server.json`,
-  which the server set-up writes. Only the warden reads it. Until the server set-up has run, the installer says so
-  and the warden imports no server errors.
+- `server.json`: the server's GlitchTip and Langfuse keys, and prod's report export with its token, copied from
+  `~/.config/software-factory/server.json`, which the server set-up writes. Only the warden reads it. Until the
+  server set-up has run, the installer says so, and the warden imports no server errors and no users' reports.

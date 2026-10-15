@@ -192,6 +192,8 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("errors.max_pages", "Pages of errors one read covers"),
             ("errors.severe_events", "Events that make an error severe"),
             ("reports.poll_minutes", "Ask for users' new reports every, minutes"),
+            ("reports.fetch_seconds", "Seconds prod's report export may take"),
+            ("reports.max_mib", "Largest report export, MiB"),
             ("telemetry.max_items", "Errors or traces one answer lists"),
             ("telemetry.max_kib", "Largest errors or traces answer, KiB"),
             ("telemetry.timeout_seconds", "Seconds a GlitchTip or Langfuse call may take"),

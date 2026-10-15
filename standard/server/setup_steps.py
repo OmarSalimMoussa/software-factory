@@ -17,6 +17,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from standard import envfile
 from standard.config_records import Config
 from standard.server import heartbeat as heartbeat_mod
 from standard.server.setup_machine import Host, SetupError, ensure_dirs, ensure_file, remote_text
@@ -313,11 +314,32 @@ def laptop(job: Job) -> None:
             "secret_key": job.services["LANGFUSE_INIT_PROJECT_SECRET_KEY"],
         },
     }
+    export = _report_export(job)
+    if export is not None:
+        data["reports"] = export
     text = json.dumps(data, indent=2) + "\n"
     if path.exists() and path.read_text() == text and path.stat().st_mode & 0o777 == 0o600:
         print(f"   found: {path} up to date")
         return
     job.host.act(f"write {path} (0600) for the warden", lambda: _write_private(path, text))
+
+
+def _report_export(job: Job) -> dict[str, str] | None:
+    """The warden's way to prod's report export; None without [reports], or (with a to-do) until prod has its token."""
+    reports, config = job.config.reports, job.config
+    if reports is None:
+        return None
+    env_path = f"/srv/{config.product.name}/prod/env/{config.env.file}"
+    found = remote_text(job.host, env_path)
+    token = stack.parse_env(found[1], env_path).get(reports.token_key, "") if found else ""
+    if not token or envfile.placeholders({reports.token_key: token}) or envfile.generate(token) is not None:
+        job.todo.append(
+            f"deploy prod, then run the set-up again: the warden reads users' reports with prod's {reports.token_key}, "
+            f"which {env_path} does not hold yet"
+        )
+        return None
+    url = stack.public_url(config, "server", reports.port) + reports.path
+    return {"url": url, "header": reports.header, "token": token}
 
 
 def _write_private(path: Path, text: str) -> None:

@@ -160,7 +160,7 @@ def main() -> int:
                   threading.RLock(), CheckPlaces())  # fmt: skip
     dispatcher = Dispatcher(doors, resolve(VERBS))
     ops.recover(places, clock)
-    launch.forget_checks(places)
+    launch.forget_requests(places)
     public.write_settings(places, current)
     public.write_switches(places, public.read_switches(places))
     # The unit runners refuse every request until public/sessions.json exists, the first start's git call included.

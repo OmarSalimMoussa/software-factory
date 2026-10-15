@@ -41,7 +41,7 @@ class Slot0:
     def __init__(self, port: int) -> None:
         self.port = port
 
-    def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
+    def run_stack(self, slot: int, verb: list[str], session: str, given: str = "") -> StackResult:
         return StackResult(0, f"http://127.0.0.1:{self.port}/healthz\n", "")
 
 

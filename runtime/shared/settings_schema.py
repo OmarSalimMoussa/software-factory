@@ -170,6 +170,8 @@ SCHEMA: dict[str, Spec] = {
     "errors.max_pages": Spec("int", 1, 50),
     "errors.severe_events": Spec("int", 1, 1_000_000),
     "reports.poll_minutes": Spec("int", 1, 1440),
+    "reports.fetch_seconds": Spec("int", 1, 120),
+    "reports.max_mib": Spec("int", 1, 64),
     "telemetry.max_items": Spec("int", 1, 200),  # contract: added by FB6, `factory errors` and `factory traces`
     "telemetry.max_kib": Spec("int", 4, 1024),
     "telemetry.timeout_seconds": Spec("int", 1, 120),

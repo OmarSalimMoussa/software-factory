@@ -20,6 +20,8 @@ Environment=@uv_env@
 ExecStart=@python@ -I @install@/runtime/system/runners/stack_run.py @state@ %i
 # append, not truncate: systemd opens the file again for the exit recorder, and truncating would empty it.
 StandardOutput=append:@runs@/%i.log
+# What the verb reads, such as the export the reports verb sorts, which no agent may read on its way.
+StandardInput=file:@runs@/%i.in
 StandardError=inherit
 ExecStopPost=+@python@ -I @install@/runtime/system/runners/record_exit.py @runs@/%i.exit
 UMask=0027

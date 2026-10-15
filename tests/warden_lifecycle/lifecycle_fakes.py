@@ -92,7 +92,7 @@ class FakeLauncher:
         self.stopped.append(session_id)
         self.procs.pop(session_id, None)
 
-    def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
+    def run_stack(self, slot: int, verb: list[str], session: str, given: str = "") -> StackResult:
         self.stacks.append((slot, verb))
         return StackResult(0, "", "stack.log")
 

@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from test_stack import CONFIG, FACTORY_TOML
 
+from standard.config import ConfigError, parse_text
 from standard.server import heartbeat, setup, setup_steps
 from standard.server import setup_machine as machine
 from standard.server.setup_machine import Host, SetupError
@@ -339,3 +340,48 @@ def test_shared_service_secrets_are_kept_never_made_anew_over_a_blank_or_unreada
     server.answers[("sudo", "-n", "sh", "-c", machine.READ_FILE, "read", env_file)] = (1, "", "cat: Permission denied")
     with pytest.raises(SetupError, match="on the server but cannot be read"):
         setup.run(make_job(server))
+
+
+REPORTS = '[reports]\nport = 8110\npath = "/api/export"\nheader = "X-Shop-Token"\ntoken_key = "SHOP_EXPORT_TOKEN"\n'
+
+
+@pytest.mark.parametrize(
+    ("prod_env", "saved"),
+    [
+        ("SHOP_EXPORT_TOKEN=t0k3n\n", {"url": "https://shop-box.tail0.ts.net:8110/api/export", "header": "X-Shop-Token",
+                                       "token": "t0k3n"}),
+        ("SHOP_EXPORT_TOKEN=generate-with-openssl-rand-hex-32\n", None),
+        ("SHOP_EXPORT_TOKEN=REPLACE_ME\n", None),
+        (None, None),
+    ],
+    ids=["deployed", "not-generated", "placeholder", "never-deployed"],
+)  # fmt: skip
+def test_the_warden_gets_prods_report_export_once_prod_holds_its_token(
+    make_job: Any, capsys: pytest.CaptureFixture[str], prod_env: str | None, saved: dict[str, str] | None
+) -> None:
+    server = Server()
+    if prod_env is not None:
+        server.files["/srv/shop/prod/env/shop.env"] = ("deploy:deploy 600", prod_env)
+    job = make_job(server)
+    job.config = parse_text(FACTORY_TOML + REPORTS)
+
+    setup.run(job)
+    assert json.loads((job.home / "server.json").read_text()).get("reports") == saved
+    assert ("Still to do: deploy prod, then run the set-up again" in capsys.readouterr().out) is (saved is None)
+
+
+@pytest.mark.parametrize(
+    ("line", "problem"),
+    [
+        ("port = 0", "[reports].port"),
+        ('path = "api/export"', "[reports].path"),
+        ('header = "X Shop Token"', "[reports].header"),
+        ('token_key = "export_token"', "[reports].token_key"),
+    ],
+)
+def test_a_report_export_factory_toml_cannot_name_is_refused(line: str, problem: str) -> None:
+    key = line.split(" =")[0]
+    kept = "".join(row + "\n" for row in REPORTS.splitlines() if not row.startswith(f"{key} ="))
+    with pytest.raises(ConfigError) as refused:
+        parse_text(FACTORY_TOML + kept + line + "\n")
+    assert [p for p in refused.value.problems if p.startswith(problem)]

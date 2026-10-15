@@ -24,6 +24,7 @@ from standard.config_records import (
     ExtraImage,
     Product,
     Release,
+    Reports,
     Route,
     Server,
     Services,
@@ -36,6 +37,7 @@ FILE = "factory.toml"
 # One line, owner/name@<40-character sha>: the factory commit the product's CI plans and checks with.
 FACTORY_REF = ".github/factory-ref"
 FACTORY_REF_LINE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@([0-9a-f]{40})")
+REQUIRED = ("product", "build", "smoke", "services", "env", "server", "workspaces", "deploy", "edge")
 WORKSPACES = ("staging", "prod")
 RELEASE_KINDS = ("chrome-web-store",)
 # What an [env.set] value may name; each workspace and slot fills them in.
@@ -50,6 +52,7 @@ _USER = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _ENV_KEY = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _ARG = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_HEADER = re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]+$")
 _URL_PATH = re.compile(r"^/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$")
 _BLOCKED = re.compile(r"^/[A-Za-z0-9._~!$&'()+,;=:@%/-]*\*?$")
 
@@ -98,11 +101,7 @@ class _Reader(Fields):
     """Walks the parsed file, collecting every problem rather than stopping at the first."""
 
     def config(self, data: dict[str, Any]) -> Config | None:
-        self.known(
-            data,
-            "factory.toml",
-            ("product", "build", "smoke", "services", "env", "server", "workspaces", "deploy", "edge", "release"),
-        )
+        self.known(data, "factory.toml", (*REQUIRED, "release", "reports"))
         product = self.product(data)
         build = self.build(data)
         smoke = self.smoke(data)
@@ -113,9 +112,10 @@ class _Reader(Fields):
         deploy = self.deploy(data)
         edge = self.edge(data)
         releases = self.releases(data)
+        reports = self.reports(data)
         if self.problems:
             return None
-        return Config(product, build, smoke, services, env, server, workspaces, deploy, edge, releases, data)
+        return Config(product, build, smoke, services, env, server, workspaces, deploy, edge, releases, reports, data)
 
     def product(self, data: dict[str, Any]) -> Product:
         t = self.table(data, "product", "", ("name", "registry"))
@@ -290,6 +290,17 @@ class _Reader(Fields):
             to = self.text(item, "redirect", where, _HOST, "a host name") or self._missing(item, "redirect", where)
             routes.append(Route(host, to))
         return Edge(self.texts(t, "blocked_paths", "[edge]", blocked), tuple(routes))
+
+    def reports(self, data: dict[str, Any]) -> Reports | None:
+        if "reports" not in data:
+            return None
+        t = self.table(data, "reports", "", ("port", "path", "header", "token_key"))
+        return Reports(
+            self.number(t, "port", "[reports]", 1, 65535),
+            self.text(t, "path", "[reports]", _URL_PATH, "a path starting with /"),
+            self.text(t, "header", "[reports]", _HEADER, "an HTTP header name"),
+            self.text(t, "token_key", "[reports]", _ENV_KEY, "an UPPER_CASE environment key"),
+        )
 
     def releases(self, data: dict[str, Any]) -> tuple[Release, ...]:
         found = []

@@ -103,7 +103,7 @@ def laptop_langfuse_json(places: Places) -> Path:
     return layout.secrets(places.state) / layout.LAPTOP_LANGFUSE
 
 
-def _keys(path: Path, section: str, names: tuple[str, ...], missing: str) -> dict[str, str]:
+def read_keys(path: Path, section: str, names: tuple[str, ...], missing: str) -> dict[str, str]:
     """The named values of one section of a JSON key file (the whole file when ``section`` is empty)."""
     try:
         raw = store.read_json(path)
@@ -126,20 +126,20 @@ def _keys(path: Path, section: str, names: tuple[str, ...], missing: str) -> dic
 
 def glitchtip(places: Places, workspace: str) -> GlitchTip:
     if workspace in (PROD, STAGING):
-        keys = _keys(server_json(places), "glitchtip", ("url", "org", "token"), "the server set-up has not run")
+        keys = read_keys(server_json(places), "glitchtip", ("url", "org", "token"), "the server set-up has not run")
     else:
-        keys = _keys(laptop_glitchtip_json(places), "", ("url", "org", "token"),
-                     "the laptop's GlitchTip is not set up: reinstall the factory")  # fmt: skip
+        keys = read_keys(laptop_glitchtip_json(places), "", ("url", "org", "token"),
+                         "the laptop's GlitchTip is not set up: reinstall the factory")  # fmt: skip
     return GlitchTip(keys["url"], keys["org"], keys["token"])
 
 
 def langfuse(places: Places, workspace: str) -> Langfuse:
     if workspace in (PROD, STAGING):
-        keys = _keys(server_json(places), "langfuse", ("url", "public_key", "secret_key"),
-                     "the server set-up has not run")  # fmt: skip
+        keys = read_keys(server_json(places), "langfuse", ("url", "public_key", "secret_key"),
+                         "the server set-up has not run")  # fmt: skip
         return Langfuse(keys["url"], keys["public_key"], keys["secret_key"])
-    keys = _keys(laptop_langfuse_json(places), "", ("url", "public_key", "secret_key"),
-                 "the laptop's Langfuse is not set up: reinstall the factory")  # fmt: skip
+    keys = read_keys(laptop_langfuse_json(places), "", ("url", "public_key", "secret_key"),
+                     "the laptop's Langfuse is not set up: reinstall the factory")  # fmt: skip
     return Langfuse(keys["url"], keys["public_key"], keys["secret_key"])
 
 

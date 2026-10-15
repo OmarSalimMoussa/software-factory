@@ -41,7 +41,7 @@ class _Events:
         self.logs, self.lines = logs, lines
         self.calls: list[list[str]] = []
 
-    def run_stack(self, slot: int, verb: list[str], session: str) -> StackResult:
+    def run_stack(self, slot: int, verb: list[str], session: str, given: str = "") -> StackResult:
         self.calls.append(verb)
         log = self.logs / f"events-{len(self.calls)}.log"
         log.write_text("".join(json.dumps(line) + "\n" for line in self.lines))
