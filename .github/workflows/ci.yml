@@ -16,8 +16,8 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
       - run: uv sync --frozen --extra dev
       - name: pytest
         run: uv run --frozen --extra dev pytest -q
@@ -26,13 +26,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       # The whole history: the ratchet checks compare this push with the commit it started from.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10
       - run: uv sync --frozen --extra dev
       # The error-telemetry check reads the pages' scripts with the TypeScript that package.json pins.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: npm ci
@@ -44,8 +44,8 @@ jobs:
   drives:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       # The drives load Playwright's driver from PLAYWRIGHT_CORE and launch the runner's own Google Chrome, headless;
@@ -74,7 +74,7 @@ jobs:
       cancel-in-progress: false
     steps:
       # The whole history: the release carries it, for the warden's clone of the factory.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Build the release file

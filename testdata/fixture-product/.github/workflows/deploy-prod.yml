@@ -36,7 +36,7 @@ jobs:
           SHA: ${{ inputs.sha }}
         run: |
           [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::sha must be a full commit: 40 lowercase hex characters"; exit 1; }
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
           persist-credentials: false
@@ -81,7 +81,7 @@ jobs:
       group: releases
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
           fetch-depth: 0
@@ -96,14 +96,14 @@ jobs:
           fi
           echo "repo=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
           echo "sha=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ steps.factory.outputs.repo }}
           ref: ${{ steps.factory.outputs.sha }}
           ssh-key: ${{ secrets.FACTORY_READ_KEY }}
           persist-credentials: false
           path: factory
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Release what changed
