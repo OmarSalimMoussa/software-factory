@@ -58,7 +58,7 @@ jobs:
           ssh-key: ${{ secrets.FACTORY_READ_KEY }}
           persist-credentials: false
           path: factory
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.0
       - name: Install the factory's pinned tools
         working-directory: factory
         run: uv sync --frozen --extra dev --no-install-project
