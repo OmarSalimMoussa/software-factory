@@ -149,6 +149,10 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
      passes, or, told why, once that task is closed or parked.
    - Anything else the factory can make (a seed, a scenario out of date, a page a slot can serve): send it back to
      building, as a failure, with what to make in the note.
+   A revert takes out all the merge brought, a fix it carried for what every task shares too (a build or ignore
+   file, a shared script). Read `git diff --stat <merge>^1 <merge>` first. Right after the revert, apply those
+   files' changes again, all in one commit that says what it fixes: `git diff <merge>^1 <merge> -- <files> | git
+   apply --3way --index`. If that conflicts, `git checkout HEAD -- <files>` and file a request instead.
    Then move on to other work. A blocker an implementer reports before its merge goes the same ways, with nothing to
    revert.
 5. **Staging is the owner's.** The warden offers the newest commit that is safe to ship on Home, and the owner

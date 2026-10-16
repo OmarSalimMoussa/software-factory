@@ -33,7 +33,9 @@ nothing starts without the owner's approval, except the fix for a clear prod out
    an account, leave to use an outside site), the task is blocked: it waits on Home for the owner's **Fixed, carry
    on**, its implementer benched and written to SELF_REFLECT, while other work goes on. When another open task makes
    it, the task is on hold, and the warden sends it back once that task is checked, or closed or parked. Anything
-   else the factory can make (a seed, a scenario out of date) goes back to the implementer as a failure does.
+   else the factory can make (a seed, a scenario out of date) goes back to the implementer as a failure does. A
+   fix the merge carried for what every task shares, such as a build or ignore file, is applied again right after
+   the revert, in one commit of its own; one that no longer applies cleanly becomes a request.
 10. **Staging.** The warden offers the push of the newest commit whose merges all passed their check. It waits on
     Home until the owner pushes it, and CI then deploys staging; no agent asks for a push or waits on one. A
     regression there is reverted at once, and the revert waits for the owner's push the same way.
