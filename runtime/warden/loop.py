@@ -13,6 +13,7 @@ tick. A step that fails never stops the steps after it. The orchestrator's `fact
 from __future__ import annotations
 
 import copy
+import dataclasses
 import hashlib
 import logging
 from collections.abc import Callable
@@ -20,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.queue import files, format_check, formats, goal, intake, tasks, triage, turn
-from runtime.queue.book import Queue
+from runtime.queue.book import Queue, request_rel
 from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
@@ -34,9 +35,10 @@ from runtime.warden.owner import reflections
 log = logging.getLogger(__name__)
 
 # deployed: the build each environment last answered with, so tasks advance once per new build.
+# staging_red: the request the warden filed for staging's red spell, "" while it is not red.
 # goal: the hash of GOAL.md the scores were last made from.
 _FRESH: dict[str, Any] = {
-    "probed": {}, "deployed": {}, "staging_red": False, "loop_due": None, "triage_due": None, "goal": None,
+    "probed": {}, "deployed": {}, "staging_red": "", "loop_due": None, "triage_due": None, "goal": None,
 }  # fmt: skip
 
 
@@ -146,7 +148,9 @@ def _staging(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
     a network failure changes nothing, nor does a failure while the deploy of the warden's last push lands. The
     event and the request name that push as the first suspect; reverting stays the orchestrator's call."""
     if probe.ok:
-        memo["staging_red"] = False
+        red, memo["staging_red"] = memo["staging_red"], ""
+        if isinstance(red, str) and red:
+            _recovered(ctx, red, memo["deployed"].get(probe.env), probe)
         return
     if not probe.counts or memo["staging_red"]:
         return
@@ -156,16 +160,32 @@ def _staging(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
     streak = probes.recent(ctx.places, probes.STAGING, needed)
     if len(streak) < needed or not all(p.counts for p in streak):
         return
-    memo["staging_red"] = True
     suspect = deploys.builds(ctx.places, probes.STAGING)["current"]
     pushed = deploys.last_push(ctx.places, probes.STAGING)
-    reflections.incident(ctx, f"Staging went red at {streak[0].at}; the orchestrator was told to revert or fix it.")
     body = (f"Staging's health check failed {needed} probes in a row since {streak[0].at}: {probe.error}. "
             + (f"The warden's last push, {pushed[:12]}, is the first suspect. " if pushed else "")
             + "Revert the change that broke it at once, or fix it forward.")  # fmt: skip
-    req = file_red(ctx, "staging", body)
+    memo["staging_red"] = req = file_red(ctx, "staging", body)
+    reflections.incident(ctx, f"Staging went red at {streak[0].at}; the orchestrator was told to revert or fix it.")
     ctx.post_event(inbox.STAGING_RED, {"probe": models.dump(probe), "request": req, "suspect": pushed or None,
                                        "last_good": suspect["commit"] if suspect else None})  # fmt: skip
+
+
+def _recovered(ctx: Context, red: str, last_good: str | None, probe: Probe) -> None:
+    """The red spell's end, added to the request the warden filed for it: on the build it went red on, or a new one."""
+    build = probe.commit[:12]
+    if build and probe.commit == last_good:
+        how = f", on build {build}, the one it went red on"
+    else:
+        how = f", on a new build, {build}" if build else ""
+    queue = Queue.of(ctx)
+    try:
+        with ctx.lock, queue.lock():
+            req = queue.request(red)
+            body = f"{req.body}\n\nStaging answered healthy again at {probe.at}{how}."
+            queue.write({request_rel(req): formats.dump_request(dataclasses.replace(req, body=body))})
+    except (OSError, formats.FormatError, Refused, store.StoreError) as exc:
+        log.warning("warden: noting staging's recovery on %s failed (%s)", red, type(exc).__name__)
 
 
 def file_red(ctx: Context, where: str, body: str) -> str:

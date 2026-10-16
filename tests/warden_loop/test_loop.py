@@ -8,6 +8,7 @@ import pytest
 from loop_fakes import World, healthy
 
 from runtime.queue import formats
+from runtime.queue.book import Queue
 from runtime.shared import network, store
 from runtime.shared.models import INBOXES, Request
 from runtime.warden import inbox, loop
@@ -158,6 +159,58 @@ def test_staging_goes_red_after_failures_in_a_row_and_never_while_a_push_deploys
     assert inbox.STAGING_RED in _staging_fails(ticking, tmp_path, 1)
     red = next(e for e in inbox.read(ticking.ctx, {}, None)["events"] if e["kind"] == inbox.STAGING_RED)
     assert red["data"]["suspect"] == "c" * 40 and red["data"]["request"].startswith("r-")
+
+
+@pytest.mark.parametrize(
+    ("build", "said"),
+    [
+        ("c" * 40, ", on build cccccccccccc, the one it went red on."),
+        ("d" * 40, ", on a new build, dddddddddddd."),
+    ],
+    ids=["by-itself", "new-build"],
+)
+def test_the_red_request_says_when_staging_came_back_and_on_which_build(
+    ticking: World, tmp_path: Path, build: str, said: str
+) -> None:
+    file_requests(ticking, 0, 0)
+    loop.run_tick(ticking.ctx, lambda url, timeout: healthy("c" * 40), *kernel(tmp_path))
+    _staging_fails(ticking, tmp_path, ticking.ctx.settings().get_int("watch.outage_after"))
+    red = next(e for e in inbox.read(ticking.ctx, {}, None)["events"] if e["kind"] == inbox.STAGING_RED)
+    period = ticking.ctx.settings().get_int("watch.probe_seconds")
+    ticking.clock.t += period
+    back = ticking.ctx.clock.iso()
+
+    for _ in range(2):  # noted once per red spell
+        loop.run_tick(ticking.ctx, lambda url, timeout: healthy(build), *kernel(tmp_path))
+        ticking.clock.t += period
+
+    body = Queue.of(ticking.ctx).request(red["data"]["request"]).body
+    assert body.endswith(f"\n\nStaging answered healthy again at {back}{said}")
+    assert body.count("Staging answered healthy again") == 1
+
+
+def test_a_recovery_note_that_cannot_be_written_is_reported_and_the_probes_go_on(
+    ticking: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    file_requests(ticking, 0, 0)
+    loop.run_tick(ticking.ctx, lambda url, timeout: healthy("c" * 40), *kernel(tmp_path))
+    _staging_fails(ticking, tmp_path, ticking.ctx.settings().get_int("watch.outage_after"))
+    red = next(e for e in inbox.read(ticking.ctx, {}, None)["events"] if e["kind"] == inbox.STAGING_RED)
+
+    def gone(self: Queue, request_id: str) -> Request:
+        raise FileNotFoundError(request_id)
+
+    monkeypatch.setattr(Queue, "request", gone)
+    period = ticking.ctx.settings().get_int("watch.probe_seconds")
+    with caplog.at_level(logging.WARNING, logger=loop.__name__):
+        for _ in range(2):  # reported once: the red spell is over either way
+            ticking.clock.t += period
+            loop.run_tick(ticking.ctx, lambda url, timeout: healthy("d" * 40), *kernel(tmp_path))
+
+    assert [r.getMessage() for r in caplog.records] == [
+        f"warden: noting staging's recovery on {red['data']['request']} failed (FileNotFoundError)"
+    ]
+    assert deploys.builds(ticking.ctx.places, probes.STAGING)["current"]["commit"] == "d" * 40
 
 
 def test_a_read_only_walk_of_prod_is_asked_for_a_day_after_the_last_one(ticking: World, tmp_path: Path) -> None:
