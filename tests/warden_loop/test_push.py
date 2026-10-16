@@ -475,3 +475,52 @@ def test_an_upgrade_s_pin_on_the_last_one_not_yet_pushed_goes_out_after_it(
 
     assert git(github_repo, "rev-parse", "master") == second
     assert git(github_repo, "rev-parse", "master^") == first
+
+
+def _owned(world: World) -> str:
+    """The owner's own change to factory.toml, as root commits and records it (factory-own)."""
+    parent = git(world.checkout, "rev-parse", "HEAD")
+    text = (world.checkout / "factory.toml").read_text() + "# the owner's own line\n"
+    made = commit(world.checkout, lambda root: (root / "factory.toml").write_text(text))
+    places = world.ctx.places
+    places.upgrade.mkdir(parents=True, exist_ok=True)
+    record = {"commit": made, "parent": parent, "blobs": {"factory.toml": upgrades.blob_id(text)}}
+    store.write_json(upgrades.owned_path(places), [*upgrades.read_owned(places), record])
+    return made
+
+
+def test_the_owners_own_change_waits_for_a_check_it_asks_for_once_then_ships_as_theirs(
+    world: World, github_repo: Path
+) -> None:
+    passed(world, git(world.checkout, "rev-parse", "HEAD^{tree}"))
+    owned = _owned(world)
+
+    offer(world)
+    github_push.look_soon(world.ctx.places)
+    offer(world)
+
+    assert github_push.waiting(world.ctx.places) is None and reflections.entries(world.ctx.places) == []
+    assert [e for e in world.events if e[0] == inbox.CHECK_DUE] == [(inbox.CHECK_DUE, {"commit": owned})]
+    passed(world, git(world.checkout, "rev-parse", f"{owned}^{{tree}}"))
+    held = ship(world)
+    assert held["sha"] == owned and held["items"] == [{"kind": "owner", "task": ""}]
+    assert git(github_repo, "rev-parse", "master") == owned
+
+
+@pytest.mark.parametrize("why", ["a-task-holds-the-turn", "an-unchecked-merge", "nothing-new"])
+def test_no_check_is_asked_for_while_the_tip_waits_on_more_than_factory_check(
+    world: World, github_repo: Path, monkeypatch: pytest.MonkeyPatch, why: str
+) -> None:
+    passed(world, git(world.checkout, "rev-parse", "HEAD^{tree}"))
+    if why == "a-task-holds-the-turn":
+        commit(world.checkout, write("src/app.py"))
+        monkeypatch.setattr(turn, "holder", lambda places: {"task": "t-0001", "branch": "b", "base": "c"})
+    elif why == "an-unchecked-merge":
+        git(world.checkout, "checkout", "-q", "-b", "side")
+        commit(world.checkout, write("src/side.py"))
+        git(world.checkout, "checkout", "-q", "-")
+        git(world.checkout, "merge", "-q", "--no-ff", "-m", "Merge side", "side")
+
+    offer(world)
+
+    assert [e for e in world.events if e[0] == inbox.CHECK_DUE] == []

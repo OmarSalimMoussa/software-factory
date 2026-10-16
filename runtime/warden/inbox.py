@@ -31,6 +31,8 @@ QA_PROD_DUE = "qa-prod due"  # prod answers on a build the owner pushed: walk it
 BENCHED, CRASHED = "benched", "crashed"
 GOAL_CHANGED = "goal-changed"  # the loop read a new GOAL.md: the scores changed, so the proposals may too
 NEEDS_RUNG = "needs rung"  # an implementer spent routing.cause_tries without confirming a cause
+# The default branch's newest commit waits on nothing but `factory check`: the owner's own change, or a revert.
+CHECK_DUE = "check due"
 # Every owner decision (plan R4), so the orchestrator acts at once; `answered` carries the answer to a question only
 # the orchestrator can act on (R15): the warden hands a session's own answer to it directly.
 APPROVED, NOT_NOW, DROPPED, BOOSTED, GO = "approved", "not-now", "dropped", "boosted", "go"
@@ -54,6 +56,7 @@ KINDS = frozenset(
         BENCHED,
         CRASHED,
         NEEDS_RUNG,
+        CHECK_DUE,
         YOURS,
         *OWNER_DECISIONS,
     }

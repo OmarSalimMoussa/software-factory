@@ -1,4 +1,5 @@
-"""An upgrade of the factory, in root's own folder: what is installed, and how an upgrade under way is going.
+"""An upgrade of the factory, in root's own folder: what is installed, how an upgrade under way is going, and the
+commits root made on the agents' default branch for the owner.
 
 Only root writes here (the install, and the upgrade service the dashboard starts); the warden reads it for the
 dashboard, which keeps showing an upgrade while the warden and the dashboard stop and start again. For an upgrade
@@ -94,6 +95,11 @@ def pins_path(places: Places) -> Path:
     return places.upgrade / "pins.json"
 
 
+def owned_path(places: Places) -> Path:
+    """The owner's own changes to paths only a person changes, which root committed on the owner's command."""
+    return places.upgrade / "owned.json"
+
+
 # Workflows the factory once copied into products, and copies no more.
 RETIRED_WORKFLOWS = ("heartbeat.yml",)
 
@@ -111,17 +117,30 @@ def blob_id(text: str) -> str:
     return hashlib.sha1(b"blob %d\0" % len(data) + data, usedforsecurity=False).hexdigest()
 
 
-def _pin_ok(pin: object) -> bool:
-    if not isinstance(pin, dict) or set(pin) != {"commit", "parent", "blobs"}:
+def _record_ok(record: object) -> bool:
+    if not isinstance(record, dict) or set(record) != {"commit", "parent", "blobs"}:
         return False
-    shas = isinstance(pin["commit"], str) and bool(FULL_SHA.match(pin["commit"])) and isinstance(pin["parent"], str)
-    return shas and isinstance(pin["blobs"], dict)
+    shas = (
+        isinstance(record["commit"], str)
+        and bool(FULL_SHA.match(record["commit"]))
+        and isinstance(record["parent"], str)
+    )
+    return shas and isinstance(record["blobs"], dict)
+
+
+def _records(path: Path) -> list[dict[str, Any]]:
+    raw = store.read_json_or(path, [])
+    if not isinstance(raw, list) or not all(_record_ok(r) for r in raw):
+        raise store.StoreError(f"{path}: needs a list of commits, parents and blobs")
+    found: list[dict[str, Any]] = raw
+    return found
 
 
 def read_pins(places: Places) -> list[dict[str, Any]]:
     """Each commit an upgrade made to move the product to its factory, its parent, and each path's blob (or None)."""
-    raw = store.read_json_or(pins_path(places), [])
-    if not isinstance(raw, list) or not all(_pin_ok(p) for p in raw):
-        raise store.StoreError(f"{pins_path(places)}: needs a list of commits, parents and blobs")
-    found: list[dict[str, Any]] = raw
-    return found
+    return _records(pins_path(places))
+
+
+def read_owned(places: Places) -> list[dict[str, Any]]:
+    """Each commit root made of the owner's own change, its parent, and each path's blob (or None)."""
+    return _records(owned_path(places))

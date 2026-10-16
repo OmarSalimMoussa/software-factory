@@ -42,6 +42,7 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 | `not-now`, `dropped`, `boosted`, `proposal-slot-free` | Fill the free proposal slots. |
 | `go` | The owner said Go to a spec: the warden starts its build when a place frees and ends its designer. Nothing to do. |
 | `pushed` | The owner pushed what waited to staging, and CI deploys it. Nothing to do: a regression there comes as `staging red`. |
+| `check due` | The default branch's newest commit (the event's `commit`) waits on nothing but `factory check`: the owner's own change, or a revert. Run `factory check` in the main checkout; once it passes, the warden offers it on Home. A failure becomes a request. |
 | `decided-extend`, `park`, `to-designer` | The owner decided a stuck task; the warden told its session or ended it. `to-designer`: propose it at rung 3. |
 | `limit-extended` | The owner gave a session more of a limit; the warden told it. Nothing to do. |
 | `unblocked` | The owner fixed what blocked a task; the warden brings its implementer back when a place frees. Nothing to do. |

@@ -11,7 +11,7 @@ from pathlib import Path
 from runtime.shared import upgrades
 from runtime.shared.paths import AGENT_USER, MANAGED_SETTINGS, SCRATCH, SLICE, WARDEN_USER
 from runtime.shared.protocol import Refused
-from runtime.system import layout, render
+from runtime.system import layout, render, root_commits
 from runtime.system.host import CommandError, Host
 from runtime.system.job import Install, github_name, refuse
 
@@ -78,6 +78,8 @@ def firewall(ctx: Install) -> None:
 def factory_command(ctx: Install) -> None:
     script = f'#!/bin/sh\nexec {layout.PYTHON} -I {ctx.places.install}/runtime/cli/factory "$@"\n'
     ctx.host.write(layout.FACTORY_BIN, script, mode=0o755)
+    own = f'#!/bin/sh\nexec {layout.PYTHON} -I {ctx.places.install}/runtime/system/owner_commit.py "$@"\n'
+    ctx.host.write(layout.OWN_BIN, own, mode=0o755)
 
 
 def git_hooks(ctx: Install) -> None:
@@ -100,60 +102,34 @@ def factory_repo(ctx: Install) -> str:
     return str(ctx.release["repo"]) if ctx.release else github_name(ctx.factory_origin) or ""
 
 
-# The factory's git identity: the agents commit as it, and root's pin commit names it on its own command line.
-GIT_NAME, GIT_EMAIL = "software factory", "factory@software.invalid"
-PIN_AUTHOR = ["-c", f"user.name={GIT_NAME}", "-c", f"user.email={GIT_EMAIL}"]
-
-
 def product_pin(ctx: Install) -> None:
     """An upgrade moves the agents' copy of the product to the factory it installs, in one commit on the default
     branch that only root may make: no agent may change .github. The warden pushes it as the owner's (runtime/warden/
-    pins.py). A move that cannot be made is told and left to the owner: the factory itself is upgraded either way."""
+    delivery/pins.py). A move that cannot be made is told and left to the owner: the factory itself is upgraded
+    either way."""
     try:
         _pin(ctx)
     # telemetry: surfaced — the owner is told, through `tell`, to move the product's pin by hand
-    except (CommandError, Refused) as exc:
-        ctx.host.tell(f"The product stays on its factory for now ({exc}): move .github/factory-ref by hand.")
+    except (CommandError, Refused, root_commits.NotHere) as exc:
+        ctx.host.tell(f"The product stays on its factory for now ({exc}): once that is put right, install again.")
 
 
 def _pin(ctx: Install) -> None:
     host, checkout, repo = ctx.host, ctx.checkout(), factory_repo(ctx)
-    branch = ctx.need_settings().get_str("repo.default_branch")
-    # No hooks, and plumbing that applies no filter: nothing the agent configured shapes what root records.
-    git = ["git", "-C", str(checkout), "-c", "core.hooksPath=/dev/null"]
-    on = host.query([*git, "symbolic-ref", "--short", "HEAD"], user=AGENT_USER)[1].strip()
-    dirty = host.query([*git, "status", "--porcelain", "--untracked-files=no"], user=AGENT_USER)[1].strip()
-    if ctx.first or host.dry or not repo or on != branch or dirty:
-        host.say(f"the product's pin is left as it is (first {ctx.first}, {repo!r}, on {on!r}, changes {bool(dirty)})")
+    if ctx.first or host.dry or not repo:
+        host.say(f"the product's pin is left as it is (first {ctx.first}, {repo!r})")
         return
+    branch = ctx.need_settings().get_str("repo.default_branch")
+    root_commits.ready(host, checkout, branch)
     want = upgrades.pin_files(ctx.tree() / "templates" / "ci", repo, ctx.sha)
-    parent = host.run([*git, "rev-parse", "--verify", f"refs/heads/{branch}^{{commit}}"], user=AGENT_USER).strip()
-    held = set(host.run([*git, "ls-tree", "-r", "--name-only", parent, "--", *want], user=AGENT_USER).splitlines())
-    blobs = {rel: upgrades.blob_id(text) if text else None for rel, text in want.items() if text or rel in held}
-    env = {"GIT_INDEX_FILE": str(checkout / ".git" / "factory-pin.index")}
-    host.run([*git, "read-tree", parent], user=AGENT_USER, env=env)
-    for rel, text in want.items():
-        if text is not None:
-            host.run([*git, "hash-object", "-w", "--no-filters", "--stdin"], user=AGENT_USER, stdin=text)
-            entry = f"100644,{blobs[rel]},{rel}"
-            host.run([*git, "update-index", "--add", "--cacheinfo", entry], user=AGENT_USER, env=env)
-        elif rel in held:
-            host.run([*git, "update-index", "--force-remove", rel], user=AGENT_USER, env=env)
-    tree = host.run([*git, "write-tree"], user=AGENT_USER, env=env).strip()
-    host.run(["rm", "-f", env["GIT_INDEX_FILE"]], user=AGENT_USER)
-    if tree == host.run([*git, "rev-parse", f"{parent}^{{tree}}"], user=AGENT_USER).strip():
+    message = f"The product moves to the factory at {ctx.sha[:12]}, as the owner's upgrade asked"
+    ledger = (upgrades.pins_path(ctx.places), upgrades.read_pins(ctx.places))
+    made = root_commits.commit(host, checkout, branch, root_commits.tip(host, checkout, branch), want, message, {},
+                               ledger)  # fmt: skip
+    if made is None:
         host.say(f"the product already uses the factory at {ctx.sha[:12]}")
         return
-    message = f"The product moves to the factory at {ctx.sha[:12]}, as the owner's upgrade asked"
-    made = host.run([*git, *PIN_AUTHOR, "commit-tree", tree, "-p", parent, "-m", message], user=AGENT_USER).strip()
-    listed = host.run([*git, "ls-tree", "-r", made, "--", *blobs], user=AGENT_USER).splitlines()
-    if {line.split("\t", 1)[1]: line.split()[2] for line in listed} != {k: v for k, v in blobs.items() if v}:
-        raise refuse("the commit git made holds other files than root gave it")
-    host.run([*git, "update-ref", f"refs/heads/{branch}", made, parent], user=AGENT_USER)
-    host.run([*git, "read-tree", "-m", "-u", parent, made], user=AGENT_USER)  # the working tree follows the branch
-    pins = [*upgrades.read_pins(ctx.places), {"commit": made, "parent": parent, "blobs": blobs}]
-    host.write(upgrades.pins_path(ctx.places), json.dumps(pins, indent=1) + "\n", mode=0o644)
-    host.tell(f"The product moves to this factory in commit {made[:12]}; the warden pushes it when it starts.")
+    host.tell(f"The product moves to this factory in commit {made.commit[:12]}; the warden pushes it when it starts.")
 
 
 def https_handlers(status: str) -> dict[str, str] | None:

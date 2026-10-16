@@ -13,7 +13,7 @@ from runtime.shared import releases, upgrades
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
-from runtime.system import ci_check, install, layout, render, uninstall
+from runtime.system import ci_check, install, layout, render, root_commits, uninstall
 from runtime.system.host import DryHost
 from runtime.system.install_steps import steps_machine, steps_prepare, steps_secrets, steps_services, steps_wire
 from runtime.system.job import REPO_ROOT, Install
@@ -549,7 +549,7 @@ def test_an_upgrade_moves_the_agents_product_to_its_factory_in_one_commit_root_r
     job.host = RealHost(Journal(terminal=False))
     job.settings = settings(**{"repo.path": str(repo)})
     job.first, job.sha, job.factory_origin, job.stage = first, "e" * 40, FACTORY_ORIGIN, REPO_ROOT
-    monkeypatch.setattr(steps_wire, "AGENT_USER", "")  # this test's user stands in for the agent's
+    monkeypatch.setattr(root_commits, "AGENT_USER", "")  # this test's user stands in for the agent's
     monkeypatch.setattr(job.host, "write", lambda path, text, **how: (path.parent.mkdir(parents=True, exist_ok=True),
                                                                       path.write_text(text)))  # fmt: skip
 

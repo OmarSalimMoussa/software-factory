@@ -175,3 +175,9 @@ the list. A product names any other path only a person may change in
 `repo.protected_paths` (a trailing `/` names a folder). The guard, the git hooks and the warden's push refuse a change
 to any of them. While that checkout's `factory.toml` cannot be read, they refuse every write, commit and push, until
 the owner fixes it.
+
+To change one yourself, commit the change in your own checkout, write it out with
+`git format-patch -1 --no-renames <commit>`, and run `sudo factory-own --patch <file>`. Root commits it on the
+agents' default branch with its author and message, and records it as yours. The warden then asks the orchestrator
+to check that branch, and once the check passes, your change waits on Home with the next push to staging.
+`sudo factory-own --commit <id>` records a commit already on that branch instead.

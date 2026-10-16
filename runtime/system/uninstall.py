@@ -134,8 +134,8 @@ def _with_leftovers(path: Path) -> tuple[Path, ...]:
 
 
 def programs(host: Host, places: Places, dashboard_port: str | None) -> None:
-    for path in (paths.FACTORY_BIN, layout.CLAUDE_BIN.parent, *_with_leftovers(paths.INSTALL), layout.TOOLS,
-                 *_with_leftovers(layout.TOOLCHAIN), paths.RUN, paths.FIREWALL, paths.UPGRADE,
+    for path in (paths.FACTORY_BIN, layout.OWN_BIN, layout.CLAUDE_BIN.parent, *_with_leftovers(paths.INSTALL),
+                 layout.TOOLS, *_with_leftovers(layout.TOOLCHAIN), paths.RUN, paths.FIREWALL, paths.UPGRADE,
                  layout.DRILLS):  # fmt: skip
         _remove(host, path)
     sealed_copies(host)

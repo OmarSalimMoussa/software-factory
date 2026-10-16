@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.guard.writes import UnknownProtectedPaths, is_protected, protected_paths
+from runtime.queue import turn
 from runtime.queue.book import Queue
 from runtime.queue.turn import merges
 from runtime.shared import environment, operations, store, upgrades
@@ -39,6 +40,7 @@ SHIPPABLE = frozenset({"checked", ON_STAGING, "promoted"})
 # One push at a time, of either kind: the check that none runs and the start happen together.
 pushing = threading.Lock()
 _LOOKED: dict[str, float] = {}  # when each warden last looked, by its state folder: a look fetches from GitHub
+_ASKED: dict[str, str] = {}  # each state folder's tip the orchestrator was last asked to check
 
 
 def mirror_path(places: Places) -> Path:
@@ -84,6 +86,8 @@ def offer(ctx: Context) -> None:
                 reflections.incident(ctx, f"The staging push is not offered: {refused.reason}")
             elif refused.rule != "unchecked":
                 raise
+            else:
+                _ask_for_check(ctx, git)
             return
         held = waiting(ctx.places)
         if held is not None and (not git.knows(held["sha"]) or git.is_ancestor(held["sha"], remote)):
@@ -92,6 +96,19 @@ def offer(ctx: Context) -> None:
         if count and (held is None or not git.is_ancestor(sha, held["sha"])):
             held = {"sha": sha, "commits": count, "items": _going(ctx, git, remote, sha), "asked_at": ctx.clock.iso()}
             store.write_json(waiting_path(ctx.places), held, mode=0o600)
+
+
+def _ask_for_check(ctx: Context, git: Git) -> None:
+    """Ask the orchestrator, once a tip, to check a tip that waits on nothing else: no unchecked merge, no turn held."""
+    branch = ctx.settings().get_str("repo.default_branch")
+    remote, tip = (git.run("rev-parse", f"refs/{side}/{branch}").strip() for side in ("github", "checkout"))
+    if tip == remote or turn.holder(ctx.places) is not None or _unchecked_merges(ctx, git, remote, tip):
+        return
+    if checks.passed(ctx.places, git.run("rev-parse", f"{tip}^{{tree}}").strip()):
+        return
+    if _ASKED.get(str(ctx.places.state)) != tip:
+        _ASKED[str(ctx.places.state)] = tip
+        ctx.post_event(inbox.CHECK_DUE, {"commit": tip})
 
 
 def look_soon(places: Places) -> None:
@@ -183,15 +200,18 @@ def fetch_checkout(ctx: Context, git: Git, *wanted: str) -> str:
 
 def _going(ctx: Context, git: Git, remote: str, head: str) -> list[dict[str, str]]:
     """What a push of ``head`` takes to GitHub: each task whose merge it adds, each task whose earlier merge it takes
-    back, and the factory's upgrade when one of its pins is in the range. A merge it adds and takes back is left out."""
+    back, the factory's upgrade when one of its pins is in the range, and the owner's own change when root committed
+    one there. A merge it adds and takes back is left out."""
     reverted = set(REVERTS.findall(git.run("log", "--format=%B", f"{remote}..{head}")))
     found = merges(ctx.places)
     added = git.run("rev-list", "--reverse", "--first-parent", "--merges", f"{remote}..{head}").split()
     going = [{"kind": "task", "task": found.get(m, "")} for m in added if m not in reverted]
     going += [{"kind": "revert", "task": found.get(m, "")} for m in sorted(reverted - set(added))]
-    pinned = {p["commit"] for p in upgrades.read_pins(ctx.places)}
-    if pinned & set(git.run("rev-list", f"{remote}..{head}").split()):
+    ranged = set(git.run("rev-list", f"{remote}..{head}").split())
+    if {p["commit"] for p in upgrades.read_pins(ctx.places)} & ranged:
         going.append({"kind": "factory", "task": ""})
+    if {p["commit"] for p in upgrades.read_owned(ctx.places)} & ranged:
+        going.append({"kind": "owner", "task": ""})
     return going
 
 

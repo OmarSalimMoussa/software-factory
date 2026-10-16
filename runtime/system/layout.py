@@ -31,6 +31,8 @@ DOCKER_USERS = {STACK_USER: STACK_HOME, ERRORS_USER: ERRORS_HOME}
 PYTHON = "/usr/bin/python3"
 # The factory command. Sessions type the bare word alone, which is the one text the sandbox lets out.
 FACTORY_BIN = paths.FACTORY_BIN
+# The owner's own change to a path only a person changes, which root commits (runtime/system/owner_commit.py).
+OWN_BIN = Path("/usr/local/sbin/factory-own")
 # The agents' own Claude Code: root-owned, so no session can replace the program that runs its guard.
 CLAUDE_BIN = Path("/usr/local/libexec/software-factory/claude")
 TOOLS = paths.CHECK_TOOLS

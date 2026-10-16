@@ -28,6 +28,7 @@ dist_to_src = {}
 "runtime/system/drill_probe.py" = "the drills' probe: what it prints is the drill's evidence, and the drill reads its exit"
 "runtime/system/install.py" = "the installer, run by the owner with sudo: its stderr and exit status reach the owner"
 "runtime/system/uninstall.py" = "the uninstaller, run by the owner with sudo: its stderr and exit status reach the owner"
+"runtime/system/owner_commit.py" = "factory-own, run by the owner with sudo: its stderr and exit status reach the owner"
 "runtime/system/release.py" = "the release file's runner, run by the owner: its stderr and exit status reach the owner"
 "runtime/system/pause_checks.py" = "a systemd unit's step: its stderr and exit status go to the journal"
 "runtime/system/runners/agent_run.py" = "a systemd unit's command: its stderr and exit status go to the journal"

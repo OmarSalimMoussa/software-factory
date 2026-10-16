@@ -158,6 +158,8 @@ def staging_ready(snap: Snap) -> dict[str, Any] | None:
         title = task["title"] if task else "A merge no task names"
         if item["kind"] == "factory":
             items.append({"chip": {"text": "factory", "tone": ""}, "title": "Factory upgrade"})
+        elif item["kind"] == "owner":
+            items.append({"chip": {"text": "you", "tone": ""}, "title": "Your own change"})
         elif item["kind"] == "revert":
             items.append({"chip": {"text": "revert", "tone": "warn"}, "title": f"Takes back: {title}"})
         elif fix and item["task"] == fix:
