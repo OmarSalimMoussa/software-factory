@@ -28,7 +28,7 @@ from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.warden import inbox
 from runtime.warden.context import Context
-from runtime.warden.delivery import ci_watch, deploys, github_push, outage, prod_push
+from runtime.warden.delivery import deploys, github_push, outage, prod_push
 from runtime.warden.health import container_events, errors_import, heartbeat, probes, vitals
 from runtime.warden.owner import reflections
 
@@ -96,7 +96,6 @@ def run_tick(
         ("goal", lambda: _goal(ctx, _memo(ctx.places))),
         ("rescore", lambda: _rescore(ctx, now)),
         ("errors import", lambda: errors_import.poll(ctx)),
-        ("CI watch", lambda: ci_watch.poll(ctx)),
         ("daily qa-prod", lambda: _qa_prod_due(ctx, now)),
         ("container events", lambda: container_events.run_pass(ctx)),
     ]

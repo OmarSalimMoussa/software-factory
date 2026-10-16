@@ -107,6 +107,9 @@ class FakeGitHub:
     def run(self, run_id: str) -> dict[str, Any]:
         raise AssertionError("the walk never promotes")
 
+    def job_log(self, job_id: str, most: int) -> str:
+        raise AssertionError("no CI run fails here")
+
     def reachable(self) -> bool:
         return True
 

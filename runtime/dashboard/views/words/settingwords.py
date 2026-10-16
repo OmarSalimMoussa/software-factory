@@ -162,6 +162,8 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("watch.push_wait_minutes", "Minutes a push to prod may take"),
             ("watch.deploy_minutes", "Minutes staging's deploy of a push may take"),
             ("watch.ci_poll_minutes", "Ask GitHub about CI's run of a push every, minutes"),
+            ("watch.ci_log_kib", "KiB of a failed CI job's log its request quotes"),
+            ("watch.ci_log_mib", "Longest CI job log the warden reads, MiB"),
             ("watch.branch_retry_minutes", "Look at GitHub's default branch every, minutes"),
             ("watch.resume_tries", "Resumes to try before a crashed agent retires"),
             ("watch.crash_window_minutes", "Minutes within which crashes add up"),

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.warden.context import Clock, Context, StackResult
+from runtime.warden.delivery.github import GitHubError
 from runtime.warden.health.probes import Answer
 
 
@@ -28,6 +29,7 @@ class FakeGitHub:
     released: list[str] = field(default_factory=list)  # what each dispatch said the last releases ran at
     releases: str = "success"  # how the prod workflow's jobs after its deploy job end
     ci: dict[str, Any] | None = None  # CI's run of a pushed commit, once GitHub started one
+    logs: dict[str, str] = field(default_factory=dict)  # each job's log by its id; a job without one is refused
 
     def dispatch_promote(self, sha: str, released: str) -> str:
         self.dispatched.append(sha)
@@ -52,6 +54,11 @@ class FakeGitHub:
             "url": "https://github.test/42",
             "jobs": {"deploy": {"status": "completed", "conclusion": "success"}},
         }
+
+    def job_log(self, job_id: str, most: int) -> str:
+        if job_id not in self.logs:
+            raise GitHubError(f"GitHub refused GET /repos/o/n/actions/jobs/{job_id}/logs: HTTP 410 Gone")
+        return self.logs[job_id]
 
     def reachable(self) -> bool:
         return self.up

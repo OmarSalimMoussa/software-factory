@@ -25,7 +25,7 @@ from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, Places
 from runtime.shared.settings import Settings
 from runtime.warden import gc, imports, inbox, loop, public, schedule, server, upgrade
 from runtime.warden.context import Caller, CheckPlaces, Clock, Context
-from runtime.warden.delivery import done, github, github_push, prod_push
+from runtime.warden.delivery import ci_watch, done, github, github_push, prod_push
 from runtime.warden.dispatch import Dispatcher, Doors, resolve
 from runtime.warden.owner import factory_upgrade, ops, reflections, settings_save, yolo
 from runtime.warden.sessions import crashwatch, launch, reap, registry
@@ -80,6 +80,11 @@ def _check_releases(ctx: Context) -> None:
     loop.run_once(ctx, "the release check", lambda: factory_upgrade.poll(ctx))
 
 
+def _watch_ci(ctx: Context) -> None:
+    # In its own thread: a failed run's request reads its jobs' logs from GitHub.
+    loop.run_once(ctx, "the CI watch", lambda: ci_watch.poll(ctx))
+
+
 def _offer_push(ctx: Context) -> None:
     # In its own thread: a look fetches from GitHub and the agents' checkout.
     loop.run_once(ctx, "the staging push's offer", lambda: github_push.offer(ctx))
@@ -111,6 +116,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
         ("branch", imports.Background(_ask_branch, imports.in_thread("branch")).run_pass),
         ("releases", imports.Background(_check_releases, imports.in_thread("releases")).run_pass),
         ("offer", imports.Background(_offer_push, imports.in_thread("offer")).run_pass),
+        ("ci", imports.Background(_watch_ci, imports.in_thread("ci")).run_pass),
         ("done", imports.Background(_refresh_done, imports.in_thread("done")).run_pass),
         (
             "replays",

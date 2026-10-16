@@ -94,6 +94,9 @@ class GitHub:
             "jobs": {"deploy": {"status": "completed", "conclusion": "success"}},
         }
 
+    def job_log(self, job_id: str, most: int) -> str:
+        raise AssertionError("no CI run fails here")
+
     def reachable(self) -> bool:
         return True
 
