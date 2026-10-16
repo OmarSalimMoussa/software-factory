@@ -79,11 +79,11 @@ def _git(ctx: Context, checkout: str, *args: str) -> str:
     return out
 
 
-def _state(ctx: Context, checkout: str) -> tuple[str, str, str, bool]:
-    """The checkout's commit, tree and branch ("HEAD" when detached), and whether it has uncommitted changes."""
-    dirty = bool(_git(ctx, checkout, "status", "--porcelain", "--untracked-files=no").strip())
+def _state(ctx: Context, checkout: str) -> tuple[str, str, str, list[str]]:
+    """The checkout's commit, tree and branch ("HEAD" when detached), and its uncommitted changes, as git lists them."""
+    changed = _git(ctx, checkout, "status", "--porcelain", "--untracked-files=no").strip().splitlines()
     commit, tree, branch = _git(ctx, checkout, "rev-parse", "HEAD", "HEAD^{tree}", "--abbrev-ref", "HEAD").split()
-    return commit, tree, branch, dirty
+    return commit, tree, branch, [line.strip() for line in changed]
 
 
 def _session(ctx: Context) -> Session:
@@ -179,9 +179,10 @@ def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
     session = _session(ctx)
     only = _only(args)
     checkout = session.worktree
-    commit, tree, branch, dirty = _state(ctx, checkout)
-    if dirty:
-        raise Refused("check", "commit your changes first: a check reads what the branch has committed")
+    commit, tree, branch, changed = _state(ctx, checkout)
+    if changed:
+        listed = ", ".join(changed)
+        raise Refused("check", f"commit your changes first: a check reads what the branch has committed ({listed})")
     on_default = branch == ctx.settings().get_str("repo.default_branch")
     # A pass is a branch's check against the default branch it left, every ratchet included. --all on a branch skips
     # the ratchets (they compare only what a branch changed): it is a run of the whole set, held to the merge turn
@@ -199,8 +200,8 @@ def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
         code, output = ctx.launcher.run_check(checkout, argv)
     recorded = False
     if records and code == 0:
-        after_commit, after_tree, _, after_dirty = _state(ctx, checkout)
-        if (after_commit, after_tree, after_dirty) == (commit, tree, False):
+        after_commit, after_tree, _, after_changed = _state(ctx, checkout)
+        if (after_commit, after_tree, after_changed) == (commit, tree, []):
             _record(ctx, tree, commit, branch, session.task)
             recorded = True
             output += f"factory check: recorded tree {tree} as passed\n"

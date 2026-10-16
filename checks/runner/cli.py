@@ -73,8 +73,10 @@ def changed_paths(root: Path, settings: Settings | None, since: str | None) -> t
         compared = settings.get_str("repo.default_branch")
     else:  # on CI no settings name the default branch, so only a named base or everything can be checked
         raise Refusal("on CI, run factory check --all, or --since the commit to compare with")
-    if git(root, "status", "--porcelain", "--untracked-files=no").strip():
-        raise Refusal("commit your changes first: factory check checks what the branch has committed")
+    changed = git(root, "status", "--porcelain", "--untracked-files=no").strip().splitlines()
+    if changed:
+        listed = ", ".join(line.strip() for line in changed)
+        raise Refusal(f"commit your changes first: factory check checks what the branch has committed ({listed})")
     try:
         base = git(root, "merge-base", "HEAD", compared).strip()
     except GitError as exc:

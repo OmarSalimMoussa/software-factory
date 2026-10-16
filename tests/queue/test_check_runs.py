@@ -118,7 +118,7 @@ def test_a_checkout_with_uncommitted_changes_is_refused_before_anything_runs(wor
     _implementer(world, "turn")
     git["dirty"] = " M app.py\n"
 
-    with pytest.raises(Refused, match="commit your changes first"):
+    with pytest.raises(Refused, match=r"commit your changes first: .* \(M app.py\)"):
         checks.check(world.ctx("implementer", "s-impl"), {}, None)
     assert world.launcher.checks == []
 

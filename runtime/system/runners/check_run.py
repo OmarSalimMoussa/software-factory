@@ -2,10 +2,10 @@
 
 Run as ``/usr/bin/python3 -I <install>/runtime/system/runners/check_run.py <state> <id>``. The checks run the
 product's own code (``scripts/dev deps`` and ``test``), so the runner starts them under bubblewrap: the agent's home
-is hidden but for the checkout, its tools' caches and, read-only, the main checkout; every other worktree and the
-agent's Claude folder are gone; the git folder the merge hook and every worktree share is read-only, so nothing the
-check runs can plant a hook or forge what the warden records. Its exit status is the check's, which systemd hands
-to the warden. Stdlib only.
+is hidden but for the checkout, its tools' caches and, read-only, the main checkout and the Claude settings it
+tracks; every other worktree and the agent's Claude folder are gone; the git folder the merge hook and every
+worktree share is read-only, so nothing the check runs can plant a hook or forge what the warden records. Its exit
+status is the check's, which systemd hands to the warden. Stdlib only.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from runtime.shared import environment
 from runtime.shared.paths import CHECK_TOOLS
 from runtime.system import layout
 from runtime.system.runners import launch_file as lf
+from runtime.warden.sessions import session_settings
 
 INSTALL = Path(__file__).resolve().parents[3]
 # Under the tools' Python in isolated mode: the install's root comes in as the first argument.
@@ -46,15 +47,26 @@ def walls(checkout: Path, main: Path, common: Path, home: Path, caches: list[Pat
     """bubblewrap's mounts, in the order it makes them: a later one lies over an earlier one."""
     argv = ["--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp", "--tmpfs", str(home)]
     argv += ["--bind" if main == checkout else "--ro-bind", str(main), str(main)]
-    if (main / ".claude").is_dir():
-        argv += ["--tmpfs", str(main / ".claude")]  # every session's worktree and settings
+    argv += _claude(main)
+    worktrees = session_settings.worktrees(main)
+    worktrees.mkdir(exist_ok=True)  # made now, so a worktree made during the check is hidden too
+    argv += ["--tmpfs", str(worktrees)]
     if main != checkout:
-        argv += ["--bind", str(checkout), str(checkout)]
+        argv += ["--bind", str(checkout), str(checkout), *_claude(checkout)]
     argv += ["--ro-bind", str(common), str(common)]
     for cache in caches:
         if cache.is_dir():
             argv += ["--bind", str(cache), str(cache)]
     return argv
+
+
+def _claude(root: Path) -> list[str]:
+    """``root``'s Claude folder, made now, read-only (git finds what it tracks; no check writes it), never a link."""
+    folder = root / ".claude"
+    if folder.is_symlink():
+        raise lf.BadRequest(f"{folder} is a link: a check walls in only a folder of its own")
+    folder.mkdir(exist_ok=True)
+    return ["--ro-bind", str(folder), str(folder)]
 
 
 def command(checkout: Path, args: list[str], home: Path, caches: list[Path], timeout: int) -> list[str]:

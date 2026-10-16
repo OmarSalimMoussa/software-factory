@@ -83,7 +83,7 @@ def test_an_uncommitted_change_is_refused(
     subprocess.run(["git", "checkout", "-q", "-b", "work"], cwd=fixture_product, check=True)
     (fixture_product / "qa" / "scenarios" / "README.md").write_text("# QA scenarios\n\nEach opens with its labels.\n")
     status, output = check(fixture_product)
-    assert status == 2 and "commit your changes first" in output
+    assert status == 2 and "commit your changes first" in output and "(M qa/scenarios/README.md)" in output
 
 
 @pytest.mark.parametrize(

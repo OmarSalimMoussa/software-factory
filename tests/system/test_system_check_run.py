@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from runtime.system.runners import check_run
+from runtime.system.runners import launch_file as lf
 
 BWRAP = shutil.which("bwrap")
 
@@ -20,7 +22,8 @@ def _git(cwd: Path, *args: str) -> None:
 
 
 def _home(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
-    """An agent's home: Claude's folder, a cache, the main checkout and two sessions' worktrees."""
+    """An agent's home: Claude's folder, a cache, the main checkout tracking its project's Claude settings, as a product
+    may, and two sessions' worktrees."""
     home = tmp_path / "home"
     (home / ".claude").mkdir(parents=True)
     (home / ".claude" / ".credentials.json").write_text("token")
@@ -29,16 +32,20 @@ def _home(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     main.mkdir()
     _git(main, "init", "-q", "-b", "master")
     (main / "app.py").write_text("print('hi')\n")
-    _git(main, "add", "app.py")
+    (main / ".claude").mkdir()
+    (main / ".claude" / "settings.json").write_text("{}\n")
+    _git(main, "add", "app.py", ".claude/settings.json")
     _git(main, "commit", "-q", "-m", "first")
     for name in ("impl-a", "impl-b"):
         _git(main, "worktree", "add", "-q", "-b", name, str(main / ".claude" / "worktrees" / name))
     return home, main, main / ".claude" / "worktrees" / "impl-a", main / ".claude" / "worktrees" / "impl-b"
 
 
-def _try(home: Path, checkout: Path, script: str) -> int:
+def _try(home: Path, checkout: Path, script: str, meanwhile: Callable[[], object] = lambda: None) -> int:
+    """``script`` run inside the walls, after ``meanwhile`` ran outside them once they were drawn."""
     main, common = check_run.git_folders(checkout, 30)
     walls = check_run.walls(checkout, main, common, home, [home / ".cache" / "uv"])
+    meanwhile()
     argv = [str(BWRAP), "--die-with-parent", "--unshare-pid", *walls, "--chdir", str(checkout), "/bin/sh", "-c", script]
     return subprocess.run(argv, capture_output=True, check=False).returncode
 
@@ -56,6 +63,7 @@ def _try(home: Path, checkout: Path, script: str) -> int:
         ("echo 'exit 0' > $MAIN/.git/hooks/pre-merge-commit", False),
         ("echo x >> $MAIN/.git/config", False),
         ("git status --porcelain", True),
+        ("echo x > .claude/settings.local.json", False),
     ],
     ids=[
         "own-checkout",
@@ -67,6 +75,7 @@ def _try(home: Path, checkout: Path, script: str) -> int:
         "plant-hook",
         "git-config",
         "git-reads",
+        "own-claude-settings",
     ],  # fmt: skip
 )
 def test_a_worktree_check_writes_only_its_checkout_and_caches(tmp_path: Path, script: str, allowed: bool) -> None:
@@ -78,8 +87,42 @@ def test_a_worktree_check_writes_only_its_checkout_and_caches(tmp_path: Path, sc
 
 
 @pytest.mark.skipif(BWRAP is None, reason="bubblewrap is not installed here")
-def test_the_main_checkout_s_check_writes_it_but_not_its_git_folder_or_any_worktree(tmp_path: Path) -> None:
+def test_the_main_checkout_s_check_writes_it_but_not_its_git_folder_its_claude_settings_or_any_worktree(
+    tmp_path: Path,
+) -> None:
     home, main, mine, _ = _home(tmp_path)
     assert _try(home, main, "echo x > made.txt") == 0
     assert _try(home, main, "echo x >> .git/config") != 0
+    assert _try(home, main, "echo x >> .claude/settings.json") != 0
     assert _try(home, main, f"ls {mine}") != 0
+
+
+@pytest.mark.skipif(BWRAP is None, reason="bubblewrap is not installed here")
+def test_the_main_checkout_s_check_sees_every_file_it_tracks_so_git_finds_it_clean(tmp_path: Path) -> None:
+    home, main, _, _ = _home(tmp_path)
+    (main / "made.txt").write_text("untracked\n")
+
+    assert _try(home, main, 'test -z "$(git status --porcelain --untracked-files=no)"') == 0
+
+
+@pytest.mark.skipif(BWRAP is None, reason="bubblewrap is not installed here")
+def test_a_worktree_made_while_the_main_checkout_is_checked_stays_hidden(tmp_path: Path) -> None:
+    home, main, _, _ = _home(tmp_path)
+    worktrees = main / ".claude" / "worktrees"
+    shutil.rmtree(worktrees)  # before any session's first worktree
+    late = worktrees / "impl-c"
+
+    def made() -> None:
+        late.mkdir(parents=True)
+        (late / "secret.txt").write_text("another session's work\n")
+
+    assert _try(home, main, f"! cat {late / 'secret.txt'}", made) == 0
+
+
+def test_a_claude_folder_the_branch_made_a_link_is_refused(tmp_path: Path) -> None:
+    home, main, _, _ = _home(tmp_path)
+    (main / ".claude").rename(tmp_path / "moved")
+    (main / ".claude").symlink_to(home / ".claude")
+
+    with pytest.raises(lf.BadRequest, match="is a link"):
+        check_run.walls(main, main, main / ".git", home, [])
