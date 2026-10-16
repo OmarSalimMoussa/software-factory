@@ -2,7 +2,7 @@
 # and the dashboard's and the install console's browser drives, on every push. An install takes only a commit on
 # which every job here passed: nothing is tested on the owner's machine. On a push to the default branch, once every
 # check passed, the last job publishes the release file the owner installs from, so a release exists only for a
-# commit that passed.
+# commit that passed. Every job runs on Ubuntu 24.04, the laptop's own, whose python3 is the 3.12 the factory runs on.
 name: ci
 
 on:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -23,7 +23,7 @@ jobs:
         run: uv run --frozen --extra dev pytest -q
 
   self-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       # The whole history: the ratchet checks compare this push with the commit it started from.
       - uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
         run: uv run --frozen --extra dev pytest -m self_check
 
   drives:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -65,7 +65,7 @@ jobs:
   release:
     needs: [test, self-check, drives]
     if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     # One release at a time; a newer push waits, so the newest commit is the latest release.

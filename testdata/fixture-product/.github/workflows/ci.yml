@@ -23,7 +23,7 @@ defaults:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # A newer push to the same branch cancels these checks, and with them everything after them in the older run.
     concurrency:
       group: checks-${{ github.ref }}-${{ inputs.ref || 'push' }}
@@ -78,7 +78,7 @@ jobs:
   plan:
     needs: checks
     if: github.event_name == 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       commit: ${{ needs.checks.outputs.commit }}
       factory_repo: ${{ needs.checks.outputs.factory_repo }}
@@ -112,7 +112,7 @@ jobs:
   build:
     needs: plan
     name: build ${{ matrix.image.name }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         image: ${{ fromJSON(needs.plan.outputs.base) }}
@@ -155,7 +155,7 @@ jobs:
     needs: [plan, build]
     if: needs.plan.outputs.has_derived == 'true'
     name: build ${{ matrix.image.name }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         image: ${{ fromJSON(needs.plan.outputs.derived) }}
@@ -164,7 +164,7 @@ jobs:
   # The files a deploy needs on the server, with the plan, as one image: the server pulls it and builds nothing.
   deploy-image:
     needs: plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -213,7 +213,7 @@ jobs:
     if: >-
       ${{ !failure() && !cancelled() && needs.build.result == 'success' && needs.deploy-image.result == 'success'
       && (needs.build-derived.result == 'success' || needs.build-derived.result == 'skipped') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -240,7 +240,7 @@ jobs:
   deploy-staging:
     needs: [plan, smoke]
     if: ${{ !failure() && !cancelled() && needs.smoke.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # One staging deploy at a time, never cancelled half way; a newer waiting one replaces an older waiting one. Prod
     # has its own group, so a staging deploy never replaces a waiting prod deploy; the server's lock runs the two one
     # at a time.

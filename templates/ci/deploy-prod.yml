@@ -24,7 +24,7 @@ defaults:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # One prod deploy at a time, never cancelled half way; staging has its own group, so its deploys never replace
     # this one. The server's lock runs a staging and a prod deploy one at a time.
     concurrency:
@@ -76,7 +76,7 @@ jobs:
 
   releases:
     needs: deploy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     concurrency:
       group: releases
       cancel-in-progress: false
