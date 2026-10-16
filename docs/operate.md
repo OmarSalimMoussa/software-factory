@@ -68,7 +68,8 @@ first, and seal the commit from your checkout the same way.
   now. Nothing starts until you approve it, except the fix for a clear prod outage.
 - **Also needs you** holds the rest: a spec to sign off (open its brief, select text to comment on, press Go or Send
   feedback), a stuck task (Extend, To a designer or Park), questions from sessions, and a task blocked by something
-  only you can give, such as a key or a seed: give it, then press **Fixed, carry on**.
+  only you can give, such as a key or an account: give it, then press **Fixed, carry on**. A task waiting for
+  another task's check to pass is on hold, and comes back by itself.
 - **Boost** any queued task or request on the Work page to make it the next proposal.
 - **Done**, on the Work page, lists each finished task and how far it has reached: local, GitHub, staging, prod.
   Its Open button opens slot 0 on this laptop, signed in as the test address you set under Settings, Slots.

@@ -41,7 +41,7 @@ SURFACES = ("ui", "api", "access", "desktop", "none")
 QA_CLEAN, ON_STAGING = "qa-clean", "on-staging"
 TASK_STATUSES = (
     "queued", "parked", "proposed", "approved", "designing", "review", "building", "deprioritized", "qa",
-    QA_CLEAN, "turn", "merged", "checked", ON_STAGING, "promoted", "decide", "blocked", "closed",
+    QA_CLEAN, "turn", "merged", "checked", ON_STAGING, "promoted", "decide", "blocked", "on-hold", "closed",
 )  # fmt: skip
 SEVERITIES = ("blocker", "major", "minor")
 OPEN_SEVERITIES = SEVERITIES[:2]

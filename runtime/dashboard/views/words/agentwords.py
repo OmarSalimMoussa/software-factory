@@ -26,6 +26,7 @@ _KID_ORDER = ("intake", "impl", "design", "qa", "orch")
 OWN_WAIT = {
     "merged": "Merged · ends when its check passes, comes back if it fails",
     "blocked": "Blocked · comes back when you mark it fixed",
+    "on-hold": "On hold · comes back when the task it waits for passes its check",
 }
 WHY = {
     "finished": ("finished", "good"),

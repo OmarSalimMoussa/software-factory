@@ -3,6 +3,7 @@ of values, at every depth. Unknown values (None) may stand anywhere."""
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import tomllib
 from pathlib import Path
@@ -17,8 +18,9 @@ from seed_kit import FIXTURES, iso
 from runtime.dashboard.views import agents, ops, spend
 from runtime.dashboard.views.kit import PartError, Snap
 from runtime.dashboard.views.tasks.task import qa_line
-from runtime.dashboard.views.words import agentwords
+from runtime.dashboard.views.words import agentwords, taskwords
 from runtime.dashboard.views.words.settingwords import LABELS
+from runtime.queue import formats
 from runtime.shared import models, store
 from runtime.shared import operations as kinds
 from runtime.shared import settings as settings_module
@@ -174,9 +176,10 @@ def test_an_agent_out_of_the_work_says_so_with_its_icon(rig: Rig, agent: str, ic
         ("t-0002", "merged", "Pushed out for “Task two” · comes back first"),
         ("t-0001", "merged", "Merged · ends when its check passes, comes back if it fails"),
         ("t-0001", "blocked", "Blocked · comes back when you mark it fixed"),
+        ("t-0001", "on-hold", "On hold · comes back when the task it waits for passes its check"),
         ("t-0001", "building", "Sent back to it · comes back when a place frees"),
     ],
-    ids=["for-another", "merged", "blocked", "sent-back"],
+    ids=["for-another", "merged", "blocked", "on-hold", "sent-back"],
 )
 def test_a_benched_agent_says_what_it_waits_for(benched_for: str, status: str, says: str) -> None:
     tasks = [{"id": "t-0001", "title": "Task one", "status": status}, {"id": "t-0002", "title": "Task two"}]
@@ -310,6 +313,21 @@ def test_the_push_sheet_says_a_staging_build_off_the_default_branch_cannot_go_to
     blocked = rig.parts("/api/push")["push"]["data"]["blocked"]
     says = {True: None, False: "only master's checked work goes to prod", None: "GitHub did not answer"}[on_default]
     assert blocked is None if says is None else says in blocked
+
+
+def test_a_task_on_hold_counts_as_building_on_home_and_says_it_waits_for_another(rig: Rig, tmp_path: Path) -> None:
+    def stages() -> dict[str, int]:
+        return {s["key"]: s["count"] for s in rig.parts("/api/home")["tiles"]["data"]["work"]["stages"]}
+
+    before = stages()
+    texts = [p.read_text() for p in (tmp_path / "repo" / "queue" / "tasks").glob("*.md")]
+    building = formats.parse_task(next(text for text in texts if "\nstatus: building\n" in text))
+    held = dataclasses.replace(building, status="on-hold")
+    (tmp_path / "repo" / "queue" / "tasks" / f"{held.id}.md").write_text(formats.dump_task(held))
+
+    assert stages() == before
+    word = {"tone": "ring", "word": "Waiting for another task's check to pass"}
+    assert taskwords.status(Snap(0.0, {}, {}), {"id": held.id, "status": "on-hold"}) == word
 
 
 def test_home_draws_every_live_proposal_even_one_a_crash_left_without_its_place(rig: Rig) -> None:

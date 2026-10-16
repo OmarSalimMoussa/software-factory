@@ -110,6 +110,7 @@ def task_status(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
         _text(args, "to"),
         _text(args, "event", required=False),
         _text(args, "note", required=False),
+        _text(args, "after", required=False),
     )
     return ok(task=task.id, status=task.status)
 

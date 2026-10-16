@@ -42,7 +42,7 @@ _LAPTOP = {
 }
 _STAGES = (
     ("designing", "designing", "--f-design", ("designing",)),
-    ("building", "building", "--f-impl", ("building", "deprioritized", "turn", "merged", "checked")),
+    ("building", "building", "--f-impl", ("building", "deprioritized", "on-hold", "turn", "merged", "checked")),
     ("qa", "in QA", "--f-qa", ("qa", QA_CLEAN)),
     ("needs", "need you", "--warn", ("review", "decide", "blocked")),
 )

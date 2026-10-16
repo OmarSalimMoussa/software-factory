@@ -40,6 +40,14 @@ _BRING_BACK = (
 REVERTED = "Your work was taken back off {default}: {note}\n\n" + _BRING_BACK
 BLOCKED = "Your task was blocked: {note}\n\nThe owner fixed what blocked it: carry on."
 BLOCKED_OFF = BLOCKED + " It was taken back off {default}. " + _BRING_BACK
+HELD = "Your task was put on hold: {note}\n\n{after}, which it waited for, passed its check: carry on."
+HELD_GONE = (
+    "Your task was put on hold: {note}\n\n{after}, which it waited for, was {how} before its check passed: find "
+    "another way, or report what still stops it."
+)
+_OFF = " It was taken back off {default}. " + _BRING_BACK
+PASSED = tasks.LANDED - {MERGED, "closed"}
+GONE = frozenset({"closed", "parked"})  # a task here makes nothing a held task waits for
 
 
 def _path(places: Places) -> Path:
@@ -209,6 +217,63 @@ def block(ctx: Context, task_id: str, note: str) -> Task:
     _bench(ctx, task_id, f"blocked: {formats.one_line(note)}")
     reflections.incident(ctx, f"{task_id} is blocked until the owner fixes what stopped it: {note}", f"task {task_id}")
     return moved
+
+
+def hold(ctx: Context, task_id: str, note: str, after: str) -> Task:
+    """Another task makes what stopped this one (a seed, a scenario): it waits benched, off the default branch, until
+    that task's check passes, and the warden brings it back (``release_held``). Nothing waits on the owner."""
+    if not note.strip():
+        raise Refused("note", "a hold names what stopped the task, and the revert's commit once merged, in --note")
+    queue = Queue.of(ctx)
+    with ctx.lock, queue.lock():
+        task = queue.task(task_id)
+        if not after or after == task_id:
+            raise Refused("task-status", f"a hold names, in --after, the task {task_id} waits for")
+        by_id = {t.id: t for t in queue.tasks()[0]}
+        waited = by_id.get(after)
+        if waited is None:
+            raise Refused("task-status", f"there is no task {after} for {task_id} to wait for")
+        if waited.status in PASSED:
+            raise Refused("task-status", f"{after} passed its check already: send {task_id} back instead")
+        if waited.status in GONE:
+            raise Refused("task-status", f"{after} is {waited.status}, so nothing makes what {task_id} lacks")
+        if task_id in _upstream(by_id, after):
+            raise Refused("task-status", f"{after} waits, through its after tasks, for {task_id}: neither would move")
+        waits = task.after if after in task.after else [*task.after, after]
+        on_hold = tasks.ON_HOLD
+        moved = tasks.transition(ctx, queue, task, on_hold, on_hold, tasks.actor(ctx), note.strip(), after=waits)
+    _bench(ctx, task_id, f"on hold until {after} passes its check: {formats.one_line(note)}")
+    return moved
+
+
+def _upstream(by_id: dict[str, Task], start: str) -> set[str]:
+    seen: set[str] = set()
+    todo = [start]
+    while todo:
+        found = todo.pop()
+        if found in by_id and found not in seen:
+            seen.add(found)
+            todo += by_id[found].after
+    return seen
+
+
+def release_held(ctx: Context) -> None:
+    """The warden's pass: a held task goes back, told why, once all it waits for passed its check, or one is gone."""
+    queue = Queue.of(ctx)
+    found, _ = queue.tasks()
+    by_id = {t.id: t for t in found}
+    for task in found:
+        waits = [by_id.get(a) for a in task.after]
+        gone = [w for w in waits if w is not None and w.status in GONE]
+        if task.status != tasks.ON_HOLD or not (gone or all(w is not None and w.status in PASSED for w in waits)):
+            continue
+        held = next((e for e in reversed(queue.read_log(task.id)) if e["event"] == tasks.ON_HOLD), None)
+        note, off = ("", False) if held is None else (held["text"], held.get("from") == MERGED)
+        waited = ", ".join(w.id for w in gone) or ", ".join(task.after)
+        how = " or ".join(sorted({w.status for w in gone}))
+        told = (HELD_GONE if gone else HELD).format(note=note, after=waited, how=how)
+        told += _OFF.format(default=ctx.settings().get_str("repo.default_branch")) if off else ""
+        _back(ctx, task.id, "released", statuses.WARDEN, f"{waited} {how or 'passed its check'}", told)
 
 
 def unblock(ctx: Context, task_id: str) -> Task:

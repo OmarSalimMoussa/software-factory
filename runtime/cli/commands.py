@@ -150,6 +150,7 @@ def _queue(sub: Any) -> None:
     status.add_argument("to")
     status.add_argument("--event", default="")
     status.add_argument("--note", default="")
+    status.add_argument("--after", default="", help="on-hold: the task this one waits for")
 
 
 def _telemetry(sub: Any) -> None:

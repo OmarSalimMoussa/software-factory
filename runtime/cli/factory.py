@@ -143,7 +143,8 @@ def _queue_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Ca
     if ns.task_cmd == "facts":
         return Call("task.facts", {"task": ns.task, **_fact_args(ns)})
     args = {"task": ns.task, "to": ns.to, **({"event": ns.event} if ns.event else {})}
-    return Call("task.status", {**args, **({"note": ns.note} if ns.note else {})})
+    told = {**({"note": ns.note} if ns.note else {}), **({"after": ns.after} if ns.after else {})}
+    return Call("task.status", {**args, **told})
 
 
 def _propose_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:

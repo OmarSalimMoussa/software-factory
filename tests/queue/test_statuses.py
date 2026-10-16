@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from pathlib import Path
 
 import pytest
 from queue_kit import World
@@ -13,6 +14,7 @@ from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
 from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, REVIVING, Task
 from runtime.shared.protocol import Refused
+from runtime.warden import wardend
 from runtime.warden.delivery import github_push
 from runtime.warden.owner import reflections
 from runtime.warden.sessions import backstop, lifecycle, permits, registry, respawn, revive
@@ -157,7 +159,7 @@ def _blocked(world: World, monkeypatch: pytest.MonkeyPatch, status: str, impleme
     monkeypatch.setattr(backstop, "processes", lambda: {})
     with pytest.raises(Refused, match="--note"):
         tasks.set_status(world.ctx(), task.id, "blocked", "", " ")
-    with pytest.raises(Refused, match="a block moves"):
+    with pytest.raises(Refused, match="--event blocked moves"):
         tasks.set_status(world.ctx(), task.id, "building", "blocked", BLOCK)
     tasks.set_status(world.ctx(), task.id, "blocked", "", BLOCK)
     return task
@@ -200,6 +202,87 @@ def test_a_blocked_task_the_owner_drops_takes_its_card_with_it(world: World, mon
     owner.drop(world.owner(), task.id, "the outside site is gone for good")
 
     assert [c.answered for c in cards.read(world.places)] == ["closed"]
+
+
+HOLD = "qa-regression needs the practice page the other task serves; reverted as 0abc123"
+
+
+@pytest.mark.parametrize(
+    ("status", "implementer", "benched", "off_master"),
+    [("merged", DEPRIORITIZED, DEPRIORITIZED, True), ("qa", "working", BENCH_PENDING, False)],
+    ids=["merged-then-reverted", "in-qa"],
+)
+def test_a_task_on_hold_waits_benched_for_the_task_it_names_then_the_warden_sends_it_back(
+    world: World, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, status: str, implementer: str, benched: str,
+    off_master: bool,
+) -> None:  # fmt: skip
+    release = dict(wardend.passes(world.places, [], tmp_path))["holds"]
+    task, maker = world.task(branch="impl-t-0001"), dataclasses.replace(world.task(), run=1)
+    world.queue().write_task(dataclasses.replace(task, status=status, run=1))
+    world.session("s-impl", "implementer", "impl-t-0001", task.id)
+    sessions = registry.read(world.places)
+    sessions["s-impl"].state = implementer
+    registry.write(world.places, sessions)
+    monkeypatch.setattr(backstop, "processes", lambda: {})
+    hold = {"task": task.id, "to": "on-hold", "note": HOLD}
+    for after, said in (("", "--after, the task"), (task.id, "--after, the task"), ("t-0099", "no task t-0099")):
+        with pytest.raises(Refused, match=said):
+            verbs.task_status(world.ctx(), {**hold, "after": after}, None)
+    with pytest.raises(Refused, match="goes only with on-hold"):
+        verbs.task_status(world.ctx(), {**hold, "to": "blocked", "after": maker.id}, None)
+
+    verbs.task_status(world.ctx(), {**hold, "after": maker.id}, None)
+
+    held = world.queue().task(task.id)
+    assert (held.status, held.after, registry.read(world.places)["s-impl"].state) == ("on-hold", [maker.id], benched)
+    assert cards.read(world.places) == [] and reflections.entries(world.places) == []
+    for not_yet in ("queued", "building", "merged"):  # a merge may still be reverted: its check has not passed
+        world.queue().write_task(dataclasses.replace(maker, status=not_yet))
+        release(world.ctx())
+        assert world.queue().task(task.id).status == "on-hold"
+    world.queue().write_task(dataclasses.replace(maker, status="checked"))
+
+    release(world.ctx())
+
+    told = lifecycle.held_path(world.ctx(), task.id).read_text()
+    assert HOLD in told and f"{maker.id}, which it waited for, passed its check: carry on." in told
+    assert ("taken back off master" in told) == off_master
+    assert world.queue().task(task.id).status == "building"
+    assert world.queue().read_log(task.id)[-1]["event"] == "released"
+    with pytest.raises(Refused, match="passed its check already"):
+        verbs.task_status(world.ctx(), {**hold, "after": maker.id}, None)
+
+
+@pytest.mark.parametrize("gone", ["closed", "parked"])
+def test_a_task_on_hold_goes_back_told_why_once_the_task_it_waits_for_is_closed_or_parked(
+    world: World, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, gone: str
+) -> None:
+    release = dict(wardend.passes(world.places, [], tmp_path))["holds"]
+    task, maker = world.task(), dataclasses.replace(world.task(), run=1)
+    world.queue().write_task(dataclasses.replace(task, status="qa", run=1))
+    monkeypatch.setattr(backstop, "processes", lambda: {})
+    verbs.task_status(world.ctx(), {"task": task.id, "to": "on-hold", "note": HOLD, "after": maker.id}, None)
+    world.queue().write_task(dataclasses.replace(maker, status=gone))
+
+    release(world.ctx())
+
+    told = lifecycle.held_path(world.ctx(), task.id).read_text()
+    assert f"{maker.id}, which it waited for, was {gone} before its check passed: find another way" in told
+    assert world.queue().task(task.id).status == "approved"  # no implementer is left: a new one starts
+
+
+def test_a_hold_on_a_task_that_makes_nothing_or_waits_back_on_it_is_refused(world: World) -> None:
+    task, other, third = world.task(), *(dataclasses.replace(world.task(), run=1) for _ in range(2))
+    world.queue().write_task(dataclasses.replace(task, status="qa", run=1))
+    world.queue().write_task(dataclasses.replace(third, status="building", after=[task.id]))
+    for status, after, said in (
+        ("parked", [], f"{other.id} is parked, so nothing makes what {task.id} lacks"),
+        ("closed", [], "is closed"),
+        ("building", [third.id], f"{other.id} waits, through its after tasks, for {task.id}"),
+    ):
+        world.queue().write_task(dataclasses.replace(other, status=status, after=after))
+        with pytest.raises(Refused, match=said):
+            verbs.task_status(world.ctx(), {"task": task.id, "to": "on-hold", "note": HOLD, "after": other.id}, None)
 
 
 def test_a_revert_said_while_its_implementer_comes_back_follows_it_once_it_is_back(

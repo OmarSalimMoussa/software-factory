@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from runtime.queue import formats
+from runtime.queue import formats, tasks
 from runtime.shared import store
 from runtime.shared.models import (
     BENCH_PENDING,
@@ -29,7 +29,6 @@ from runtime.shared.models import (
     DEPRIORITIZED,
     FINISHED,
     OFF_SEAT,
-    ON_STAGING,
     PENDING,
     QA_CLEAN,
     WAITING,
@@ -55,12 +54,8 @@ OWED = " Events you have not acted on yet: {kinds}. `factory inbox` lists them."
 IDLE = "idle"
 _SETTLING: set[str] = set()
 # A session whose task has moved past its part is finished; a process that ends before that crashed.
-DONE_AT = {
-    IMPL: frozenset({"checked", ON_STAGING, "promoted", "closed"}),
-    DESIGN: frozenset(
-        {"building", "qa", QA_CLEAN, "turn", "merged", "blocked", "checked", ON_STAGING, "promoted", "closed"}
-    ),
-}
+_LANDED = tasks.LANDED - {"merged"}
+DONE_AT = {IMPL: _LANDED, DESIGN: _LANDED | {"building", "qa", QA_CLEAN, "turn", "merged", "blocked", "on-hold"}}
 
 
 class SessionsWatch:

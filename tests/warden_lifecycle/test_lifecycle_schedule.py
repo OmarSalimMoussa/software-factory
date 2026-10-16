@@ -78,7 +78,8 @@ def test_a_deprioritized_run_that_outranks_an_approved_one_comes_back_first(worl
 
 
 @pytest.mark.parametrize(
-    ("status", "back", "by"), [("merged", "reverted", "orchestrator"), ("blocked", "unblocked", "owner")]
+    ("status", "back", "by"),
+    [("merged", "reverted", "orchestrator"), ("blocked", "unblocked", "owner"), ("on-hold", "released", "warden")],
 )
 def test_an_implementer_benched_at_its_merge_holds_no_place_and_comes_back_when_its_task_is_sent_back(
     world: World, status: str, back: str, by: str
@@ -91,7 +92,8 @@ def test_an_implementer_benched_at_its_merge_holds_no_place_and_comes_back_when_
     schedule.run_pass(world.ctx())
     assert world.session("5e550001").state == DEPRIORITIZED and _live(world, "t-0002") == [WORKING]
 
-    world.queue.move(world.ctx(), "t-0001", "building", back, by)  # its check failed, or the owner fixed its block
+    # Its check failed, the owner fixed its block, or the task it waited for landed.
+    world.queue.move(world.ctx(), "t-0001", "building", back, by)
     world.cap(2)
     schedule.run_pass(world.ctx())
     assert world.session("5e550001").state == WORKING and world.launcher.resumed == ["5e550001"]

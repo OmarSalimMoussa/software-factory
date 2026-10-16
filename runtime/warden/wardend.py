@@ -18,7 +18,7 @@ from functools import partial
 from pathlib import Path
 
 from runtime.qa.replay import pending
-from runtime.queue import reports
+from runtime.queue import reports, turn
 from runtime.shared import environment, error_reports, store
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, Places
@@ -116,6 +116,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
             "replays",
             imports.Background(partial(_build_replays, transcripts=transcripts), imports.in_thread("replays")).run_pass,
         ),  # fmt: skip
+        ("holds", turn.release_held),
         ("schedule", schedule.run_pass),
         ("yolo", yolo.run_pass),
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),

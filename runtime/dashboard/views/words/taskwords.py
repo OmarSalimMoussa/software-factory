@@ -28,6 +28,7 @@ _AT = {
     "deprioritized": 5,
     "decide": 5,
     "blocked": 5,
+    "on-hold": 5,
     "qa": 6,
     QA_CLEAN: 6,
     "turn": 7,
@@ -41,7 +42,7 @@ TONES = {
     "queued": "ring", "parked": "ring", "proposed": "warn", "approved": "good", "designing": "accent",
     "review": "warn", "building": "accent", "deprioritized": "warn", "decide": "warn", "qa": "accent",
     QA_CLEAN: "accent", "turn": "accent", "merged": "accent", "checked": "good", ON_STAGING: "good",
-    "promoted": "good", "blocked": "bad", "closed": "ring",
+    "promoted": "good", "blocked": "bad", "on-hold": "ring", "closed": "ring",
 }  # fmt: skip
 _WORDS = {
     "queued": "Queued",
@@ -58,6 +59,7 @@ _WORDS = {
     "promoted": "On prod",
     "decide": "Needs your decision",
     "blocked": "Blocked until you fix it",
+    "on-hold": "Waiting for another task's check to pass",
     "closed": "Closed",
 }
 NEED_ACTIONS: dict[str, dict[str, Any]] = {
@@ -84,6 +86,7 @@ IN_PROGRESS = (
     "checked",
     "decide",
     "blocked",
+    "on-hold",
 )
 _TESTER_WORDS = (
     ("UI", ("qa-ui-function", "qa-ux", "qa-visual")),

@@ -103,8 +103,8 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
   vision, its quality bar, or what comes first. When none of those answers it:
   `factory needs-owner <task> --picture <file> --question "<the question>"`. Only that task waits. With YOLO mode
   on, never ask: decide as the owner would from `GOAL.md` and their past rulings.
-- **What only the owner can give** (a key, an account, a dataset, an outside site): never wait for it. A task it
-  stops is blocked (below); anything else goes to `factory reflect --kind friction "<what is missing and what it
+- **What only the owner can give** (a key, an account, a paid service, leave to use an outside site): never wait for
+  it. A task it stops is blocked (below); anything else goes to `factory reflect --kind friction "<what is missing and what it
   stops>"`, and you move on.
 - **Specs.** A rung 3 designer hands back its spec and brief: approve it if it serves the task's goal item and stays
   within rung 3 (`factory queue task status <task> building`); the warden starts its implementer. A spec that turned
@@ -131,18 +131,26 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    and the merged spec's own checks. Load the seeds they need (`factory slot seed load <name>`). Start the
    `qa-regression` testers at once, the scenarios split between them, each signed in as its own test address. Start
    each in its own lane, `qa-regression`, then `qa-regression-2` and on, as its `subagent_type`: two in one lane share
-   one browser, and a lane named only in the brief changes nothing. A check of slot 0's health is read in the tester's
+   one browser, and a lane named only in the brief changes nothing. A brief names scenarios, never an earlier
+   report's results or causes. A check of slot 0's health is read in the tester's
    browser: no tester's shell reaches a slot. Save each tester's report to a file and run
    `factory queue check <merge sha> --body <that file>`.
 4. **A failure** reverts the merge only when that merge is the one change to the scenario's code since its last
    pass: `git revert -m 1 <merge> --no-edit`, then `factory queue task status <task> building --note "<why>; reverted
    as <the revert's sha>"`. The warden tells its implementer, or starts a new one once it has ended. Any other
    failure becomes a request. A saved check with no failure moves the task to `checked` by itself.
-   **Blocked**, with nothing failed: a scenario the environment stopped (a key, a seed, an account, a site a tester
-   cannot reach). Revert the merge the same way, then `factory queue task status <task> blocked --note "<what
-   stopped it and what would fix it>; reverted as <the revert's sha>"`. The warden benches its implementer, writes
-   it to SELF_REFLECT and puts it on Home for the owner's Fixed: move on to other work. A blocker an implementer
-   reports before its merge is blocked the same way, with nothing to revert.
+   **Blocked**, with nothing failed: a scenario that could not run, for a cause a tester saw in this check (never one
+   copied from an earlier report: run it again first). Revert the merge the same way, then one of three:
+   - Only the owner can give it (a key, an account, a paid service, leave to use an outside site):
+     `factory queue task status <task> blocked --note "<what stopped it and what would fix it>; reverted as <sha>"`.
+     The warden benches its implementer, writes it to SELF_REFLECT and puts it on Home for the owner's Fixed.
+   - Another open task makes it: `factory queue task status <task> on-hold --after <that task> --note "<what
+     stopped it>; reverted as <sha>"`. The warden benches its implementer and sends it back once that task's check
+     passes, or, told why, once that task is closed or parked.
+   - Anything else the factory can make (a seed, a scenario out of date, a page a slot can serve): send it back to
+     building, as a failure, with what to make in the note.
+   Then move on to other work. A blocker an implementer reports before its merge goes the same ways, with nothing to
+   revert.
 5. **Staging is the owner's.** The warden offers the newest commit that is safe to ship on Home, and the owner
    pushes it when they choose: never ask for a push or wait for one. Staging regressing after a push: revert and
    `factory check` at once (`${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md`); the revert is offered the same way.

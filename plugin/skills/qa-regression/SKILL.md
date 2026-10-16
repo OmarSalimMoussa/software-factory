@@ -58,8 +58,10 @@ the default branch's record, and a row in any other shape is refused.
   `pass`, `fail` or `blocked`, and nothing else. Steps run is a whole number: how many steps you ran. No cell holds
   a `|`.
 - **Checks:** one row for each other item in your brief.
-- **Blocked:** the evidence says what stopped you, and whether the environment lacks it (a key, a seed, an account,
-  an outside site) or the scenario asks for what the product no longer has.
+- **Blocked:** the evidence says the step this walk reached, what you saw there, and whether the environment lacks
+  it (a key, a seed, an account, an outside site) or the scenario asks for what the product no longer has. Only what
+  you saw in this walk: never a cause from a brief or an earlier report. Try the first step before calling it
+  blocked.
 
 Then one finding per failure: the step that failed, what you saw, what the scenario expected, and the screenshot or
 request that shows it. A failure you suspect is a broken scenario still fails; say why you suspect it.

@@ -18,7 +18,8 @@ OWNER, ORCH, IMPL, DESIGN, WARDEN = "owner", "orchestrator", "implementer", "des
 ACTORS = (OWNER, ORCH, IMPL, DESIGN, WARDEN)
 RUNNING = frozenset({"designing", "building", "qa", "qa-clean", "turn"})
 OPEN = RUNNING | {"approved", "review", "deprioritized", "decide"}
-WAITS = frozenset({"merged", "blocked"})  # a benched builder's task waits on its check or the owner, not a place
+# A benched builder's task waits on its check, the owner or another task, not a place.
+WAITS = frozenset({"merged", "blocked", "on-hold"})
 NOT_CLOSED = frozenset(TASK_STATUSES) - {"closed"}
 
 
@@ -63,9 +64,12 @@ MOVES: tuple[Move, ...] = (
     _m(RUNNING, {"decide"}, "limits", WARDEN),
     _m({"decide"}, set(RUNNING), "extend", OWNER),  # back to the status the spent limit stopped it in
     _m({"decide"}, {"parked"}, "park", OWNER),
-    # A key, seed or site the environment lacks: off the default branch until the owner's Fixed (queue/turn.py).
+    # What only the owner can give: off the default branch until the owner's Fixed (queue/turn.py).
     _m({"building", "qa", "qa-clean", "turn", "merged"}, {"blocked"}, "blocked", ORCH),
     _m({"blocked"}, {"building", "approved"}, "unblocked", OWNER),
+    # What another task makes (a seed, a scenario): off the default branch until that task's check passes.
+    _m({"building", "qa", "qa-clean", "turn", "merged"}, {"on-hold"}, "on-hold", ORCH),
+    _m({"on-hold"}, {"building", "approved"}, "released", WARDEN),
     _m({"decide"}, {"proposed"}, "to-designer", OWNER),
     _m(OPEN, {"proposed"}, "rung-up", ORCH),
     _m(OPEN, {"proposed"}, "void", WARDEN),
