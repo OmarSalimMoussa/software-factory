@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -17,8 +18,10 @@ from runtime.qa import browser_check
 from runtime.shared.paths import FACTORY_BIN, WARDEN_USER, Places
 from runtime.shared.protocol import Refused
 from runtime.system import drill_probe, install, layout, render
-from runtime.system.install_drills import browser_drill, drills, renew_drill, roster, worktree_drill
+from runtime.system.install_drills import browser_drill, drill_worktrees, drills, renew_drill, roster, worktree_drill
 from runtime.system.install_drills.evidence import Ran, Result
+from runtime.system.journal import Journal
+from runtime.system.real_host import RealHost
 from runtime.warden.owner import settings_save
 
 
@@ -183,8 +186,8 @@ def test_a_guard_drill_passes_only_on_its_own_rule(
 @pytest.mark.parametrize(
     ("result", "ok"),
     [
-        ("write:/w/a/.claude/settings.json -> EACCES\nwrite:/w/a/.claude/skills -> EACCES", True),
-        ("write:/w/a/.claude/settings.json -> EACCES\nwrite:/w/a/.claude/skills -> written", False),
+        ("write:.claude/settings.json -> EACCES\nwrite:.claude/skills -> EACCES", True),
+        ("write:.claude/settings.json -> EACCES\nwrite:.claude/skills -> written", False),
         ("Exit code 1", False),  # a sandbox that runs nothing proves nothing
     ],
     ids=["walled", "one-written", "bare-failure"],
@@ -288,15 +291,12 @@ class Overlapping(FakeRig):
 
     running: int = 0
     most: int = 0
-    beside_config: list[int] = field(default_factory=list)  # how many ran while the config probe did
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None, properties: tuple[str, ...] = ()) -> Ran:
         with self.lock:
             self.running += 1
             self.most = max(self.most, self.running)
-            if any(".mcp.json" in command for command in commands):
-                self.beside_config.append(self.running - 1)
         time.sleep(0.05)
         with self.lock:
             self.running -= 1
@@ -311,7 +311,43 @@ def test_session_drills_run_side_by_side_and_every_drill_reports_once_in_order()
     named = {drill: drill(FakeRig()).name for drill in roster.DRILLS}
     assert [r.name for r in results] == [named[drill] for drill in roster.DRILLS]
     assert rig.most == 3
-    assert rig.beside_config == [0]  # its probe shares the drill worktree with no other session
+
+
+def _git(repo: Path, *argv: str) -> str:
+    return subprocess.run(["git", "-C", str(repo), *argv], capture_output=True, text=True, check=True).stdout
+
+
+def test_each_drill_session_has_a_worktree_of_its_own_and_only_drill_worktrees_are_swept(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Claude Code's sandbox deletes the placeholders it laid in its folder, even one another session took for a real
+    file, whose sandbox then cannot start: no two drill sessions may share a folder, as no two agents do."""
+    monkeypatch.setattr(drill_worktrees, "AGENT_USER", "")  # this test's user stands in for the agent's
+    repo = tmp_path / "product"
+    repo.mkdir()
+    (repo / "app.py").write_text("print('shop')\n")
+    _git(repo, "init", "-q", "-b", "master")
+    _git(repo, "add", ".")
+    _git(repo, "-c", "user.name=t", "-c", "user.email=t@invalid", "commit", "-q", "-m", "The shop")
+    trees = drill_worktrees.Worktrees(RealHost(Journal(terminal=False)), repo)
+    prefix = drill_worktrees.PREFIX
+    # An agent's worktree; one a stopped install left, with a tag of its name; the owner's branch with a drill's
+    # prefix; and a folder a sandbox left, which git does not list.
+    agents, left = trees.root / "impl-t-0001", trees.root / f"{prefix}0badcafe"
+    for worktree in (agents, left):
+        _git(repo, "worktree", "add", "-q", "-b", worktree.name, str(worktree), "HEAD")
+    _git(repo, "tag", left.name)
+    _git(repo, "branch", f"{prefix}notes")
+    (trees.root / f"{prefix}5ca1ab1e" / ".claude").mkdir(parents=True)
+
+    trees.open()
+    first, second = trees.own(), trees.own()
+    assert len({first, second, trees.a, trees.b}) == 4 and not left.exists()
+    assert (first / "app.py").read_text() == (second / "app.py").read_text() == "print('shop')\n"
+    trees.sweep()
+
+    assert sorted(path.name for path in trees.root.iterdir()) == ["impl-t-0001"]
+    assert _git(repo, "branch", "--format=%(refname:lstrip=2)").split() == [f"{prefix}notes", "impl-t-0001", "master"]
 
 
 def test_the_install_refuses_to_finish_while_a_drill_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

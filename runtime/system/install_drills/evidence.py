@@ -41,7 +41,7 @@ class Rig(Protocol):
 
     places: Places
     settings: Settings
-    worktree_a: Path  # the drill session's own worktree
+    worktree_a: Path  # the guard drills' session's worktree, where the agent's plain commands run
     worktree_b: Path  # another session's
     branch_b: str
     finished_agent: str  # a finished intake subagent in the drill session's transcript

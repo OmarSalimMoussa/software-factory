@@ -1,5 +1,5 @@
 """Every drill an install runs, in the order its log lists them, and how they run: the guard and host drills one
-after another, then the drills that each start a sandboxed session, side by side."""
+after another, then the drills that each start a sandboxed session, side by side, each in a worktree of its own."""
 
 from __future__ import annotations
 
@@ -42,12 +42,10 @@ DRILLS: tuple[Callable[[Rig], Result], ...] = (
 
 
 # Each starts at least one sandboxed session, which waits on a model: they run side by side.
-SESSIONS = frozenset({drills.sandbox_runs, drills.shell_write_other_worktree, drills.secrets_unreadable,
-                      drills.sockets_refused, drills.hosts_refused, drills.bubblewrap_missing,
-                      drills.factory_in_sandbox, drills.path_shadow, drills.toolchain_answers,
-                      drills.background_session, renew_drill.copy_remembers})  # fmt: skip
-# Alone, last: each sandboxed command mounts over the shared drill worktree's missing config files, then removes them.
-LAST = (drills.claude_config_by_shell,)
+SESSIONS = frozenset({drills.sandbox_runs, drills.shell_write_other_worktree, drills.claude_config_by_shell,
+                      drills.secrets_unreadable, drills.sockets_refused, drills.hosts_refused,
+                      drills.bubblewrap_missing, drills.factory_in_sandbox, drills.path_shadow,
+                      drills.toolchain_answers, drills.background_session, renew_drill.copy_remembers})  # fmt: skip
 
 
 def _one(drill: Callable[[Rig], Result], rig: Rig) -> Result:
@@ -60,10 +58,9 @@ def _one(drill: Callable[[Rig], Result], rig: Rig) -> Result:
 
 def run_all(rig: Rig, at_once: int) -> list[Result]:
     """Every drill's result, once each, in the order of DRILLS: the guard and host drills one after another, then the
-    session drills ``at_once`` at a time, then the LAST ones alone."""
-    done = {drill: _one(drill, rig) for drill in DRILLS if drill not in SESSIONS and drill not in LAST}
+    session drills ``at_once`` at a time."""
+    done = {drill: _one(drill, rig) for drill in DRILLS if drill not in SESSIONS}
     with ThreadPoolExecutor(max_workers=at_once, thread_name_prefix="drill") as pool:
         started = {drill: pool.submit(_one, drill, rig) for drill in DRILLS if drill in SESSIONS}
         done.update({drill: future.result() for drill, future in started.items()})
-    done.update({drill: _one(drill, rig) for drill in LAST})
     return [done[drill] for drill in DRILLS]

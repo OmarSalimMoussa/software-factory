@@ -89,9 +89,10 @@ def claude_config_by_tool(rig: Rig) -> Result:
 
 
 def claude_config_by_shell(rig: Rig) -> Result:
-    targets = [f"write:{rig.worktree_a / path.rstrip('/')}" for path in writes.CLAUDE_CONFIG]
+    """Relative paths: the session runs in a worktree made for it, where its shell starts."""
+    targets = [f"write:{path.rstrip('/')}" for path in writes.CLAUDE_CONFIG]
     return sandboxed_probe(rig, "a shell command cannot write Claude Code's project config in its worktree",
-                           *targets, first=f"mkdir -p {rig.worktree_a / '.claude'}")  # fmt: skip
+                           *targets, first="mkdir -p .claude")  # fmt: skip
 
 
 def secrets_unreadable(rig: Rig) -> Result:

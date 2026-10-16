@@ -2,9 +2,8 @@
 
 It never touches the warden's own registry. Drills that need a permitted session see a drill view instead: a
 temporary public/ holding the warden's published settings and switches and a registry of drill sessions only,
-mounted over the real public/ for that one command. Two drill worktrees and their branches are added to the product
-checkout for the drills and removed afterwards; any an earlier, stopped install left are removed first. Sessions run
-side by side, so what they share (the drill registry, the numbering of their logs) is changed under one lock.
+mounted over the real public/ for that one command. Sessions run side by side, each in a worktree of its own
+(drill_worktrees.py), so what they share (the drill registry, the numbering of their logs) is changed under one lock.
 """
 
 from __future__ import annotations
@@ -28,6 +27,7 @@ from runtime.shared import store
 from runtime.shared.models import RETIRED, WORKING, Session
 from runtime.shared.paths import AGENT_USER, SLICE, Places
 from runtime.system import layout, render
+from runtime.system.install_drills.drill_worktrees import NAME, Worktrees
 from runtime.system.install_drills.evidence import Ran
 from runtime.system.job import Install, refuse
 from runtime.warden.owner import messages
@@ -46,7 +46,6 @@ STEPS = ABOUT + (
     "Run each of these exact shell commands once with the Bash tool, one call each, in order, changing nothing in "
     "them, then reply DONE:\n{}"
 )
-_DRILL_NAME = "software-drill"
 
 
 def _now() -> str:
@@ -80,9 +79,8 @@ class RealRig:
     def __init__(self, ctx: Install) -> None:
         self.ctx, self.places, self.settings = ctx, ctx.places, ctx.need_settings()
         self.view = Places(self.places.install, layout.DRILLS / "state", self.places.run)
-        root = session_settings.worktrees(ctx.checkout())
-        self.worktree_a, self.worktree_b = root / f"{_DRILL_NAME}-a", root / f"{_DRILL_NAME}-b"
-        self.branch_a, self.branch_b = f"{_DRILL_NAME}-a", f"{_DRILL_NAME}-b"
+        self.trees = Worktrees(ctx.host, ctx.checkout())
+        self.worktree_a, self.worktree_b, self.branch_b = self.trees.a, self.trees.b, self.trees.b.name
         self.finished_agent = "drillintake"
         self.transcript = layout.DRILLS / "transcript.jsonl"
         self.session_a = str(uuid.uuid4())
@@ -98,18 +96,14 @@ class RealRig:
     # setting up and tearing down
 
     def open(self) -> None:
-        host, repo = self.ctx.host, str(self.ctx.checkout())
-        self._remove_worktrees()
-        host.query(["git", "-C", repo, "worktree", "prune"], user=AGENT_USER)
         shutil.rmtree(layout.DRILLS, ignore_errors=True)
         layout.DRILLS.mkdir(mode=0o755)
-        agent = host.account(AGENT_USER)
+        agent = self.ctx.host.account(AGENT_USER)
         if agent is None:
             raise refuse(f"there is no user {AGENT_USER}")
         (layout.DRILLS / "debug").mkdir(mode=0o700)
         os.chown(layout.DRILLS / "debug", agent.uid, agent.gid)  # the drill sessions write their debug logs here
-        for worktree, branch in ((self.worktree_a, self.branch_a), (self.worktree_b, self.branch_b)):
-            host.run(["git", "-C", repo, "worktree", "add", "-q", "-b", branch, str(worktree), "HEAD"], user=AGENT_USER)
+        self.trees.open()
         public = layout.public(self.view.state)
         for name in ("settings.json", "switches.json"):
             source = layout.public(self.places.state) / name
@@ -117,9 +111,9 @@ class RealRig:
             store.write_text(public / name, source.read_text(encoding="utf-8"))
         b = str(uuid.uuid4())
         self.sessions = {
-            self.session_a: _session(self.session_a, f"{_DRILL_NAME}-a", self.worktree_a),
-            b: _session(b, f"{_DRILL_NAME}-b", self.worktree_b),
-            "drill-intake": _session("drill-intake", f"{_DRILL_NAME}-intake", self.worktree_a, role="intake",
+            self.session_a: _session(self.session_a, f"{NAME}-a", self.worktree_a),
+            b: _session(b, f"{NAME}-b", self.worktree_b),
+            "drill-intake": _session("drill-intake", f"{NAME}-intake", self.worktree_a, role="intake",
                                      parent=self.session_a, state=RETIRED, agent_id=self.finished_agent),
         }  # fmt: skip
         registry.write(self.view, self.sessions)
@@ -140,14 +134,8 @@ class RealRig:
                 )
             time.sleep(1)
 
-    def _remove_worktrees(self) -> None:
-        host, repo = self.ctx.host, str(self.ctx.checkout())
-        for worktree, branch in ((self.worktree_a, self.branch_a), (self.worktree_b, self.branch_b)):
-            host.query(["git", "-C", repo, "worktree", "remove", "--force", str(worktree)], user=AGENT_USER)
-            host.query(["git", "-C", repo, "branch", "-D", branch], user=AGENT_USER)
-
     def close(self) -> None:
-        self._remove_worktrees()
+        self.trees.sweep()
         self.places.drill_permits.unlink(missing_ok=True)
         shutil.rmtree(layout.DRILLS, ignore_errors=True)
         if self.log_dir.exists():
@@ -161,13 +149,16 @@ class RealRig:
     # what the drills call
 
     def _systemd_run(self, user: str, argv: list[str], *, view: bool, stdin: str = "", token: bool = False,
-                     properties: tuple[str, ...] = ()) -> Ran:  # fmt: skip
+                     properties: tuple[str, ...] = (), cwd: Path | None = None) -> Ran:  # fmt: skip
+        """``argv`` as ``user``, in ``cwd``: by default, the agent's in worktree a and anyone else's in their home."""
         account = self.ctx.host.account(user)
         if account is None:
             raise refuse(f"there is no user {user}")
         runtime = f"/run/user/{account.uid}"
-        cmd = ["systemd-run", "--quiet", "--collect", "--wait", "--pipe", f"--uid={user}", f"--gid={user}",
-               f"--slice={SLICE}", f"--working-directory={self.worktree_a if user == AGENT_USER else account.home}",
+        where = cwd or (self.worktree_a if user == AGENT_USER else account.home)
+        unit = f"{NAME}-{uuid.uuid4().hex[:8]}.service"
+        cmd = ["systemd-run", "--quiet", "--collect", "--wait", "--pipe", f"--unit={unit}", f"--uid={user}",
+               f"--gid={user}", f"--slice={SLICE}", f"--working-directory={where}",
                f"--setenv=HOME={account.home}", f"--setenv=XDG_RUNTIME_DIR={runtime}",
                f"--setenv=PATH={layout.UNIT_PATH}",
                *(f"--setenv={key}={value}" for key, value in layout.UV_ENV.items())]  # fmt: skip
@@ -186,6 +177,7 @@ class RealRig:
                                   timeout=self.timeout, check=False)  # fmt: skip
         # telemetry: surfaced — a drill past its time comes back as a failed `Ran` naming it
         except subprocess.TimeoutExpired:
+            self.stop(unit)  # the timeout ends only systemd-run, which leaves its unit running
             return Ran(124, f"the drill ran past {self.timeout} s")
         return Ran(done.returncode, done.stdout + done.stderr)
 
@@ -206,15 +198,16 @@ class RealRig:
         return self._systemd_run(AGENT_USER, hook, view=True, stdin=json.dumps(event))
 
     def sandboxed(self, *commands: str, extra: dict[str, Any] | None = None, properties: tuple[str, ...] = ()) -> Ran:
-        """One `claude -p` session, permitted in the drill view, asked to run exactly ``commands``, in order."""
+        """One `claude -p` session in a worktree of its own, in the drill view, to run exactly ``commands``."""
+        own = self.trees.own()
         listed = "\n".join(f"Command {n}: {command}" for n, command in enumerate(commands, 1))
         prompt = PROMPT.format(commands[0]) if len(commands) == 1 else STEPS.format(listed)
         sid = str(uuid.uuid4())
         with self.lock:
-            self.sessions[sid] = _session(sid, f"{_DRILL_NAME}-{sid[:8]}", self.worktree_a)
+            self.sessions[sid] = _session(sid, own.name, own)
             registry.write(self.view, dict(self.sessions))
         self._permit(sid)
-        body = session_settings.render(self.settings, self.places, "implementer", self.worktree_a, layout.AGENT_HOME)
+        body = session_settings.render(self.settings, self.places, "implementer", own, layout.AGENT_HOME)
         for key, value in (extra or {}).items():
             body[key] = {**body.get(key, {}), **value}
         name = f"session-settings/drill-{sid}.json"
@@ -228,7 +221,7 @@ class RealRig:
                 "--debug-file", str(self._debug(sid))]  # fmt: skip
         # SRT_DEBUG: Claude Code's sandbox names every mount it makes, on stderr, so a drill's log shows the walls.
         ran = self._systemd_run(
-            AGENT_USER, argv, view=True, token=True, properties=(*properties, "Environment=SRT_DEBUG=1")
+            AGENT_USER, argv, view=True, token=True, properties=(*properties, "Environment=SRT_DEBUG=1"), cwd=own
         )
         self._log(prompt, ran, self._debug(sid))
         return ran
@@ -265,7 +258,7 @@ class RealRig:
 
     def background(self, user: str, argv: list[str]) -> str:
         """Start ``argv`` signed in, so a claude it starts waits for its input instead of exiting unsigned."""
-        unit = f"{_DRILL_NAME}-{uuid.uuid4().hex[:8]}.service"
+        unit = f"{NAME}-{uuid.uuid4().hex[:8]}.service"
         token = f"LoadCredential={layout.CLAUDE_TOKEN}:{layout.secrets(self.places.state)}/claude.token"
         runner = self.places.install / "runtime" / "system" / "runners" / "with_token.py"
         subprocess.run(["systemd-run", "--quiet", "--collect", f"--unit={unit}", f"--uid={user}", f"--gid={user}",
@@ -301,7 +294,7 @@ class RealRig:
         return time.monotonic()
 
     def warden_check(self, probe: list[str]) -> tuple[Path, Ran]:
-        checkout = layout.AGENT_HOME / f"{_DRILL_NAME}-check"
+        checkout = layout.AGENT_HOME / f"{NAME}-check"
         host, agent = self.ctx.host, self.ctx.host.account(AGENT_USER)
         if agent is None:
             raise refuse(f"there is no user {AGENT_USER}")
@@ -330,7 +323,7 @@ class RealRig:
         return checkout, Ran(code, out)
 
     def real_session(self, name: str, prompt: str, **more: str) -> Ran:
-        request_id = f"{_DRILL_NAME}-{uuid.uuid4().hex[:12]}"
+        request_id = f"{NAME}-{uuid.uuid4().hex[:12]}"
         model, role, checkout = self.settings["install.drill"], "implementer", self.ctx.checkout()
         self._permit(name)
         written = session_settings.write(self.settings, self.places, request_id, role, checkout, layout.AGENT_HOME)
