@@ -155,6 +155,7 @@ SCHEMA: dict[str, Spec] = {
     "watch.start_grace_seconds": Spec("int", 30, 600),  # contract: a start's process must appear within this
     "watch.respawn_poll_seconds": Spec("int", 1, 30),
     "watch.message_seconds": Spec("int", 3, 60),  # contract: how long the owner's message is held out to a session
+    "watch.stop_seconds": Spec("int", 1, 30),
     "watch.loop_minutes": Spec("int", 5, 120, when=AT_INSTALL),
     "watch.orchestrator_silent_minutes": Spec("int", 10, 180),
     "watch.orchestrator_busy_silent_minutes": Spec("int", 10, 600),

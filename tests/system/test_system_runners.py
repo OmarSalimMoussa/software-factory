@@ -143,7 +143,7 @@ def test_a_message_request_names_a_session_and_text_that_cannot_be_read_as_flags
 def test_a_message_is_held_out_in_a_terminal_and_a_failure_of_its_own_is_reported(
     tmp_path: Path, script: str, status: int
 ) -> None:
-    assert lf.run_in_terminal([sys.executable, "-c", script], tmp_path, {}, 1) == status
+    assert lf.run_in_terminal([sys.executable, "-c", script], tmp_path, {}, 1, 1) == status
 
 
 def test_claude_gets_its_sign_in_token_on_a_pipe_and_in_no_environment(tmp_path: Path) -> None:

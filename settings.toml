@@ -162,6 +162,7 @@ respawn_poll_seconds = 1  # how often the warden looks whether a session it resp
 account_check_seconds = 180  # how long a switch of Claude accounts waits for the first agent back to answer
 reap_retry_minutes = 10  # a reap that could not empty a retired session's slot is tried again after this
 message_seconds = 10    # how long the warden holds the owner's message out to a session before letting go
+stop_seconds = 5        # how long the message's delivery then gets to finish before it is stopped
 loop_minutes = 30
 orchestrator_silent_minutes = 40
 orchestrator_busy_silent_minutes = 120

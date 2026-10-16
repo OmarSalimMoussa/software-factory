@@ -25,7 +25,8 @@ def main(argv: list[str]) -> int:
         if raw["kind"] == lf.MESSAGE:
             command, repo = lf.message_argv(raw), Path(settings.get_str("repo.path"))
             env, fds = lf.claude_env(inherited, environment.credentials_folder())
-            return lf.run_in_terminal(command, repo, env, settings.get_int("watch.message_seconds"), fds)
+            hold, stop = settings.get_int("watch.message_seconds"), settings.get_int("watch.stop_seconds")
+            return lf.run_in_terminal(command, repo, env, hold, stop, fds)
         if raw["kind"] == lf.SESSION:
             command, cwd = lf.session_argv(raw, state), lf.session_cwd(raw, settings)
         else:

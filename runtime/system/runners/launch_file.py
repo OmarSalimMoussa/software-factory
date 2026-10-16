@@ -236,8 +236,10 @@ def message_argv(raw: dict[str, Any]) -> list[str]:
     return [PROGRAMS["claude"], "--resume", session, text]
 
 
-def run_in_terminal(argv: list[str], cwd: Path, env: dict[str, str], hold: int, fds: tuple[int, ...] = ()) -> int:
-    """Run ``argv`` in a pseudo-terminal for ``hold`` seconds, then let go of it.
+def run_in_terminal(
+    argv: list[str], cwd: Path, env: dict[str, str], hold: int, stop: int, fds: tuple[int, ...] = ()
+) -> int:
+    """Run ``argv`` in a pseudo-terminal for ``hold`` seconds, then let go of it; it gets ``stop`` seconds to stop.
 
     `claude --resume <id> <text>` on a running background session sends the text as its next turn, then attaches,
     and with no terminal it sends nothing. Ctrl+Z leaves the attached view and the session keeps running. An exit of
@@ -255,6 +257,7 @@ def run_in_terminal(argv: list[str], cwd: Path, env: dict[str, str], hold: int, 
         return REFUSED
     os.close(follower)
     seen = b""
+    closed = False
     deadline = time.monotonic() + hold
     while time.monotonic() < deadline and proc.poll() is None:
         ready, _, _ = select.select([leader], [], [], 0.5)
@@ -263,21 +266,28 @@ def run_in_terminal(argv: list[str], cwd: Path, env: dict[str, str], hold: int, 
                 seen = (seen + os.read(leader, 65536))[-4096:]
             # telemetry: expected — the terminal closed: the session's output has ended
             except OSError:
+                closed = True
                 break
+    if closed:  # it closes as the process exits, a moment before it can be reaped: its status says how it ended
+        _reap(proc, stop)
     if proc.poll() is None:
         os.write(leader, b"\x1a")
-        try:
-            proc.wait(5)
-        # telemetry: expected — a process that does not stop within its five seconds is killed
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait(5)
+        _reap(proc, stop)
         os.close(leader)
         return 0
     os.close(leader)
     if proc.returncode != 0:
         print(f"runner: claude exited {proc.returncode}: {_plain(seen)[-300:]}", flush=True)
     return proc.returncode
+
+
+def _reap(proc: subprocess.Popen[bytes], stop: int) -> None:
+    try:
+        proc.wait(stop)
+    # telemetry: expected — a process that has not ended within its time is killed; a closed terminal's is reported
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(stop)
 
 
 def _plain(raw: bytes) -> str:
