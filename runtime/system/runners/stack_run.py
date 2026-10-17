@@ -111,6 +111,8 @@ def events(since: str, until: str, timeout: int) -> int:
         raw = json.loads(line)
         actor = raw["Actor"]
         attributes = actor.get("Attributes", {})
+        if RUN_LABEL in attributes:  # a `run`'s exit is its command's, answered to whoever ran it
+            continue
         print(json.dumps({"action": raw["Action"], "at": raw["timeNano"], "id": actor["ID"][:12],
                           "name": attributes.get("name", ""), "slot": attributes.get(SLOT_LABEL, ""),
                           "exit": attributes.get("exitCode", "")}), flush=True)  # fmt: skip

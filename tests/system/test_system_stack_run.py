@@ -230,7 +230,7 @@ def test_the_sweep_removes_the_containers_still_on_a_slots_network_before_the_ne
     assert "removed 2 container(s) still on slot 2's network n-slot2: agent-7, agent-8" in capsys.readouterr().out
 
 
-def test_the_events_verb_prints_each_slot_containers_stop_as_one_line(
+def test_the_events_verb_prints_each_slot_containers_stop_as_one_line_but_a_runs(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     seen = {
@@ -242,7 +242,9 @@ def test_the_events_verb_prints_each_slot_containers_stop_as_one_line(
 
     def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
         asked.append(args)
-        return subprocess.CompletedProcess(args, 0, json.dumps(seen) + "\n", "")
+        run = {**seen, "Actor": {"ID": "fedcba9876543210", "Attributes": {
+            "name": "web-run-1", "software.slot": "2", "exitCode": "1", stack_run.RUN_LABEL: "r-1"}}}  # fmt: skip
+        return subprocess.CompletedProcess(args, 0, json.dumps(seen) + "\n" + json.dumps(run) + "\n", "")
 
     monkeypatch.setattr(stack_run, "_docker", docker)
 
