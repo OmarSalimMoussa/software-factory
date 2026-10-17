@@ -7,6 +7,8 @@
 # published on 127.0.0.1 only; the server serves them to its tailnet.
 # Services reach each other by container name, never by service key: a workspace network a shared container joins
 # could hold a product service with the same key.
+# A healthcheck probes every 30s, and at a start's quick pace (start_interval) only within its start period: each probe
+# starts a process in the container, and on one server beside prod and the slots that adds up to a real share of CPU.
 name: factory-services
 
 # What the Langfuse web and worker containers share.
@@ -51,9 +53,11 @@ services:
     healthcheck:
       # Over TCP, not the socket: initdb's temporary server answers on the socket while TCP is still closed.
       test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1 -p 5432"]
-      interval: 3s
+      interval: 30s
       timeout: 3s
       retries: 20
+      start_period: 60s
+      start_interval: 3s
     ports:
       - "127.0.0.1:5434:5432"
     volumes:
@@ -116,12 +120,13 @@ services:
       HOSTNAME: 0.0.0.0
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/public/health || exit 1"]
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 60
       # The first start migrates its databases, which is slow: failures in this window do not count, so a first
       # boot is never declared unhealthy halfway through.
       start_period: 600s
+      start_interval: 5s
     ports:
       - "127.0.0.1:3100:3000"
     networks:
@@ -147,12 +152,13 @@ services:
       HOSTNAME: 0.0.0.0
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3030/api/health || exit 1"]
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 30
       # The first start migrates its databases, which is slow: failures in this window do not count, so a first
       # boot is never declared unhealthy halfway through.
       start_period: 600s
+      start_interval: 5s
     networks:
       - langfuse
     deploy:
@@ -180,12 +186,13 @@ services:
       - factory-langfuse-clickhouse-logs:/var/log/clickhouse-server
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 10
       # The first start migrates its databases, which is slow: failures in this window do not count, so a first
       # boot is never declared unhealthy halfway through.
       start_period: 600s
+      start_interval: 5s
     networks:
       - langfuse
     deploy:
@@ -210,10 +217,11 @@ services:
       - factory-langfuse-minio-data:/data
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
-      interval: 1s
+      interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 1s
+      start_period: 30s
+      start_interval: 1s
     networks:
       - langfuse
     deploy:
@@ -230,9 +238,11 @@ services:
       - factory-langfuse-redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 3s
+      interval: 30s
       timeout: 10s
       retries: 10
+      start_period: 30s
+      start_interval: 3s
     networks:
       - langfuse
     deploy:
@@ -252,9 +262,11 @@ services:
       PGTZ: UTC
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1 -p 5432"]
-      interval: 3s
+      interval: 30s
       timeout: 3s
       retries: 20
+      start_period: 60s
+      start_interval: 3s
     volumes:
       - factory-langfuse-postgres-data:/var/lib/postgresql/data
     networks:
@@ -317,12 +329,13 @@ services:
     environment: *glitchtip-env
     healthcheck:
       test: ["CMD", "python", "healthcheck.py"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 6
       # The first start migrates its databases, which is slow: failures in this window do not count, so a first
       # boot is never declared unhealthy halfway through.
       start_period: 600s
+      start_interval: 10s
     ports:
       - "127.0.0.1:8200:8000"
     volumes:
@@ -359,9 +372,11 @@ services:
       POSTGRES_PASSWORD: ${GLITCHTIP_POSTGRES_PASSWORD:?}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1 -p 5432"]
-      interval: 3s
+      interval: 30s
       timeout: 3s
       retries: 20
+      start_period: 60s
+      start_interval: 3s
     volumes:
       - factory-glitchtip-postgres-data:/var/lib/postgresql/data
     networks:
@@ -377,9 +392,11 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "valkey-cli", "ping"]
-      interval: 3s
+      interval: 30s
       timeout: 3s
       retries: 20
+      start_period: 60s
+      start_interval: 3s
     networks:
       - glitchtip
     deploy:
