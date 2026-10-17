@@ -79,10 +79,14 @@ issues as requests, and `factory errors` never shows them to an agent. Read them
 
 Without that address, the warden and the dashboard do not start, and their logs say why.
 
-A container that stops when nothing asked is one of those errors: a crash, or a kill from outside such as running out
-of memory. Every service of a slot and of prod restarts unless stopped, as does every shared service that keeps
-running, so Docker brings it back and counts it. Every `watch.container_deaths_minutes` the warden reads each container's count, and reports
-each count that rose, once. A stop the factory or a deploy asked for is never counted.
+The warden reports two kinds of failure there too:
+
+- **A container that stops when nothing asked:** a crash, or a kill from outside such as running out of memory.
+  Every service of a slot and of prod restarts unless stopped, as does every shared service that keeps running, so
+  Docker brings it back and counts it. Every `watch.container_deaths_minutes` the warden reads each container's
+  count, and reports each count that rose. A stop the factory or a deploy asked for is never counted.
+- **An import still failing after `watch.failing_alarm_minutes`:** prod's or staging's errors, or the users'
+  reports. It is reported once for each run of failures.
 
 ## The keys the warden holds
 

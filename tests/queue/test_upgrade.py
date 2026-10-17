@@ -8,7 +8,7 @@ import json
 from queue_kit import World
 
 from runtime.qa import findings
-from runtime.queue import approvals, cards, formats, intake, records, turn
+from runtime.queue import approvals, cards, formats, intake, records, reports, turn
 from runtime.queue.book import Queue, spec_rel, task_rel
 from runtime.shared import store
 from runtime.slots import leases
@@ -99,6 +99,21 @@ def test_an_errors_record_that_has_read_reads_on_and_one_that_never_read_takes_w
     upgrade.migrate(dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden")))
     since = {env: json.loads(errors_import.path(places, env).read_text())["since"] for env in ("prod", "slot0")}
     assert since["prod"] is not None and since["slot0"] is None
+
+
+def test_an_import_timer_that_said_only_whether_it_failed_says_since_when(world: World) -> None:
+    places = world.places
+    store.write_json(reports.timer_path(places), {"polled": 1_791_000_000.0, "failing": True, "note": "failed"})
+    store.write_json(errors_import.path(places, "prod"), {"filed": {}, "since": None, "polled": None, "failing": False,
+                                                          "note": None})  # fmt: skip
+    ctx = dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden"))
+
+    assert "since when reports-poll.json, errors-prod.json have failed" in upgrade.migrate(ctx)
+
+    assert json.loads(reports.timer_path(places).read_text())["failing_since"] == ctx.clock.now()
+    assert json.loads(errors_import.path(places, "prod").read_text())["failing_since"] is None
+    assert reports.note(ctx) == "failed" and errors_import.note(places) is None
+    assert upgrade.migrate(ctx) == []
 
 
 def test_self_reflect_entries_open_under_the_ids_the_library_gave_them_by_their_place(world: World) -> None:

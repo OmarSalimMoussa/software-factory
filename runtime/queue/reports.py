@@ -25,6 +25,7 @@ from typing import Any
 from runtime.queue import formats, intake
 from runtime.queue.book import Queue, request_rel
 from runtime.shared import network, store
+from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden import imports
 from runtime.warden.context import Context
@@ -203,16 +204,16 @@ def _erased(path: Path) -> dict[str, str]:
     return erased
 
 
-def _timer_path(ctx: Context) -> Path:
-    return ctx.places.state / "reports-poll.json"
+def timer_path(places: Places) -> Path:
+    return places.state / "reports-poll.json"
 
 
 def _timer(ctx: Context) -> dict[str, Any]:
-    raw = store.read_json_or(_timer_path(ctx), None)
+    raw = store.read_json_or(timer_path(ctx.places), None)
     if raw is None:
         return imports.fresh()
     if not isinstance(raw, dict) or set(raw) != set(imports.TIMER_KEYS):
-        raise store.StoreError(f"{_timer_path(ctx)}: want exactly {sorted(imports.TIMER_KEYS)}")
+        raise store.StoreError(f"{timer_path(ctx.places)}: want exactly {sorted(imports.TIMER_KEYS)}")
     return raw
 
 
@@ -240,4 +241,4 @@ def poll(ctx: Context) -> None:
         return ", ".join(parts)
 
     if imports.run(ctx, TIMED, state, work):
-        store.write_json(_timer_path(ctx), state)
+        store.write_json(timer_path(ctx.places), state)

@@ -13,7 +13,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from runtime.queue import approvals, formats, turn
+from runtime.queue import approvals, formats, reports, turn
 from runtime.queue.book import Queue
 from runtime.shared import claude_accounts, store
 from runtime.shared.models import SEVERITIES
@@ -35,8 +35,8 @@ def migrate(ctx: Context) -> list[str]:
     """Bring every old shape over; what each step did."""
     done: list[str] = []
     steps: list[Callable[[Context], str]] = [
-        _inbox_cursor, _leases, _errors_filed, _errors_since, _turn, _merges, _staging_red, _typed_verdicts,
-        _approvals_routed, _briefs_home, _active_account, _older_skills, _reflection_states,
+        _inbox_cursor, _leases, _errors_filed, _errors_since, _failing_since, _turn, _merges, _staging_red,
+        _typed_verdicts, _approvals_routed, _briefs_home, _active_account, _older_skills, _reflection_states,
     ]  # fmt: skip
     for step in steps:
         try:
@@ -159,6 +159,18 @@ def _errors_since(ctx: Context) -> str:
             store.write_json(errors_import.path(ctx.places, env), {**raw, "since": since})
             changed.append(env)
     return f"when the {', '.join(changed)} errors imports began" if changed else ""
+
+
+def _failing_since(ctx: Context) -> str:
+    """An import's timer that said only whether it was failing says since when: from now, the first time known."""
+    changed = []
+    for path in (reports.timer_path(ctx.places), *(errors_import.path(ctx.places, env) for env in errors_import.ENVS)):
+        raw = store.read_json_or(path, None)
+        if isinstance(raw, dict) and "failing" in raw:
+            failing = raw.pop("failing")
+            store.write_json(path, {**raw, "failing_since": ctx.clock.now() if failing else None})
+            changed.append(path.name)
+    return f"since when {', '.join(changed)} have failed" if changed else ""
 
 
 def _turn(ctx: Context) -> str:

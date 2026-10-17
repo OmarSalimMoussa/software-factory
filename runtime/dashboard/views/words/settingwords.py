@@ -168,6 +168,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("watch.bench_min_run_minutes", "Minutes an agent works before it can be pushed out"),
             ("watch.account_check_seconds", "Seconds a switch of accounts waits for an agent's answer"),
             ("watch.container_deaths_minutes", "Minutes between counts of containers that stopped"),
+            ("watch.failing_alarm_minutes", "Minutes an import fails before it is reported as an error"),
             ("watch.done_minutes", "Minutes between reads of what is done"),
             ("watch.start_grace_seconds", "Seconds a starting agent gets to appear"),
             ("watch.respawn_poll_seconds", "Look for an agent coming back every, seconds"),

@@ -175,6 +175,24 @@ def test_a_failed_pull_is_logged_once_and_tried_again_at_the_next_poll(
     assert "failed (reports: scripts/dev reports exited 3)" in str(reports.note(ctx))
 
 
+def test_a_pull_still_failing_after_the_alarm_minutes_is_logged_as_an_error_once(
+    world: World, tmp_path: Path, prod: Prod, caplog: pytest.LogCaptureFixture
+) -> None:
+    _stack(world, tmp_path, "", code=3)
+    ctx = world.ctx("warden", session="")
+    period = world.settings.get_int("reports.poll_minutes") * 60
+    alarm = world.settings.get_int("watch.failing_alarm_minutes") * 60
+
+    with caplog.at_level(logging.WARNING):
+        for _ in range(alarm // period + 3):
+            reports.poll(ctx)
+            world.clock.at += period
+    assert [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR] == [
+        f"warden: pulling the users' reports has failed for {alarm // 60} minutes (reports: scripts/dev reports "
+        "exited 3); it still runs at each poll"
+    ]
+
+
 def test_the_warden_reads_prods_export_with_the_saved_token_and_the_verb_reads_it(
     world: World, tmp_path: Path, prod: Prod
 ) -> None:
