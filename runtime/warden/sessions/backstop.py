@@ -3,7 +3,8 @@
 Claude Code writes one record per session process under the agent user's ``~/.claude/sessions``, naming the
 session's id, its name and its chat link; that is how the warden sees every session, whatever started it. Each tick
 a new session whose name a pending start is waiting for is bound to that start; any other session the registry does
-not hold, or holds as retired or deprioritized, is stopped. A session being benched or revived is never touched.
+not hold, or holds as retired or deprioritized, is stopped. A session being benched or revived is never touched, nor
+is a revived one's process in its first seconds, while it names a fresh id under the session's name.
 """
 
 from __future__ import annotations
@@ -153,7 +154,7 @@ def bind(sessions: dict[str, Session], procs: dict[str, Proc]) -> tuple[bool, di
 def unpermitted(sessions: dict[str, Session], proc: Proc) -> bool:
     known = sessions.get(proc.session)
     if known is None:
-        return True
+        return not any(s.name == proc.name and s.state == REVIVING for s in sessions.values())
     if known.state in (BENCH_PENDING, REVIVING):
         return False
     return known.state in (RETIRED, DEPRIORITIZED)

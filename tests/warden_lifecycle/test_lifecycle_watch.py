@@ -88,6 +88,14 @@ def test_the_backstop_stops_only_processes_the_warden_did_not_permit(world: Worl
     assert world.launcher.stopped == (["5e550001", "9f9f9f9f"] if stopped else ["9f9f9f9f"])
 
 
+def test_a_revived_sessions_process_naming_a_fresh_id_for_its_first_seconds_is_not_stopped(world: World) -> None:
+    world.seat("44426cd6", name="orchestrator", role="orchestrator", family="orch", state=REVIVING, since=NOW)
+    world.procs["82b353ac"] = Proc(pid=9, session="82b353ac", name="orchestrator", chat_link="")
+    world.procs["9f9f9f9f"] = Proc(pid=10, session="9f9f9f9f", name="anything", chat_link="")
+    backstop.sweep(world.ctx(), dict(world.procs))
+    assert world.launcher.stopped == ["9f9f9f9f"]
+
+
 def test_a_start_is_bound_to_its_session_by_name_and_its_pending_id_still_names_it(world: World) -> None:
     world.seat("pending-abc", name="impl-t-0001", task="t-0001", since=NOW)
     world.procs["0f00ba12-real"] = Proc(pid=7, session="0f00ba12-real", name="impl-t-0001", chat_link="")
