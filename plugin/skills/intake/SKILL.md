@@ -57,7 +57,7 @@ Write in your own words, with no person in them: never copy a user's words, name
 
 ## The verdict
 
-Hand it back to the orchestrator with the SubagentHandback tool: five lines, plain words, no code, file names,
+Hand it back to the orchestrator in your final message: five lines, plain words, no code, file names,
 lines or stack traces.
 
 ```

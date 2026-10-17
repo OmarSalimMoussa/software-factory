@@ -40,6 +40,6 @@ change a setting. If a step would change data, skip it and say so.
 
 ## Report
 
-Hand back with the SubagentHandback tool. One line per page: loaded or not, time, console errors. Then one finding
+Hand back in your final message. One line per page: loaded or not, time, console errors. Then one finding
 per problem, severity `blocker` when a customer cannot use the product, with the page, what you saw and the
 screenshot's file name.

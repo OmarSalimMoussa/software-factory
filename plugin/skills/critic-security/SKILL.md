@@ -28,7 +28,7 @@ checklists behind these questions. Least privilege and deny by default are the e
 
 ## How you report
 
-Hand back to the designer with the SubagentHandback tool: one issue per problem, each with a severity (`blocker`,
+Hand back to the designer in your final message: one issue per problem, each with a severity (`blocker`,
 `major` or `minor`), where (the spec's section), what is wrong, why it matters, and the change you recommend.
 Mark an issue only the owner could settle. Say "no issues" when there are none; never invent any.
 

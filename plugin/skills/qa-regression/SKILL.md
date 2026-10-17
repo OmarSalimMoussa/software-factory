@@ -41,7 +41,7 @@ them.
 
 ## Report
 
-Hand back with the SubagentHandback tool. Two tables first, exactly in this shape: the orchestrator saves them as
+Hand back in your final message. Two tables first, exactly in this shape: the orchestrator saves them as
 the default branch's record, and a row in any other shape is refused.
 
 ```
