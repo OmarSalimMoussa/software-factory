@@ -12,7 +12,7 @@ SHARED = {"factory-postgres", "factory-glitchtip"}
 
 def provision_slot(docker: FakeDocker, state: Path) -> dict[str, str]:
     return provision.workspace(
-        config(), SERVICES, docker, workspace="slot2", origin="http://127.0.0.1:8402", commit="dev-slot2", state=state
+        config(), docker, workspace="slot2", origin="http://127.0.0.1:8402", commit="dev-slot2", state=state
     )
 
 
@@ -68,7 +68,7 @@ def test_drop_removes_the_database_role_and_network_and_forgets_the_password(tmp
     provision_slot(docker, tmp_path)
     docker.calls.clear()
 
-    provision.drop(config(), SERVICES, docker, workspace="slot2", state=tmp_path)
+    provision.drop(config(), docker, workspace="slot2", state=tmp_path)
 
     sql = next(stdin for argv, stdin in docker.calls if "psql" in argv)
     assert sql == 'DROP DATABASE IF EXISTS "notes_slot2" WITH (FORCE);\nDROP ROLE IF EXISTS "notes_slot2";\n'

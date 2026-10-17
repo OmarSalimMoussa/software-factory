@@ -17,7 +17,6 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from standard.config_records import Config
-from standard.envfile import parse_values
 from standard.services import glitchtip_bootstrap as glitchtip
 
 Run = Callable[[list[str], str | None], subprocess.CompletedProcess[str]]
@@ -30,7 +29,6 @@ SHARED = (POSTGRES, GLITCHTIP)
 # of the services network, so it never has a route to the database.
 TELEMETRY = (GLITCHTIP,)
 GLITCHTIP_INGEST = "factory-glitchtip:8000"
-SERVICE_KEYS = ("POSTGRES_PASSWORD", "GLITCHTIP_OWNER_PASSWORD")
 # Terse errors name no statement text, so a failed ALTER ROLE never prints the password it carried.
 PSQL = [
     *("docker", "exec", "-i", POSTGRES, "psql", "-U", "postgres", "-d", "postgres", "-X", "-q"),
@@ -72,21 +70,6 @@ def tail(text: str, lines: int = 5) -> str:
     return " / ".join(found[-lines:]) or "it printed nothing"
 
 
-def read_services_env(path: Path) -> dict[str, str]:
-    """The shared stack's generated secrets, as the set-up or the installer wrote them."""
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        raise ProvisionError(
-            f"{path}: cannot read the shared services' settings ({type(exc).__name__}: {exc})"
-        ) from exc
-    values, problems = parse_values(text, str(path))
-    problems += [f"{path} has no {key}" for key in SERVICE_KEYS if not values.get(key)]
-    if problems:
-        raise ProvisionError("; ".join(problems))
-    return values
-
-
 def database(config: Config, workspace: str) -> str:
     """The name of both the workspace's database and its role."""
     return f"{config.product.name}_{workspace}".replace("-", "_")
@@ -123,9 +106,7 @@ def bootstrap(config: Config, services: dict[str, str], run: Run) -> dict[str, s
     return {"token": token}
 
 
-def workspace(
-    config: Config, services: dict[str, str], run: Run, *, workspace: str, origin: str, commit: str, state: Path
-) -> dict[str, str]:
+def workspace(config: Config, run: Run, *, workspace: str, origin: str, commit: str, state: Path) -> dict[str, str]:
     """Provision one workspace or slot and return every env value the factory writes for it."""
     present = networks(run)
     net, telemetry_net = network(config, workspace), telemetry_network(config, workspace)
@@ -186,7 +167,7 @@ def env_values(
     return values
 
 
-def drop(config: Config, services: dict[str, str], run: Run, *, workspace: str, state: Path) -> None:
+def drop(config: Config, run: Run, *, workspace: str, state: Path) -> None:
     """Remove the workspace's database, role and networks; its GlitchTip projects and their history stay."""
     name = database(config, workspace)
     checked(run, PSQL, f"DROP DATABASE IF EXISTS {_ident(name)} WITH (FORCE);\nDROP ROLE IF EXISTS {_ident(name)};\n")

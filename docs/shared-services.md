@@ -13,9 +13,8 @@ The factory installs on that server, beside prod, and makes no services of its o
   `factory-postgres` and `factory-glitchtip` are running. When they are not, it stops and says to run the server
   set-up first.
 - The stack user, `software-stack`, joins the `docker` group and runs every slot on the server's own Docker.
-- `services.env` becomes readable by the stack user's group (mode 0640), since each slot's provisioning reads it. A
-  run of the server set-up makes it the admin's alone again: install the factory again after one. The uninstall
-  makes it the admin's alone and leaves the services and their data as they are.
+- `services.env` stays the admin's alone: a slot is provisioned inside the services' own containers, with no
+  password. The uninstall leaves the services and their data as they are.
 
 Slot code can use the server's Docker socket, so an agent's code can reach prod and its data: know that before a
 product has real users.

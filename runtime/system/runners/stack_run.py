@@ -30,7 +30,7 @@ from runtime.system.runners import same_up
 from standard import config as product_config
 from standard import envfile
 from standard.config_records import Config
-from standard.services import host_paths, provision, stack
+from standard.services import host_paths, provision
 
 SLOT_LABEL = "software.slot"
 RUN_LABEL = "software.run"
@@ -221,11 +221,9 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
     env_dir, state = places.slot_env_dir(slot), places.slot_state_dir(slot)
     try:
         config = product_config.load(checkout)
-        services = provision.read_services_env(places.services / stack.ENV_FILE)
         for folder in (env_dir, state):
             folder.mkdir(mode=0o700, parents=True, exist_ok=True)
-        values = provision.workspace(config, services, run, workspace=workspace, origin=origin, commit=commit,
-                                     state=state)  # fmt: skip
+        values = provision.workspace(config, run, workspace=workspace, origin=origin, commit=commit, state=state)
         env_file = env_dir / config.env.file
         keys, given, notes = _slot_keys(places, config, values, env_file, checkout / config.env.template)
         placeholders = envfile.placeholder_values(workspace=workspace, origin=origin, port=port, commit=commit,
@@ -251,7 +249,7 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
     if verb[0] != EMPTY or status != 0:
         return status
     try:
-        provision.drop(config, services, run, workspace=workspace, state=state)
+        provision.drop(config, run, workspace=workspace, state=state)
         env_file.unlink(missing_ok=True)
         envfile.defaults_path(env_file).unlink(missing_ok=True)
         _given_path(env_file).unlink(missing_ok=True)

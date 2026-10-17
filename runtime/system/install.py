@@ -67,7 +67,6 @@ PHASES: tuple[Phase, ...] = (
     Phase("Preparing this computer", (
         ("Installing the system packages", steps_machine.packages),
         ("Creating the factory's users", steps_machine.users),
-        ("Letting the slots read the shared services' settings", steps_services.share),
         ("Stopping the running factory", steps_prepare.stop_factory),
         ("Making the factory's folders", steps_machine.state_tree),
     )),

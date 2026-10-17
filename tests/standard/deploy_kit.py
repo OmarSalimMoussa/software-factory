@@ -86,13 +86,6 @@ networks:
     name: ${FACTORY_SERVICES_NETWORK}
 """
 
-SERVICES_ENV = "\n".join(
-    [
-        "POSTGRES_PASSWORD=pg",
-        "GLITCHTIP_OWNER_PASSWORD=owner-secret",
-    ]
-)
-
 
 def config(text: str = FACTORY_TOML) -> Config:
     return parse_text(text)

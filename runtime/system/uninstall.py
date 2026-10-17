@@ -37,7 +37,6 @@ from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
 from runtime.system.runners.stack_run import SLOT_LABEL
 from standard.server import edge as server_edge
-from standard.services import stack
 
 PROGRAM = "uninstall.py"
 
@@ -164,10 +163,6 @@ def sealed_copies(host: Host) -> None:
 def state(host: Host, places: Places) -> None:
     _remove(host, places.state)
     _remove(host, places.keys)
-    # The shared services are the server set-up's, and prod's: only the stack user's group is taken off their settings.
-    env = places.services / stack.ENV_FILE
-    if host.exists(env):
-        host.run(["chmod", "0600", str(env)])
 
 
 def users(host: Host) -> None:

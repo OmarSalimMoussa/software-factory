@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from deploy_kit import COMPOSE, FACTORY_TOML, SERVICES_ENV, TEMPLATE, FakeClock, FakeDocker, FakeHealth, commit
+from deploy_kit import COMPOSE, FACTORY_TOML, TEMPLATE, FakeClock, FakeDocker, FakeHealth, commit
 
 from standard.server.deploy import main
 from standard.server.deploy_inputs import Paths, Tools
@@ -59,7 +59,6 @@ class Server:
             mirror=self.root / "repo" / ".git",
             srv=self.root / "srv",
             lock=self.root / "srv" / "factory" / "state" / "deploy.lock",
-            services_env=self.root / "srv" / "factory" / "services" / "services.env",
             edge_sites=self.root / "srv" / "factory" / "edge" / "sites",
             product_toml=self.product_toml,
             gc_log=self.root / "srv" / "factory" / "state" / "gc.log",
@@ -82,7 +81,6 @@ class Server:
 def server(tmp_path: Path) -> Server:
     files = {
         "etc/product.toml": FACTORY_TOML,
-        "srv/factory/services/services.env": SERVICES_ENV,
         "srv/notes/prod/env/notes.env": "MAIL_HOST=mail.example.com\n",
     }
     for name, text in files.items():

@@ -63,7 +63,7 @@ def test_the_uninstall_takes_stagings_site_off_the_edge_and_closes_its_port(monk
     assert asked == ["ufw delete allow 8090/tcp", " ".join(edge.RELOAD)]
 
 
-def test_the_uninstall_leaves_the_shared_services_and_their_data_and_their_settings_the_admins_alone(
+def test_the_uninstall_leaves_the_shared_services_and_their_data(
     tmp_path: Path,
 ) -> None:
     places = Places.under(tmp_path)
@@ -74,7 +74,7 @@ def test_the_uninstall_leaves_the_shared_services_and_their_data_and_their_setti
     uninstall.state(host, places)
     uninstall.users(host)
 
-    assert f"remove: {places.keys}" in host.actions and f"run: chmod 0600 {env}" in host.actions
+    assert f"remove: {places.keys}" in host.actions and not any(str(env) in action for action in host.actions)
     assert not any(action.startswith(f"remove: {places.services}") for action in host.actions)
     assert f"run: userdel --remove {layout.STACK_USER}" in host.actions
 

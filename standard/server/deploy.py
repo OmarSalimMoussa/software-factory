@@ -178,10 +178,8 @@ class _Deploy:
 
     def settings(self) -> dict[str, str]:
         """Provision the workspace's shared services, then write its env file; the env file's values."""
-        services = provision.read_services_env(self.paths.services_env)
         values = provision.workspace(
             self.config,
-            services,
             self.tools.run,
             workspace=self.ws.name,
             origin=self.ws.origin,

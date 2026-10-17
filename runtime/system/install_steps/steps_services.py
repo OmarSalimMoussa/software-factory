@@ -32,14 +32,6 @@ def check(ctx: Install) -> None:
                      f"{SET_UP}")  # fmt: skip
 
 
-def share(ctx: Install) -> None:
-    """services.env, the server set-up's admin's alone, is readable by the stack user's group too: each slot's
-    provisioning reads it."""
-    env = ctx.places.services / stack.ENV_FILE
-    ctx.host.run(["chgrp", layout.STACK_USER, str(env)])
-    ctx.host.run(["chmod", "0640", str(env)])
-
-
 def errors_project(ctx: Install) -> None:
     """The factory's own project in the shared GlitchTip, and its address on this machine's loopback, written for the
     warden and the dashboard, where their own errors go."""

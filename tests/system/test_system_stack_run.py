@@ -32,7 +32,6 @@ Path(__file__).with_name("ran.json").write_text(json.dumps(
 (env_file.parent / "seeds" / "users.json").write_text("[]")
 sys.exit(int(os.environ["DEV_EXIT"]))
 """
-SERVICES = "POSTGRES_PASSWORD=p\nGLITCHTIP_OWNER_PASSWORD=g\n"
 
 
 def _never(argv: list[str], stdin: str | None) -> subprocess.CompletedProcess[str]:
@@ -46,13 +45,13 @@ class Shared:
         self.checkout, self.fail = checkout, fail
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
-    def workspace(self, config: object, services: dict[str, str], run: object, **kw: Any) -> dict[str, str]:
+    def workspace(self, config: object, run: object, **kw: Any) -> dict[str, str]:
         if self.fail:
             raise provision.ProvisionError("GlitchTip (factory-glitchtip) refused: no such organization")
         self.calls.append(("workspace", kw))
         return {"FACTORY_SERVICES_NETWORK": "notes-slot2-services", "DATABASE_URL": "postgresql://n:pw@db:5432/n"}
 
-    def drop(self, config: object, services: dict[str, str], run: object, **kw: Any) -> None:
+    def drop(self, config: object, run: object, **kw: Any) -> None:
         assert (self.checkout / "scripts" / "ran.json").is_file(), "dropped before scripts/dev ran"
         self.calls.append(("drop", kw))
 
@@ -87,8 +86,6 @@ def checkout(tmp_path: Path) -> Path:
     (root / "scripts" / "dev").write_text(DEV)
     (root / "scripts" / "dev").chmod(0o755)
     places = Places.under(tmp_path)
-    places.services.mkdir(parents=True)
-    (places.services / "services.env").write_text(SERVICES)
     places.keys.mkdir(parents=True)
     return root
 

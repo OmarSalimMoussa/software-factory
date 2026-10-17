@@ -55,15 +55,13 @@ def test_the_install_refuses_before_changing_anything_unless_the_shared_services
         steps_services.check(job)
 
 
-def test_the_install_makes_no_services_of_its_own_and_lets_the_slots_read_the_shared_ones(tmp_path: Path) -> None:
+def test_the_install_makes_no_services_of_its_own_and_never_shares_their_secrets(tmp_path: Path) -> None:
     job = dry_job(tmp_path)
 
     install.run(job)
 
     env, acts = job.places.services / stack.ENV_FILE, _host(job).actions
-    shared = acts.index(f"run: chgrp {layout.STACK_USER} {env}")
-    assert acts[shared + 1] == f"run: chmod 0640 {env}"
-    assert shared > next(n for n, a in enumerate(acts) if a.startswith("run: useradd") and layout.STACK_USER in a)
+    assert not any(str(env) in a for a in acts if a.startswith(("run: chgrp", "run: chmod", "run: setfacl")))
     assert not any("docker compose" in a or "dockerd-rootless" in a or "software-errors" in a for a in acts)
     written = acts.index(f"write: {error_reports.dsn_path(job.places)} (640, software-warden:software-dashboard)")
     assert written < next(n for n, a in enumerate(acts) if a.startswith("run: systemctl restart software-warden"))

@@ -15,7 +15,7 @@ from pathlib import Path
 from standard.server import deploy_steps as steps
 from standard.server import edge, gc, heartbeat
 from standard.server.deploy_steps import SHORT, Get
-from standard.services import host_paths, provision, stack
+from standard.services import host_paths, provision
 from standard.services.provision import Run
 
 _COMMIT = re.compile(r"[0-9a-f]{40}")
@@ -58,7 +58,6 @@ class Paths:
     mirror: Path
     srv: Path = Path("/srv")  # each workspace lives in <srv>/<product>/<workspace>/
     lock: Path = Path("/srv/factory/state/deploy.lock")
-    services_env: Path = host_paths.FOLDER / stack.ENV_FILE
     edge_sites: Path = edge.SITES
     product_toml: Path = heartbeat.PRODUCT_TOML
     docker_socket: str = host_paths.DOCKER_SOCKET
