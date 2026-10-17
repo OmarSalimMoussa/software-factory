@@ -141,9 +141,10 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    browser: no tester's shell reaches a slot. Save each tester's report to a file and run
    `factory queue check <merge sha> --body <that file>`.
 4. **A failure** reverts the merge only when that merge is the one change to the scenario's code since its last
-   pass: `git revert -m 1 <merge> --no-edit`, then `factory queue task status <task> building --note "<why>; reverted
-   as <the revert's sha>"`. The warden tells its implementer, or starts a new one once it has ended. Any other
-   failure becomes a request. A saved check with no failure moves the task to `checked` by itself.
+   pass: revert it as `${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md` says, then `factory queue task status
+   <task> building --note "<why>; reverted as <the revert's sha>"`. The warden tells its implementer, or starts a
+   new one once it has ended. Any other failure becomes a request. A saved check with no failure moves the task to
+   `checked` by itself.
    **Blocked**, with nothing failed: a scenario that could not run, for a cause a tester saw in this check (never one
    copied from an earlier report: run it again first). Revert the merge the same way, then one of three:
    - Only the owner can give it (a key, an account, a paid service, leave to use an outside site):
@@ -154,12 +155,9 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
      passes, or, told why, once that task is closed or parked.
    - Anything else the factory can make (a seed, a scenario out of date, a page a slot can serve): send it back to
      building, as a failure, with what to make in the note.
-   A revert takes out all the merge brought, a fix it carried for what every task shares too (a build or ignore
-   file, a shared script). Read `git diff --stat <merge>^1 <merge>` first. Right after the revert, apply those
-   files' changes again, all in one commit that says what it fixes: `git diff <merge>^1 <merge> -- <files> | git
-   apply --3way --index`. If that conflicts, `git checkout HEAD -- <files>` and file a request instead.
-   Then move on to other work. A blocker an implementer reports before its merge goes the same ways, with nothing to
-   revert.
+   A revert keeps a fix the merge carried for what every task shares (a build or ignore file, a shared script):
+   the procedure says how, in the revert's one commit. Then move on to other work. A blocker an implementer reports
+   before its merge goes the same ways, with nothing to revert.
 5. **Staging is slot 0.** Each check leaves slot 0 up at the default branch's tip, so staging always runs the newest
    merge; there is no push to staging. A revert follows `${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md`. Prod
    moves only when the owner pushes it from Home, or the owner's own Claude does it for them; never you. Never ask
