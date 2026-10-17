@@ -132,7 +132,8 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    turn land, with the pass for its tree. The warden finds the merge and records it.
 3. **Check.** Rebuild slot 0 with what the merge touched (`factory slot up [service…]`). Pick the scenarios whose
    `protects` names a path the merge changed (`git diff --name-only <merge>^1 <merge>`), the one that waited longest,
-   and the merged spec's own checks. Load the seeds they need (`factory slot seed load <name>`). Start the
+   and the merged spec's own checks. Load the seeds they need (`factory slot seed load <name>`), and do a
+   scenario's set-up that writes inside a service with `factory slot run <service> -- <command>`. Start the
    `qa-regression` testers at once, the scenarios split between them, each signed in as its own test address. Start
    each in its own lane, `qa-regression`, then `qa-regression-2` and on, as its `subagent_type`: two in one lane share
    one browser, and a lane named only in the brief changes nothing. A brief names scenarios, never an earlier

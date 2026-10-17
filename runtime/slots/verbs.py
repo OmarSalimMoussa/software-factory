@@ -4,8 +4,9 @@ The slot is always worked out from the caller's lease, never from an argument: s
 implementer has the slot it claimed, and its testers share it. A stack command before ``claim`` is refused. The
 answer carries scripts/dev's exit status and the tail of its output; the full log stays the owner's.
 
-A tester only reads its slot, signs in and opens its desktop: seeds and the stack are its parent's. A backend or
-security tester may also run one command in a new container of a service, to look from inside the slot's network.
+A tester only reads its slot, signs in and opens its desktop: seeds and the stack are its parent's. The slot's own
+session, an implementer or the orchestrator, may run one command in a new container of a service, such as a
+scenario's set-up; so may its backend and security testers, to look from inside the slot's network.
 One tester holds a slot's desktop at a time, from its `desktop up` until it hands back (its row retires) or its
 parent takes the desktop down; another tester's `desktop up` waits, so no one's new password cuts off a tester
 mid-step.
@@ -98,8 +99,6 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     if op == "release":
         failed = leases.empty(ctx, n, session.id)
         return ok(slot=n, released=not failed, **({"failed": failed} if failed else {}))
-    if op == leases.RUN and session.role != IMPL:
-        raise Refused("slot", "slot run is an implementer's, and its backend and security testers', on its own slot")
     verb = _verb(op, args)
     if op == "desktop":
         _desktop_lease(ctx, n, verb)
