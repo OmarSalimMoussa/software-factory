@@ -39,7 +39,8 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 | `triage due` | Start one `triage` subagent on the batch the event names (its request ids). When it hands back, `factory triage apply`; give each new task a light intake pass. |
 | `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed, giving it the event's `since`, `prod` and `staging` addresses (staging is slot 0) and `health` path. |
 | `approved` | The warden starts it when a place frees. Fill the free proposal slot. |
-| `not-now`, `dropped`, `boosted`, `proposal-slot-free` | Fill the free proposal slots. |
+| `not-now`, `dropped`, `proposal-slot-free` | Fill the free proposal slots. |
+| `boosted` | Propose the task it names now: it goes first, even when every slot is held. |
 | `go` | The owner said Go to a spec: the warden starts its build when a place frees and ends its designer. Nothing to do. |
 | `check due` | The default branch's newest commit (the event's `commit`) waits on nothing but `factory check`: the owner's own change, or a revert. Run `factory check` in the main checkout; once it passes, bring slot 0 up at it (`factory slot up`), so staging runs it. A failure becomes a request. |
 | `decided-extend`, `park`, `to-designer` | The owner decided a stuck task; the warden told its session or ended it. `to-designer`: propose it at rung 3. |
