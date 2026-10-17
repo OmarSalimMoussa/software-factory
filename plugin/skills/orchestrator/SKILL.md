@@ -67,8 +67,9 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
 - **File, never task.** Every new problem or ask is a request: `factory request new --from <who> --severity
   severe|normal --where "<place>" --body <file>`. Severe means staging or prod broken, a security
   exposure, or data at risk.
-- **The owner's words** are filed `--from owner`, quoted word for word. Something they say about the factory itself
-  goes to `factory reflect --kind owner-feedback "<their words>"`, never into the queue.
+- **The owner's words** are filed `--from owner`, quoted word for word. Their view of how the factory itself works
+  goes to `factory reflect --kind owner-feedback "<their words>"`, never into the queue. An instruction to do
+  something is done, not reflected.
 - **Triage proposes; code applies.** The triage subagent saves its plan itself; `factory triage apply` applies it and
   answers with what it did. It refuses a plan that leaves a request without exactly one outcome. An owner request
   that comes out noise or parked: tell the owner in chat, with the reason.
