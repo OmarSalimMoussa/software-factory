@@ -11,9 +11,10 @@ from queue_kit import World
 from runtime.guard import commit_check
 from runtime.queue import formats, tasks
 from runtime.queue.book import task_rel
-from runtime.shared.models import Task
+from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, WORKING, Task
 from runtime.shared.protocol import Refused
 from runtime.warden import checks
+from runtime.warden.sessions import registry
 from runtime.warden.sessions.launch import LaunchError
 
 WORKTREE = "/home/agent/repo/.claude/worktrees/impl-a"
@@ -49,6 +50,12 @@ def _implementer(world: World, status: str) -> Task:
     world.write_raw(task_rel(task.id), formats.dump_task(dataclasses.replace(task, status=status, run=1)))
     world.session("s-impl", "implementer", "impl-a", task=task.id, worktree=WORKTREE)
     return task
+
+
+def _put(world: World, state: str) -> None:
+    sessions = registry.read(world.places)
+    sessions["s-impl"].state = state
+    registry.write(world.places, sessions)
 
 
 def test_an_implementer_runs_the_whole_set_only_on_its_merge_turn_and_at_most_its_limit(
@@ -112,6 +119,42 @@ def test_no_pass_is_recorded_for_a_failure_part_of_the_set_or_a_checkout_that_mo
     world.launcher.check = run
     assert not checks.check(world.ctx("implementer", "s-impl"), args, None)["passed"]
     assert not checks.passed(world.places, "t1" * 20) and not checks.passed(world.places, "t2" * 20)
+
+
+def test_a_session_being_benched_starts_no_check(world: World, git: dict[str, str]) -> None:
+    _implementer(world, "turn")
+    _put(world, BENCH_PENDING)
+
+    with pytest.raises(Refused, match="you are benched"):
+        checks.check(world.ctx("implementer", "s-impl"), {"only": ["tests"]}, None)
+    assert world.launcher.checks == []
+
+
+@pytest.mark.parametrize(
+    ("code", "told", "again"),
+    [
+        (0, f"it passed, and tree {'t1' * 20} is recorded as passed.", "already passed"),
+        (1, "it failed, and that run is not counted on your merge turn: run it again to see why.", "{} whole runs"),
+    ],
+    ids=["passed", "failed"],
+)
+def test_a_whole_run_that_ends_after_its_session_was_benched_is_kept_for_it_and_a_failure_costs_no_run(
+    world: World, git: dict[str, str], code: int, told: str, again: str
+) -> None:
+    _implementer(world, "turn")
+    ctx = world.ctx("implementer", "s-impl")
+
+    def benched_midway(checkout: str, argv: list[str]) -> tuple[int, str]:
+        _put(world, DEPRIORITIZED)
+        return code, ""
+
+    world.launcher.check = benched_midway
+    checks.check(ctx, {}, None)
+    _put(world, WORKING)
+    world.launcher.check = lambda checkout, argv: (code, "")
+
+    assert checks.unheard(world.places, "impl-a").endswith(f"ended after you were benched: {told}")
+    assert again.format(world.settings.get_int("rounds.check_runs") - 1) in checks.check(ctx, {}, None)["output"]
 
 
 def test_a_checkout_with_uncommitted_changes_is_refused_before_anything_runs(world: World, git: dict[str, str]) -> None:

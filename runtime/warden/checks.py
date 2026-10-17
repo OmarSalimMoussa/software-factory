@@ -10,6 +10,9 @@ public/, which only the warden writes; the push asks ``passed``.
 An implementer runs the whole set only on its merge turn, at most rounds.check_runs times a turn plus what its
 session was extended by; a run of named checks (--only) costs nothing. On the default branch a check covers what
 changed since the newest commit there whose tree passed.
+
+A session being benched starts no check. One benched while its check runs never hears the answer, so the warden
+keeps the outcome for the message the session comes back to, and a whole run that failed unheard is not counted.
 """
 
 from __future__ import annotations
@@ -22,7 +25,7 @@ from typing import Any
 from checks.runner import catalog
 from runtime.queue.book import Queue
 from runtime.shared import store, upgrades
-from runtime.shared.models import RETIRED, Session
+from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.shared.settings import places_for_test_runs
@@ -54,6 +57,43 @@ def _runs(places: Places) -> dict[str, int]:
     if not isinstance(raw, dict) or not all(isinstance(v, int) for v in raw.values()):
         raise store.StoreError(f"{_runs_path(places)}: not a count per task")
     return raw
+
+
+def _unheard_path(places: Places) -> Path:
+    return places.state / "check-unheard.json"
+
+
+def _unheard(places: Places) -> dict[str, str]:
+    raw = store.read_json_or(_unheard_path(places), {})
+    if not isinstance(raw, dict) or not all(isinstance(v, str) for v in raw.values()):
+        raise store.StoreError(f"{_unheard_path(places)}: not a line per session")
+    return raw
+
+
+def unheard(places: Places, name: str) -> str:
+    """The outcome of session ``name``'s check that ended after it was benched, or "" when it heard every one."""
+    return _unheard(places).get(name, "")
+
+
+def heard(places: Places, name: str) -> None:
+    """Session ``name`` came back told. The caller holds ctx.lock."""
+    found = _unheard(places)
+    if found.pop(name, None) is not None:
+        store.write_json(_unheard_path(places), found)
+
+
+def _keep_unheard(ctx: Context, session: Session, started: str, outcome: str, refund: bool) -> None:
+    with ctx.lock:
+        now = registry.by_name(registry.read(ctx.places).values(), session.name)
+        if now is None or now.state not in (DEPRIORITIZED, REVIVING):
+            return
+        runs = _runs(ctx.places)
+        if refund and runs.get(session.task, 0) > 0:
+            runs[session.task] -= 1
+            store.write_json(_runs_path(ctx.places), runs)
+        found = _unheard(ctx.places)
+        found[session.name] = f"Your factory check from {started} ended after you were benched: {outcome}."
+        store.write_json(_unheard_path(ctx.places), found)
 
 
 def new_turn(ctx: Context, task_id: str) -> None:
@@ -90,6 +130,8 @@ def _session(ctx: Context) -> Session:
     session = registry.read(ctx.places).get(ctx.caller.session)
     if session is None or session.state == RETIRED or not session.worktree:
         raise Refused("check", "only a live factory session checks its own checkout")
+    if session.state == BENCH_PENDING:
+        raise Refused(BENCH_PENDING, "you are benched: commit your work and stop; check when you come back")
     return session
 
 
@@ -191,6 +233,7 @@ def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
     records = whole and not (args.get("all") and not on_default)
     if records and passed(ctx.places, tree):
         return ok(exit=0, passed=True, tree=tree, output=f"factory check: tree {tree} already passed; nothing to run")
+    started = ctx.clock.iso()
     with _place(ctx, session, only, whole and session.role == IMPL) as left:
         argv = ["--only", ",".join(only)] if only is not None else []
         if args.get("all"):
@@ -210,6 +253,11 @@ def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
     elif not records and code == 0:
         why = "--only ran part of the set" if only is not None else "--all on a branch runs no ratchet"
         output += f"factory check: {why}, so no pass is recorded\n"
+    refund = left is not None and code != 0
+    recorded_now = f", and tree {tree} is recorded as passed" if recorded else ""
+    refunded = ", and that run is not counted on your merge turn" if refund else ""
+    outcome = f"it passed{recorded_now}" if code == 0 else f"it failed{refunded}: run it again to see why"
+    _keep_unheard(ctx, session, started, outcome, refund)
     if left is not None:
         output += f"factory check: {left} whole runs left on this merge turn\n"
     kib = ctx.settings().get_int("checks.output_kib")

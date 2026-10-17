@@ -11,7 +11,7 @@ from typing import Any
 from runtime.shared import models, operations, store
 from runtime.shared.models import RETIRED, WAITING, WORKING
 from runtime.shared.protocol import Refused, ok
-from runtime.warden import inbox
+from runtime.warden import checks, inbox
 from runtime.warden.context import Context
 from runtime.warden.owner import ops
 from runtime.warden.sessions import older_skills, permits, registry, respawn
@@ -47,7 +47,8 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
         rebuild = f" Slot {slot} is yours again: rebuild it with factory slot up." if slot is not None else ""
         older = older_skills.holds(ctx.places, s.id)
         held = held_word(ctx, s.task)
-        said = "\n\n".join(part for part in (older_skills.RELOAD if older else "", note, held) if part)
+        unheard = checks.unheard(ctx.places, s.name)
+        said = "\n\n".join(part for part in (older_skills.RELOAD if older else "", unheard, note, held) if part)
         back = respawn.resume(ctx, s, REVIVED + rebuild + (f"\n\n{said}" if said else ""))
     # telemetry: surfaced — the session stays deprioritized; `move` records why, and the caller is told
     except (LaunchError, Refused) as exc:
@@ -69,6 +70,8 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
         registry.write(ctx.places, sessions)
         if older:
             older_skills.told(ctx.places, back)
+        if unheard:
+            checks.heard(ctx.places, s.name)
         # A word held while it came back (a revert said as it revived) was not in its message: it follows now.
         late = took_held(ctx, s.task, held)
     if late:

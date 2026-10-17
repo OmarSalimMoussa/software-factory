@@ -57,6 +57,7 @@ class FakeLauncher:
         self.restarts = 0
         self.upgrades: list[str] = []
         self.on_restart: Callable[[], None] = lambda: None  # what else happens while the daemon restarts
+        self.check: Callable[[str, list[str]], tuple[int, str]] = lambda checkout, args: (0, "")
         # The token the daemon signed in with at its last restart, and how each token's first call answers.
         self.held: str | None = None
         self.answers: dict[str, str | None] = {}
@@ -80,13 +81,16 @@ class FakeLauncher:
         if "remote" in argv:
             return 0, self.remote + "\n"
         if "rev-parse" in argv:
-            return 0, "worktree-branch\n"
+            return 0, f"{'c1' * 20}\n{'t1' * 20}\nworktree-branch\n" if "HEAD^{tree}" in argv else "worktree-branch\n"
         if argv[1:3] == ["worktree", "remove"]:
             return 1, "fatal: it contains modified or untracked files"
         return 0, ""
 
     def message_session(self, session_id: str, text: str) -> None:
         self.messages.append((session_id, text))
+
+    def run_check(self, checkout: str, args: list[str]) -> tuple[int, str]:
+        return self.check(checkout, args)
 
     def stop_session(self, session_id: str) -> None:
         self.stopped.append(session_id)

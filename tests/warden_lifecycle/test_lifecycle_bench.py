@@ -9,7 +9,7 @@ from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, STOPPED, WAITING, WORKING
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
-from runtime.warden import schedule
+from runtime.warden import checks, schedule
 from runtime.warden.owner import ops
 from runtime.warden.sessions import crashwatch, lifecycle, older_skills, revive
 
@@ -190,6 +190,23 @@ def test_a_session_alive_when_a_new_factory_is_installed_is_told_once_to_load_it
 
     told = [(sid, older_skills.RELOAD in said) for sid, said in world.launcher.messages]
     assert told == [("0c0c0c0c", True), ("1a1a1a1a", False), ("0c0c0c0c", False)]
+
+
+def test_a_check_that_ends_after_its_session_was_benched_is_told_once_as_it_comes_back(world: World) -> None:
+    world.seat("0c0c0c0c", role="orchestrator", family="orch")
+
+    def benched_midway(checkout: str, args: list[str]) -> tuple[int, str]:
+        world.seat("0c0c0c0c", role="orchestrator", family="orch", state=DEPRIORITIZED)
+        return 1, "factory check: 1 of 29 failed\n"
+
+    world.launcher.check = benched_midway
+    checks.check(world.ctx(session="0c0c0c0c"), {"only": ["comment-budgets"]}, None)
+    revive.revive_session(world.ctx(), "0c0c0c0c", "warden")
+    world.seat("0c0c0c0c", role="orchestrator", family="orch", state=DEPRIORITIZED)
+    revive.revive_session(world.ctx(), "0c0c0c0c", "warden")
+
+    told = [said.count("ended after you were benched: it failed: run it again") for _, said in world.launcher.messages]
+    assert told == [1, 0]
 
 
 def test_a_stopped_run_that_never_was_a_proposal_goes_back_to_the_queue(world: World) -> None:

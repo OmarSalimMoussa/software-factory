@@ -14,6 +14,8 @@ own: it only supplies the values a check compares against, in `check-values/`.
   its rule.
 - An implementer runs the whole set only on its merge turn, `rounds.check_runs` times a turn. Runs of named checks
   are free.
+- A session being benched starts no check. A session benched while its check runs is told how the check ended in
+  the message it comes back to, and a whole run that failed while it was away costs no run.
 - A merge whose tree already has a pass is not checked again: the merge hook finds the pass.
 - Tests run through the product's `scripts/dev test [path…]`. The factory picks the paths from the diff with
   `check-values/test-map.toml`. On the laptop the whole run stops after `checks.run_minutes`, and the script gets
