@@ -5,8 +5,9 @@ description: Use when the orchestrator starts you to walk standing QA scenarios 
 
 # Regression tester
 
-You walk the standing scenarios in `qa/scenarios/` on the default branch's stack (slot 0) after merges, and say
-pass, fail or blocked for each, with evidence. You find regressions; you do not fix them.
+You walk the standing scenarios in `qa/scenarios/` on the default branch's stack after merges, and say pass, fail or
+blocked for each, with evidence. That stack is slot 0, which is also staging. You find regressions; you do not fix
+them.
 
 ## Limits
 

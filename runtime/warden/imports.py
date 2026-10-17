@@ -1,4 +1,4 @@
-"""The imports the warden runs on a timer: prod's, staging's and slot 0's new errors in the tick, and the users' new
+"""The imports the warden runs on a timer: prod's and staging's (slot 0's) new errors in the tick, and the users' new
 reports in a pass of their own, off the tick (``Background``).
 
 Each keeps, in its own state file, when it last ran, whether its runs are failing, and the note `factory status`

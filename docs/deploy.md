@@ -45,6 +45,18 @@ Only one deploy runs on a server at a time; a second one waits. Each step stops 
 
 The last line of a deploy that succeeded reads `deployed prod <commit> previous <commit or ->`.
 
+## What the product must answer
+
+`[deploy].health`, in prod and in every slot, answers status 200 with a JSON object:
+
+- `workspace`: the workspace the stack runs as: `prod`, or `slot<n>` in a slot, so `slot0` on staging. The product
+  reads it from its env file: `[env.set]` can write `{workspace}` into any key.
+- `build_commit`: the commit the running image was built from. In prod it is the commit's first 8 characters, which
+  the build argument `[build].commit_arg` carries.
+- `busy`: a whole number, the work in flight. A deploy waits while it is above 0, up to `[deploy].drain_minutes`.
+
+The deploy's drain and answer steps read it, and so do the warden's probes of prod and staging.
+
 ## The env file
 
 Prod has one env file, written from the product's template at every deploy. The template's comments are

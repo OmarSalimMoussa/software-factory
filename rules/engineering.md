@@ -94,4 +94,5 @@ you, and on the critics and testers who hold you to it.
 - **Migrations keep the previous build working.** Prod can be pushed back to the commit it ran before, so a
   migration must leave that build able to run: add first, remove in a later change. A migration that cannot run
   backwards is fixed forward.
-- **Images carry their inputs; a deploy is an image pull.** Nothing is built or checked out on the server.
+- **Images carry their inputs.** A deploy builds them on the server from a clean copy of the commit, never at
+  `docker compose up`.

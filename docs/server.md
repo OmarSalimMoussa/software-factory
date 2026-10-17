@@ -110,12 +110,11 @@ Sign in to GlitchTip and Langfuse with `[services] owner_email`.
 
 ## Run it again
 
-Run the set-up again, from a factory checkout at the right commit:
+Run the set-up again, from a factory checkout at the commit the server's factory runs:
 
-- **After a factory change**, from a checkout at the commit the factory now runs.
 - **After a change to `factory.toml`** that touches what the set-up places: the server's folders, the shared
   services or the tailnet. Push to prod refreshes the server's copy of the file itself.
-- **After a change to the shared services**, which comes with a factory change. The set-up brings them up again and
-  joins them back to each workspace's networks.
+- **After a factory change to the shared services** or to what the set-up places. The set-up brings the services up
+  again and joins them back to each workspace's networks.
 
 Each run prints what it found and what it changed, and ends with "Changed nothing" when the server already matched.

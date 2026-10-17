@@ -16,12 +16,9 @@ Every product takes one shape, so the factory needs nothing from a product beyon
 ├── check-values/           values the standard checks compare against
 ├── scripts/
 │   └── dev                 the stack, with fixed verbs
-├── factory.toml            how the product is built, smoke-tested and deployed
-├── compose.yml             the stack every workspace and laptop slot runs
-├── <env template>          the settings the factory fills in for each workspace and slot
-├── .github/
-│   ├── workflows/          the factory's two workflows, copied unchanged
-│   └── factory-ref         the factory commit CI checks with
+├── factory.toml            how the product is built and deployed
+├── compose.yml             the stack prod and every slot runs
+├── <env template>          the settings the factory fills in for prod and each slot
 └── .gitignore              lists queue/
 ```
 
@@ -33,55 +30,48 @@ schema.
 
 | Section | Says |
 | --- | --- |
-| `[product]` | The product's short name, and the registry its images go to: `ghcr.io/<owner>`, where CI signs in |
+| `[product]` | The product's short name, and the registry path its image names start with |
 | `[build]` | The build arguments that carry the commit, and the images no compose service builds |
-| `[smoke]` | Where the smoke test finds the health address, what else must answer, and the product's own check |
 | `[services]` | The owner's sign-in on the shared services, and the error projects each workspace gets |
 | `[env]` | The env file compose reads, its template, and the keys the factory writes into it |
 | `[server]` | The server: its host and pinned key, its admin user, its tailnet name, the certificate email |
-| `[workspaces.staging]`, `[workspaces.prod]` | Each workspace's domain, loopback port and after-deploy scripts |
+| `[workspaces.prod]` | Prod's domain, loopback port and after-deploy scripts |
 | `[deploy]` | The health address, how long a deploy waits, the files a deploy copies, how many builds to keep |
 | `[edge]` | Paths the edge answers 404, and hosts it redirects |
-| `[[release]]` | Optional: what to release after a prod deploy, such as a browser extension |
 | `[reports]` | Optional: the tailnet port and path where prod's report export answers, the header that carries its token, and `token_key`: the key in prod's env file that holds the token |
 
-The scripts factory.toml names are its **hooks**: `[smoke].check` runs in CI after the smoke test, each workspace's
-`after_deploy` scripts run on the server after a deploy, and each release's `package` runs in CI after a prod
+The scripts factory.toml names are its **hooks**: prod's `after_deploy` scripts, which run on the server after a
 deploy. Each hook is committed and executable.
 
 ## compose.yml
 
 - **Every service with a `build:` section is one of the product's images**, named after the service:
   `<registry>/<name>-<service>`. Its `image:` is that name tagged `${KEY}`, where `[env.set]` sets `KEY` to
-  `"{commit}"`, so a deploy runs the image CI built for the commit. An image no service runs goes in
+  `"{commit}"`, so a deploy runs the image it built for the commit. An image no service runs goes in
   `[build].extra_images`.
 - **A Dockerfile may build FROM another product image** tagged with `[build].tag_arg`. It then builds after that
   image. One level only: a base image never builds from a third.
-- **Build arguments are literals**, or name `[build].commit_arg` or `[build].tag_arg`, which CI fills with the
-  commit. CI has no product env to fill anything else.
+- **Build arguments are literals**, or name `[build].commit_arg` or `[build].tag_arg`, which the build fills with
+  the commit. The build has no product env to fill anything else.
 - **Every image leaves out `**/.claude`** in its ignore file: the Dockerfile's own `<Dockerfile>.dockerignore` when
   it has one, else its context's `.dockerignore`. Agents' worktrees live there, and Claude Code leaves folders there
   that the user building the slots cannot read.
 - **Every published port binds 127.0.0.1.** The edge is the only way in.
 - **A service that uses the shared services** (Postgres, Langfuse, GlitchTip) joins the external network named
   `${FACTORY_SERVICES_NETWORK}`, which the factory creates for each workspace and slot.
-- **`[deploy].files` lists what a deploy copies to the server**: compose.yml, the env template, and every file a
-  service mounts from the repo. A folder there is copied whole.
+- **`[deploy].files` lists what a deploy copies into prod's stack folder**: compose.yml, the env template, and every
+  file a service mounts from the repo. A folder there is copied whole.
 
-## CI
+## The build and deploy
 
-Every product runs the same two workflows, the factory's `templates/ci/`, copied into `.github/workflows/` byte
-for byte: `ci.yml` checks every push and takes the default branch to staging, and `deploy-prod.yml` deploys prod
-when the owner pushes. The server, not CI, tells the uptime monitor prod is up ([server.md](server.md)).
-[ci.md](ci.md) says what each workflow does and [deploy.md](deploy.md) what a deploy does on the server. The product
-brings:
+The factory builds and deploys prod on the server, from a clean copy of the commit the owner pushes
+([deploy.md](deploy.md)), so a product needs no CI. GitHub holds a mirror of the default branch, which the warden
+keeps up to date. GitHub refuses the warden's deploy key a commit that changes `.github/workflows/`, and the mirror
+stays at the commit before one until the owner pushes it with their own login, so only a person changes them. The
+server, not GitHub, tells the uptime monitor prod is up ([server.md](server.md)).
 
-- **`.github/factory-ref`**: one line, `owner/name@<40-character sha>`, naming the factory repo and the commit CI
-  checks and deploys with. The owner moves it to each factory commit they install.
-- **The secret `FACTORY_READ_KEY`**: the private half of a read-only deploy key on the factory repo, so CI can check
-  the factory out. The installer makes the pair and prints both halves once. [ci.md](ci.md) lists the other secrets.
-- **A health address**, `[deploy].health`, which answers JSON naming the `workspace`, the running commit as
-  `build_commit`, and how much work is in flight as `busy`.
+The product brings a **health address**, `[deploy].health`, which answers JSON naming the `workspace`, the running
+commit as `build_commit`, and how much work is in flight as `busy` ([deploy.md](deploy.md) says what each holds).
 
 ## GOAL.md
 
@@ -166,15 +156,13 @@ Only values, never code. Each file is named for the check it feeds (see [checks.
 
 ## What only a person changes
 
-Agents may never change `GOAL.md`, `goal/`, `check-values/surfaces.toml`, `.github/workflows/`,
-`.github/factory-ref`, `factory.toml` or any hook it names. The hooks factory.toml names are read from the factory's
-own checkout of the product, so a branch cannot drop one from the list. A product names any other path only a person
-may change in `repo.protected_paths` (a trailing `/` names a folder). The guard, the git hooks and the warden's push
-refuse a change to any of them. While that checkout's `factory.toml` cannot be read, they refuse every write, commit and push, until
-the owner fixes it.
+Agents may never change `GOAL.md`, `goal/`, `check-values/surfaces.toml`, `.github/workflows/`, `factory.toml` or
+any hook it names. The hooks factory.toml names are read from the factory's own checkout of the product, so a branch
+cannot drop one from the list. A product names any other path only a person may change in `repo.protected_paths`
+(a trailing `/` names a folder). The guard and the git hooks refuse an agent's change to any of them. While that
+checkout's `factory.toml` cannot be read, they refuse every write and commit, until the owner fixes it.
 
-To change one yourself, commit the change in your own checkout, write it out with
-`git format-patch -1 --no-renames <commit>`, and run `sudo factory-own --patch <file>`. Root commits it on the
-agents' default branch with its author and message, and records it as yours. The warden then asks the orchestrator
-to check that branch, and once the check passes, your change waits on Home with the next push to staging.
-`sudo factory-own --commit <id>` records a commit already on that branch instead.
+To change one yourself, commit on the agents' default branch in that checkout, as the agent user:
+`sudo -u software-agent git -C <repo.path> …` ([operate.md](operate.md) gives the steps). The warden then asks the
+orchestrator to check that branch. Once the check passes, slot 0 runs your change as staging, and it goes to prod
+with the next Push to prod.

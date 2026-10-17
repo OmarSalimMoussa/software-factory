@@ -30,7 +30,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `budget` | The slice's memory and CPU, and the memory a test run needs |
 | `checks` | How long a check and one test may run, how much of a report an agent sees, and the tool caches a check may write |
 | `vitals`, `watch` | Amber and red levels; probe, loop, grace and silence times |
-| `errors` | How often the warden reads prod's, staging's and slot 0's new GlitchTip issues into requests, and how many pages one read covers |
+| `errors` | How often the warden reads prod's and staging's new GlitchTip issues into requests, and how many pages one read covers |
 | `reports` | How often the warden reads prod's report export, how long it waits for it, and the largest it takes |
 | `telemetry` | What `factory errors` and `factory traces` give an agent: how many items, how large, how long a call |
 | `cost`, `prices` | The daily budget (past it, only severe work starts that day), the plan-limit levels, and dollars per million tokens per model |
@@ -38,8 +38,9 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `gc` | The nightly prune's hour, how long images stay, the Docker disk budget |
 | `install` | The guard's timeout, the check-ins' grace, the product's toolchain |
 
-`models.allowed` and `prices` are set at install and are read-only on the dashboard. Staging's and prod's health
-addresses are not settings: the warden reads them from `factory.toml` in the product's checkout at every probe.
+`models.allowed` and `prices` are set at install and are read-only on the dashboard. Prod's health address is not a
+setting: the warden reads it from `factory.toml` in the product's checkout at every probe. Staging's is slot 0's
+port on loopback, with the same path.
 
 `slots.zero_origin` is where staging, which is slot 0, opens to the internet: `http://<the box's IPv4 address>:<port>`,
 on a port clear of the dashboard's and the slots'. The install puts a site for it on the box's edge, listening on that

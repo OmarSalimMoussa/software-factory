@@ -11,10 +11,9 @@ Claude agents, holds the code to one standard set of checks, ships to staging, a
   spend, the library, settings (the agents' Claude account among them), self-reflections and the guard.
 - **The checks** are one standard set for every product, fed only with values from the product's `check-values/`.
 - **The plugin** carries the roles (orchestrator, designers, implementers, intake, triage, critics and testers).
-
-- **The standard build and deploy** in `standard/`: the build plan and smoke test CI runs, the server's set-up and
-  deploy command, and the shared services every product gets (a database, traces and errors), on the server, where
-  the factory's slots use them too.
+- **The standard build and deploy** in `standard/`: the build plan, the server's set-up, prod's build and deploy on
+  the server, as the product's `factory.toml` says, and the shared services every product gets (a database, traces
+  and errors), which the factory's slots use too.
 
 Set up the product's server first, from the owner's laptop: `python3 -m standard.server.setup --product <path>`
 ([docs/server.md](docs/server.md)). Then install the factory from a clone of its repo, with your GitHub CLI signed in:

@@ -1,7 +1,6 @@
 # Reverting a merge
 
-How the orchestrator takes a merge back off the default branch: after a failed check, or when staging regresses
-after a push.
+How the orchestrator takes a merge back off the default branch after a failed check.
 
 1. `git revert -m 1 <merge sha> --no-edit` on the default branch.
 2. **A merge that added a migration** keeps its migration files and the models they create: revert with
@@ -11,9 +10,10 @@ after a push.
    is known at once and runs nothing; any other revert is checked from the newest commit that passed.
 4. Check the revert like a merge: rebuild slot 0 with what it touched, and walk the scenario that failed, so it has
    a fresh pass before the work comes back.
-5. Nothing to ask: the warden offers its push on Home, marked as a revert, until the owner pushes it.
+5. Nothing to ask: slot 0, which is staging, now runs the revert, and it reaches prod with the owner's next Push to
+   prod.
 6. Send the task back: `factory queue task status <task> building --note "<why>; reverted as <the revert's sha>"`.
-   The warden hands the note to its implementer. After a push, that implementer has ended: the warden puts the task
-   back in the approved runs instead (a designed build back in the designed builds), and the new implementer's
-   first message carries the note. Either one brings the work back first: `git merge --ff-only <default branch>`,
-   `git revert <the revert's sha>`, then the fix.
+   The warden hands the note to its implementer. Once the task was checked, that implementer has ended: the warden
+   puts the task back in the approved runs instead (a designed build back in the designed builds), and the new
+   implementer's first message carries the note. Either one brings the work back first:
+   `git merge --ff-only <default branch>`, `git revert <the revert's sha>`, then the fix.

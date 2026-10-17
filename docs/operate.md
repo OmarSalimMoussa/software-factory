@@ -17,9 +17,9 @@ removed when it ends) and runs every step from it. It prints each phase with a c
 preparing it, connecting your accounts, setting up the factory, starting up and finishing.
 
 - **Questions** come as the install reaches them: the 6-digit code's secret as a QR code to scan, with its key to type
-  instead; your GitHub token, a read-only token for the factory's repo, and the agents' Claude token. With your `gh`
-  signed in, the install puts the GitHub keys in place itself; when it is not, it asks you to sign in, or shows each
-  key with where it goes.
+  instead; a read-only token for the factory's repo, and the agents' Claude token. With your `gh` signed in, the
+  install puts the warden's deploy key on the product's repo itself; when it is not, it asks you to sign in, or shows
+  the key with where it goes.
 - **The log** keeps every detail: each command, its output and how long each step took. `--verbose` prints it too.
   Each install and uninstall writes a new one in `/var/log/software-factory/`, readable by you and root.
 - **Options:** `--healthchecks`, `--keep-on-failure` (which keeps the sealed copy too), `--dry-run` (no sudo needed)
@@ -60,33 +60,48 @@ or from `/opt/software-factory`.
 
 ## Ship
 
-Nothing reaches GitHub until you push it. When checked work is ready, the Staging card on Home shows **Push N to
-staging**: press it to see what goes out (each task, a revert, the factory's upgrade), then Push to staging. The
-warden checks it all again, pushes, and CI deploys staging.
+Staging is slot 0, on this machine. After each merge the orchestrator brings slot 0 up at the default branch's tip
+and checks it there, so staging always runs the newest merge. GitHub holds a mirror: every `watch.done_minutes` the
+warden fast-forwards GitHub's default branch to the checkout's. A branch that took commits on GitHub itself stays as
+it is, and the warden logs that once.
 
-The product's CI is the factory's templates, copied in unchanged. It checks every push, and builds each push to the
-default branch, smoke-tests it and deploys it to staging, the standard way the product's `factory.toml` describes
-([ci.md](ci.md)). The server's deploy command does the rest ([deploy.md](deploy.md)). Staging and prod each answer a
-health address with JSON naming the workspace, the running commit as `build_commit`, and the work still running as
-`busy`.
+When staging looks right, press Push to prod in the top bar, then Push to prod in the panel. It shows both builds and
+what prod gains. The warden pushes staging's build only once it is cleared: staging answers on it, it is on the default
+branch, its tree passed `factory check`, and every merge since prod's build passed its check. The factory then builds
+that commit's images on this machine, deploys prod ([deploy.md](deploy.md)), waits until prod answers on it, and asks
+for a read-only walk of prod. If prod misbehaves, push back the same way, to the commit prod ran before. Going back
+needs only that the commit is on the default branch, so it works even while staging is down.
 
-When staging looks right, press Push to prod in the top bar, then Push to prod in the panel. The warden starts the
-product's `deploy-prod.yml` with exactly the commit staging runs, follows its deploy job, then watches prod until it
-answers on it. The release steps run last (a browser extension's store upload, when it changed); a failed release shows
-as the push's last step, with prod already live. If prod misbehaves, push back the same way: the warden starts the same
-workflow with the commit prod ran when the last push began, so a push that never answered does not move the target. Push
-to prod refuses a staging build pinned off the default branch: lift the pin first.
+Staging and prod each answer a health address with JSON naming the workspace, the running commit as `build_commit`,
+and the work still running as `busy`.
 
 Your own checkout of the product runs the factory's git hooks too: a merge into the default branch there lands only
 with a tree that passed `factory check`.
 
+## Your own change to the product
+
+Agents never change `GOAL.md`, `factory.toml`, the scripts it names, or the other paths only a person changes
+([repo-shape.md](repo-shape.md)). You change them with a commit on the agents' default branch, made as the agent
+user in the factory's checkout of the product (the setting `repo.path`):
+
+1. Pause the factory, so no merge is half done in that checkout.
+2. Commit as the agent user: run each git command as `sudo -u software-agent git -C <repo.path> …`. To bring in a
+   commit from your own checkout, write it out with `git format-patch -1 --no-renames <commit>`, then apply the file:
+   `sudo -u software-agent git -C <repo.path> am < <file>`. It keeps your message and authorship. Make plain
+   commits, never a merge: Push to prod refuses a merge no task made.
+3. Resume. The warden asks the orchestrator to check the new tip. Once `factory check` passes, the orchestrator brings
+   slot 0 up at it, and your change goes to prod with your next Push to prod.
+
+The guard keeps every agent's session off these paths. The git hooks refuse a change to them only inside the
+agents' sessions, so your commit lands.
+
 ## Errors and traces
 
 Every product gets a database, traces (Langfuse) and errors (GlitchTip) from one copy of the shared services on its
-server, for prod, staging and the stack slots alike ([server.md](server.md), [shared-services.md](shared-services.md)).
-Each new prod error arrives once as a request in the agents' inbox, for triage beside your feedback. Agents read
-errors and traces with `factory errors` and `factory traces`. The factory's own failures report to a GlitchTip
-project of its own there, `factory`, which no agent reads.
+server, for prod and every stack slot, staging among them ([server.md](server.md),
+[shared-services.md](shared-services.md)). Each new prod error arrives once as a request in the agents' inbox, for
+triage beside your feedback. Agents read errors and traces with `factory errors` and `factory traces`. The factory's
+own failures report to a GlitchTip project of its own there, `factory`, which no agent reads.
 
 ## The product's tools
 
@@ -117,10 +132,10 @@ seen.
 
 Switch on **YOLO mode** in Settings to let the factory run without you, overnight say. While it is on, the warden
 approves the orchestrator's proposals as places free, answers any question an agent asks you with "Be proactive and
-solve it yourself.", and hands each spec's Go and each stuck task to the orchestrator to decide. Nothing is pushed:
-the night's merges wait on Home as Push N to staging. The daily budget, the guard and every other limit still apply.
-Home shows a band while it is on; switch it off there or in Settings. Every choice is in its task's log, saying who
-made it.
+solve it yourself.", and hands each spec's Go and each stuck task to the orchestrator to decide. Nothing goes to
+prod: the night's merges wait on staging for your Push to prod. The daily budget, the guard and every other limit
+still apply. Home shows a band while it is on; switch it off there or in Settings. Every choice is in its task's log,
+saying who made it.
 
 ## Switch the Claude account
 
@@ -159,8 +174,8 @@ The factory never changes itself: Claude or the owner changes it. Read Self-refl
 1. Change the factory's repo: branch, test, merge, push. Run the self-check (`pytest -m self_check`) and the browser
    drives (`node tests/dashboard_ui/run.cjs`) before you push.
 2. Upgrade to the pushed commit with `factory.upgrade`.
-3. Run the server set-up again from a factory checkout at that commit (`python3 -m standard.server.setup --product
-   <path>`). Older builds stay deployable.
+3. When the change touches the shared services or what the server set-up places, run the set-up again from a
+   factory checkout at that commit (`python3 -m standard.server.setup --product <path>`).
 4. **Restart the factory** on Home: every agent comes back with its work. One whose subagents the upgrade changed
    comes back as a copy that has the new ones, with its whole conversation; its chat link changes.
 

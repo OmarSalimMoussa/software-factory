@@ -22,8 +22,7 @@ anyone will know. The draft spec is the one your brief names; the rulebook is
 - **Data and migrations.** What a migration does to existing records; no old-format readers kept for old data. A
   migration leaves the previous build able to run, since prod can be pushed back. A change to stored files says what
   happens to the ones already on staging and prod, or it is a blocker.
-- **Shipping and going back.** The change ships through the product's own CI to staging; what a revert of
-  this merge, or a push back of prod, leaves behind.
+- **Shipping and going back.** What a revert of this merge, or a push back of prod, leaves behind.
 - **Proof.** The spec's QA section would catch these failures.
 
 ## How you report

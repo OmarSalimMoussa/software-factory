@@ -35,14 +35,13 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 | --- | --- |
 | `loop due` | One loop pass (below). |
 | `severe request` | Start intake on it at once (one subagent place is always kept for intake). Route its task next. |
-| `prod red`, `staging red` | As "When something is red" says. |
+| `prod red` | As "When something is red" says. |
 | `triage due` | Start one `triage` subagent on the batch the event names (its request ids). When it hands back, `factory triage apply`; give each new task a light intake pass. |
-| `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed, giving it the event's `since`, `prod` and `staging` addresses and `health` path. |
+| `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed, giving it the event's `since`, `prod` and `staging` addresses (staging is slot 0) and `health` path. |
 | `approved` | The warden starts it when a place frees. Fill the free proposal slot. |
 | `not-now`, `dropped`, `boosted`, `proposal-slot-free` | Fill the free proposal slots. |
 | `go` | The owner said Go to a spec: the warden starts its build when a place frees and ends its designer. Nothing to do. |
-| `pushed` | The owner pushed what waited to staging, and CI deploys it. Nothing to do: a regression there comes as `staging red`. |
-| `check due` | The default branch's newest commit (the event's `commit`) waits on nothing but `factory check`: the owner's own change, or a revert. Run `factory check` in the main checkout; once it passes, the warden offers it on Home. A failure becomes a request. |
+| `check due` | The default branch's newest commit (the event's `commit`) waits on nothing but `factory check`: the owner's own change, or a revert. Run `factory check` in the main checkout; once it passes, bring slot 0 up at it (`factory slot up`), so staging runs it. A failure becomes a request. |
 | `decided-extend`, `park`, `to-designer` | The owner decided a stuck task; the warden told its session or ended it. `to-designer`: propose it at rung 3. |
 | `limit-extended` | The owner gave a session more of a limit; the warden told it. Nothing to do. |
 | `unblocked` | The owner fixed what blocked a task; the warden brings its implementer back when a place frees. Nothing to do. |
@@ -59,7 +58,7 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 ## A loop pass
 
 `factory tick` records the pass. The warden does its own part on its own timers: probes, the user-report pull, sweeps,
-and filing each new prod, staging or slot 0 error-tracker issue as a request from `glitchtip` (again when one comes
+and filing each new prod or staging (slot 0) error-tracker issue as a request from `glitchtip` (again when one comes
 back after its fix reached there). Then: staging's health in `factory status`; and when no implementer is live and
 nothing merged for a while, a regression walk of the scenarios that waited longest.
 
@@ -157,20 +156,17 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    apply --3way --index`. If that conflicts, `git checkout HEAD -- <files>` and file a request instead.
    Then move on to other work. A blocker an implementer reports before its merge goes the same ways, with nothing to
    revert.
-5. **Staging is the owner's.** The warden offers the newest commit that is safe to ship on Home, and the owner
-   pushes it when they choose: never ask for a push or wait for one. Staging regressing after a push: revert and
-   `factory check` at once (`${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md`); the revert is offered the same way.
-   Prod moves only when the owner pushes it.
+5. **Staging is slot 0.** Each check leaves slot 0 up at the default branch's tip, so staging always runs the newest
+   merge; there is no push to staging. A revert follows `${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md`. Prod
+   moves only when the owner pushes it from Home, or the owner's own Claude does it for them; never you. Never ask
+   for a push or wait for one.
 
 ## When something is red
 
-- **Staging red:** staging failed several probes in a row after its deploy landed. The event names the warden's
-  last push as the first suspect and the build staging ran well before it; decide whether to revert it.
-  The warden filed the severe request.
 - **Prod red** is a clear outage only when the warden says so. The warden files its severe request, which goes to
   intake at once, and
-  `factory start implementer <task>` starts the one fix without an approval, at rung 1 or 2. The fix waits for the
-  owner's push to staging like any other; the owner pushes it to prod.
+  `factory start implementer <task>` starts the one fix without an approval, at rung 1 or 2. The fix merges and
+  reaches staging like any other; the owner pushes it to prod.
 
 ## Never
 

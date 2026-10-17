@@ -1,7 +1,7 @@
 # The dev cycle
 
-Every change moves from a request to staging. Nothing reaches GitHub, staging or prod until the owner pushes it, and
-nothing starts without the owner's approval, except the fix for a clear prod outage. Each role's skill in
+Every change moves from a request to staging. Nothing reaches prod until the owner pushes it, and nothing starts
+without the owner's approval, except the fix for a clear prod outage. Each role's skill in
 `plugin/skills/` says how it does its part; the guard and the warden enforce the limits in code.
 
 ## The steps
@@ -36,11 +36,11 @@ nothing starts without the owner's approval, except the fix for a clear prod out
    else the factory can make (a seed, a scenario out of date) goes back to the implementer as a failure does. A
    fix the merge carried for what every task shares, such as a build or ignore file, is applied again right after
    the revert, in one commit of its own; one that no longer applies cleanly becomes a request.
-10. **Staging.** The warden offers the push of the newest commit whose merges all passed their check. It waits on
-    Home until the owner pushes it, and CI then deploys staging; no agent asks for a push or waits on one. A
-    regression there is reverted at once, and the revert waits for the owner's push the same way.
-11. **Prod.** Only the owner pushes to prod, from the dashboard, at exactly the commit staging
-    runs. Pushing back redeploys the commit prod ran before.
+10. **Staging** is slot 0: the check leaves it up at the default branch's tip, so it always runs the newest merge.
+    The warden mirrors the default branch to GitHub; no agent pushes, asks for a push or waits on one.
+11. **Prod.** Only the owner pushes to prod, from the dashboard, at exactly the commit staging runs, once every merge
+    since prod's build passed its check. The factory builds that commit on the server and deploys it. Pushing back
+    redeploys the commit prod ran before.
 
 ## The rungs
 
