@@ -230,8 +230,8 @@ def test_a_rerun_joins_the_shared_containers_back_to_each_workspace_network(make
     setup.run(make_job(server))
 
     assert server.networks == {
-        "shop-prod-services": ["shop-prod-web", "factory-postgres", "factory-langfuse", "factory-glitchtip"],
-        "shop-prod-telemetry": ["factory-langfuse", "factory-glitchtip"],
+        "shop-prod-services": ["shop-prod-web", "factory-postgres", "factory-glitchtip"],
+        "shop-prod-telemetry": ["factory-glitchtip"],
     }
 
 

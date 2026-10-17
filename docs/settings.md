@@ -32,7 +32,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `vitals`, `watch` | Amber and red levels; probe, loop, grace and silence times |
 | `errors` | How often the warden reads prod's and staging's new GlitchTip issues into requests, and how many pages of a GlitchTip list one read covers |
 | `reports` | How often the warden reads prod's report export, how long it waits for it, and the largest it takes |
-| `telemetry` | What `factory errors`, `factory logs` and `factory traces` give an agent: how many items, how large, how long a call |
+| `telemetry` | What `factory errors` and `factory logs` give an agent: how many items, how large, how long a call |
 | `cost`, `prices` | The daily budget (past it, only severe work starts that day), the plan-limit levels, and dollars per million tokens per model |
 | `dashboard` | Port, refresh and stale times, the code lock, page size, the hosts it answers |
 | `gc` | The nightly prune's hour, how long images stay, the Docker disk budget |

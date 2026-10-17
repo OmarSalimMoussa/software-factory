@@ -32,10 +32,7 @@ Path(__file__).with_name("ran.json").write_text(json.dumps(
 (env_file.parent / "seeds" / "users.json").write_text("[]")
 sys.exit(int(os.environ["DEV_EXIT"]))
 """
-SERVICES = (
-    "POSTGRES_PASSWORD=p\nLANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk\nLANGFUSE_INIT_PROJECT_SECRET_KEY=sk\n"
-    "GLITCHTIP_OWNER_PASSWORD=g\n"
-)
+SERVICES = "POSTGRES_PASSWORD=p\nGLITCHTIP_OWNER_PASSWORD=g\n"
 
 
 def _never(argv: list[str], stdin: str | None) -> subprocess.CompletedProcess[str]:

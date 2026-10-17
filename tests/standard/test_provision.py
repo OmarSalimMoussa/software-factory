@@ -6,12 +6,8 @@ from deploy_kit import FakeDocker, config
 
 from standard.services import provision
 
-SERVICES = {
-    "LANGFUSE_INIT_PROJECT_PUBLIC_KEY": "pk-lf-1",
-    "LANGFUSE_INIT_PROJECT_SECRET_KEY": "sk-lf-1",
-    "GLITCHTIP_OWNER_PASSWORD": "owner-secret",
-}
-SHARED = {"factory-postgres", "factory-langfuse", "factory-glitchtip"}
+SERVICES = {"GLITCHTIP_OWNER_PASSWORD": "owner-secret"}
+SHARED = {"factory-postgres", "factory-glitchtip"}
 
 
 def provision_slot(docker: FakeDocker, state: Path) -> dict[str, str]:
@@ -31,7 +27,7 @@ def test_a_second_run_creates_nothing_and_keeps_the_password(tmp_path: Path) -> 
     assert second == first
     assert ["docker", "network", "create", "notes-slot2-services"] in first_calls
     assert not [argv for argv in docker.argvs() if argv[1:3] in (["network", "create"], ["network", "connect"])]
-    assert docker.networks == {"notes-slot2-services": SHARED, "notes-slot2-telemetry": set(provision.TELEMETRY)}
+    assert docker.networks == {"notes-slot2-services": SHARED, "notes-slot2-telemetry": {"factory-glitchtip"}}
     assert (tmp_path / "notes_slot2.password").stat().st_mode & 0o777 == 0o600
 
 
@@ -57,10 +53,6 @@ def test_the_values_name_the_shared_services_inside_docker_and_the_origin_for_br
     assert {k: v for k, v in values.items() if k != "DATABASE_URL"} == {
         "FACTORY_SERVICES_NETWORK": "notes-slot2-services",
         "FACTORY_TELEMETRY_NETWORK": "notes-slot2-telemetry",
-        "LANGFUSE_HOST": "http://factory-langfuse:3000",
-        "LANGFUSE_PUBLIC_KEY": "pk-lf-1",
-        "LANGFUSE_SECRET_KEY": "sk-lf-1",
-        "LANGFUSE_TRACING_ENVIRONMENT": "slot2",
         "SENTRY_ENVIRONMENT": "slot2",
         "SENTRY_RELEASE": "dev-slot2",
         "SENTRY_INGEST_URL": "http://factory-glitchtip:8000",

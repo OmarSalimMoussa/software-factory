@@ -81,9 +81,8 @@ def summary(job: Job) -> None:
     else:
         print("Changed nothing: the server already matched." if not changes else f"Made {len(changes)} changes.")
     print(f"GlitchTip  {stack.public_url(config, stack.PORTS['glitchtip'])}")
-    print(f"Langfuse   {stack.public_url(config, stack.PORTS['langfuse'])}")
-    print(f"  Sign in to both as {config.services.owner_email}. The passwords are GLITCHTIP_OWNER_PASSWORD and")
-    print(f"  LANGFUSE_INIT_USER_PASSWORD in {env} on the server (readable by {config.server.admin}).")
+    print(f"  Sign in as {config.services.owner_email}. The password is GLITCHTIP_OWNER_PASSWORD in {env} on the")
+    print(f"  server (readable by {config.server.admin}).")
     for item in job.todo:
         print(f"Still to do: {item}")
     print("Next: install the factory on the server; its Push to prod builds prod there and deploys it.")

@@ -66,7 +66,6 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["errors"],
         ["errors", "--where", "slot", "3", "--issue", "12"],
         ["errors", "--where", "slot", "3", "--issue", "12", "--whole"],
-        ["traces", "--where", "slot", "0", "--trace", "abc"],
         ["logs", "--where", "slot", "0", "--find", "sentinel", "--since", "2026-10-17T09:17:00Z"],
         ["request", "new", "--from", "owner", "--severity", "normal", "--where", "the sign-in page", "--body", FILE],
         ["triage", "apply", "--body", FILE],
@@ -206,7 +205,7 @@ def test_the_owners_account_commands_send_the_token_as_bytes_and_follow_a_switch
         "qa waive t-0001 f-1 --why 'not a bug'", "qa-ready abc", "qa-clean", "ready-check", "triage plan --body p.json",
         "triage apply", "inbox", "inbox --wait", "tick", "status", "reflect --kind miss 'it missed'",
         "slot claim", "slot up", "propose t-0001 --picture p.svg --why now", "spec save t-0001 s.md --slices 2",
-        "needs-owner t-0001 --picture p.svg --question why", "errors", "traces", "logs", "doing 'reading'",
+        "needs-owner t-0001 --picture p.svg --question why", "errors", "logs", "doing 'reading'",
     ],
 )  # fmt: skip
 def test_every_command_asks_for_the_verb_the_guard_reads_it_as(line: str) -> None:

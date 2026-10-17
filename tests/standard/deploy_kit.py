@@ -89,8 +89,6 @@ networks:
 SERVICES_ENV = "\n".join(
     [
         "POSTGRES_PASSWORD=pg",
-        "LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-1",
-        "LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-1",
         "GLITCHTIP_OWNER_PASSWORD=owner-secret",
     ]
 )

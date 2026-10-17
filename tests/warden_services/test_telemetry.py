@@ -1,5 +1,5 @@
-"""`factory errors`, `factory traces` and `factory logs`: each workspace reads its own services and its own projects,
-and an answer never outgrows telemetry.max_kib."""
+"""`factory errors` and `factory logs`: each workspace reads its own projects of the shared GlitchTip, and an answer
+never outgrows telemetry.max_kib."""
 
 from __future__ import annotations
 
@@ -14,10 +14,7 @@ from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
 from runtime.warden.health import logs, telemetry
 
-SERVER = {
-    "glitchtip": {"url": "https://box.test:8200", "org": "notes", "token": "tok-server"},
-    "langfuse": {"url": "https://box.test:3100", "public_key": "pk-lf-1", "secret_key": "sk-lf-1"},
-}
+SERVER = {"glitchtip": {"url": "https://box.test:8200", "org": "notes", "token": "tok-server"}}
 
 
 def issue(n: int, project: str, title: str = "KeyError") -> dict[str, Any]:

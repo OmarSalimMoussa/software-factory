@@ -90,8 +90,8 @@ CLAUDE_TOKEN = "claude-token"  # the credential name the agent units load the si
 
 # Where the shared GlitchTip answers on this machine's loopback.
 GLITCHTIP_URL = f"http://127.0.0.1:{stack.PORTS['glitchtip']}"
-# In the secrets folder, the warden's alone: the shared GlitchTip's and Langfuse's keys and prod's report export, as
-# the server set-up saved them.
+# In the secrets folder, the warden's alone: the shared GlitchTip's keys and prod's report export, as the server
+# set-up saved them.
 SERVER_KEYS = "server.json"
 # The owner's copy of the server's keys, written by `python3 -m standard.server.setup`.
 OWNER_SERVER_KEYS = Path(".config") / "software-factory" / SERVER_KEYS

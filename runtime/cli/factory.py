@@ -167,11 +167,9 @@ def _telemetry_call(ns: argparse.Namespace) -> Call:
         raise CliError("--where is prod or slot <n>; staging is slot 0")
     if ns.cmd == "logs":
         given = {"find": None if ns.find is None else " ".join(ns.find), "since": ns.since}
-        args.update({key: value for key, value in given.items() if value is not None})
-    elif ns.one is not None:
-        args["issue" if ns.cmd == "errors" else "trace"] = ns.one
-    if ns.cmd == "errors" and ns.whole:
-        args["whole"] = True
+    else:
+        given = {"issue": ns.issue, "whole": ns.whole or None}
+    args.update({key: value for key, value in given.items() if value is not None})
     return Call(ns.cmd, args)
 
 
@@ -241,7 +239,6 @@ _CALLS: dict[str, Callable[[argparse.Namespace, Callable[[str], bytes]], Call]] 
     "reflect": lambda ns, _: Call("reflect", {"kind": ns.kind, "text": ns.text}),
     "settings": lambda ns, _: Call("settings.show", {}),
     "errors": lambda ns, _: _telemetry_call(ns),
-    "traces": lambda ns, _: _telemetry_call(ns),
     "logs": lambda ns, _: _telemetry_call(ns),
     "request": _request_call,
     "triage": _triage_call,

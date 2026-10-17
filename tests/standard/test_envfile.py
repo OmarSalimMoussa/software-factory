@@ -43,14 +43,14 @@ def values(tmp_path: Path) -> dict[str, str]:
 
 
 def test_generated_values_are_filled_once_and_kept(tmp_path: Path) -> None:
-    template = TEMPLATE + "STORE_KEY=pk-lf-generate-with-openssl-rand-hex-8\nFERNET=generate-with-python-fernet\n"
+    template = TEMPLATE + "STORE_KEY=pk-generate-with-openssl-rand-hex-8\nFERNET=generate-with-python-fernet\n"
     write(tmp_path, template)
     first = values(tmp_path)
     write(tmp_path, template)
 
     assert values(tmp_path) == first
     assert len(first["SESSION_KEY"]) == 32 and first["SESSION_KEY"] != "generate-with-openssl-rand-hex-16"
-    assert first["STORE_KEY"].startswith("pk-lf-") and len(first["STORE_KEY"]) == len("pk-lf-") + 16
+    assert first["STORE_KEY"].startswith("pk-") and len(first["STORE_KEY"]) == len("pk-") + 16
     assert len(first["FERNET"]) == 44
 
 

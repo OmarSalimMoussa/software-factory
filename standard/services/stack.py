@@ -3,7 +3,7 @@ slots use it.
 
 The stack is compose.yml beside this file, run as compose project factory-services from the server set-up's folder
 (host_paths.FOLDER), which holds a copy of it and its services.env. The env file's secrets are made once and then
-kept for good: the databases and the Langfuse project keys were created with them.
+kept for good: the databases were created with them.
 """
 
 from __future__ import annotations
@@ -24,27 +24,14 @@ PROJECT = "factory-services"
 WAIT_SECONDS = 1200
 ENV_FILE = "services.env"
 # The loopback ports the stack publishes; the server serves the same ones to its tailnet.
-PORTS = {"glitchtip": 8200, "langfuse": 3100, "minio": 9090, "pgweb": 8081, "postgres": 5434}
+PORTS = {"glitchtip": 8200, "pgweb": 8081, "postgres": 5434}
 ONE_SHOT = ("glitchtip-migrate",)
 
-# key: (prefix, random bytes, written as hex). Sizes keep within each service's bounds (MinIO: user 3-20
-# characters, password 8-40; Langfuse's ENCRYPTION_KEY is exactly 64 hex characters).
-_SECRETS: dict[str, tuple[str, int]] = {
-    "POSTGRES_PASSWORD": ("", 32),
-    "LANGFUSE_POSTGRES_PASSWORD": ("", 32),
-    "LANGFUSE_SALT": ("", 32),
-    "LANGFUSE_ENCRYPTION_KEY": ("", 32),
-    "NEXTAUTH_SECRET": ("", 32),
-    "CLICKHOUSE_PASSWORD": ("", 32),
-    "REDIS_AUTH": ("", 32),
-    "MINIO_ROOT_USER": ("", 8),
-    "MINIO_ROOT_PASSWORD": ("", 16),
-    "LANGFUSE_INIT_PROJECT_PUBLIC_KEY": ("pk-lf-", 16),
-    "LANGFUSE_INIT_PROJECT_SECRET_KEY": ("sk-lf-", 16),
-    "LANGFUSE_INIT_USER_PASSWORD": ("", 16),
-    "GLITCHTIP_SECRET_KEY": ("", 32),
-    "GLITCHTIP_POSTGRES_PASSWORD": ("", 24),
-    "GLITCHTIP_OWNER_PASSWORD": ("", 16),
+_SECRET_BYTES: dict[str, int] = {
+    "POSTGRES_PASSWORD": 32,
+    "GLITCHTIP_SECRET_KEY": 32,
+    "GLITCHTIP_POSTGRES_PASSWORD": 24,
+    "GLITCHTIP_OWNER_PASSWORD": 16,
 }
 
 _HEADER = (
@@ -65,17 +52,12 @@ def public_url(config: Config, port: int) -> str:
 def generate_env(config: Config, *, existing: dict[str, str]) -> dict[str, str]:
     """The shared services' settings: each secret ``existing`` holds kept, and one it lacks made. A secret it holds
     blank is refused: the data already stored was made with a value, which a new one would not open."""
-    blank = sorted(key for key in _SECRETS if key in existing and not existing[key])
+    blank = sorted(key for key in _SECRET_BYTES if key in existing and not existing[key])
     if blank:
         raise StackError(f"{ENV_FILE} holds {', '.join(blank)} empty: put back the value the services were set up "
                          "with, or remove the services' data and the line to start them afresh")  # fmt: skip
-    values = {key: existing.get(key) or prefix + secrets.token_hex(size) for key, (prefix, size) in _SECRETS.items()}
+    values = {key: existing.get(key) or secrets.token_hex(size) for key, size in _SECRET_BYTES.items()}
     values |= {
-        "NEXTAUTH_URL": public_url(config, PORTS["langfuse"]),
-        "LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT": public_url(config, PORTS["minio"]),
-        "LANGFUSE_INIT_ORG_ID": config.product.name,
-        "LANGFUSE_INIT_PROJECT_ID": config.product.name,
-        "LANGFUSE_INIT_USER_EMAIL": config.services.owner_email,
         "GLITCHTIP_DOMAIN": public_url(config, PORTS["glitchtip"]),
         "GLITCHTIP_FROM_EMAIL": config.services.owner_email,
         "ACME_EMAIL": config.server.acme_email,

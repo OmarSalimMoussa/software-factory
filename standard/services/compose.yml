@@ -1,45 +1,15 @@
 # The factory's shared services: one stack per host, compose project factory-services.
 #
-# Postgres for the products' databases (one per workspace or slot), pgweb, Langfuse v3, GlitchTip and the edge. Every
-# value that differs between hosts comes from services.env, which the server set-up writes (standard/services/
-# stack.py). Container names and volume names are fixed: there is one of each per host, and the provisioner reaches
-# factory-postgres, factory-langfuse and factory-glitchtip by name over each workspace's own network. Ports are
-# published on 127.0.0.1 only; the server serves them to its tailnet.
+# Postgres for the products' databases (one per workspace or slot), pgweb, GlitchTip and the edge. Every value that
+# differs between hosts comes from services.env, which the server set-up writes (standard/services/stack.py).
+# Container names and volume names are fixed: there is one of each per host, and the provisioner reaches
+# factory-postgres and factory-glitchtip by name over each workspace's own network. Ports are published on 127.0.0.1
+# only; the server serves them to its tailnet.
 # Services reach each other by container name, never by service key: a workspace network a shared container joins
 # could hold a product service with the same key.
 # A healthcheck probes every 30s, and at a start's quick pace (start_interval) only within its start period: each probe
 # starts a process in the container, and on one server beside prod and the slots that adds up to a real share of CPU.
 name: factory-services
-
-# What the Langfuse web and worker containers share.
-x-langfuse-env: &langfuse-env
-  NEXTAUTH_URL: ${NEXTAUTH_URL:?}
-  DATABASE_URL: postgresql://postgres:${LANGFUSE_POSTGRES_PASSWORD:?}@factory-langfuse-postgres:5432/postgres
-  SALT: ${LANGFUSE_SALT:?}
-  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?}
-  CLICKHOUSE_MIGRATION_URL: clickhouse://factory-langfuse-clickhouse:9000
-  CLICKHOUSE_URL: http://factory-langfuse-clickhouse:8123
-  CLICKHOUSE_USER: clickhouse
-  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?}
-  CLICKHOUSE_CLUSTER_ENABLED: "false"
-  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
-  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
-  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?}
-  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?}
-  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://factory-langfuse-minio:9000
-  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
-  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
-  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
-  LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
-  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?}
-  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?}
-  # Baked into presigned media links, so it is the address a browser opens.
-  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT:?}
-  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
-  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
-  REDIS_HOST: factory-langfuse-redis
-  REDIS_PORT: "6379"
-  REDIS_AUTH: ${REDIS_AUTH:?}
 
 services:
   postgres:
@@ -87,194 +57,6 @@ services:
       resources:
         limits:
           memory: 256M
-
-  langfuse:
-    image: docker.io/langfuse/langfuse:3.206.0
-    container_name: factory-langfuse
-    restart: unless-stopped
-    depends_on: &langfuse-stores
-      langfuse-postgres:
-        condition: service_healthy
-      langfuse-minio:
-        condition: service_healthy
-      langfuse-redis:
-        condition: service_healthy
-      langfuse-clickhouse:
-        condition: service_healthy
-    environment:
-      <<: *langfuse-env
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?}
-      # Read at start: Langfuse creates this organization, project, keys and first user once, when its database is
-      # empty. The keys must never change after that, so they are kept in services.env for good.
-      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:?}
-      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_ID:?}
-      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:?}
-      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_ID:?}
-      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:?}
-      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY:?}
-      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:?}
-      LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_EMAIL:?}
-      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:?}
-      # Next.js binds to $HOSTNAME; unset, it answers on one network only and refuses the workspaces' networks
-      # the provisioner connects it to, silently.
-      HOSTNAME: 0.0.0.0
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/public/health || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 60
-      # The first start migrates its databases, which is slow: failures in this window do not count, so a first
-      # boot is never declared unhealthy halfway through.
-      start_period: 600s
-      start_interval: 5s
-    ports:
-      - "127.0.0.1:3100:3000"
-    networks:
-      - langfuse
-    deploy:
-      resources:
-        limits:
-          # Under 1G the Next.js server dies of a V8 heap OOM about every 30 s.
-          memory: 2G
-
-  langfuse-worker:
-    image: docker.io/langfuse/langfuse-worker:3.206.0
-    container_name: factory-langfuse-worker
-    restart: unless-stopped
-    depends_on:
-      <<: *langfuse-stores
-      # The web container runs the migrations at start; a worker that starts before they finish stalls.
-      langfuse:
-        condition: service_healthy
-    environment:
-      <<: *langfuse-env
-      # It binds to $HOSTNAME too; unset, that is the container's own address and 127.0.0.1 is refused.
-      HOSTNAME: 0.0.0.0
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3030/api/health || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 30
-      # The first start migrates its databases, which is slow: failures in this window do not count, so a first
-      # boot is never declared unhealthy halfway through.
-      start_period: 600s
-      start_interval: 5s
-    networks:
-      - langfuse
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-
-  langfuse-clickhouse:
-    # The new query analyzer (the default since 24.8) fails Langfuse's scores.all query on this version
-    # (NOT_FOUND_COLUMN_IN_BLOCK, the per-trace Scores tab). The config below forces the legacy analyzer, the mode
-    # Langfuse's documented minimum ClickHouse runs in. Drop it only after re-checking scores.all on a new version.
-    image: docker.io/clickhouse/clickhouse-server:26.6.1.1193
-    container_name: factory-langfuse-clickhouse
-    restart: unless-stopped
-    user: "101:101"
-    environment:
-      CLICKHOUSE_DB: default
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?}
-    configs:
-      - source: clickhouse-legacy-analyzer
-        target: /etc/clickhouse-server/users.d/legacy-analyzer.xml
-    volumes:
-      - factory-langfuse-clickhouse-data:/var/lib/clickhouse
-      - factory-langfuse-clickhouse-logs:/var/log/clickhouse-server
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 10
-      # The first start migrates its databases, which is slow: failures in this window do not count, so a first
-      # boot is never declared unhealthy halfway through.
-      start_period: 600s
-      start_interval: 5s
-    networks:
-      - langfuse
-    deploy:
-      resources:
-        limits:
-          memory: 3G
-
-  langfuse-minio:
-    # Chainguard publishes only `latest` for free, so the image is pinned by digest.
-    image: cgr.dev/chainguard/minio@sha256:23e54aadcc2386845bcb9c3dd96bf255915cdf603aba45e6f16ab2c115743f3f
-    container_name: factory-langfuse-minio
-    restart: unless-stopped
-    entrypoint: sh
-    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
-    ports:
-      # The S3 port, for the browser-facing media links.
-      - "127.0.0.1:9090:9000"
-    volumes:
-      - factory-langfuse-minio-data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-      start_interval: 1s
-    networks:
-      - langfuse
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-
-  langfuse-redis:
-    image: docker.io/redis:7.4.9
-    container_name: factory-langfuse-redis
-    restart: unless-stopped
-    command: --requirepass ${REDIS_AUTH:?} --maxmemory-policy noeviction
-    volumes:
-      - factory-langfuse-redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 30s
-      start_interval: 3s
-    networks:
-      - langfuse
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-
-  langfuse-postgres:
-    image: docker.io/postgres:17.10
-    container_name: factory-langfuse-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${LANGFUSE_POSTGRES_PASSWORD:?}
-      POSTGRES_DB: postgres
-      TZ: UTC
-      PGTZ: UTC
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1 -p 5432"]
-      interval: 30s
-      timeout: 3s
-      retries: 20
-      start_period: 60s
-      start_interval: 3s
-    volumes:
-      - factory-langfuse-postgres-data:/var/lib/postgresql/data
-    networks:
-      - langfuse
-    deploy:
-      resources:
-        limits:
-          memory: 1G
 
   # The image's web command does not migrate (it serves a healthy /_health/ against an empty database), so this
   # one-shot creates the schema first and exits 0; web and worker wait for it. It runs again on every `up`.
@@ -423,38 +205,16 @@ services:
         limits:
           memory: 256M
 
-configs:
-  clickhouse-legacy-analyzer:
-    content: |
-      <clickhouse>
-          <profiles>
-              <default>
-                  <enable_analyzer>0</enable_analyzer>
-              </default>
-          </profiles>
-      </clickhouse>
-
 networks:
   # Each set of datastores sits on its own network behind its one web service. A workspace reaches the shared
   # services only through the network the provisioner makes for it, never through these.
   data: {}
-  langfuse: {}
   glitchtip: {}
 
 # Named for the host, not the compose project: the data belongs to the host's one stack.
 volumes:
   factory-postgres-data:
     name: factory-postgres-data
-  factory-langfuse-postgres-data:
-    name: factory-langfuse-postgres-data
-  factory-langfuse-clickhouse-data:
-    name: factory-langfuse-clickhouse-data
-  factory-langfuse-clickhouse-logs:
-    name: factory-langfuse-clickhouse-logs
-  factory-langfuse-minio-data:
-    name: factory-langfuse-minio-data
-  factory-langfuse-redis-data:
-    name: factory-langfuse-redis-data
   factory-glitchtip-postgres-data:
     name: factory-glitchtip-postgres-data
   factory-glitchtip-cold:

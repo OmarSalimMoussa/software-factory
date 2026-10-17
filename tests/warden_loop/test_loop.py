@@ -95,7 +95,6 @@ def test_a_failed_errors_read_never_stops_the_loop_and_is_logged_once_a_run(
     file_requests(ticking, 0, 0)
     store.write_json(telemetry.server_json(ticking.ctx.places), {
         "glitchtip": {"url": "https://box.test:8200", "org": "notes", "token": "tok-read"},
-        "langfuse": {"url": "https://box.test:3100", "public_key": "pk-lf-1", "secret_key": "sk-lf-1"},
     })  # fmt: skip
     reads: list[str] = []
 

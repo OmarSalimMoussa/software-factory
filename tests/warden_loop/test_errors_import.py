@@ -19,10 +19,7 @@ from runtime.shared.network import Answer
 from runtime.warden.health import errors_import, telemetry
 
 GLITCHTIP = "https://box.test:8200"
-SERVER = {
-    "glitchtip": {"url": GLITCHTIP, "org": "notes", "token": "tok-read"},
-    "langfuse": {"url": "https://box.test:3100", "public_key": "pk-lf-1", "secret_key": "sk-lf-1"},
-}
+SERVER = {"glitchtip": {"url": GLITCHTIP, "org": "notes", "token": "tok-read"}}
 
 
 def issue(n: int, project: str) -> dict[str, Any]:

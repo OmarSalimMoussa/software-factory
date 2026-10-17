@@ -1,17 +1,14 @@
-"""Read-only telemetry for agents, `factory errors` and `factory traces`, and the GlitchTip reads the errors import and
-`factory logs` share.
+"""`factory errors`, read-only for agents, and the GlitchTip reads the errors import and `factory logs` share.
 
-The warden holds every key and asks GlitchTip and Langfuse itself; an agent sees only the answer. Every workspace,
-prod and each slot (slot 0 is staging), lives on this machine's shared services, reached with the keys in the secrets'
-server.json that the server set-up wrote. A workspace's GlitchTip projects are named for it (prod-…, slot0-…,
-slot3-…) and its Langfuse traces carry its name as their environment, so a read never strays into another workspace,
-or into the factory's own project. Every answer is cut to telemetry.max_kib. A key never appears in an answer, an
-error or a log line.
+The warden holds every key and asks GlitchTip itself; an agent sees only the answer. Every workspace, prod and each
+slot (slot 0 is staging), lives on this machine's shared services, reached with the keys in the secrets' server.json
+that the server set-up wrote. A workspace's GlitchTip projects are named for it (prod-…, slot0-…, slot3-…), so a read
+never strays into another workspace, or into the factory's own project. Every answer is cut to telemetry.max_kib. A
+key never appears in an answer, an error or a log line.
 """
 
 from __future__ import annotations
 
-import base64
 import json
 import re
 import urllib.error
@@ -31,13 +28,12 @@ from runtime.warden.context import Context
 
 PROD, SLOT = "prod", "slot"
 _ISSUE_ID = re.compile(r"^[0-9]{1,20}$")
-_TRACE_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 _LINK = re.compile(r'<[^>]*>((?:\s*;\s*[A-Za-z]+="[^"]*")*)')
 _ATTR = re.compile(r'([A-Za-z]+)="([^"]*)"')
 
 
 class TelemetryError(Exception):
-    """GlitchTip or Langfuse could not be read; the message says which and why, never a key."""
+    """GlitchTip or the server's keys could not be read; the message says which and why, never a key."""
 
 
 class NotSetUp(TelemetryError):
@@ -49,13 +45,6 @@ class GlitchTip:
     url: str
     org: str
     token: str = field(repr=False)
-
-
-@dataclass(frozen=True, slots=True)
-class Langfuse:
-    url: str
-    public_key: str
-    secret_key: str = field(repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,19 +110,8 @@ def glitchtip(places: Places) -> GlitchTip:
     return GlitchTip(keys["url"], keys["org"], keys["token"])
 
 
-def langfuse(places: Places) -> Langfuse:
-    keys = read_keys(server_json(places), "langfuse", ("url", "public_key", "secret_key"),
-                     "the server set-up has not run")  # fmt: skip
-    return Langfuse(keys["url"], keys["public_key"], keys["secret_key"])
-
-
 def bearer(service: GlitchTip) -> dict[str, str]:
     return {"Authorization": f"Bearer {service.token}"}
-
-
-def _basic(service: Langfuse) -> dict[str, str]:
-    pair = base64.b64encode(f"{service.public_key}:{service.secret_key}".encode()).decode()
-    return {"Authorization": f"Basic {pair}"}
 
 
 def next_cursor(link: str) -> str:
@@ -225,39 +203,6 @@ def _latest(service: GlitchTip, workspace: str, issue_id: Any, timeout: float, w
     return {"issue": _issue_row(issue), "latest_event": event if whole else _event(event)}
 
 
-def _trace_row(raw: dict[str, Any]) -> dict[str, Any]:
-    return {"id": _text(raw, "id"), "name": _text(raw, "name"), "at": _text(raw, "timestamp"),
-            "latency_seconds": raw.get("latency"), "cost_usd": raw.get("totalCost")}  # fmt: skip
-
-
-def _recent(service: Langfuse, workspace: str, limit: int, timeout: float) -> list[dict[str, Any]]:
-    query = {"environment": workspace, "limit": limit, "orderBy": "timestamp.desc", "fields": "core,metrics"}
-    url = f"{service.url}/api/public/traces?{urllib.parse.urlencode(query)}"
-    page, _ = get_json("Langfuse", url, _basic(service), timeout)
-    rows = page.get("data") if isinstance(page, dict) else None
-    if not isinstance(rows, list):
-        raise TelemetryError("Langfuse's trace list holds no data")
-    return [_trace_row(row) for row in _dicts(rows)]
-
-
-def _trace(service: Langfuse, workspace: str, trace_id: Any, timeout: float) -> dict[str, Any]:
-    if not isinstance(trace_id, str) or not _TRACE_ID.match(trace_id):
-        raise Refused("args", "--trace is a Langfuse trace id")
-    url = f"{service.url}/api/public/traces/{urllib.parse.quote(trace_id, safe='')}?fields=core,observations,metrics"
-    raw, _ = get_json("Langfuse", url, _basic(service), timeout)
-    if not isinstance(raw, dict):
-        raise TelemetryError("Langfuse's trace is not an object")
-    if raw.get("environment") != workspace:
-        raise Refused("telemetry", f"trace {trace_id} is not one of {workspace}'s")
-    steps = sorted(_dicts(raw.get("observations")), key=lambda o: _text(o, "startTime") or "")
-    return {**_trace_row(raw), "observations": [
-        {"name": _text(o, "name"), "type": _text(o, "type"), "at": _text(o, "startTime"), "level": _text(o, "level"),
-         "status_message": _text(o, "statusMessage"), "model": _text(o, "model"),
-         "cost_usd": o.get("calculatedTotalCost")}
-        for o in steps
-    ]}  # fmt: skip
-
-
 def workspace_of(ctx: Context, args: dict[str, Any]) -> str:
     """prod or slot<n> from ``--where``; a slot must be slot 0, which is staging, or one of the slots."""
     where = args.get("where")
@@ -323,23 +268,6 @@ def errors(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
             found = unresolved(service, f"{workspace}-", timeout, settings.get_int("errors.max_pages"),
                                settings.get_int("telemetry.max_items"))  # fmt: skip
             answer = {"where": workspace, "issues": [_issue_row(issue) for issue in found]}
-    except TelemetryError as exc:
-        raise Refused("telemetry", str(exc)) from exc
-    return fit(ok(**answer), settings.get_int("telemetry.max_kib") * 1024)
-
-
-def traces(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """`factory traces`: a workspace's recent Langfuse traces, newest first, or one trace with its steps."""
-    settings = ctx.settings()
-    workspace = workspace_of(ctx, args)
-    timeout = float(settings.get_int("telemetry.timeout_seconds"))
-    try:
-        service = langfuse(ctx.places)
-        answer: dict[str, Any] = {"where": workspace}
-        if "trace" in args:
-            answer["trace"] = _trace(service, workspace, args["trace"], timeout)
-        else:
-            answer["traces"] = _recent(service, workspace, settings.get_int("telemetry.max_items"), timeout)
     except TelemetryError as exc:
         raise Refused("telemetry", str(exc)) from exc
     return fit(ok(**answer), settings.get_int("telemetry.max_kib") * 1024)

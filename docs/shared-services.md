@@ -1,8 +1,8 @@
 # The shared services
 
 One copy of the shared services runs on the product's server, where the server set-up made it
-([server.md](server.md)): Postgres for the databases, pgweb to browse them, Langfuse for traces and GlitchTip for
-errors. Prod, every slot and the factory's own errors all use it. This page says what the factory's install needs
+([server.md](server.md)): Postgres for the databases, pgweb to browse them, and GlitchTip for errors. Prod, every
+slot and the factory's own errors all use it. This page says what the factory's install needs
 from it, what each slot gets, and where the keys live.
 
 ## What the install needs
@@ -10,8 +10,8 @@ from it, what each slot gets, and where the keys live.
 The factory installs on that server, beside prod, and makes no services of its own.
 
 - Before it changes anything, the install checks that `/srv/factory/services/services.env` is there and that
-  `factory-postgres`, `factory-langfuse` and `factory-glitchtip` are running. When they are not, it stops and says to
-  run the server set-up first.
+  `factory-postgres` and `factory-glitchtip` are running. When they are not, it stops and says to run the server
+  set-up first.
 - The stack user, `software-stack`, joins the `docker` group and runs every slot on the server's own Docker.
 - `services.env` becomes readable by the stack user's group (mode 0640), since each slot's provisioning reads it. A
   run of the server set-up makes it the admin's alone again: install the factory again after one. The uninstall
@@ -23,8 +23,8 @@ product has real users.
 ## Where to open them
 
 [server.md](server.md) lists their addresses on the tailnet. On the server itself, each answers on the loopback:
-GlitchTip at http://127.0.0.1:8200, Langfuse at http://127.0.0.1:3100, pgweb at http://127.0.0.1:8081 and Postgres at
-127.0.0.1:5434. The passwords are in `/srv/factory/services/services.env`.
+GlitchTip at http://127.0.0.1:8200, pgweb at http://127.0.0.1:8081 and Postgres at 127.0.0.1:5434. The passwords
+are in `/srv/factory/services/services.env`.
 
 ## What each slot gets
 
@@ -34,12 +34,11 @@ the share is made once and then kept.
 
 - **Its own database**, `<product>_slot<n>`, owned by its own database user of the same name. No other slot's user
   can connect to it.
-- **Its own network**, `<product>-slot<n>-services`. It joins the shared Postgres, Langfuse and GlitchTip and
-  nothing else, so two slots never share a network.
+- **Its own network**, `<product>-slot<n>-services`. It joins the shared Postgres and GlitchTip and nothing else,
+  so two slots never share a network.
 - **Its own GlitchTip projects**, `slot<n>-<name>` for each name in factory.toml's `[services].errors`. Slot 0
   runs the default branch as staging, so the warden files each new issue of its projects as a request, as it does
   prod's.
-- **Its traces** in the product's one Langfuse project, under the environment `slot<n>`.
 - **Its env file**, written from the product's env template. It holds the slot's own values: the workspace
   `slot<n>`, the origin `http://127.0.0.1:<port>` (slot 0's is `slots.zero_origin` when set), the commit `dev-slot<n>`
   and the Docker socket `/var/run/docker.sock`, plus the shared services' keys and your slot keys. `scripts/dev` finds
@@ -96,11 +95,10 @@ The warden reports two kinds of failure there too:
 
 The installer keeps these in the warden's secrets folder:
 
-- `server.json`: the shared GlitchTip's address, organization and read-only token, Langfuse's address and the
-  product project's keys, and prod's report export with its token. The install copies it from
-  `~/.config/software-factory/server.json`, which the server set-up writes on the machine it runs from. On the server
-  itself, its addresses are loopback ones (`http://127.0.0.1:<port>`). `factory errors`, `factory logs` and
-  `factory traces` read every workspace through it, each slot's too. Only the warden reads it. Until the server
-  set-up has run, the installer says so, and the warden imports no errors and no users' reports.
+- `server.json`: the shared GlitchTip's address, organization and read-only token, and prod's report export with
+  its token. The install copies it from `~/.config/software-factory/server.json`, which the server set-up writes on
+  the machine it runs from. On the server itself, its addresses are loopback ones (`http://127.0.0.1:<port>`).
+  `factory errors` and `factory logs` read every workspace through it, each slot's too. Only the warden reads it.
+  Until the server set-up has run, the installer says so, and the warden imports no errors and no users' reports.
 - `factory-dsn`: the address of the factory's GlitchTip project, where the factory's own errors go. Only the warden
   and the dashboard read it.

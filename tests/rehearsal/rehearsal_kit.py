@@ -51,10 +51,7 @@ GITHUB = "acme/notes"
 AGENT_UID, OWNER_UID, DASHBOARD_UID = 2001, 1000, 2002
 T0 = datetime(2026, 10, 9, 9, 0, tzinfo=UTC).timestamp()
 SNAPSHOT = "runtime.warden.snapshot:"
-SERVICES_ENV = (
-    "POSTGRES_PASSWORD=pg\nLANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-1\nLANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-1\n"
-    "GLITCHTIP_OWNER_PASSWORD=gt\n"
-)
+SERVICES_ENV = "POSTGRES_PASSWORD=pg\nGLITCHTIP_OWNER_PASSWORD=gt\n"
 # docker as a slot's provisioning and start drive it: networks are made and joined, psql takes its statements,
 # GlitchTip's shell answers with a DSN for each project it is asked for, and no container runs. Anything else fails,
 # naming itself.

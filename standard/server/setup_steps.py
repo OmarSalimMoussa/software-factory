@@ -38,7 +38,7 @@ COMMANDS = {
 }
 
 
-SERVE_HTTPS = tuple(stack.PORTS[name] for name in ("glitchtip", "langfuse", "minio", "pgweb"))
+SERVE_HTTPS = tuple(stack.PORTS[name] for name in ("glitchtip", "pgweb"))
 
 
 SERVE_TCP = (stack.PORTS["postgres"],)
@@ -212,11 +212,6 @@ def laptop(job: Job) -> None:
             "url": stack.public_url(config, stack.PORTS["glitchtip"]),
             "org": config.product.name,
             "token": job.token,
-        },
-        "langfuse": {
-            "url": stack.public_url(config, stack.PORTS["langfuse"]),
-            "public_key": job.services["LANGFUSE_INIT_PROJECT_PUBLIC_KEY"],
-            "secret_key": job.services["LANGFUSE_INIT_PROJECT_SECRET_KEY"],
         },
     }
     export = _report_export(job)

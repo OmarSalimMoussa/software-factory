@@ -134,7 +134,7 @@ def _claude_account(ctx: Install, folder: Path) -> None:
 
 
 def _server_keys(ctx: Install, folder: Path) -> None:
-    """The server's GlitchTip and Langfuse keys and prod's report export, for the warden alone."""
+    """The server's GlitchTip keys and prod's report export, for the warden alone."""
     host, theirs = ctx.host, ctx.owner.home / layout.OWNER_SERVER_KEYS
     if not host.exists(theirs):
         host.tell("Your server is not set up yet, so the factory reads no errors or users' reports from it. Set it "

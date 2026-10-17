@@ -24,20 +24,13 @@ Run = Callable[[list[str], str | None], subprocess.CompletedProcess[str]]
 TIMEOUT_SECONDS = 1800
 
 POSTGRES = "factory-postgres"
-LANGFUSE = "factory-langfuse"
 GLITCHTIP = "factory-glitchtip"
-SHARED = (POSTGRES, LANGFUSE, GLITCHTIP)
-# The telemetry network reaches only traces and errors: what a product runs for others (its agents' containers) joins
-# it instead of the services network, so it never has a route to the database.
-TELEMETRY = (LANGFUSE, GLITCHTIP)
-LANGFUSE_HOST = "http://factory-langfuse:3000"
+SHARED = (POSTGRES, GLITCHTIP)
+# The telemetry network reaches only errors: what a product runs for others (its agents' containers) joins it instead
+# of the services network, so it never has a route to the database.
+TELEMETRY = (GLITCHTIP,)
 GLITCHTIP_INGEST = "factory-glitchtip:8000"
-SERVICE_KEYS = (
-    "POSTGRES_PASSWORD",
-    "LANGFUSE_INIT_PROJECT_PUBLIC_KEY",
-    "LANGFUSE_INIT_PROJECT_SECRET_KEY",
-    "GLITCHTIP_OWNER_PASSWORD",
-)
+SERVICE_KEYS = ("POSTGRES_PASSWORD", "GLITCHTIP_OWNER_PASSWORD")
 # Terse errors name no statement text, so a failed ALTER ROLE never prints the password it carried.
 PSQL = [
     *("docker", "exec", "-i", POSTGRES, "psql", "-U", "postgres", "-d", "postgres", "-X", "-q"),
@@ -149,9 +142,7 @@ def workspace(
     public = urlsplit(origin)
     return env_values(
         config, workspace=workspace, commit=commit, networks=(net, telemetry_net),
-        database_url=f"postgresql://{name}:{password}@{POSTGRES}:5432/{name}", langfuse=(LANGFUSE_HOST,
-        services["LANGFUSE_INIT_PROJECT_PUBLIC_KEY"], services["LANGFUSE_INIT_PROJECT_SECRET_KEY"]),
-        ingest=f"http://{GLITCHTIP_INGEST}",
+        database_url=f"postgresql://{name}:{password}@{POSTGRES}:5432/{name}", ingest=f"http://{GLITCHTIP_INGEST}",
         dsn=lambda errors: f"http://{keys[errors][0]}@{GLITCHTIP_INGEST}/{keys[errors][1]}",
         public_dsn=lambda errors: f"{public.scheme}://{keys[errors][0]}@{public.netloc}"
         f"{config.services.errors_public_path}/{keys[errors][1]}",
@@ -173,21 +164,16 @@ def env_values(
     commit: str,
     networks: tuple[str, str],
     database_url: str,
-    langfuse: tuple[str, str, str],
     ingest: str,
     dsn: Callable[[str], str],
     public_dsn: Callable[[str], str],
 ) -> dict[str, str]:
-    """Every env value the factory writes for a workspace, the one list of their keys: ``langfuse`` is its host,
-    public key and secret key, and ``dsn`` and ``public_dsn`` give each error project's addresses."""
+    """Every env value the factory writes for a workspace, the one list of their keys: ``dsn`` and ``public_dsn``
+    give each error project's addresses."""
     values = {
         "FACTORY_SERVICES_NETWORK": networks[0],
         "FACTORY_TELEMETRY_NETWORK": networks[1],
         "DATABASE_URL": database_url,
-        "LANGFUSE_HOST": langfuse[0],
-        "LANGFUSE_PUBLIC_KEY": langfuse[1],
-        "LANGFUSE_SECRET_KEY": langfuse[2],
-        "LANGFUSE_TRACING_ENVIRONMENT": workspace,
         "SENTRY_ENVIRONMENT": workspace,
         "SENTRY_RELEASE": commit,
         "SENTRY_INGEST_URL": ingest,

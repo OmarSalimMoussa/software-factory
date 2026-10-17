@@ -154,12 +154,12 @@ def _queue(sub: Any) -> None:
 
 
 def _telemetry(sub: Any) -> None:
-    for verb, flag, what in (("errors", "--issue", "a GlitchTip issue"), ("traces", "--trace", "a Langfuse trace")):
-        parser = sub.add_parser(verb, help=f"{verb} of prod or a slot (slot 0 is staging), or {what}; read-only")
-        parser.add_argument("--where", nargs="+", default=["prod"], metavar="prod|slot N")
-        parser.add_argument(flag, dest="one")
-        if verb == "errors":
-            parser.add_argument("--whole", action="store_true", help="with --issue: the newest event, all of it")
+    errors = sub.add_parser(
+        "errors", help="errors of prod or a slot (slot 0 is staging), or a GlitchTip issue; read-only"
+    )
+    errors.add_argument("--where", nargs="+", default=["prod"], metavar="prod|slot N")
+    errors.add_argument("--issue")
+    errors.add_argument("--whole", action="store_true", help="with --issue: the newest event, all of it")
     logs = sub.add_parser("logs", help="log lines of prod or a slot (slot 0 is staging), newest first; read-only")
     logs.add_argument("--where", nargs="+", default=["prod"], metavar="prod|slot N")
     logs.add_argument("--find", nargs="+", help="only lines whose text holds these words, in this order")

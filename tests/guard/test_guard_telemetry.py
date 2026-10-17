@@ -1,4 +1,4 @@
-"""Errors and traces are read by the sessions and, among subagents, by intake, triage and the testers only."""
+"""Errors and logs are read by the sessions and, among subagents, by intake, triage and the testers only."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from guard_kit import NOW, TESTER_ID, Kit, entry
         ("implementer", "Explore", "factory-verbs"),
     ],
 )
-def test_only_sessions_intake_triage_and_testers_read_errors_and_traces(
+def test_only_sessions_intake_triage_and_testers_read_errors_and_logs(
     tmp_path: Path, role: str, kind: str, rule: str | None
 ) -> None:
     kit = Kit(tmp_path)
@@ -30,5 +30,5 @@ def test_only_sessions_intake_triage_and_testers_read_errors_and_traces(
     kit.session(role, worktree=where)
     kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
     caller = {"agent_id": TESTER_ID, "agent_type": kind} if kind else {}
-    for command in ("factory errors --where slot 1 --issue 12", "factory traces --trace abc"):
+    for command in ("factory errors --where slot 1 --issue 12", "factory logs --find boom"):
         assert kit.bash(command, cwd=str(where), **caller) == rule, command

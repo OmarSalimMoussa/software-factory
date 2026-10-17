@@ -69,7 +69,7 @@ kept. For each key:
   takes the template's current default, so a changed default reaches prod and every slot. The defaults
   of the last write are kept beside the file, in `<file>.defaults`.
 - A key the template no longer has is removed, and the deploy log says so.
-- `generate-with-openssl-rand-hex-<N>` becomes N random bytes in hex, keeping any text before it (`pk-lf-`).
+- `generate-with-openssl-rand-hex-<N>` becomes N random bytes in hex, keeping any text before it, such as `pk-`.
   `generate-with-python-fernet` becomes a Fernet key. Each is made once and kept.
 
 A line `# server: <why>` directly above a key marks a value that is only right on a laptop. A server deploy refuses
@@ -83,20 +83,21 @@ The file is private to the admin user and replaced whole on each write. The stac
 
 ## What each workspace gets from the shared services
 
-The server runs one set of shared services for every workspace: Postgres, Langfuse and GlitchTip. Each deploy, and
-each laptop slot before it runs, makes sure its workspace has:
+The server runs one set of shared services for every workspace: Postgres and GlitchTip. Each deploy, and each
+laptop slot before it runs, makes sure its workspace has:
 
-- **A network** of its own, joined by the three shared services. The product's compose file attaches the services
-  that need them to it, through `FACTORY_SERVICES_NETWORK`. Workspaces never share a network.
+- **A network** of its own, joined by both shared services. The product's compose file attaches the services that
+  need them to it, through `FACTORY_SERVICES_NETWORK`. Workspaces never share a network.
+- **A second network**, `FACTORY_TELEMETRY_NETWORK`, joined by GlitchTip alone. What the product runs for others,
+  such as its agents' containers, joins it instead, so that code can report errors but never reach the database.
 - **A database and a role** named `<product>_<workspace>`. The role owns the database, and no other workspace's
   role can connect to it. Its password is made once and kept in the workspace's state folder.
 - **Error projects** in GlitchTip named `<workspace>-<name>` for each `[services].errors` name.
-- **Traces** in the host's one Langfuse project, told apart by environment, which is the workspace's name.
 
-The env keys the factory writes are `FACTORY_SERVICES_NETWORK`, `DATABASE_URL`, `LANGFUSE_HOST`,
-`LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_TRACING_ENVIRONMENT`, `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE`,
-`SENTRY_INGEST_URL` and, for each errors name, `SENTRY_DSN_<NAME>`. With `[services].errors_public_path` set, each
-also gets `SENTRY_PUBLIC_DSN_<NAME>`, which reaches GlitchTip through the workspace's own address.
+The env keys the factory writes are `FACTORY_SERVICES_NETWORK`, `FACTORY_TELEMETRY_NETWORK`, `DATABASE_URL`,
+`SENTRY_ENVIRONMENT`, `SENTRY_RELEASE`, `SENTRY_INGEST_URL` and, for each errors name, `SENTRY_DSN_<NAME>`. With
+`[services].errors_public_path` set, each also gets `SENTRY_PUBLIC_DSN_<NAME>`, which reaches GlitchTip through the
+workspace's own address.
 
 ## The deploy log and the history
 

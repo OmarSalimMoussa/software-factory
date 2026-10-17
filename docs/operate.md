@@ -95,14 +95,13 @@ user in the factory's checkout of the product (the setting `repo.path`):
 The guard keeps every agent's session off these paths. The git hooks refuse a change to them only inside the
 agents' sessions, so your commit lands.
 
-## Errors and traces
+## Errors and logs
 
-Every product gets a database, traces (Langfuse) and errors (GlitchTip) from one copy of the shared services on its
-server, for prod and every stack slot, staging among them ([server.md](server.md),
-[shared-services.md](shared-services.md)). Each new prod error arrives once as a request in the agents' inbox, for
-triage beside your feedback. Agents read errors, log lines and traces with `factory errors`, `factory logs` and
-`factory traces`. The factory's own failures report to a GlitchTip project of its own there, `factory`, which no agent
-reads.
+Every product gets a database and errors (GlitchTip) from one copy of the shared services on its server, for prod
+and every stack slot, staging among them ([server.md](server.md), [shared-services.md](shared-services.md)). Each
+new prod error arrives once as a request in the agents' inbox, for triage beside your feedback. Agents read errors
+and log lines with `factory errors` and `factory logs`. The factory's own failures report to a GlitchTip project of
+its own there, `factory`, which no agent reads.
 
 ## The product's tools
 

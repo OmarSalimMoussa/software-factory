@@ -29,8 +29,7 @@ You run beside the orchestrator in the main checkout, on the default branch. Rea
 2. **Where it lives:** the screen or endpoint, and the files and lines that make it. Read `git log` on those files: a
    recent merge is a likely cause. Find it in the errors: `factory errors` (prod; `--where slot <n>` for a
    slot, and slot 0 is staging), then `factory errors --issue <id>` for its latest event and trace, and
-   `factory logs --find <text>` for the log lines that name it; `factory traces`
-   shows the model runs, and `factory traces --trace <id>` one run's steps.
+   `factory logs --find <text>` for the log lines that name it.
 3. **The cause, when the code shows it.** Name it only when you can point at the line, as `path/file.py:41, what it
    does wrong`. Otherwise leave it out and say what the implementer should reproduce first.
 4. **The routing facts:** `severity` (`severe`, `major` or `minor`; severe only when staging or prod is broken, a

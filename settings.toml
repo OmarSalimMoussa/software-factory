@@ -214,10 +214,10 @@ poll_minutes = 10       # how often the warden asks for new ones
 fetch_seconds = 20      # how long prod's export may take to answer
 max_mib = 8             # the largest export the warden takes; a larger one fails the pull until the export pages
 
-[telemetry]             # `factory errors`, `logs` and `traces`: agents read GlitchTip and Langfuse through the warden
-max_items = 20          # issues, log lines or traces one answer lists
+[telemetry]             # `factory errors` and `logs`: agents read GlitchTip through the warden
+max_items = 20          # issues or log lines one answer lists
 max_kib = 64            # the largest answer an agent gets; longer lists and texts are cut to fit
-timeout_seconds = 20    # one call to GlitchTip or Langfuse
+timeout_seconds = 20    # one call to GlitchTip
 
 [reflect]
 fold_hours = 24         # the same kind and text within this window bumps a count instead of a new entry
