@@ -226,6 +226,42 @@ def test_a_cancelled_factory_call_stops_and_gets_no_answer() -> None:
     assert to_server.getvalue() == ""  # the server never saw the call, so it is not told it was cancelled
 
 
+def _call(key: int, name: str, **args: Any) -> str:
+    params = {"name": name, "arguments": args}
+    return json.dumps({"jsonrpc": "2.0", "id": key, "method": "tools/call", "params": params})
+
+
+def _said(to: io.StringIO) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in to.getvalue().splitlines()]
+
+
+def test_a_call_the_browser_does_not_answer_in_time_fails_and_its_late_answer_reaches_no_one() -> None:
+    proxy, to_server, to_session = _proxy()
+    proxy.from_client(_call(7, "browser_evaluate", function="() => new Promise(() => {})"))
+    for _ in range(500):
+        if to_session.getvalue():
+            break
+        threading.Event().wait(0.01)
+    [answer] = _said(to_session)
+    assert answer["id"] == 7 and answer["result"]["isError"]
+    assert "did not answer browser_evaluate within 0 s" in answer["result"]["content"][0]["text"]
+    # The browser is told to stop the call, and its answer, should it still come, goes nowhere.
+    assert _said(to_server)[-1] == {"jsonrpc": "2.0", "method": "notifications/cancelled",
+                                    "params": {"requestId": 7, "reason": "no answer within 0 s"}}  # fmt: skip
+    proxy.from_server(json.dumps({"jsonrpc": "2.0", "id": 7, "result": {"content": []}}))
+    assert len(_said(to_session)) == 1
+
+
+def test_a_wait_has_its_own_time_to_answer_beside_the_browsers() -> None:
+    proxy, _, to_session = _proxy()
+    proxy.from_client(_call(8, "browser_wait_for", time=30))
+    threading.Event().wait(0.2)
+    assert to_session.getvalue() == ""
+    proxy.from_server(json.dumps({"jsonrpc": "2.0", "id": 8, "result": {"content": []}}))
+    assert _said(to_session) == [{"jsonrpc": "2.0", "id": 8, "result": {"content": []}}]
+    proxy.close()
+
+
 class Ticks(threading.Event):
     """A cancel flag whose waits pass on a clock of their own, and never end early."""
 

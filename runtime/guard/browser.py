@@ -15,7 +15,7 @@ from pathlib import Path, PurePosixPath
 
 from runtime.guard import shell, transcript
 from runtime.guard.facts import Call, Decision, Refusal, Rewrite, SessionView, inside, public, resolve
-from runtime.qa.wrapper import SERVER_CODE
+from runtime.qa.wrapper import SERVER_CODE, WAIT_FOR
 from runtime.qa.wrapper_tools import WAIT_UNTIL
 from runtime.shared import lanes
 from runtime.shared.models import WORKING
@@ -26,9 +26,8 @@ CHROME = "mcp__claude-in-chrome__"
 # driven by its element references.
 DESKTOP = ("mcp__computer-use__", "mcp__remote-devices__computer", BROWSER + "browser_mouse_")
 DRIVERS = (BROWSER, *DESKTOP)
-WAIT = "browser_wait_for"
 # Each browser wait the guard cuts to a tester's time left: the input that sets its length, and seconds per unit.
-_WAITS = {BROWSER + WAIT: ("time", 1), BROWSER + WAIT_UNTIL: ("minutes", 60)}
+_WAITS = {BROWSER + WAIT_FOR: ("time", 1), BROWSER + WAIT_UNTIL: ("minutes", 60)}
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
 # The input fields that name a file or an address, tool by tool; Grep's `pattern` is text, Glob's a path.
 _PATH_FIELDS = {

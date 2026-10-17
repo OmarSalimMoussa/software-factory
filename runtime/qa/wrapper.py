@@ -6,6 +6,8 @@ Right after the session opens, the wrapper starts the trace itself and swallows 
 start stops the browser, so nothing is tested untraced. It drops the trace's tools and the rest of the devtools
 capability from the tool list, adds the factory's tools (wrapper_tools.py) and answers those itself, calling the
 server as a client would. Every other message passes through unchanged. Nothing but MCP goes to standard output.
+A call of the session's the server leaves unanswered past ``qa.browser_answer_seconds``, plus a browser_wait_for's own
+time, fails, and the server is told to stop it: a page script that never ends would hold the tester to the end.
 When the server stops, the wrapper stops too, so the session sees its browser gone.
 """
 
@@ -21,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import IO, Any
 
 SERVER_CODE = "browser_run_code_unsafe"
+WAIT_FOR = "browser_wait_for"
 # The devtools capability holds the trace's tools; the wrapper needs the capability on, the tester keeps its usual
 # tools, so every tool the capability adds is hidden. Closing the browser would end the trace, and the next call
 # would open an untraced browser, so that is hidden too: the browser closes with the session.
@@ -67,6 +70,9 @@ class Proxy:
         self._mine: dict[str, _Waiting] = {}
         self._lists: set[Any] = set()
         self._running: dict[str, threading.Event] = {}  # the factory tools at work, by the session's request id
+        self._sent: dict[str, threading.Timer] = {}  # the session's calls the server has yet to answer
+        self._overdue: set[str] = set()  # calls the session was told timed out, whose late answers go nowhere
+        self._calls_lock = threading.Lock()
         self._ids = itertools.count(1)
         self._secrets: list[str] = []
         self.untraced: Callable[[str], None] = lambda why: None
@@ -84,6 +90,8 @@ class Proxy:
     def from_server(self, line: str) -> None:
         message = json.loads(line)
         key = message.get("id")
+        if "method" not in message and not self._arrived(key):
+            return
         if isinstance(key, str) and key.startswith(OWN):
             # An answer that came after its request gave up waiting is nobody's: the session never asked.
             mine = self._mine.pop(key, None)
@@ -118,9 +126,54 @@ class Proxy:
         if method == "tools/call" and not self.traced():
             self._error(message.get("id"), "the browser stopped: its trace did not start")
             return
+        if method == "tools/call":
+            self._time(message.get("id"), params)
+        elif method == "notifications/cancelled":
+            self._arrived(params.get("requestId"))
         self._to_server(line)
         if method == "notifications/initialized":
             self.start_trace()
+
+    def _time(self, key: Any, params: dict[str, Any]) -> None:
+        """Answer a call for the server once it is past due: a page script that never ends would hold the tester."""
+        args = params.get("arguments")
+        given = args.get("time") if isinstance(args, dict) and params.get("name") == WAIT_FOR else None
+        limit = self._wait + (given if isinstance(given, int | float) and not isinstance(given, bool) else 0)
+        timer = threading.Timer(limit, self._late, args=(key, str(params.get("name")), limit))
+        timer.daemon = True
+        with self._calls_lock:
+            self._sent[str(key)] = timer
+        timer.start()
+
+    def _arrived(self, key: Any) -> bool:
+        with self._calls_lock:
+            timer = self._sent.pop(str(key), None)
+            if timer is not None:
+                timer.cancel()
+            late = str(key) in self._overdue
+            self._overdue.discard(str(key))
+        return not late
+
+    def _late(self, key: Any, name: str, limit: float) -> None:
+        with self._calls_lock:
+            if self._sent.pop(str(key), None) is None:
+                return
+            self._overdue.add(str(key))
+        stop = {"requestId": key, "reason": f"no answer within {limit:.0f} s"}
+        self._to_server(json.dumps({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": stop}))
+        said = (
+            f"the browser did not answer {name} within {limit:.0f} s, so the factory stopped waiting for it: a page "
+            "script must end on its own, and a wait tool waits for the page"
+        )
+        result = {"content": [{"type": "text", "text": said}], "isError": True}
+        self._to_client(json.dumps({"jsonrpc": "2.0", "id": key, "result": result}))
+
+    def close(self) -> None:
+        """Stop the clocks of the calls still out: the server and the session are going."""
+        with self._calls_lock:
+            for timer in self._sent.values():
+                timer.cancel()
+            self._sent.clear()
 
     def start_trace(self) -> None:
         """Awaited on a thread of its own: the server asks the session for its roots before it starts a trace, and the
@@ -263,6 +316,7 @@ def serve(
     reader.start()
     threading.Thread(target=feed, daemon=True).start()
     ended.wait()
+    proxy.close()
     if why[0] == "session":
         server.stdin.close()
         reader.join()  # the server's last answers still reach the session

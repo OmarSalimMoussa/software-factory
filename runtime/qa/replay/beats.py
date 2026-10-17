@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 
 from runtime.guard.browser import BROWSER
 from runtime.qa.replay.trace import Trace
+from runtime.qa.wrapper import WAIT_FOR
 from runtime.qa.wrapper_tools import LINK, OPEN_DESKTOP, SIGN_IN, WAIT_UNTIL
 
 # Calls with nothing to show: the browser's own housekeeping.
@@ -254,7 +255,7 @@ def _read(seen: Seen) -> dict[str, Any]:
 
 # The calls whose words need nothing but their input: (kind, words).
 _WORDS: dict[str, Callable[[dict[str, Any]], tuple[str, str]]] = {
-    "browser_wait_for": lambda a: ("wait", f"Waited {a['time']} s" if "time" in a else f"Waited for “{_bit(a)}”"),
+    WAIT_FOR: lambda a: ("wait", f"Waited {a['time']} s" if "time" in a else f"Waited for “{_bit(a)}”"),
     WAIT_UNTIL: lambda a: ("wait", f"Waited for “{_bit(a)}”"),
     "browser_resize": lambda a: ("resize", f"Set the window to {a.get('width')} × {a.get('height')}"),
     "browser_console_messages": lambda a: ("read", "Read the console"),
