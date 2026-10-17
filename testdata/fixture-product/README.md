@@ -8,7 +8,6 @@ for the standard build and deploy.
 - `web/` holds the page that lists the notes.
 - `tests/` holds the tests `scripts/dev test` runs.
 - `qa/` holds the scenarios testers walk.
-- `scripts/` holds the stack script and the app's own smoke check.
-- `factory.toml` describes how the app is built, smoke-tested and deployed; `compose.yml` is its stack and
+- `scripts/` holds the stack script.
+- `factory.toml` describes how the app is built and deployed; `compose.yml` is its stack and
   `notes.env.template` its settings. The factory's tests read them; nothing builds or runs them.
-- `.github/` holds the factory's workflows, copied unchanged, and the factory commit they check with.

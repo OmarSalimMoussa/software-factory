@@ -16,7 +16,7 @@ from system_fakes import dry_job, settings
 from runtime.dashboard.server import UI
 from runtime.shared import upgrades
 from runtime.shared.paths import Places, stored_signin
-from runtime.system import layout, root_commits
+from runtime.system import layout
 from runtime.system.install_steps import steps_machine
 from runtime.system.runners import launch_file as lf
 from runtime.system.runners import record_exit, trust, upgrading, with_token
@@ -236,8 +236,8 @@ def test_the_install_gives_the_agents_checkout_the_factorys_git_identity(tmp_pat
     steps_machine.agent_checkout(job)
     configs = [a for a in job.host.actions if " config user." in a]  # type: ignore[attr-defined]  # a dry host
     assert configs == [
-        f"run: git -C {job.checkout()} config user.name {root_commits.GIT_NAME} (as software-agent)",
-        f"run: git -C {job.checkout()} config user.email {root_commits.GIT_EMAIL} (as software-agent)",
+        f"run: git -C {job.checkout()} config user.name {steps_machine.GIT_NAME} (as software-agent)",
+        f"run: git -C {job.checkout()} config user.email {steps_machine.GIT_EMAIL} (as software-agent)",
     ]
 
 

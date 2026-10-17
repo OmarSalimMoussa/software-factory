@@ -35,7 +35,7 @@ sys.exit(commit_check.main(sys.argv[1:]))
         (["GOAL.md"], True, "pre-commit", False, False, True),
         (["goal/hero.png"], True, "pre-commit", True, False, True),
         (["factory.toml"], True, "pre-commit", False, False, True),
-        ([".github/workflows/deploy-prod.yml"], True, "pre-commit", False, False, True),
+        ([".github/workflows/ci.yml"], True, "pre-commit", False, False, True),
         (["check-values/surfaces.toml"], True, "pre-commit", False, False, True),
         (["src/app.py", "docs/GOAL.md", "goals.md"], True, "pre-commit", True, False, False),
         (["GOAL.md"], False, "pre-commit", True, False, False),

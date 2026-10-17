@@ -29,8 +29,6 @@ STACK_HOME = Path("/home") / STACK_USER
 PYTHON = "/usr/bin/python3"
 # The factory command, on every user's PATH.
 FACTORY_BIN = paths.FACTORY_BIN
-# The owner's own change to a path only a person changes, which root commits (runtime/system/owner_commit.py).
-OWN_BIN = Path("/usr/local/sbin/factory-own")
 # The agents' own Claude Code: root-owned, so no session can replace the program that runs its guard.
 CLAUDE_BIN = Path("/usr/local/libexec/software-factory/claude")
 TOOLS = paths.CHECK_TOOLS

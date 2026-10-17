@@ -120,13 +120,13 @@ def make_job(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     bootstrap = {"token": "read-token"}
     monkeypatch.setattr(provision, "bootstrap", lambda config, services, run: bootstrap)
 
-    def make(server: Server, *, dirty: str = "", fresh: bool = False, ref: str = "a" * 40) -> setup_steps.Job:
+    def make(server: Server, *, dirty: str = "", fresh: bool = False) -> setup_steps.Job:
         def local(argv: list[str], stdin: str | None) -> subprocess.CompletedProcess[str]:
             answers = {"status": dirty, "rev-parse": "a" * 40 + "\n"}
             return _cp(argv, 0, answers[argv[3]])
 
         host = Host(server, dry_run=False)
-        return setup_steps.Job(CONFIG, FACTORY_TOML, host, local, fresh, tmp_path / "home", factory, ref)
+        return setup_steps.Job(CONFIG, FACTORY_TOML, host, local, fresh, tmp_path / "home", factory)
 
     return make
 
@@ -192,23 +192,11 @@ def test_the_admin_owns_the_product_settings_its_deploys_refresh_and_no_ci_user_
     assert not [argv for argv in server.calls if "ci" in argv or "useradd" in argv]
 
 
-@pytest.mark.parametrize(
-    ("job", "said"),
-    [
-        ({"dirty": " M standard/config.py\n"}, "not committed"),
-        (
-            {"ref": "b" * 40},
-            "the factory checkout is at aaaaaaaa, and the product's .github/factory-ref names bbbbbbbb",
-        ),
-    ],
-)
-def test_a_checkout_the_product_does_not_name_is_refused_before_the_server_is_touched(
-    make_job: Any, job: dict[str, str], said: str
-) -> None:
+def test_a_factory_checkout_with_uncommitted_changes_is_refused_before_the_server_is_touched(make_job: Any) -> None:
     server = Server()
 
-    with pytest.raises(SetupError, match=said):
-        setup.run(make_job(server, **job))
+    with pytest.raises(SetupError, match="not committed"):
+        setup.run(make_job(server, dirty=" M standard/config.py\n"))
 
     assert server.calls == []
 
@@ -361,3 +349,18 @@ def test_a_report_export_factory_toml_cannot_name_is_refused(line: str, problem:
     with pytest.raises(ConfigError) as refused:
         parse_text(FACTORY_TOML + kept + line + "\n")
     assert [p for p in refused.value.problems if p.startswith(problem)]
+
+
+@pytest.mark.parametrize(
+    ("table", "where"),
+    [
+        ("[smoke]\ntimeout_seconds = 60\n", "factory.toml.smoke"),
+        ('[[release]]\nkind = "chrome-web-store"\n', "factory.toml.release"),
+        ('[workspaces.staging]\ndomain = "staging.acme.dev"\nport = 8101\nafter_deploy = []\n', "[workspaces].staging"),
+    ],
+    ids=["smoke", "release", "staging"],
+)
+def test_a_factory_toml_with_a_table_the_factory_does_not_read_is_refused_as_unknown(table: str, where: str) -> None:
+    with pytest.raises(ConfigError) as refused:
+        parse_text(FACTORY_TOML + "\n" + table)
+    assert [p for p in refused.value.problems if p.startswith(f"{where}: unknown key")], refused.value.problems

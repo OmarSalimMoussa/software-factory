@@ -1,8 +1,8 @@
 """factory.toml: the one file a product sets for the standard build and deploy.
 
 It sits at the top of the product's repo and only a person changes it. Every key is required unless noted, an
-unknown key is an error, and every problem is reported at once. The same file drives CI's build plan and smoke test,
-the server's set-up and deploys, the laptop's stack slots and the warden's view of staging and prod.
+unknown key is an error, and every problem is reported at once. The same file drives the build plan, the server's
+set-up and prod's deploys, the stack slots and the warden's view of prod.
 """
 
 from __future__ import annotations
@@ -18,28 +18,20 @@ from standard.config_records import (
     Config,
     Deploy,
     Edge,
-    Endpoint,
     Env,
-    Expect,
     ExtraImage,
     Product,
-    Release,
     Reports,
     Route,
     Server,
     Services,
-    Smoke,
     Workspace,
 )
 from standard.toml_fields import Fields
 
 FILE = "factory.toml"
-# One line, owner/name@<40-character sha>: the factory commit the product's CI plans and checks with.
-FACTORY_REF = ".github/factory-ref"
-FACTORY_REF_LINE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@([0-9a-f]{40})")
-REQUIRED = ("product", "build", "smoke", "services", "env", "server", "workspaces", "deploy", "edge")
-WORKSPACES = ("staging", "prod")
-RELEASE_KINDS = ("chrome-web-store",)
+REQUIRED = ("product", "build", "services", "env", "server", "workspaces", "deploy", "edge")
+WORKSPACES = ("prod",)
 # What an [env.set] value may name; each workspace and slot fills them in.
 PLACEHOLDERS = ("workspace", "origin", "port", "commit", "dir", "env_dir", "docker_socket")
 
@@ -101,21 +93,19 @@ class _Reader(Fields):
     """Walks the parsed file, collecting every problem rather than stopping at the first."""
 
     def config(self, data: dict[str, Any]) -> Config | None:
-        self.known(data, "factory.toml", (*REQUIRED, "release", "reports"))
+        self.known(data, "factory.toml", (*REQUIRED, "reports"))
         product = self.product(data)
         build = self.build(data)
-        smoke = self.smoke(data)
         services = self.services(data)
         env = self.env(data)
         server = self.server(data)
         workspaces = self.workspaces(data)
         deploy = self.deploy(data)
         edge = self.edge(data)
-        releases = self.releases(data)
         reports = self.reports(data)
         if self.problems:
             return None
-        return Config(product, build, smoke, services, env, server, workspaces, deploy, edge, releases, reports, data)
+        return Config(product, build, services, env, server, workspaces, deploy, edge, reports, data)
 
     def product(self, data: dict[str, Any]) -> Product:
         t = self.table(data, "product", "", ("name", "registry"))
@@ -144,38 +134,6 @@ class _Reader(Fields):
             self.text(t, "commit_arg", "[build]", _ARG, "a build argument name"),
             self.text(t, "tag_arg", "[build]", _ARG, "a build argument name"),
             tuple(extras),
-        )
-
-    def endpoint(self, item: Any, where: str) -> Endpoint:
-        if not isinstance(item, dict):
-            self.fail(where, "missing" if item is None else "must be a table {service, port}")
-            return Endpoint("", 0)
-        self.known(item, where, ("service", "port"))
-        return Endpoint(
-            self.text(item, "service", where) or self._missing(item, "service", where),
-            self.number(item, "port", where, 1, 65535) or self._missing_int(item, "port", where),
-        )
-
-    def smoke(self, data: dict[str, Any]) -> Smoke:
-        t = self.table(data, "smoke", "", ("timeout_seconds", "health", "expect"), optional=("check",))
-        expects = []
-        for where, item in self.items(t, "expect", "[smoke]"):
-            self.known(item, where, ("service", "port", "path", "status"))
-            expects.append(
-                Expect(
-                    self.text(item, "service", where) or self._missing(item, "service", where),
-                    self.number(item, "port", where, 1, 65535) or self._missing_int(item, "port", where),
-                    self.text(item, "path", where, _URL_PATH, "a path starting with /")
-                    or self._missing(item, "path", where),
-                    self.number(item, "status", where, 100, 599) or self._missing_int(item, "status", where),
-                )
-            )
-        health = self.endpoint(t["health"], "[smoke].health") if "health" in t else Endpoint("", 0)
-        return Smoke(
-            self.number(t, "timeout_seconds", "[smoke]", 10, 3600),
-            health,
-            tuple(expects),
-            self.path_key(t, "check", "[smoke]", optional=True),
         )
 
     def services(self, data: dict[str, Any]) -> Services:
@@ -238,7 +196,7 @@ class _Reader(Fields):
         )
 
     def workspaces(self, data: dict[str, Any]) -> tuple[Workspace, ...]:
-        t = self.table(data, "workspaces", "", keys=("prod",), optional=("staging",))
+        t = self.table(data, "workspaces", "", keys=WORKSPACES)
         found = []
         for name in WORKSPACES:
             item = t.get(name)
@@ -259,11 +217,6 @@ class _Reader(Fields):
                     self.texts(item, "after_deploy", where, self.rel_path),
                 )
             )
-        if len(found) == 2:
-            if found[0].domain and found[0].domain == found[1].domain:
-                self.fail("[workspaces]", "staging and prod need different domains")
-            if found[0].port and found[0].port == found[1].port:
-                self.fail("[workspaces]", "staging and prod need different ports")
         return tuple(found)
 
     def deploy(self, data: dict[str, Any]) -> Deploy:
@@ -301,23 +254,3 @@ class _Reader(Fields):
             self.text(t, "header", "[reports]", _HEADER, "an HTTP header name"),
             self.text(t, "token_key", "[reports]", _ENV_KEY, "an UPPER_CASE environment key"),
         )
-
-    def releases(self, data: dict[str, Any]) -> tuple[Release, ...]:
-        found = []
-        for where, item in self.items(data, "release", "[[release]]"):
-            self.known(item, where, ("kind", "when_changed", "package", "live"))
-            for key in ("kind", "when_changed", "package", "live"):
-                if key not in item:
-                    self.fail(f"{where}.{key}", "missing")
-            kind = self.text(item, "kind", where)
-            if kind and kind not in RELEASE_KINDS:
-                self.fail(f"{where}.kind", f"{kind!r} is not one of {', '.join(RELEASE_KINDS)}")
-            found.append(
-                Release(
-                    kind,
-                    self.texts(item, "when_changed", where, self.rel_path, empty_ok=False),
-                    self.path_key(item, "package", where),
-                    self.flag(item, "live", where),
-                )
-            )
-        return tuple(found)

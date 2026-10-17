@@ -51,7 +51,6 @@ def routes_text(config: Config) -> str:
 
 
 def write_sites(config: Config, sites_dir: Path, workspace: str) -> list[Path]:
-    """Write the workspace's site file and the redirects file; return both paths."""
     name, ws = config.product.name, config.workspace(workspace)
     written = [sites_dir / f"{name}-{workspace}.caddy", sites_dir / f"{name}-routes.caddy"]
     # The edge reads these as its own user.

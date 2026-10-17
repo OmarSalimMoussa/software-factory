@@ -23,11 +23,6 @@ commit_arg = "NOTES_BUILD_COMMIT"
 tag_arg = "NOTES_IMAGE_TAG"
 extra_images = []
 
-[smoke]
-timeout_seconds = 60
-health = { service = "app", port = 8000 }
-expect = [{ service = "app", port = 8000, path = "/", status = 200 }]
-
 [services]
 owner_email = "owner@example.com"
 errors = ["app", "web-ui"]
@@ -48,11 +43,6 @@ host_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINotesFixtureHostKey"
 admin = "deploy"
 tailnet = "notes-box.example.ts.net"
 acme_email = "owner@example.com"
-
-[workspaces.staging]
-domain = "staging.notes.example.com"
-port = 8301
-after_deploy = []
 
 [workspaces.prod]
 domain = "notes.example.com"

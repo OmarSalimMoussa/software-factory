@@ -128,7 +128,7 @@ def envs(snap: Snap) -> dict[str, Any]:
         "staging": env_card(snap, "staging"),
         "prod": env_card(snap, "prod"),
         "to_push": ahead,
-        # Between the cards when no task waits on staging: staging can still differ from prod (a push back, a pin).
+        # Between the cards when no task waits on staging: staging can still differ from prod (a push back, a revert).
         "step_word": "in step" if prod_runs_staging(snap) else "differs",
         "laptop": laptop(snap),
     }

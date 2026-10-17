@@ -1,10 +1,9 @@
-"""Deploy shape: the product can be built, smoke-tested and deployed the standard way.
+"""Deploy shape: the product can be built and deployed the standard way.
 
-factory.toml loads and names a ghcr.io registry; every hook factory.toml names is tracked and executable; the build
-plan can be made, and each image's ignore file leaves out .claude folders; every built service runs the image CI
-builds for the commit; the smoke test reaches built services; the deploy files are tracked and hold compose.yml, the
-env template and every relative bind mount; every product image a tracked file names is built; every [env.set] key is
-in the env template; and every published port binds 127.0.0.1.
+factory.toml loads; every hook factory.toml names is tracked and executable; the build plan can be made, and each
+image's ignore file leaves out .claude folders; every built service runs the image the deploy builds for the commit;
+the deploy files are tracked and hold compose.yml, the env template and every relative bind mount; every product image
+a tracked file names is built; every [env.set] key is in the env template; and every published port binds 127.0.0.1.
 """
 
 from __future__ import annotations
@@ -22,11 +21,10 @@ from standard.config import ConfigError
 from standard.config_records import Config
 
 ID = "deploy-shape"
-RULE = "The product builds, smoke-tests and deploys the standard way, as factory.toml describes"
+RULE = "The product builds and deploys the standard way, as factory.toml describes"
 VALUES_FILE = None
 VALUES = None
 
-REGISTRY = "ghcr.io/"
 LOOPBACK = "127.0.0.1"
 _ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
 LEFT_OUT = "**/.claude"
@@ -57,19 +55,15 @@ def image_problems(repo: Repo, config: Config, compose: Compose) -> list[str]:
         out += [f"the build plan cannot be made: {p}" for p in exc.problems]
     else:
         out += ignore_problems(repo, images)
-    # The env file names the commit's tag; on the server it is the tag of the images CI pushed.
+    # The env file names the commit's tag; on the server it is the tag of the images the deploy built.
     tags = [key for key, value in config.env.set if value == "{commit}"]
     for service in compose.built():
         ref = plan_mod.image_ref(config, service.name)
         image = service.image or ""
         if not (tags and image.startswith(f"{ref}:") and re.fullmatch(plan_mod.reference(tags), image[len(ref) + 1 :])):
             out.append(f"{compose_mod.FILE}: service {service.name} builds an image, so its image must be "
-                       f"{ref}:${{KEY}} with KEY = \"{{commit}}\" in [env.set]: a deploy runs the image CI built for "
+                       f"{ref}:${{KEY}} with KEY = \"{{commit}}\" in [env.set]: a deploy runs the image it built for "
                        "the commit")  # fmt: skip
-    built = {s.name for s in compose.built()}
-    smoke = [config.smoke.health.service, *(e.service for e in config.smoke.expect)]
-    out += [f"[smoke] names the service {name}, which compose.yml does not build: smoke-test a built service"
-            for name in dict.fromkeys(smoke) if name not in built]  # fmt: skip
     return out
 
 
@@ -87,7 +81,7 @@ def _named_images(repo: Repo, config: Config, built: set[str]) -> list[str]:
             # A name ending in - is a prefix the code appends a key to; some built image must carry it.
             covered = any(b.startswith(name) for b in built) if name.endswith("-") else name in built
             if not covered:
-                out.append(f"{rel} names the image {prefix}{name}, which CI never builds, so no deploy can pull it: "
+                out.append(f"{rel} names the image {prefix}{name}, which no deploy builds, so none can run it: "
                            "build it (a compose service with a build section, or [build].extra_images)")  # fmt: skip
     return out
 
@@ -156,11 +150,7 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
     # telemetry: surfaced — factory.toml's problems are the list `run` returns, which the check reports
     except ConfigError as exc:
         return [f"{config_mod.FILE}: {p}" for p in exc.problems]
-    out: list[str] = []
-    if not config.product.registry.startswith(REGISTRY):
-        out.append(f"[product].registry is {config.product.registry}, but CI pushes only to {REGISTRY}<owner>, where "
-                   "it signs in with the workflow's own token: set it to ghcr.io/<owner>")  # fmt: skip
-    out += hook_problems(repo, config) + env_problems(repo, config)
+    out = hook_problems(repo, config) + env_problems(repo, config)
     if compose_mod.FILE not in repo.tracked:
         return [*out, f"{compose_mod.FILE} is missing (or not committed): the stack every deploy runs"]
     try:

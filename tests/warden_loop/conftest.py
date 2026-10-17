@@ -55,9 +55,7 @@ def github_repo(world: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     git(tmp_path, "init", "-q", "--bare", str(remote))
     world.checkout.mkdir(exist_ok=True)
     git(world.checkout, "init", "-q")
-    # The settings name the hook scripts a push refuses to change.
-    shutil.copy(ROOT / "testdata" / "fixture-product" / "factory.toml", world.checkout / "factory.toml")
-    commit(world.checkout, write(".github/workflows/ci.yml"))
+    commit(world.checkout, write("README.md"))
     git(world.checkout, "push", "-q", str(remote), "master")
     key = github_push.deploy_key(world.ctx.places)
     key.parent.mkdir(parents=True)

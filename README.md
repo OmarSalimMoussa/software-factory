@@ -10,8 +10,6 @@ Claude agents, holds the code to one standard set of checks, ships to staging, a
 - **The dashboard** is the owner's one window: proposals to approve, staging and prod, the work, the agents,
   spend, the library, settings (the agents' Claude account among them), self-reflections and the guard.
 - **The checks** are one standard set for every product, fed only with values from the product's `check-values/`.
-- **The CI templates** in `templates/ci/` are every product's CI, copied in unchanged. With the standard build and
-  deploy in `standard/`, they build each push, smoke-test it and deploy it, as the product's `factory.toml` says.
 - **The plugin** carries the roles (orchestrator, designers, implementers, intake, triage, critics and testers).
 
 - **The standard build and deploy** in `standard/`: the build plan and smoke test CI runs, the server's set-up and

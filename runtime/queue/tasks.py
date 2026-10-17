@@ -344,8 +344,8 @@ def advance_deployed(
     ctx: Context, staging_commit: str | None, prod_commit: str | None, includes: Callable[[str, str], bool | None]
 ) -> list[str]:
     """Keep each merged task's status in step with the builds staging and prod run: checked, on-staging (staging's
-    build includes its merge) and promoted (prod's does), forward and back, as a push back or a pin takes a build
-    away. ``includes(build, merge)`` answers None for a build git does not know: that build moves nothing."""
+    build includes its merge) and promoted (prod's does), forward and back, as a push back takes a build away.
+    ``includes(build, merge)`` answers None for a build git does not know: that build moves nothing."""
     queue = Queue.of(ctx)
     moved: list[str] = []
 

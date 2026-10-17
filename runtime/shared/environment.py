@@ -32,10 +32,6 @@ def handed_on() -> dict[str, str]:
     return dict(os.environ)
 
 
-def on_ci() -> bool:
-    return os.environ.get("CI") == "true"
-
-
 def sudo_user() -> str | None:
     return os.environ.get("SUDO_USER")
 

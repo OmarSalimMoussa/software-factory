@@ -86,9 +86,8 @@ PHASES: tuple[Phase, ...] = (
         ("Writing the factory's services", steps_wire.units),
         ("Writing the factory's permissions", steps_wire.polkit),
         ("Writing the factory's firewall", steps_wire.firewall),
-        ("Installing the factory commands", steps_wire.factory_command),
+        ("Installing the factory command", steps_wire.factory_command),
         ("Adding the factory's checks to the product", steps_wire.git_hooks),
-        ("Moving the product to this factory", steps_wire.product_pin),
         ("Publishing the dashboard and staging on the edge", steps_wire.edge),
     )),
     Phase("Starting up", (

@@ -14,13 +14,14 @@ from pathlib import Path
 from runtime.shared import network
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER, queue_dir
 from runtime.shared.settings import overrides_toml
-from runtime.system import layout, render, root_commits
+from runtime.system import layout, render
 from runtime.system.host import CommandError, Host
 from runtime.system.install_steps import steps_wire
 from runtime.system.job import Install, refuse
 from runtime.warden.sessions import session_settings
 
 _APT_ENV = {"DEBIAN_FRONTEND": "noninteractive"}
+GIT_NAME, GIT_EMAIL = "software factory", "factory@software.invalid"
 
 
 def installed(host: Host, package: str) -> bool:
@@ -226,7 +227,7 @@ def agent_checkout(ctx: Install) -> None:
         raise refuse(f"{queue} is a {kind.strip()}, not a folder: remove it, then install again")
     ctx.host.mkdir(queue, mode=0o755, owner=WARDEN_USER)
     # The checkout's own config, which every worktree shares, gives the agents an identity to commit as.
-    for key, value in (("user.name", root_commits.GIT_NAME), ("user.email", root_commits.GIT_EMAIL)):
+    for key, value in (("user.name", GIT_NAME), ("user.email", GIT_EMAIL)):
         ctx.host.run(["git", "-C", str(ctx.checkout()), "config", key, value], user=AGENT_USER)
     # A slot's containers read the worktrees as users outside the agent's group, so what agents wrote before their
     # umask let others read it is opened up here. Run as the agent, it changes only the agent's own files; it never

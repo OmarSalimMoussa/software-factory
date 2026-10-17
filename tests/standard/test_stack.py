@@ -22,11 +22,6 @@ commit_arg = "SHOP_COMMIT"
 tag_arg = "SHOP_TAG"
 extra_images = []
 
-[smoke]
-timeout_seconds = 120
-health = { service = "web", port = 8000 }
-expect = [ { service = "web", port = 8000, path = "/api", status = 401 } ]
-
 [services]
 owner_email = "owner@acme.dev"
 errors = ["web"]
@@ -44,11 +39,6 @@ host_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHO"
 admin = "deploy"
 tailnet = "shop-box.tail0.ts.net"
 acme_email = "ops@acme.dev"
-
-[workspaces.staging]
-domain = "staging.acme.dev"
-port = 8101
-after_deploy = []
 
 [workspaces.prod]
 domain = "prod.acme.dev"

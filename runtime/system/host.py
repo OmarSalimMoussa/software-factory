@@ -32,17 +32,12 @@ Runner = Callable[[list[str], str | None], subprocess.CompletedProcess[str]]
 
 @dataclass(frozen=True, slots=True)
 class DeployKey:
-    """A key the owner adds to a GitHub repo as a deploy key. The factory's read key also hands its private half over,
-    once, for the product's CI to keep as an Actions secret."""
+    """A key the owner adds to a GitHub repo as a deploy key with write access."""
 
     repo: str  # owner/name of the repo the key goes on
     title: str  # the key's comment, which GitHub shows as its title
     public: str
-    write: bool
     why: str  # one sentence: what the key is for
-    private: str  # "" when the private half stays on this machine
-    secret: str  # the Actions secret that keeps ``private``, on ``ci_repo``; "" with no private half
-    ci_repo: str
 
 
 class CommandError(Exception):
@@ -89,14 +84,10 @@ class Host(ABC):
         self.journal.line("the 6-digit code's secret was shown")
 
     def show_key(self, key: DeployKey) -> None:
-        screen, kind = self.journal.screen, "a deploy key with write access" if key.write else "a read-only deploy key"
+        screen = self.journal.screen
         screen("")
-        screen(f"Add this key to {key.repo} on GitHub, as {kind}. {key.why}")
+        screen(f"Add this key to {key.repo} on GitHub, as a deploy key with write access. {key.why}")
         screen(f"  {key.public}")
-        if key.private:
-            screen(f"Then save the lines below, unchanged, as {key.ci_repo}'s Actions secret {key.secret}. They are "
-                   "shown once, now:")  # fmt: skip
-            screen(key.private)
         screen("")
         self.journal.line(f"the key for {key.repo} was shown to add by hand")
 

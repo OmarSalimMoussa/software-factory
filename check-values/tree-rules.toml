@@ -30,5 +30,4 @@ env_allow = {}
 "plugin/skills/verifying-claims" = "a skill folder: its SKILL.md says what the skill is and when it runs"
 "plugin/.claude-plugin" = "Claude Code's plugin manifest folder, read by Claude Code, not by people"
 "testdata/dashboard-fixtures" = "fixtures of the dashboard's payloads; a README would be read as a fixture"
-"testdata/fixture-product/.github" = "a copy of a product's shape: a README would change the fixture"
 "testdata/fixture-product/check-values" = "a copy of a product's values: the folder holds only values files"

@@ -3,7 +3,7 @@
 It asks prod's public health address, ``https://<[workspaces.prod].domain><[deploy].health>``, through the internet
 and the edge like any visitor, and checks the answer names the workspace ``prod``. Then it checks in with
 Healthchecks.io, or tells it at once that prod failed. When the check-ins stop, because the server or its network is
-down, Healthchecks.io tells the owner. It runs on the server so the heartbeat costs no CI minutes.
+down, Healthchecks.io tells the owner.
 """
 
 from __future__ import annotations
@@ -32,10 +32,7 @@ def _get(url: str, body: bytes | None) -> bytes:
 
 def prod_problem(config: Config, get: Get) -> str:
     """Why prod does not answer as prod; "" when it does."""
-    prod = next((ws for ws in config.workspaces if ws.name == "prod"), None)
-    if prod is None:
-        return "factory.toml names no prod workspace"
-    url = f"https://{prod.domain}{config.deploy.health}"
+    url = f"https://{config.workspace('prod').domain}{config.deploy.health}"
     try:
         answer = json.loads(get(url, None))
     # telemetry: surfaced — a prod that does not answer with JSON is what `prod_problem` returns

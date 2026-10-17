@@ -8,13 +8,13 @@ from standard.server import edge
 
 
 def test_the_site_answers_blocked_paths_first_and_keeps_websockets_through_a_reload(tmp_path: Path) -> None:
-    edge.write_sites(config(), tmp_path, "staging")
+    edge.write_sites(config(), tmp_path, "prod")
 
-    assert (tmp_path / "notes-staging.caddy").read_text() == (
+    assert (tmp_path / "notes-prod.caddy").read_text() == (
         f"{edge.HEADER}\n"
-        "staging.notes.example.com {\n"
+        "notes.example.com {\n"
         "\trespond /admin/export* 404\n"
-        "\treverse_proxy 127.0.0.1:8301 {\n"
+        "\treverse_proxy 127.0.0.1:8300 {\n"
         "\t\tstream_close_delay 30s\n"
         "\t}\n"
         "}\n"

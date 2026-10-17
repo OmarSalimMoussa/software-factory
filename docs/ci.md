@@ -1,7 +1,7 @@
 # CI
 
-Every product runs the same two GitHub workflows. They live in the factory's `templates/ci/`, and the product copies
-them into `.github/workflows/` and never edits them. Everything that belongs to one product comes from its
+Every product runs the same two GitHub workflows. They live in the factory's templates/ci/, and the product copies
+them into .github/workflows/ and never edits them. Everything that belongs to one product comes from its
 `factory.toml`.
 
 | Workflow | Runs | Does |
@@ -11,7 +11,7 @@ them into `.github/workflows/` and never edits them. Everything that belongs to 
 
 ## ci.yml
 
-On every push, the **checks** job checks out the factory at the commit `.github/factory-ref` pins and runs the
+On every push, the **checks** job checks out the factory at the commit .github/factory-ref pins and runs the
 factory's checks over the whole product. A newer push to the same branch cancels an older run's checks, and so the
 rest of that run.
 

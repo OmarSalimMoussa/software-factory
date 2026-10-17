@@ -63,7 +63,6 @@ class Job:
     fresh: bool
     home: Path  # the owner's ~/.config/software-factory
     factory: Path
-    factory_ref: str  # the factory commit the product's CI plans every build with
     admin_group: str = ""
     services: dict[str, str] = field(default_factory=dict)
     token: str = ""

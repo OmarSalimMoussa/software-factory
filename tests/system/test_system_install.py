@@ -1,22 +1,20 @@
 from __future__ import annotations
 
-import functools
 import json
 import re
-import subprocess
 from pathlib import Path
 
 import pytest
-from system_fakes import FACTORY_ORIGIN, PUBLIC_HOST, dry_job, settings
+from system_fakes import PUBLIC_HOST, dry_job, settings
 
 from runtime.shared import network, upgrades
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
-from runtime.system import factory_repo, install, layout, root_commits, uninstall
+from runtime.system import factory_repo, install, layout, uninstall
 from runtime.system.host import CommandError, DryHost
 from runtime.system.install_steps import steps_machine, steps_prepare, steps_secrets, steps_wire
-from runtime.system.job import REPO_ROOT, Install
+from runtime.system.job import Install
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
 from runtime.warden.sessions import registry, session_settings
@@ -27,8 +25,7 @@ def _answered(job: Install) -> None:
     """Every secret and key in place already, so a run asks the owner nothing."""
     assert isinstance(job.host, DryHost)
     folder = job.places.state / "secrets"
-    job.host.paths |= {job.places.totp_secret, folder / "deploy.key", folder / "factory-read.key.pub",
-                       folder / "github.token", folder / "claude.token"}  # fmt: skip
+    job.host.paths |= {job.places.totp_secret, folder / "deploy.key", folder / "claude.token"}
     job.host.files[job.owner.home / layout.OWNER_SERVER_KEYS] = "{}"
 
 
@@ -59,6 +56,9 @@ def test_the_terminal_shows_only_the_phases_unless_verbose_and_a_dry_run_changes
     else:
         assert out == phases
     assert any(action.startswith("write: /etc/systemd/system/software-factory.slice") for action in job.host.actions)
+    assert [a for a in job.host.actions if a.startswith("write: /usr/local/")] == [
+        f"write: {layout.FACTORY_BIN} (755, root:root)"
+    ]
     # The owner's own git hooks read the settings published under it; no factory user may list or enter it.
     assert f"make: {tmp_path / 'root' / 'state'}/ (710, software-warden:owner)" in job.host.actions
     assert not (tmp_path / "root").exists()
@@ -213,13 +213,7 @@ def test_the_secrets_step_keeps_the_agents_claude_accounts(
     host, folder = job.host, job.places.state / "secrets"
     assert isinstance(host, DryHost)
     host.dry = dry
-    host.paths |= {
-        job.places.totp_secret,
-        folder / "deploy.key",
-        folder / "factory-read.key.pub",
-        folder / "github.token",
-        upgrades.token_path(job.places),
-    }
+    host.paths |= {job.places.totp_secret, folder / "deploy.key", upgrades.token_path(job.places)}
     host.files.update({folder / name: text for name, text in present.items()})
 
     steps_secrets.secrets(job)
@@ -230,6 +224,7 @@ def test_the_secrets_step_keeps_the_agents_claude_accounts(
     assert [a for a in host.actions if a.startswith("write: ")] == [
         f"write: {folder}/{w} {WARDEN_OWNED}" for w in written
     ]
+    assert not [a for a in host.actions if "ssh-keygen" in a]  # the warden's deploy key is the only key
 
 
 @pytest.mark.parametrize(
@@ -245,8 +240,7 @@ def test_the_install_asks_once_for_a_factory_token_that_github_lets_read_the_rep
     host, folder, mine = job.host, job.places.state / "secrets", upgrades.token_path(job.places)
     assert isinstance(host, DryHost)
     host.dry = False  # decides like a real install; a dry host still changes nothing
-    host.paths |= {job.places.totp_secret, folder / "deploy.key", folder / "factory-read.key.pub",
-                   folder / "github.token", folder / "claude.token"}  # fmt: skip
+    host.paths |= {job.places.totp_secret, folder / "deploy.key", folder / "claude.token"}
     if kept:
         host.paths.add(mine)
     asked: list[tuple[str, str | None]] = []
@@ -485,55 +479,6 @@ def test_the_warden_trusts_github_only_by_the_host_keys_github_publishes_over_ht
     else:
         steps_machine.github_host_keys(job)
         assert written[job.places.github_known_hosts].startswith("github.com ssh-ed25519 AAAA")
-
-
-def _product(tmp_path: Path) -> Path:
-    """The agents' checkout of a product on an older factory: its pin, an old workflow and the retired heartbeat."""
-    repo = tmp_path / "agents-shop"
-    (repo / ".github" / "workflows").mkdir(parents=True)
-    (repo / ".github" / "factory-ref").write_text(f"acme/software-factory@{'a' * 40}\n")
-    (repo / ".github" / "workflows" / "ci.yml").write_text("old ci\n")
-    (repo / ".github" / "workflows" / "heartbeat.yml").write_text("old heartbeat\n")
-    (repo / "app.py").write_text("print('shop')\n")
-    for argv in (["init", "-q", "-b", "master"], ["add", "."], ["-c", "user.name=t", "-c", "user.email=t@invalid",
-                                                                  "commit", "-q", "-m", "The shop"]):  # fmt: skip
-        subprocess.run(["git", "-C", str(repo), *argv], check=True)
-    return repo
-
-
-@pytest.mark.parametrize(
-    ("first", "dirty", "moves"),
-    [(False, False, True), (True, False, False), (False, True, False)],
-    ids=["an-upgrade-moves-it", "a-first-install-leaves-it", "uncommitted-work-leaves-it"],
-)
-def test_an_upgrade_moves_the_agents_product_to_its_factory_in_one_commit_root_records(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, first: bool, dirty: bool, moves: bool
-) -> None:
-    repo = _product(tmp_path)
-    before = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True).stdout
-    if dirty:
-        (repo / "app.py").write_text("print('half done')\n")
-    job = dry_job(tmp_path)
-    job.host = RealHost(Journal(terminal=False))
-    job.settings = settings(**{"repo.path": str(repo)})
-    job.first, job.sha, job.factory_origin, job.stage = first, "e" * 40, FACTORY_ORIGIN, REPO_ROOT
-    monkeypatch.setattr(root_commits, "AGENT_USER", "")  # this test's user stands in for the agent's
-    monkeypatch.setattr(job.host, "write", lambda path, text, **how: (path.parent.mkdir(parents=True, exist_ok=True),
-                                                                      path.write_text(text)))  # fmt: skip
-
-    steps_wire.product_pin(job)
-
-    git = functools.partial(lambda *argv: subprocess.run(["git", "-C", str(repo), *argv], capture_output=True,
-                                                         text=True, check=True).stdout)  # fmt: skip
-    head = git("rev-parse", "HEAD")
-    if not moves:
-        assert head == before and not upgrades.pins_path(job.places).exists()
-        return
-    assert (repo / ".github" / "factory-ref").read_text() == f"acme/software-factory@{'e' * 40}\n"
-    assert (repo / ".github" / "workflows" / "ci.yml").read_text() == (REPO_ROOT / "templates/ci/ci.yml").read_text()
-    assert not (repo / ".github" / "workflows" / "heartbeat.yml").exists() and git("status", "--porcelain") == ""
-    [pin] = upgrades.read_pins(job.places)
-    assert (pin["commit"], pin["parent"]) == (head.strip(), before.strip())
 
 
 def test_the_session_settings_folder_is_the_wardens(tmp_path: Path) -> None:

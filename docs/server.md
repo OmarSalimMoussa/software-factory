@@ -112,8 +112,7 @@ Sign in to GlitchTip and Langfuse with `[services] owner_email`.
 
 Run the set-up again, from a factory checkout at the right commit:
 
-- **After a factory change** the product moves to. The set-up refuses a factory checkout at any other commit than
-  the one the product's `.github/factory-ref` names, so move that first.
+- **After a factory change**, from a checkout at the commit the factory now runs.
 - **After a change to `factory.toml`** that touches what the set-up places: the server's folders, the shared
   services or the tailnet. Push to prod refreshes the server's copy of the file itself.
 - **After a change to the shared services**, which comes with a factory change. The set-up brings them up again and

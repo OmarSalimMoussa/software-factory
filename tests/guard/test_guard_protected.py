@@ -22,12 +22,12 @@ from runtime.guard.writes import protected_paths
         ("scripts/deploy.sh", True),
         ("deploy/prod/run.sh", True),
         ("factory.toml", True),
-        ("scripts/smoke-check", True),
+        ("scripts/after-deploy", True),
         ("GOAL.md", True),
         (".claude/settings.json", False),
         (".mcp.json", False),
         ("scripts/deploy.sh.bak", False),
-        ("scripts/smoke-check.md", False),
+        ("scripts/after-deploy.md", False),
         ("src/deploy/app.py", False),
     ],
 )
@@ -35,6 +35,8 @@ from runtime.guard.writes import protected_paths
 def test_a_protected_path_is_refused_at_every_door(tmp_path: Path, door: str, path: str, refused: bool) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer")
+    toml = kit.repo / "factory.toml"
+    toml.write_text(toml.read_text().replace("after_deploy = []", 'after_deploy = ["scripts/after-deploy"]'))
     settings = read_settings(kit.places)
     if door == "guard":
         found = kit.rule("Write", {"file_path": str(kit.worktree / path), "content": "x"}) == "protected-paths"

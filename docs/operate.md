@@ -158,10 +158,9 @@ The factory never changes itself: Claude or the owner changes it. Read Self-refl
 
 1. Change the factory's repo: branch, test, merge, push. Run the self-check (`pytest -m self_check`) and the browser
    drives (`node tests/dashboard_ui/run.cjs`) before you push.
-2. Upgrade to the pushed commit with `factory.upgrade`. The upgrade also commits the product's `.github/factory-ref`
-   and CI workflows for the new factory; that commit waits on Home for your Push to staging, like any other.
+2. Upgrade to the pushed commit with `factory.upgrade`.
 3. Run the server set-up again from a factory checkout at that commit (`python3 -m standard.server.setup --product
-   <path>`). It refuses a checkout at another commit than `.github/factory-ref` names. Older builds stay deployable.
+   <path>`). Older builds stay deployable.
 4. **Restart the factory** on Home: every agent comes back with its work. One whose subagents the upgrade changed
    comes back as a copy that has the new ones, with its whole conversation; its chat link changes.
 

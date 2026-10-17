@@ -1,10 +1,10 @@
 """The check runner: the standard set on the product checkout holding the current folder.
 
-On the laptop the warden runs it, walled into one checkout (runtime/warden/checks.py), and records a pass itself from
-the exit status; on CI the product's workflow runs it with ``--all``. By default it checks what the branch adds to
-the default branch (committed changes only); ``--since <commit>`` checks what HEAD adds to that commit instead.
-``--all`` checks everything. ``--only <ids>`` runs the named checks. ``--list`` names every check and its rule.
-Exit 0 when every check passed, 1 when one failed, 2 when the run could not start.
+The warden runs it, walled into one checkout (runtime/warden/checks.py), and records a pass itself from the exit
+status. By default it checks what the branch adds to the default branch (committed changes only); ``--since
+<commit>`` checks what HEAD adds to that commit instead. ``--all`` checks everything. ``--only <ids>`` runs the
+named checks. ``--list`` names every check and its rule. Exit 0 when every check passed, 1 when one failed, 2 when
+the run could not start.
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ from checks.runner import catalog
 from checks.runner.catalog import NOTE, Check
 from checks.runner.repo import GitError, Repo, git
 from checks.runner.values import ValuesError
-from runtime.shared import environment, store
 from runtime.shared import settings as settings_mod
+from runtime.shared import store
 from runtime.shared.paths import Places
 from runtime.shared.settings import Settings, SettingsError
 
@@ -47,10 +47,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def effective_settings() -> Settings | None:
-    """The machine's effective settings, which the warden publishes; None on CI, where only --all or --since runs and
-    nothing else shares the machine, so a test run needs no memory guard."""
-    if environment.on_ci():
-        return None
+    """The machine's effective settings, which the warden publishes."""
     return settings_mod.build(store.read_json(Places.system().state / "public" / "settings.json"), {})
 
 
@@ -71,8 +68,8 @@ def changed_paths(root: Path, settings: Settings | None, since: str | None) -> t
         compared = since
     elif settings is not None:
         compared = settings.get_str("repo.default_branch")
-    else:  # on CI no settings name the default branch, so only a named base or everything can be checked
-        raise Refusal("on CI, run factory check --all, or --since the commit to compare with")
+    else:  # the self-check passes no settings, so nothing names the default branch
+        raise Refusal("with no settings, run factory check --all, or --since the commit to compare with")
     changed = git(root, "status", "--porcelain", "--untracked-files=no").strip().splitlines()
     if changed:
         listed = ", ".join(line.strip() for line in changed)
@@ -138,7 +135,7 @@ def run(argv: list[str], cwd: Path, settings: Settings | None, out: TextIO) -> i
         return 1
     base, changed = branch if branch is not None else (None, None)
     repo = Repo.open(root, changed, base)
-    if settings is not None and not environment.on_ci():  # CI runners hold nothing else: no memory guard
+    if settings is not None:
         ceiling = settings.get_int("budget.test_memory_ceiling_mib")
         repo.test_memory = (ceiling, settings.get_int("budget.test_reserve_mib"))
         repo.test_seconds = (settings.get_int("checks.test_seconds"), settings.get_int("checks.run_minutes") * 60)

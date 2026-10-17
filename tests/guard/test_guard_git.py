@@ -89,9 +89,6 @@ def test_the_orchestrator_merges_only_with_a_merge_commit(kit: Kit, command: str
 @pytest.mark.parametrize(
     ("command", "rule"),
     [
-        ("gh workflow run deploy-prod.yml", "prod-frozen"),
-        ("gh run rerun 123", "prod-frozen"),
-        ("gh api -X POST repos/o/r/actions/workflows/9/dispatches", "prod-frozen"),
         ("git push origin v1.0", "prod-frozen"),
         ("git push --tags origin", "prod-frozen"),
         ("git push origin HEAD:release", "prod-frozen"),

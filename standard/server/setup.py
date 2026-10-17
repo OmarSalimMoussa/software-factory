@@ -16,7 +16,7 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from standard.config import FACTORY_REF, FACTORY_REF_LINE, FILE, ConfigError, load
+from standard.config import FILE, ConfigError, load
 from standard.server import setup_machine as machine
 from standard.server.setup_machine import FACTORY, Host, SetupError
 from standard.server.setup_steps import (
@@ -36,20 +36,8 @@ from standard.services import host_paths, provision, stack
 _PING = re.compile(r"^https://[A-Za-z0-9.-]+/[A-Za-z0-9/_-]+$")
 
 
-def factory_ref(product: Path) -> str:
-    """The commit the product's .github/factory-ref names (one line, owner/name@<40-character sha>)."""
-    try:
-        text = (product / FACTORY_REF).read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        raise SetupError([f"{FACTORY_REF} in the product cannot be read: {exc}"]) from exc
-    found = FACTORY_REF_LINE.fullmatch(text.strip())
-    if found is None:
-        raise SetupError([f"{FACTORY_REF} must hold one line, owner/name@<40-character sha>; it holds {text[:80]!r}"])
-    return found.group(1)
-
-
 def prepare(job: Job) -> None:
-    """Everything read on the laptop before the server is touched: the checkout must be the commit the product names."""
+    """Everything read on the laptop before the server is touched: the factory checkout must be a commit."""
     git = ["git", "-C", str(job.factory)]
     dirty = on_laptop(job, [*git, "status", "--porcelain"], "reading the factory checkout").strip()
     if dirty:
@@ -57,10 +45,6 @@ def prepare(job: Job) -> None:
             ["the factory checkout has changes that are not committed; the server runs only a commit: " + dirty]
         )
     head = on_laptop(job, [*git, "rev-parse", "HEAD"], "reading the factory's commit").strip()
-    if head != job.factory_ref:
-        raise SetupError([f"the factory checkout is at {head[:8]}, and the product's {FACTORY_REF} names "
-                          f"{job.factory_ref[:8]}: check out that commit, so the server runs the factory the product's "
-                          "CI plans its builds with"])  # fmt: skip
     print(f"Factory commit {head[:8]}.")
 
 
@@ -128,8 +112,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             home = Path.home() / ".config" / "software-factory"
             product_toml = (args.product / FILE).read_text()
-            ref = factory_ref(args.product)
-            job = Job(config, product_toml, host, provision.real_run, args.fresh, home, FACTORY, ref)
+            job = Job(config, product_toml, host, provision.real_run, args.fresh, home, FACTORY)
             job.ping = args.healthchecks_ping
             run(job)
     except ConfigError as exc:

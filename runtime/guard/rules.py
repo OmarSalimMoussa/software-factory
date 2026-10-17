@@ -26,7 +26,7 @@ RULES: dict[str, str] = {
     "git-bypass": "skipped hooks, rewritten refs, config or remote changes, any push, a merge without --no-ff, "
     "a hand-run check, GitHub writes",
     "own-branch": "a git command that moves a ref other than the session's own branch, or adds or removes a worktree",
-    "prod-frozen": "running the deploy scripts by hand, starting a workflow, pushing a tag or another branch",
+    "prod-frozen": "pushing a tag or another branch",
     "protected-paths": "writes to the factory's own files and the product's protected paths",
     "own-worktree": "Edit, Write, MultiEdit and NotebookEdit outside the session's own worktree",
     "subagent-writes": "a subagent's write in a checkout outside its session's .factory/, or a git command that "

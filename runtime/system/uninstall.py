@@ -132,7 +132,7 @@ def _with_leftovers(path: Path) -> tuple[Path, ...]:
 
 
 def programs(host: Host) -> None:
-    for path in (paths.FACTORY_BIN, layout.OWN_BIN, layout.CLAUDE_BIN.parent, *_with_leftovers(paths.INSTALL),
+    for path in (paths.FACTORY_BIN, layout.CLAUDE_BIN.parent, *_with_leftovers(paths.INSTALL),
                  layout.TOOLS, *_with_leftovers(layout.TOOLCHAIN), paths.RUN, paths.FIREWALL,
                  paths.UPGRADE):  # fmt: skip
         _remove(host, path)

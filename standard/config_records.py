@@ -29,28 +29,6 @@ class Build:
 
 
 @dataclass(frozen=True, slots=True)
-class Endpoint:
-    service: str
-    port: int
-
-
-@dataclass(frozen=True, slots=True)
-class Expect:
-    service: str
-    port: int
-    path: str
-    status: int
-
-
-@dataclass(frozen=True, slots=True)
-class Smoke:
-    timeout_seconds: int
-    health: Endpoint
-    expect: tuple[Expect, ...]
-    check: str  # "" when the product has no smoke check of its own
-
-
-@dataclass(frozen=True, slots=True)
 class Services:
     owner_email: str
     errors: tuple[str, ...]
@@ -107,14 +85,6 @@ class Edge:
 
 
 @dataclass(frozen=True, slots=True)
-class Release:
-    kind: str
-    when_changed: tuple[str, ...]
-    package: str
-    live: bool
-
-
-@dataclass(frozen=True, slots=True)
 class Reports:
     port: int
     path: str
@@ -126,14 +96,12 @@ class Reports:
 class Config:
     product: Product
     build: Build
-    smoke: Smoke
     services: Services
     env: Env
     server: Server
-    workspaces: tuple[Workspace, ...]  # staging, then prod
+    workspaces: tuple[Workspace, ...]
     deploy: Deploy
     edge: Edge
-    releases: tuple[Release, ...]
     reports: Reports | None  # None: the product has no report export
     raw: dict[str, Any]  # the parsed file, for comparing two copies
 
@@ -147,13 +115,9 @@ class Config:
         return f"{self.product.registry}/{self.product.name}-{image}:{tag}"
 
     def project(self, workspace: str) -> str:
-        """The compose project of a workspace (``prod``) or a laptop slot (``slot2``)."""
+        """The compose project of a workspace (``prod``) or a slot (``slot2``)."""
         return f"{self.product.name}-{workspace}"
 
     def hooks(self) -> tuple[str, ...]:
         """Every script factory.toml names: each is protected like factory.toml itself."""
-        found = [self.smoke.check] if self.smoke.check else []
-        for ws in self.workspaces:
-            found += ws.after_deploy
-        found += [r.package for r in self.releases]
-        return tuple(dict.fromkeys(found))
+        return tuple(dict.fromkeys(hook for ws in self.workspaces for hook in ws.after_deploy))

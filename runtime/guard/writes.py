@@ -20,17 +20,9 @@ from standard import config as product_config
 
 # The paths only a person changes in every product: the goal and its pictures, git's own folder (config, hooks, refs
 # and the pass record `factory check` keeps there), the surfaces that decide which testers a change needs, the
-# workflows that reach staging and prod, the factory commit CI checks with, and factory.toml. Every script
-# factory.toml names is protected too, and a product adds its own paths in repo.protected_paths.
-ALWAYS_PROTECTED = (
-    "GOAL.md",
-    "goal/",
-    ".git",
-    "check-values/surfaces.toml",
-    ".github/workflows/",
-    ".github/factory-ref",
-    product_config.FILE,
-)
+# GitHub workflows, which GitHub refuses the mirror's key and so would stop the mirror for good, and factory.toml.
+# Every script factory.toml names is protected too, and a product adds its own paths in repo.protected_paths.
+ALWAYS_PROTECTED = ("GOAL.md", "goal/", ".git", "check-values/surfaces.toml", ".github/workflows/", product_config.FILE)
 QUEUE = "queue"
 EDIT_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
 _MUTATORS = frozenset(

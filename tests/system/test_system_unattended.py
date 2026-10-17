@@ -31,10 +31,10 @@ def _host(tmp_path: Path) -> tuple[UnattendedHost, Places]:
 @pytest.mark.parametrize(
     "asks",
     [
-        lambda h: h.ask("Your GitHub token for the warden: ", secret=True, hint="", link=""),
+        lambda h: h.ask("A read-only GitHub token for the factory's own repo: ", secret=True, hint="", link=""),
         lambda h: h.confirm("Sign in to GitHub", "", yes="Done", no="Skip"),
         lambda h: h.show_code("secret", "otpauth://x"),
-        lambda h: h.show_key(DeployKey("acme/shop", "t", "ssh-ed25519 AAAA", True, "", "", "", "")),
+        lambda h: h.show_key(DeployKey("acme/shop", "t", "ssh-ed25519 AAAA", "")),
     ],
     ids=["a-question", "a-confirmation", "a-new-code", "a-key-to-add"],
 )
@@ -151,7 +151,7 @@ def test_an_upgrade_without_a_signed_in_github_cli_keeps_the_keys_and_asks_nothi
     assert isinstance(host, DryHost)
     host.dry = False
     host.paths |= {job.places.totp_secret, upgrades.token_path(job.places)}
-    host.paths |= {folder / name for name in ("deploy.key", "factory-read.key.pub", "github.token")}
+    host.paths.add(folder / "deploy.key")
     host.files[folder / "claude.token"] = "sk-ant-oat01-kept-from-before-a1b2\n"
 
     steps_secrets.secrets(job)

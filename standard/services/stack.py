@@ -95,7 +95,6 @@ def parse_env(text: str, where: str) -> dict[str, str]:
 
 
 def services() -> list[str]:
-    """The stack's service keys."""
     return list(yaml_subset.load(COMPOSE.read_text())["services"])
 
 

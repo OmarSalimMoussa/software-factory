@@ -2,8 +2,8 @@
 
 1. An ``__init__.py`` holds nothing but comments: importers name the module that owns the symbol.
 2. No barrel: no ``index.(ts|tsx|js|jsx|mjs)`` and no module that only re-exports, unless it is a listed entrypoint.
-3. Every folder holding tracked files has a README.md, except check-values/ (values only) and .github/ (the
-   factory's CI template).
+3. Every folder holding tracked files has a README.md, except check-values/ (values only) and .github/ (GitHub's
+   own).
 4. Product Python reads no environment default (``environ.get(k, d)``, ``getenv(k, d)``, ``... or d``,
    ``environ.setdefault(``): config loads once, every key required.
 5. A service module (``service.py``, ``*_service.py``) imports no HTTP framework: routes parse, services decide.

@@ -97,6 +97,11 @@ def _derive_twice(root: Path) -> None:
         (root / name / "Dockerfile").write_text(f"FROM ghcr.io/owner/{base}\n" if base else "FROM busybox:1.37\n")
 
 
+def _hook(root: Path) -> None:
+    _edit("factory.toml", "after_deploy = []", 'after_deploy = ["scripts/dev"]')(root)
+    _chmod("scripts/dev")(root)
+
+
 def test_the_fixture_has_the_standard_deploy_shape(fixture_product: Path) -> None:
     assert deploy_shape.run(Repo.open(fixture_product), {}) == []
 
@@ -105,11 +110,7 @@ def test_the_fixture_has_the_standard_deploy_shape(fixture_product: Path) -> Non
     ("damage", "said"),
     [
         (_edit("factory.toml", 'name = "notes"', 'name = "Notes"'), "factory.toml: [product].name: 'Notes' is not"),
-        (_edit("factory.toml", '"ghcr.io/owner"', '"registry.example.com/owner"'),
-         "[product].registry is registry.example.com/owner, but CI pushes only to ghcr.io/<owner>"),
-        (_chmod("scripts/smoke-check"), "factory.toml names scripts/smoke-check as a hook, but it is not executable"),
-        (_edit("factory.toml", 'expect = [{ service = "app"', 'expect = [{ service = "db"'),
-         "[smoke] names the service db, which compose.yml does not build"),
+        (_hook, "factory.toml names scripts/dev as a hook, but it is not executable"),
         (_edit("factory.toml", "extra_images = []",
                'extra_images = [{ name = "worker", dockerfile = "worker/Dockerfile", context = "." }]'),
          "worker/Dockerfile is missing"),
@@ -122,7 +123,7 @@ def test_the_fixture_has_the_standard_deploy_shape(fixture_product: Path) -> Non
         (_edit("factory.toml", '"compose.yml", "notes.env.template"]', '"compose.yml"]'),
          "[deploy].files lacks notes.env.template"),
         (_add("qa/README.md", "Pull ghcr.io/owner/notes-worker:latest first.\n"),
-         "qa/README.md names the image ghcr.io/owner/notes-worker, which CI never builds"),
+         "qa/README.md names the image ghcr.io/owner/notes-worker, which no deploy builds"),
         (_edit("notes.env.template", "NOTES_ORIGIN=\n", ""), "[env.set] writes NOTES_ORIGIN, which notes.env.template"),
         (_edit("compose.yml", '"127.0.0.1:${NOTES_PORT:?}:8000"', '"${NOTES_PORT:?}:8000"'),
          "service app publishes '${NOTES_PORT:?}:8000' beyond this machine"),
@@ -132,7 +133,7 @@ def test_the_fixture_has_the_standard_deploy_shape(fixture_product: Path) -> Non
          ".dockerignore lets !**/keep back in, and a wildcard"),
         (_add("app/Dockerfile.dockerignore", "**/__pycache__\n"), "app/Dockerfile.dockerignore does not leave out"),
     ],
-    ids=["settings", "registry", "hook", "smoke", "extra-image", "two-levels", "image-name", "bind-mount",
+    ids=["settings", "hook", "extra-image", "two-levels", "image-name", "bind-mount",
          "untracked-file", "deploy-files", "named-image", "env-key", "port", "claude-folders", "no-ignore-file",
          "wildcard-back-in", "dockerfiles-own-ignore"],
 )  # fmt: skip

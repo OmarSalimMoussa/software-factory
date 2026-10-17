@@ -82,8 +82,7 @@ class _Source:
 
 
 def files(config: Config) -> tuple[str, ...]:
-    hooks = [hook for ws in config.workspaces for hook in ws.after_deploy]
-    return tuple(dict.fromkeys([*config.deploy.files, *hooks, config_mod.FILE]))
+    return tuple(dict.fromkeys([*config.deploy.files, *config.hooks(), config_mod.FILE]))
 
 
 def images(repo: Path, config: Config, compose: Compose, short: str) -> tuple[Image, ...]:

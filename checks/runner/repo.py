@@ -68,11 +68,10 @@ class Repo:
     changed: tuple[str, ...] | None  # None when checking everything
     # The commit the branch left the default branch at: what a ratchet compares with. None when checking everything.
     base: str | None = None
-    # (ceiling MiB, reserve MiB) a test run must fit in, from the budget.test_* settings; None where nothing else
-    # shares the machine (CI), so no guard is needed.
+    # (ceiling MiB, reserve MiB) a test run must fit in, from the budget.test_* settings; None with no settings.
     test_memory: tuple[int, int] | None = None
-    # (seconds one test may take, seconds the whole test run may take), from the checks.* settings; None on CI, where
-    # the workflow's own time limit stops a run that hangs.
+    # (seconds one test may take, seconds the whole test run may take), from the checks.* settings; None with no
+    # settings.
     test_seconds: tuple[int, int] | None = None
     _baseline: dict[str, Any] | None = field(default=None, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)

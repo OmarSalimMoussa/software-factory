@@ -1,11 +1,9 @@
-"""The install's secrets: the 6-digit code's secret (shown once), the warden's deploy key, the product CI's read key
-for the factory repo, the owner's GitHub token, root's read-only token for the factory repo, the agents' Claude
-account, and the server's keys the server set-up saved for the owner.
+"""The install's secrets: the 6-digit code's secret (shown once), the warden's deploy key, root's read-only token for
+the factory repo, the agents' Claude account, and the server's keys the server set-up saved for the owner.
 
-With the owner's signed-in GitHub CLI the install puts every GitHub key in place itself, and asks the owner to sign in
-when it is not; only an owner who declines adds the keys by hand. Each piece is made once and kept, and a rerun after
-any failure finishes what the last run began: a code's secret is kept only once it was shown, and the read key's
-private half stays on this machine only until GitHub holds it.
+With the owner's signed-in GitHub CLI the install puts the warden's deploy key on GitHub itself, and asks the owner to
+sign in when it is not; only an owner who declines adds the key by hand. Each piece is made once and kept, and a rerun
+after any failure finishes what the last run began: a code's secret is kept only once it was shown.
 """
 
 from __future__ import annotations
@@ -18,13 +16,12 @@ from runtime.shared.claude_accounts import AccountError
 from runtime.shared.paths import WARDEN_USER
 from runtime.system import factory_repo, github_keys, layout
 from runtime.system.host import DeployKey
-from runtime.system.job import Install, github_name, refuse
+from runtime.system.job import Install, refuse
 
-# Each key's comment, which GitHub shows as its title.
+# The key's comment, which GitHub shows as its title.
 DEPLOY_TITLE = "software-factory deploy"
-READ_TITLE = "software-factory read"
 SIGN_IN = (
-    "The install puts the factory's keys on GitHub for you, with your GitHub CLI, which is not signed in. In a "
+    "The install puts the warden's key on GitHub for you, with your GitHub CLI, which is not signed in. In a "
     "terminal, run gh auth login and sign in to github.com, then come back here."
 )
 
@@ -33,24 +30,24 @@ def _public_half(key: Path) -> Path:
     return key.with_name(key.name + ".pub")  # where ssh-keygen -f <key> writes it
 
 
-def _keygen(ctx: Install, key: Path, title: str) -> None:
+def _keygen(ctx: Install, key: Path) -> None:
     """A new key pair at ``key``; any half an earlier run left is removed first, so ssh-keygen never asks."""
     for half in (key, _public_half(key)):
         if ctx.host.exists(half):
             ctx.host.remove(half)
-    ctx.host.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", title, "-f", str(key)], user=WARDEN_USER)
+    ctx.host.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", DEPLOY_TITLE, "-f", str(key)], user=WARDEN_USER)
 
 
 def signed_in_gh(ctx: Install) -> str:
-    """The owner's GitHub CLI once it is signed in; "" when the owner chose to add the keys by hand. Unattended, ""
-    when it is not signed in: the keys an install made are kept, and a missing one stops the upgrade by name."""
+    """The owner's GitHub CLI once it is signed in; "" when the owner chose to add the key by hand. Unattended, ""
+    when it is not signed in: the key an install made is kept, and a missing one stops the upgrade by name."""
     host = ctx.host
     if host.dry:
         return ""
     gh = github_keys.owner_gh(host, ctx.owner)
     if ctx.unattended:
         return gh
-    while not gh and host.confirm("Sign in to GitHub", SIGN_IN, yes="I signed in", no="I will add the keys myself"):
+    while not gh and host.confirm("Sign in to GitHub", SIGN_IN, yes="I signed in", no="I will add the key myself"):
         gh = github_keys.owner_gh(host, ctx.owner)
     return gh
 
@@ -66,27 +63,15 @@ def secrets(ctx: Install) -> None:
     gh = signed_in_gh(ctx)
     key = folder / "deploy.key"
     if not host.exists(key):
-        _keygen(ctx, key, DEPLOY_TITLE)
+        _keygen(ctx, key)
         if not gh:
             public = host.read(_public_half(key)).strip() if not host.dry else "<the public key>"
             why = "The warden pushes the agents' work with it."
-            host.show_key(DeployKey(github, DEPLOY_TITLE, public, True, why, "", "", ""))
+            host.show_key(DeployKey(github, DEPLOY_TITLE, public, why))
     # Kept in step on every install, so a key the owner never added, or one removed by hand, comes back.
     if gh:
-        said = github_keys.put_deploy_key(ctx, gh, github, github_keys.WARDEN_TITLE, host.read(_public_half(key)),
-                                          write=True)  # fmt: skip
+        said = github_keys.put_deploy_key(ctx, gh, github, github_keys.WARDEN_TITLE, host.read(_public_half(key)))
         host.say(f"the warden's deploy key on {github}: {said}")
-    _read_key(ctx, folder, github, gh)
-    if not host.exists(folder / "github.token"):
-        value = host.ask(
-            "Your GitHub token for the warden: ", secret=True,
-            hint=f"A fine-grained token with Actions: Read and write on {github}. The warden starts the product's "
-                 "workflows with it.",
-            link="https://github.com/settings/personal-access-tokens/new",
-        )  # fmt: skip
-        if not value:
-            raise refuse("The warden needs your GitHub token: install again and paste it when asked")
-        host.write(folder / "github.token", value + "\n", mode=0o600, owner=WARDEN_USER)
     _factory_token(ctx)
     _claude_account(ctx, folder)
     _server_keys(ctx, folder)
@@ -116,29 +101,6 @@ def _factory_token(ctx: Install) -> None:
                          "again") from exc  # fmt: skip
     host.mkdir(ctx.places.upgrade, mode=0o755)
     host.write(path, value + "\n", mode=0o600)
-
-
-def _read_key(ctx: Install, folder: Path, github: str, gh: str) -> None:
-    """The key the product's CI checks the factory out with. The machine keeps only its public half, the mark it was
-    made; a private half still here means an earlier run stopped before GitHub held it, so it is handed over again."""
-    host, read_key = ctx.host, folder / "factory-read.key"
-    if host.exists(_public_half(read_key)) and not host.exists(read_key):
-        return
-    if not host.exists(read_key):
-        _keygen(ctx, read_key, READ_TITLE)
-    factory = github_name(ctx.factory_origin) or ctx.factory_origin
-    if gh:
-        title = github_keys.read_title(github)
-        said = github_keys.put_deploy_key(ctx, gh, factory, title, host.read(_public_half(read_key)), write=False)
-        github_keys.put_secret(ctx, gh, github, github_keys.READ_SECRET, read_key)
-        host.say(f"the CI's read key on {factory}: {said}; its private half is {github}'s secret "
-                 f"{github_keys.READ_SECRET}")  # fmt: skip
-    else:
-        public = host.read(_public_half(read_key)).strip() if not host.dry else "<the public key>"
-        private = host.read(read_key).strip() if not host.dry else "<the private key>"
-        why = f"{github}'s CI checks out the factory with it."
-        host.show_key(DeployKey(factory, READ_TITLE, public, False, why, private, github_keys.READ_SECRET, github))
-    host.remove(read_key)
 
 
 def _claude_account(ctx: Install, folder: Path) -> None:

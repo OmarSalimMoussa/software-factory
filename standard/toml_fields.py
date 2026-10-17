@@ -56,12 +56,6 @@ class Fields:
             return 0
         return value
 
-    def flag(self, t: dict[str, Any], key: str, where: str) -> bool:
-        value = t.get(key)
-        if key in t and not isinstance(value, bool):
-            self.fail(f"{where}.{key}", "must be true or false")
-        return value is True
-
     def texts(
         self, t: dict[str, Any], key: str, where: str, check: Any = None, empty_ok: bool = True
     ) -> tuple[str, ...]:
@@ -85,11 +79,7 @@ class Fields:
         if value.startswith(("/", "~")) or ".." in parts:
             self.fail(where, f"{value!r} must be a path inside the repo, relative to its top")
 
-    def path_key(self, t: dict[str, Any], key: str, where: str, optional: bool = False) -> str:
-        if optional and t.get(key, "") == "":
-            if key in t and not isinstance(t[key], str):
-                self.fail(f"{where}.{key}", "must be a string")
-            return ""
+    def path_key(self, t: dict[str, Any], key: str, where: str) -> str:
         value = self.text(t, key, where)
         if value:
             self.rel_path(f"{where}.{key}", value)
@@ -108,8 +98,3 @@ class Fields:
         if key not in t:
             self.fail(f"{where}.{key}", "missing")
         return ""
-
-    def _missing_int(self, t: dict[str, Any], key: str, where: str) -> int:
-        if key not in t:
-            self.fail(f"{where}.{key}", "missing")
-        return 0

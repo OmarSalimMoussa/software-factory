@@ -6,8 +6,8 @@ path = ""               # required: the factory's own checkout of the product, o
 default_branch = "master"
 github = ""             # required: owner/name of the product on GitHub
 protected_paths = []    # the product's extra paths only a person changes; a trailing / names a folder. GOAL.md,
-                        # goal/, .git, check-values/surfaces.toml, .github/workflows/, .github/factory-ref,
-                        # factory.toml and every script factory.toml names always are
+                        # goal/, .git, check-values/surfaces.toml, factory.toml and every script factory.toml
+                        # names always are
 
 [models]                # model and effort for every role
 allowed = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
