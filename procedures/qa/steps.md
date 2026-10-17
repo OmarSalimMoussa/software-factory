@@ -1,7 +1,8 @@
 # Marking your steps
 
-The owner watches each of your runs as a replay, one step at a time. The replay knows where a step starts and how
-it ended only from your marks, so mark every step you walk.
+The owner watches each run of a tester an implementer starts as a replay, one step at a time. The replay knows where
+a step starts and how it ended only from your marks, so mark every step you walk. A regression tester marks none:
+its report's tables are its record.
 
 - **Name the item as your brief does:** a scenario by its file name without `.md`, a check by its short name. A check
   with no numbered steps is one step, step 1.
