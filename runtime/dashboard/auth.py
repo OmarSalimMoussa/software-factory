@@ -1,9 +1,9 @@
 """Who may use the dashboard: a request to one of its own addresses, from a device the owner admitted with the
 6-digit code once, and, for a write, a same-origin JSON request the browser could only have sent from the page.
 
-A device's token lives in an HttpOnly, SameSite=Strict owner cookie (Secure on a public name, served over HTTPS) and is
-checked with the warden on every request. While the warden is away, a token it confirmed before still opens the
-page's last known state until that token's own expiry.
+A device's token lives in an HttpOnly, SameSite=Strict owner cookie (Secure on a public name, served over HTTPS), or
+comes as the MCP's bearer token, and is checked with the warden on every request. While the warden is away, a token it
+confirmed before still opens the page's last known state until that token's own expiry.
 """
 
 from __future__ import annotations
@@ -85,6 +85,11 @@ def token_of(headers: Mapping[str, str]) -> str | None:
         return None
     morsel = jar.get(COOKIE)
     return morsel.value if morsel is not None and morsel.value else None
+
+
+def bearer_of(headers: Mapping[str, str]) -> str | None:
+    scheme, _, token = headers.get("authorization", "").partition(" ")
+    return (token.strip() or None) if scheme.lower() == "bearer" else None
 
 
 def _digest(token: str) -> str:

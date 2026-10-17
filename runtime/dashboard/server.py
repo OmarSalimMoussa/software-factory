@@ -20,10 +20,10 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
-from runtime.dashboard import auth, brief_frame, cache, pictures
+from runtime.dashboard import auth, brief_frame, cache, mcp, pictures
 from runtime.dashboard.client import Warden, WardenDown
 from runtime.dashboard.views import ops, routes, writes
-from runtime.dashboard.views.kit import PartError, Snap, clock
+from runtime.dashboard.views.kit import PartError, Snap, clock, iso
 from runtime.dashboard.views.tasks import proposals
 from runtime.shared import error_reports, store
 from runtime.shared import settings as settings_module
@@ -96,6 +96,8 @@ class App:
         path, query = split.path, dict(parse_qsl(split.query))
         try:
             auth.check_host(headers, self.settings().get_list("dashboard.hosts"), write=False)
+            if path == mcp.PATH:  # Claude Code asks here for an event stream, which this MCP never sends
+                return Reply(405, b"", {"Allow": "POST"})
             return self._api(target, path, query, headers) if path.startswith("/api/") else self._static(path)
         # telemetry: surfaced — the browser is answered with `_json` saying why access was refused
         except auth.Denied as exc:
@@ -104,8 +106,7 @@ class App:
             return self._away(target)
 
     def _api(self, target: str, path: str, query: dict[str, str], headers: Mapping[str, str]) -> Reply:
-        refused = self._device(headers)
-        if refused is not None:
+        if (refused := self._device(auth.token_of(headers))) is not None:
             return refused
         image = pictures.fetch(self.warden, path)
         if image is not None:
@@ -124,11 +125,11 @@ class App:
             return _json(404, {"ok": False, "error": "There is no such page."})
         return self._page(target, *page)
 
-    def _device(self, headers: Mapping[str, str]) -> Reply | None:
+    def _device(self, token: str | None) -> Reply | None:
         """None when the device is admitted, else the answer saying why not. A device the warden never confirmed is
         not let in while the warden is away, so what the dashboard last knew never reaches a stranger."""
         try:
-            if self.devices.admitted(auth.token_of(headers)):
+            if self.devices.admitted(token):
                 return None
         except WardenDown:
             return self._unreachable("Can't reach the warden, so nothing changed.")
@@ -175,7 +176,7 @@ class App:
         built: dict[str, Any] = {}
         for name, build in builders.items():
             try:
-                built[name] = {"ok": True, "as_of": _iso(snap.now), "data": build()}
+                built[name] = {"ok": True, "as_of": iso(snap.now), "data": build()}
             # telemetry: surfaced — the part is `built` with its sentence, drawn in its place; the rest still draws
             except PartError as exc:
                 built[name] = {"ok": False, "error": str(exc)}
@@ -190,7 +191,7 @@ class App:
     def _op(self, op_id: str) -> Reply:
         answer = self.warden.call("op.get", {"id": op_id})
         if answer["ok"]:
-            part = {"ok": True, "as_of": _iso(self.now()), "data": ops.operation(answer)}
+            part = {"ok": True, "as_of": iso(self.now()), "data": ops.operation(answer)}
         else:
             part = {"ok": False, "error": sentence(str(answer.get("reason", "")))}
         return _json(200, self._timed(self.parts.fresh(f"/api/ops/{op_id}", {"op": part})))
@@ -210,27 +211,29 @@ class App:
     def post(self, target: str, headers: Mapping[str, str], raw: bytes) -> Reply:
         path = urlsplit(target).path
         try:
-            host = auth.check_host(headers, self.settings().get_list("dashboard.hosts"), write=True)
-            try:
-                body = json.loads(raw) if raw else None
-            except ValueError as exc:
-                raise auth.Denied(400, "A change is one JSON object.") from exc
-            key = auth.check_write(headers, body)
-            assert isinstance(body, dict)  # check_write refused anything else
-            if path == "/api/device":
-                return self._admit(body, key, host)
-            refused = self._device(headers)
-            if refused is not None:
-                return refused
-            found = writes.find(path)
-            if found is None:
-                return _json(404, {"ok": False, "error": "There is no such action."})
-            return self._write(*found, body, key)
-        # telemetry: surfaced — the browser is answered with `_json` saying why access was refused
+            return self._mcp(headers, raw) if path == mcp.PATH else self._change(path, headers, raw)
+        # telemetry: surfaced — the caller is answered with `_json` saying why access was refused
         except auth.Denied as exc:
             return _json(exc.status, {"ok": False, "refused": "access", "reason": str(exc)})
         except WardenDown:
             return self._unreachable("Can't reach the warden, so nothing changed.")
+
+    def _change(self, path: str, headers: Mapping[str, str], raw: bytes) -> Reply:
+        host = auth.check_host(headers, self.settings().get_list("dashboard.hosts"), write=True)
+        try:
+            body = json.loads(raw) if raw else None
+        except ValueError as exc:
+            raise auth.Denied(400, "A change is one JSON object.") from exc
+        key = auth.check_write(headers, body)
+        assert isinstance(body, dict)  # check_write refused anything else
+        if path == "/api/device":
+            return self._admit(body, key, host)
+        if (refused := self._device(auth.token_of(headers))) is not None:
+            return refused
+        found = writes.find(path)
+        if found is None:
+            return _json(404, {"ok": False, "error": "There is no such action."})
+        return self._write(*found, body, key)
 
     def _write(self, write: writes.Write, ref: str, body: dict[str, Any], key: str) -> Reply:
         snap = None
@@ -258,6 +261,14 @@ class App:
                 reply[key] = answer[key]
         return _json(200, reply)
 
+    def _mcp(self, headers: Mapping[str, str], raw: bytes) -> Reply:
+        # Claude Code sends no Origin, so only a foreign one is refused: no browser sends a bearer token by itself.
+        auth.check_host(headers, self.settings().get_list("dashboard.hosts"), write=False)
+        if (refused := self._device(auth.bearer_of(headers))) is not None:
+            return refused
+        status, answer = mcp.answer(self.warden, self._warden_lost, raw)
+        return Reply(status, b"") if answer is None else _json(status, answer)
+
     def _admit(self, body: dict[str, Any], key: str, host: str) -> Reply:
         answer = self.warden.call("device.admit", {"code": body.get("code"), "idempotency_key": key})
         if not answer["ok"]:
@@ -278,10 +289,6 @@ class App:
                 out["code"] = {"locked_until": clock(until)}
         # A wrong or locked code is the owner's to retry (403); any other refusal is a conflict with the state (409).
         return _json(403 if "code" in out else 409, out)
-
-
-def _iso(seconds: float) -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(seconds))
 
 
 # ---- HTTP ------------------------------------------------------------------------------------------------------------
@@ -378,13 +385,9 @@ def main() -> int:
         return 2
     warden = Warden(places.owner_socket, lambda: float(settings().get_int("dashboard.warden_seconds")))
     app = App(settings, warden, time.time)
-    server = serve(
-        app,
-        current.get_int("dashboard.port"),
-        current.get_int("dashboard.max_threads"),
-        current.get_int("watch.socket_read_seconds"),
-    )
-    log.info("dashboard: serving on %s:%d", BIND, current.get_int("dashboard.port"))
+    port = current.get_int("dashboard.port")
+    server = serve(app, port, current.get_int("dashboard.max_threads"), current.get_int("watch.socket_read_seconds"))
+    log.info("dashboard: serving on %s:%d", BIND, port)
     threading.Event().wait()
     server.shutdown()
     return 0

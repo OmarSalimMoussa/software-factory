@@ -52,7 +52,7 @@ def test_a_right_code_admits_the_device_with_a_strict_owner_cookie(rig: Rig) -> 
     cookie = reply.headers["Set-Cookie"]
     token = cookie.split(";")[0].removeprefix("owner=")
     assert token not in reply.body.decode()
-    assert {"HttpOnly", "SameSite=Strict", "Path=/", "Max-Age=2592000"} <= {p.strip() for p in cookie.split(";")}
+    assert {"HttpOnly", "SameSite=Strict", "Path=/", "Max-Age=31536000"} <= {p.strip() for p in cookie.split(";")}
     assert "Secure" not in cookie  # served on 127.0.0.1, plain HTTP
     assert rig.get("/api/shell", {**HOST, "cookie": f"owner={token}"}).status == 200
     public = "factory.example.com"
