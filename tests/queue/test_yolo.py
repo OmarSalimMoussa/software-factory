@@ -63,6 +63,21 @@ def test_yolo_approves_only_into_a_free_place_of_the_runs_own_role(world: World)
     assert any(note.endswith(", by YOLO mode") for note in notes)
 
 
+def test_yolo_approves_again_a_task_whose_own_run_holds_its_place_though_no_other_place_is_free(
+    world: World,
+) -> None:
+    world.with_settings(caps__implementers=1, routing__max_proposals=4)
+    held, other = world.task().id, world.task().id
+    world.session("s-impl", "implementer", f"impl-{held}", held, "/wt/x")
+    for task_id in (other, held):
+        propose(world.ctx(), task_id, 1, "why", "", PICTURE, "")
+    _switch(world, True)
+
+    yolo.run_pass(world.ctx())
+
+    assert world.queue().task(held).status == "building" and world.queue().task(other).status == "proposed"
+
+
 def test_yolo_answers_a_question_asked_of_the_owner_as_the_owner(world: World) -> None:
     asked = cards.needs_owner(world.ctx("designer", "s-design"), world.task().id, "", "Keep the link?", PICTURE)
     _switch(world, True)

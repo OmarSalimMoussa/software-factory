@@ -42,6 +42,11 @@ def live(sessions: Iterable[Session]) -> list[Session]:
     return [s for s in sessions if s.state != RETIRED]
 
 
+def holding(sessions: Iterable[Session], task_id: str) -> Session | None:
+    """The run on ``task_id`` that still holds its place, as one does when a facts change voids its approval."""
+    return next((s for s in sessions if s.task == task_id and s.state in HOLDS_SLOT and not s.parent), None)
+
+
 def seated(sessions: Iterable[Session], role: str) -> list[Session]:
     """Sessions of ``role`` that hold a cap slot: working, waiting, or between states."""
     return [s for s in sessions if s.role == role and s.state in HOLDS_SLOT and not s.parent]

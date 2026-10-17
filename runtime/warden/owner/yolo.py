@@ -2,7 +2,8 @@
 
 While it is on, the warden approves the orchestrator's proposals in the seat order, each only into a free place of
 its role: the role's cap, less the runs that hold a place, the benched ones and the runs approved or designed and
-waiting. So YOLO never starts a run the next one benches. It answers each question asked of the owner with ANSWER,
+waiting. A task whose run still holds its place, as one does when a facts change voids its approval, is approved in
+that place. So YOLO never starts a run the next one benches. It answers each question asked of the owner with ANSWER,
 as the owner, and hands each spec's Go and each stuck task to the orchestrator to decide (`factory decide`). It never
 pushes: what waits for the owner's push to prod keeps waiting. The daily budget, the guard and every other limit
 stay as they are.
@@ -74,7 +75,8 @@ def run_pass(ctx: Context) -> None:
     ranking = permits.ranking(ctx)
     offered = [permits.read_task(ctx, t) for t in proposals.read(ctx.places).open if t and t != "none"]
     for task in sorted(offered, key=lambda t: order.seat_rank(t, ranking)):
-        if _free(ctx, permits.needed_role(ctx, task.id)) > 0:
+        role, run = permits.needed_role(ctx, task.id), registry.holding(registry.read(ctx.places).values(), task.id)
+        if (run is not None and run.role == role) or _free(ctx, role) > 0:
             owner.approve(ctx, task.id, by="YOLO mode")
     open_cards = [c for c in cards.read(ctx.places) if not c.answered]
     for card in open_cards:
