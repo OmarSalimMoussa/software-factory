@@ -42,7 +42,7 @@ def test_a_protected_path_is_refused_at_every_door(tmp_path: Path, door: str, pa
         found = kit.rule("Write", {"file_path": str(kit.worktree / path), "content": "x"}) == "protected-paths"
     else:
         prefixes = protected_paths(settings)
-        found = bool(refusal([path], prefixes=prefixes, in_slice=True, hook="pre-commit", on_default=False,
+        found = bool(refusal([path], prefixes=prefixes, hook="pre-commit", on_default=False,
                              merging=False, factory=False))  # fmt: skip
     assert found is refused
 

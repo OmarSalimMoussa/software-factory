@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 from guard_kit import Kit
 
+from runtime.guard import commit_check
 from runtime.guard.commit_check import UNNAMED, HookError, is_factory_repo, passed, refusal, turn_refusal
 from runtime.guard.writes import ALWAYS_PROTECTED
 from runtime.shared import store
@@ -30,34 +31,42 @@ sys.exit(commit_check.main(sys.argv[1:]))
 
 
 @pytest.mark.parametrize(
-    ("paths", "in_slice", "hook", "on_default", "merging", "refused"),
+    ("paths", "hook", "on_default", "merging", "refused"),
     [
-        (["GOAL.md"], True, "pre-commit", False, False, True),
-        (["goal/hero.png"], True, "pre-commit", True, False, True),
-        (["factory.toml"], True, "pre-commit", False, False, True),
-        ([".github/workflows/ci.yml"], True, "pre-commit", False, False, True),
-        (["check-values/surfaces.toml"], True, "pre-commit", False, False, True),
-        (["src/app.py", "docs/GOAL.md", "goals.md"], True, "pre-commit", True, False, False),
-        (["GOAL.md"], False, "pre-commit", True, False, False),
-        (["GOAL.md"], True, "pre-merge-commit", True, True, True),
-        (["GOAL.md"], True, "pre-merge-commit", False, True, False),
-        ([], True, "pre-push", True, False, True),
-        ([], False, "pre-push", True, False, False),
+        (["GOAL.md"], "pre-commit", False, False, True),
+        (["goal/hero.png"], "pre-commit", True, False, True),
+        (["factory.toml"], "pre-commit", False, False, True),
+        ([".github/workflows/ci.yml"], "pre-commit", False, False, True),
+        (["check-values/surfaces.toml"], "pre-commit", False, False, True),
+        (["src/app.py", "docs/GOAL.md", "goals.md"], "pre-commit", True, False, False),
+        (["GOAL.md"], "pre-merge-commit", True, True, True),
+        (["GOAL.md"], "pre-merge-commit", False, True, False),
+        ([], "pre-push", True, False, True),
     ],
 )
 def test_inside_the_slice_no_change_to_a_protected_path_lands_and_nothing_is_pushed(
-    paths: list[str], in_slice: bool, hook: str, on_default: bool, merging: bool, refused: bool
+    paths: list[str], hook: str, on_default: bool, merging: bool, refused: bool
 ) -> None:
     reason = refusal(
         paths,
         prefixes=ALWAYS_PROTECTED,
-        in_slice=in_slice,
         hook=hook,
         on_default=on_default,
         merging=merging,
         factory=False,
     )
     assert bool(reason) is refused
+
+
+@pytest.mark.parametrize("hook", ["pre-commit", "pre-merge-commit", "pre-push"])
+def test_outside_the_slice_the_owner_commits_merges_and_pushes_without_the_warden_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, hook: str
+) -> None:
+    subprocess.run(["git", "init", "-q", "-b", "master", str(tmp_path)], check=True)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(commit_check.Places, "system", classmethod(lambda cls: Places.under(tmp_path / "unreadable")))
+    monkeypatch.setattr(commit_check, "_in_slice", lambda: False)
+    assert commit_check.main([hook]) == 0
 
 
 @pytest.mark.parametrize(
@@ -75,7 +84,6 @@ def test_the_factory_never_commits_to_its_own_repo(url: str, factory: bool) -> N
     reason = refusal(
         ["src/x.py"],
         prefixes=ALWAYS_PROTECTED,
-        in_slice=True,
         hook="pre-commit",
         on_default=False,
         merging=False,

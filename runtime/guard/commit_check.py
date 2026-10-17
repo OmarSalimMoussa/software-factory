@@ -2,7 +2,8 @@
 a protected path, nothing is committed to the factory's own repo, and no push leaves (the warden pushes). A merge
 into the default branch lands only with a tree that passed `factory check` on its branch, so it is never checked
 twice and never unchecked. The protected paths are the guard's, scripts the main checkout's factory.toml names
-included; while that file cannot be read, nothing is committed inside the slice.
+included; while that file cannot be read, nothing is committed inside the slice. Outside it, the owner's own hand
+commits freely, and the hook reads none of the warden's files, which the agent user cannot open there.
 
 The guard reads each tool call, but a script run from the shell can write a file it never sees; every change reaches
 the default branch through a commit or a merge, so the hooks check both. The hooks run this installed, root-owned
@@ -47,19 +48,16 @@ def refusal(
     paths: list[str],
     *,
     prefixes: tuple[str, ...],
-    in_slice: bool,
     hook: str,
     on_default: bool,
     merging: bool,
     factory: bool,
 ) -> str:
-    """Why this commit, merge or push may not be made, or nothing.
+    """Why this commit, merge or push, made inside the slice, may not be made, or nothing.
 
     A merge into another branch is let through: it brings only what the default branch already holds, which was
     checked when it got there.
     """
-    if not in_slice:
-        return ""
     if hook == "pre-push":
         return "commit-check: only the owner pushes, from Home; your work stays local"
     if factory:
@@ -126,7 +124,10 @@ def _in_slice() -> bool:
 
 
 def main(argv: list[str]) -> int:
-    hook = argv[0] if argv else "pre-commit"
+    return _checked(argv[0] if argv else "pre-commit") if _in_slice() else 0
+
+
+def _checked(hook: str) -> int:
     try:
         branch = _optional_git("symbolic-ref", "--short", "-q", "HEAD")
         merging = hook == "pre-merge-commit" or bool(_optional_git("rev-parse", "-q", "--verify", "MERGE_HEAD"))
@@ -135,12 +136,9 @@ def main(argv: list[str]) -> int:
         default = settings.get_str("repo.default_branch")
         paths = [] if hook == "pre-push" else _git("diff", "--cached", "--name-only", "--no-renames", "-z").split("\0")
         factory = is_factory_repo(_optional_git("remote", "get-url", "origin"))
-        in_slice = _in_slice()
-        # Read only inside the slice: the owner's own commit, which may be the fix to factory.toml, never needs them.
         reason = refusal(
             [p for p in paths if p],
-            prefixes=protected_paths(settings) if in_slice else (),
-            in_slice=in_slice,
+            prefixes=protected_paths(settings),
             hook=hook,
             on_default=branch == default,
             merging=merging,
@@ -151,13 +149,12 @@ def main(argv: list[str]) -> int:
             return 1
         if hook == "pre-push" or branch != default or not merging:
             return 0
-        if in_slice:
-            # pre-merge-commit runs before git records MERGE_HEAD; refused, the merge stays staged for `git commit`.
-            head = _optional_git("rev-parse", "-q", "--verify", "MERGE_HEAD")
-            turn = turn_refusal(Places.system(), head) if head else UNNAMED
-            if turn:
-                print(turn, file=sys.stderr)
-                return 1
+        # pre-merge-commit runs before git records MERGE_HEAD; refused, the merge stays staged for `git commit`.
+        head = _optional_git("rev-parse", "-q", "--verify", "MERGE_HEAD")
+        turn = turn_refusal(Places.system(), head) if head else UNNAMED
+        if turn:
+            print(turn, file=sys.stderr)
+            return 1
         tree = _git("write-tree").strip()
         if not passed(Places.system(), tree):
             print(
