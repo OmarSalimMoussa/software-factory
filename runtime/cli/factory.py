@@ -166,7 +166,8 @@ def _telemetry_call(ns: argparse.Namespace) -> Call:
     else:
         raise CliError("--where is prod or slot <n>; staging is slot 0")
     if ns.cmd == "logs":
-        args.update({key: value for key in ("find", "since") if (value := getattr(ns, key)) is not None})
+        given = {"find": None if ns.find is None else " ".join(ns.find), "since": ns.since}
+        args.update({key: value for key, value in given.items() if value is not None})
     elif ns.one is not None:
         args["issue" if ns.cmd == "errors" else "trace"] = ns.one
     if ns.cmd == "errors" and ns.whole:

@@ -130,6 +130,9 @@ def test_a_step_mark_names_its_step_as_a_finding_does() -> None:
 def test_telemetry_is_read_from_prod_or_a_slot_and_staging_is_slot_0() -> None:
     assert _build(["errors", "--where", "slot", "0"]).args == {"where": "slot", "slot": 0}
     assert _build(["logs", "--find", "sentinel"]).args == {"where": "prod", "find": "sentinel"}
+    # Agents leave a text of several words unquoted; it is still one text.
+    found = _build(["logs", "--find", "connection", "refused", "--since", "2026-10-17T17:40:00Z"]).args
+    assert found == {"where": "prod", "find": "connection refused", "since": "2026-10-17T17:40:00Z"}
     with pytest.raises(CliError, match="staging is slot 0"):
         _build(["errors", "--where", "staging"])
 

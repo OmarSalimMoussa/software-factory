@@ -162,7 +162,7 @@ def _telemetry(sub: Any) -> None:
             parser.add_argument("--whole", action="store_true", help="with --issue: the newest event, all of it")
     logs = sub.add_parser("logs", help="log lines of prod or a slot (slot 0 is staging), newest first; read-only")
     logs.add_argument("--where", nargs="+", default=["prod"], metavar="prod|slot N")
-    logs.add_argument("--find", help="only lines whose text holds this")
+    logs.add_argument("--find", nargs="+", help="only lines whose text holds these words, in this order")
     logs.add_argument("--since", help="only lines from this time on, such as 2026-10-17T09:17:00Z")
 
 
