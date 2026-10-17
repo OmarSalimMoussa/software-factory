@@ -118,8 +118,9 @@ def _model(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision
     return Refusal("model", f"a {kind} {wanted}; leave the model out")
 
 
-def _browsers(call: Call, kind: str) -> Decision:
-    """At most caps.browsers_at_once browser testers on the machine, none on red vitals: amber holds back new work."""
+def _browsers(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
+    """At most caps.browsers_at_once browser testers on the machine, none on red vitals: amber holds back new work.
+    This session's earlier starts count too: one sent in the same message has no session row yet."""
     personas = call.settings.get_list("subagents.browser_personas")
     if kind not in personas:
         return None
@@ -127,11 +128,14 @@ def _browsers(call: Call, kind: str) -> Decision:
     # No tester outlasts its items' time, a desktop's start and a lost hand-back's quiet: older rows hold no browser.
     waits = call.settings.get_int("slots.verb_minutes") * 60 + call.settings.get_int("qa.stale_seconds")
     longest = _budget(call, call.settings.get_int("qa.max_items")) + waits
-    running = [s for s in call.sessions.values() if s.parent in alive and s.state == "working" and s.role in personas
-               and (call.now - _when(s.started)).total_seconds() < longest]  # fmt: skip
-    cap = call.settings.get_int("caps.browsers_at_once")
-    if len(running) >= cap:
-        return Refusal("subagents-at-once", f"{len(running)} browser testers run on this machine, its cap of {cap}; "
+    rows = [s for s in call.sessions.values() if s.parent in alive and s.state == "working" and s.role in personas
+            and (call.now - _when(s.started)).total_seconds() < longest]  # fmt: skip
+    known = {s.agent_id for s in call.sessions.values() if s.agent_id}
+    starting = [c for c in calls if lanes.kind_of(c.subagent_type) in personas and c.agent_id not in known
+                and _running(call, c)]  # fmt: skip
+    running, cap = len(rows) + len(starting), call.settings.get_int("caps.browsers_at_once")
+    if running >= cap:
+        return Refusal("subagents-at-once", f"{running} browser testers run on this machine, its cap of {cap}; "
                                             "wait for one to report")  # fmt: skip
     level, why = read_vitals(call.places)
     if level == "red":
@@ -147,7 +151,7 @@ def _when(iso: str) -> datetime:
 def _at_once(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     if call.off("subagents-at-once"):
         return None
-    machine = _browsers(call, kind)
+    machine = _browsers(call, kind, calls)
     if machine is not None:
         return machine
     running = [c for c in calls if _running(call, c)]
@@ -217,7 +221,7 @@ def _qa(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     heads: dict[str, bool] = {head: False}
     for agent in calls:
         if agent.subagent_type.startswith(TESTER):
-            active = [r for r in records if _at(r["at"]) <= agent.started]
+            active = [r for r in records if _when(r["at"]) <= agent.started]
             if active:
                 started_on = str(active[-1]["head"])
                 heads[started_on] = heads.get(started_on, False) or agent.agent_id in interrupted
@@ -232,10 +236,6 @@ def _interrupted(call: Call) -> set[str | None]:
     """The subagents the warden retired with their parent when it benched the session."""
     rows = call.sessions.values()
     return {s.agent_id for s in rows if s.agent_id and s.state == RETIRED and s.retired == WITH_PARENT}
-
-
-def _at(stamp: str) -> datetime:
-    return datetime.fromisoformat(stamp.replace("Z", "+00:00"))
 
 
 def _critic_rounds(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:

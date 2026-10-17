@@ -389,6 +389,18 @@ def test_browser_testers_are_capped_across_the_machine_and_start_unless_its_vita
     assert held is None or why in held.reason  # it names the reading that holds the tester back
 
 
+@pytest.mark.parametrize(("current", "refused"), [("t1", False), ("t2", True)])
+def test_browser_testers_started_in_one_message_count_against_the_machines_cap(
+    tmp_path: Path, current: str, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.settings(caps__subagents_at_once=4, caps__browsers_at_once=2)
+    kit.transcript(_running("qa-visual", "qa-ux", "qa-ui-function", ago=0))
+    decision = kit.decide("Agent", _agent("qa-ui-function"), tool_use_id=current)
+    assert (isinstance(decision, Refusal) and decision.rule == "subagents-at-once") is refused
+
+
 @pytest.mark.parametrize("kind", ["intake", "Explore", "qa-backend"])
 def test_a_finished_subagent_of_any_kind_is_not_resumed(tmp_path: Path, kind: str) -> None:
     kit = Kit(tmp_path)
