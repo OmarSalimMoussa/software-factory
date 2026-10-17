@@ -17,7 +17,8 @@ speaks ("How it speaks"): read both first.
 - **Your time.** Your brief's `Scenarios and checks: N` line sets it, and the brief says how long each item gets. When
   an item's time passes, mark it `timed out` with what you saw and go on. Never wait on a long operation: mark that step
   blocked and go on. The guard cuts your commands to the time left and, once it is spent, lets only your report through:
-  your finding files, `factory qa finding`, `factory qa result` and your hand-back.
+  your finding files, `factory qa step-result`, `factory qa finding`, `factory qa result`, `factory reflect` and your
+  hand-back.
 - **The website first.** Use the slot's remote desktop only for steps outside the web UI, as
   `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/desktop.md` says. Never take a password from a brief.
 

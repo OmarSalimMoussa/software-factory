@@ -38,8 +38,11 @@ SLOT_API = "mcp__slot-api__slot_api"
 # Claude Code's waits, in milliseconds: its defaults, and its longest, for a `factory` call the warden bounds itself.
 _TIMED_TOOLS = {"Bash": ("timeout", 120_000), "Monitor": ("timeout_ms", 300_000)}
 _LONGEST_BASH = 600_000
-REPORT = "record what you found with `factory qa finding`, run `factory qa result`, then hand back"
-_REPORTS = frozenset({"qa.finding", "qa.result"})
+REPORT = (
+    "record each step's result with `factory qa step-result` and what you found with `factory qa finding`, run "
+    "`factory qa result`, then hand back"
+)
+_REPORTS = frozenset({"qa.step-result", "qa.finding", "qa.result", "reflect"})
 
 
 def check_slot_session(call: Call) -> Decision:
@@ -300,8 +303,8 @@ def check_send(call: Call) -> Decision:
 
 def check_tester_time(call: Call) -> Decision:
     """A tester's own calls: refused once its time is spent, or its desktop time once it drives the remote desktop;
-    shell and browser waits cut to the time left. Its report always goes: a file in its scratch folder, `factory qa
-    finding`, `factory qa result` and its hand-back."""
+    shell and browser waits cut to the time left. Its report always goes: a file in its scratch folder, its steps'
+    results, findings and verdict, a reflection, and its hand-back."""
     tester = call.in_subagent and call.agent_type.startswith(TESTER)
     if not tester or call.tool == HANDBACK or call.off("tester-time"):
         return None
@@ -323,7 +326,7 @@ def check_tester_time(call: Call) -> Decision:
 
 
 def reports(call: Call) -> bool:
-    """A tester's report: a file in its scratch folder, `factory qa finding` or `factory qa result`."""
+    """A tester's report: a file in its scratch folder, a step's result, a finding, its verdict or a reflection."""
     if call.tool == "Write":
         return scratch.in_scratch(call, resolve(str(call.tool_input.get("file_path", "")), call.cwd, call.home))
     words = factory_calls.plain_words(str(call.tool_input.get("command", ""))) if call.tool == "Bash" else None

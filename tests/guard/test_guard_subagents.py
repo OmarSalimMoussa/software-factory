@@ -287,13 +287,15 @@ def test_a_testers_slot_api_session_carries_its_id_and_the_implementers_keeps_it
             True,
         ),
         ("Bash", {"command": "factory qa result --head abc1234"}, True),
+        ("Bash", {"command": "factory qa step-result --head abc1234 --step a:1 --result pass --got 'Saved.'"}, True),
+        ("Bash", {"command": "factory reflect --kind friction 'The budget ran out.'"}, True),
         ("Write", {"file_path": ".factory/f.md", "content": "Save fails."}, True),
         ("Write", {"file_path": "notes.md", "content": "Save fails."}, False),
         ("Bash", {"command": "factory qa result --head abc1234; sleep 60"}, False),
         ("Bash", {"command": "factory qa step --head abc1234"}, False),
         ("mcp__qa-browser__browser_snapshot", {}, False),
     ],
-    ids=["finding", "result", "finding-file", "other-file", "result-and-more", "step", "browser"],
+    ids=["finding", "result", "step-result", "reflect", "file", "other-file", "result-and-more", "step", "browser"],
 )
 def test_a_tester_out_of_time_still_records_its_report(
     tmp_path: Path, tool: str, tool_input: dict[str, Any], goes: bool
