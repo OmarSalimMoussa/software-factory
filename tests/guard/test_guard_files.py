@@ -148,7 +148,12 @@ def test_intake_reads_the_queue_and_hears_a_command_that_does_not_exist_named_as
         ("factory status | tail -3", "factory-alone"),
         ("factory status &", "factory-alone"),
         ("(factory status)", "factory-alone"),
-        ("cd src && factory status", "factory-alone"),
+        ("cd src && factory status", None),
+        ("cd /home/software-agent/product; factory status", None),
+        ("cd 'my work' && factory status", None),
+        ("cd $HOME && factory status", "factory-alone"),
+        ("cd a && cd b && factory status", "factory-alone"),
+        ("cd src && factory status && ls", "factory-alone"),
         ("timeout 60 factory status", "factory-alone"),
         ("/usr/local/bin/factory status", "factory-alone"),
         ("FACTORY_X=1 factory status", "factory-alone"),
@@ -178,7 +183,7 @@ def test_a_factory_call_is_one_plain_command_and_names_no_subagent(kit: Kit, com
         ("factory status && ls", "`&&` adds a second command"),
         ("factory status 2>&1", "`>&` joins a second command or a file"),
         ("factory status > out.txt", "`>` sends the answer to a file"),
-        ("cd src && factory status", "something comes before the bare word factory"),
+        ("timeout 60 factory status", "something comes before the bare word factory"),
         ("factory status\nls", "a line break starts a second command"),
         ('factory reflect --kind miss "costs $5"', "the shell would expand `$` there"),
     ],
@@ -214,6 +219,9 @@ def test_a_subagents_factory_call_names_it_right_after_the_program(tmp_path: Pat
     decision = kit.decide("Bash", {"command": "factory queue task new --title x"}, **intake)
     assert isinstance(decision, Rewrite)
     assert decision.updated_input["command"] == "factory --agent-id a1234567890abc queue task new --title x"
+    decision = kit.decide("Bash", {"command": "cd notes && factory queue task new --title x"}, **intake)
+    assert isinstance(decision, Rewrite)
+    assert decision.updated_input["command"] == "cd notes && factory --agent-id a1234567890abc queue task new --title x"
     assert kit.decide("Bash", {"command": "factory status"}, cwd=str(kit.repo)) is None
 
 

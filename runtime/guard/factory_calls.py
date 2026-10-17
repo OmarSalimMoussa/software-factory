@@ -3,7 +3,8 @@ telemetry verbs to intake, triage and the testers among subagents), a task's sta
 (`queue-status`), and the command alone in its line (`factory-alone`). The warden counts an implementer's check runs.
 
 The guard names a subagent on its factory calls by rewriting the call's text, which it can do safely only when the
-whole text is `factory` or `factory …`: one plain command, the bare word first, nothing the shell would expand or join.
+whole text is `factory` or `factory …`, after at most one `cd` into a plain folder: one plain command, nothing the shell
+would expand or join.
 """
 
 from __future__ import annotations
@@ -21,6 +22,8 @@ FACTORY = "factory"
 AGENT_ID_FLAG = "--agent-id"
 _SAFE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _PLAIN_START = re.compile(r"^factory(\s|$)")
+# One `cd` into a plain folder may come first: agents reach for it by habit, and a relative --body file needs it.
+_CD_FIRST = re.compile(r"^cd[ \t]+(?:'[^'\n]*'|[\w./+-]+)[ \t]*(?:&&|;)[ \t]*")
 _SHELL_SPECIAL = frozenset("$`*?[{}")
 _JOINS = {"|": "pipes the answer into another command", "&&": "adds a second command", "||": "adds a second command",
           ";": "adds a second command", "&": "runs it in the background", ">": "sends the answer to a file",
@@ -103,9 +106,16 @@ def _expanded(text: str) -> str:
     return ""
 
 
+def _after_cd(command: str) -> tuple[str, str]:
+    """``command`` split into its leading `cd` into one plain folder, if any, and the rest."""
+    text = command.strip()
+    found = _CD_FIRST.match(text)
+    return (found.group(0), text[found.end() :]) if found else ("", text)
+
+
 def _parse(command: str) -> tuple[list[str], str]:
     """The words of a command and, when it is not one plain `factory` call, why not: the words are then partial."""
-    text = command.strip()
+    _, text = _after_cd(command)
     if not _PLAIN_START.match(text):
         return [], "something comes before the bare word factory"
     if "\n" in text or "\r" in text:
@@ -165,6 +175,6 @@ def stamp(call: Call) -> Decision:
         return None
     if not _SAFE_ID.match(call.agent_id):
         return Refusal("agent-id", "this subagent's id cannot be passed to the factory safely; report to your parent")
-    text = command.strip()
-    stamped = f"{FACTORY} {AGENT_ID_FLAG} {call.agent_id}{text[len(FACTORY) :]}"
+    cd, text = _after_cd(command)
+    stamped = f"{cd}{FACTORY} {AGENT_ID_FLAG} {call.agent_id}{text[len(FACTORY) :]}"
     return Rewrite({**call.tool_input, "command": stamped})
