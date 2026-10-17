@@ -58,6 +58,7 @@ class FakeLauncher:
         self.upgrades: list[str] = []
         self.on_restart: Callable[[], None] = lambda: None  # what else happens while the daemon restarts
         self.check: Callable[[str, list[str]], tuple[int, str]] = lambda checkout, args: (0, "")
+        self.behind: int | None = 0  # commits the default branch has that a worktree's branch lacks; None: git fails
         # The token the daemon signed in with at its last restart, and how each token's first call answers.
         self.held: str | None = None
         self.answers: dict[str, str | None] = {}
@@ -71,19 +72,24 @@ class FakeLauncher:
     def agent_command(self, argv: list[str], cwd: str) -> tuple[int, str]:
         self.commands.append(argv)
         if argv[:2] == ["claude", "respawn"]:
-            if self.lost:
-                return 1, f"No background session {argv[2]}"
-            [sid] = [sid for sid in registry.read(self.places) if sid.startswith(argv[2])]
-            self.resumed.append(sid)
-            if not self.stays_down:
-                self.procs[sid] = Proc(pid=5000 + len(self.commands), session=sid, name="", chat_link="")
-            return 0, ""
+            return self._respawn(argv[2])
         if "remote" in argv:
             return 0, self.remote + "\n"
+        if "rev-list" in argv:
+            return (1, "fatal: bad revision") if self.behind is None else (0, f"{self.behind}\n")
         if "rev-parse" in argv:
             return 0, f"{'c1' * 20}\n{'t1' * 20}\nworktree-branch\n" if "HEAD^{tree}" in argv else "worktree-branch\n"
         if argv[1:3] == ["worktree", "remove"]:
             return 1, "fatal: it contains modified or untracked files"
+        return 0, ""
+
+    def _respawn(self, prefix: str) -> tuple[int, str]:
+        if self.lost:
+            return 1, f"No background session {prefix}"
+        [sid] = [sid for sid in registry.read(self.places) if sid.startswith(prefix)]
+        self.resumed.append(sid)
+        if not self.stays_down:
+            self.procs[sid] = Proc(pid=5000 + len(self.commands), session=sid, name="", chat_link="")
         return 0, ""
 
     def message_session(self, session_id: str, text: str) -> None:

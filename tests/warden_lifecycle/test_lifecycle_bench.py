@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import pytest
@@ -207,6 +208,22 @@ def test_a_check_that_ends_after_its_session_was_benched_is_told_once_as_it_come
 
     told = [said.count("ended after you were benched: it failed: run it again") for _, said in world.launcher.messages]
     assert told == [1, 0]
+
+
+@pytest.mark.parametrize(("behind", "told", "logged"), [(3, True, False), (0, False, False), (None, False, True)])
+def test_a_revived_implementer_is_told_how_far_the_default_branch_moved(
+    world: World, caplog: pytest.LogCaptureFixture, behind: int | None, told: bool, logged: bool
+) -> None:
+    world.queue.add("t-0001", status="deprioritized")
+    world.seat("5e550001", task="t-0001", state=DEPRIORITIZED)
+    world.launcher.behind = behind
+
+    with caplog.at_level(logging.WARNING):
+        revive.revive_session(world.ctx(), "5e550001", "warden")
+
+    [(_, said)] = world.launcher.messages
+    assert ("The default branch has 3 commits your branch lacks: `git rebase " in said) == told
+    assert any("was not compared with" in r.getMessage() for r in caplog.records) == logged
 
 
 def test_a_stopped_run_that_never_was_a_proposal_goes_back_to_the_queue(world: World) -> None:

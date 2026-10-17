@@ -9,7 +9,7 @@ import logging
 from typing import Any
 
 from runtime.shared import models, operations, store
-from runtime.shared.models import RETIRED, WAITING, WORKING
+from runtime.shared.models import RETIRED, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused, ok
 from runtime.warden import checks, inbox
 from runtime.warden.context import Context
@@ -48,7 +48,9 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
         older = older_skills.holds(ctx.places, s.id)
         held = held_word(ctx, s.task)
         unheard = checks.unheard(ctx.places, s.name)
-        said = "\n\n".join(part for part in (older_skills.RELOAD if older else "", unheard, note, held) if part)
+        behind = _behind(ctx, s) if s.role == IMPL else ""
+        parts = (older_skills.RELOAD if older else "", unheard, behind, note, held)
+        said = "\n\n".join(part for part in parts if part)
         back = respawn.resume(ctx, s, REVIVED + rebuild + (f"\n\n{said}" if said else ""))
     # telemetry: surfaced — the session stays deprioritized; `move` records why, and the caller is told
     except (LaunchError, Refused) as exc:
@@ -79,6 +81,20 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
     if s.task and permits.read_task(ctx, s.task).status == "deprioritized":
         permits.move_task(ctx, s.task, "designing" if s.role == DESIGN else "building", "revive")
     return ""
+
+
+def _behind(ctx: Context, s: Session) -> str:
+    """How far the default branch moved past an implementer's branch, so it builds on what the branch lacks."""
+    default = ctx.settings().get_str("repo.default_branch")
+    try:
+        count = int(checks.in_checkout(ctx, s.worktree, "rev-list", "--count", f"HEAD..{default}"))
+    except (Refused, ValueError) as exc:
+        log.warning("warden: %s's branch was not compared with %s (%s)", s.name, default, type(exc).__name__)
+        return ""
+    if not count:
+        return ""
+    lacks = f"{count} commit{'' if count == 1 else 's'} your branch lacks"
+    return f"The default branch has {lacks}: `git rebase {default}` before you rebuild your slot, to build its fixes."
 
 
 def hand_held(ctx: Context, sid: str, task_id: str, word: str) -> None:

@@ -112,7 +112,8 @@ def _record(ctx: Context, tree: str, commit: str, branch: str, task: str) -> Non
         store.write_json(ctx.places.public_check_passes, {"trees": sorted({p["tree"] for p in found})})
 
 
-def _git(ctx: Context, checkout: str, *args: str) -> str:
+def in_checkout(ctx: Context, checkout: str, *args: str) -> str:
+    """git ``args`` in an agent's ``checkout``, as the agent user; what it printed. Refused when git fails."""
     code, out = ctx.launcher.agent_command([*_GIT, *args], checkout)
     if code != 0:
         raise Refused("check", f"git {args[0]} failed in {checkout}: {out.strip()[-300:]}")
@@ -121,8 +122,10 @@ def _git(ctx: Context, checkout: str, *args: str) -> str:
 
 def _state(ctx: Context, checkout: str) -> tuple[str, str, str, list[str]]:
     """The checkout's commit, tree and branch ("HEAD" when detached), and its uncommitted changes, as git lists them."""
-    changed = _git(ctx, checkout, "status", "--porcelain", "--untracked-files=no").strip().splitlines()
-    commit, tree, branch = _git(ctx, checkout, "rev-parse", "HEAD", "HEAD^{tree}", "--abbrev-ref", "HEAD").split()
+    changed = in_checkout(ctx, checkout, "status", "--porcelain", "--untracked-files=no").strip().splitlines()
+    commit, tree, branch = in_checkout(
+        ctx, checkout, "rev-parse", "HEAD", "HEAD^{tree}", "--abbrev-ref", "HEAD"
+    ).split()
     return commit, tree, branch, [line.strip() for line in changed]
 
 
@@ -174,7 +177,7 @@ def _count_run(ctx: Context, session: Session, spend: bool) -> int:
 def _since(ctx: Context, checkout: str) -> list[str]:
     """On the default branch: from the newest first-parent commit whose tree passed, or everything when none did."""
     trees = {p["tree"] for p in _passes(ctx.places)}
-    for line in _git(ctx, checkout, "log", "--first-parent", "--format=%H %T", "HEAD").splitlines():
+    for line in in_checkout(ctx, checkout, "log", "--first-parent", "--format=%H %T", "HEAD").splitlines():
         commit, tree = line.split()
         if tree in trees:
             return ["--since", commit]
