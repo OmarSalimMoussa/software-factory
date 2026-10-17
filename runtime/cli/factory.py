@@ -310,6 +310,14 @@ def _local(argv: list[str], places: Places) -> int:
     return slot_api.main(lambda: ask(places.socket, Call("slot", {"op": "which"})))
 
 
+def _read(path: str) -> bytes:
+    try:
+        return Path(path).read_bytes()
+    except OSError as exc:
+        raise CliError(f"{path[:60]!r} is not a file this can read ({exc.strerror}): write the text to a file "
+                       "first, then name the file") from exc  # fmt: skip
+
+
 def main(argv: list[str], places: Places | None = None) -> int:
     places = places or Places.system()
     try:
@@ -320,7 +328,7 @@ def main(argv: list[str], places: Places | None = None) -> int:
             from runtime.cli import accounts
 
             return accounts.main(rest[1:], places.owner_socket, ask, sys.stdin, sys.stdout, sys.stderr)
-        call = build(argv, lambda path: Path(path).read_bytes())
+        call = build(argv, _read)
     except (CliError, OSError) as exc:
         print(f"factory: {exc}", file=sys.stderr)
         return 2

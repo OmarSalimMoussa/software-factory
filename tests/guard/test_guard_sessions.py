@@ -104,6 +104,16 @@ def test_a_subagent_of_a_session_being_benched_is_told_to_report_and_hand_back(
     assert "commit" not in decision.reason
 
 
+@pytest.mark.parametrize(
+    ("file", "refused"), [(".factory/f-1.md", False), ("app/notes.py", True)], ids=["its-report", "the-code"]
+)
+def test_a_tester_of_a_session_being_benched_still_writes_its_report(tmp_path: Path, file: str, refused: bool) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer", state="bench-pending")
+    asked = {"file_path": str(kit.worktree / file), "content": "Save fails."}
+    assert (kit.rule("Write", asked, agent_id="a1b2c3", agent_type="qa-ux") == "bench-pending") is refused
+
+
 def test_each_decision_reads_the_transcript_as_it_is_though_its_size_and_time_did_not_change(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer")

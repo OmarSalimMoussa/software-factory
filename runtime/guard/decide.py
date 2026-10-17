@@ -94,6 +94,8 @@ def _bench_pending(call: Call) -> Decision:
         return None
     if commands.is_way_out(call) or (call.tool in commands.SHELL_TOOLS and _commits_only(call)):
         return None
+    if call.in_subagent and subagents.reports(call):
+        return None
     if call.in_subagent:
         return Refusal("bench-pending", f"{SUBAGENT_BENCH}: {subagents.report_now(call)}")
     return Refusal("bench-pending", BENCH_NOTE)

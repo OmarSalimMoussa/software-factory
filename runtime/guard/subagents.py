@@ -307,7 +307,7 @@ def check_tester_time(call: Call) -> Decision:
         return None
     left = _time_left(call)
     if isinstance(left, Refusal):
-        return None if _reports(call) else left
+        return None if reports(call) else left
     timed = _TIMED_TOOLS.get(call.tool)
     if timed is None:
         return browser.cap_wait(call, left)
@@ -322,7 +322,8 @@ def check_tester_time(call: Call) -> Decision:
     return Rewrite(updated) if updated != call.tool_input else None
 
 
-def _reports(call: Call) -> bool:
+def reports(call: Call) -> bool:
+    """A tester's report: a file in its scratch folder, `factory qa finding` or `factory qa result`."""
     if call.tool == "Write":
         return scratch.in_scratch(call, resolve(str(call.tool_input.get("file_path", "")), call.cwd, call.home))
     words = factory_calls.plain_words(str(call.tool_input.get("command", ""))) if call.tool == "Bash" else None

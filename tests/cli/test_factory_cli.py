@@ -6,12 +6,14 @@ from __future__ import annotations
 import io
 import json
 import shlex
+from pathlib import Path
 
 import pytest
 
 from runtime.cli import accounts, factory
 from runtime.cli.factory import Call, CliError, build
 from runtime.guard.factory_calls import verb_of
+from runtime.shared.paths import Places
 from runtime.warden.verbs import VERBS
 
 FILE = "/home/agent/wt/picture.svg"
@@ -211,3 +213,12 @@ def test_every_command_asks_for_the_verb_the_guard_reads_it_as(line: str) -> Non
     argv = shlex.split(line)
     call = build(argv, lambda path: b"text")
     assert verb_of(["factory", *argv]) == call.verb and call.verb in VERBS
+
+
+def test_a_body_given_as_text_instead_of_a_file_says_to_write_the_file_first(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    text = "The save button does nothing and says nothing, " * 6
+    argv = ["qa", "finding", "--head", "abc1234", "--severity", "minor", "--where", "/notes", "--body", text]
+    assert factory.main(argv, Places.under(tmp_path)) == 2
+    assert "write the text to a file first, then name the file" in capsys.readouterr().err
