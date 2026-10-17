@@ -85,6 +85,23 @@ def test_slot_0_is_staging_and_comes_up_whole(world: World) -> None:
     assert world.launcher.stacks == [(0, ["up"])]
 
 
+@pytest.mark.parametrize("args", [{"op": "up"}, {"op": "down"}, {"op": "restart", "services": ["web"]}])
+def test_no_stack_changes_under_a_tester_still_walking_the_slot(world: World, args: dict[str, object]) -> None:
+    _implementer(world, 1)
+    slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)
+    world.session("t-1", "qa-ui-function", "qa-ui-function of impl-t-0001", agent_id="agent-qa-1", parent="s-1")
+    world.launcher.stack = lambda n, verb: StackResult(0, "done\n", "/log")
+
+    with pytest.raises(Refused, match="qa-ui-function of impl-t-0001 still testing slot 1"):
+        slot(world.ctx("implementer", "s-1"), args, None)
+    sessions = registry.read(world.places)
+    sessions["t-1"].state = RETIRED
+    registry.write(world.places, sessions)
+    slot(world.ctx("implementer", "s-1"), args, None)
+
+    assert len(world.launcher.stacks) == 1
+
+
 def test_the_holder_restarts_the_services_it_names(world: World) -> None:
     _implementer(world, 1)
     slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)

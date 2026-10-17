@@ -16,7 +16,7 @@ from runtime.queue import tasks
 from runtime.queue.formats import SHA
 from runtime.queue.statuses import IMPL
 from runtime.shared import slices, store
-from runtime.shared.models import RETIRED, Session, Task
+from runtime.shared.models import RETIRED, TESTER, Session, Task
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import health, leases
 from runtime.warden.context import Context
@@ -183,7 +183,7 @@ def _tester_on_head(ctx: Context, args: dict[str, Any], verb: str) -> tuple[Sess
     """The implementer, its registered tester that asks, and the full head of the last ready record it names."""
     session = _implementer(ctx)
     tester = registry.read(ctx.places).get(ctx.caller.agent_id) if ctx.caller.agent_id else None
-    if tester is None or not tester.role.startswith("qa-"):
+    if tester is None or not tester.role.startswith(TESTER):
         raise Refused(verb, "only a registered tester reports a QA finding or result")
     head = args.get("head")
     records = ready_records(ctx, session)
@@ -257,8 +257,8 @@ def qa_clean(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
         latest[str(result["tester"])] = str(result["head"])
         reported |= {str(result["agent"])} if result["head"] == head else set()
     # Two testers of one kind may test at once, each in its own browser lane: one's verdict is not the other's.
-    testers = [s for s in registry.read(ctx.places).values() if s.parent == session.id and s.role.startswith("qa-")]
-    testing = sorted(s.name for s in testers if s.state != RETIRED and s.agent_id not in reported)
+    walking = registry.testing(registry.read(ctx.places).values(), session.id)
+    testing = sorted(s.name for s in walking if s.agent_id not in reported)
     missing: list[str] = []
     open_: list[str] = []
     for tester in records[-1].get("testers", []):

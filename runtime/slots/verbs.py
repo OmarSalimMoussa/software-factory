@@ -9,7 +9,7 @@ session, an implementer or the orchestrator, may run one command in a new contai
 set-up; so may its backend and security testers, to look from inside the slot's network. One tester holds a slot's
 desktop at a time, until its parent or, once it hands back, the warden takes it down; another tester's `desktop up`
 waits, so no one's new password cuts off a tester mid-step. Slot 0 is staging, so it comes up whole: one build of the
-stack, never a service at a time.
+stack, never a service at a time. No stack changes under a tester still walking it.
 """
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ EMAIL = re.compile(r"^[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}
 # Verbs a tester may run on its implementer's slot; the rest change the stack and are the implementer's own.
 TESTER_OPS = frozenset({"list", "which", "sign-in", "desktop"})
 RUNNER_OPS = TESTER_OPS | {leases.RUN}
+_CHANGES_STACK = frozenset({"up", "down", leases.RESTART})
 
 
 def _session(ctx: Context) -> Session:
@@ -101,12 +102,21 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
         failed = leases.empty(ctx, n, session.id)
         return ok(slot=n, released=not failed, **({"failed": failed} if failed else {}))
     verb = _verb(op, args)
-    if n == 0 and verb[0] == "up" and len(verb) > 1:
-        raise Refused("slot", "slot 0 is staging, one build of the whole stack: factory slot up, naming no service")
+    if op in _CHANGES_STACK:
+        _may_change(ctx, session, n, verb)
     if op == "desktop":
         _desktop_lease(ctx, n, verb)
     result = ctx.launcher.run_stack(n, verb, session.id)
     return _answer(ctx, n, result)
+
+
+def _may_change(ctx: Context, session: Session, n: int, verb: list[str]) -> None:
+    if n == 0 and verb[0] == "up" and len(verb) > 1:
+        raise Refused("slot", "slot 0 is staging, one build of the whole stack: factory slot up, naming no service")
+    walking = registry.testing(registry.read(ctx.places).values(), session.id)
+    if walking:
+        names = ", ".join(sorted(s.name for s in walking))
+        raise Refused("slot", f"{names} still testing slot {n}: change its stack once they report")
 
 
 def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> None:

@@ -19,6 +19,8 @@ A slot is one running copy of the product on the laptop. The factory decides who
 - **Leases do not expire.** Only the holder may bring a slot up, down or empty it. A stack command before a claim is
   refused rather than falling back to slot 0. When a session retires (finished, stopped, crashed) or is benched, the
   warden empties its slot and gives it up itself; a slot that would not empty is tried again.
+- **No change under a tester.** While a tester you started still walks the slot, `up`, `restart` and `down` are
+  refused: change the stack once it reports, so no tester sees the slot rebuilt mid-step.
 - **Output.** The warden answers with the command's exit status and its last lines, or a run's whole output, up to
   `slots.tail_max_kib`; the full log is kept for the owner. A product whose `scripts/dev` has no `run` or `restart`
   says so.

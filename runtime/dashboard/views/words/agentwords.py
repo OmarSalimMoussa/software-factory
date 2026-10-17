@@ -5,7 +5,18 @@ from __future__ import annotations
 from typing import Any
 
 from runtime.dashboard.views.kit import INITIALS, Snap, cost_of, model_label
-from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, PAUSED, RETIRED, REVIVING, WAITING, WITH_PARENT, WORKING
+from runtime.shared.models import (
+    BENCH_PENDING,
+    CRITIC,
+    DEPRIORITIZED,
+    PAUSED,
+    RETIRED,
+    REVIVING,
+    TESTER,
+    WAITING,
+    WITH_PARENT,
+    WORKING,
+)
 
 _ROLE_WORDS = {"orchestrator": "orchestrator", "designer": "designer", "intake": "intake", "triage": "triage"}
 # Marker and state word for each live state; a retired agent shows how it ended.
@@ -52,9 +63,9 @@ def role(row: dict[str, Any]) -> str:
     kind = str(row["role"])
     if kind == "implementer":
         return {1: "implementer, small", 2: "implementer, large"}.get(row["rung"], "implementer")
-    if kind.startswith("qa-"):
+    if kind.startswith(TESTER):
         return "tester"
-    if kind.startswith("critic-"):
+    if kind.startswith(CRITIC):
         return "critic"
     return _ROLE_WORDS.get(kind, kind)
 

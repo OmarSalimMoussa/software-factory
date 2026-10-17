@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from runtime.shared import models, store
-from runtime.shared.models import HOLDS_SLOT, RETIRED, Session
+from runtime.shared.models import HOLDS_SLOT, RETIRED, TESTER, Session
 from runtime.shared.paths import Places
 
 # contract: rows written before a slot's lease file became the one record of its holder carry a slot of their own.
@@ -54,6 +54,11 @@ def seated(sessions: Iterable[Session], role: str) -> list[Session]:
 
 def children(sessions: dict[str, Session], parent_id: str) -> list[Session]:
     return [s for s in sessions.values() if s.parent == parent_id]
+
+
+def testing(sessions: Iterable[Session], parent_id: str) -> list[Session]:
+    """The testers session ``parent_id`` started that have not handed back."""
+    return [s for s in sessions if s.parent == parent_id and s.role.startswith(TESTER) and s.state != RETIRED]
 
 
 def subtree(sessions: dict[str, Session], root_id: str) -> list[Session]:

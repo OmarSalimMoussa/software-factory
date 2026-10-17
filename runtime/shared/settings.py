@@ -15,13 +15,14 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from runtime.shared.models import CRITIC
 from runtime.shared.settings_schema import SCHEMA, Spec
 
 
 def model_role(kind: str) -> str | None:
     """The [models] role an agent or subagent kind runs on: qa-backend is qa_backend, and every critic shares
     critic. None for a kind with no model of its own to set, such as Explore."""
-    role = "critic" if kind.startswith("critic-") else kind.replace("-", "_")
+    role = "critic" if kind.startswith(CRITIC) else kind.replace("-", "_")
     return role if f"models.{role}" in SCHEMA else None
 
 

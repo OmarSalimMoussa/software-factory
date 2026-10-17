@@ -27,14 +27,13 @@ from runtime.guard.facts import (
 )
 from runtime.guard.wire import HANDBACK, REFUSED
 from runtime.shared import lanes
-from runtime.shared.models import RETIRED, WITH_PARENT
+from runtime.shared.models import CRITIC, RETIRED, TESTER, WITH_PARENT
 from runtime.shared.settings import model_role
 from runtime.shared.settings_schema import SCHEMA
 from runtime.warden.verbs import VERBS, VERDICTS
 
 INTAKE = "intake"
 SLOT_API = "mcp__slot-api__slot_api"
-TESTER, CRITIC = "qa-", "critic-"
 # Claude Code's own timeouts when a call names none, in milliseconds.
 _TIMED_TOOLS = {"Bash": ("timeout", 120_000), "Monitor": ("timeout_ms", 300_000)}
 REPORT = "record what you found with `factory qa finding`, run `factory qa result`, then hand back"
