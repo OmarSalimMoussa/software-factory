@@ -487,3 +487,13 @@ def test_the_session_settings_folder_is_the_wardens(tmp_path: Path) -> None:
     steps_machine.state_tree(job)
 
     assert f"make: {session_settings.folder(job.places)}/ (755, software-warden:software-warden)" in job.host.actions
+
+
+def test_the_sealed_tree_carries_its_bytecode_since_no_user_of_it_may_write_any(tmp_path: Path) -> None:
+    job = dry_job(tmp_path)
+    fresh = job.places.install.with_name(job.places.install.name + ".new")
+
+    steps_machine.place(job)
+
+    compiled = f"run: {layout.PYTHON} -I -m compileall -q {fresh}/runtime {fresh}/standard {fresh}/checks"
+    assert job.host.actions.index(compiled) < job.host.actions.index(f"run: chown -R root:root {fresh}")

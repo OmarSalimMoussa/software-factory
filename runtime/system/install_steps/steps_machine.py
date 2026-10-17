@@ -128,6 +128,9 @@ def in_place(ctx: Install) -> bool:
     return steps_wire.install_digest(ctx) == host.read(ctx.places.install_hash).strip()
 
 
+_COMPILED = ("runtime", "standard", "checks")
+
+
 def place(ctx: Install) -> None:
     """The sealed tree, root-owned and read-only, swapped in whole, unless that commit is in place already; then the
     pinned check tools beside it."""
@@ -142,6 +145,8 @@ def place(ctx: Install) -> None:
         host.copy_tree(ctx.tree(), fresh)
         # The release the warden's and the dashboard's own error reports name.
         host.write(fresh / "COMMIT", ctx.sha + "\n", mode=0o644)
+        # No user of the sealed tree may write its bytecode: without it, every guard call compiles what it imports.
+        host.run([layout.PYTHON, "-I", "-m", "compileall", "-q", *(str(fresh / part) for part in _COMPILED)])
         host.run(["chown", "-R", "root:root", str(fresh)])
         host.run(["chmod", "-R", "u=rwX,go=rX", str(fresh)])
         if host.exists(install):
