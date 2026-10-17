@@ -64,10 +64,12 @@ If one fails, the set-up stops before it changes anything and says what to do.
   it. Save the private half as the product's GitHub secret `SERVER_DEPLOY_KEY`; the summary names the file.
 - **The factory's code.** The factory's `standard/` folder and its commit, in `/usr/local/lib/software-factory/`,
   owned by root. The commands `factory-deploy`, `factory-ci-gate` and `factory-gc` in `/usr/local/bin/` run that
-  code. A copy of the product's `factory.toml` goes to `/etc/software-factory/product.toml`. One sudo rule lets
-  `ci` run `factory-deploy` as the admin user, and nothing else; it is checked before it is placed.
+  code. A copy of the product's `factory.toml` goes to `/etc/software-factory/product.toml`, a folder the factory's
+  own install and uninstall leave alone. One sudo rule lets `ci` run `factory-deploy` as the admin user, and nothing
+  else; it is checked before it is placed.
 - **Folders.** `/srv/factory/` for the shared services, the edge's site files and the deploy lock, and
   `/srv/<product>/<workspace>/` for each workspace's stack, env file and deploy records. The admin user owns them.
+  The factory's install adds one site file of its own, `factory.caddy`, for its dashboard; a deploy never touches it.
 - **The shared services.** Their compose file, the edge's settings and their own `services.env`, in
   `/srv/factory/services/`. The set-up brings them up and waits until every one is healthy. Then it creates
   GlitchTip's organization, your GlitchTip user and a read-only token.

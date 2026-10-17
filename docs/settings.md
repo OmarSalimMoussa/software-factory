@@ -36,7 +36,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `cost`, `prices` | The daily budget (past it, only severe work starts that day), the plan-limit levels, and dollars per million tokens per model |
 | `dashboard` | Port, refresh and stale times, the code lock, page size, the hosts it answers |
 | `gc` | The nightly prune's hour, how long images stay, the Docker disk budget |
-| `install` | The guard's timeout, the check-ins' grace, the product's toolchain, how long publishing the dashboard may wait |
+| `install` | The guard's timeout, the check-ins' grace, the product's toolchain |
 
 `models.allowed` and `prices` are set at install and are read-only on the dashboard. Staging's and prod's health
 addresses are not settings: the warden reads them from `factory.toml` in the product's checkout at every probe.
@@ -62,6 +62,6 @@ walls.
 | The repo | At the next orchestrator start; stop the old one first |
 | The dashboard's threads, and the warden's (`factory.warden_threads`) | At the next warden start |
 | The `install` group | At the next install |
-| The dashboard's port and hosts, the probe period and the loop period | Only with the install's `--set`: the install wires them into the firewall, the tailnet's link and the check-in periods, so the Settings page shows them read-only |
+| The dashboard's port and hosts, the probe period and the loop period | Only with the install's `--set`: the install wires them into the firewall, the edge's site and the check-in periods, so the Settings page shows them read-only |
 
 The dashboard shows the value running now beside one that waits, such as "4 at the next slot claim".

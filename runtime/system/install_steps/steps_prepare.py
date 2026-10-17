@@ -3,7 +3,6 @@ sealed copy, settle the settings, then stop the running factory."""
 
 from __future__ import annotations
 
-import json
 import shlex
 import tomllib
 from pathlib import PurePosixPath
@@ -19,9 +18,10 @@ from runtime.system.install_steps import steps_wire
 from runtime.system.job import Install, github_name, refuse
 from runtime.warden.sessions import registry
 from standard import envfile
+from standard.server import edge as server_edge
 
 # What the owner sets up before an install; the packages step installs the rest (nftables among them).
-_MACHINE_TOOLS = ("git", "tar", "systemctl", "systemd-run", "runuser", "loginctl", "useradd", "tailscale")
+_MACHINE_TOOLS = ("git", "tar", "systemctl", "systemd-run", "runuser", "loginctl", "useradd")
 _OWNER_TOOLS = ("uv", "claude")
 
 
@@ -72,6 +72,9 @@ def check_machine(ctx: Install) -> None:
         problems.append(
             "apt-get is not here: the factory installs its packages with apt, so it runs on Debian or Ubuntu"
         )
+    if not host.exists(server_edge.SITES):
+        problems.append(f"it has no edge to publish the dashboard on: {server_edge.SITES}, which the server set-up "
+                        "makes, is missing")  # fmt: skip
     for tool in _OWNER_TOOLS:
         code, found = owner_tool(ctx, tool)
         if (code != 0 or not found) and not host.dry:
@@ -161,25 +164,6 @@ def _effective(defaults: dict[str, Any], overrides: dict[str, Any], key: str) ->
     return node
 
 
-def _tailnet_name(ctx: Install) -> str | None:
-    code, out = ctx.host.query(["tailscale", "status", "--json"])
-    if ctx.host.dry and not out:
-        return None
-    try:
-        name = json.loads(out)["Self"]["DNSName"] if code == 0 else ""
-    except (ValueError, KeyError, TypeError) as exc:
-        raise refuse(
-            "Tailscale is not signed in on this computer, so the dashboard has no address: sign in to "
-            "Tailscale, then install again"
-        ) from exc
-    if not isinstance(name, str) or not name.strip("."):
-        raise refuse(
-            "Tailscale is not signed in on this computer, so the dashboard has no address: sign in to "
-            "Tailscale, then install again"
-        )
-    return name.strip(".")
-
-
 def settle_settings(ctx: Install) -> None:
     """The commit's defaults, the owner's saved overrides and --set, plus what only the install knows; checked."""
     defaults = tomllib.loads((ctx.tree() / "settings.toml").read_text(encoding="utf-8"))
@@ -196,10 +180,6 @@ def settle_settings(ctx: Install) -> None:
     for key, value in derived.items():
         if not _effective(defaults, overrides, key) and value:
             overrides[key] = value
-    tailnet = _tailnet_name(ctx)
-    hosts = list(_effective(defaults, overrides, "dashboard.hosts") or [])
-    if tailnet and tailnet not in hosts:
-        overrides["dashboard.hosts"] = [*hosts, tailnet]
     try:
         ctx.settings = build(defaults, overrides)
     except SettingsError as exc:
@@ -208,6 +188,9 @@ def settle_settings(ctx: Install) -> None:
             f"The settings cannot be used: {problems}. Set each with --set key=value, then install again"
         ) from exc
     ctx.overrides = overrides
+    if not steps_wire.public_hosts(ctx.settings.get_list("dashboard.hosts")):
+        raise refuse("The setting dashboard.hosts names no public address for the dashboard, which the box's edge "
+                     "serves: set it with --set dashboard.hosts=[...], then install again")  # fmt: skip
     repo = PurePosixPath(ctx.settings.get_str("repo.path"))
     if not str(repo).startswith(f"{layout.AGENT_HOME}/") or ".." in repo.parts:
         raise refuse(f"The setting repo.path must be a folder inside {layout.AGENT_HOME}, the agents' home: set it "

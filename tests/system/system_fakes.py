@@ -9,11 +9,13 @@ from runtime.shared.settings import Settings, build
 from runtime.system.host import Account, DryHost
 from runtime.system.install_steps import steps_prepare
 from runtime.system.job import REPO_ROOT, Install
+from standard.server import edge
 
 FIXTURE = REPO_ROOT / "testdata" / "fixture-product"
 
 # What only the owner can give with --set; the install derives every repo.* setting itself.
-GIVEN: dict[str, Any] = {}
+PUBLIC_HOST = "factory.example.com"
+GIVEN: dict[str, Any] = {"dashboard.hosts": ["127.0.0.1", "localhost", PUBLIC_HOST]}
 PRODUCT_ORIGIN = "git@github.com:acme/shop.git"
 FACTORY_ORIGIN = "git@github.com:acme/software-factory.git"
 
@@ -31,10 +33,11 @@ def dry_job(tmp_path: Path, *, healthchecks: bool = False) -> Install:
     product.mkdir(exist_ok=True)
     shutil.copy(FIXTURE / "factory.toml", product / "factory.toml")
     host = DryHost(
+        paths={edge.SITES},
         answers={
             f"git -C {REPO_ROOT} remote get-url origin": (0, FACTORY_ORIGIN),
             f"git -C {product} remote get-url origin": (0, PRODUCT_ORIGIN),
-        }
+        },
     )
     owner = Account("owner", 1000, 1000, tmp_path / "home", ("owner",), "/bin/bash")
     return Install(host, Places.under(tmp_path / "root"), REPO_ROOT, product, "main", owner, dict(GIVEN), healthchecks)

@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 NOT_APPLICABLE = {
     "repo-shape": "wants GOAL.md, queue/, qa/scenarios/ and scripts/dev: a product's shape, not the tool's",
-    "deploy-shape": "wants the product CI templates, the prod deploy and factory.toml; the factory installs a commit",
+    "deploy-shape": "wants the prod deploy and factory.toml; the factory installs a commit",
     "qa-scenarios": "describes what a product's users do; the factory has no users but its owner",
     "seeds-current": "checks a product's seed data through scripts/dev; the factory has no seed data",
     "tests": "runs a product's tests through its test map; the factory runs its own pytest directly",

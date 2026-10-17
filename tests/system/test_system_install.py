@@ -2,25 +2,26 @@ from __future__ import annotations
 
 import functools
 import json
-import logging
+import re
 import subprocess
 from pathlib import Path
 
 import pytest
-from system_fakes import FACTORY_ORIGIN, dry_job, settings
+from system_fakes import FACTORY_ORIGIN, PUBLIC_HOST, dry_job, settings
 
 from runtime.shared import network, upgrades
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
 from runtime.system import factory_repo, install, layout, render, root_commits, uninstall
-from runtime.system.host import DryHost
+from runtime.system.host import CommandError, DryHost
 from runtime.system.install_steps import steps_machine, steps_prepare, steps_secrets, steps_services, steps_wire
 from runtime.system.job import REPO_ROOT, Install
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
 from runtime.warden.delivery import pins
 from runtime.warden.sessions import registry, session_settings
+from standard.server import edge as server_edge
 
 
 def _answered(job: Install) -> None:
@@ -348,73 +349,81 @@ def test_a_saved_value_for_a_setting_the_factory_no_longer_has_is_dropped_and_th
     assert "Dropped your saved factory.clone: this factory has no such setting." in capsys.readouterr().out
 
 
-def _serving(*handlers: tuple[str, str]) -> str:
-    web = {"box.tail0.ts.net:443": {"Handlers": {path: {"Proxy": target} for path, target in handlers}}}
-    return json.dumps({"TCP": {"443": {"HTTPS": True}}, "Web": web})
-
-
-@pytest.mark.parametrize(
-    ("said", "address", "reported"),
-    [
-        (json.dumps({"Self": {"DNSName": "laptop.tail1.ts.net."}}), "https://laptop.tail1.ts.net/", False),
-        (json.dumps({"Self": {"DNSName": ""}}), "", False),
-        ("tailscale: not JSON", "", True),
-    ],
-    ids=["named", "no-machine", "unreadable"],
-)
-def test_the_dashboards_address_is_tailscales_name_and_an_unreadable_answer_is_reported(
-    said: str, address: str, reported: bool, caplog: pytest.LogCaptureFixture
-) -> None:
-    host = DryHost()
-    host.answers["tailscale status --json"] = (0, said)
-
-    with caplog.at_level(logging.WARNING):
-        assert steps_wire.dashboard_address(host) == address
-
-    warned = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-    assert bool(warned) is reported
-    assert not reported or "tailscale status --json" in warned[0] and "JSONDecodeError" in warned[0]
-
-
-def test_the_dashboard_never_takes_a_tailnet_port_that_serves_something_else(tmp_path: Path) -> None:
-    job = dry_job(tmp_path)
-    assert isinstance(job.host, DryHost)
-    steps_prepare.check_machine(job)
-    steps_prepare.settle_settings(job)
-    job.host.answers["tailscale serve status --json"] = (0, _serving(("/", "http://127.0.0.1:3000")))
-
-    with pytest.raises(Refused, match="already serves http://127.0.0.1:3000 at / on port 443"):
-        steps_wire.tailnet(job)
-
-    assert not any("tailscale set" in action or "tailscale serve" in action for action in job.host.actions)
-
-
-def test_the_install_keeps_the_operator_it_clears_and_the_uninstall_puts_it_back(
+def test_the_dashboard_goes_on_the_edge_by_its_public_names_and_the_uninstall_takes_it_off(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     job = dry_job(tmp_path)
     assert isinstance(job.host, DryHost)
     steps_prepare.check_machine(job)
     steps_prepare.settle_settings(job)
-    job.host.answers["tailscale debug prefs"] = (0, json.dumps({"OperatorUser": "owner"}))
     written: dict[Path, str] = {}
     monkeypatch.setattr(job.host, "write", lambda path, text, **kw: written.__setitem__(path, text))
+    reload = f"run: {' '.join(server_edge.RELOAD)}"
 
-    steps_wire.tailnet(job)
+    steps_wire.edge(job)
 
-    record = layout.tailnet_record(job.places.state)
-    ours = f"http://127.0.0.1:{settings().get_int('dashboard.port')}"
-    assert json.loads(written[record]) == {"operator": "owner", "served": ours}
-    job.host.files[record] = written[record]
+    port = settings().get_int("dashboard.port")
+    lines = written[layout.EDGE_SITE].splitlines()
+    assert f"{PUBLIC_HOST} {{" in lines and f"\treverse_proxy 127.0.0.1:{port} {{" in lines
+    assert job.host.actions == [reload]
+    assert steps_wire.dashboard_address(job.need_settings().get_list("dashboard.hosts")) == f"https://{PUBLIC_HOST}/"
+    job.host.paths.add(layout.EDGE_SITE)
     job.host.dry = False  # decides like a real uninstall; a dry host still changes nothing
-    job.host.answers["tailscale serve status --json"] = (0, _serving(("/", ours)))
     asked: list[str] = []
     answer = job.host.query
     monkeypatch.setattr(job.host, "query", lambda argv, **kw: asked.append(" ".join(argv)) or answer(argv, **kw))
 
-    uninstall.tailnet(job.host, job.places, str(settings().get_int("dashboard.port")))
+    uninstall.programs(job.host)
 
-    assert asked[1:] == ["tailscale serve --https=443 off", "tailscale set --operator=owner"]
+    assert [a for a in job.host.actions if str(server_edge.SITES) in a] == [f"remove: {layout.EDGE_SITE}"]
+    assert asked == [" ".join(server_edge.RELOAD)]
+
+
+def test_a_dashboard_site_the_edge_refuses_comes_off_the_edge_before_the_install_stops(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job = dry_job(tmp_path)
+    steps_prepare.check_machine(job)
+    steps_prepare.settle_settings(job)
+    done: list[str] = []
+
+    def run(argv: list[str], **kw: object) -> str:
+        done.append("reload")
+        if done == ["reload"]:
+            raise CommandError(argv, 1, "Error: adapting config using caddyfile: ambiguous site definition")
+        return ""
+
+    monkeypatch.setattr(job.host, "run", run)
+    monkeypatch.setattr(job.host, "remove", lambda path: done.append(f"remove {path}"))
+
+    with pytest.raises(Refused, match="The edge refused the dashboard's site, which is off the edge again"):
+        steps_wire.edge(job)
+
+    assert done == ["reload", f"remove {layout.EDGE_SITE}", "reload"]
+
+
+@pytest.mark.parametrize(
+    ("edge", "hosts", "said"),
+    [
+        (False, None, f"it has no edge to publish the dashboard on: {server_edge.SITES}, which the server set-up"),
+        (True, ["127.0.0.1", "localhost"], "dashboard.hosts names no public address for the dashboard"),
+    ],
+    ids=["no-edge", "no-public-name"],
+)
+def test_an_install_refuses_a_box_without_an_edge_or_a_public_name_before_it_changes_anything(
+    tmp_path: Path, edge: bool, hosts: list[str] | None, said: str
+) -> None:
+    job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    if not edge:
+        job.host.paths.discard(server_edge.SITES)
+    if hosts is not None:
+        job.changes["dashboard.hosts"] = hosts
+
+    with pytest.raises(Refused, match=re.escape(said)):
+        install.run(job)
+
+    assert job.reached < install.FIRST_CHANGE and job.host.actions == []
 
 
 @pytest.mark.parametrize(

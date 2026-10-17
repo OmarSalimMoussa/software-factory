@@ -55,14 +55,14 @@ def test_a_right_code_admits_the_device_with_a_strict_owner_cookie(rig: Rig) -> 
     assert {"HttpOnly", "SameSite=Strict", "Path=/", "Max-Age=2592000"} <= {p.strip() for p in cookie.split(";")}
     assert "Secure" not in cookie  # served on 127.0.0.1, plain HTTP
     assert rig.get("/api/shell", {**HOST, "cookie": f"owner={token}"}).status == 200
-    tailnet = "factory.tailnet.example"
+    public = "factory.example.com"
     tree = store.read_json(rig.places.state / "public" / "settings.json")
-    tree["dashboard"]["hosts"].append(tailnet)
+    tree["dashboard"]["hosts"].append(public)
     store.write_json(rig.places.state / "public" / "settings.json", tree)
     again = rig.post(
         "/api/device",
         {"code": _code(rig, 1), "idempotency_key": "device-0002"},
-        {**sent, "host": tailnet, "origin": f"https://{tailnet}"},
+        {**sent, "host": public, "origin": f"https://{public}"},
     )
     assert again.headers["Set-Cookie"].endswith("; Secure")
 

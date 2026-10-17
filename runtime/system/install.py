@@ -94,7 +94,7 @@ PHASES: tuple[Phase, ...] = (
         ("Installing the factory commands", steps_wire.factory_command),
         ("Adding the factory's checks to the product", steps_wire.git_hooks),
         ("Moving the product to this factory", steps_wire.product_pin),
-        ("Publishing the dashboard on your tailnet", steps_wire.tailnet),
+        ("Publishing the dashboard on the edge", steps_wire.edge),
     )),
     Phase("Starting up", (
         ("Starting the services", steps_services.start),
@@ -304,9 +304,9 @@ def main(argv: list[str]) -> int:
         # A real host even for a dry run: the copy a dry run ran from was made for real.
         sealed.finish(RealHost(journal), ctx.stage, kept=problem is not None and args.keep_on_failure)
     if problem is None:
-        found = steps_wire.dashboard_address(host)
+        found = steps_wire.dashboard_address(ctx.need_settings().get_list("dashboard.hosts"))
         journal.screen("The dry run finished. Nothing changed." if args.dry_run else
-                       f"The factory is installed.{f' Open the dashboard: {found}' if found else ''}")  # fmt: skip
+                       f"The factory is installed. Open the dashboard: {found}")  # fmt: skip
     if journal.path:
         journal.screen(journal.where())
     return 0 if problem is None else 1

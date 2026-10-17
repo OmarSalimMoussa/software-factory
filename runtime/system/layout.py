@@ -10,6 +10,7 @@ from pathlib import Path
 
 from runtime.shared import paths
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, WARDEN_USER
+from standard.server import edge
 from standard.services import stack
 
 STACK_USER = "software-stack"
@@ -62,9 +63,11 @@ UNITS_DIR = Path("/etc/systemd/system")
 SLICE_CONTROL = Path("/etc/systemd/system.control")  # where `systemctl set-property` keeps its drop-ins
 SLEEP_HOOK = Path("/usr/lib/systemd/system-sleep/software-factory")
 POLKIT_RULE = Path("/etc/polkit-1/rules.d/50-software-factory.rules")
-CONFIG = Path("/etc/software-factory")
-NFT_FILE = CONFIG / "firewall.nft"
+# A file of the factory's own: /etc/software-factory holds the server set-up's product.toml and heartbeat-ping.
+NFT_FILE = Path("/etc/software-firewall.nft")
 NFT_TABLE = "software_factory"
+# The dashboard's site on the box's edge, which the server set-up runs; a deploy writes only its workspaces' sites.
+EDGE_SITE = edge.SITES / "factory.caddy"
 APPARMOR_DIR = Path("/etc/apparmor.d")
 APPARMOR_PROFILE = APPARMOR_DIR / "software-bwrap"
 BWRAP = Path("/usr/bin/bwrap")
@@ -130,12 +133,6 @@ def public(state: Path) -> Path:
 
 def install_record(state: Path) -> Path:
     return state / "install.json"
-
-
-def tailnet_record(state: Path) -> Path:
-    """What the install changed on Tailscale, for the uninstall to put back: the operator it cleared and what it
-    serves."""
-    return state / "tailnet.json"
 
 
 def stack_wall(stack_uid: str) -> Path:

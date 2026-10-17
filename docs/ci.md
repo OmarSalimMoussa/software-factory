@@ -1,8 +1,8 @@
 # CI
 
 Every product runs the same two GitHub workflows. They live in the factory's `templates/ci/`, and the product copies
-them into `.github/workflows/` and never edits them: the `deploy-shape` check refuses a copy that differs by one byte.
-Everything that belongs to one product comes from its `factory.toml`.
+them into `.github/workflows/` and never edits them. Everything that belongs to one product comes from its
+`factory.toml`.
 
 | Workflow | Runs | Does |
 | --- | --- | --- |

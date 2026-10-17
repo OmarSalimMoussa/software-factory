@@ -45,7 +45,7 @@ def save(ctx: Context, **args: Any) -> dict[str, Any]:
         ({"prices": {}}, None, "settings"),
         ({"repo.path": "/elsewhere"}, None, "settings"),
         ({"caps.implementers": 4}, "0000000000000000", "stale"),
-        ({"dashboard.port": 9000}, None, "settings"),  # wired into the firewall and the tailnet at install
+        ({"dashboard.port": 9000}, None, "settings"),  # wired into the firewall and the edge at install
         ({"qa.widths": []}, None, "settings"),  # a tester browser needs a width
         ({"qa.widths": [1440, "wide"]}, None, "settings"),
         ({"install.toolchain": ["uv", " "]}, None, "settings"),

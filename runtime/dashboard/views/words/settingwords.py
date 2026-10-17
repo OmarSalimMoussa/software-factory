@@ -344,7 +344,6 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         "Install",
         "Read by the installer: a change applies at the next install.",
         [
-            ("install.tailnet_seconds", "Seconds to publish the dashboard"),
             ("install.hook_timeout_seconds", "Seconds Claude Code waits for the guard"),
             ("install.firewall_refresh_seconds", "Load the firewall again every, seconds"),
             ("install.healthchecks_grace_minutes", "Minutes a check-in may be late"),

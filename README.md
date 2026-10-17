@@ -33,7 +33,8 @@ unit; installing the commit before is the way back. `runtime/system/uninstall.py
 runs on Debian or Ubuntu, and checks everything it needs before it changes anything. It copies the programs the
 product's scripts need (the setting `install.toolchain`) as your own shell finds them, rc files and all (nvm, mise,
 fnm), and refuses one whose version differs from the product's `.nvmrc` or `.node-version`. It copies the Python the
-product asks for from your uv, so the agents and the stack run the same tools you do. It takes port 443 on your
-tailnet only when nothing else serves there, and the uninstall puts back the Tailscale operator it cleared.
+product asks for from your uv, so the agents and the stack run the same tools you do. It puts the dashboard on the
+server's edge, at each name in `dashboard.hosts` that is not loopback (give yours with `--set`), and refuses a machine
+with no edge. The uninstall takes the dashboard off the edge again, and leaves what the server set-up placed.
 
 How to run it: [docs/operate.md](docs/operate.md). The shape a product must take: [docs/repo-shape.md](docs/repo-shape.md).

@@ -19,6 +19,7 @@ from pathlib import Path
 
 from standard import envfile
 from standard.config_records import Config
+from standard.server import edge
 from standard.server import heartbeat as heartbeat_mod
 from standard.server.setup_machine import Host, SetupError, ensure_dirs, ensure_file, remote_text
 from standard.services import provision, stack
@@ -199,7 +200,7 @@ def _wrapper(name: str) -> str:
 def folders(job: Job) -> None:
     owner, name = job.admin, job.config.product.name
     wanted = [(path, owner, "755") for path in ("/srv/factory", "/srv/factory/services", "/srv/factory/edge")]
-    wanted += [(path, owner, "755") for path in ("/srv/factory/edge/sites", "/srv/factory/state", f"/srv/{name}")]
+    wanted += [(path, owner, "755") for path in (str(edge.SITES), "/srv/factory/state", f"/srv/{name}")]
     for ws in job.config.workspaces:
         base = f"/srv/{name}/{ws.name}"
         wanted += [(base, owner, "755"), (f"{base}/stack", owner, "755"), (f"{base}/env", owner, "700")]
@@ -212,7 +213,7 @@ def shared_services(job: Job) -> None:
     changed = ensure_file(host, f"{SERVICES}/compose.yml", stack.COMPOSE.read_text(), owner=owner, mode="644")
     # The edge holds this file through a bind mount, which keeps the inode it started with: write it in place.
     caddyfile = stack.EDGE_CADDYFILE.read_text()
-    edge = ensure_file(host, f"{SERVICES}/edge.Caddyfile", caddyfile, owner=owner, mode="644", in_place=True)
+    edge_changed = ensure_file(host, f"{SERVICES}/edge.Caddyfile", caddyfile, owner=owner, mode="644", in_place=True)
     env_path = f"{SERVICES}/{stack.ENV_FILE}"
     found = remote_text(host, env_path)
     existing = stack.parse_env(found[1], env_path) if found else {}
@@ -225,9 +226,8 @@ def shared_services(job: Job) -> None:
         host.act("bring the shared services up and wait until healthy", lambda: stack.up(host.run, SERVICES, edge=True))
     else:
         print("   found: every shared service up and healthy")
-    if edge:
-        reload = ["docker", "exec", "factory-edge", "caddy", "reload", "--config", "/etc/caddy/Caddyfile"]
-        host.change("reload the edge's settings", reload)
+    if edge_changed:
+        host.change("reload the edge's settings", edge.RELOAD)
     _reconnect(job)
     if host.dry_run:
         print("   would make sure of GlitchTip's organization, owner and read-only token")

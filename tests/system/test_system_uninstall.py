@@ -3,11 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from system_fakes import dry_job
 
 from runtime.shared import paths
 from runtime.shared.paths import MANAGED_SETTINGS, Places
-from runtime.system import layout, uninstall
+from runtime.system import install, layout, uninstall
 from runtime.system.host import Account, DryHost
+from standard.server import setup_steps
 
 
 @pytest.mark.parametrize(
@@ -61,3 +63,19 @@ def test_the_uninstall_takes_the_factorys_own_glitchtip_away_with_its_account_an
     assert f"remove: {paths.ERRORS}" in host.actions
     assert f"run: userdel --remove {layout.ERRORS_USER}" in host.actions
     assert layout.ERRORS_UNIT in uninstall.UNITS
+
+
+def test_taking_back_a_failed_first_install_leaves_the_server_set_ups_config_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prods = Path(setup_steps.PRODUCT_TOML)
+    job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    job.host.files |= {prods: "[product]\n", MANAGED_SETTINGS: "{}"}
+    monkeypatch.setattr(job.host, "exists", lambda path: True)  # whatever the machine holds
+
+    install.roll_back(job)
+
+    removed = [Path(action.removeprefix("remove: ")) for action in job.host.actions if action.startswith("remove: ")]
+    assert layout.NFT_FILE in removed
+    assert not [path for path in removed if prods.is_relative_to(path)]

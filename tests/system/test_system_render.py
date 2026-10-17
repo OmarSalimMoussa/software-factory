@@ -161,7 +161,7 @@ def test_the_firewall_loads_after_nftables_again_on_its_timer_and_the_kernel_wal
              "ExecStartPost=/usr/bin/touch /run/software-firewall/loaded"}  # fmt: skip
 
     assert {"After=nftables.service", "PartOf=nftables.service", *stamp} <= set(firewall)
-    assert {"ExecStart=/usr/sbin/nft -f /etc/software-factory/firewall.nft", *stamp} <= set(refresh)
+    assert {"ExecStart=/usr/sbin/nft -f /etc/software-firewall.nft", *stamp} <= set(refresh)
     assert {"OnActiveSec=45s", "OnUnitActiveSec=45s", "WantedBy=timers.target"} <= set(timer)
     slice_ = _unit("software-factory.slice").splitlines()
     assert "IPAddressDeny=100.64.0.0/10 fd7a:115c:a1e0::/48" in slice_

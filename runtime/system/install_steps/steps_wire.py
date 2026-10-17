@@ -1,23 +1,17 @@
 """The steps that wire the factory in: managed settings, units, polkit, the firewall, the factory command, the git
-hooks, the tailnet, starting it, and the record a finished install leaves."""
+hooks, the dashboard's site on the box's edge, starting it, and the record a finished install leaves."""
 
 from __future__ import annotations
 
 import json
-import logging
-import re
-from pathlib import Path
 
-from runtime.shared import upgrades
+from runtime.shared import network, upgrades
 from runtime.shared.paths import AGENT_USER, MANAGED_SETTINGS, SCRATCH, SLICE, WARDEN_USER
 from runtime.shared.protocol import Refused
 from runtime.system import layout, render, root_commits
-from runtime.system.host import CommandError, Host
+from runtime.system.host import CommandError
 from runtime.system.job import Install, github_name, refuse
-
-log = logging.getLogger(__name__)
-_HTTPS = 443
-_TAILSCALE_LINK = re.compile(r"https://login\.tailscale\.com/\S+")
+from standard.server import edge as server_edge
 
 
 def managed_settings(ctx: Install) -> None:
@@ -63,7 +57,6 @@ def polkit(ctx: Install) -> None:
 
 
 def firewall(ctx: Install) -> None:
-    ctx.host.mkdir(layout.CONFIG, mode=0o755)
     text = render.artifact(render.FIREWALL, ctx.templates(), given(ctx))
     ctx.host.write(render.FIREWALL.dest, text, mode=render.FIREWALL.mode)
     if ctx.host.dry:
@@ -132,89 +125,25 @@ def _pin(ctx: Install) -> None:
     host.tell(f"The product moves to this factory in commit {made.commit[:12]}; the warden pushes it when it starts.")
 
 
-def https_handlers(status: str) -> dict[str, str] | None:
-    """What the tailnet serves on its HTTPS port, each path to its target, from `tailscale serve status --json`; None
-    when the answer cannot be read."""
-    try:
-        data = json.loads(status or "{}")
-    # telemetry: surfaced — an unreadable answer is None from `https_handlers`, and the install refuses why
-    except ValueError:
-        return None
-    if not isinstance(data, dict):
-        return None
-    found: dict[str, str] = {}
-    for where, web in (data.get("Web") or {}).items():
-        if not isinstance(web, dict) or where.rpartition(":")[2] != str(_HTTPS):
-            continue
-        for path, handler in (web.get("Handlers") or {}).items():
-            target = (
-                handler.get("Proxy") or handler.get("Path") or handler.get("Text") if isinstance(handler, dict) else ""
-            )
-            found[path] = str(target or "a handler")
-    forward = ((data.get("TCP") or {}).get(str(_HTTPS)) or {}).get("TCPForward")
-    if forward:
-        found["(every connection)"] = str(forward)
-    return found
+def public_hosts(hosts: list[str]) -> list[str]:
+    """The names of ``dashboard.hosts`` the box's edge serves over HTTPS: every one but loopback's."""
+    return [name for name in hosts if name not in network.LOOPBACK]
 
 
-def read_tailnet_record(host: Host, state: Path) -> dict[str, object]:
-    """What an earlier install changed on Tailscale (``layout.tailnet_record``); empty when it changed nothing yet."""
-    path = layout.tailnet_record(state)
-    if not host.exists(path):
-        return {}
-    try:
-        found = json.loads(host.read(path))
-    except ValueError as exc:
-        raise refuse(f"{path} cannot be read ({exc}): remove it, then try again") from exc
-    return found if isinstance(found, dict) else {}
-
-
-def _operator(prefs: str) -> str | None:
-    """The Tailscale operator `tailscale debug prefs` names: "" for none, None when its answer cannot be read."""
-    try:
-        found = json.loads(prefs).get("OperatorUser", "")
-    # telemetry: surfaced — an unreadable answer is None from `_operator`, and the uninstall tells the owner
-    except (ValueError, AttributeError):
-        return None
-    return found if isinstance(found, str) else None
-
-
-def tailnet(ctx: Install) -> None:
-    """Only root may change what the tailnet serves, so no agent can reroute the owner's dashboard. On a tailnet whose
-    HTTPS is off, tailscale waits for the owner to turn it on at a link it prints: past the wait, the owner is shown
-    that link. The dashboard never takes over a port 443 that serves something else, and the operator the install
-    clears is kept for the uninstall to put back."""
+def edge(ctx: Install) -> None:
+    """Root writes the dashboard's site on the box's edge, so no agent can reroute the owner's dashboard. The edge
+    fetches each name's certificate itself once the name's DNS points at the box. A site the edge refuses comes off
+    again at once: left there, it would fail every reload of prod's deploys, and the edge's next start."""
     settings, host = ctx.need_settings(), ctx.host
-    port = settings.get_int("dashboard.port")
-    ours = f"http://127.0.0.1:{port}"
-    record = read_tailnet_record(host, ctx.places.state)
-    code, status = host.query(["tailscale", "serve", "status", "--json"])
-    handlers = https_handlers(status) if code == 0 else None
-    if handlers is None and not host.dry:
-        raise refuse("Tailscale did not say what your tailnet serves (tailscale serve status --json): check that "
-                     "tailscale runs, then install again")  # fmt: skip
-    others = sorted(f"{target} at {path}" for path, target in (handlers or {}).items()
-                    if target not in (ours, record.get("served")))  # fmt: skip
-    if others:
-        raise refuse(f"Your tailnet already serves {', '.join(others)} on port {_HTTPS}, which the dashboard takes: "
-                     "move it to another port, then install again")  # fmt: skip
-    if "operator" not in record:
-        code, prefs = host.query(["tailscale", "debug", "prefs"])
-        record["operator"] = _operator(prefs) if code == 0 else None
-    record["served"] = ours
-    host.write(layout.tailnet_record(ctx.places.state), json.dumps(record) + "\n", mode=0o600)
-    host.run(["tailscale", "set", "--operator="])
-    serve = ["tailscale", "serve", "--yes", "--bg", f"--https={_HTTPS}", f"http://127.0.0.1:{port}"]
+    site = server_edge.site(public_hosts(settings.get_list("dashboard.hosts")), settings.get_int("dashboard.port"))
+    host.write(layout.EDGE_SITE, site, mode=0o644)
     try:
-        ctx.host.run(serve, timeout=settings.get_int("install.tailnet_seconds"))
+        host.run(server_edge.RELOAD)
     except CommandError as exc:
-        link = _TAILSCALE_LINK.search(exc.output)
-        if link is None:
-            raise
-        raise refuse(
-            f"Turn on HTTPS for your tailnet, so the dashboard gets its address: open {link.group(0)}, "
-            "approve it, then install again"
-        ) from exc
+        host.remove(layout.EDGE_SITE)
+        host.run(server_edge.RELOAD)
+        raise refuse(f"The edge refused the dashboard's site, which is off the edge again ({exc}): put dashboard.hosts "
+                     "right with --set, then install again") from exc  # fmt: skip
 
 
 def start(ctx: Install) -> None:
@@ -250,12 +179,7 @@ def record(ctx: Install) -> None:
     host.say(f"the factory at {ctx.sha[:12]} is installed")
 
 
-def dashboard_address(host: Host) -> str:
-    """The dashboard on the tailnet, where `tailscale serve` publishes it; "" when tailscale names no machine."""
-    code, out = host.query(["tailscale", "status", "--json"])
-    try:
-        name = json.loads(out)["Self"]["DNSName"] if code == 0 else ""
-    except (ValueError, KeyError, TypeError) as exc:
-        log.warning("install: tailscale status --json cannot be read (%s), so no dashboard address", type(exc).__name__)
-        return ""
-    return f"https://{name.strip('.')}/" if isinstance(name, str) and name.strip(".") else ""
+def dashboard_address(hosts: list[str]) -> str | None:
+    """The dashboard as the edge serves it, by its first public name; None when it has none."""
+    public = public_hosts(hosts)
+    return f"https://{public[0]}/" if public else None

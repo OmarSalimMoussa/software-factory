@@ -4,12 +4,13 @@ From the owner's clone of the factory, or from the installed copy in /opt/softwa
     sudo python3 runtime/system/uninstall.py [--repo <product checkout>] [--dry-run] [--verbose]
 
 It refuses while any session is working or waiting. It stops and removes the factory's units, rules, firewall table,
-AppArmor profile, managed settings, commands and programs, and the sealed copies installs ran from; the warden's state
-(its secrets and the 6-digit code's secret included), the laptop's shared services and the factory's own GlitchTip
-with their data; the factory's users with their homes (the agents' clone and each Docker user's Docker data); and the
-factory's git hooks setting in the owner's checkout. It never removes packages, the owner's own files, the install
-logs, or anything on the server or on GitHub: it says what to remove there. Like the installer, it shows a few phases
-and logs the rest.
+AppArmor profile, managed settings, commands and programs, the dashboard's site on the edge, and the sealed copies
+installs ran from; the warden's state (its secrets and the 6-digit code's secret included), the laptop's shared
+services and the factory's own GlitchTip with their data; the factory's users with their homes (the agents' clone and
+each Docker user's Docker data); and the factory's git hooks setting in the owner's checkout. It never removes
+packages, the owner's own files, the install logs, what the server set-up placed (the edge and /etc/software-factory
+among it), or anything on GitHub, where it says what to remove. Like the installer, it shows a few phases and logs the
+rest.
 """
 
 from __future__ import annotations
@@ -25,16 +26,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from runtime.shared import environment, paths, store
-from runtime.shared import settings as settings_module
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER, Places
 from runtime.shared.protocol import Refused
 from runtime.system import layout
 from runtime.system.github_keys import WARDEN_TITLE
 from runtime.system.host import Account, CommandError, DryHost, Host
-from runtime.system.install_steps import steps_prepare, steps_wire
+from runtime.system.install_steps import steps_prepare
 from runtime.system.job import REPO_ROOT, Install
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
+from standard.server import edge as server_edge
 
 PROGRAM = "uninstall.py"
 
@@ -116,7 +117,7 @@ def system_files(host: Host) -> None:
     _try(host, ["systemctl", "reset-failed"])
     _remove(host, layout.POLKIT_RULE)
     _try(host, ["nft", "delete", "table", "inet", layout.NFT_TABLE])
-    _remove(host, layout.CONFIG)
+    _remove(host, layout.NFT_FILE)
     if host.exists(layout.APPARMOR_PROFILE):
         _try(host, ["apparmor_parser", "-R", str(layout.APPARMOR_PROFILE)])
         _remove(host, layout.APPARMOR_PROFILE)
@@ -133,37 +134,15 @@ def _with_leftovers(path: Path) -> tuple[Path, ...]:
     return (path, *(path.with_name(f"{path.name}.{end}") for end in ("new", "old", "partial", "bundle")))
 
 
-def programs(host: Host, places: Places, dashboard_port: str | None) -> None:
+def programs(host: Host) -> None:
     for path in (paths.FACTORY_BIN, layout.OWN_BIN, layout.CLAUDE_BIN.parent, *_with_leftovers(paths.INSTALL),
                  layout.TOOLS, *_with_leftovers(layout.TOOLCHAIN), paths.RUN, paths.FIREWALL,
                  paths.UPGRADE):  # fmt: skip
         _remove(host, path)
     sealed_copies(host)
-    tailnet(host, places, dashboard_port)
-
-
-def tailnet(host: Host, places: Places, dashboard_port: str | None) -> None:
-    """Take the dashboard off the tailnet, but never another handler on its port, and put back the operator the
-    install cleared."""
-    record = steps_wire.read_tailnet_record(host, places.state)
-    served = record.get("served") if isinstance(record.get("served"), str) else None
-    ours = f"http://127.0.0.1:{dashboard_port}" if dashboard_port is not None else served
-    code, status = host.query(["tailscale", "serve", "status", "--json"])
-    handlers = steps_wire.https_handlers(status) if code == 0 else None
-    if ours is None:
-        host.tell("The dashboard's port could not be read, so nothing is taken off your tailnet: check "
-                  "tailscale serve status and remove the dashboard's entry yourself.")  # fmt: skip
-    elif handlers and set(handlers.values()) == {ours}:
-        _try(host, ["tailscale", "serve", "--https=443", "off"])
-    elif handlers and ours in handlers.values():
-        host.tell("Your tailnet's port 443 serves more than the dashboard, so it stays: take the dashboard's handler "
-                  "off it yourself (tailscale serve status shows it).")  # fmt: skip
-    operator = record.get("operator")
-    if isinstance(operator, str) and operator:
-        _try(host, ["tailscale", "set", f"--operator={operator}"])
-    elif record and operator is None:
-        host.tell("The install could not read your Tailscale operator, so it is not put back: if you had one, set it "
-                  "again with sudo tailscale set --operator=<you>.")  # fmt: skip
+    if host.exists(layout.EDGE_SITE):
+        host.remove(layout.EDGE_SITE)
+        _try(host, server_edge.RELOAD)
 
 
 def sealed_copies(host: Host) -> None:
@@ -226,18 +205,18 @@ STEPS = (
 )
 LEFT_FOR_YOU = (
     f"Left for you: on GitHub, the warden's deploy key on the product (titled '{WARDEN_TITLE}' or as you named it), "
-    f"which the next install replaces. The server is untouched, and the install logs stay in {layout.LOGS}."
+    f"which the next install replaces. What the server set-up placed stays, and so do the install logs in "
+    f"{layout.LOGS}."
 )
 
 
 def remove_all(host: Host, places: Places, owner: str, repo: Path | None, *, phases: bool) -> None:
     """Every removal, in order, each its own phase or, when the installer takes back a first install that failed,
     each a step of its one phase."""
-    port = dashboard_port(places)
     removals: tuple[Callable[[], None], ...] = (
         lambda: stop(host),
         lambda: system_files(host),
-        lambda: programs(host, places, port),
+        lambda: programs(host),
         lambda: state(host, places),
         lambda: users(host),
         lambda: owner_checkout(host, owner, repo),
@@ -306,17 +285,6 @@ def main(argv: list[str]) -> int:
     if journal.path:
         journal.screen(journal.where())
     return 1 if failed else 0
-
-
-def dashboard_port(places: Places) -> str | None:
-    """The port the dashboard was published on, from the warden's published settings; None when they cannot be
-    read (no install, or one that never published them)."""
-    published = places.state / "public" / "settings.json"
-    try:
-        return str(settings_module.read_some(store.read_json(published), ("dashboard.port",))["dashboard.port"])
-    # telemetry: surfaced — the uninstall says it could not tell the port `dashboard_port` returns as None
-    except (OSError, store.StoreError, settings_module.SettingsError):
-        return None
 
 
 if __name__ == "__main__":

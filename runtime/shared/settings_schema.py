@@ -22,7 +22,7 @@ class Spec:
 AT_ONCE, NEXT_START, MINUTE, ORCH = "At once", "Next start", "Within a minute", "Next orchestrator start"
 
 
-# Wired by the install into what nothing else rewrites (the firewall, the tailnet's serve entry, the check-in periods):
+# Wired by the install into what nothing else rewrites (the firewall, the edge's site, the check-in periods):
 # changed only with the install's --set, so a save never leaves them out of step.
 AT_INSTALL = "Set at install"
 
@@ -215,7 +215,6 @@ SCHEMA: dict[str, Spec] = {
     "factory.command_seconds": Spec("int", 10, 900),
     "factory.warden_threads": Spec("int", 2, 64, when="Next warden start"),  # contract: added by 1B-3
     # contract: added by builder 3, read by the installer only.
-    "install.tailnet_seconds": Spec("int", 10, 600, when="Next install"),
     "install.hook_timeout_seconds": Spec("int", 2, 60, when="Next install"),
     "install.firewall_refresh_seconds": Spec("int", 10, 600, when="Next install"),
     "install.healthchecks_grace_minutes": Spec("int", 1, 120, when="Next install"),

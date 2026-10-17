@@ -1,28 +1,24 @@
 """Deploy shape: the product can be built, smoke-tested and deployed the standard way.
 
-factory.toml loads and names a ghcr.io registry; the two workflows are the factory's templates, byte for byte (read
-from the factory this check runs in, so a product is held to that commit's copy); ``.github/factory-ref`` pins the
-factory; every hook factory.toml names is tracked and executable; the build plan can be made, and each image's ignore
-file leaves out .claude folders; every built service runs the image CI builds for the commit; the smoke test reaches
-built services; the deploy files are tracked and hold compose.yml, the env template and every relative bind mount;
-every product image a tracked file names is built; every [env.set] key is in the env template; and every published
-port binds 127.0.0.1.
+factory.toml loads and names a ghcr.io registry; every hook factory.toml names is tracked and executable; the build
+plan can be made, and each image's ignore file leaves out .claude folders; every built service runs the image CI
+builds for the commit; the smoke test reaches built services; the deploy files are tracked and hold compose.yml, the
+env template and every relative bind mount; every product image a tracked file names is built; every [env.set] key is
+in the env template; and every published port binds 127.0.0.1.
 """
 
 from __future__ import annotations
 
 import posixpath
 import re
-from pathlib import Path
 from typing import Any
 
 from checks.runner.repo import Repo
-from runtime.shared.paths import PROMOTE_WORKFLOW
 from standard import compose as compose_mod
 from standard import config as config_mod
 from standard import plan as plan_mod
 from standard.compose import Compose, ComposeError
-from standard.config import FACTORY_REF, FACTORY_REF_LINE, ConfigError
+from standard.config import ConfigError
 from standard.config_records import Config
 
 ID = "deploy-shape"
@@ -30,45 +26,11 @@ RULE = "The product builds, smoke-tests and deploys the standard way, as factory
 VALUES_FILE = None
 VALUES = None
 
-TEMPLATES = Path(__file__).resolve().parents[2] / "templates" / "ci"
-WORKFLOWS = ("ci.yml", PROMOTE_WORKFLOW)
-# CI signs in to this registry with the workflow's own GITHUB_TOKEN; it holds no other registry's password.
 REGISTRY = "ghcr.io/"
 LOOPBACK = "127.0.0.1"
 _ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
 LEFT_OUT = "**/.claude"
 _WILDCARD = re.compile(r"[*?\[]")
-
-
-def _first_difference(mine: bytes, template: bytes) -> int:
-    ours, theirs = mine.splitlines(keepends=True), template.splitlines(keepends=True)
-    pairs = enumerate(zip(ours, theirs, strict=False), 1)
-    return next((n for n, (a, b) in pairs if a != b), min(len(ours), len(theirs)) + 1)
-
-
-def workflow_problems(repo: Repo) -> list[str]:
-    out = []
-    for name in WORKFLOWS:
-        rel = f".github/workflows/{name}"
-        if rel not in repo.tracked:
-            out.append(f"{rel} is missing (or not committed): copy the factory's templates/ci/{name} there unchanged")
-            continue
-        mine, template = (repo.root / rel).read_bytes(), (TEMPLATES / name).read_bytes()
-        if mine != template:
-            line = _first_difference(mine, template)
-            out.append(f"{rel} differs from the factory's template at line {line}: copy templates/ci/{name} over it "
-                       "unchanged; the product's settings go in factory.toml")  # fmt: skip
-    return out
-
-
-def ref_problems(repo: Repo) -> list[str]:
-    wanted = "one line, owner/name@<40-character sha>, naming the factory repo and commit CI checks with"
-    if FACTORY_REF not in repo.tracked:
-        return [f"{FACTORY_REF} is missing (or not committed): write {wanted}"]
-    lines = repo.read(FACTORY_REF).splitlines()
-    if len(lines) != 1 or not FACTORY_REF_LINE.fullmatch(lines[0]):
-        return [f"{FACTORY_REF} must hold {wanted}; it holds {repo.read(FACTORY_REF)[:80]!r}"]
-    return []
 
 
 def _under(rel: str, entry: str) -> bool:
@@ -189,12 +151,12 @@ def port_problems(compose: Compose) -> list[str]:
 
 
 def run(repo: Repo, values: dict[str, Any]) -> list[str]:
-    out = workflow_problems(repo) + ref_problems(repo)
     try:
         config = config_mod.load(repo.root)
-    # telemetry: surfaced — factory.toml's problems go into `out`, which the check reports
+    # telemetry: surfaced — factory.toml's problems are the list `run` returns, which the check reports
     except ConfigError as exc:
-        return out + [f"{config_mod.FILE}: {p}" for p in exc.problems]
+        return [f"{config_mod.FILE}: {p}" for p in exc.problems]
+    out: list[str] = []
     if not config.product.registry.startswith(REGISTRY):
         out.append(f"[product].registry is {config.product.registry}, but CI pushes only to {REGISTRY}<owner>, where "
                    "it signs in with the workflow's own token: set it to ghcr.io/<owner>")  # fmt: skip

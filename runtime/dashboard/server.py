@@ -33,7 +33,7 @@ from runtime.shared.settings import Settings
 log = logging.getLogger("factory.dashboard")
 
 UI = Path(__file__).resolve().parent / "ui"
-BIND = "127.0.0.1"  # the tailnet reaches the dashboard through `tailscale serve`, never directly
+BIND = "127.0.0.1"  # the network reaches the dashboard only through the box's edge
 _TYPES = {
     ".html": "text/html; charset=utf-8",
     ".css": "text/css; charset=utf-8",

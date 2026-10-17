@@ -1,7 +1,7 @@
 """Who may use the dashboard: a request to one of its own addresses, from a device the owner admitted with the
 6-digit code once, and, for a write, a same-origin JSON request the browser could only have sent from the page.
 
-A device's token lives in an HttpOnly, SameSite=Strict owner cookie (Secure on the tailnet's HTTPS name) and is
+A device's token lives in an HttpOnly, SameSite=Strict owner cookie (Secure on a public name, served over HTTPS) and is
 checked with the warden on every request. While the warden is away, a token it confirmed before still opens the
 page's last known state until that token's own expiry.
 """
@@ -17,6 +17,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from runtime.dashboard.client import Warden, WardenDown
+from runtime.shared import network
 from runtime.shared.settings import Settings
 
 COOKIE = "owner"
@@ -25,7 +26,6 @@ PAGE_POLICY = (
     "frame-ancestors 'none'"
 )
 WRITE_HEADER = "X-Software"
-_LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
 # Every header name is looked up in lower case: the server lowers them as they arrive.
@@ -127,7 +127,7 @@ class Devices:
 
 
 def owner_cookie(token: str, host: str, settings: Settings) -> str:
-    """The Set-Cookie value that admits this device; Secure wherever the page is served over HTTPS (the tailnet)."""
+    """The Set-Cookie value that admits this device; Secure wherever the page is served over HTTPS (the edge)."""
     age = settings.get_int("dashboard.device_days") * 86400
-    secure = "" if host in _LOOPBACK else "; Secure"
+    secure = "" if host in network.LOOPBACK else "; Secure"
     return f"{COOKIE}={token}; Path=/; Max-Age={age}; HttpOnly; SameSite=Strict{secure}"

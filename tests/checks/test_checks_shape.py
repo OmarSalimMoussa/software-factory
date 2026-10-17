@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import shutil
-import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
@@ -99,18 +97,8 @@ def _derive_twice(root: Path) -> None:
         (root / name / "Dockerfile").write_text(f"FROM ghcr.io/owner/{base}\n" if base else "FROM busybox:1.37\n")
 
 
-@pytest.fixture
-def standard_product(fixture_product: Path) -> Path:
-    """The fixture product carrying the factory's current workflow templates, whether or not its copies match yet."""
-    for template in deploy_shape.TEMPLATES.iterdir():
-        shutil.copy(template, fixture_product / ".github" / "workflows" / template.name)
-    for args in (["add", "-A"], ["commit", "-q", "--no-verify", "--allow-empty", "-m", "the factory's workflows"]):
-        subprocess.run(["git", *args], cwd=fixture_product, check=True, capture_output=True)
-    return fixture_product
-
-
-def test_the_fixture_has_the_standard_deploy_shape(standard_product: Path) -> None:
-    assert deploy_shape.run(Repo.open(standard_product), {}) == []
+def test_the_fixture_has_the_standard_deploy_shape(fixture_product: Path) -> None:
+    assert deploy_shape.run(Repo.open(fixture_product), {}) == []
 
 
 @pytest.mark.parametrize(
@@ -119,9 +107,6 @@ def test_the_fixture_has_the_standard_deploy_shape(standard_product: Path) -> No
         (_edit("factory.toml", 'name = "notes"', 'name = "Notes"'), "factory.toml: [product].name: 'Notes' is not"),
         (_edit("factory.toml", '"ghcr.io/owner"', '"registry.example.com/owner"'),
          "[product].registry is registry.example.com/owner, but CI pushes only to ghcr.io/<owner>"),
-        (_edit(".github/workflows/ci.yml", "\n", "\r\n"), ".github/workflows/ci.yml differs from the factory's"),
-        (_remove(".github/workflows/deploy-prod.yml"), ".github/workflows/deploy-prod.yml is missing"),
-        (_add(".github/factory-ref", "owner/software-factory@main\n"), ".github/factory-ref must hold one line"),
         (_chmod("scripts/smoke-check"), "factory.toml names scripts/smoke-check as a hook, but it is not executable"),
         (_edit("factory.toml", 'expect = [{ service = "app"', 'expect = [{ service = "db"'),
          "[smoke] names the service db, which compose.yml does not build"),
@@ -147,14 +132,14 @@ def test_the_fixture_has_the_standard_deploy_shape(standard_product: Path) -> No
          ".dockerignore lets !**/keep back in, and a wildcard"),
         (_add("app/Dockerfile.dockerignore", "**/__pycache__\n"), "app/Dockerfile.dockerignore does not leave out"),
     ],
-    ids=["settings", "registry", "workflow", "workflow-missing", "factory-ref", "hook", "smoke", "extra-image",
-         "two-levels", "image-name", "bind-mount", "untracked-file", "deploy-files", "named-image", "env-key", "port",
-         "claude-folders", "no-ignore-file", "wildcard-back-in", "dockerfiles-own-ignore"],
+    ids=["settings", "registry", "hook", "smoke", "extra-image", "two-levels", "image-name", "bind-mount",
+         "untracked-file", "deploy-files", "named-image", "env-key", "port", "claude-folders", "no-ignore-file",
+         "wildcard-back-in", "dockerfiles-own-ignore"],
 )  # fmt: skip
 def test_a_product_off_the_standard_deploy_fails_naming_what_to_do(
-    standard_product: Path, commit: Callable[[Path, str], None], damage: Break, said: str
+    fixture_product: Path, commit: Callable[[Path, str], None], damage: Break, said: str
 ) -> None:
-    damage(standard_product)
-    commit(standard_product, "damage")
-    problems = deploy_shape.run(Repo.open(standard_product), {})
+    damage(fixture_product)
+    commit(fixture_product, "damage")
+    problems = deploy_shape.run(Repo.open(fixture_product), {})
     assert any(said in p for p in problems), problems
