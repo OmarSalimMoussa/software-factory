@@ -49,8 +49,9 @@ def thread(snap: Snap, row: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def box(snap: Snap, row: dict[str, Any]) -> dict[str, Any] | None:
-    """The box that sends the owner's next message; none for a subagent or a retired session."""
-    if row["parent"] or row["state"] == RETIRED:
+    """The box that sends the owner's next message; none for a subagent or a retired session, nor under YOLO mode
+    for any session but the orchestrator, which speaks for the owner then."""
+    if row["parent"] or row["state"] == RETIRED or row["role"] != "orchestrator" and snap.get("yolo") is not None:
         return None
     benched = row["state"] == DEPRIORITIZED
     if benched and factory_state(snap) == "paused":

@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from dashboard_rig import Rig
 
+from runtime.shared import store
 from runtime.warden.owner import ops
 from runtime.warden.owner.messages import PREFIX
 
@@ -40,6 +41,13 @@ def test_the_panel_offers_what_the_session_can_take(
     assert (panel["message"] or {}).get("label") == label
     assert (panel["chat_url"], panel["chat_note"]) == (None, chat_note)
     assert panel["thread"] == thread
+
+
+@pytest.mark.parametrize(("session", "offered"), [("orchestrator", True), ("impl-sign-in-loop", False)])
+def test_under_yolo_mode_only_the_orchestrators_panel_offers_a_message(rig: Rig, session: str, offered: bool) -> None:
+    store.write_json(rig.places.state / "yolo.json", {"since": "2026-10-09T10:00:00Z", "told": []})
+    panel = rig.parts(f"/api/agent/{session}")["agent"]["data"]
+    assert (panel["message"] is not None) is offered
 
 
 def test_a_message_reaches_the_session_as_its_next_turn(rig: Rig) -> None:

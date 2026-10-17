@@ -105,6 +105,8 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
   vision, its quality bar, or what comes first. When none of those answers it:
   `factory needs-owner <task> --picture <file> --question "<the question>"`. Only that task waits. With YOLO mode
   on, never ask: decide as the owner would from `GOAL.md` and their past rulings.
+- **Reports.** A session's report that asks nothing gets no reply: a reply wakes it, and it must then tell you
+  something again before it may stop.
 - **What only the owner can give** (a key, an account, a paid service, leave to use an outside site): never wait for
   it. A task it stops is blocked (below); anything else goes to `factory reflect --kind friction "<what is missing and what it
   stops>"`, and you move on.

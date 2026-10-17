@@ -149,6 +149,66 @@ def test_the_orchestrator_cannot_go_idle_without_its_inbox_wait(
     assert (isinstance(decision, Refusal) and decision.rule == "inbox-wait") is refused
 
 
+def _entry(role: str, content: object, **extra: object) -> str:
+    return json.dumps({"type": role, "message": {"role": role, "content": content}, **extra})
+
+
+def _send(to: str) -> str:
+    return _entry("assistant", [{"type": "tool_use", "id": "m1", "name": "SendMessage", "input": {"to": to}}])
+
+
+_PROMPT = _entry("user", "Build t-0001.")
+_SENT = _entry("user", [{"type": "tool_result", "tool_use_id": "m1", "content": "sent"}], toolUseResult={"ok": True})
+_OWNER = _entry("user", "Message from the owner, sent from the dashboard: is the fix right?", origin={"kind": "human"})
+_REPLY = _entry("user", "Another Claude session sent a message: go on", isMeta=True, origin={"kind": "peer"})
+_NOTICE = _entry("user", "<task-notification>qa-ux finished</task-notification>", origin={"kind": "task-notification"})
+_SKILL = _entry("user", [{"type": "text", "text": "Base directory for this skill: …"}], isMeta=True)
+_ORCH = {"kind": "peer", "name": "orchestrator", "from": "uds:/run/orch.sock"}
+_ORCH_SAYS = _entry("user", "Another Claude session sent a message: you're next", isMeta=True, origin=_ORCH)
+_NOTE = _entry("user", [{"type": "text", "text": "<system-reminder> [SYSTEM NOTIFICATION] a background-task event"}])
+_TO_ORCH, _TO_TESTER, _TO_ADDRESS = _send("orchestrator"), _send("qa-ux"), _send("uds:/run/orch.sock")
+
+
+@pytest.mark.parametrize(
+    ("role", "lines", "extra", "state", "refused"),
+    [
+        ("implementer", [_PROMPT], {}, "working", True),
+        ("implementer", [_PROMPT, _TO_ORCH, _SENT], {}, "working", False),
+        ("implementer", [_PROMPT, _TO_ORCH, _SENT, _OWNER], {}, "working", True),
+        ("implementer", [_PROMPT, _TO_TESTER, _SENT], {}, "working", True),
+        ("implementer", [_PROMPT, _TO_ORCH, _SENT, _REPLY], {}, "working", True),
+        ("implementer", [_PROMPT, _TO_ORCH, _SENT, _NOTICE], {}, "working", True),
+        ("implementer", [_PROMPT, _TO_ORCH, _SENT, _SKILL], {}, "working", False),
+        ("implementer", [_PROMPT, _ORCH_SAYS, _TO_ADDRESS, _SENT], {}, "working", False),
+        ("implementer", [_PROMPT, _TO_ORCH, _SENT, _NOTE], {}, "working", True),
+        ("implementer", [_PROMPT], {"background_tasks": [{"id": "a1", "type": "subagent"}]}, "working", False),
+        ("implementer", [_PROMPT], {"background_tasks": [_shell("scripts/dev run")]}, "working", True),
+        ("implementer", [_PROMPT], {"background_tasks": [{"type": "subagent", "status": "done"}]}, "working", True),
+        ("implementer", [_PROMPT], {"stop_hook_active": True}, "working", True),
+        ("implementer", [_PROMPT], {}, "waiting", False),
+        ("implementer", [_PROMPT], {}, "bench-pending", False),
+        ("implementer", [_PROMPT], {"agent_id": "a1"}, "working", False),
+        ("designer", [_PROMPT], {}, "working", True),
+    ],
+    ids=["nothing", "told-the-orchestrator", "the-owner-spoke-after", "told-a-tester", "the-orchestrator-answered",
+         "a-notice-came", "a-skill-loaded", "replied-to-its-address", "a-system-notice-came", "a-tester-runs",
+         "only-a-command-runs", "a-tester-finished",
+         "turned-back-again", "waits-on-a-card", "being-benched", "a-subagent", "designer"],
+)  # fmt: skip
+def test_an_implementer_or_designer_goes_idle_only_with_something_to_wake_it(
+    tmp_path: Path, role: str, lines: list[str], extra: dict[str, object], state: str, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session(role, state=state)
+    kit.transcript(lines)
+    payload = {"hook_event_name": "Stop", "session_id": SID, "stop_hook_active": False, "cwd": str(kit.worktree),
+               "transcript_path": str(kit.session_transcript), **extra}  # fmt: skip
+    call = decide.resolve(payload, kit.places, NOW, kit.home)
+    assert call is not None
+    decision = decide.check_stop(call)
+    assert (isinstance(decision, Refusal) and decision.rule == "no-waker") is refused
+
+
 def test_a_session_the_warden_has_not_bound_yet_is_known_by_the_name_it_was_started_under(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer", sid=PENDING + "0f0f")

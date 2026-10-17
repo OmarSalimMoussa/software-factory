@@ -10,9 +10,11 @@ import pytest
 from queue_kit import PICTURE, World
 
 from runtime.queue import cards, documents
+from runtime.shared.models import WAITING, WORKING
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
 from runtime.warden.owner import briefs
+from runtime.warden.sessions import registry
 
 PAGE = b"<!doctype html><title>Done mark</title><body><p>The check draws itself in 300 ms.</p></body>"
 
@@ -65,6 +67,25 @@ def test_a_comment_waits_for_the_designer_then_its_answer_waits_for_the_owner(wo
     assert briefs.comments(ctx, {"task": task}, None)["threads"] == []
     with pytest.raises(Refused, match="name a saved version"):
         briefs.comment(world.owner(), {**asked, "version": 3}, None)
+
+
+@pytest.mark.parametrize("asked", [True, False], ids=["the-owners-card-is-open", "no-card-yet"])
+def test_a_spec_revised_while_the_owners_card_is_open_sets_its_designer_waiting_again(
+    world: World, asked: bool
+) -> None:
+    task, ctx = _designer(world)
+    world.queue().write_task(dataclasses.replace(world.queue().task(task), status="designing", run=4))
+    documents.save_spec(ctx, task, b"# A spec\n\nThe plan.\n", 2)
+    briefs.save(ctx, {"task": task}, PAGE)
+    if asked:
+        cards.needs_owner(ctx, task, "Go?", "", PICTURE)
+    sessions = registry.read(world.places)  # the owner's feedback set it working on the revision
+    sessions["s-design"] = dataclasses.replace(sessions["s-design"], state=WORKING)
+    registry.write(world.places, sessions)
+
+    documents.save_spec(ctx, task, b"# A spec\n\nThe revised plan.\n", 2)
+
+    assert registry.read(world.places)["s-design"].state == (WAITING if asked else WORKING)
 
 
 def test_a_specs_sign_off_names_the_brief_version_it_asks_on(world: World) -> None:

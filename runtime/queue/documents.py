@@ -31,7 +31,8 @@ def _slices_path(ctx: Context) -> Path:
 
 def save_spec(ctx: Context, task_id: str, data: bytes | None, slices: object) -> Spec:
     """A designer's draft spec of its task, with the number of slices it lists; a revision keeps the spec's status
-    and brief. The count becomes the task's when the spec is approved: it routes the build and qa-ready holds it."""
+    and brief. The count becomes the task's when the spec is approved: it routes the build and qa-ready holds it. A
+    revision while the owner's card on it is open, as after their feedback, sets its designer waiting on them again."""
     if isinstance(slices, bool) or not isinstance(slices, int) or slices < 1:
         raise Refused("slices", "name the number of slices the spec lists: --slices <N>")
     text = intake.body_text(data, "spec", ctx.settings().get_int("queue.max_upload_kib"))
@@ -49,6 +50,11 @@ def save_spec(ctx: Context, task_id: str, data: bytes | None, slices: object) ->
         queue.log(task_id, ctx.clock.iso(), "designer", "spec", f"spec saved: {title}, {slices} slices")
         counts = store.read_json_or(_slices_path(ctx), {})
         store.write_json(_slices_path(ctx), {**counts, task_id: slices}, mode=0o600)
+    from runtime.queue import cards  # cards imports the sessions, which import this module
+
+    card = next((c for c in cards.read(ctx.places) if c.kind == "spec" and c.task == task_id and not c.answered), None)
+    if card is not None:
+        cards.waiting(ctx, card)
     return spec
 
 

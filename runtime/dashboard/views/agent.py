@@ -11,7 +11,7 @@ from runtime.dashboard.views.shell import factory_state
 from runtime.dashboard.views.words import agentwords as words
 from runtime.shared.models import DEPRIORITIZED, RETIRED
 
-WANTS = ("settings", "sessions", "queue", "cost", "factory")
+WANTS = ("settings", "sessions", "queue", "cost", "factory", "yolo")
 _DEPRI = "Deprioritized. It holds no slot, keeps its full context, and comes back first when a slot frees."
 _RETIRED = "Retired. It can never be resumed. It moves to History in a few minutes."
 

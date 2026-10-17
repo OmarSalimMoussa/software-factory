@@ -2,6 +2,7 @@
 
 Claude Code delivers a message as the session's next user turn: at once when it is idle, after its current turn when
 it is busy. So it carries the owner's own authority, and nothing is stored here: the thread is the transcript.
+Under YOLO mode only the orchestrator takes one: a session the owner spoke to directly would wait on them.
 A benched session comes back with the message; a subagent runs inside its parent's session and has no turn of its own.
 """
 
@@ -14,12 +15,13 @@ from runtime.shared import models, operations
 from runtime.shared.models import DEPRIORITIZED, RETIRED, Session
 from runtime.shared.protocol import Refused, ok
 from runtime.warden.context import Context
-from runtime.warden.owner import ops
+from runtime.warden.owner import ops, yolo
 from runtime.warden.sessions import launch, lifecycle, permits, registry, revive
 from runtime.warden.sessions.launch import LaunchError
 from runtime.warden.sessions.lifecycle import OWNER
 from runtime.warden.sessions.permits import CAP, SEVERE
 from runtime.warden.spend import cost
+from runtime.warden.verbs import ORCH
 
 # The agent reads this line first; the thread finds the owner's messages in the transcript by it.
 PREFIX = "Message from the owner, sent from the dashboard:\n\n"
@@ -47,6 +49,9 @@ def send(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
             raise Refused("subagent", "a subagent runs inside its parent's session: message that session")
         if s.state == RETIRED:
             raise Refused("retired", "this session is retired and can never act again")
+        if s.role != ORCH and yolo.state(ctx.places) is not None:
+            raise Refused("yolo", "YOLO mode is on, so the orchestrator speaks for you: send it there, and it passes "
+                                  "on what this session needs")  # fmt: skip
         if s.state in (models.BENCH_PENDING, models.REVIVING):
             moving = "going to" if s.state == models.BENCH_PENDING else "coming back from"
             raise Refused("settling", f"this session is {moving} the bench; send it again in a minute")

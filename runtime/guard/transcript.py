@@ -84,6 +84,42 @@ def _blocks(entry: dict[str, Any]) -> list[dict[str, Any]]:
     return [b for b in content if isinstance(b, dict)] if isinstance(content, list) else []
 
 
+def messaged_since_prompt(path: Path, to: str) -> bool:
+    """Whether the session sent ``to`` a message (SendMessage) since its last prompt: whatever starts a turn, be it a
+    person's words, another session's message or a background task's notice. A tool's result, and the skill text a
+    Skill call loads (meta, with no peer behind it), arrive inside a turn and start none. A reply to the address a
+    message from ``to`` came from counts as one to ``to``: Claude Code tells a session to answer that way."""
+    sent, names = False, {to}
+    for entry in entries(path):
+        message = entry.get("message")
+        role = message.get("role") if isinstance(message, dict) else None
+        origin = entry.get("origin")
+        if isinstance(origin, dict) and origin.get("kind") == "peer" and origin.get("name") == to:
+            names.add(str(origin.get("from")))
+        if role == "user" and _prompts(entry):
+            sent = False
+        elif role == "assistant":
+            sent = sent or any(_message_to(block, names) for block in _blocks(entry))
+    return sent
+
+
+def _prompts(entry: dict[str, Any]) -> bool:
+    if any(block.get("type") == "tool_result" for block in _blocks(entry)):
+        return False
+    origin = entry.get("origin")
+    return not entry.get("isMeta") or (isinstance(origin, dict) and origin.get("kind") == "peer")
+
+
+def _message_to(block: dict[str, Any], names: set[str]) -> bool:
+    args = block.get("input")
+    return (
+        block.get("type") == "tool_use"
+        and block.get("name") == "SendMessage"
+        and isinstance(args, dict)
+        and args.get("to") in names
+    )
+
+
 def agent_calls(path: Path) -> list[AgentCall]:
     """Every Agent call in a session's transcript, oldest first, each marked finished once its result arrived."""
     calls: dict[str, AgentCall] = {}

@@ -42,4 +42,6 @@ RULES: dict[str, str] = {
     "unreadable-command": "a command the guard cannot read, or one naming what runs through a variable, alias or pipe",
     "agent-id": "an agent-written --agent-id: only the guard names a subagent on its factory calls",
     "inbox-wait": "the orchestrator going idle without `factory inbox --wait` in the background",
+    "no-waker": "an implementer or designer ending its turn with nothing to wake it: no subagent of its own running, "
+    "and no message to the orchestrator since its last prompt",
 }

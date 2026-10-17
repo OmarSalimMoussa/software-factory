@@ -14,8 +14,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from runtime.guard import browser, commands, factory_calls, git_rules, scratch, shell, subagents, writes
+from runtime.guard import browser, commands, factory_calls, git_rules, scratch, shell, subagents, transcript, writes
 from runtime.guard.facts import (
+    DESIGNER,
+    IMPLEMENTER,
     ORCHESTRATOR,
     OWNER,
     UNPERMITTED,
@@ -190,9 +192,15 @@ def _read(path: Path, what: str) -> str:
 
 
 def check_stop(call: Call) -> Decision:
-    """The orchestrator may not go idle without its wait for the warden's events in the background. A stop the hook
-    already turned back once is let through, so the refusal names the whole remedy."""
-    if call.role != ORCHESTRATOR or call.in_subagent or call.payload.get("stop_hook_active"):
+    """No session goes idle with nothing to wake it. The orchestrator keeps its wait for the warden's events in the
+    background; a stop the hook already turned back once is let through, so the refusal names the whole remedy. An
+    implementer or designer at work keeps a subagent running, or has told the orchestrator since its last prompt,
+    since no one else answers its chat: turned back every time, as it can always send that message."""
+    if call.in_subagent:
+        return None
+    if call.role in (IMPLEMENTER, DESIGNER):
+        return _waker(call)
+    if call.role != ORCHESTRATOR or call.payload.get("stop_hook_active"):
         return None
     if call.session is None or call.session.state not in (WORKING, WAITING) or call.off("inbox-wait"):
         return None
@@ -207,4 +215,22 @@ def check_stop(call: Call) -> Decision:
         "inbox-wait",
         "your wait for the warden's events is gone: run `factory inbox --wait` as a background command "
         "(Bash with run_in_background), then stop",
+    )
+
+
+def _waker(call: Call) -> Decision:
+    if call.session is None or call.session.state != WORKING or call.off("no-waker"):
+        return None
+    tasks = call.payload.get("background_tasks")
+    # A tester or critic always reports back within its time; a background command may run for ever.
+    reports = isinstance(tasks, list) and any(
+        isinstance(t, dict) and t.get("type") == "subagent" and t.get("status", "running") == "running" for t in tasks
+    )
+    if reports or transcript.messaged_since_prompt(call.transcript, ORCHESTRATOR):
+        return None
+    return Refusal(
+        "no-waker",
+        "nothing would wake you: no tester or critic of yours runs, a background command does not count, and no one "
+        "answers this chat, the owner included. Carry on, or send what you need to the orchestrator (SendMessage to "
+        "orchestrator), then end your turn",
     )

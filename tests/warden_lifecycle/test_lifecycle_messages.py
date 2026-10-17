@@ -11,7 +11,7 @@ from lifecycle_fakes import World
 from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, WORKING
 from runtime.shared.protocol import Refused
-from runtime.warden.owner import messages, ops
+from runtime.warden.owner import messages, ops, yolo
 from runtime.warden.sessions import lifecycle, revive
 from runtime.warden.sessions.launch import LaunchError
 
@@ -52,6 +52,20 @@ def test_a_message_goes_only_to_a_session_that_can_take_a_turn(world: World, fie
     with pytest.raises(Refused) as refused:
         messages.send(world.owner(), {"session": "5e550001", "text": "hello"}, None)
     assert refused.value.rule == rule and world.launcher.messages == []
+
+
+@pytest.mark.parametrize(("role", "takes"), [("orchestrator", True), ("implementer", False)])
+def test_under_yolo_mode_only_the_orchestrator_takes_the_owners_message(world: World, role: str, takes: bool) -> None:
+    yolo.owner_switch(world.owner(), {"on": True}, None)
+    world.seat("5e550001", role=role, family="orch" if role == "orchestrator" else "impl")
+
+    if takes:
+        ops.join(messages.send(world.owner(), {"session": "5e550001", "text": "Carry on."}, None)["op"])
+    else:
+        with pytest.raises(Refused) as refused:
+            messages.send(world.owner(), {"session": "5e550001", "text": "Carry on."}, None)
+        assert refused.value.rule == "yolo"
+    assert bool(world.launcher.messages) is takes
 
 
 def test_a_benched_session_comes_back_with_the_message(world: World) -> None:

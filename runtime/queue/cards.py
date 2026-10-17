@@ -68,7 +68,7 @@ def needs_owner(ctx: Context, task_id: str, ask: str, question: str, picture: by
         if question:
             title = task.title if task else "A question"
             card = Card("", "question", task_id, title, formats.one_line(question), now, asked_by=ctx.caller.session)
-            return _waiting(ctx, _add(ctx, card, picture))
+            return waiting(ctx, _add(ctx, card, picture))
         assert task is not None
         saved = briefs.read(ctx.places, task_id)["versions"]
         if not saved:
@@ -84,10 +84,10 @@ def needs_owner(ctx: Context, task_id: str, ask: str, question: str, picture: by
         card = Card(
             "", "spec", task_id, task.title, formats.one_line(ask), now, brief=brief, asked_by=ctx.caller.session
         )
-        return _waiting(ctx, _add(ctx, card, picture))
+        return waiting(ctx, _add(ctx, card, picture))
 
 
-def _waiting(ctx: Context, card: Card) -> Card:
+def waiting(ctx: Context, card: Card) -> Card:
     """The session that asked waits for the owner, so it holds its place without working. The orchestrator never
     waits: the owner's answer reaches it through its inbox."""
     with ctx.lock:
