@@ -43,6 +43,7 @@ BENCH_NOTE = (
     "you are benched: commit your work in progress (`git add`, then `git commit`) and stop; you come back with your "
     "full context when there is work for you"
 )
+SUBAGENT_BENCH = "the session that started you is being benched: the factory paused, or its place went to other work"
 _BANNED_TOOLS = frozenset({"Workflow", "RemoteTrigger"})
 # What keeps work in the Claude account, off this machine: an agent on another account could not read it back.
 _ACCOUNT_TOOLS = frozenset({"Artifact", "ArtifactData", "ArtifactComments", "DesignSync", "PushNotification"})
@@ -92,6 +93,8 @@ def _bench_pending(call: Call) -> Decision:
         return None
     if commands.is_way_out(call) or (call.tool in commands.SHELL_TOOLS and _commits_only(call)):
         return None
+    if call.in_subagent:
+        return Refusal("bench-pending", f"{SUBAGENT_BENCH}: {subagents.report_now(call)}")
     return Refusal("bench-pending", BENCH_NOTE)
 
 

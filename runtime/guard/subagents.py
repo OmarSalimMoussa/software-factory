@@ -373,5 +373,9 @@ def _time_left(call: Call) -> float | Refusal:
 
 
 def _time_up(call: Call, why: str) -> Refusal:
+    return Refusal("tester-time", f"{why}: {report_now(call)}")
+
+
+def report_now(call: Call) -> str:
     """A tester that records a verdict reports through `factory`; the others hand their report back."""
-    return Refusal("tester-time", f"{why}: {REPORT if call.agent_type in VERDICTS else 'hand back your report now'}")
+    return REPORT if call.agent_type in VERDICTS else "hand back your report now"

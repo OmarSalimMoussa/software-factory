@@ -88,6 +88,21 @@ def test_a_session_being_benched_may_only_commit_and_ask_the_factory(
         assert isinstance(decision, Refusal) and "commit your work in progress" in decision.reason
 
 
+@pytest.mark.parametrize(
+    ("agent_type", "says"),
+    [("qa-ux", "run `factory qa result`, then hand back"), ("Explore", "hand back your report now")],
+)
+def test_a_subagent_of_a_session_being_benched_is_told_to_report_and_hand_back(
+    tmp_path: Path, agent_type: str, says: str
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer", state="bench-pending")
+    decision = kit.decide("Bash", {"command": "uv run pytest"}, agent_id="a1b2c3", agent_type=agent_type)
+    assert isinstance(decision, Refusal) and decision.rule == "bench-pending"
+    assert "being benched" in decision.reason and decision.reason.endswith(says)
+    assert "commit" not in decision.reason
+
+
 @pytest.mark.parametrize("rule", ["raw-starts", "retired"])
 def test_a_switched_off_rule_lets_the_call_through(tmp_path: Path, rule: str) -> None:
     kit = Kit(tmp_path)
