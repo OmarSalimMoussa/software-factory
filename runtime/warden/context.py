@@ -96,6 +96,10 @@ class CheckPlaces:
         with self._lock:
             self._held.remove(holder)
 
+    def holders(self) -> list[str]:
+        with self._lock:
+            return list(self._held)
+
 
 @dataclass
 class Context:

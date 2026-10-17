@@ -84,14 +84,19 @@ def test_an_upgrade_names_a_full_commit_of_an_installed_factory(
     assert launcher.upgrades == [] and factory_upgrade.asked(ctx.places) is None
 
 
-def test_an_agent_that_never_settles_stops_the_upgrade_before_it_starts(
-    ctx: Context, launcher: FakeLauncher, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+@pytest.mark.parametrize(
+    ("working", "checking", "said"),
+    [(True, False, "impl-t-0001 did not settle"), (False, True, "orchestrator's check did not settle")],
+    ids=["a-working-agent", "a-check-running-tests"],
+)
+def test_an_agent_or_check_that_never_settles_stops_the_upgrade_before_it_starts(
+    ctx: Context, launcher: FakeLauncher, monkeypatch: pytest.MonkeyPatch, working: bool, checking: bool, said: str
 ) -> None:
     _installed(ctx.places)
-    busy = [{"name": "impl-t-0001", "state": "working"}]
-    monkeypatch.setattr(
-        factory_upgrade.registry, "read", lambda places: {"s1": type("S", (), busy[0])()}
-    )  # a session the pause could not bench
+    busy = {"s1": type("S", (), {"name": "impl-t-0001", "state": "working"})()} if working else {}
+    monkeypatch.setattr(factory_upgrade.registry, "read", lambda places: busy)  # a session the pause could not bench
+    if checking:
+        assert ctx.check_places.take(1, "orchestrator") is None  # stopping the factory would kill its run
     monkeypatch.setattr(factory_upgrade, "_pause", lambda ctx: "paused")
     monkeypatch.setattr(factory_upgrade.time, "sleep", lambda s: setattr(ctx.clock, "t", ctx.clock.now() + 3600))
 
@@ -99,7 +104,7 @@ def test_an_agent_that_never_settles_stops_the_upgrade_before_it_starts(
     ops.join(op_id, 10)
 
     op = ops.get(ctx, {"id": op_id}, None)["op"]
-    assert op["state"] == ops.FAILED and "impl-t-0001 did not settle" in op["steps"][1]["detail"]
+    assert op["state"] == ops.FAILED and said in op["steps"][1]["detail"]
     assert launcher.upgrades == []
 
 

@@ -28,12 +28,13 @@ preparing it, connecting your accounts, setting up the factory, starting up and 
   it made, unless you kept it. Run it again after a fix: each step finishes what an earlier run left.
 
 **Upgrade** to any commit of the factory's repo on GitHub with the owner action `factory.upgrade`, given the commit's
-full sha. The factory pauses, waits for every agent to settle, and starts root's upgrade unit. The unit downloads the
-commit with the read-only token, seals it and runs its install, which asks nothing. No commit need be newer than the
-one installed: to go back, upgrade to the commit before. While the dashboard is away, its address shows a page that
-says the factory is upgrading and comes back by itself; Home then says how it ended. An upgrade that needs an answer
-(a new token, a key to add) stops and says so: install by hand to give it. If the dashboard does not come back, start
-the unit for the commit before over SSH: `sudo systemctl start software-upgrade@<sha>.service`.
+full sha. The factory pauses, waits for every agent to settle and every running check to end, and starts root's upgrade
+unit. The unit downloads the commit with the read-only token, seals it and runs its install, which asks nothing. No
+commit need be newer than the one installed: to go back, upgrade to the commit before. While the dashboard is away, its
+address shows a page that says the factory is upgrading and comes back by itself; Home then says how it ended. An
+upgrade that needs an answer (a new token, a key to add) stops and says so: install by hand to give it. If the dashboard
+does not come back, start the unit for the commit before over SSH: `sudo systemctl start
+software-upgrade@<sha>.service`.
 
 `sudo python3 runtime/system/uninstall.py [--repo <path>] [--dry-run]` removes the factory. It runs from your clone,
 or from `/opt/software-factory`.
