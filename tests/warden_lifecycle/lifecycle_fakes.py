@@ -56,6 +56,7 @@ class FakeLauncher:
         self.messages: list[tuple[str, str]] = []
         self.restarts = 0
         self.upgrades: list[str] = []
+        self.slices: list[list[str]] = []
         self.on_restart: Callable[[], None] = lambda: None  # what else happens while the daemon restarts
         self.check: Callable[[str, list[str]], tuple[int, str]] = lambda checkout, args: (0, "")
         self.behind: int | None = 0  # commits the default branch has that a worktree's branch lacks; None: git fails
@@ -108,6 +109,9 @@ class FakeLauncher:
 
     def start_upgrade(self, commit: str) -> None:
         self.upgrades.append(commit)
+
+    def set_slice(self, properties: list[str], runtime: bool) -> None:
+        self.slices.append(properties)
 
     def restart_daemon(self) -> None:
         self.restarts += 1

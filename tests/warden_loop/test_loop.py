@@ -12,21 +12,24 @@ from runtime.queue.book import Queue
 from runtime.shared import network, store
 from runtime.shared.models import INBOXES, Request
 from runtime.warden import inbox, loop
-from runtime.warden.health import errors_import, heartbeat, probes, telemetry
+from runtime.warden.health import cpu_budget, errors_import, heartbeat, probes, telemetry
 from runtime.warden.health.probes import Answer
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def kernel(tmp_path: Path) -> tuple[Path, Path]:
-    proc, power = tmp_path / "proc", tmp_path / "power" / "AC"
-    (proc / "pressure").mkdir(parents=True, exist_ok=True)
+def kernel(tmp_path: Path) -> tuple[Path, Path, Path]:
+    proc, power, cgroups = tmp_path / "proc", tmp_path / "power" / "AC", tmp_path / "cgroup"
+    proc.mkdir(parents=True, exist_ok=True)
     (proc / "meminfo").write_text("MemAvailable:   16000000 kB\n")
-    (proc / "pressure" / "cpu").write_text("some avg10=0.00 avg60=0.00 avg300=0.00 total=0\n")
+    (proc / "stat").write_text("cpu  300 0 100 9600 0 0 0 0 0 0\ncpu0 300 0 100 9600 0 0 0 0 0 0\n")
+    cgroup = cpu_budget.slice_dir(cgroups)
+    cgroup.mkdir(parents=True, exist_ok=True)
+    (cgroup / "cpu.stat").write_text("usage_usec 1000000\n")
     power.mkdir(parents=True, exist_ok=True)
     (power / "type").write_text("Mains\n")
     (power / "online").write_text("1\n")
-    return proc, power.parent
+    return proc, power.parent, cgroups
 
 
 def file_requests(world: World, count: int, age_hours: float) -> None:

@@ -39,6 +39,7 @@ class FakeStack:
     calls: list[tuple[int, list[str], str]] = field(default_factory=list)
     deployed: list[tuple[str, bool]] = field(default_factory=list)  # each deploy's commit, and whether it went back
     deploy: Callable[[str], tuple[int, str]] = lambda sha: (0, "")
+    slices: list[tuple[list[str], bool]] = field(default_factory=list)  # each slice change, and whether until a boot
 
     def run_stack(self, slot: int, verb: list[str], session: str, given: str = "") -> StackResult:
         self.calls.append((slot, verb, session))
@@ -49,6 +50,9 @@ class FakeStack:
     def deploy_prod(self, sha: str, back: bool) -> tuple[int, str]:
         self.deployed.append((sha, back))
         return self.deploy(sha)
+
+    def set_slice(self, properties: list[str], runtime: bool) -> None:
+        self.slices.append((properties, runtime))
 
 
 @dataclass

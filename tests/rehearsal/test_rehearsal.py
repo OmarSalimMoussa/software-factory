@@ -14,6 +14,7 @@ from runtime.queue.book import Queue
 from runtime.shared.models import BENCH_PENDING, FINISHED, RETIRED, WORKING
 from runtime.warden import checks, loop
 from runtime.warden.delivery import deploys, done
+from runtime.warden.health import cpu_budget
 from runtime.warden.sessions import crashwatch, registry
 
 TASK = "t-0001"
@@ -37,16 +38,18 @@ def rehearsal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Rehearsal:
     return build(tmp_path, monkeypatch)
 
 
-def kernel(tmp_path: Path) -> tuple[Path, Path]:
-    """The kernel's memory, pressure and power readings for the warden's tick."""
-    proc, power = tmp_path / "kernel", tmp_path / "power" / "AC"
-    (proc / "pressure").mkdir(parents=True)
+def kernel(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """The kernel's memory, CPU and power readings for the warden's tick, and the factory slice's CPU use."""
+    proc, power, cgroups = tmp_path / "kernel", tmp_path / "power" / "AC", tmp_path / "cgroup"
+    proc.mkdir(parents=True)
     (proc / "meminfo").write_text("MemAvailable:   16000000 kB\n")
-    (proc / "pressure" / "cpu").write_text("some avg10=0.00 avg60=0.00 avg300=0.00 total=0\n")
+    (proc / "stat").write_text("cpu  300 0 100 9600 0 0 0 0 0 0\ncpu0 300 0 100 9600 0 0 0 0 0 0\n")
+    cpu_budget.slice_dir(cgroups).mkdir(parents=True)
+    (cpu_budget.slice_dir(cgroups) / "cpu.stat").write_text("usage_usec 1000000\n")
     power.mkdir(parents=True)
     (power / "type").write_text("Mains\n")
     (power / "online").write_text("1\n")
-    return proc, power.parent
+    return proc, power.parent, cgroups
 
 
 def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_path: Path) -> None:
@@ -73,8 +76,7 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
     merge = _merged_and_mirrored(r, orch, impl, worktree, branch)
 
     # The warden's tick sees staging answer on the merge, and logs it; prod still runs the first build.
-    proc, power = kernel(tmp_path)
-    loop.run_tick(r.warden(), r.health(staging=merge, prod=first), proc, power)
+    loop.run_tick(r.warden(), r.health(staging=merge, prod=first), *kernel(tmp_path))
     logged = {env: deploys.builds(r.places, env)["current"] for env in ("staging", "prod")}
     assert {env: row["commit"] for env, row in logged.items() if row} == {"staging": merge, "prod": first}
 

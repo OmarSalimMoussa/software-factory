@@ -267,6 +267,9 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("budget.slice_memory_high", "Memory where the factory slows"),
             ("budget.slice_memory_max", "Factory memory cap"),
             ("budget.slice_cpu_weight", "Factory CPU weight"),
+            ("budget.cpu_target_percent", "Average CPU use to keep to, % of every CPU"),
+            ("budget.cpu_floor_percent", "Least CPU the factory keeps, % of every CPU"),
+            ("budget.cpu_window_seconds", "Seconds the CPU average reaches back"),
             ("budget.test_memory_ceiling_mib", "Memory one check may use, MiB"),
             ("budget.test_reserve_mib", "Memory kept for other agents, MiB"),
         ],
@@ -278,7 +281,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         [
             ("vitals.memory_amber_gib", "Free memory that turns amber, GiB"),
             ("vitals.memory_red_gib", "Free memory that turns red, GiB"),
-            ("vitals.cpu_pressure_amber", "CPU pressure that turns amber, %"),
+            ("vitals.cpu_red_percent", "Average CPU use past which nothing starts, %"),
             ("vitals.battery_amber", "Battery that turns amber, %"),
             ("vitals.battery_red", "Battery that turns red, %"),
             ("vitals.firewall_stale_seconds", "Firewall last loaded longer ago than this turns red, seconds"),

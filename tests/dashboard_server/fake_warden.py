@@ -65,6 +65,9 @@ class Launcher:
     def start_upgrade(self, commit: str) -> None:
         self.calls.append(("upgrade", commit))
 
+    def set_slice(self, properties: list[str], runtime: bool) -> None:
+        self.calls.append(("slice", properties))
+
     def deploy_prod(self, sha: str, back: bool) -> tuple[int, str]:
         self.calls.append(("deploy", sha))
         return self.deploy(sha)

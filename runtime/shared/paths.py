@@ -250,6 +250,10 @@ class Places:
         return self.state / "vitals.json"
 
     @property
+    def cpu(self) -> Path:
+        return self.state / "cpu.json"
+
+    @property
     def woke(self) -> Path:
         """When the laptop last woke from sleep, written by root's sleep hook."""
         return self.state / "woke.json"

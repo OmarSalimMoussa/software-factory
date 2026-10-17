@@ -49,6 +49,7 @@ class FakeLauncher:
     checks: list[tuple[str, list[str]]] = field(default_factory=list)
     messages: list[tuple[str, str]] = field(default_factory=list)
     stopped: list[str] = field(default_factory=list)
+    slices: list[list[str]] = field(default_factory=list)
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
         raise AssertionError("the queue starts no session")
@@ -71,6 +72,9 @@ class FakeLauncher:
     def run_check(self, checkout: str, args: list[str]) -> tuple[int, str]:
         self.checks.append((checkout, args))
         return self.check(checkout, args)
+
+    def set_slice(self, properties: list[str], runtime: bool) -> None:
+        self.slices.append(properties)
 
 
 @dataclass

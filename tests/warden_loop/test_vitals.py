@@ -1,4 +1,4 @@
-"""The laptop's vitals as the permits read them: a wall that stopped loading blocks every start."""
+"""The machine's vitals as the permits read them: a wall that stopped loading blocks every start."""
 
 from __future__ import annotations
 
@@ -60,18 +60,21 @@ def test_power_is_green_on_mains_or_a_charged_battery_and_turns_amber_then_red_a
 def test_the_machines_level_names_the_readings_that_set_it() -> None:
     memory = vitals.Reading("memory", vitals.GREEN, "8.0 GiB free")
     power = vitals.Reading("power", vitals.AMBER, "on battery, 25%")
-    cpu = vitals.Reading("cpu", vitals.AMBER, "pressure 70% over a minute")
+    cpu = vitals.Reading("cpu", vitals.AMBER, "70% of every CPU in use on average")
     assert vitals.why([memory]) == ""
-    assert vitals.why([memory, power, cpu]) == "power: on battery, 25%; cpu: pressure 70% over a minute"
+    assert vitals.why([memory, power, cpu]) == "power: on battery, 25%; cpu: 70% of every CPU in use on average"
     assert vitals.why([power, vitals.Reading("install", vitals.RED, "differs")]) == "install: differs"
 
 
-def test_a_reading_the_kernel_does_not_have_is_missing_and_blocks_nothing(world: World) -> None:
-    missing = vitals.cpu(None, world.ctx.settings())
-    green = vitals.Reading("memory", vitals.GREEN, "8.0 GiB free")
-    assert missing.level == vitals.MISSING
-    assert vitals.worst([green, missing]) == vitals.GREEN
-    assert vitals.worst([green, vitals.cpu("", world.ctx.settings())]) == vitals.UNKNOWN  # unreadable is not missing
+@pytest.mark.parametrize(
+    ("use", "level"),
+    [(0.30, vitals.GREEN), (0.54, vitals.GREEN), (0.56, vitals.AMBER), (0.91, vitals.RED)],
+    ids=["under-budget", "just-under-budget", "past-budget", "past-the-red-line"],
+)
+def test_the_cpu_vital_turns_amber_past_the_budget_so_new_work_waits_and_red_past_its_red_line(
+    world: World, use: float, level: str
+) -> None:
+    assert vitals.cpu(use, world.ctx.settings()).level == level
 
 
 def _process(proc: Path, pid: int, argv: list[str], started_ticks: int) -> None:

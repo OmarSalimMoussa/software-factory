@@ -24,7 +24,7 @@ from typing import Any
 
 from runtime.shared import store
 from runtime.shared.models import PENDING, WORKING, Session
-from runtime.shared.paths import AGENT_USER, DEPLOY_UNIT, UPGRADE_UNIT, Places, stored_signin
+from runtime.shared.paths import AGENT_USER, DEPLOY_UNIT, SLICE, UPGRADE_UNIT, Places, stored_signin
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.slots import leases
@@ -174,6 +174,12 @@ class Units:
         done = self.run(["restart", DAEMON_UNIT])
         if done.returncode != 0:
             raise LaunchError(f"the agents' Claude daemon did not restart: {done.stderr.strip()[-300:]}")
+
+    def set_slice(self, properties: list[str], runtime: bool) -> None:
+        """Set the factory slice's ``properties``; ``runtime`` ones last until the machine starts again."""
+        done = self.run(["set-property", *(["--runtime"] if runtime else []), SLICE, *properties])
+        if done.returncode != 0:
+            raise LaunchError(f"the factory's slice was not set: {done.stderr.strip()[-300:]}")
 
     def signed_in(self) -> str | None:
         """The token the agents' Claude daemon last signed in with: it writes its stored sign-in as it starts."""

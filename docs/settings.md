@@ -27,7 +27,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `intake` | Batch size and wait, the fast lane's time, the score's weights |
 | `routing` | Slices per rung, open proposals at once, the estimate's window, tries to confirm a cause |
 | `slots` | How many, the first port, the output an agent sees, how long a run may take, their share of the CPU against prod's, the keys slots take from your env file, staging's address on the internet |
-| `budget` | The slice's memory and CPU, and the memory a test run needs |
+| `budget` | The slice's memory and CPU, the machine's CPU budget, and the memory a test run needs |
 | `checks` | How long a check and one test may run, how much of a report an agent sees, and the tool caches a check may write |
 | `vitals`, `watch` | Amber and red levels; probe, loop, grace and silence times |
 | `errors` | How often the warden reads prod's and staging's new GlitchTip issues into requests, and how many pages of a GlitchTip list one read covers |

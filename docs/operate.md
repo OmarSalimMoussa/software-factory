@@ -167,6 +167,11 @@ accounts keeps its one token as the account `main`.
 Change any setting on the Settings page and save. Each value is checked before it is saved, the save is written to the
 warden's state on this machine, and only what reads that value reloads. See [settings.md](settings.md).
 
+The machine's average CPU use stays near `budget.cpu_target_percent`: a host that meters CPU on credits (a Hostinger
+VPS, at 60%) holds the whole machine down once they run out, prod included. The factory's own work gets what the
+budget leaves after prod, the shared services and the slots, never under `budget.cpu_floor_percent`. Past the budget
+new work waits; past `vitals.cpu_red_percent` nothing starts.
+
 ## Improve the factory
 
 The factory never changes itself: Claude or the owner changes it. Read Self-reflect, on its page or through the MCP
@@ -191,3 +196,4 @@ The factory never changes itself: Claude or the owner changes it. Read Self-refl
 - **The warden unreachable:** the dashboard keeps its last known state, marked old, and refuses every change until
   the warden answers. Check its service on the laptop.
 - **Vitals red:** nothing starts until memory, CPU or power recover, or the install hash matches an upgrade.
+- **The server stops answering under load:** its host has held it down. Restart it from the host's panel, then pause.

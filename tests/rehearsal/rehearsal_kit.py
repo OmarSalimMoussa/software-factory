@@ -116,8 +116,12 @@ class Systemd:
     checks: list[dict[str, Any]] = field(default_factory=list)
     stops: list[str] = field(default_factory=list)  # each `claude stop` the warden asked for, by short id
     messages: list[dict[str, Any]] = field(default_factory=list)  # each message handed to a running session
+    slices: list[list[str]] = field(default_factory=list)  # each change to the factory slice's properties
 
     def __call__(self, argv: list[str]) -> subprocess.CompletedProcess[str]:
+        if argv[:1] == ["set-property"]:
+            self.slices.append(argv[1:])
+            return subprocess.CompletedProcess(argv, 0, "", "")
         wait = argv[:1] == ["--wait"]
         verb, unit = argv[1:] if wait else argv
         assert verb == "start", argv

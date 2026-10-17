@@ -129,6 +129,10 @@ keys = []               # the keys copied from it into every slot before each st
 slice_memory_high = "11G"
 slice_memory_max = "12G"
 slice_cpu_weight = 50
+cpu_target_percent = 55.0  # the machine's average CPU use the factory keeps to, % of all CPUs: under a host's baseline
+                           # (60% on a VPS that meters CPU on credits), less what the host counts and the machine misses
+cpu_floor_percent = 15.0   # the least of all CPUs the factory's slice keeps, however busy the rest of the machine is
+cpu_window_seconds = 300   # how far back the CPU averages reach
 test_memory_ceiling_mib = 6656
 test_reserve_mib = 4096 # kept for every other session: as many checks run tests at once
                         # as fit under slice_memory_high after it, in test_memory_ceiling_mib each
@@ -136,7 +140,7 @@ test_reserve_mib = 4096 # kept for every other session: as many checks run tests
 [vitals]
 memory_amber_gib = 8.0
 memory_red_gib = 4.0
-cpu_pressure_amber = 60.0
+cpu_red_percent = 90.0  # the machine's average CPU use, % of all CPUs, past which nothing starts
 battery_amber = 30
 battery_red = 15
 firewall_stale_seconds = 180  # the firewall loaded longer ago than this is red: every start waits

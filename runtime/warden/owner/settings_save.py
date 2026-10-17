@@ -15,7 +15,6 @@ import json
 import logging
 import re
 import shutil
-import subprocess
 import threading
 from collections.abc import Mapping
 from pathlib import Path
@@ -24,7 +23,7 @@ from typing import Any
 from runtime.shared import operations, store
 from runtime.shared import settings as settings_module
 from runtime.shared.models import RETIRED
-from runtime.shared.paths import SLICE, Places
+from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings, SettingsError
 from runtime.shared.settings_schema import AT_INSTALL, SCHEMA
@@ -125,25 +124,6 @@ def render_plugin(places: Places, settings: Settings) -> None:
         shutil.rmtree(old, ignore_errors=True)
 
 
-def apply_slice(settings: Settings) -> None:
-    """Resize the slice every factory session runs in (polkit lets the warden set this one unit's properties)."""
-    argv = [
-        "systemctl",
-        "set-property",
-        SLICE,
-        f"MemoryHigh={settings['budget.slice_memory_high']}",
-        f"MemoryMax={settings['budget.slice_memory_max']}",
-        f"CPUWeight={settings['budget.slice_cpu_weight']}",
-    ]
-    timeout = settings.get_int("factory.command_seconds")
-    try:
-        done = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False)
-    except subprocess.TimeoutExpired as exc:
-        raise ops.StepError(f"systemctl took longer than {timeout} s") from exc
-    if done.returncode != 0:
-        raise ops.StepError(f"systemctl set-property failed: {done.stderr.strip()[-200:]}")
-
-
 # ---- the save ---------------------------------------------------------------------------------------------------
 
 
@@ -170,7 +150,10 @@ def _steps(ctx: Context, changes: dict[str, Any]) -> list[ops.Step]:
         return "the next subagents start with them"
 
     def resize() -> str:
-        apply_slice(saved["new"])
+        new = saved["new"]
+        sizes = ["MemoryHigh", "MemoryMax", "CPUWeight"]
+        keys = ["budget.slice_memory_high", "budget.slice_memory_max", "budget.slice_cpu_weight"]
+        ctx.launcher.set_slice([f"{size}={new[key]}" for size, key in zip(sizes, keys, strict=True)], runtime=False)
         return "within a minute"
 
     steps: list[ops.Step] = [("Save the new values", save_values)]

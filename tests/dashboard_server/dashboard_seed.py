@@ -167,7 +167,7 @@ def _seed_health(places: Places, now: float) -> None:
     )
     readings = [
         ("memory", "green", "11.8 GiB free", 11.8),
-        ("cpu", "green", "pressure 34% over a minute", 34.0),
+        ("cpu", "green", "34% of every CPU in use on average", 34.0),
         ("power", "green", "on mains power", None),
         ("install", "green", "install 0123456789ab", None),
         ("hooks", "green", "the checkout runs the factory's hooks", None),

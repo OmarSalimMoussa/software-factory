@@ -84,7 +84,7 @@ def laptop(snap: Snap) -> dict[str, Any]:
     cpu_pct, power_pct = cpu["figure"], power["figure"]
     mains = on_mains(power)
     used = memory_used(snap)
-    cpu_words = f"{cpu_pct:.0f}%" if cpu_pct is not None else "not reported" if cpu["level"] == "missing" else "unknown"
+    cpu_words = f"{cpu_pct:.0f}%" if cpu_pct is not None else "unknown"
     power_words = "Mains" if mains else f"{power_pct:.0f}%" if power_pct is not None else power["value"]
     return {
         "state": state,

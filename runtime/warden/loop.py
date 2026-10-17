@@ -27,7 +27,7 @@ from runtime.shared.protocol import Refused, ok
 from runtime.warden import inbox
 from runtime.warden.context import Context
 from runtime.warden.delivery import deploys, github_push, outage, prod_push
-from runtime.warden.health import container_deaths, errors_import, heartbeat, probes, vitals
+from runtime.warden.health import container_deaths, cpu_budget, errors_import, heartbeat, probes, vitals
 
 log = logging.getLogger(__name__)
 
@@ -75,12 +75,17 @@ def tick(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
 
 
 def run_tick(
-    ctx: Context, fetch: probes.Fetch = probes.http_get, proc: Path = vitals.PROC, supplies: Path = vitals.POWER
+    ctx: Context,
+    fetch: probes.Fetch = probes.http_get,
+    proc: Path = vitals.PROC,
+    supplies: Path = vitals.POWER,
+    cgroups: Path = cpu_budget.CGROUPS,
 ) -> None:
     """Each step runs on its own: one that fails is logged with its class, and the steps after it still run."""
     now = ctx.clock.now()
     steps: list[tuple[str, Callable[[], object]]] = [
-        ("vitals", lambda: vitals.refresh(ctx, proc, supplies)),
+        ("vitals", lambda: vitals.refresh(ctx, proc, supplies, cgroups)),
+        ("cpu budget", lambda: cpu_budget.apply(ctx)),
         ("probes", lambda: _probes(ctx, fetch, now)),
         ("loop due", lambda: _loop_due(ctx, _memo(ctx.places), now)),
         ("outage fix", lambda: _fix(ctx)),

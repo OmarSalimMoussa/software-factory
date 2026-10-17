@@ -7,7 +7,7 @@
    "tone": "good"
   },
   {
-   "label": "CPU pressure",
+   "label": "CPU use",
    "value": "34%",
    "pct": 34,
    "tone": "good"

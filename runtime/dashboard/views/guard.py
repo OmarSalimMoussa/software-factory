@@ -10,7 +10,7 @@ from runtime.dashboard.views.words import agentwords
 from runtime.shared.models import RETIRED
 
 WANTS = ("settings", "vitals", "slots", "sessions", "queue", "refusals", "rules", "docker")
-_TONES = {"green": "good", "amber": "warn", "red": "bad", "unknown": "", "missing": ""}
+_TONES = {"green": "good", "amber": "warn", "red": "bad", "unknown": ""}
 _GIB = 1024**3
 
 
@@ -30,11 +30,10 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
     )
     cpu = found.get("cpu")
     pct = cpu["figure"] if cpu else None
-    missing = cpu is not None and cpu["level"] == "missing"
     out.append(
         {
-            "label": "CPU pressure",
-            "value": f"{pct:.0f}%" if pct is not None else "not reported" if missing else "unknown",
+            "label": "CPU use",
+            "value": f"{pct:.0f}%" if pct is not None else "unknown",
             "pct": round(pct) if pct is not None else None,
             "tone": _TONES[cpu["level"] if cpu else "unknown"],
         }

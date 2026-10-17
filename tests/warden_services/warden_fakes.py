@@ -49,6 +49,9 @@ class FakeLauncher:
     def stop_session(self, session_id: str) -> None:
         self.calls.append(("stop", session_id))
 
+    def set_slice(self, properties: list[str], runtime: bool) -> None:
+        self.calls.append(("slice", properties))
+
     def start_upgrade(self, commit: str) -> None:
         self.upgrades.append(commit)
 

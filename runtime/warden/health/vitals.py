@@ -1,7 +1,6 @@
-"""The laptop's vitals, read every tick: memory, CPU pressure, power, the install, the git hooks, the agent's Claude
-daemon and the firewall. Each reading is green, amber, red or unknown; unknown is treated as amber, never as fine.
-A reading this machine does not have (a kernel without CPU pressure) is missing: shown as such, and it blocks
-nothing. A machine with no battery listed, a desktop or a VM, is on mains power.
+"""The machine's vitals, read every tick: memory, CPU use against its budget (cpu_budget), power, the install, the
+git hooks, the agent's Claude daemon and the firewall. Each reading is green, amber, red or unknown; unknown is treated
+as amber, never as fine. A machine with no battery listed, a desktop or a VM, is on mains power.
 
 The permits read vitals.json: red blocks every start; amber blocks all but severe work. Readers take the kernel's
 folders as arguments, so tests feed samples.
@@ -21,14 +20,14 @@ from runtime.shared.paths import AGENT_USER, SLICE, Places
 from runtime.shared.settings import Settings
 from runtime.warden import public
 from runtime.warden.context import Context
+from runtime.warden.health import cpu_budget
 from runtime.warden.sessions import backstop, launch
 
-GREEN, AMBER, UNKNOWN, RED, MISSING = "green", "amber", "unknown", "red", "missing"
+GREEN, AMBER, UNKNOWN, RED = "green", "amber", "unknown", "red"
 RECORDS = "sessions"
-LEVELS = (GREEN, MISSING, AMBER, UNKNOWN, RED)  # worst last
+LEVELS = (GREEN, AMBER, UNKNOWN, RED)  # worst last
 PROC = Path("/proc")
 POWER = Path("/sys/class/power_supply")
-_PRESSURE = re.compile(r"^(some|full)\s+avg10=([\d.]+)\s+avg60=([\d.]+)", re.MULTILINE)
 _GIB_KB = 1024 * 1024
 
 
@@ -37,14 +36,14 @@ class Reading:
     name: str
     level: str
     value: str  # in words, for factory status
-    # The reading's number, for the dashboard: free memory in GiB, CPU pressure and battery charge in percent; None
+    # The reading's number, for the dashboard: free memory in GiB, CPU use and battery charge in percent; None
     # for a reading without one, one not read, and the power of a machine on mains.
     figure: float | None = None
 
 
 def worst(readings: list[Reading]) -> str:
-    """The machine's level: the worst reading's, where a missing one counts for nothing."""
-    return max((r.level for r in readings if r.level != MISSING), key=LEVELS.index, default=GREEN)
+    """The machine's level: the worst reading's."""
+    return max((r.level for r in readings), key=LEVELS.index, default=GREEN)
 
 
 def why(readings: list[Reading]) -> str:
@@ -65,15 +64,16 @@ def memory(meminfo: str, settings: Settings) -> Reading:
     return Reading("memory", GREEN, value, free)
 
 
-def cpu(pressure: str | None, settings: Settings) -> Reading:
-    """``pressure`` is None when the kernel has no pressure file at all."""
-    if pressure is None:
-        return Reading("cpu", MISSING, "this kernel reports no CPU pressure")
-    psi = {kind: float(avg60) for kind, _, avg60 in _PRESSURE.findall(pressure)}
-    if "some" not in psi:
-        return Reading("cpu", UNKNOWN, "cannot read the CPU pressure")
-    level = AMBER if psi["some"] > settings.get_float("vitals.cpu_pressure_amber") else GREEN
-    return Reading("cpu", level, f"pressure {psi['some']:.0f}% over a minute", psi["some"])
+def cpu(use: float, settings: Settings) -> Reading:
+    """``use`` is the machine's average CPU use, a share of all its CPUs."""
+    percent = use * 100
+    target = settings.get_float("budget.cpu_target_percent")
+    if percent > settings.get_float("vitals.cpu_red_percent"):
+        return Reading("cpu", RED, f"{percent:.0f}% of every CPU in use on average", percent)
+    if percent > target:
+        said = f"{percent:.0f}% of every CPU in use on average, past the {target:.0f}% budget"
+        return Reading("cpu", AMBER, said, percent)
+    return Reading("cpu", GREEN, f"{percent:.0f}% of every CPU in use on average", percent)
 
 
 def power(supplies: Path, settings: Settings) -> Reading:
@@ -250,17 +250,22 @@ def _text(path: Path) -> str:
         return ""
 
 
-def _pressure(path: Path) -> str | None:
-    """The pressure file's text; None when the kernel has none, "" (unknown) when it cannot be read."""
-    return _text(path) if path.exists() else None
+def _cpu(ctx: Context, proc: Path, cgroups: Path, settings: Settings) -> Reading:
+    try:
+        return cpu(cpu_budget.update(ctx.places, proc, cgroups, settings)["use"], settings)
+    # telemetry: surfaced — the CPU vital's `Reading` is unknown, naming why
+    except cpu_budget.BudgetError as exc:
+        return Reading("cpu", UNKNOWN, str(exc))
 
 
-def refresh(ctx: Context, proc: Path = PROC, supplies: Path = POWER) -> dict[str, Any]:
+def refresh(
+    ctx: Context, proc: Path = PROC, supplies: Path = POWER, cgroups: Path = cpu_budget.CGROUPS
+) -> dict[str, Any]:
     """Read every vital and write vitals.json for the permits, the dashboard and the status."""
     settings = ctx.settings()
     readings = [
         memory(_text(proc / "meminfo"), settings),
-        cpu(_pressure(proc / "pressure" / "cpu"), settings),
+        _cpu(ctx, proc, cgroups, settings),
         power(supplies, settings),
         install(ctx.places),
         hooks(ctx.places, Path(settings.get_str("repo.path")), settings.get_int("watch.tick_seconds")),
