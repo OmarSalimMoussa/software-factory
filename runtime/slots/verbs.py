@@ -8,7 +8,8 @@ A tester only reads its slot, signs in and opens its desktop: seeds and the stac
 session, an implementer or the orchestrator, may run one command in a new container of a service, such as a scenario's
 set-up; so may its backend and security testers, to look from inside the slot's network. One tester holds a slot's
 desktop at a time, until its parent or, once it hands back, the warden takes it down; another tester's `desktop up`
-waits, so no one's new password cuts off a tester mid-step.
+waits, so no one's new password cuts off a tester mid-step. Slot 0 is staging, so it comes up whole: one build of the
+stack, never a service at a time.
 """
 
 from __future__ import annotations
@@ -100,6 +101,8 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
         failed = leases.empty(ctx, n, session.id)
         return ok(slot=n, released=not failed, **({"failed": failed} if failed else {}))
     verb = _verb(op, args)
+    if n == 0 and verb[0] == "up" and len(verb) > 1:
+        raise Refused("slot", "slot 0 is staging, one build of the whole stack: factory slot up, naming no service")
     if op == "desktop":
         _desktop_lease(ctx, n, verb)
     result = ctx.launcher.run_stack(n, verb, session.id)

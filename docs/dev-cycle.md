@@ -26,7 +26,7 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    implementer, which rebases and has the warden run `factory check`, at most `rounds.check_runs` times. The
    orchestrator merges with `--no-ff`; the merge hook lets only the turn's branch land, with the pass for its tree.
    The warden finds the merge itself.
-9. **Check the default branch.** Slot 0 rebuilds what the merge touched, and regression testers walk the scenarios
+9. **Check the default branch.** Slot 0 comes up at the merge, whole, and regression testers walk the scenarios
    it could break, in parallel. A failure reverts the merge only when that merge is the one change to the
    scenario's code since its last pass; any other failure becomes a request. A check with no failure marks the task
    checked. A scenario that could not run reverts the merge too. When only the owner can give what it lacks (a key,

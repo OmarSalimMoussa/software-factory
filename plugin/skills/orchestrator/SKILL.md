@@ -130,7 +130,7 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    hold. Then two separate commands: `git merge --no-ff --no-commit <branch>`, and after it
    `git commit -m "Merge <branch>: <the outcome in one line>"`. The commit's hook lets only the branch holding the
    turn land, with the pass for its tree. The warden finds the merge and records it.
-3. **Check.** Rebuild slot 0 with what the merge touched (`factory slot up [service…]`). Pick the scenarios whose
+3. **Check.** Bring slot 0 up at the merge, whole (`factory slot up`). Pick the scenarios whose
    `protects` names a path the merge changed (`git diff --name-only <merge>^1 <merge>`), the one that waited longest,
    and the merged spec's own checks. Load the seeds they need (`factory slot seed load <name>`), and do a
    scenario's set-up that writes inside a service with `factory slot run <service> -- <command>`. Start the

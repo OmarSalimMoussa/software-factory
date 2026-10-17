@@ -74,6 +74,17 @@ def test_only_checked_words_reach_scripts_dev(world: World, args: dict[str, obje
     assert world.launcher.stacks == []
 
 
+def test_slot_0_is_staging_and_comes_up_whole(world: World) -> None:
+    world.session("s-orch", "orchestrator", "orchestrator")
+    world.launcher.stack = lambda n, verb: StackResult(0, "up\n", "/log")
+
+    with pytest.raises(Refused, match="one build of the whole stack"):
+        slot(world.ctx(), {"op": "up", "services": ["control-plane"]}, None)
+    slot(world.ctx(), {"op": "up"}, None)
+
+    assert world.launcher.stacks == [(0, ["up"])]
+
+
 def test_the_holder_restarts_the_services_it_names(world: World) -> None:
     _implementer(world, 1)
     slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)

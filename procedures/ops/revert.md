@@ -8,8 +8,8 @@ How the orchestrator takes a merge back off the default branch after a failed ch
    forward instead, never reverted.
 3. `factory check` on the default branch. A revert back to a state that already passed (the last merge taken off)
    is known at once and runs nothing; any other revert is checked from the newest commit that passed.
-4. Check the revert like a merge: rebuild slot 0 with what it touched, and walk the scenario that failed, so it has
-   a fresh pass before the work comes back.
+4. Check the revert like a merge: bring slot 0 up at it (`factory slot up`), and walk the scenario that failed, so it
+   has a fresh pass before the work comes back.
 5. Nothing to ask: slot 0, which is staging, now runs the revert, and it reaches prod with the owner's next Push to
    prod.
 6. Send the task back: `factory queue task status <task> building --note "<why>; reverted as <the revert's sha>"`.
