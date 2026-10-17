@@ -30,6 +30,9 @@ def install(places: Places) -> None:
     for folder in ("procedures", "rules"):
         (places.install / folder).mkdir()
         (places.install / folder / "a.md").write_text("text\n")
+    skill = places.install / "plugin" / "skills" / "qa"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("Read `${CLAUDE_PLUGIN_ROOT}/../procedures/a.md`.\n")
 
 
 def save(ctx: Context, **args: Any) -> dict[str, Any]:
@@ -79,7 +82,8 @@ def test_a_save_applies_at_once_stays_on_this_machine_and_is_audited(ctx: Contex
     assert json.loads((ctx.places.state / "public" / "settings.json").read_text())["models"]["critic"] == critic
     rendered = (ctx.places.rendered_agents / "critic-ux.md").read_text()
     assert f'model: "{HAIKU}"\neffort: "low"' in rendered
-    assert (ctx.places.rendered_plugin.parent / "procedures" / "a.md").exists()
+    procedure = ctx.places.rendered_plugin.parent / "procedures" / "a.md"
+    assert procedure.exists() and f"`{procedure}`" in (ctx.places.rendered_plugin / "skills/qa/SKILL.md").read_text()
     assert not (ctx.places.rendered_plugin / "agents").exists()
     assert ctx.places.defaults.read_text() == defaults  # the installed release's defaults are never written
     [audit] = store.read_jsonl(ctx.places.audit)

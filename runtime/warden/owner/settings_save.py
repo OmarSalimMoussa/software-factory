@@ -82,6 +82,8 @@ def _changes(args: dict[str, Any], current: Settings) -> dict[str, Any]:
 # The implementer's launcher takes the large rung's values; a session's start passes the rung's own model and effort.
 _LAUNCHER_ROLES = {"implementer": "implementer_large"}
 _PLACEHOLDERS = ("{{model}}", "{{effort}}")
+# A model resolving this `..` itself has dropped a folder and read the factory's state; the copy names it outright.
+_BESIDE = "${CLAUDE_PLUGIN_ROOT}/../"
 
 
 def _role_of(agent: str) -> str | None:
@@ -91,14 +93,18 @@ def _role_of(agent: str) -> str | None:
 
 def render_plugin(places: Places, settings: Settings) -> None:
     """Copy the installed plugin into public/, where every session loads it, with the procedures and rules its skills
-    reach beside it, and its launchers, models filled in, apart: in the plugin each would be a second agent of its
-    kind, without its browser server. Each folder is swapped in whole."""
+    reach beside it, named by their full paths, and its launchers, models filled in, apart: in the plugin each would
+    be a second agent of its kind, without its browser server. Each folder is swapped in whole."""
     target = places.rendered_plugin.parent
     plugin, agents = places.rendered_plugin.name, places.rendered_agents.name
     for name in (plugin, "procedures", "rules"):
         staging = target / f".{name}.new"
         shutil.rmtree(staging, ignore_errors=True)
         shutil.copytree(places.install / name, staging, symlinks=False)
+    for page in sorted((target / f".{plugin}.new").rglob("*.md")):
+        text = page.read_text()
+        if _BESIDE in text:
+            page.write_text(text.replace(_BESIDE, f"{target}/"))
     shutil.rmtree(target / f".{agents}.new", ignore_errors=True)
     (target / f".{plugin}.new" / "agents").rename(target / f".{agents}.new")
     for agent in sorted((target / f".{agents}.new").glob("*.md")):
