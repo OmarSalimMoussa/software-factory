@@ -19,10 +19,9 @@ drive('settings', async t => {
   await p.click('.yolo [data-action="yolo-off"]');
   t.check(await until(p, () => !document.querySelector('.yolo')), 'the YOLO band stayed after Turn off');
   await t.go(p, 'settings');
-  // the factory card: its version and last check, and Check now answers in a toast, whatever GitHub said
-  t.check((await p.textContent('.card:has([data-action="check-factory"])')).includes('Factory'), 'no Factory card');
-  await p.click('[data-action="check-factory"]');
-  t.check(await until(p, () => document.querySelector('#toasts').textContent.includes('Asking GitHub for a newer factory')), 'Check now said nothing');
+  // the factory card: the version installed here, and nothing to press
+  const factory = await p.$('.repo-card:has(.repo-path .mono):not(:has(button))');
+  t.check(factory && (await factory.textContent()).includes('Factory'), 'no Factory card, or one with a button');
   await p.click('[data-row="models.intake"] [data-ddbtn]'); await p.click('[data-ddopt][data-ddkind="model"][data-ddkey="models.intake"][data-v="Haiku 5.5"]');
   await p.click('[data-step="1"][data-key="caps.designers"]');
   t.check((await bar()).includes('2 changes'), 'savebar: ' + await bar());

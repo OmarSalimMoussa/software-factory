@@ -1,4 +1,4 @@
-"""software-upgrading.service: the dashboard's stand-in while the dashboard's upgrade replaces the factory.
+"""software-upgrading.service: the dashboard's stand-in while an upgrade replaces the factory.
 
 Run as ``/usr/bin/python3 -I <factory>/runtime/system/runners/upgrading.py <port> <seconds>``, as the dashboard's
 user, on the dashboard's own address. Every page says the factory is upgrading, at which step, and reloads every

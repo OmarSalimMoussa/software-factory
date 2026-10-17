@@ -1,4 +1,4 @@
-# The dashboard's stand-in while the dashboard's upgrade replaces the factory: it holds the dashboard's address and
+# The dashboard's stand-in while an upgrade replaces the factory: it holds the dashboard's address and
 # says the factory is upgrading, so a reload finds a page, not nothing. Starting either one stops the other, and the
 # stop runs first, so the dashboard always finds its port free.
 [Unit]

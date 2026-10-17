@@ -5,56 +5,38 @@ code from the authenticator app set up at install; after that, every action is o
 
 ## Install, upgrade and uninstall
 
-Install the factory, or update it, from its latest release. With your GitHub CLI (`gh`) signed in, in any folder:
+Install the factory from a clone of its repo, with your GitHub CLI (`gh`) signed in:
 
 ```
-gh release download --repo OmarSalimMoussa/software-factory --pattern 'software-factory.pyz*' --clobber
-sha256sum -c software-factory.pyz.sha256 && sudo python3 software-factory.pyz --repo <your checkout of the product>
+gh repo clone OmarSalimMoussa/software-factory && cd software-factory
+sudo python3 runtime/system/install.py --commit HEAD --repo <your checkout of the product>
 ```
 
-The first line downloads the release file and its checksum; the second checks the download, then runs it. The
-factory's CI publishes a release only for a commit on which every check passed, so nothing is tested on this
-computer. `python3 software-factory.pyz --version` says which commit a file holds; `--check` checks it against its
-own manifest. Neither needs sudo.
+The install seals the commit into a new copy under `/var/lib/software-factory-stage/` (owned by root, read-only,
+removed when it ends) and runs every step from it. It prints each phase with a check mark: checking this computer,
+preparing it, fetching the services, connecting your accounts, setting up the factory, starting up and finishing.
 
-Run with sudo, the file checks itself, unpacks the factory into a new sealed copy under
-`/var/lib/software-factory-stage/` (owned by root, read-only, removed when it ends) and opens the install console in
-your browser. It prints the page's link too; the link works once, in the browser that opens it.
-
-- **This laptop** says whether the factory is installed, at which commit and since when, whether the warden, the
-  dashboard, GlitchTip, Langfuse and the factory's own GlitchTip answer, and where the dashboard is on your tailnet.
-- **Install** installs the release's commit. On a laptop that has the factory, it says **Upgrade**, from which
-  commit, and what it keeps: your settings, accounts, keys and code, the Healthchecks.io checks, the agents' work, the
-  shared services and the factory's own GlitchTip. Turn on **Dry run** to go through every step on this computer
-  without changing anything.
-- **An install** shows a few phases with a progress bar and one line on what it is doing: checking this computer,
-  preparing it, fetching the services, connecting your accounts, setting up the factory, starting up and
-  finishing. It never shows the commands it runs.
-- **Questions** appear as the install reaches them: the 6-digit code's secret as a QR code to scan, with its key to
-  type instead and a Copy button; your GitHub token and the agents' Claude token, typed into password fields. With
-  your `gh` signed in, the install puts the GitHub keys in place itself. When it is not, the install asks you to sign
-  in; if you choose to add the keys yourself, it shows each one with where it goes.
-- **The log** keeps every detail: each command, its output and how long each step took. **Show the log** opens it.
+- **Questions** come as the install reaches them: the 6-digit code's secret as a QR code to scan, with its key to type
+  instead; your GitHub token, a read-only token for the factory's repo, and the agents' Claude token. With your `gh`
+  signed in, the install puts the GitHub keys in place itself; when it is not, it asks you to sign in, or shows each
+  key with where it goes.
+- **The log** keeps every detail: each command, its output and how long each step took. `--verbose` prints it too.
   Each install and uninstall writes a new one in `/var/log/software-factory/`, readable by you and root.
-- **When it stops**, it says in one sentence what failed and what to do, and where the log is. A first install that
-  fails takes back what it made, unless you chose to keep it. Run it again after a fix: each step finishes what an
-  earlier run left.
-- **Uninstall** first shows what it would remove, changing nothing. Remove everything does it. The logs stay.
+- **Options:** `--healthchecks`, `--keep-on-failure` (which keeps the sealed copy too), `--dry-run` (no sudo needed)
+  and `--set key=value`.
+- **When it stops**, it says in one sentence what failed and what to do. A first install that fails takes back what
+  it made, unless you kept it. Run it again after a fix: each step finishes what an earlier run left.
 
-One action runs at a time. Close on the page stops the console once no action runs. Ctrl-C in the terminal stops it
-at any time: it first lets a running action end, refusing any question the action still asks, and a second Ctrl-C
-stops at once.
+**Upgrade** to any commit of the factory's repo on GitHub with the owner action `factory.upgrade`, given the commit's
+full sha. The factory pauses, waits for every agent to settle, and starts root's upgrade unit. The unit downloads the
+commit with the read-only token, seals it and runs its install, which asks nothing. No commit need be newer than the
+one installed: to go back, upgrade to the commit before. While the dashboard is away, its address shows a page that
+says the factory is upgrading and comes back by itself; Home then says how it ended. An upgrade that needs an answer
+(a new token, a key to add) stops and says so: install by hand to give it. If the dashboard does not come back, start
+the unit for the commit before over SSH: `sudo systemctl start software-upgrade@<sha>.service`.
 
-The same file runs in the terminal instead: `sudo python3 software-factory.pyz --terminal --repo <path>` prints each
-phase with a check mark, asks its questions in the terminal (the QR code too), and with `--verbose` prints every
-detail the log keeps. It takes `--healthchecks`, `--keep-on-failure` (which keeps the sealed copy too),
-`--dry-run` and `--set key=value`, as the console does. `sudo python3 software-factory.pyz --uninstall [--repo
-<path>] [--dry-run]` removes the factory.
-
-From your own checkout of the factory, the same programs run a commit whose CI passed: `sudo python3
-runtime/system/console.py --repo <path> [--commit <sha>]`, `sudo python3 runtime/system/install.py --commit <sha>
---repo <path>` and `sudo python3 runtime/system/uninstall.py`. They check the commit's CI on GitHub with your `gh`
-first, and seal the commit from your checkout the same way.
+`sudo python3 runtime/system/uninstall.py [--repo <path>] [--dry-run]` removes the factory. It runs from your clone,
+or from `/opt/software-factory`.
 
 ## Start
 
@@ -173,22 +155,14 @@ warden's state on this machine, and only what reads that value reloads. See [set
 The factory never changes itself. Read the Self-reflect page: misses, friction, discoveries, misroutes and incidents.
 To act on one:
 
-1. Change the factory's repo by hand: branch, test, merge, push. The factory's CI publishes a release once every
-   check passes.
-2. Home shows **A newer factory is ready**, with what changed. **Upgrade** pauses the
-   factory, waits for every agent to settle, and installs the release as root, after checking on GitHub that CI made
-   it. While the dashboard is away, its address shows a page that says the factory is upgrading and comes back by
-   itself. The upgrade also commits the product's `.github/factory-ref` and CI
-   workflows for the new factory; that commit waits on Home for your Push to staging, like any other.
+1. Change the factory's repo by hand: branch, test, merge, push. Run the self-check (`pytest -m self_check`) and the
+   browser drives (`node tests/dashboard_ui/run.cjs`) before you push.
+2. Upgrade to the pushed commit with `factory.upgrade`. The upgrade also commits the product's `.github/factory-ref`
+   and CI workflows for the new factory; that commit waits on Home for your Push to staging, like any other.
 3. Run the server set-up again from a factory checkout at that commit (`python3 -m standard.server.setup --product
    <path>`). It refuses a checkout at another commit than `.github/factory-ref` names. Older builds stay deployable.
-4. **Restart the factory** on Home: every agent comes back with its work. One whose subagents the release
-   changed comes back as a copy that has the new ones, with its whole conversation; its chat link changes.
-
-The dashboard looks for releases every `install.release_check_hours`, with a read-only GitHub token for the
-factory's repo, which the install asks for once, so the first upgrade to a factory that has this button is by hand,
-from the release file. **Check now** on Settings, beside the factory's version, asks at once. An upgrade that needs
-an answer (a new token, a key to add) stops and says so: run the release file by hand to give it.
+4. **Restart the factory** on Home: every agent comes back with its work. One whose subagents the upgrade changed
+   comes back as a copy that has the new ones, with its whole conversation; its chat link changes.
 
 ## When something is wrong
 

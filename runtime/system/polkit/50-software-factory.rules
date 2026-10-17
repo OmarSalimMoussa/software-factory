@@ -1,8 +1,8 @@
 // What the warden may ask systemd and logind for, and nothing more: start and stop the three template units that run
 // as the agent and stack users (a request, a stack verb, a check), restart the agents' Claude daemon (so it loads the
-// token of the account the owner switched to), set the factory slice's budget, start the owner's upgrade to a release
-// commit (the one unit it starts as root, whose runner checks that release on GitHub itself), and hold the sleep and
-// lid locks while agents work. No unit of any other name.
+// token of the account the owner switched to), set the factory slice's budget, start an upgrade to a commit (the one
+// unit it starts as root, whose runner downloads that commit from GitHub itself), and hold the sleep and lid locks
+// while agents work. No unit of any other name.
 polkit.addRule(function (action, subject) {
   if (subject.user !== "@warden_user@") {
     return polkit.Result.NOT_HANDLED;

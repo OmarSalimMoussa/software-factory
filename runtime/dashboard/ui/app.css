@@ -190,9 +190,6 @@ a.btn{text-decoration:none}
 .yolo .ico{background:var(--f-design)}
 .upgrade[data-state="failed"]{border-color:color-mix(in srgb,var(--bad) 45%,transparent);background:var(--bad-soft)}
 .upgrade[data-state="failed"] .ico{background:var(--bad);color:#fff}
-.u-log{margin-top:6px;font-size:13px}
-.u-log summary{cursor:pointer;min-height:24px;display:flex;align-items:center}
-.u-log ul{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
 .o-t{font-weight:700;font-size:16px}
 .probes{display:flex;gap:3px;align-items:center;margin:6px 0}
 .probes i{width:9px;height:18px;border-radius:3px;background:var(--good)}

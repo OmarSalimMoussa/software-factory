@@ -314,33 +314,17 @@ _COMES_BACK = "The dashboard restarts during the upgrade. This page comes back o
 
 
 def upgrade(snap: Snap) -> dict[str, Any] | None:
-    """A newer factory on offer, the upgrade under way, how it ended, or nothing; the words are all here."""
-    band = _upgrade_band(snap)
-    if band is None:
-        return None
-    changes = len(band["changelog"])
-    title = f"What changed ({changes})" if changes else None
-    return {**band, "busy": band["state"] in ("preparing", "running"), "changes_title": title}
-
-
-def _upgrade_band(snap: Snap) -> dict[str, Any] | None:
+    """The upgrade under way, how it ended, or nothing; the words are all here."""
     found = snap.get("upgrade")
     band = _upgrade_asked(found) if found["asked"] is not None else None
-    available = found["offer"]["available"]
-    if band is not None or available is None:
-        return band
-    changes = len(available["changelog"])
-    return {"state": "available", "title": "A newer factory is ready",
-            "message": f"{plural(changes, 'change')} since yours, released {when(epoch(available['published']))}.",
-            "changelog": available["changelog"], "log": None, "commit": available["commit"],
-            "actions": ["upgrade"]}  # fmt: skip
+    return None if band is None else {**band, "busy": band["state"] in ("preparing", "running")}
 
 
 def _upgrade_asked(found: dict[str, Any]) -> dict[str, Any] | None:
     """The upgrade the owner asked for, from its getting ready to its end; None once the factory runs again."""
-    asked, progress, op, available = found["asked"], found["progress"], found["op"], found["offer"]["available"]
+    asked, progress, op = found["asked"], found["progress"], found["op"]
     resume = ["resume"] if found["paused"] else []
-    blank: dict[str, Any] = {"changelog": [], "log": None, "commit": None, "actions": []}
+    blank: dict[str, Any] = {"log": None, "actions": []}
     to = asked["to"][:7]
     mine = progress if progress and progress["to"] == asked["to"] and progress["at"] >= asked["at"] else None
     if mine is None and op is not None and op["state"] in ("waiting", "running", "failed"):
@@ -355,14 +339,12 @@ def _upgrade_asked(found: dict[str, Any]) -> dict[str, Any] | None:
                 "message": f"{mine['step'] if mine else 'Starting'}. {_COMES_BACK}"}  # fmt: skip
     if mine["state"] == "failed":
         return {**blank, "state": "failed", "title": "The upgrade stopped", "message": mine["problem"],
-                "log": mine["log"] or None, "commit": available["commit"] if available else None,
-                "actions": [*(["upgrade"] if available else []), *resume]}  # fmt: skip
+                "log": mine["log"] or None, "actions": resume}  # fmt: skip
     if resume:
         return {**blank, "state": "done", "title": f"The factory is upgraded to {to}", "message": "Your agents are "
                 "paused with their work kept; restart the factory when you are ready. The warden pushes the product's "
                 f"move to this factory itself. Then run the server set-up from a factory checkout at {to} "
-                "(docs/server.md).",
-                "changelog": asked["changelog"], "actions": resume}  # fmt: skip
+                "(docs/server.md).", "actions": resume}  # fmt: skip
     return None
 
 

@@ -1,5 +1,5 @@
-"""Remove everything the installer made, as root, so the next install starts from a clean machine. The release file
-runs it (``sudo python3 software-factory.pyz --uninstall``); from the owner's clone of the factory it is
+"""Remove everything the installer made, as root, so the next install starts from a clean machine.
+From the owner's clone of the factory, or from the installed copy in /opt/software-factory, it is
 
     sudo python3 runtime/system/uninstall.py [--repo <product checkout>] [--dry-run] [--verbose]
 
@@ -28,7 +28,7 @@ from runtime.shared import environment, paths, store
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER, Places
 from runtime.shared.protocol import Refused
-from runtime.system import layout, sealed
+from runtime.system import layout
 from runtime.system.github_keys import WARDEN_TITLE
 from runtime.system.host import Account, CommandError, DryHost, Host
 from runtime.system.install_steps import steps_prepare, steps_wire
@@ -167,15 +167,15 @@ def tailnet(host: Host, places: Places, dashboard_port: str | None) -> None:
 
 
 def sealed_copies(host: Host) -> None:
-    """Every sealed copy but the one this runs from (the console, or a first install taking itself back), which goes
-    when its program ends."""
+    """Every sealed copy but the one this runs from (a first install taking itself back), which goes when its program
+    ends."""
     if not REPO_ROOT.is_relative_to(layout.STAGE_ROOT):
         _remove(host, layout.STAGE_ROOT)
         return
     own = layout.STAGE_ROOT / REPO_ROOT.relative_to(layout.STAGE_ROOT).parts[0]
     _, listed = host.query(["find", str(layout.STAGE_ROOT), "-mindepth", "1", "-maxdepth", "1"])
     for line in listed.splitlines():
-        if line.strip() and Path(line.strip()) not in (own, sealed.release_folder(own)):
+        if line.strip() and Path(line.strip()) != own:
             _remove(host, Path(line.strip()))
     host.say(f"kept {own}: this runs from it, and it goes when it ends")
 
@@ -252,8 +252,8 @@ def remove_all(host: Host, places: Places, owner: str, repo: Path | None, *, pha
 
 
 def perform(host: Host, places: Places, owner: Account, repo: Path | None) -> str | None:
-    """The uninstall, as the command line and the console both run it: refused while a session is working or
-    waiting. A failure is told through the host; returns what stopped it, or None once everything is removed."""
+    """The uninstall: refused while a session is working or waiting. A failure is told through the host; returns what
+    stopped it, or None once everything is removed."""
     ctx = Install(host, places, REPO_ROOT, (repo or Path(".")).resolve(), "HEAD", owner, {}, False)
     try:
         try:
@@ -299,12 +299,7 @@ def main(argv: list[str]) -> int:
         journal = Journal(verbose=True)  # a dry run as the owner keeps no log: what it would do is its whole point
     host: Host = LookingHost(journal) if args.dry_run else RealHost(journal)
     journal.screen("Dry run: what Uninstall removes" if args.dry_run else "Removing the factory from this computer")
-    source = environment.staged()
-    try:
-        failed = perform(host, Places.system(), owner, args.repo) is not None
-    finally:
-        if source is not None:  # run from a release, from a sealed copy that goes now
-            sealed.finish(RealHost(journal), source.stage, kept=False)
+    failed = perform(host, Places.system(), owner, args.repo) is not None
     if not failed:
         journal.screen("Nothing changed." if args.dry_run else "The factory is removed from this computer.")
         journal.screen(LEFT_FOR_YOU)

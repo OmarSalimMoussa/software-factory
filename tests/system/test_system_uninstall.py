@@ -6,7 +6,7 @@ import pytest
 
 from runtime.shared import paths
 from runtime.shared.paths import MANAGED_SETTINGS, Places
-from runtime.system import layout, sealed, uninstall
+from runtime.system import layout, uninstall
 from runtime.system.host import Account, DryHost
 
 
@@ -36,7 +36,7 @@ def test_the_uninstall_removes_every_sealed_copy_but_the_one_it_runs_from(
 ) -> None:
     monkeypatch.setattr(uninstall, "REPO_ROOT", runs_from)
     own, stale = layout.STAGE_ROOT / "0123abcd-0a1b2c3d", layout.STAGE_ROOT / "4567ef01-2b3c4d5e"
-    copies = [own, sealed.release_folder(own), stale, sealed.release_folder(stale)]
+    copies = [own, stale]
     find = f"find {layout.STAGE_ROOT} -mindepth 1 -maxdepth 1"
     host = DryHost(paths={layout.STAGE_ROOT, *copies}, answers={find: (0, "\n".join(map(str, copies)))})
 
@@ -46,7 +46,7 @@ def test_the_uninstall_removes_every_sealed_copy_but_the_one_it_runs_from(
     if not removed:
         # A copy an earlier failed install kept goes; the one this runs from goes when it ends.
         gone = {action.removeprefix("remove: ") for action in host.actions if action.startswith("remove: ")}
-        assert gone == {str(stale), str(sealed.release_folder(stale))}
+        assert gone == {str(stale)}
 
 
 def test_the_uninstall_takes_the_factorys_own_glitchtip_away_with_its_account_and_its_data(tmp_path: Path) -> None:

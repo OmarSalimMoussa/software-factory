@@ -48,11 +48,6 @@ _KINDS: dict[str, tuple[str, list[str], Said]] = {
         ["agent", "home"],
         lambda r: "Told. It reads it as soon as its current turn ends.",
     ),
-    kinds.RELEASE_CHECK: (
-        "Checking for a newer factory",
-        ["settings", "home", "shell"],
-        lambda r: "A newer factory is ready: Home has the upgrade." if r["newer"] else "This is the newest factory.",
-    ),
     kinds.UPGRADE: (
         "Getting ready to upgrade",
         ["home", "shell"],

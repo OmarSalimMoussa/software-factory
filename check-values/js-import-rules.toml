@@ -1,4 +1,4 @@
-# Audited: the dashboard's scripts (runtime/dashboard/ui/js/) and the install console's (console_ui/console.js) load
-# as plain scripts, in the order their page lists them, and none imports another. There is no import to rule.
+# Audited: the dashboard's scripts (runtime/dashboard/ui/js/) load as plain scripts, in the order their page lists
+# them, and none imports another. There is no import to rule.
 rules = []
 exempt = []

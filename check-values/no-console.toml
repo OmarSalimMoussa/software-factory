@@ -1,6 +1,6 @@
-# The factory's browser code: the dashboard's pages and the install console. No module calls the console; a page
-# shows a failure to the owner instead.
-roots = ["runtime/dashboard/ui", "runtime/system/install_console/console_ui"]
+# The factory's browser code: the dashboard's pages. No module calls the console; a page shows a failure to the owner
+# instead.
+roots = ["runtime/dashboard/ui"]
 suffixes = [".js"]
 log_modules = []
 remedy = "show the failure to the owner on the page, as core.js does with loadFailed; the console reaches no one"

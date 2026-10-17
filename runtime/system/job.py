@@ -2,8 +2,7 @@
 
 The steps fill it in order (the commit's sha, its sealed copy, the settled settings), and each later step asks
 for what it needs through a method that fails loudly when an earlier step did not run. The commit comes from the
-owner's checkout of the factory or from a release file; a release names its GitHub repository and holds the factory's
-history, so no checkout of the factory is needed.
+owner's checkout of the factory, or for an upgrade from GitHub, in the repository root's record of the install names.
 """
 
 from __future__ import annotations
@@ -43,7 +42,7 @@ def github_origin(repo: str) -> str:
 class Install:
     host: Host
     places: Places
-    factory: Path | None  # the owner's clone of the factory the commit is sealed from; None for a release
+    factory: Path | None  # the owner's clone of the factory the commit is sealed from; None for a commit GitHub sent
     product: Path  # the owner's checkout of the product (--repo)
     commit: str
     owner: Account
@@ -52,11 +51,10 @@ class Install:
     sha: str = ""
     subject: str = ""  # the commit's first line
     stage: Path | None = None  # the commit's sealed copy, which this install runs from
-    release: dict[str, Any] | None = None  # a release's manifest: its commit, branch and repository
     settings: Settings | None = None
     overrides: dict[str, Any] = field(default_factory=dict)
     first: bool = True  # no earlier install recorded
-    unattended: bool = False  # the dashboard's upgrade, run by root's unit: nobody is at the keyboard
+    unattended: bool = False  # an upgrade, run by root's unit: nobody is at the keyboard
     reached: int = 0  # the number of the step running, or the last one done
     product_origin: str = ""
     factory_origin: str = ""

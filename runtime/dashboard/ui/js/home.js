@@ -45,21 +45,13 @@ function laptopHTML(l) {
 /* ---------- YOLO mode: the factory runs on its own until the owner switches it off ---------- */
 const yoloBand = y => `<div class="card upgrade yolo" role="status"><span class="ico">${icon('moon')}</span><div style="min-width:0"><div class="o-t">${esc(y.title)}</div><div class="o-s">${esc(y.message)}</div></div><div class="o-a"><button class="btn sm" data-action="yolo-off" data-write>${esc(y.button)}</button></div></div>`;
 
-/* ---------- the upgrade band: a newer factory, the upgrade under way, or how it ended ---------- */
+/* ---------- the upgrade band: the upgrade under way, or how it ended ---------- */
 function upgradeBand(u) {
   const acts = {
-    upgrade: () => `<button class="btn sm primary" data-action="upgrade-factory" data-commit="${esc(u.commit)}">${icon('arrow-up-circle', 'sm')}Upgrade</button>`,
     resume: () => `<button class="btn sm" data-action="resume">${icon('play-circle', 'sm')}Restart the factory</button>`,
   };
-  const busy = u.busy;
-  const changes = u.changes_title ? `<details class="u-log"><summary>${esc(u.changes_title)}</summary><ul>${u.changelog.map(c => `<li>${esc(c)}</li>`).join('')}</ul></details>` : '';
   const log = u.log ? `<div class="o-s muted">The log: <span class="mono">${esc(u.log)}</span></div>` : '';
-  return `<div class="card upgrade" data-state="${esc(u.state)}" role="status"><span class="ico">${icon(busy ? 'arrow-path' : 'arrow-up-circle')}</span><div style="min-width:0"><div class="o-t">${esc(u.title)}</div><div class="o-s">${esc(u.message)}</div>${log}${changes}</div><div class="o-a">${u.actions.map(a => acts[a] ? acts[a]() : '').join('')}</div></div>`;
-}
-function upgradeFactory(commit) {
-  const u = homePart('upgrade') || {changelog: []};
-  confirmSheet('Upgrade the factory', `<div class="muted">The factory pauses, every agent keeps its work, and the new factory is installed. The dashboard restarts on the way; then you choose when to restart the factory.</div>${u.changelog.length ? `<ul class="changes">${u.changelog.map(c => `<li><span>${esc(c)}</span></li>`).join('')}</ul>` : ''}`, 'Upgrade',
-    key => post('/api/factory/upgrade', {commit}, key), {icon: 'arrow-up-circle'});
+  return `<div class="card upgrade" data-state="${esc(u.state)}" role="status"><span class="ico">${icon(u.busy ? 'arrow-path' : 'arrow-up-circle')}</span><div style="min-width:0"><div class="o-t">${esc(u.title)}</div><div class="o-s">${esc(u.message)}</div>${log}</div><div class="o-a">${u.actions.map(a => acts[a] ? acts[a]() : '').join('')}</div></div>`;
 }
 
 /* ---------- the outage band: decided by the warden's probes, never by an agent ---------- */

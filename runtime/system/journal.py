@@ -26,7 +26,7 @@ class Journal:
     def __init__(self, path: Path | None = None, *, verbose: bool = False, terminal: bool = True) -> None:
         self.path = path  # None: the details are kept nowhere but, with verbose, the terminal
         self.verbose = verbose
-        self.terminal = terminal  # False: nothing is printed, as when the console's page shows the run instead
+        self.terminal = terminal  # False: nothing is printed, as when root's upgrade unit runs it
         self._lock = threading.RLock()
         self._began = time.monotonic()
         self._phase: tuple[str, float] | None = None

@@ -1,7 +1,7 @@
 {
   "name": "software-factory-checks",
   "private": true,
-  "description": "The tools the factory's own checks need: typescript, for the error-telemetry check's scan of the dashboard's and the install console's scripts.",
+  "description": "The tools the factory's own checks need: typescript, for the error-telemetry check's scan of the dashboard's scripts.",
   "license": "UNLICENSED",
   "devDependencies": {
     "typescript": "6.0.3"

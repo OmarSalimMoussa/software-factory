@@ -9,11 +9,11 @@ from pathlib import Path
 import pytest
 from system_fakes import FACTORY_ORIGIN, dry_job, settings
 
-from runtime.shared import releases, upgrades
+from runtime.shared import network, upgrades
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
-from runtime.system import ci_check, install, layout, render, root_commits, uninstall
+from runtime.system import factory_repo, install, layout, render, root_commits, uninstall
 from runtime.system.host import DryHost
 from runtime.system.install_steps import steps_machine, steps_prepare, steps_secrets, steps_services, steps_wire
 from runtime.system.job import REPO_ROOT, Install
@@ -262,7 +262,6 @@ def test_the_secrets_step_keeps_the_agents_claude_accounts(
         folder / "deploy.key",
         folder / "factory-read.key.pub",
         folder / "github.token",
-        folder / "factory.token",
         upgrades.token_path(job.places),
     }
     host.files.update({folder / name: text for name, text in present.items()})
@@ -279,43 +278,39 @@ def test_the_secrets_step_keeps_the_agents_claude_accounts(
 
 @pytest.mark.parametrize(
     ("kept", "github", "refused"),
-    [(True, None, False), (False, None, False), (False, "HTTP 404", True)],
+    [(True, 200, False), (False, 200, False), (False, 404, True)],
     ids=["kept-from-before", "asked-and-checked", "one-github-refuses"],
 )
-def test_the_install_asks_once_for_a_factory_token_that_github_lets_read_the_releases(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kept: bool, github: str | None, refused: bool
+def test_the_install_asks_once_for_a_factory_token_that_github_lets_read_the_repo_and_root_alone_keeps_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kept: bool, github: int, refused: bool
 ) -> None:
     job = dry_job(tmp_path)
     job.settings = settings(**{"factory.github": "acme/software-factory"})
-    host, folder = job.host, job.places.state / "secrets"
+    host, folder, mine = job.host, job.places.state / "secrets", upgrades.token_path(job.places)
     assert isinstance(host, DryHost)
     host.dry = False  # decides like a real install; a dry host still changes nothing
     host.paths |= {job.places.totp_secret, folder / "deploy.key", folder / "factory-read.key.pub",
                    folder / "github.token", folder / "claude.token"}  # fmt: skip
     if kept:
-        host.files[folder / "factory.token"] = "github_pat_read_only\n"
-    checked: list[str] = []
+        host.paths.add(mine)
+    asked: list[tuple[str, str | None]] = []
 
-    def check(repo: str, token: str, timeout: float) -> None:
-        checked.append(repo)
-        if github:
-            raise releases.ReleaseError(f"GitHub refused GET /repos/acme/software-factory: {github}")
+    def get(url: str, headers: dict[str, str], timeout: float) -> network.Answer:
+        asked.append((url, headers.get("Authorization")))
+        return network.Answer(github, {}, b"{}")
 
-    monkeypatch.setattr(steps_secrets, "check_factory_token", check)
+    monkeypatch.setattr(factory_repo, "http_get", get)
     if refused:
-        with pytest.raises(Refused, match="That token cannot read the factory's releases"):
+        with pytest.raises(Refused, match="That token cannot read the factory's repo"):
             steps_secrets.secrets(job)
     else:
         steps_secrets.secrets(job)
 
-    asked = [a for a in host.actions if a.startswith("ask the owner: A read-only GitHub token for the factory")]
-    wrote = [a for a in host.actions if a.startswith(f"write: {folder}/factory.token")]
-    assert (len(asked), checked, len(wrote)) == (
-        (0, [], 0) if kept else (1, ["acme/software-factory"], 0 if refused else 1)
-    )
-    # Root keeps its own copy for the upgrade unit, which never reads the warden's.
-    copied = [a for a in host.actions if a.startswith(f"write: {upgrades.token_path(job.places)} (600, root:root)")]
-    assert len(copied) == (0 if refused else 1)
+    questions = [a for a in host.actions if a.startswith("ask the owner: A read-only GitHub token for the factory")]
+    wrote = [a for a in host.actions if a.startswith(f"write: {mine} (600, root:root)")]
+    checked = [] if kept else [("https://api.github.com/repos/acme/software-factory", "Bearer <answer>")]
+    assert (len(questions), asked, len(wrote)) == (0 if kept else 1, checked, 0 if kept or refused else 1)
+    assert not [a for a in host.actions if a.startswith(f"write: {folder}/factory.token")]  # never the warden's
 
 
 @pytest.mark.parametrize(
@@ -325,10 +320,8 @@ def test_the_install_asks_once_for_a_factory_token_that_github_lets_read_the_rel
         (False, install.FIRST_CHANGE + 5, False, False),  # a reinstall: removing it would delete real work
         (True, install.FIRST_CHANGE - 1, False, False),  # nothing was changed yet
         (True, install.FIRST_CHANGE + 5, True, False),  # the owner keeps it to look at
-        # A commit whose CI has not passed is refused before anything changes.
-        (True, [step for _, step in install.STEPS].index(ci_check.passed) + 1, False, False),
     ],
-    ids=["first-install", "reinstall", "before-any-change", "kept", "ci-not-passed"],
+    ids=["first-install", "reinstall", "before-any-change", "kept"],
 )
 def test_only_a_failed_first_install_is_taken_back(
     tmp_path: Path, first: bool, reached: int, keep: bool, rolled: bool
@@ -340,7 +333,7 @@ def test_only_a_failed_first_install_is_taken_back(
     assert install.rolls_back(job, keep=keep) is rolled
 
 
-def test_a_saved_value_for_a_setting_the_release_no_longer_has_is_dropped_and_the_rest_kept(
+def test_a_saved_value_for_a_setting_the_factory_no_longer_has_is_dropped_and_the_rest_kept(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     job = dry_job(tmp_path)
@@ -352,7 +345,7 @@ def test_a_saved_value_for_a_setting_the_release_no_longer_has_is_dropped_and_th
 
     assert job.settings is not None and job.settings.get_int("caps.implementers") == 2
     assert "factory.clone" not in job.settings.overrides and job.settings.get_str("factory.github")
-    assert "Dropped your saved factory.clone: this release has no such setting." in capsys.readouterr().out
+    assert "Dropped your saved factory.clone: this factory has no such setting." in capsys.readouterr().out
 
 
 def _serving(*handlers: tuple[str, str]) -> str:

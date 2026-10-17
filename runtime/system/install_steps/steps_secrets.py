@@ -1,6 +1,6 @@
 """The install's secrets: the 6-digit code's secret (shown once), the warden's deploy key, the product CI's read key
-for the factory repo, the owner's GitHub token, the agents' Claude account, and the server's keys the server set-up
-saved for the owner.
+for the factory repo, the owner's GitHub token, root's read-only token for the factory repo, the agents' Claude
+account, and the server's keys the server set-up saved for the owner.
 
 With the owner's signed-in GitHub CLI the install puts every GitHub key in place itself, and asks the owner to sign in
 when it is not; only an owner who declines adds the keys by hand. Each piece is made once and kept, and a rerun after
@@ -13,10 +13,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from runtime.shared import claude_accounts, releases, totp, upgrades
+from runtime.shared import claude_accounts, totp, upgrades
 from runtime.shared.claude_accounts import AccountError
 from runtime.shared.paths import WARDEN_USER
-from runtime.system import github_keys, layout
+from runtime.system import factory_repo, github_keys, layout
 from runtime.system.host import DeployKey
 from runtime.system.job import Install, github_name, refuse
 
@@ -93,41 +93,29 @@ def secrets(ctx: Install) -> None:
 
 
 def _factory_token(ctx: Install) -> None:
-    """The owner's read-only token for the factory's own repo, asked for once: the warden finds new releases with it,
-    and the dashboard's Upgrade downloads them. Checked on GitHub before it is kept."""
-    host, path, mine = ctx.host, releases.token_path(ctx.places), upgrades.token_path(ctx.places)
+    """The owner's read-only token for the factory's own repo, asked for once and kept by root alone: root's upgrade
+    unit downloads each commit it installs with it. Checked on GitHub before it is kept."""
+    host, path = ctx.host, upgrades.token_path(ctx.places)
     if host.exists(path):
-        # Root's own copy, for the upgrade unit, made from the token the owner gave.
-        if not host.exists(mine) and not host.dry:
-            host.mkdir(ctx.places.upgrade, mode=0o755)
-            host.write(mine, host.read(path), mode=0o600)
         return
     settings = ctx.need_settings()
     factory = settings.get_str("factory.github")
     value = host.ask(
         "A read-only GitHub token for the factory's own repo: ", secret=True,
-        hint=f"A fine-grained token with Contents: Read and Actions: Read on {factory}. The dashboard finds and "
-             "installs new factory releases with it.",
+        hint=f"A fine-grained token with Contents: Read on {factory}. The factory installs its own commits with it.",
         link="https://github.com/settings/personal-access-tokens/new",
     )  # fmt: skip
     if not value:
-        raise refuse("The factory needs its read-only token to find new releases: install again and paste it")
+        raise refuse("The factory needs its read-only token to install its commits: install again and paste it")
     if not host.dry:
+        timeout = float(settings.get_int("watch.http_timeout_seconds"))
         try:
-            check_factory_token(factory, value, float(settings.get_int("watch.http_timeout_seconds")))
-        except releases.ReleaseError as exc:
-            raise refuse(f"That token cannot read the factory's releases ({exc}): make one as asked, then install "
+            factory_repo.FactoryRepo(factory, value, timeout, factory_repo.http_get).check()
+        except factory_repo.RepoError as exc:
+            raise refuse(f"That token cannot read the factory's repo ({exc}): make one as asked, then install "
                          "again") from exc  # fmt: skip
-    host.write(path, value + "\n", mode=0o600, owner=WARDEN_USER)
     host.mkdir(ctx.places.upgrade, mode=0o755)
-    host.write(mine, value + "\n", mode=0o600)
-
-
-def check_factory_token(repo: str, token: str, timeout: float) -> None:
-    """Raises ReleaseError unless ``token`` reads the factory repo and its CI runs, as an upgrade does."""
-    found = releases.Releases(repo, token, timeout, releases.http_get)
-    found.default_branch()
-    found.can_read_runs()
+    host.write(path, value + "\n", mode=0o600)
 
 
 def _read_key(ctx: Install, folder: Path, github: str, gh: str) -> None:

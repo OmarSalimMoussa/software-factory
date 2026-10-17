@@ -1,8 +1,7 @@
 """A QR code, made here so the install shows the 6-digit code's secret with no network and no library to scan.
 
 It follows ISO/IEC 18004 for what this needs: byte mode, error correction level M, the smallest of versions 1 to 10
-that holds the text (up to 213 bytes), and the mask with the lowest penalty. The console draws its dark modules from
-``svg_path``; the terminal prints them as half blocks.
+that holds the text (up to 213 bytes), and the mask with the lowest penalty. The terminal prints it as half blocks.
 """
 
 from __future__ import annotations
@@ -233,22 +232,6 @@ def matrix(text: str, *, mask: int | None = None) -> list[list[bool]]:
     if mask is not None:
         return grid.masked(mask)
     return min((grid.masked(each) for each in range(len(_MASKS))), key=_penalty)
-
-
-def svg_path(grid: list[list[bool]]) -> str:
-    """Every dark module as one SVG path, a row's runs merged, inside a quiet border of ``QUIET`` modules."""
-    parts = []
-    for y, row in enumerate(grid):
-        x = 0
-        while x < len(row):
-            if not row[x]:
-                x += 1
-                continue
-            start = x
-            while x < len(row) and row[x]:
-                x += 1
-            parts.append(f"M{start + QUIET} {y + QUIET}h{x - start}v1h-{x - start}z")
-    return "".join(parts)
 
 
 def half_blocks(grid: list[list[bool]]) -> list[str]:

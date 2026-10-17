@@ -295,7 +295,7 @@ def test_the_dashboards_stand_in_says_the_factory_is_upgrading_on_every_page_unt
     try:
         page = _ask(server, "/tasks/t-0001")
         api = _ask(server, "/api/home")
-        write = _ask(server, "/api/factory/upgrade", "POST")
+        write = _ask(server, "/api/factory/pause", "POST")
         css = _ask(server, "/app.css")
     finally:
         server.shutdown()

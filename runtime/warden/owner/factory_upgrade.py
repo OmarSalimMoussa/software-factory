@@ -1,21 +1,19 @@
-"""The owner's Upgrade from the dashboard: a newer factory found on GitHub, and the upgrade to it started.
+"""An upgrade of the factory to any commit of its repo on GitHub, started with the owner's factory.upgrade.
 
-The releases pass asks GitHub every install.release_check_hours for the factory's newest release, with the owner's
-read-only factory token, in the repo root's record of the install names. A release ahead of the installed commit is
-offered with its changelog: the subjects of the commits it adds. The owner's Upgrade (coded) pauses the factory,
-waits for every agent to settle, and starts root's upgrade unit, which checks the release again itself. The warden
-stops while the install runs: what was asked for stays here for the page, and root's progress record says how it went.
+The verb takes the commit's full sha. It pauses the factory, waits for every agent to settle, and starts root's
+upgrade unit, which downloads that commit itself and installs it. No commit need be newer than the one installed, so
+installing the commit before is the way back. The warden stops while the install runs: what was asked for stays here
+for the page, and root's progress record says how it went.
 """
 
 from __future__ import annotations
 
-import logging
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from runtime.shared import operations, releases, store, upgrades
+from runtime.shared import operations, store, upgrades
 from runtime.shared.models import RESTING
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
@@ -23,113 +21,24 @@ from runtime.warden.context import Context
 from runtime.warden.owner import ops
 from runtime.warden.sessions import lifecycle, registry, revive
 
-log = logging.getLogger(__name__)
-
-
-def offer_path(places: Places) -> Path:
-    return places.state / "upgrade-offer.json"
-
 
 def asked_path(places: Places) -> Path:
     return places.state / "upgrade-asked.json"
 
 
-OFFER_KEYS = {"available", "checked_at", "note", "base"}
-
-
-def offer(places: Places) -> dict[str, Any]:
-    """The newest release ahead of ``base`` (the install it was asked for), when GitHub was last asked, and why that
-    failed."""
-    raw = store.read_json_or(offer_path(places), {"available": None, "checked_at": None, "note": None, "base": None})
-    if not isinstance(raw, dict) or set(raw) != OFFER_KEYS:
-        raise store.StoreError(f"{offer_path(places)}: needs {', '.join(sorted(OFFER_KEYS))}")
-    return raw
-
-
-def _for_installed(places: Places) -> dict[str, Any] | None:
-    """What is on offer for the factory installed now: none when it was asked for another install."""
-    installed = upgrades.read_installed(places)
-    found = offer(places)
-    return found["available"] if installed is not None and found["base"] == installed["commit"] else None
-
-
 def asked(places: Places) -> dict[str, Any] | None:
-    """The upgrade the owner asked for last: from and to, its changelog, when, and the operation that started it."""
+    """The upgrade the owner asked for last: from and to, when, and the operation that started it."""
     raw = store.read_json_or(asked_path(places), None)
-    if raw is not None and (not isinstance(raw, dict) or set(raw) != {"from", "to", "changelog", "at", "op"}):
-        raise store.StoreError(f"{asked_path(places)}: needs from, to, changelog, at and op")
+    if raw is not None and (not isinstance(raw, dict) or set(raw) != {"from", "to", "at", "op"}):
+        raise store.StoreError(f"{asked_path(places)}: needs from, to, at and op")
     return raw
-
-
-def poll(ctx: Context, force: bool = False) -> None:
-    settings, places, now = ctx.settings(), ctx.places, ctx.clock.now()
-    last, every = offer(places), settings.get_int("install.release_check_hours") * 3600
-    available, note, base = None, None, None
-    try:
-        installed = upgrades.read_installed(places)
-        base = installed["commit"] if installed else None
-        if not force and _asked_lately(places, last, base, now, every):
-            return
-        if installed is None:
-            note = "Upgrade once by hand from a release file; the dashboard offers every upgrade after that."
-        else:
-            timeout = float(settings.get_int("watch.http_timeout_seconds"))
-            rel = releases.Releases.of(releases.token_path(places), installed["repo"], timeout, releases.http_get)
-            available = _ahead(rel, installed["commit"])
-    except (releases.ReleaseError, store.StoreError) as exc:
-        available = last["available"] if base == last["base"] else None
-        note = f"GitHub could not be asked for a newer factory: {exc}"
-        if note != last["note"]:
-            log.warning("warden: the release check failed (%s)", type(exc).__name__)
-    record = {"available": available, "checked_at": now, "note": note, "base": base}
-    store.write_json(offer_path(places), record, mode=0o600)
-
-
-def check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """The owner's Check now: GitHub asked at once, whatever install.release_check_hours says. It runs as an
-    operation, as asking GitHub can take longer than the dashboard waits for an answer."""
-    found: dict[str, Any] = {}
-    return ok(
-        op=ops.launch(
-            ctx, operations.RELEASE_CHECK, [("Asking GitHub for a newer factory", lambda: _check(ctx, found))], found
-        )
-    )
-
-
-def _check(ctx: Context, found: dict[str, Any]) -> str:
-    poll(ctx, force=True)
-    note = offer(ctx.places)["note"]
-    if note:
-        raise ops.StepError(note)
-    found["newer"] = _for_installed(ctx.places) is not None
-    return "a newer factory is ready" if found["newer"] else "this is the newest factory"
-
-
-def _asked_lately(places: Places, last: dict[str, Any], base: str | None, now: float, every: int) -> bool:
-    """Asked within the period, for this install, and no upgrade failed since. A new install asks again at once (what
-    was on offer may be the very release it installed), and so does a failure: a newer release may replace the one."""
-    if base != last["base"] or last["checked_at"] is None or now - last["checked_at"] >= every:
-        return False
-    progress = upgrades.read_progress(places)
-    return progress is None or progress["state"] != upgrades.FAILED or _epoch(progress["at"]) <= last["checked_at"]
-
-
-def _ahead(rel: releases.Releases, installed: str) -> dict[str, Any] | None:
-    latest = rel.latest()
-    if latest.commit == installed:
-        return None
-    status, changelog = rel.changes(installed, latest.commit)
-    if status != "ahead":
-        return None
-    return {"commit": latest.commit, "tag": latest.tag, "published": latest.published, "changelog": changelog}
 
 
 def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     places = ctx.places
     commit = args.get("commit")
-    available = _for_installed(places)
-    if not isinstance(commit, str) or available is None or available["commit"] != commit:
-        raise Refused("stale", "This changed: that release is not the one on offer now")
+    if not isinstance(commit, str) or not upgrades.FULL_SHA.match(commit):
+        raise Refused("upgrade", "Name the factory's commit by its full 40-character sha")
     with ctx.lock:
         progress, before = progress_now(ctx), asked(places)
         if progress is not None and progress["state"] == upgrades.RUNNING:
@@ -139,15 +48,14 @@ def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
             raise Refused("upgrading", "An upgrade is already getting ready")
         installed = upgrades.read_installed(places)
         if installed is None:
-            raise Refused("upgrade", "Upgrade once by hand from a release file first")
+            raise Refused("upgrade", "Install the factory by hand first")
         steps = [
             ("Pausing the factory", lambda: _pause(ctx)),
             ("Waiting for every agent to settle", lambda: _settled(ctx)),
             ("Starting the upgrade", lambda: _start(ctx, commit)),
         ]
         op_id = ops.launch(ctx, operations.UPGRADE, steps, {"to": commit})
-        record = {"from": installed["commit"], "to": commit, "changelog": available["changelog"], "op": op_id}
-        record["at"] = ctx.clock.iso()
+        record = {"from": installed["commit"], "to": commit, "op": op_id, "at": ctx.clock.iso()}
         store.write_json(asked_path(places), record, mode=0o600)
     return ok(op=op_id)
 
@@ -222,7 +130,6 @@ def view(ctx: Context) -> dict[str, Any]:
     before = _asked_for_installed(places, installed)
     return {
         "installed": installed["commit"] if installed else None,
-        "offer": {**offer(places), "available": _for_installed(places)},
         "asked": before,
         "op": _op(ctx, before["op"]) if before else None,
         "progress": progress_now(ctx) if before else None,

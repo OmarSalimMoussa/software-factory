@@ -1,8 +1,7 @@
-"""The upgrade the dashboard starts: the release's own install, run as root by the upgrade service, with nobody at
-the keyboard.
+"""An upgrade: the install of a commit GitHub sent, run as root by the upgrade unit, with nobody at the keyboard.
 
 A step that would ask the owner anything (a token, a key to add, a code to scan) stops the upgrade instead, saying
-what it needs and to run the release file by hand to give it. Each phase and step goes into root's progress record,
+what it needs and to install by hand to give it. Each phase and step goes into root's progress record,
 which the warden reads for the dashboard while it stops and starts again around it.
 """
 
@@ -15,7 +14,10 @@ from runtime.system.job import refuse
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
 
-BY_HAND = "Run the release file by hand to give it: sudo python3 software-factory.pyz"
+BY_HAND = (
+    "Install by hand to give it, from a clone of the factory: sudo python3 runtime/system/install.py --commit "
+    "<sha> --repo <your checkout of the product>"
+)
 
 
 class UnattendedHost(RealHost):

@@ -5,8 +5,8 @@ skip = ["checks/standard/patterns/mirror_markers.py", "rules/engineering.md", "t
 claims = []
 
 [copies]
-# Server vocabularies copied, undeclared, into the browser code of the dashboard and the install console.
+# Server vocabularies copied, undeclared, into the dashboard's browser code.
 server = ["runtime/"]
-web = ["runtime/dashboard/ui/", "runtime/system/install_console/console_ui/"]
+web = ["runtime/dashboard/ui/"]
 generated_markers = []
 rows = []

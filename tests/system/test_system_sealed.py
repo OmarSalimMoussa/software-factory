@@ -1,4 +1,4 @@
-"""The sealed copy an install and the console run from, and what every command they start sees of the environment."""
+"""The sealed copy an install runs from, and what every command it starts sees of the environment."""
 
 from __future__ import annotations
 
@@ -37,14 +37,13 @@ def test_a_sealed_copy_is_unpacked_by_root_into_a_new_folder_and_made_read_only_
     ]
 
 
-@pytest.mark.parametrize("display", [(), environment.DISPLAY], ids=["install", "console"])
+@pytest.mark.parametrize("by", ["owner", "upgrade-unit"])
 def test_a_sealed_copy_starts_isolated_with_only_the_declared_environment(
-    monkeypatch: pytest.MonkeyPatch, display: tuple[str, ...]
+    monkeypatch: pytest.MonkeyPatch, by: str
 ) -> None:
     inherited = {
         "PATH": "/home/owner/.venv/bin:/usr/bin", "PYTHONPATH": "/home/owner/src", "VIRTUAL_ENV": "/home/owner/.venv",
         "UV_PYTHON": "3.14", "SUDO_USER": "owner", "TERM": "xterm-256color", "DISPLAY": ":0",
-        "WAYLAND_DISPLAY": "wayland-0", "XAUTHORITY": "/run/user/1000/xauth",
         environment.STAGE: "/tmp/elsewhere", environment.SHA: "junk", environment.CHECKOUT: "/tmp/junk",
     }  # fmt: skip
     for key, value in inherited.items():
@@ -55,19 +54,27 @@ def test_a_sealed_copy_starts_isolated_with_only_the_declared_environment(
         started.append((path, argv, env))
         raise SystemExit(0)
 
-    monkeypatch.setattr(sealed.os, "execve", execve)
+    def run(argv: list[str], env: dict[str, str], check: bool) -> subprocess.CompletedProcess[str]:
+        started.append((argv[0], argv, env))
+        return subprocess.CompletedProcess(argv, 0)
 
-    with pytest.raises(SystemExit):
-        sealed.exec_staged(SHA, STAGE, "runtime/system/install.py", ["--commit", SHA], checkout=CHECKOUT,
-                           display=display)  # fmt: skip
+    monkeypatch.setattr(sealed.os, "execve", execve)
+    monkeypatch.setattr(sealed.subprocess, "run", run)
+
+    if by == "owner":
+        with pytest.raises(SystemExit):
+            sealed.exec_staged(SHA, STAGE, "runtime/system/install.py", ["--commit", SHA], checkout=CHECKOUT)
+    else:
+        assert sealed.run_staged(SHA, STAGE, "runtime/system/install.py", ["--commit", SHA]) == 0
 
     [(program, argv, env)] = started
     assert [program, *argv] == [layout.PYTHON, layout.PYTHON, "-I", "-B", f"{STAGE}/runtime/system/install.py",
                                 "--commit", SHA]  # fmt: skip
+    # The upgrade unit's copy inherits nothing: no owner ran it, and GitHub, not a checkout, gave the commit.
+    owners = {"SUDO_USER": "owner", "TERM": "xterm-256color", environment.CHECKOUT: str(CHECKOUT)}
     assert env == {
-        "PATH": layout.ROOT_PATH, "LANG": "C.UTF-8", "HOME": "/root", "SUDO_USER": "owner", "TERM": "xterm-256color",
-        environment.STAGE: str(STAGE), environment.SHA: SHA, environment.CHECKOUT: str(CHECKOUT),
-        **{key: inherited[key] for key in display},
+        "PATH": layout.ROOT_PATH, "LANG": "C.UTF-8", "HOME": "/root", environment.STAGE: str(STAGE),
+        environment.SHA: SHA, **(owners if by == "owner" else {}),
     }  # fmt: skip
 
 
@@ -108,7 +115,7 @@ def test_a_command_the_installer_starts_sees_only_what_it_declares(
     ids=["ended", "kept-beside-a-failed-install", "not-a-sealed-copy"],
 )
 def test_the_sealed_copy_goes_when_its_program_ends_unless_kept(stage: Path, kept: bool, removed: bool | None) -> None:
-    host = DryHost(paths={sealed.release_folder(stage)})  # a release's manifest and history go with its copy
+    host = DryHost()
     host.dry = False  # decides like a real run; a dry host still changes nothing
 
     if removed is None:
@@ -119,7 +126,6 @@ def test_the_sealed_copy_goes_when_its_program_ends_unless_kept(stage: Path, kep
     sealed.finish(host, stage, kept=kept)
 
     assert (f"remove: {stage}" in host.actions) is removed
-    assert (f"remove: {sealed.release_folder(stage)}" in host.actions) is removed
 
 
 @pytest.mark.parametrize(
@@ -128,19 +134,16 @@ def test_the_sealed_copy_goes_when_its_program_ends_unless_kept(stage: Path, kep
         ({}, None),
         (
             {environment.STAGE: "/stage", environment.SHA: "abc", environment.CHECKOUT: "/checkout"},
-            environment.Staged(Path("/stage"), "abc", Path("/checkout"), None),
+            environment.Staged(Path("/stage"), "abc", Path("/checkout")),
         ),
-        (
-            {environment.STAGE: "/stage", environment.SHA: "abc", environment.RELEASE: "/release"},
-            environment.Staged(Path("/stage"), "abc", None, Path("/release")),
-        ),
+        ({environment.STAGE: "/stage", environment.SHA: "abc"}, environment.Staged(Path("/stage"), "abc", None)),
     ],
-    ids=["run-from-a-checkout", "sealed-from-a-checkout", "sealed-from-a-release"],
+    ids=["run-from-a-checkout", "sealed-from-a-checkout", "sealed-from-github"],
 )
 def test_a_process_knows_the_sealed_copy_it_runs_from(
     monkeypatch: pytest.MonkeyPatch, variables: dict[str, str], known: environment.Staged | None
 ) -> None:
-    for key in (environment.STAGE, environment.SHA, environment.CHECKOUT, environment.RELEASE):
+    for key in (environment.STAGE, environment.SHA, environment.CHECKOUT):
         monkeypatch.delenv(key, raising=False)
     for key, value in variables.items():
         monkeypatch.setenv(key, value)

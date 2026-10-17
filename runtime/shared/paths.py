@@ -16,7 +16,7 @@ RUN = Path("/run/software-factory")
 FIREWALL = Path("/run/software-firewall")
 # Root's alone, readable by all: what is installed, as root knows it, and the progress of an upgrade under way.
 UPGRADE = Path("/var/lib/software-factory-upgrade")
-UPGRADE_UNIT = "software-upgrade@{}.service"  # the owner's upgrade to a release commit, the warden's one root unit
+UPGRADE_UNIT = "software-upgrade@{}.service"  # an upgrade to a commit, the one unit the warden starts as root
 MANAGED_SETTINGS = Path("/etc/claude-code/managed-settings.json")
 # On every user's PATH, so a session types the bare word.
 FACTORY_BIN = Path("/usr/local/bin/factory")

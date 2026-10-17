@@ -1,4 +1,4 @@
-"""The QR code a phone scans to open the console or the dashboard: its modules, pinned bit for bit."""
+"""The QR code a phone scans for the 6-digit code's secret: its modules, pinned bit for bit."""
 
 from __future__ import annotations
 

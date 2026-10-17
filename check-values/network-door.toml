@@ -57,11 +57,11 @@ remedy = "the checks and the hooks reach nothing over the network: read what the
 
 [[doors]]
 name = "page links"
-scans = ["runtime/dashboard/ui/", "runtime/system/install_console/console_ui/"]
+scans = ["runtime/dashboard/ui/"]
 suffixes = [".js"]
 calls = ['\bfetch\(', '\bnew\s+WebSocket\(', '\bnew\s+EventSource\(', '\bXMLHttpRequest\b', '\bsendBeacon\(']
 unless = []
-owners = ["runtime/dashboard/ui/js/core.js", "runtime/system/install_console/console_ui/console.js"]
+owners = ["runtime/dashboard/ui/js/core.js"]
 allow = {}
 code_only = true
-remedy = "ask the page's server through core.js's api and post (console.js's api on the install page)"
+remedy = "ask the page's server through core.js's api and post"

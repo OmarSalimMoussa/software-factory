@@ -9,14 +9,14 @@ import tomllib
 from pathlib import PurePosixPath
 from typing import Any
 
-from runtime.shared import store, upgrades
+from runtime.shared import store
 from runtime.shared.models import RESTING
 from runtime.shared.settings import SettingsError, build, flatten
-from runtime.shared.settings_schema import AT_INSTALL, SCHEMA
+from runtime.shared.settings_schema import SCHEMA
 from runtime.system import layout
 from runtime.system.host import Account, Host
 from runtime.system.install_steps import steps_wire
-from runtime.system.job import Install, github_name, github_origin, refuse
+from runtime.system.job import Install, github_name, refuse
 from runtime.warden.sessions import registry
 from standard import envfile
 
@@ -25,7 +25,7 @@ _MACHINE_TOOLS = ("git", "tar", "systemctl", "systemd-run", "runuser", "loginctl
 _OWNER_TOOLS = ("uv", "claude")
 
 
-# The shell's start-up files may print before its answer, and with no terminal (the dashboard's upgrade) it warns
+# The shell's start-up files may print before its answer, and with no terminal (an upgrade) it warns
 # about job control after it: only what lies between these two lines is the answer.
 LOOKUP_MARK = "--- the factory looks up a tool ---"
 LOOKUP_END = "--- the factory found it ---"
@@ -82,8 +82,6 @@ def check_machine(ctx: Install) -> None:
         if code != 0 and not host.dry:
             problems.append(f"{path} is not a clone of the {name}'s repository on GitHub")
         setattr(ctx, f"{name}_origin", out.strip())
-    if ctx.release is not None:
-        ctx.factory_origin = github_origin(str(ctx.release["repo"]))
     mine, theirs = github_name(ctx.factory_origin), github_name(ctx.product_origin)
     if (ctx.factory is not None and ctx.factory.resolve() == ctx.product.resolve()) or (mine and mine == theirs):
         problems.append("the product checkout you named is the factory's own repository, and the factory never works "
@@ -112,9 +110,9 @@ def refuse_live_sessions(ctx: Install) -> None:
 def sealed_copy(ctx: Install) -> None:
     """The commit is sealed before the first step (runtime/system/sealed.py); a dry run says what would be."""
     host = ctx.host
-    if ctx.release is not None:
-        host.say(f"{ctx.sha[:12]} is sealed from the release built {ctx.release['built']}, root-owned and read-only, "
-                 f"in {ctx.stage}; every step runs from it")  # fmt: skip
+    if ctx.factory is None:
+        host.say(f"{ctx.sha[:12]} is sealed from GitHub's copy, root-owned and read-only, in {ctx.stage}; every step "
+                 "runs from it")  # fmt: skip
         return
     git = ["git", "-C", str(ctx.factory)]
     if ctx.stage is not None:
@@ -138,8 +136,8 @@ def _saved_overrides(ctx: Install) -> dict[str, Any]:
     except FileNotFoundError:
         return {}
     except store.StoreError as exc:
-        raise refuse(f"Your saved settings cannot be read safely ({exc}): upgrade by hand from the release "
-                     "file") from exc  # fmt: skip
+        raise refuse(f"Your saved settings cannot be read safely ({exc}): fix the file, then install by "
+                     "hand") from exc  # fmt: skip
     except PermissionError:
         if not ctx.host.dry:
             raise
@@ -188,7 +186,7 @@ def settle_settings(ctx: Install) -> None:
     saved = _saved_overrides(ctx)
     gone = sorted(key for key in saved if key not in SCHEMA)
     if gone:
-        ctx.host.tell(f"Dropped your saved {', '.join(gone)}: this release has no such setting.")
+        ctx.host.tell(f"Dropped your saved {', '.join(gone)}: this factory has no such setting.")
     overrides = {**{key: value for key, value in saved.items() if key not in gone}, **ctx.changes}
     derived = {
         "repo.path": str(layout.AGENT_HOME / ctx.product.name),
@@ -210,8 +208,6 @@ def settle_settings(ctx: Install) -> None:
             f"The settings cannot be used: {problems}. Set each with --set key=value, then install again"
         ) from exc
     ctx.overrides = overrides
-    if ctx.unattended:
-        _as_last_installed(ctx, overrides)
     repo = PurePosixPath(ctx.settings.get_str("repo.path"))
     if not str(repo).startswith(f"{layout.AGENT_HOME}/") or ".." in repo.parts:
         raise refuse(f"The setting repo.path must be a folder inside {layout.AGENT_HOME}, the agents' home: set it "
@@ -229,27 +225,9 @@ def settle_settings(ctx: Install) -> None:
         )
 
 
-# The settings an install acts on as root: the rest the running factory applies itself.
-ROOT_APPLIED = frozenset(
-    k for k, s in SCHEMA.items() if s.when in ("Next install", AT_INSTALL) or k.startswith("repo.")
-)
-
-
-def _as_last_installed(ctx: Install, overrides: dict[str, Any]) -> None:
-    """Unattended, only the owner's own run of the release file may change what root acts on: not the warden."""
-    last = upgrades.read_settings(ctx.places)
-    if last is None:
-        raise refuse("This laptop's last install kept no record of its settings: upgrade once by hand from the "
-                     "release file")  # fmt: skip
-    changed = sorted(k for k in ROOT_APPLIED if overrides.get(k) != last.get(k))
-    if changed:
-        raise refuse(f"Settings an install applies changed since the last one ({', '.join(changed)}): upgrade by hand "
-                     "from the release file to apply them")  # fmt: skip
-
-
 def stop_factory(ctx: Install) -> None:
     """Stop the warden, the dashboard and the agents' daemon, then check the registry again with the warden down. The
-    dashboard's upgrade puts the dashboard's stand-in in its place, so the page says what is happening."""
+    upgrade unit puts the dashboard's stand-in in its place, so the page says what is happening."""
     running = [unit for unit in layout.SERVICES if ctx.host.exists(layout.UNITS_DIR / unit)]
     if running and ctx.unattended:
         steps_wire.stand_in(ctx)

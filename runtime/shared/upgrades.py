@@ -1,15 +1,15 @@
 """An upgrade of the factory, in root's own folder: what is installed, how an upgrade under way is going, and the
 commits root made on the agents' default branch for the owner.
 
-Only root writes here (the install, and the upgrade service the dashboard starts); the warden reads it for the
-dashboard, which keeps showing an upgrade while the warden and the dashboard stop and start again. For an upgrade
-nobody watches, root takes whose laptop it is, the product checkout, the factory repo, the token and the settings an
-install applies from here; of the warden's folder, only the settings the running factory applies itself.
+Only root writes here (the install, and the upgrade unit the warden starts); the warden reads it for the dashboard,
+which keeps showing an upgrade while the warden and the dashboard stop and start again. For an upgrade nobody
+watches, root takes whose machine it is, the product checkout, the factory repo and the token from here.
 """
 
 from __future__ import annotations
 
 import hashlib
+import re
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,11 +17,11 @@ from typing import Any
 
 from runtime.shared import store
 from runtime.shared.paths import Places
-from runtime.shared.releases import FULL_SHA
 from runtime.shared.settings import Settings, build
 from standard.config import FACTORY_REF
 
 RUNNING, DONE, FAILED = "running", "done", "failed"
+FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
 def installed_path(places: Places) -> Path:

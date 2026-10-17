@@ -23,7 +23,6 @@ from runtime.warden import imports
 from runtime.warden.context import Context
 from runtime.warden.delivery import deploys, prod_push
 from runtime.warden.health import errors_import, probes
-from runtime.warden.owner import factory_upgrade
 from runtime.warden.sessions import older_skills, registry
 
 log = logging.getLogger(__name__)
@@ -37,7 +36,7 @@ def migrate(ctx: Context) -> list[str]:
     done: list[str] = []
     steps: list[Callable[[Context], str]] = [
         _inbox_cursor, _leases, _errors_filed, _errors_since, _turn, _merges, _released, _typed_verdicts,
-        _approvals_routed, _release_offer, _briefs_home, _active_account, _older_skills,
+        _approvals_routed, _briefs_home, _active_account, _older_skills,
     ]  # fmt: skip
     for step in steps:
         try:
@@ -54,16 +53,6 @@ def migrate(ctx: Context) -> list[str]:
 def _older_skills(ctx: Context) -> str:
     found = older_skills.note_install(ctx.places)
     return f"{found} sessions load their skills again as they come back" if found else ""
-
-
-def _release_offer(ctx: Context) -> str:
-    """A release offer that names no install it was asked for goes: the releases pass asks GitHub again at once."""
-    path = factory_upgrade.offer_path(ctx.places)
-    raw = store.read_json_or(path, None)
-    if not isinstance(raw, dict) or "base" in raw:
-        return ""
-    path.unlink()
-    return "the release offer, asked again"
 
 
 # A spec's or card's brief that was a Claude artifact; a brief now lives on this machine, under its version.

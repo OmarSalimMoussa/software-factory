@@ -48,7 +48,7 @@ def units(ctx: Install) -> None:
 
 
 def stand_in(ctx: Install) -> None:
-    """Start the dashboard's stand-in, which stops the dashboard. It runs from the sealed copy of this release, which
+    """Start the dashboard's stand-in, which stops the dashboard. It runs from the sealed copy of this commit, which
     the factory installed now may predate; the units step points it at the install."""
     item = next(a for a in render.UNIT_FILES if a.dest.name == layout.UPGRADING_UNIT)
     values = {**given(ctx), "install": str(ctx.tree())}
@@ -98,8 +98,8 @@ def git_hooks(ctx: Install) -> None:
 
 
 def factory_repo(ctx: Install) -> str:
-    """The factory's repo as the release file or the owner's checkout names it, never as the warden's settings do."""
-    return str(ctx.release["repo"]) if ctx.release else github_name(ctx.factory_origin) or ""
+    """The factory's repo as the owner's checkout or root's record names it, never as the warden's settings do."""
+    return github_name(ctx.factory_origin) or ""
 
 
 def product_pin(ctx: Install) -> None:
@@ -239,11 +239,10 @@ def record(ctx: Install) -> None:
     """Written last, after every step: until then the warden's vitals stay red and nothing starts."""
     state, host = ctx.places.state, ctx.host
     host.write(ctx.places.install_hash, install_digest(ctx) + "\n", mode=0o600, owner=WARDEN_USER)
-    # The owner's own checkout of the product too: the install console offers it for the next install.
     body = {"commit": ctx.sha, "subject": ctx.subject, "managed_settings": str(MANAGED_SETTINGS),
             "product": str(ctx.product)}  # fmt: skip
     host.write(layout.install_record(state), json.dumps(body, indent=1) + "\n", mode=0o600, owner=WARDEN_USER)
-    # Root's own record, which the dashboard's upgrade trusts where it would not trust the warden's folder.
+    # Root's own record, which root's upgrade unit trusts where it would not trust the warden's folder.
     host.mkdir(ctx.places.upgrade, mode=0o755)
     mine = {"commit": ctx.sha, "owner": ctx.owner.name, "product": str(ctx.product), "repo": factory_repo(ctx)}
     host.write(upgrades.installed_path(ctx.places), json.dumps(mine, indent=1) + "\n", mode=0o644)

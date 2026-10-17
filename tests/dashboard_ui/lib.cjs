@@ -27,21 +27,9 @@ async function liveServer() {
   return {url, stop: () => proc.kill(), set: body => postJSON('/__switch', body), reset: () => postJSON('/__reset', {}), calls: () => fetch(url + '/__calls').then(r => r.json())};
 }
 
-/* The install console on a temporary machine, every action dry; see tests/system/console_live.py. Its url is the
-   console's one-time link. */
-async function consoleServer() {
-  const proc = spawn('python3', [path.join(__dirname, '..', 'system', 'console_live.py')], {stdio: ['ignore', 'pipe', 'inherit']});
-  const url = await new Promise((resolve, reject) => {
-    let buf = '';
-    proc.stdout.on('data', d => { buf += d; const m = buf.match(/listening on (\S+)/); if (m) resolve(m[1]); });
-    proc.on('exit', c => reject(new Error('the console exited with ' + c)));
-  });
-  return {url, stop: () => proc.kill()};
-}
-
-async function drive(name, fn, start = liveServer) {
+async function drive(name, fn) {
   const errors = [], shots = process.env.SHOTS;
-  const pw = playwright(), srv = await start();
+  const pw = playwright(), srv = await liveServer();
   const browser = await pw.chromium.launch({executablePath: CHROME, args: ['--headless=new']});
   const t = {
     srv, errors, browser,
@@ -134,4 +122,4 @@ async function frames(p, sel, side, act) {
 const heights = (p, sel) => p.$$eval(sel, els => els.map(e => Math.round(e.getBoundingClientRect().height)));
 const texts = (p, sel) => p.$$eval(sel, els => els.map(e => e.textContent.trim()));
 
-module.exports = {drive, ready, settle, until, frames, heights, texts, consoleServer};
+module.exports = {drive, ready, settle, until, frames, heights, texts};

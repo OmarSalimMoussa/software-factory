@@ -195,17 +195,9 @@ def to_saved(settings: Settings, key: str, value: Any) -> Any:
 
 
 def factory(snap: Snap) -> dict[str, Any]:
-    """The factory this laptop runs, when GitHub was last asked for a newer one, and Check now."""
-    found = snap.get("upgrade")
-    offer = found["offer"]
-    checked = offer["checked_at"]
-    return {
-        "version": found["installed"][:7] if found["installed"] else "Version unknown",
-        "checked": f"checked {ago(checked, snap.now)}" if checked is not None else "not checked yet",
-        "note": offer["note"],
-        "newer": "A newer factory is ready: Home has the upgrade." if offer["available"] else None,
-        "button": "Check now",
-    }
+    """The commit of the factory installed here."""
+    installed = snap.get("upgrade")["installed"]
+    return {"version": installed[:7] if installed else "Version unknown"}
 
 
 def mode(snap: Snap) -> dict[str, Any]:

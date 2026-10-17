@@ -19,23 +19,21 @@ Claude agents, holds the code to one standard set of checks, ships to staging, a
   the laptop.
 
 Set up the product's server first, from the owner's laptop: `python3 -m standard.server.setup --product <path>`
-([docs/server.md](docs/server.md)). Then install the factory from its latest release, with your GitHub CLI signed in:
+([docs/server.md](docs/server.md)). Then install the factory from a clone of its repo, with your GitHub CLI signed in:
 
 ```
-gh release download --repo OmarSalimMoussa/software-factory --pattern 'software-factory.pyz*' --clobber
-sha256sum -c software-factory.pyz.sha256 && sudo python3 software-factory.pyz --repo <your checkout of the product>
+gh repo clone OmarSalimMoussa/software-factory && cd software-factory
+sudo python3 runtime/system/install.py --commit HEAD --repo <your checkout of the product>
 ```
 
-The same two lines update it. The release file is one Python file that the factory's CI publishes only for a commit on
-which every check passed. Run with sudo, it checks itself, unpacks into a sealed, read-only copy and opens the install
-console in your browser: a page that installs, upgrades or uninstalls the factory as a few phases with a progress
-bar, and asks in place for each secret. `--terminal` installs in the terminal instead, and `--uninstall` removes the
-factory. Every command and its output goes to a log in `/var/log/software-factory/`. The install runs on Debian or
-Ubuntu, and checks everything it needs before it changes anything. It copies the programs the product's scripts need
-(the setting `install.toolchain`) as your own shell finds them, rc files and all (nvm, mise, fnm), and refuses one whose
-version differs from the product's `.nvmrc` or `.node-version`. It copies the Python the product asks for from your uv,
-so the agents and the stack run the same tools you do. It takes port 443 on your tailnet only when nothing else serves
-there, and the uninstall puts back the Tailscale operator it cleared. From a checkout of the factory, `runtime/system/`
-runs the same steps for a commit whose CI passed.
+The install seals the commit into a read-only copy and runs every step from it, in the terminal, as a few phases. It
+asks for each secret in place, and every command and its output goes to a log in `/var/log/software-factory/`. After
+that, the owner action `factory.upgrade` installs any commit of the factory's repo on GitHub, through root's upgrade
+unit; installing the commit before is the way back. `runtime/system/uninstall.py` removes the factory. The install
+runs on Debian or Ubuntu, and checks everything it needs before it changes anything. It copies the programs the
+product's scripts need (the setting `install.toolchain`) as your own shell finds them, rc files and all (nvm, mise,
+fnm), and refuses one whose version differs from the product's `.nvmrc` or `.node-version`. It copies the Python the
+product asks for from your uv, so the agents and the stack run the same tools you do. It takes port 443 on your
+tailnet only when nothing else serves there, and the uninstall puts back the Tailscale operator it cleared.
 
 How to run it: [docs/operate.md](docs/operate.md). The shape a product must take: [docs/repo-shape.md](docs/repo-shape.md).

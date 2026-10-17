@@ -1,4 +1,4 @@
-"""The upgrade the dashboard starts: root's own records, and an install that asks nothing and says how it goes."""
+"""An upgrade, run by root's unit: root's own records, and an install that asks nothing and says how it goes."""
 
 from __future__ import annotations
 
@@ -38,11 +38,11 @@ def _host(tmp_path: Path) -> tuple[UnattendedHost, Places]:
     ],
     ids=["a-question", "a-confirmation", "a-new-code", "a-key-to-add"],
 )
-def test_an_upgrade_never_waits_for_an_answer_it_stops_and_says_to_upgrade_by_hand(
+def test_an_upgrade_never_waits_for_an_answer_it_stops_and_says_to_install_by_hand(
     tmp_path: Path, asks: Callable[[UnattendedHost], object]
 ) -> None:
     host, _ = _host(tmp_path)
-    with pytest.raises(Refused, match="Run the release file by hand"):
+    with pytest.raises(Refused, match="Install by hand to give it"):
         asks(host)
 
 
@@ -100,40 +100,17 @@ def test_root_reads_the_warden_s_settings_only_as_a_plain_file_never_through_a_l
         store.read_inside(state, rel)
 
 
-@pytest.mark.parametrize(
-    ("saved", "last", "refused"),
-    [({}, {}, None), ({"dashboard.port": 9000}, {}, "dashboard.port"), ({"caps.implementers": 3}, {}, None),
-     ({}, None, "kept no record")],
-    ids=["as-last-installed", "an-install-setting-changed", "a-live-setting-changed", "no-record-yet"],
-)  # fmt: skip
-def test_an_unattended_upgrade_applies_only_the_settings_root_applied_last(
-    tmp_path: Path, saved: dict[str, object], last: dict[str, object] | None, refused: str | None
-) -> None:
+def test_an_upgrade_applies_the_owners_saved_settings_those_the_install_acts_on_too(tmp_path: Path) -> None:
     job = dry_job(tmp_path)
     job.unattended = True
-    places = job.places
-    job.settings = None
-    places.overrides.parent.mkdir(parents=True)
-    places.overrides.write_text(overrides_toml(saved))
-    baseline = _settled_overrides(tmp_path, places)
-    if last is not None:
-        places.upgrade.mkdir(parents=True)
-        store.write_json(upgrades.settings_path(places), {**baseline, **last})
+    job.places.overrides.parent.mkdir(parents=True)
+    job.places.overrides.write_text(overrides_toml({"dashboard.port": 9000, "caps.implementers": 3}))
     steps_prepare.check_machine(job)
-    if refused:
-        with pytest.raises(Refused, match=refused):
-            steps_prepare.settle_settings(job)
-    else:
-        steps_prepare.settle_settings(job)
 
+    steps_prepare.settle_settings(job)
 
-def _settled_overrides(tmp_path: Path, places: Places) -> dict[str, object]:
-    """What a hand install with no saved settings would have recorded on this machine."""
-    (tmp_path / "plain").mkdir()
-    plain = dry_job(tmp_path / "plain")
-    steps_prepare.check_machine(plain)
-    steps_prepare.settle_settings(plain)
-    return dict(plain.overrides)
+    assert job.settings is not None
+    assert (job.settings.get_int("dashboard.port"), job.settings.get_int("caps.implementers")) == (9000, 3)
 
 
 @pytest.mark.parametrize(
@@ -174,7 +151,7 @@ def test_an_upgrade_without_a_signed_in_github_cli_keeps_the_keys_and_asks_nothi
     assert isinstance(host, DryHost)
     host.dry = False
     host.paths |= {job.places.totp_secret, upgrades.token_path(job.places)}
-    host.paths |= {folder / name for name in ("deploy.key", "factory-read.key.pub", "github.token", "factory.token")}
+    host.paths |= {folder / name for name in ("deploy.key", "factory-read.key.pub", "github.token")}
     host.files[folder / "claude.token"] = "sk-ant-oat01-kept-from-before-a1b2\n"
 
     steps_secrets.secrets(job)
@@ -182,8 +159,8 @@ def test_an_upgrade_without_a_signed_in_github_cli_keeps_the_keys_and_asks_nothi
     assert [a for a in host.actions if a.startswith(("ask the owner: ", "write: "))] == []
 
 
-@pytest.mark.parametrize("unattended", [True, False], ids=["the-dashboards-upgrade", "an-install-by-hand"])
-def test_only_the_dashboards_upgrade_puts_the_stand_in_in_the_dashboards_place(
+@pytest.mark.parametrize("unattended", [True, False], ids=["an-upgrade", "an-install-by-hand"])
+def test_only_an_upgrade_puts_the_stand_in_in_the_dashboards_place(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, unattended: bool
 ) -> None:
     job = dry_job(tmp_path)
@@ -200,6 +177,6 @@ def test_only_the_dashboards_upgrade_puts_the_stand_in_in_the_dashboards_place(
     stopped = f"run: systemctl stop {' '.join(layout.SERVICES)}"
     started = ["run: systemctl daemon-reload", f"run: systemctl start {layout.UPGRADING_UNIT}"]
     assert runs == ([*started, stopped] if unattended else [stopped])
-    # It runs from this release's sealed copy: the factory installed now may have no stand-in of its own.
+    # It runs from this commit's sealed copy: the factory installed now may have no stand-in of its own.
     unit = written.get(layout.UNITS_DIR / layout.UPGRADING_UNIT, "")
     assert (f"{REPO_ROOT}/runtime/system/runners/upgrading.py" in unit) is unattended

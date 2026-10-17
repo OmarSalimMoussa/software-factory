@@ -1,7 +1,7 @@
-# The owner's Upgrade from the dashboard, to the release of commit %i, as root. The warden may start this unit and
-# nothing more; the runner checks the release on GitHub itself, trusting nothing the warden said, then runs the
-# release's own install, which stops the warden and the dashboard and starts them again on the new factory. Outside
-# the factory's slice: the install stops what runs there.
+# An upgrade of the factory to commit %i, as root; the commit before is the way back. The warden may start this unit
+# and nothing more; the runner downloads the commit from GitHub with root's own token and runs its install, which
+# stops the warden and the dashboard and starts them again on the new factory. Outside the factory's slice: the
+# install stops what runs there.
 [Unit]
 Description=software factory: upgrade to %i
 CollectMode=inactive-or-failed

@@ -49,13 +49,13 @@ UNIT_PATH = ":".join((str(TOOLCHAIN_BIN), *SYSTEM_PATH))
 # Copy, never hard-link, from the cache every session shares: a session editing a file in its own venv must not edit
 # the cache another session installs from.
 UV_ENV = {"UV_PYTHON_INSTALL_DIR": str(TOOLCHAIN_PYTHON), "UV_PYTHON_DOWNLOADS": "never", "UV_LINK_MODE": "copy"}
-# Where each install and console runs from: a sealed, root-owned and read-only copy of one commit, in a folder of its
-# own named <sha>-<random>, removed when it ends.
+# Where each install runs from: a sealed, root-owned and read-only copy of one commit, in a folder of its own named
+# <sha>-<random>, removed when it ends.
 STAGE_ROOT = Path("/var/lib/software-factory-stage")
 # Where each install and uninstall keeps its log: every command, its output and how long it took. Root writes it; the
 # owner's group reads it.
 LOGS = Path("/var/log/software-factory")
-# The one PATH the installer and the console run with, and every command they run as root.
+# The one PATH the installer runs with, and every command it runs as root.
 ROOT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 UNITS_DIR = Path("/etc/systemd/system")
@@ -71,7 +71,7 @@ BWRAP = Path("/usr/bin/bwrap")
 
 WARDEN_UNIT = "software-warden.service"
 DASHBOARD_UNIT = "software-dashboard.service"
-# The dashboard's stand-in while the dashboard's upgrade runs; starting the dashboard stops it.
+# The dashboard's stand-in while an upgrade runs; starting the dashboard stops it.
 UPGRADING_UNIT = "software-upgrading.service"
 DAEMON_UNIT = "software-agent-daemon.service"
 FIREWALL_UNIT = "software-firewall.service"

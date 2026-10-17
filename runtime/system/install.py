@@ -1,13 +1,13 @@
-"""Install the factory from one commit, as root. The release file runs it (``sudo python3 software-factory.pyz
---terminal --repo <product checkout>``); from the owner's clone of the factory it is
+"""Install the factory from one commit, as root.
+From the owner's clone of the factory it is
 
     sudo python3 runtime/system/install.py --commit <sha> --repo <product checkout> [--healthchecks] [--set k=v]...
 
 Add ``--dry-run`` (no sudo needed) to go through every step, reading this machine and changing nothing, and
-``--verbose`` to print every detail the log keeps. The install runs from a sealed, read-only copy of the commit and
-takes only a commit the factory's CI passed: nothing is tested on this machine. It shows a few phases; every command
-and its output goes to a log in /var/log/software-factory. It refuses to begin while any session is working or
-waiting. Rerun it after every change to the factory.
+``--verbose`` to print every detail the log keeps. The install runs from a sealed, read-only copy of the commit. It
+shows a few phases; every command and its output goes to a log in /var/log/software-factory. It refuses to begin
+while any session is working or waiting. Root's upgrade unit runs it with ``--upgrade`` for a commit on GitHub
+(runners/upgrade.py).
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from runtime.shared import environment, store, upgrades
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
-from runtime.system import ci_check, healthchecks, layout, release, sealed
+from runtime.system import healthchecks, layout, sealed
 from runtime.system.host import Account, CommandError, Host
 from runtime.system.install_steps import (
     steps_machine,
@@ -39,7 +39,7 @@ from runtime.system.install_steps import (
     steps_toolchain,
     steps_wire,
 )
-from runtime.system.job import REPO_ROOT, Install, refuse
+from runtime.system.job import REPO_ROOT, Install, github_origin, refuse
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
 from runtime.system.unattended import UnattendedHost
@@ -61,7 +61,6 @@ PHASES: tuple[Phase, ...] = (
         ("Checking the tools this computer needs", steps_prepare.check_machine),
         ("Checking that no agent is at work", steps_prepare.refuse_live_sessions),
         ("Checking the copy the install runs from", steps_prepare.sealed_copy),
-        ("Checking that the factory's own checks passed", ci_check.passed),
         ("Checking the settings", steps_prepare.settle_settings),
     )),
     Phase("Preparing this computer", (
@@ -132,9 +131,6 @@ def job(host: Host, places: Places, owner: Account, repo: Path, commit: str, cha
     ctx = Install(host, places, factory, repo.resolve(), commit, owner, changes, healthchecks)
     if source is not None:
         ctx.stage, ctx.sha = source.stage, source.sha
-    if source is not None and source.release is not None:
-        ctx.release = release.read_manifest(source.release)
-        ctx.subject = str(ctx.release["subject"])
     # Known before any step runs: only a first install is ever taken back.
     ctx.first = not host.exists(layout.install_record(places.state))
     return ctx
@@ -161,7 +157,7 @@ def plain(ctx: Install, exc: BaseException) -> str:
 
 
 def perform(ctx: Install, *, keep: bool) -> str | None:
-    """Every step, as the command line and the console both run them. A failure is told through the host, then a
+    """Every step, as an install by hand and an upgrade both run them. A failure is told through the host, then a
     failed first install is taken back; returns what stopped it, in plain words, or None once the install finished."""
     try:
         run(ctx)
@@ -231,11 +227,12 @@ def from_commit(commit: str, owner: str, argv: list[str]) -> int:
 
 
 def upgrade(commit: str) -> int:
-    """The dashboard's upgrade, run by root's upgrade service from the release's sealed copy. Whose laptop it is and
-    which product checkout come from root's own record of the last install; a step that would ask stops it."""
+    """An upgrade, run by root's upgrade unit from its sealed copy of the commit GitHub sent. Whose machine it is, which
+    product checkout and which factory repo come from root's own record of the last install; a step that would ask
+    stops it."""
     places = Places.system()
     if os.geteuid() != 0 or environment.staged() is None:
-        print(f"{PROGRAM}: --upgrade runs as root, from a release's sealed copy", file=sys.stderr)
+        print(f"{PROGRAM}: --upgrade runs as root, from the upgrade unit's sealed copy", file=sys.stderr)
         return 2
     try:
         installed = upgrades.read_installed(places)
@@ -249,7 +246,7 @@ def upgrade(commit: str) -> int:
     journal = Journal.create(layout.LOGS, "upgrade", group=owner.groups[0], verbose=False, terminal=False)
     host = UnattendedHost(journal, places, installed["commit"], commit)
     ctx = job(host, places, owner, Path(installed["product"]), commit, {}, False)
-    ctx.unattended = True
+    ctx.unattended, ctx.factory_origin = True, github_origin(installed["repo"])
     problem: str | None = "The upgrade was stopped before it finished. Upgrade again to finish the job."
     try:
         if ctx.first:
@@ -267,7 +264,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--commit", required=True, help="the factory commit to install")
     parser.add_argument("--repo", type=Path, help="your checkout of the product the factory works on")
     parser.add_argument("--upgrade", action="store_true",
-                        help="the dashboard's upgrade, as root's upgrade service runs it: it asks nothing")  # fmt: skip
+                        help="an upgrade, as root's upgrade unit runs it: it asks nothing")  # fmt: skip
     parser.add_argument("--healthchecks", action="store_true", help="create the Healthchecks.io checks")
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="a setting to save")
     parser.add_argument("--dry-run", action="store_true", help="go through every step; change nothing")

@@ -1,9 +1,9 @@
-# The server computes and the pages draw: the dashboard's and the install console's scripts derive nothing the
-# server can send. They are read as written, since their markup lives in template strings.
+# The server computes and the pages draw: the dashboard's scripts derive nothing the server can send. They are read
+# as written, since their markup lives in template strings.
 
 [[computations]]
 name = "words and tones for a state"
-scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
+scans = ["runtime/dashboard/ui/js/"]
 suffixes = [".js"]
 when = [["\\.(state|level|status|tone|marker|kind|verdict) === '[a-z_-]+' \\?"]]
 code_only = false
@@ -14,7 +14,7 @@ remedy = "the server sends the word, the tone or the icon with the state; the pa
 
 [[computations]]
 name = "lists of states"
-scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
+scans = ["runtime/dashboard/ui/js/"]
 suffixes = [".js"]
 when = [["\\[('[a-z_-]+', )+'[a-z_-]+'\\]\\.includes\\("]]
 code_only = false
@@ -25,7 +25,7 @@ remedy = "the server sends what the list decides, such as busy or go, as a field
 
 [[computations]]
 name = "plurals"
-scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
+scans = ["runtime/dashboard/ui/js/"]
 suffixes = [".js"]
 when = [["=== 1 \\?"]]
 code_only = false
@@ -36,7 +36,7 @@ remedy = "the server sends the counted words, such as 3 files, with the count"
 
 [[computations]]
 name = "counts shown"
-scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
+scans = ["runtime/dashboard/ui/js/"]
 suffixes = [".js"]
 when = [["\\.length\\s*\\}"]]
 code_only = false
@@ -47,7 +47,7 @@ remedy = "the server sends the count beside the list it counts"
 
 [[computations]]
 name = "the clock"
-scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
+scans = ["runtime/dashboard/ui/js/"]
 suffixes = [".js"]
 when = [["new Date\\("], ["Date\\.now\\("], ["Date\\.parse\\("], ["\\.toLocale(Date|Time)String\\("]]
 code_only = false
@@ -58,7 +58,7 @@ remedy = "the server sends times as the page shows them; only core.js reads the 
 
 [[computations]]
 name = "links"
-scans = ["runtime/dashboard/ui/js/", "runtime/system/install_console/console_ui/"]
+scans = ["runtime/dashboard/ui/js/"]
 suffixes = [".js"]
 when = [["https?://"]]
 code_only = false

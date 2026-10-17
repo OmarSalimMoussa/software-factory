@@ -27,8 +27,6 @@ from runtime.shared import settings as settings_module
 from runtime.shared.models import OPEN_SEVERITIES
 from runtime.shared.settings_schema import SCHEMA
 from runtime.warden.delivery import deploys
-from runtime.warden.owner import factory_upgrade
-from runtime.warden.owner import ops as warden_ops
 
 BROKEN = {"broken", "id", "error"}
 
@@ -233,7 +231,6 @@ _RECORDED = {
     kinds.STAGING_PUSH: {"sha": "abc1234def"},
     kinds.ACCOUNT: {"name": "work"},
     kinds.MESSAGE: {"revived": False},
-    kinds.RELEASE_CHECK: {"newer": True},
     kinds.UPGRADE: {"to": "abc1234def"},
 }
 
@@ -355,40 +352,27 @@ _OLD, _NEW = "a" * 40, "b" * 40
 
 
 @pytest.mark.parametrize(
-    ("asked", "progress", "paused", "state", "actions"),
+    ("asked", "progress", "paused", "shown"),
     [
-        (False, None, False, "available", ["upgrade"]),
-        (True, "running", True, "running", []),
-        (True, "failed", True, "failed", ["upgrade", "resume"]),
-        (True, "done", True, "done", ["resume"]),
+        (False, None, False, None),
+        (True, "running", True, ("running", [])),
+        (True, "failed", True, ("failed", ["resume"])),
+        (True, "done", True, ("done", ["resume"])),
     ],
-    ids=["on-offer", "under-way", "stopped", "upgraded-and-paused"],
+    ids=["none-asked", "under-way", "stopped", "upgraded-and-paused"],
 )
 def test_home_says_where_an_upgrade_stands_and_offers_only_what_fits(
-    rig: Rig, asked: bool, progress: str | None, paused: bool, state: str, actions: list[str]
+    rig: Rig, asked: bool, progress: str | None, paused: bool, shown: tuple[str, list[str]] | None
 ) -> None:
-    changelog = ["The installer upgrades", "Faster checks"]
-    offer = {"commit": _NEW, "tag": f"build-{_NEW[:12]}", "published": "2026-10-09T13:00:00Z", "changelog": changelog}
-    store.write_json(
-        rig.places.state / "upgrade-offer.json",
-        {"available": None if progress == "done" else offer, "checked_at": rig.clock.now(), "note": None, "base": _OLD},
-    )
     installed = {"commit": _OLD, "owner": "o", "product": "/home/o/shop", "repo": "acme/software-factory"}
     rig.places.upgrade.mkdir(parents=True, exist_ok=True)
     store.write_json(rig.places.upgrade / "installed.json", installed)
     if asked:
         store.write_json(
             rig.places.state / "upgrade-asked.json",
-            {
-                "from": _OLD,
-                "to": _NEW,
-                "changelog": changelog,
-                "at": "2026-10-09T13:30:00Z",
-                "op": "op-20261009133000-0000abcd",
-            },
+            {"from": _OLD, "to": _NEW, "at": "2026-10-09T13:30:00Z", "op": "op-20261009133000-0000abcd"},
         )
     if progress:
-        rig.places.upgrade.mkdir(parents=True, exist_ok=True)
         store.write_json(
             rig.places.upgrade / "progress.json",
             {
@@ -406,48 +390,15 @@ def test_home_says_where_an_upgrade_stands_and_offers_only_what_fits(
 
     band = rig.parts("/api/home")["upgrade"]["data"]
 
-    assert (band["state"], band["actions"]) == (state, actions)
-    assert (band["commit"] == _NEW) is ("upgrade" in actions)
-    assert band["changelog"] == (changelog if state in ("available", "done") else [])
+    assert ((band["state"], band["actions"]) if band else None) == shown
 
 
-@pytest.mark.parametrize(
-    ("available", "said"),
-    [(True, "A newer factory is ready: Home has the upgrade."), (False, "This is the newest factory.")],
-    ids=["a-newer-one", "the-newest-already"],
-)
-def test_settings_shows_the_factory_and_check_now_says_what_github_has(
-    rig: Rig, monkeypatch: pytest.MonkeyPatch, available: bool, said: str
-) -> None:
+def test_settings_shows_the_commit_of_the_factory_installed_here(rig: Rig) -> None:
     rig.places.upgrade.mkdir(parents=True, exist_ok=True)
     installed = {"commit": _OLD, "owner": "o", "product": "/home/o/shop", "repo": "acme/software-factory"}
     store.write_json(rig.places.upgrade / "installed.json", installed)
-    offer = {"commit": _NEW, "tag": f"build-{_NEW[:12]}", "published": "2026-10-09T13:00:00Z", "changelog": ["Faster"]}
 
-    def github_asked(ctx: Any, force: bool = False) -> None:
-        found = {"available": offer if available else None, "checked_at": rig.clock.now(), "note": None, "base": _OLD}
-        store.write_json(rig.places.state / "upgrade-offer.json", found)
-
-    monkeypatch.setattr(factory_upgrade, "poll", github_asked)
-
-    sent = json.loads(rig.post("/api/factory/check", {"idempotency_key": "check-01"}).body)
-    warden_ops.join(sent["op"], 10)
-
-    done = rig.parts(f"/api/ops/{sent['op']}")["op"]["data"]
-    card = rig.parts("/api/settings")["factory"]["data"]
-    assert (sent["message"], done["title"], done["result"]["message"]) == (
-        "Asking GitHub for a newer factory.",
-        "Checking for a newer factory",
-        said,
-    )
-    newer = said if available else None
-    assert card == {
-        "version": _OLD[:7],
-        "checked": "checked 0 min ago",
-        "note": None,
-        "newer": newer,
-        "button": "Check now",
-    }
+    assert rig.parts("/api/settings")["factory"]["data"] == {"version": _OLD[:7]}
 
 
 @pytest.mark.parametrize(

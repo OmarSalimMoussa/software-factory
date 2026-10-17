@@ -34,9 +34,8 @@ function yoloOn() {
   confirmSheet(m.confirm.title, `<div class="muted">${esc(m.confirm.text)}</div>`, m.confirm.button, key => post('/api/yolo', {on: true}, key), {icon: 'moon'});
 }
 const yoloOff = btn => act('/api/yolo', {on: false}, {btn, icon: 'moon'});
-/* The factory this laptop runs: its version, when GitHub was last asked for a newer one, and Check now. */
-const factoryCard = env => part(env, 'factory', f => `<div class="card repo-card"><div style="flex:1;min-width:0"><div class="label">Factory</div><div class="repo-path"><span class="mono">${esc(f.version)}</span> · ${esc(f.checked)}</div>${f.newer ? `<div class="help">${esc(f.newer)}</div>` : ''}${f.note ? `<div class="help">${esc(f.note)}</div>` : ''}</div><button class="btn" data-action="check-factory" data-write>${icon('arrow-path', 'sm')}${esc(f.button)}</button></div>`);
-const checkFactory = btn => act('/api/factory/check', {}, {btn, icon: 'arrow-path', quiet: true});
+/* The factory installed here: its version. */
+const factoryCard = env => part(env, 'factory', f => `<div class="card repo-card"><div style="flex:1;min-width:0"><div class="label">Factory</div><div class="repo-path"><span class="mono">${esc(f.version)}</span></div></div></div>`);
 function setRow(r) {
   const cur = curOf(r), changed = !same(cur, r.saved), key = esc(r.key), ro = r.control === 'readonly';
   const ctl = {

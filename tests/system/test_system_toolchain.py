@@ -177,7 +177,7 @@ def test_a_python_the_owners_uv_lacks_is_fetched_with_it_once_before_the_install
 
 
 UV = "/home/owner/.local/bin/uv"
-# What the dashboard's upgrade reads: with no terminal, the shell's warnings follow its answer.
+# What an upgrade reads: with no terminal, the shell's warnings follow its answer.
 NO_TERMINAL = (
     "bash: cannot set terminal process group (3177913): Inappropriate ioctl for device\n"
     "bash: no job control in this shell\n"

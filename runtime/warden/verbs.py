@@ -134,7 +134,6 @@ VERBS: dict[str, Verb] = {
     "factory.pause": _o("runtime.warden.sessions.revive:owner_pause"),
     "factory.resume": _o("runtime.warden.sessions.revive:owner_resume"),
     "factory.upgrade": _o("runtime.warden.owner.factory_upgrade:start"),
-    "factory.check": _o("runtime.warden.owner.factory_upgrade:check"),
     "outage.stop": _o("runtime.warden.delivery.outage:owner_stop_fix"),
     "settings.save": _o("runtime.warden.owner.settings_save:save"),
     "repo.change": _o("runtime.warden.owner.settings_save:change_repo"),

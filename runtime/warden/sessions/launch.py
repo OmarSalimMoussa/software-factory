@@ -155,8 +155,7 @@ class Units:
         return self._wait(CHECK_UNIT.format(request_id), request_id)
 
     def start_upgrade(self, commit: str) -> None:
-        """Start the owner's upgrade to the release of ``commit``, as root, and return at once: the install it runs
-        stops this warden."""
+        """Start the upgrade to ``commit``, as root, and return at once: the install it runs stops this warden."""
         done = self.run(["start", "--no-block", UPGRADE_UNIT.format(commit)])
         if done.returncode != 0:
             raise LaunchError(f"the upgrade did not start: {done.stderr.strip()[-300:]}")

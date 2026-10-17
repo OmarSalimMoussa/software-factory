@@ -17,7 +17,6 @@ dist_to_src = {}
 [processes]
 "runtime/warden/wardend.py" = { process = "warden", boot = "logging.basicConfig()" }
 "runtime/dashboard/server.py" = { process = "dashboard", boot = "logging.basicConfig()" }
-"runtime/system/console.py" = { process = "install console", boot = "logging.basicConfig()" }
 
 [non_booting]
 "plugin/hooks/rulebook_loader.py" = "a Claude Code hook: its stderr and exit status reach the session that ran it"
@@ -28,7 +27,6 @@ dist_to_src = {}
 "runtime/system/install.py" = "the installer, run by the owner with sudo: its stderr and exit status reach the owner"
 "runtime/system/uninstall.py" = "the uninstaller, run by the owner with sudo: its stderr and exit status reach the owner"
 "runtime/system/owner_commit.py" = "factory-own, run by the owner with sudo: its stderr and exit status reach the owner"
-"runtime/system/release.py" = "the release file's runner, run by the owner: its stderr and exit status reach the owner"
 "runtime/system/pause_checks.py" = "a systemd unit's step: its stderr and exit status go to the journal"
 "runtime/system/runners/agent_run.py" = "a systemd unit's command: its stderr and exit status go to the journal"
 "runtime/system/runners/check_run.py" = "a systemd unit's command: its stderr and exit status go to the journal"
@@ -85,15 +83,6 @@ name = "dashboard page"
 sink = "surface"
 grounds = "browser code: an error shows on the page, where the owner sees it"
 reporters = ["loadFailed", "alertToast", "toast", "say", "wardenDown", "askDevice"]
-seams = []
-log_modules = []
-
-[[components]]
-prefix = "runtime/system/install_console/console_ui/"
-name = "install page"
-sink = "surface"
-grounds = "browser code: an error shows on the page, where the owner sees it"
-reporters = ["toast"]
 seams = []
 log_modules = []
 

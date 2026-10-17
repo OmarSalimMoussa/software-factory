@@ -10,7 +10,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
   with the reason, and nothing is written.
 - **A save** is applied at once and kept in the warden's state, on this machine only: the factory never writes its
   own repo, so one owner's values never become another's defaults. No agent and no operation stops. A reinstall
-  keeps the saved values, and drops one for a setting the new release no longer has.
+  keeps the saved values, and drops one for a setting the new factory no longer has.
 - **Every change is audited** with its old and new value. Reset to default puts one key back.
 
 ## The groups
