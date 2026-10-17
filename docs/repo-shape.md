@@ -66,9 +66,9 @@ deploy. Each hook is committed and executable.
 
 The factory builds and deploys prod on the server, from a clean copy of the commit the owner pushes
 ([deploy.md](deploy.md)), so a product needs no CI. GitHub holds a mirror of the default branch, which the warden
-keeps up to date. GitHub refuses the warden's deploy key a commit that changes `.github/workflows/`, and the mirror
-stays at the commit before one until the owner pushes it with their own login, so only a person changes them. The
-server, not GitHub, tells the uptime monitor prod is up ([server.md](server.md)).
+keeps up to date. GitHub refuses the warden's deploy key a push that adds or edits a file in `.github/workflows/`,
+and the mirror then stays where it was until the owner pushes with their own login, so only a person changes those
+files. The server, not GitHub, tells the uptime monitor prod is up ([server.md](server.md)).
 
 The product brings a **health address**, `[deploy].health`, which answers JSON naming the `workspace`, the running
 commit as `build_commit`, and how much work is in flight as `busy` ([deploy.md](deploy.md) says what each holds).
