@@ -338,6 +338,18 @@ def test_home_draws_every_live_proposal_even_one_a_crash_left_without_its_place(
     assert [s["task"] for s in slots if s.get("task")] == ["t-0027", "t-0024", "t-0025"]
 
 
+@pytest.mark.parametrize("yolo", [False, True], ids=["owner-approves", "yolo-starts-them"])
+def test_under_yolo_a_proposal_asks_no_approval_and_says_it_starts_when_a_place_is_free(rig: Rig, yolo: bool) -> None:
+    if yolo:
+        store.write_json(rig.places.state / "yolo.json", {"since": iso(T0), "told": []})
+
+    found = rig.parts("/api/home")["proposals"]["data"]
+
+    autos = {s["auto"] for s in found["slots"] if s["kind"] == "card"}
+    assert autos == {"Starts when a place is free" if yolo else None}
+    assert ("YOLO mode starts each one" in found["hint"]) is yolo
+
+
 def test_spend_of_unknown_price_is_unknown_and_the_budget_says_it_stops_nothing(rig: Rig) -> None:
     rows = store.read_jsonl(rig.places.cost)
     store.write_text(rig.places.cost, "".join(json.dumps({**r, "usd": None}) + "\n" for r in rows))

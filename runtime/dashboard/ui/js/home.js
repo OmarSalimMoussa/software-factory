@@ -62,7 +62,7 @@ function outageBand(o) {
 function propsSection(env) {
   const d = homePartOf(env, 'proposals');
   return `<section class="section">
-    <div class="sec-h"><div class="label">Proposed next ${d ? `<span class="n">${d.open} of ${d.max}</span>` : ''}${hint("The orchestrator's picks: the steps that take you closest to the goal. Nothing starts until you approve it. Only a clear prod outage skips you.")}</div>${d && d.approved_waiting ? `<button class="btn sm quiet" data-go="work">${d.approved_waiting} approved, waiting for a slot${icon('chevron-right', 'sm')}</button>` : ''}</div>
+    <div class="sec-h"><div class="label">Proposed next ${d ? `<span class="n">${d.open} of ${d.max}</span>${hint(d.hint)}` : ''}</div>${d && d.approved_waiting ? `<button class="btn sm quiet" data-go="work">${d.approved_waiting} approved, waiting for a slot${icon('chevron-right', 'sm')}</button>` : ''}</div>
     ${part(env, 'proposals', p => `<div class="props" id="props">${p.slots.map(slotHTML).join('')}</div>`)}
   </section>`;
 }
@@ -83,7 +83,7 @@ function propCard(c) {
       <div class="prop-why">${esc(c.why)}</div>
       <div class="prop-chips">${dd('prop-run', c.task, c.run.value, c.run.options, 'The run', 0, true)}<span class="chip">${esc(c.testers)}</span><span class="chip">${esc(c.estimate)}</span>${c.run_changed ? pill('run changed by you', 'violet') : ''}</div>
     </div>
-    <div class="prop-a"><button class="btn primary" data-prop-act="approve" data-id="${id}" data-write>${icon('check', 'sm')}Approve</button><button class="btn notnow" data-prop-act="later" data-id="${id}" data-write>Not now</button>
+    <div class="prop-a">${c.auto ? `<span class="prop-auto">${icon('clock', 'sm')}${esc(c.auto)}</span>` : `<button class="btn primary" data-prop-act="approve" data-id="${id}" data-write>${icon('check', 'sm')}Approve</button>`}<button class="btn notnow" data-prop-act="later" data-id="${id}" data-write>Not now</button>
       <div class="order"><button class="btn sq" data-prop-move="-1" data-id="${id}" aria-label="Move up" data-write ${c.can_up ? '' : 'disabled'}>${icon('arrow-up', 'sm')}</button><button class="btn sq" data-prop-move="1" data-id="${id}" aria-label="Move down" data-write ${c.can_down ? '' : 'disabled'}>${icon('arrow-down', 'sm')}</button></div></div>
   </div>`;
 }

@@ -20,6 +20,14 @@ SETTLED_WORDS = {
     "approve": ("approved", "done", "check", "Approved. It starts when a slot is free."),
     "later": ("later", "later", "clock", "Back in the queue until something changes."),
 }
+# YOLO mode approves each proposal itself, in order, once a place of its role is free (warden/owner/yolo.py).
+AUTO = "Starts when a place is free"
+HINTS = {
+    False: "The orchestrator's picks: the steps that take you closest to the goal. Nothing starts until you approve "
+    "it. Only a clear prod outage skips you.",
+    True: "The orchestrator's picks: the steps that take you closest to the goal. YOLO mode starts each one, in "
+    "order, when a place is free. Not now holds one back.",
+}
 DONE_WORDS = {
     "go": "Approved. The build starts next.",
     "designer": "Sent to a designer at rung 3.",
@@ -101,6 +109,7 @@ def _card(snap: Snap, task: dict[str, Any], number: int, ids: list[str]) -> dict
         "can_up": position > 0,
         "can_down": position < len(ids) - 1,
         "version": card_version(snap, task["id"]),
+        "auto": AUTO if snap.get("yolo") is not None else None,
     }
 
 
@@ -138,7 +147,13 @@ def slots(snap: Snap) -> dict[str, Any]:
             places.append(_card(snap, tasks[entry], ids.index(entry) + 1, ids))
     while len(places) < limit:
         places.append({"kind": "choosing"} if choosing else {"kind": "none", "message": ""})
-    return {"max": limit, "open": len(ids), "approved_waiting": len(found["approved"]), "slots": places}
+    return {
+        "max": limit,
+        "open": len(ids),
+        "approved_waiting": len(found["approved"]),
+        "hint": HINTS[snap.get("yolo") is not None],
+        "slots": places,
+    }
 
 
 def needs(snap: Snap) -> dict[str, Any]:

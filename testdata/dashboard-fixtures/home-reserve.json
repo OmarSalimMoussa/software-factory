@@ -35,7 +35,8 @@
    "run_changed": false,
    "can_up": true,
    "can_down": false,
-   "version": "v1"
+   "version": "v1",
+   "auto": null
   }
  ],
  "outage_card": {

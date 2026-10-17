@@ -66,6 +66,7 @@
   "max": 3,
   "open": 3,
   "approved_waiting": 0,
+  "hint": "The orchestrator's picks: the steps that take you closest to the goal. Nothing starts until you approve it. Only a clear prod outage skips you.",
   "slots": [
    {
     "kind": "card",
@@ -102,7 +103,8 @@
     "run_changed": false,
     "can_up": false,
     "can_down": true,
-    "version": "v1"
+    "version": "v1",
+    "auto": null
    },
    {
     "kind": "card",
@@ -139,7 +141,8 @@
     "run_changed": false,
     "can_up": true,
     "can_down": true,
-    "version": "v1"
+    "version": "v1",
+    "auto": null
    },
    {
     "kind": "card",
@@ -176,7 +179,8 @@
     "run_changed": false,
     "can_up": true,
     "can_down": false,
-    "version": "v1"
+    "version": "v1",
+    "auto": null
    }
   ]
  },

@@ -172,6 +172,7 @@ a.btn{text-decoration:none}
 .prop-a{display:flex;flex-direction:column;gap:8px;width:148px}
 .need-a.prop-a{align-items:stretch}
 .prop-a .order{display:flex;gap:8px;justify-content:flex-end}
+.prop-auto{height:34px;display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;font-weight:600}
 .sq{width:28px;height:28px;padding:0}
 .prop.slot{border-style:dashed;background:transparent;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--faint)}
 .prop.done{background:var(--good-soft)}
