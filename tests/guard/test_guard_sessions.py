@@ -4,13 +4,14 @@ a stopped subagent, a session being benched; and what a session reads at start a
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
 import pytest
 from guard_kit import NOW, SID, TESTER_ID, Kit
 
-from runtime.guard import decide
+from runtime.guard import decide, transcript
 from runtime.guard.facts import Refusal
 from runtime.shared.models import PENDING
 
@@ -101,6 +102,18 @@ def test_a_subagent_of_a_session_being_benched_is_told_to_report_and_hand_back(
     assert isinstance(decision, Refusal) and decision.rule == "bench-pending"
     assert "being benched" in decision.reason and decision.reason.endswith(says)
     assert "commit" not in decision.reason
+
+
+def test_each_decision_reads_the_transcript_as_it_is_though_its_size_and_time_did_not_change(tmp_path: Path) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    path = kit.transcript(['{"n": 1}'])
+    os.utime(path, ns=(1, 1))
+    assert [e["n"] for e in transcript.entries(path)] == [1]
+    kit.transcript(['{"n": 2}'])
+    os.utime(path, ns=(1, 1))
+    kit.decide("Read", {"file_path": "/x"})
+    assert [e["n"] for e in transcript.entries(path)] == [2]
 
 
 @pytest.mark.parametrize("rule", ["raw-starts", "retired"])

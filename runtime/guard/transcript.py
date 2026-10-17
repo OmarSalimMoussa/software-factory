@@ -44,8 +44,27 @@ class AgentCall:
     finished: bool
 
 
+# One decision asks a transcript several times, and a long session's runs to megabytes, slow to parse on a busy
+# machine: the last one read stays parsed until it changes or the next decision begins (forget).
+_last: tuple[tuple[Path, int, int], list[dict[str, Any]]] | None = None
+
+
+def forget() -> None:
+    global _last
+    _last = None
+
+
 def entries(path: Path) -> Iterator[dict[str, Any]]:
     """Every readable line of a transcript; a line still being written is skipped."""
+    global _last
+    seen = path.stat()
+    key = (path, seen.st_size, seen.st_mtime_ns)
+    if _last is None or _last[0] != key:
+        _last = (key, list(_parsed(path)))
+    return iter(_last[1])
+
+
+def _parsed(path: Path) -> Iterator[dict[str, Any]]:
     with path.open(encoding="utf-8", errors="replace") as lines:
         for line in lines:
             try:
