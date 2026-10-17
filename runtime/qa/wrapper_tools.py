@@ -68,8 +68,8 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": COLOUR,
-        "description": "Show this page in its light or dark colours, as a person's system setting would. It holds "
-        "across reloads until you switch it back.",
+        "description": "Show this page in its light or dark colours, as a person's system setting would. Your "
+        "browser starts light; a switch holds across reloads until you switch back.",
         "inputSchema": {
             "type": "object",
             "properties": {"scheme": {"type": "string", "enum": list(SCHEMES)}},
@@ -157,7 +157,7 @@ class Tools:
         self.call(
             SERVER_CODE, {"code": f"async (page) => {{ await page.emulateMedia({{ colorScheme: '{scheme}' }}); }}"}
         )
-        return f"The page now shows its {scheme} colours, and keeps them across reloads until you switch back."
+        return f"The page now shows its {scheme} colours, and keeps them across reloads. Your browser started light."
 
 
 def first_link(text: str) -> str:
