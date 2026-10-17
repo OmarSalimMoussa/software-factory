@@ -316,7 +316,8 @@ def test_a_tester_holding_a_desktop_stops_at_its_desktop_time(
         (4, 60, "green", True),
         (4, 10 * 120 + 180 + 300 - 60, "green", True),
         (4, 86400, "green", False),
-        (0, 60, "amber", True),
+        (0, 60, "amber", False),
+        (0, 60, "red", True),
     ],
     ids=[
         "under-the-cap",
@@ -324,9 +325,10 @@ def test_a_tester_holding_a_desktop_stops_at_its_desktop_time(
         "rows-within-a-testers-longest-run",
         "rows-older-than-any-tester-runs",
         "amber",
+        "red",
     ],
 )
-def test_browser_testers_are_capped_across_the_machine_and_start_only_on_green_vitals(
+def test_browser_testers_are_capped_across_the_machine_and_start_unless_its_vitals_are_red(
     tmp_path: Path, running: int, age: int, level: str, refused: bool
 ) -> None:
     kit = Kit(tmp_path)
@@ -336,13 +338,13 @@ def test_browser_testers_are_capped_across_the_machine_and_start_only_on_green_v
         kit.session("implementer", sid=f"other-{n}")
         kit.session("qa-ux", sid=f"tester-{n}", parent=f"other-{n}", agent_id=f"a{n}",
                     started=(NOW - timedelta(seconds=age)).isoformat())  # fmt: skip
-    why = "" if level == "green" else "power: on battery, 25%"
+    why = "" if level == "green" else "memory: 3.1 GiB free"
     store.write_json(kit.public / "vitals.json", {"level": level, "why": why})
     brief = "Scenarios and checks: 1\nWalk the sign-in."
     decision = kit.decide("Agent", {"subagent_type": "qa-ux", "prompt": brief})
-    refusal = decision if isinstance(decision, Refusal) else None
-    assert (refusal is not None and refusal.rule == "subagents-at-once") is refused
-    assert refusal is None or why in refusal.reason  # it names the reading that holds the tester back
+    held = decision if isinstance(decision, Refusal) and decision.rule == "subagents-at-once" else None
+    assert (held is not None) is refused
+    assert held is None or why in held.reason  # it names the reading that holds the tester back
 
 
 @pytest.mark.parametrize("kind", ["intake", "Explore", "qa-backend"])

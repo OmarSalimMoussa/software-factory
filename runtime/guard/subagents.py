@@ -115,8 +115,7 @@ def _model(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision
 
 
 def _browsers(call: Call, kind: str) -> Decision:
-    """A browser tester holds a browser in the slice's memory: the whole machine runs at most caps.browsers_at_once,
-    whichever sessions start them, and starts one only while the machine's vitals are green."""
+    """At most caps.browsers_at_once browser testers on the machine, none on red vitals: amber holds back new work."""
     personas = call.settings.get_list("subagents.browser_personas")
     if kind not in personas:
         return None
@@ -130,9 +129,9 @@ def _browsers(call: Call, kind: str) -> Decision:
         return Refusal("subagents-at-once", f"{len(running)} browser testers run on this machine, its cap of {cap}; "
                                             "wait for one to report")  # fmt: skip
     level, why = read_vitals(call.places)
-    if level != "green":
-        return Refusal("subagents-at-once", f"the machine's vitals are {level} ({why}): a browser tester starts once "
-                                            "they are green; test what needs no browser first")  # fmt: skip
+    if level == "red":
+        return Refusal("subagents-at-once", f"the machine's vitals are red ({why}): a browser tester starts once they "
+                                            "are not; test what needs no browser first")  # fmt: skip
     return None
 
 
