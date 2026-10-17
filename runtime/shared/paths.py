@@ -18,7 +18,7 @@ FIREWALL = Path("/run/software-firewall")
 UPGRADE = Path("/var/lib/software-factory-upgrade")
 UPGRADE_UNIT = "software-upgrade@{}.service"  # the owner's upgrade to a release commit, the warden's one root unit
 MANAGED_SETTINGS = Path("/etc/claude-code/managed-settings.json")
-# On every user's PATH, so a session types the bare word: the sandbox exempts a call by its text, `factory …` alone.
+# On every user's PATH, so a session types the bare word.
 FACTORY_BIN = Path("/usr/local/bin/factory")
 # The pinned check tools' virtual environment: `factory check` runs under its Python, with ruff and mypy beside it.
 CHECK_TOOLS = Path("/opt/software-factory-tools")
@@ -114,10 +114,6 @@ class Places:
     @property
     def history(self) -> Path:
         return self.state / "history.jsonl"
-
-    @property
-    def drill_permits(self) -> Path:
-        return self.state / "drill-permits.json"
 
     @property
     def approvals(self) -> Path:

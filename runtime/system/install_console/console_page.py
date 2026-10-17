@@ -35,12 +35,6 @@ def read_record(places: Places) -> dict[str, Any] | None:
         return None
     if not isinstance(record, dict) or not all(isinstance(record.get(key), str) for key in ("commit", "subject")):
         raise ValueError("it names no commit and its subject")
-    drills = record.get("drills")
-    if not isinstance(drills, list) or not all(
-        isinstance(d, dict) and isinstance(d.get("name"), str) and isinstance(d.get("ok"), bool)
-        and isinstance(d.get("evidence"), str) for d in drills
-    ):  # fmt: skip
-        raise ValueError("its drills are not a list of verdicts")
     return record
 
 
@@ -49,8 +43,8 @@ def read_record(places: Places) -> dict[str, Any] | None:
 
 def status(places: Places, host: Host) -> dict[str, Any]:
     path = layout.install_record(places.state)
-    blank: dict[str, Any] = {"installed": False, "headline": "Not installed", "tone": "", "facts": [], "drills": None,
-                             "services": [], "address": None, "problem": ""}  # fmt: skip
+    blank: dict[str, Any] = {"installed": False, "headline": "Not installed", "tone": "", "facts": [], "services": [],
+                             "address": None, "problem": ""}  # fmt: skip
     try:
         record = read_record(places)
     # telemetry: surfaced — the status shows the owner the `problem` with the record
@@ -64,18 +58,10 @@ def status(places: Places, host: Host) -> dict[str, Any]:
         {"label": "Commit", "value": record["commit"][:12], "sub": record["subject"]},
         {"label": "Installed", "value": when, "sub": ""},
     ]
-    verdicts = record["drills"]
-    failed = [d for d in verdicts if not d["ok"]]
-    if failed:
-        summary = f"{len(failed)} of {len(verdicts)} drills failed at the last install."
-    else:
-        summary = f"All {len(verdicts)} drills passed at the last install."
-    drills = {"summary": summary, "ok": not failed,
-              "failed": [{"name": d["name"], "evidence": d["evidence"]} for d in failed]}  # fmt: skip
     services, problem = _services(places)
-    tone = "good" if not problem and all(s["ok"] for s in services) and not failed else "warn"
-    return {"installed": True, "headline": "Installed", "tone": tone, "facts": facts, "drills": drills,
-            "services": services, "address": address(host), "problem": problem}  # fmt: skip
+    tone = "good" if not problem and all(s["ok"] for s in services) else "warn"
+    return {"installed": True, "headline": "Installed", "tone": tone, "facts": facts, "services": services,
+            "address": address(host), "problem": problem}  # fmt: skip
 
 
 # What the status reads of the installed factory's published settings. The install may be an older release's, so
@@ -301,8 +287,7 @@ def install_ending(ctx: Install, problem: str | None, keep: bool, run: Run, host
         then = "What it made is left in place, as you asked. Fix what it said, then install again."
     else:
         then = "Fix what it said, then install again."
-    drills = [_action("logs", "Open the drill sessions' output", "")] if run.folder else []
-    return _ending(run, False, _stopped(run, "The install stopped"), then, [*drills, DONE], detail=problem)
+    return _ending(run, False, _stopped(run, "The install stopped"), then, [DONE], detail=problem)
 
 
 def uninstall_ending(run: Run, problem: str | None) -> dict[str, Any]:

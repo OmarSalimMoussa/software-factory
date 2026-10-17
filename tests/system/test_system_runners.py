@@ -58,7 +58,7 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
     respawned, _ = lf.command_argv(respawn, HOME, STATE)
     shape = lf.check_parts({"kind": "check", "checkout": str(REPO), "args": ["--only", "repo-shape"]}, HOME)
 
-    # A start loads the skills only from the folder the warden renders: plugin hooks run unsandboxed.
+    # A start loads the skills only from the folder the warden renders, as a plugin's hooks run too.
     plugin = ["--plugin-dir", f"{STATE}/public/plugin"]
     assert argv[:3] == [str(layout.CLAUDE_BIN), *plugin]
     assert argv[-2:] == ["--", "-- build it"]  # a prompt that looks like a flag stays the prompt
@@ -276,8 +276,8 @@ def _ask(server: ThreadingHTTPServer, path: str, method: str = "GET") -> tuple[i
     ("progress", "said"),
     [
         (
-            (upgrades.RUNNING, "Proving the agents' walls hold"),
-            "The factory is upgrading: proving the agents' walls hold.",
+            (upgrades.RUNNING, "Starting the factory"),
+            "The factory is upgrading: starting the factory.",
         ),
         ((upgrades.FAILED, ""), "The factory is upgrading."),
         (None, "The factory is upgrading."),

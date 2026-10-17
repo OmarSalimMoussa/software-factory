@@ -2,22 +2,18 @@
 telemetry verbs to intake, triage and the testers among subagents), a task's status set only by the orchestrator
 (`queue-status`), and the command alone in its line (`factory-alone`). The warden counts an implementer's check runs.
 
-The factory command runs outside the sandbox so it can reach the warden. Claude Code exempts a call only when its
-whole text is `factory` or `factory …`, so the guard asks for exactly that: one plain command, the bare word first,
-nothing the shell would expand or join, and no file outside the session's worktree.
+The guard names a subagent on its factory calls by rewriting the call's text, which it can do safely only when the
+whole text is `factory` or `factory …`: one plain command, the bare word first, nothing the shell would expand or join.
 """
 
 from __future__ import annotations
 
-import os
 import re
 import shlex
-from pathlib import Path
 
 from runtime.cli.factory import LOCAL
 from runtime.guard import shell
-from runtime.guard.facts import ORCHESTRATOR, Call, Decision, Refusal, Rewrite, inside, resolve
-from runtime.slots import leases
+from runtime.guard.facts import ORCHESTRATOR, Call, Decision, Refusal, Rewrite
 from runtime.warden.verbs import VERBS
 
 FACTORY = "factory"
@@ -137,26 +133,15 @@ def plain_words(command: str) -> list[str] | None:
     return None if why else words
 
 
-def check_alone(call: Call, command: str, found: list[shell.Invocation], cwd: Path) -> Decision:
-    """A call that runs `factory` is that one plain call, and it reads files only from the session's own worktree."""
+def check_alone(call: Call, command: str, found: list[shell.Invocation]) -> Decision:
+    """A call that runs `factory` is that one plain call."""
     if not any(inv.program == FACTORY for inv in found) or call.off("factory-alone"):
         return None
-    words, why = _parse(command)
+    _, why = _parse(command)
     if why:
         return Refusal(
             "factory-alone", f"{why}: run factory on its own, one plain call, and read its answer as printed"
         )
-    worktree = Path(os.path.realpath(call.worktree))
-    # Its arguments are read outside the sandbox, so a file it names must be the session's own; a slot run's command,
-    # after its --, runs in the slot's container and reads nothing here.
-    ran = words[1:3] == ["slot", leases.RUN] and "--" in words
-    for word in words[1 : words.index("--") if ran else None]:
-        for candidate in [word, word.split("=", 1)[1] if "=" in word else ""]:
-            if not candidate or "://" in candidate or any(c.isspace() for c in candidate):
-                continue
-            path = resolve(candidate, cwd, call.home)
-            if os.path.lexists(path) and not inside(Path(os.path.realpath(path)), worktree):
-                return Refusal("factory-alone", f"the factory command reads files only from your worktree, {worktree}")
     return None
 
 

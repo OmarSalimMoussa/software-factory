@@ -2,8 +2,8 @@
 
 Run as ``/usr/bin/python3 -I <install>/runtime/system/runners/with_token.py <claude> daemon run``. Claude Code's daemon
 hands each session it starts a snapshot of its stored sign-in, never a token it was given on a pipe or a descriptor:
-so the token goes into the agent user's stored sign-in first, which no sandboxed command may read, and the daemon starts
-after. The token never appears on a command line or in an environment. Stdlib only.
+so the token goes into the agent user's stored sign-in first, and the daemon starts after. The token never appears
+on a command line or in an environment. Stdlib only.
 """
 
 from __future__ import annotations

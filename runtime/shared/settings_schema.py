@@ -169,6 +169,7 @@ SCHEMA: dict[str, Spec] = {
     "checks.run_minutes": Spec("int", 1, 240),
     "checks.test_seconds": Spec("int", 1, 600),
     "checks.output_kib": Spec("int", 4, 1024),
+    "checks.writable_caches": Spec("list"),  # folders in the agent's home a check may write
     "errors.poll_minutes": Spec("int", 1, 120),  # contract: added by FB6, prod's GlitchTip issues become requests
     "errors.max_pages": Spec("int", 1, 50),
     "errors.severe_events": Spec("int", 1, 1_000_000),
@@ -185,9 +186,6 @@ SCHEMA: dict[str, Spec] = {
     "cost.plan_amber_percent": Spec("int", 1, 100),
     "cost.plan_red_percent": Spec("int", 1, 100),
     "prices": Spec("prices"),
-    "sandbox.allowed_domains": Spec("list", when=NEXT_START),
-    # contract: added by FB8. Folders in the agent's home every session may write; the install makes them.
-    "sandbox.writable_caches": Spec("list", when="Next install"),
     "dashboard.port": Spec("int", 1024, 65535, when=AT_INSTALL),
     "dashboard.refresh_seconds": Spec("int", 5, 120),
     "dashboard.stale_seconds": Spec("int", 15, 600),
@@ -217,10 +215,6 @@ SCHEMA: dict[str, Spec] = {
     "factory.command_seconds": Spec("int", 10, 900),
     "factory.warden_threads": Spec("int", 2, 64, when="Next warden start"),  # contract: added by 1B-3
     # contract: added by builder 3, read by the installer only.
-    "install.drill": Spec("model", when="Next install"),
-    "install.drill_seconds": Spec("int", 30, 900, when="Next install"),
-    "install.browser_check_seconds": Spec("int", 10, 600, when="Next install"),
-    "install.drills_at_once": Spec("int", 1, 8, when="Next install"),
     "install.tailnet_seconds": Spec("int", 10, 600, when="Next install"),
     "install.hook_timeout_seconds": Spec("int", 2, 60, when="Next install"),
     "install.firewall_refresh_seconds": Spec("int", 10, 600, when="Next install"),
@@ -231,6 +225,4 @@ SCHEMA: dict[str, Spec] = {
     # contract: added by FB7. The programs the product's scripts need, copied from the owner's PATH for the agents and
     # the stack.
     "install.toolchain": Spec("list", when="Next install"),
-    "install.claude_lowest": Spec("str", when="Next install"),
-    "install.claude_untested": Spec("str", when="Next install"),
 }

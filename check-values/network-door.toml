@@ -18,8 +18,6 @@ code_only = true
 remedy = "send it through runtime/shared/network.py's call, which sets the deadline and the redirect and proxy policy"
 
 [doors.allow]
-"runtime/system/drill_probe.py" = "the drills' probe opens raw links on purpose: whether a wall lets one through is the evidence it reports"
-"runtime/system/install_drills/drill_rig.py" = "a drill's raw connection is its evidence: whether the wall refuses it"
 
 [[doors]]
 name = "standard HTTP"

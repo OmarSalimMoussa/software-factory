@@ -190,6 +190,7 @@ run_minutes = 30        # the longest one check may run before it is stopped
 test_seconds = 45       # the longest one test may run: scripts/dev test gets it as FACTORY_TEST_SECONDS
 output_kib = 1024       # the most of a check's report a session sees; the end is kept. Claude Code keeps what
                         # passes its own limit in a file and gives the agent the path
+writable_caches = [".cache/uv", ".npm"]  # folders in the agent's home a check may write: its tools' caches
 
 [queue]
 max_upload_kib = 512    # a picture, spec or triage plan sent with a factory command
@@ -213,10 +214,6 @@ timeout_seconds = 20    # one call to GlitchTip or Langfuse
 [reflect]
 fold_hours = 24         # the same kind and text within this window bumps a count instead of a new entry
 max_chars = 600         # the longest reflection an agent may write
-
-[sandbox]
-allowed_domains = ["pypi.org", "files.pythonhosted.org", "registry.npmjs.org"]
-writable_caches = [".cache/uv", ".npm"]  # folders in the agent's home a session may write: its tools' caches
 
 [dashboard]
 port = 8300
@@ -252,10 +249,6 @@ command_seconds = 120   # how long the warden waits for one of its own commands 
 warden_threads = 16     # requests the warden answers at once, on each of its sockets
 
 [install]               # read by the installer: a change takes effect at the next install
-drill = { model = "claude-haiku-5-5", effort = "low" }  # the model the drills drive a sandboxed command with
-drill_seconds = 180     # the longest one drill may run
-browser_check_seconds = 120  # how long the drill's check of a tester's browser waits on it; under drill_seconds
-drills_at_once = 4      # drill sessions run side by side, each with a unit and worktree of its own; the rest one by one
 tailnet_seconds = 60    # how long publishing the dashboard on the tailnet may wait before the owner is shown why
 hook_timeout_seconds = 10  # how long Claude Code waits for the guard, which decides within half of it or refuses
 firewall_refresh_seconds = 60  # how often the firewall table is loaded again, should anything have flushed it
@@ -264,7 +257,3 @@ release_check_hours = 1  # how often the warden asks GitHub whether a newer fact
 upgrade_wait_minutes = 40  # how long an upgrade waits for every paused agent to settle before it gives up
 upgrade_minutes = 90    # the longest an upgrade may run before it is stopped
 toolchain = ["uv", "node"]  # programs the product's scripts need, copied from the owner's PATH for the agents and stack
-# The Claude Code versions the factory's readers of its internals were drilled with: the lowest, and the first that
-# was not. Widen it only after the install's drills pass on the new version.
-claude_lowest = "2.1.296"
-claude_untested = "2.2.0"

@@ -27,37 +27,12 @@ FIXTURE = Path(__file__).resolve().parents[2] / "testdata" / "fixture-product"
 
 
 @pytest.mark.parametrize("role", ["orchestrator", "implementer"])
-def test_each_session_starts_sandboxed_in_its_worktree(world: World, tmp_path: Path, role: str) -> None:
-    repo = Path(world.settings.get_str("repo.path"))
-    folder = repo / ".claude" / "worktrees"
-    own = repo if role == "orchestrator" else folder / "impl-t-0001"
-    other = folder / "impl-t-0002"
-    for worktree in (own, other):
-        worktree.mkdir(parents=True, exist_ok=True)
-    body = session_settings.render(world.settings, world.places, role, own, tmp_path / "agent")
-    sandbox = body["sandbox"]
-    assert (sandbox["enabled"], sandbox["failIfUnavailable"], sandbox["allowUnsandboxedCommands"]) == (
-        True,
-        True,
-        False,
-    )
-    assert sandbox["excludedCommands"] == ["factory", "factory *"]
-    # Its own worktree, and its tools' caches in the agent's home (sandbox.writable_caches), nothing else.
-    caches = [str(tmp_path / "agent" / ".cache" / "uv"), str(tmp_path / "agent" / ".npm")]
-    assert sandbox["filesystem"]["allowWrite"] == [str(own), *caches]
-    if role == "orchestrator":
-        assert str(folder) in sandbox["filesystem"]["denyRead"]
-        assert sandbox["filesystem"]["denyWrite"] == [str(folder)]
-    else:
-        # Another session's worktree is denied by name, never the folder holding the session's own: a worktree read
-        # back inside a denied folder is mounted read-only, and no command can start in it.
-        assert str(other) in sandbox["filesystem"]["denyRead"]
-        assert not any(own.is_relative_to(Path(p)) for p in sandbox["filesystem"]["denyRead"])
-        assert "allowRead" not in sandbox["filesystem"]
-    assert str(tmp_path / "agent" / ".claude") in sandbox["filesystem"]["denyRead"]
+def test_each_session_runs_unsandboxed_with_every_tool_allowed_and_no_auto_memory(world: World, role: str) -> None:
+    body = session_settings.render(world.places, role)
+    assert body["sandbox"] == {"enabled": False}
+    assert body["permissions"] == {"defaultMode": "bypassPermissions"}
+    assert body["autoMemoryEnabled"] is False
     assert body["worktree"] == {"bgIsolation": "none"}
-    # The scrub runs every command sandboxed, the excluded `factory` too, which then cannot reach the warden.
-    assert "env" not in body
     assert ("statusLine" in body) == (role == "orchestrator")
 
 
@@ -152,7 +127,7 @@ def test_a_resume_respawns_the_session_with_its_start_options_and_then_hands_it_
     respawn.resume(world.ctx(), s, "carry on")
     assert world.launcher.commands == [["claude", "respawn", "1234abcd"]]
     written = session_settings.folder(world.places) / "pending-1234abcd-0000.json"
-    assert json.loads(written.read_text())["sandbox"]["enabled"] is True
+    assert json.loads(written.read_text())["permissions"] == {"defaultMode": "bypassPermissions"}
     assert world.launcher.messages == [("1234abcd-0000", "carry on")]
 
 

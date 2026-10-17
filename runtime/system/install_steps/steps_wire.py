@@ -235,12 +235,12 @@ def install_digest(ctx: Install) -> str:
     return ctx.host.run([layout.PYTHON, "-I", "-c", code]).strip() or "<digest>"
 
 
-def record(ctx: Install, drills: list[dict[str, object]]) -> None:
-    """Written last, after every drill passed: until then the warden's vitals stay red and nothing starts."""
+def record(ctx: Install) -> None:
+    """Written last, after every step: until then the warden's vitals stay red and nothing starts."""
     state, host = ctx.places.state, ctx.host
     host.write(ctx.places.install_hash, install_digest(ctx) + "\n", mode=0o600, owner=WARDEN_USER)
     # The owner's own checkout of the product too: the install console offers it for the next install.
-    body = {"commit": ctx.sha, "subject": ctx.subject, "drills": drills, "managed_settings": str(MANAGED_SETTINGS),
+    body = {"commit": ctx.sha, "subject": ctx.subject, "managed_settings": str(MANAGED_SETTINGS),
             "product": str(ctx.product)}  # fmt: skip
     host.write(layout.install_record(state), json.dumps(body, indent=1) + "\n", mode=0o600, owner=WARDEN_USER)
     # Root's own record, which the dashboard's upgrade trusts where it would not trust the warden's folder.

@@ -20,15 +20,6 @@ from runtime.system.install_steps import steps_wire
 from runtime.system.job import Install, refuse
 from runtime.warden.sessions import session_settings
 
-# Claude Code carries its seccomp helper (which blocks Unix sockets in the sandbox) inside its own binary; a version
-# without it finds the sandbox runtime's copy in the global npm folder instead.
-_SECCOMP_MARK = b"apply-seccomp"
-_NPM_RUNTIME = (
-    Path("/usr/lib/node_modules/@anthropic-ai/sandbox-runtime"),
-    Path("/usr/local/lib/node_modules/@anthropic-ai/sandbox-runtime"),
-)
-_CHUNK = 1 << 20
-_VERSION = re.compile(r"^(\d+(?:\.\d+){1,3})\b")
 _APT_ENV = {"DEBIAN_FRONTEND": "noninteractive"}
 _SUBORDINATE_START, _SUBORDINATE_COUNT = 100_000, 65_536  # where useradd starts subordinate ids, and how many
 
@@ -83,7 +74,6 @@ def users(ctx: Install) -> None:
         host.run(["gpasswd", "-a", layout.STACK_USER, AGENT_USER])
     host.run(["chmod", "0750", str(layout.AGENT_HOME)])
     host.mkdir(layout.AGENT_HOME / ".claude", mode=0o700, owner=AGENT_USER)
-    _agent_caches(ctx)
     for name in (AGENT_USER, *layout.DOCKER_USERS):
         host.run(["loginctl", "enable-linger", name])
 
@@ -105,17 +95,6 @@ def _accounts(ctx: Install) -> None:
                 host.run(["gpasswd", "--delete", name, group])
         if name in homes:
             host.run(["passwd", "--lock", name])
-
-
-def _agent_caches(ctx: Install) -> None:
-    """A session cannot make its tools' caches itself: it may write in each one, never in the home around it. Every
-    folder on the way is the agent's too, so a tool run outside the sandbox can still add its own beside them."""
-    folders: dict[Path, None] = {}
-    for cache in ctx.need_settings().get_list("sandbox.writable_caches"):
-        parts = Path(cache).parts
-        folders.update({layout.AGENT_HOME.joinpath(*parts[: n + 1]): None for n in range(len(parts))})
-    for folder in folders:
-        ctx.host.mkdir(folder, mode=0o700, owner=AGENT_USER)
 
 
 def owner_group(ctx: Install) -> str:
@@ -183,55 +162,11 @@ def place(ctx: Install) -> None:
     host.run(["chmod", "-R", "u=rwX,go=rX", str(layout.TOOLS)])
 
 
-def embeds_seccomp(binary: Path) -> bool:
-    tail = b""
-    with binary.open("rb") as fh:
-        while chunk := fh.read(_CHUNK):
-            if _SECCOMP_MARK in tail + chunk:
-                return True
-            tail = chunk[-len(_SECCOMP_MARK) :]
-    return False
-
-
-def _version(text: str) -> tuple[int, ...] | None:
-    found = _VERSION.match(text.strip())
-    return tuple(int(part) for part in found.group(1).split(".")) if found else None
-
-
-def claude_version(ctx: Install) -> None:
-    """The factory reads Claude Code's own files and output (its session records, its launch line, its transcripts),
-    which no version promises to keep: only a version the drills passed with is installed for the agents."""
-    host, settings = ctx.host, ctx.need_settings()
-    lowest, untested = settings.get_str("install.claude_lowest"), settings.get_str("install.claude_untested")
-    code, said = host.query([ctx.tool("claude"), "--version"], user=ctx.owner.name)
-    if host.dry:
-        host.say(f"Claude Code: yours must be at least {lowest} and below {untested} (a dry run does not ask)")
-        return
-    have, low, high = _version(said), _version(lowest), _version(untested)
-    if low is None or high is None:
-        raise refuse("The settings install.claude_lowest and install.claude_untested must each be a version such as "
-                     "2.1.296: fix them with --set, then install again")  # fmt: skip
-    if code != 0 or have is None:
-        raise refuse(f"Your Claude Code did not say its version ({said.strip()[:80]!r}): update it, then install again")
-    if not low <= have < high:
-        raise refuse(f"Your Claude Code is {'.'.join(map(str, have))}, and the factory is drilled with {lowest} up "
-                     f"to below {untested}: install one of those (claude install {lowest}), or, to try this one, "
-                     "install again with --set install.claude_untested=<a higher version>, and check every drill "
-                     "passes")  # fmt: skip
-    host.say(f"Claude Code {'.'.join(map(str, have))}: within the versions the drills passed with")
-
-
 def claude_binary(ctx: Install) -> None:
     host = ctx.host
-    claude_version(ctx)
     host.mkdir(layout.CLAUDE_BIN.parent, mode=0o755)
     host.run(["install", "-m", "0755", "-o", "root", "-g", "root", ctx.tool("claude"), str(layout.CLAUDE_BIN)])
     host.say(f"{host.query([str(layout.CLAUDE_BIN), '--version'])[1].strip() or 'Claude Code'} for the agents")
-    if host.dry or embeds_seccomp(layout.CLAUDE_BIN) or any(host.exists(p) for p in _NPM_RUNTIME):
-        return
-    raise refuse(
-        "Your Claude Code is too old to keep the agents' sandbox shut: update it (claude update), then install again"
-    )
 
 
 def apparmor(ctx: Install) -> None:

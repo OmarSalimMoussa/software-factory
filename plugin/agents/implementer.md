@@ -10,7 +10,7 @@ skills:
   - debugging
   - taking-review
   - verifying-claims
-# The caller's own slot's API on the loopback, which no sandboxed command reaches.
+# The caller's own slot's API on the loopback.
 mcpServers:
   - slot-api:
       type: stdio

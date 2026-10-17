@@ -60,10 +60,9 @@ function renderStatus(s) {
   const link = s.address && safeUrl(s.address.url) ? `<a class="btn sm" href="${esc(s.address.url)}" target="_blank" rel="noopener">${icon('arrow-top-right-on-square', 'sm')}${esc(s.address.label)}</a>` : '';
   const facts = s.facts.map(f => `<div><div class="l">${esc(f.label)}</div><div class="v mono">${esc(f.value)}</div>${f.sub ? `<div class="s">${esc(f.sub)}</div>` : ''}</div>`).join('');
   const services = s.services.map(x => `<li><i class="dot ${x.ok ? 'good' : 'bad'}"></i><span>${esc(x.name)}</span><span class="muted">${esc(x.text)}</span></li>`).join('');
-  const drills = s.drills ? `<div class="cdrills"><span class="chip ${s.drills.ok ? 'good' : 'bad'}">${esc(s.drills.summary)}</span>${s.drills.failed.map(d => `<div class="cnote"><b>${esc(d.name)}</b>: ${esc(d.evidence)}</div>`).join('')}</div>` : '';
   $('#status').innerHTML = `<div class="cs-top"><i class="dot ${s.tone}"></i><b>${esc(s.headline)}</b>${link}</div>`
     + (s.problem ? `<div class="cnote bad">${esc(s.problem)}</div>` : '')
-    + (facts ? `<div class="kv cfacts">${facts}</div>` : '') + (services ? `<ul class="csvc">${services}</ul>` : '') + drills;
+    + (facts ? `<div class="kv cfacts">${facts}</div>` : '') + (services ? `<ul class="csvc">${services}</ul>` : '');
 }
 
 /* The form is drawn once; later answers change only its words, never what the owner typed or chose. */
@@ -196,7 +195,7 @@ async function look() { if ((await send('/api/uninstall', {confirm: false, repo:
 async function ended(id) {
   if (id === 'dismiss') { if ((await send('/api/dismiss', {})).ok) load(); }
   else if (id === 'uninstall') { if ((await send('/api/uninstall', {confirm: true, repo: ''})).ok) watch(); }
-  else if (id === 'logs' || id === 'log') await send('/api/open', {what: id});
+  else if (id === 'log') await send('/api/open', {what: id});
 }
 async function closeConsole() {
   const r = await send('/api/close', {});

@@ -11,7 +11,6 @@ from __future__ import annotations
 import copy
 import threading
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from runtime.system import qr
@@ -51,7 +50,6 @@ class Run:
         self.answer: tuple[str, str] | None = None
         self.asked = 0
         self.closed = False
-        self.folder: Path | None = None  # a folder a step named for the owner to read, such as the drills' output
         self.ending: dict[str, Any] | None = None
 
     # ---- the worker's side ---------------------------------------------------------------------------------------
@@ -260,10 +258,6 @@ class Paged(Host):
     def show_key(self, key: DeployKey) -> None:
         self.page.ask(key_question(key))
         self.journal.line(f"the key for {key.repo} was shown to add by hand")
-
-    def show_folder(self, label: str, folder: Path) -> None:
-        self.page.folder = folder
-        self.journal.line(f"{label}: {folder}")
 
 
 class ConsoleHost(Paged, RealHost):

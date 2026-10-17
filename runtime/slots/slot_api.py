@@ -1,11 +1,10 @@
 """`factory slot-api`: a tiny MCP server, over standard input and output, that gives a session HTTP access to its
 own slot's API and nothing else (factory spec, "Reaching a slot").
 
-A sandboxed command cannot reach the host's loopback, so Claude Code starts this tool outside the sandbox. Before each
-request it asks the warden which slot is the caller's, then sends it to ``http://127.0.0.1:<that slot's port><path>``:
-no other host, no redirects, a path only, and an answer cut at the warden's size. Nothing but MCP goes to stdout.
-A request that names a session sends the cookies the slot set in that session before, by RFC 6265's paths; an answer
-shows every header line, each Set-Cookie value hidden.
+Before each request it asks the warden which slot is the caller's, then sends it to
+``http://127.0.0.1:<that slot's port><path>``: no other host, no redirects, a path only, and an answer cut at the
+warden's size. Nothing but MCP goes to stdout. A request that names a session sends the cookies the slot set in that
+session before, by RFC 6265's paths; an answer shows every header line, each Set-Cookie value hidden.
 """
 
 from __future__ import annotations

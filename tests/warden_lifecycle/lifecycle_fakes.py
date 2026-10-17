@@ -176,7 +176,7 @@ class World:
         session = Session(id=sid, role=role, **{**base, **fields})
         sessions[sid] = session
         registry.write(self.places, sessions)
-        # The backstop's line binding it to its start's pending id, which names its sandbox settings.
+        # The backstop's line binding it to its start's pending id, which names its settings file.
         store.append_jsonl(
             self.places.history,
             {

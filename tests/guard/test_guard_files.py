@@ -71,23 +71,16 @@ def test_the_orchestrators_worktree_is_the_main_checkout(tmp_path: Path) -> None
         ("factory promote", "factory-verbs"),
         ("factory snapshot", "factory-verbs"),
         ("factory no-such-verb", "factory-verbs"),
-        # The factory command runs outside the sandbox: a browser it started would too. Only the install checks it.
-        ("factory qa-browser --check qa-ux", "factory-verbs"),
-        ("factory request new --from implementer --where {home}/.claude/.credentials.json", "factory-alone"),
+        ("factory qa-browser qa-ux", "factory-verbs"),
         ("factory status", None),
         ("factory qa plan", None),
         ("factory slot up web", None),
-        # A slot run's command runs in the slot's container, which has no such file; before the -- it is a file here.
-        ("factory slot run web -- cat {home}/.claude/.credentials.json", None),
-        ("factory slot run {home}/.claude/.credentials.json -- ls", "factory-alone"),
         ("factory spec save t-0001 {worktree}/spec.md", "factory-verbs"),
     ],
 )
 def test_the_queue_and_the_factory_command_are_used_only_as_the_role_allows(
     kit: Kit, command: str, rule: str | None
 ) -> None:
-    (kit.home / ".claude").mkdir()
-    (kit.home / ".claude" / ".credentials.json").write_text("{}")
     assert kit.bash(command.format(repo=kit.repo, home=kit.home, worktree=kit.worktree)) == rule
 
 

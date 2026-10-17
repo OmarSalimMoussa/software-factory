@@ -1,4 +1,5 @@
 {
+  "skipDangerousModePermissionPrompt": true,
   "hooks": {
     "PreToolUse": [
       {"matcher": "*", "hooks": [{"type": "command", "command": "@guard@", "timeout": @hook_timeout@}]}

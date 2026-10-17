@@ -1,5 +1,5 @@
-# Lets bubblewrap create the user namespace Claude Code's sandbox runs in. Ubuntu blocks unprivileged user
-# namespaces by default (kernel.apparmor_restrict_unprivileged_userns), which would leave every session unsandboxed.
+# Lets bubblewrap create the user namespace each check runs in. Ubuntu blocks unprivileged user namespaces by
+# default (kernel.apparmor_restrict_unprivileged_userns), which would stop every check from starting.
 abi <abi/4.0>,
 include <tunables/global>
 

@@ -3,19 +3,16 @@
 It turns a command line into one request on the warden's socket and prints the answer. The warden knows who is
 asking from the calling process, never from these arguments. Every file the caller names (a picture, a spec, a
 body given with ``--body``) is read here, as the caller, and sent as bytes; the warden never opens a path a caller
-names. Nothing comes from stdin: Claude Code runs a call outside the sandbox, where the warden's socket is
-reachable, only when the call is ``factory …`` alone, with no pipe, redirect or heredoc. The guard puts
-``--agent-id <id>`` first on a subagent's call. `qa-browser` and `slot-api` run here without the warden; `check` is
-the warden's, which runs it walled into the caller's checkout; `account` is the owner's alone, on owner.sock
-(runtime/cli/accounts.py).
+names. Nothing comes from stdin: the guard lets a call through only when it is ``factory …`` alone, with no pipe,
+redirect or heredoc, so it can put ``--agent-id <id>`` first on a subagent's call. `qa-browser` and `slot-api` run
+here without the warden; `check` is the warden's, which runs it walled into the caller's checkout; `account` is the
+owner's alone, on owner.sock (runtime/cli/accounts.py).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
-import pwd
 import socket
 import sys
 from collections.abc import Callable
@@ -26,7 +23,7 @@ from typing import IO, Any
 from runtime.cli import commands
 from runtime.shared import lanes, protocol
 from runtime.shared.models import SEVERITIES
-from runtime.shared.paths import Places, stored_signin
+from runtime.shared.paths import Places
 
 LOCAL = (lanes.BROWSER, "slot-api")
 UNREACHABLE = 3
@@ -259,22 +256,6 @@ _CALLS: dict[str, Callable[[argparse.Namespace, Callable[[str], bytes]], Call]] 
 }
 
 
-def read_file(path: str) -> bytes:
-    """A file the agent names, never Claude Code's stored sign-in, however it is reached. The guard lets only the
-    session's own files through, but this runs outside the sandbox, and a link swapped in after the guard looked
-    would be followed: so the file actually opened is the one compared."""
-    with open(path, "rb") as handle:
-        opened = os.fstat(handle.fileno())
-        try:
-            signin = os.stat(stored_signin(Path(pwd.getpwuid(os.getuid()).pw_dir)))
-        # telemetry: expected — a home with no stored sign-in has none to guard
-        except FileNotFoundError:
-            signin = None
-        if signin is not None and (opened.st_dev, opened.st_ino) == (signin.st_dev, signin.st_ino):
-            raise CliError("the factory command never reads Claude Code's sign-in")
-        return handle.read()
-
-
 def ask(path: Path, call: Call) -> dict[str, Any]:
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
         sock.connect(str(path))
@@ -312,10 +293,7 @@ def show(answer: dict[str, Any], out: IO[str], err: IO[str]) -> int:
 
 def _local(argv: list[str], places: Places) -> int:
     if argv[0] == lanes.BROWSER:
-        from runtime.qa import browser_check, qa_browser
-
-        if argv[1:2] == [browser_check.FLAG]:
-            return browser_check.main(argv[2:], places)
+        from runtime.qa import qa_browser
 
         def sign_in(address: str) -> dict[str, Any]:
             return ask(places.socket, Call("slot", {"op": "sign-in", "email": address}))
@@ -336,7 +314,7 @@ def main(argv: list[str], places: Places | None = None) -> int:
             from runtime.cli import accounts
 
             return accounts.main(rest[1:], places.owner_socket, ask, sys.stdin, sys.stdout, sys.stderr)
-        call = build(argv, read_file)
+        call = build(argv, lambda path: Path(path).read_bytes())
     except (CliError, OSError) as exc:
         print(f"factory: {exc}", file=sys.stderr)
         return 2

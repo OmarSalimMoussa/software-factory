@@ -344,11 +344,10 @@ class Console:
         return _json(200, {"ok": True}) if why is None else refused(409, why)
 
     def open_folder(self, data: dict[str, Any]) -> Reply:
-        """The run's log, or the folder a step named (the drill sessions' output), in the owner's desktop."""
+        """The run's log, in the owner's desktop."""
         with self._lock:
             run = self.run
-        what = data.get("what")
-        target = (run.journal.path if what == "log" else run.folder if what == "logs" else None) if run else None
+        target = run.journal.path if run and data.get("what") == "log" else None
         if target is None:
             return refused(409, "There is nothing of that kind to open.")
         if not self.opener(str(target)):

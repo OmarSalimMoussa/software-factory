@@ -7,7 +7,7 @@ drive('settings', async t => {
   const p = await t.open(1440, 900, 'settings');
   const bar = () => p.textContent('#savebar-n');
   t.check(await p.$('[data-row="models.intake"] [data-ddbtn]') && await p.$('[data-row="caps.designers"] .stepper') && await p.$('[data-row="budget.slice_memory_high"] input.txt')
-    && await p.$('[data-row="sandbox.allowed_domains"] .listed') && await p.$('[data-row="prices"] .ro'), 'a control kind is missing');
+    && await p.$('[data-row="install.toolchain"] .listed') && await p.$('[data-row="prices"] .ro'), 'a control kind is missing');
   t.check(!(await p.$('[data-row="prices"] .reset, [data-row="prices"] [data-default]')), 'a read-only row can be changed');
   // YOLO mode: Turn on says once what it does, Home then shows its band, and Turn off there ends it
   await p.click('[data-action="yolo-on"]'); await settle(p);
@@ -28,10 +28,10 @@ drive('settings', async t => {
   t.check((await bar()).includes('2 changes'), 'savebar: ' + await bar());
   t.check((await p.textContent('[data-row="models.intake"] .was')).includes('was Sonnet 5.5 · medium'), 'no "was" on a changed model');
   await p.fill('[data-row="budget.slice_memory_high"] input', '10G'); await p.press('[data-row="budget.slice_memory_high"] input', 'Tab');
-  await p.fill('[data-row="sandbox.allowed_domains"] [data-listadd]', 'example.org'); await p.press('[data-row="sandbox.allowed_domains"] [data-listadd]', 'Enter');
-  t.check((await texts(p, '[data-row="sandbox.allowed_domains"] .listed .chip')).some(x => x.includes('example.org')), 'list item not added');
+  await p.fill('[data-row="install.toolchain"] [data-listadd]', 'make'); await p.press('[data-row="install.toolchain"] [data-listadd]', 'Enter');
+  t.check((await texts(p, '[data-row="install.toolchain"] .listed .chip')).some(x => x.includes('make')), 'list item not added');
   t.check((await bar()).includes('4 changes'), 'text and list edits not counted: ' + await bar());
-  await p.click('[data-listdel="sandbox.allowed_domains"][data-i="3"]');
+  await p.click('[data-listdel="install.toolchain"][data-i="2"]');
   t.check((await bar()).includes('3 changes'), 'removing the added item did not undo it');
   // Reset to default: implementers are saved at 4, the default is 3
   await p.click('[data-default="caps.implementers"]');

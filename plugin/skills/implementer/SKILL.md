@@ -37,14 +37,12 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
 - **Tests first,** at the seam a caller sees. A bug is reproduced in a failing test before you fix it (the
   `debugging` skill).
 - **Run only what covers your change:** the tests your diff picks (`factory check --only tests`), and the product's
-  own fast commands its `CLAUDE.md` names. A test that listens on a local socket (tsx does) fails in your shell with
-  EPERM, since the sandbox blocks sockets: run it with `factory check --only tests`. The warden runs the full
-  `factory check` only on your merge turn.
+  own fast commands its `CLAUDE.md` names. The warden runs the full `factory check` only on your merge turn.
 - **Your slot:** rebuild only what changed (`factory slot up <service>`; one whose image is unchanged keeps running,
   and `factory slot restart <service>` restarts it). Drive its API with the `slot-api` tools, which reach your slot
-  and nothing else; no command of yours can. To see what code prints inside a service, such as a size or a timing,
-  run it there: `factory slot run <service> -- <command>`. Prepare what your testers need: seeds
-  (`factory slot seed load <name>`) and any setup a scenario names. A tester that needs a service stopped asks you.
+  and nothing else. To see what code prints inside a service, such as a size or a timing, run it there:
+  `factory slot run <service> -- <command>`. Prepare what your testers need: seeds (`factory slot seed load <name>`)
+  and any setup a scenario names. A tester that needs a service stopped asks you.
 - **New behaviour gets a standing scenario** in `qa/scenarios/`, or an update to the one that covers it: three labels
   (`protects`, `needs`, `runs`) and at most `qa.max_steps` steps, each opening with a short bold name and holding an
   `Expect:` line: the owner's replay shows both. A scenario that signs in as a test address names its role in

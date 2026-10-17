@@ -7,7 +7,7 @@ Add ``--dry-run`` (no sudo needed) to go through every step, reading this machin
 ``--verbose`` to print every detail the log keeps. The install runs from a sealed, read-only copy of the commit and
 takes only a commit the factory's CI passed: nothing is tested on this machine. It shows a few phases; every command
 and its output goes to a log in /var/log/software-factory. It refuses to begin while any session is working or
-waiting, and refuses to finish while any drill fails. Rerun it after every change to the factory.
+waiting. Rerun it after every change to the factory.
 """
 
 from __future__ import annotations
@@ -31,7 +31,6 @@ from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.system import ci_check, healthchecks, layout, release, sealed
 from runtime.system.host import Account, CommandError, Host
-from runtime.system.install_drills import roster
 from runtime.system.install_steps import (
     steps_machine,
     steps_prepare,
@@ -47,28 +46,6 @@ from runtime.system.unattended import UnattendedHost
 from runtime.system.uninstall import LookingHost
 
 PROGRAM = "install.py"
-
-
-def run_drills(ctx: Install) -> None:
-    if ctx.host.dry:
-        for drill in roster.DRILLS:
-            ctx.host.say(f"would drill: {drill.__name__}")
-        return
-    from runtime.system.install_drills import drill_rig
-
-    with drill_rig.opened(ctx) as rig:
-        results = roster.run_all(rig, ctx.need_settings().get_int("install.drills_at_once"))
-    for result in results:
-        ctx.host.say(f"{'pass' if result.ok else 'FAIL'}: {result.name}: {result.evidence}")
-    ctx.drilled = [{"name": r.name, "ok": r.ok, "evidence": r.evidence} for r in results]
-    failed = [r.name for r in results if not r.ok]
-    if failed:
-        raise refuse(f"{len(failed)} of the safety checks failed ({'; '.join(failed)}), so the factory will not start. "
-                     "The log says what each one found: fix that, then install again.")  # fmt: skip
-
-
-def record(ctx: Install) -> None:
-    steps_wire.record(ctx, ctx.drilled)
 
 
 @dataclass(frozen=True)
@@ -110,7 +87,7 @@ PHASES: tuple[Phase, ...] = (
         ("Reading GitHub's host keys for the warden", steps_machine.github_host_keys),
         ("Installing Claude Code for the agents", steps_machine.claude_binary),
         ("Copying your tools for the agents", steps_toolchain.toolchain),
-        ("Letting the agents' sandbox run", steps_machine.apparmor),
+        ("Letting the checks' walls run", steps_machine.apparmor),
         ("Writing Claude Code's settings for the agents", steps_wire.managed_settings),
         ("Writing the factory's services", steps_wire.units),
         ("Writing the factory's permissions", steps_wire.polkit),
@@ -125,11 +102,8 @@ PHASES: tuple[Phase, ...] = (
         ("Connecting the services", steps_services.keys),
         ("Starting the factory", steps_wire.start),
     )),
-    Phase("Running the safety checks", (
-        ("Proving the agents' walls hold", run_drills),
-    )),
     Phase("Finishing", (
-        ("Recording the install", record),
+        ("Recording the install", steps_wire.record),
     )),
 )  # fmt: skip
 STEPS = tuple(step for phase in PHASES for step in phase.steps)

@@ -21,16 +21,15 @@ Run with sudo, the file checks itself, unpacks the factory into a new sealed cop
 `/var/lib/software-factory-stage/` (owned by root, read-only, removed when it ends) and opens the install console in
 your browser. It prints the page's link too; the link works once, in the browser that opens it.
 
-- **This laptop** says whether the factory is installed, at which commit and since when, how the last safety checks
-  did, whether the warden, the dashboard, GlitchTip, Langfuse and the factory's own GlitchTip answer, and where the
-  dashboard is on your tailnet.
+- **This laptop** says whether the factory is installed, at which commit and since when, whether the warden, the
+  dashboard, GlitchTip, Langfuse and the factory's own GlitchTip answer, and where the dashboard is on your tailnet.
 - **Install** installs the release's commit. On a laptop that has the factory, it says **Upgrade**, from which
   commit, and what it keeps: your settings, accounts, keys and code, the Healthchecks.io checks, the agents' work, the
   shared services and the factory's own GlitchTip. Turn on **Dry run** to go through every step on this computer
   without changing anything.
 - **An install** shows a few phases with a progress bar and one line on what it is doing: checking this computer,
-  preparing it, fetching the services, connecting your accounts, setting up the factory, starting up, running
-  the safety checks and finishing. It never shows the commands it runs.
+  preparing it, fetching the services, connecting your accounts, setting up the factory, starting up and
+  finishing. It never shows the commands it runs.
 - **Questions** appear as the install reaches them: the 6-digit code's secret as a QR code to scan, with its key to
   type instead and a Copy button; your GitHub token and the agents' Claude token, typed into password fields. With
   your `gh` signed in, the install puts the GitHub keys in place itself. When it is not, the install asks you to sign
@@ -112,16 +111,17 @@ The agents and the stack run the product's scripts with your own tools: the inst
 `install.toolchain` from your PATH, and the Python the product asks for (its `.python-version`, else its
 `requires-python`) from your uv, into `/opt/software-factory-toolchain/`. The copies are root-owned and read-only, and
 the factory's uv finds its Python there and never downloads one. When the product asks for a Python you have not
-installed, the install stops and names it: run `uv python install <version>`, then install again. Sessions may also
-write their tools' caches in the agent's home (`sandbox.writable_caches`), so the product's tests run inside their
-sandbox. At every install, a drill runs each tool and finds the product's Python from inside a session.
+installed, the install stops and names it: run `uv python install <version>`, then install again. A check may write
+the tools' caches in the agent's home (`checks.writable_caches`).
 
-The factory reads parts of Claude Code that no version promises to keep: its session records, the line `claude --bg`
-prints, its transcripts. So the install copies only a Claude Code the drills passed with (`install.claude_lowest` up
-to below `install.claude_untested`), the agents' copy never updates itself, and a drill starts, finds and stops a real
-background session as the warden does. To move to a newer Claude Code, install again with
-`--set install.claude_untested=<a higher version>` and check every drill passes. Should sessions ever run with no
-record the warden reads, the vitals turn red and the crash watch resumes and retires nothing until they are seen.
+## Agents' sessions
+
+Each session runs with no sandbox, every tool allowed, no permission prompt and no auto-memory: the guard is its one
+wall. The factory reads parts of Claude Code that no version promises to keep: its session records, the line
+`claude --bg` prints, its transcripts. So the agents' copy is the one the install copied from you, and it never
+updates itself. After an install, check that one session starts and the vitals are green. Should sessions ever run
+with no record the warden reads, the vitals turn red and the crash watch resumes and retires nothing until they are
+seen.
 
 ## Pause, stop, resume
 

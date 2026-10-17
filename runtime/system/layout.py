@@ -29,7 +29,7 @@ ERRORS_HOME = Path("/home") / ERRORS_USER
 DOCKER_USERS = {STACK_USER: STACK_HOME, ERRORS_USER: ERRORS_HOME}
 
 PYTHON = "/usr/bin/python3"
-# The factory command. Sessions type the bare word alone, which is the one text the sandbox lets out.
+# The factory command, on every user's PATH.
 FACTORY_BIN = paths.FACTORY_BIN
 # The owner's own change to a path only a person changes, which root commits (runtime/system/owner_commit.py).
 OWN_BIN = Path("/usr/local/sbin/factory-own")
@@ -45,8 +45,7 @@ TOOLCHAIN_PYTHON = TOOLCHAIN / "python"
 # What every unit that runs product code finds on its PATH: the toolchain first, then the system's own folders.
 SYSTEM_PATH = ("/usr/local/bin", "/usr/bin", "/bin")
 UNIT_PATH = ":".join((str(TOOLCHAIN_BIN), *SYSTEM_PATH))
-# What those units and the drills also set: uv finds the product's Python among the toolchain's copies and never
-# downloads one, since no session may reach where uv downloads from or write where it would put it.
+# What those units also set: uv finds the product's Python among the toolchain's copies and never downloads one.
 # Copy, never hard-link, from the cache every session shares: a session editing a file in its own venv must not edit
 # the cache another session installs from.
 UV_ENV = {"UV_PYTHON_INSTALL_DIR": str(TOOLCHAIN_PYTHON), "UV_PYTHON_DOWNLOADS": "never", "UV_LINK_MODE": "copy"}
@@ -69,7 +68,6 @@ NFT_TABLE = "software_factory"
 APPARMOR_DIR = Path("/etc/apparmor.d")
 APPARMOR_PROFILE = APPARMOR_DIR / "software-bwrap"
 BWRAP = Path("/usr/bin/bwrap")
-DRILLS = Path("/run/software-drills")
 
 WARDEN_UNIT = "software-warden.service"
 DASHBOARD_UNIT = "software-dashboard.service"
@@ -90,7 +88,7 @@ SERVICES_UNIT = "software-services.service"
 # The factory's own GlitchTip, run by its own user; a reinstall leaves it up.
 ERRORS_UNIT = "software-errors.service"
 
-PACKAGES = ("bubblewrap", "socat", "uidmap", "nftables", "apparmor-utils")
+PACKAGES = ("bubblewrap", "uidmap", "nftables", "apparmor-utils")
 ROOTLESS_SETUP = "dockerd-rootless-setuptool.sh"
 ROOTLESS_EXTRAS = "docker-ce-rootless-extras"  # the package of Docker's own that brings it
 CLAUDE_TOKEN = "claude-token"  # the credential name the agent units load the sign-in token under

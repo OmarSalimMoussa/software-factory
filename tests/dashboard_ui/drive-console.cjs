@@ -7,7 +7,7 @@ const {drive, consoleServer} = require('./lib.cjs');
 
 const SECRET = 'sk-ant-oat01-typed-in-the-console-5e5e';
 const ASKED = ['authenticator', 'deploy key to acme/shop', 'deploy key to acme/software-factory', 'GitHub token for the warden', 'read-only GitHub token for the factory', 'claude setup-token', 'name for this Claude account'];
-const PHASES = 8;
+const PHASES = 7;
 
 async function dryInstall(t, p, tag) {
   if (!(await p.isChecked('#f-dry'))) await p.click('.cf-switch');

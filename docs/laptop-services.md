@@ -17,8 +17,6 @@ The factory's own GlitchTip runs apart, on the rootless Docker of a user of its 
 - Is it up? `systemctl status software-services.service`. When it is not, its log names each service that did not
   become healthy.
 - Restart it: `sudo systemctl restart software-services.service`. A stop keeps the containers and their data.
-- At every install, one drill checks that GlitchTip and Langfuse answer the stack user on the addresses below, and
-  another that the factory's own GlitchTip answers the warden and neither the agent user nor the stack user.
 
 ## Where to open them
 

@@ -88,7 +88,7 @@ def main(argv: list[str]) -> int:
         settings, _ = lf.published(state)
         checkout, args = lf.check_parts(raw, home)
         timeout = settings.get_int("checks.run_minutes") * 60
-        caches = [home / rel for rel in settings.get_list("sandbox.writable_caches")]
+        caches = [home / rel for rel in settings.get_list("checks.writable_caches")]
         argv_ = command(checkout, args, home, caches, settings.get_int("factory.command_seconds"))
     # telemetry: surfaced — the refusal is `print`ed to the unit's log, and the exit says it was refused
     except lf.BadRequest as exc:

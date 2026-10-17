@@ -25,7 +25,6 @@ from runtime.warden.sessions.backstop import Proc
 from runtime.warden.sessions.launch import LaunchError
 
 NOW = "2026-10-09T12:00:00Z"
-DRILL = "d1d1d1d1-0000-4000-8000-000000000000"  # an install's drill session
 
 
 @pytest.mark.parametrize("state", [BENCH_PENDING, REVIVING, DEPRIORITIZED])
@@ -87,37 +86,6 @@ def test_the_backstop_stops_only_processes_the_warden_did_not_permit(world: Worl
     world.procs["9f9f9f9f"] = Proc(pid=9, session="9f9f9f9f", name="anything", chat_link="")
     backstop.sweep(world.ctx(), dict(world.procs))
     assert world.launcher.stopped == (["5e550001", "9f9f9f9f"] if stopped else ["9f9f9f9f"])
-
-
-@pytest.mark.parametrize(
-    ("permits", "after", "stopped", "logged"),
-    [
-        ({DRILL: 60}, 0, False, False),
-        ({DRILL[:8]: 60}, 0, False, False),
-        ({"drill-session-ab12": 60}, 0, False, False),
-        ({DRILL: 60}, 61, True, False),
-        ("{not json", 0, True, True),
-        (f'["{DRILL}"]', 0, True, True),
-    ],
-    ids=["by-id", "by-short-id", "by-name", "ended", "unreadable", "not-a-map"],
-)
-def test_the_backstop_leaves_the_installs_drill_sessions_alone_while_their_permits_last(
-    world: World,
-    caplog: pytest.LogCaptureFixture,
-    permits: dict[str, int] | str,
-    after: int,
-    stopped: bool,
-    logged: bool,
-) -> None:
-    world.procs[DRILL] = Proc(pid=9, session=DRILL, name="drill-session-ab12", chat_link="")
-    if isinstance(permits, dict):
-        store.write_json(world.places.drill_permits, {k: world.clock.now() + v for k, v in permits.items()})
-    else:
-        store.write_text(world.places.drill_permits, permits)
-    world.later(after)
-    with caplog.at_level(logging.WARNING):
-        backstop.sweep(world.ctx(), dict(world.procs))
-    assert (world.launcher.stopped == [DRILL], "drill permits" in caplog.text) == (stopped, logged)
 
 
 def test_a_start_is_bound_to_its_session_by_name_and_its_pending_id_still_names_it(world: World) -> None:

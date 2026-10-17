@@ -82,10 +82,10 @@ def check_bash(call: Call) -> Decision:
             decision = rule(call, inv, cwd)
             if decision is not None:
                 return decision
-    return _whole(call, command, found, cwd)
+    return _whole(call, command, found)
 
 
-def _whole(call: Call, command: str, found: list[shell.Invocation], cwd: Path) -> Decision:
+def _whole(call: Call, command: str, found: list[shell.Invocation]) -> Decision:
     readers = [inv for inv in found if nested.reads_its_script_from_stdin(inv.program, inv.argv[1:])]
     # Each shell that reads its standard input needs a heredoc body the guard read as its script.
     if len(readers) > shell.shell_heredocs(command) and not call.off("unreadable-command"):
@@ -95,7 +95,7 @@ def _whole(call: Call, command: str, found: list[shell.Invocation], cwd: Path) -
         )
     if not call.off("git-bypass") and any(map(git_rules.sets_config_from_env, found)):
         return Refusal("git-bypass", "git's configuration is the owner's, from the environment too")
-    return factory_calls.check_alone(call, command, found, cwd)
+    return factory_calls.check_alone(call, command, found)
 
 
 def _after_cd(call: Call, inv: shell.Invocation, cwd: Path) -> Path:

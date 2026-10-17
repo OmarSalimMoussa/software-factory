@@ -257,6 +257,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("checks.run_minutes", "Minutes one check may take"),
             ("checks.test_seconds", "Seconds one test may take"),
             ("checks.output_kib", "Most of a check's report an agent sees, KiB"),
+            ("checks.writable_caches", "Tool caches a check may write, in the agent's home"),
         ],
     ),
     (
@@ -294,15 +295,6 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("subagents.implementer", "An implementer may start"),
             ("subagents.browser_personas", "Testers with a browser"),
             ("subagents.unpermitted", "Allowed in a session the warden never started"),
-        ],
-    ),
-    (
-        "sandbox",
-        "Sandbox",
-        "Sites apply to each agent that starts after you save; cache folders at the next install, which makes them.",
-        [
-            ("sandbox.allowed_domains", "Sites agents may reach"),
-            ("sandbox.writable_caches", "Tool caches agents may write, in their home"),
         ],
     ),
     (
@@ -352,10 +344,6 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         "Install",
         "Read by the installer: a change applies at the next install.",
         [
-            ("install.drill", "Model the drills use"),
-            ("install.drill_seconds", "Longest drill, seconds"),
-            ("install.browser_check_seconds", "Browser check, seconds"),
-            ("install.drills_at_once", "Drill sessions at once"),
             ("install.tailnet_seconds", "Seconds to publish the dashboard"),
             ("install.hook_timeout_seconds", "Seconds Claude Code waits for the guard"),
             ("install.firewall_refresh_seconds", "Load the firewall again every, seconds"),
@@ -364,8 +352,6 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("install.upgrade_wait_minutes", "Minutes an upgrade waits for the agents to settle"),
             ("install.upgrade_minutes", "Longest an upgrade may run, minutes"),
             ("install.toolchain", "Programs the product's scripts need"),
-            ("install.claude_lowest", "Lowest Claude Code version the drills passed with"),
-            ("install.claude_untested", "First Claude Code version not yet drilled"),
         ],
     ),
 ]

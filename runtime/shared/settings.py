@@ -32,8 +32,8 @@ class SettingsError(Exception):
 
 
 _PRICE_KEYS = ("input", "output", "cache_read", "cache_write")
-# A session that could write Claude Code's settings, a tool's configuration, a program on a login shell's PATH or a
-# key would act outside its sandbox the next time something read it, so no writable cache lies under these.
+# A check that could write Claude Code's settings, a tool's configuration, a program on a login shell's PATH or a key
+# would act outside its walls the next time something read it, so no writable cache lies under these.
 _UNWRITABLE = frozenset({".claude", ".config", ".local", ".ssh", "bin"})
 _WEIGHT_KEYS = ("severity", "goal", "requests", "users", "age")
 _KIB = {"K": 1, "M": 1024, "G": 1024**2, "T": 1024**3}
@@ -284,9 +284,9 @@ def _between(tree: dict[str, Any]) -> list[str]:
             "or no check could run the tests"
         )
     return problems + [
-        f"sandbox.writable_caches: {path!r} must be a folder inside the agent's home, such as .cache/uv, and not "
+        f"checks.writable_caches: {path!r} must be a folder inside the agent's home, such as .cache/uv, and not "
         f"under {', '.join(sorted(_UNWRITABLE))}"
-        for path in tree["sandbox"]["writable_caches"] if not _home_folder(path)
+        for path in tree["checks"]["writable_caches"] if not _home_folder(path)
     ]  # fmt: skip
 
 

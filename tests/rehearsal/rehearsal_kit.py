@@ -241,7 +241,7 @@ class Rehearsal:
 
     def owner(self, argv: list[str]) -> dict[str, Any]:
         """The owner's own terminal: `factory <argv>` on the agent socket."""
-        call = cli.build(argv, cli.read_file)
+        call = cli.build(argv, lambda path: Path(path).read_bytes())
         caller = server.identify(
             self.places, self.peers, AGENT_SOCKET, pid=9000, uid=OWNER_UID, bind_now=self._bind_now()
         )
@@ -260,7 +260,7 @@ class Rehearsal:
 
     def session(self, session: str, argv: list[str], agent_id: str = "") -> dict[str, Any]:
         """`factory <argv>` run by the session, or by its subagent ``agent_id``, whose id the guard puts first."""
-        call = cli.build(["--agent-id", agent_id, *argv] if agent_id else argv, cli.read_file)
+        call = cli.build(["--agent-id", agent_id, *argv] if agent_id else argv, lambda path: Path(path).read_bytes())
         line = protocol.request(call.verb, call.args, call.data, agent_id=call.agent_id)
         return self._ask(self._from_session(session), AGENT_SOCKET, line)
 

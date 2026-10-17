@@ -14,4 +14,3 @@ env_files = {}
 services = []
 
 [allow]
-"runtime/system/drill_probe.py" = "a drill's probe: it reports whether a named variable reached the user it runs as, which is the wall the drill proves"

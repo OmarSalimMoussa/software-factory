@@ -89,7 +89,6 @@ def test_a_claude_session_with_no_record_the_warden_reads_is_red(tmp_path: Path)
     old = 100 * ticks  # started 900 s ago
     _process(proc, 101, ["claude", "--bg"], old)  # has its record
     _process(proc, 102, ["claude", "daemon", "run"], old)
-    _process(proc, 103, ["claude", "-p", "drill"], old)
     _process(proc, 104, ["claude", "--resume"], 999 * ticks)  # a second old: not settled yet
     (folder / "101.json").write_text(json.dumps({"sessionId": "s-101", "pid": 101, "procStart": str(old)}))
     assert backstop.unseen(folder, proc, os.getuid(), 60) == []

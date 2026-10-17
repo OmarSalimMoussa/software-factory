@@ -13,7 +13,7 @@ Group=@agent_user@
 Slice=@slice@
 Environment=XDG_RUNTIME_DIR=/run/user/@agent_uid@
 Environment=PATH=@path@
-# The installed Claude Code is the version the drills passed with: it never replaces itself.
+# The installed Claude Code changes only with an install: it never replaces itself.
 Environment=DISABLE_AUTOUPDATER=1
 Environment=@uv_env@
 LoadCredential=@claude_token@:@secrets@/claude.token

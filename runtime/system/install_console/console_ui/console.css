@@ -17,7 +17,6 @@
 .csvc{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 24px}
 .csvc li{display:flex;align-items:center;gap:8px;min-height:24px}
 .csvc li .muted{margin-left:auto}
-.cdrills{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 
 /* the install form */
 .cform{padding:4px 0}

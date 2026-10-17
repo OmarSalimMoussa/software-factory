@@ -167,13 +167,10 @@ Only values, never code. Each file is named for the check it feeds (see [checks.
 ## What only a person changes
 
 Agents may never change `GOAL.md`, `goal/`, `check-values/surfaces.toml`, `.github/workflows/`,
-`.github/factory-ref`, `factory.toml` or any hook it names. Nor may they change Claude Code's project config, which a
-session started in the checkout loads: `.claude/settings.json`, `.claude/settings.local.json`, `.claude/agents/`,
-`.claude/skills/`, `.claude/commands/` and `.mcp.json`. Settings carry hooks, which run outside the sandbox. The
-hooks factory.toml names are read from the factory's own checkout of the product, so a branch cannot drop one from
-the list. A product names any other path only a person may change in
-`repo.protected_paths` (a trailing `/` names a folder). The guard, the git hooks and the warden's push refuse a change
-to any of them. While that checkout's `factory.toml` cannot be read, they refuse every write, commit and push, until
+`.github/factory-ref`, `factory.toml` or any hook it names. The hooks factory.toml names are read from the factory's
+own checkout of the product, so a branch cannot drop one from the list. A product names any other path only a person
+may change in `repo.protected_paths` (a trailing `/` names a folder). The guard, the git hooks and the warden's push
+refuse a change to any of them. While that checkout's `factory.toml` cannot be read, they refuse every write, commit and push, until
 the owner fixes it.
 
 To change one yourself, commit the change in your own checkout, write it out with

@@ -103,9 +103,8 @@ def sessions_folder() -> Path:
 
 def unseen(folder: Path, proc: Path, agent_uid: int, settled: float) -> list[int]:
     """The agent's claude processes running for at least ``settled`` seconds that no session record names: sessions
-    the warden cannot see, as when a Claude Code update moved or reshaped its records. Neither its daemon, which
-    writes no record, nor a one-shot `claude -p` (the install's drills) counts. OSError or ValueError when /proc cannot
-    be read."""
+    the warden cannot see, as when a Claude Code update moved or reshaped its records. Its daemon, which writes no
+    record, does not count. OSError or ValueError when /proc cannot be read."""
     named = {p.pid for p in read_processes(folder, proc).values()}
     uptime = float((proc / "uptime").read_text().split()[0])
     entries = [e for e in proc.iterdir() if e.name.isdigit()]
@@ -119,7 +118,7 @@ def unseen(folder: Path, proc: Path, agent_uid: int, settled: float) -> list[int
         # telemetry: expected — the process ended while it was read
         except OSError:
             continue
-        if not argv[0].endswith(b"claude") or argv[1:3] == [b"daemon", b"run"] or {b"-p", b"--print"} & set(argv):
+        if not argv[0].endswith(b"claude") or argv[1:3] == [b"daemon", b"run"]:
             continue
         started = _started(proc, int(entry.name))
         if int(entry.name) not in named and started.isdigit() and uptime - int(started) / ticks >= settled:
@@ -158,20 +157,6 @@ def unpermitted(sessions: dict[str, Session], proc: Proc) -> bool:
     if known.state in (BENCH_PENDING, REVIVING):
         return False
     return known.state in (RETIRED, DEPRIORITIZED)
-
-
-def drilled(places: Places, now: float) -> frozenset[str]:
-    """The install's drill sessions, by id, short id or name, whose permits have not ended: the backstop leaves them
-    alone. Only root and the warden can reach the file. None when it cannot be read, so its sessions are stopped."""
-    try:
-        permits = store.read_json_or(places.drill_permits, {})
-    except store.StoreError as exc:
-        log.warning("backstop: the install's drill permits cannot be read (%s)", type(exc).__name__)
-        return frozenset()
-    if not isinstance(permits, dict):
-        log.warning("backstop: the install's drill permits are not a map of sessions to times")
-        return frozenset()
-    return frozenset(key for key, ends in permits.items() if key and isinstance(ends, int | float) and ends > now)
 
 
 def stop(ctx: Context, proc: Proc) -> None:
@@ -214,10 +199,7 @@ def sweep(ctx: Context, procs: dict[str, Proc]) -> list[Proc]:
             log.warning("backstop: skipped this tick, the registry cannot be read (%s)", type(exc).__name__)
             return []
         bind_running(ctx.places, ctx.clock, sessions, procs)
-        drills = drilled(ctx.places, ctx.clock.now())
-        strays = [
-            p for p in procs.values() if unpermitted(sessions, p) and not {p.session, p.session[:8], p.name} & drills
-        ]
+        strays = [p for p in procs.values() if unpermitted(sessions, p)]
         for proc in strays:
             log.warning("backstop: stopping session %s (pid %d), which runs without a permit", proc.session, proc.pid)
             stop(ctx, proc)

@@ -258,7 +258,7 @@ def test_the_status_checks_an_older_install_by_the_few_settings_it_reads(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, published: dict[str, Any], checked: bool
 ) -> None:
     places = Places.under(tmp_path)
-    record = {"commit": SHA, "subject": "An older release", "drills": []}
+    record = {"commit": SHA, "subject": "An older release"}
     layout.install_record(places.state).parent.mkdir(parents=True)
     layout.install_record(places.state).write_text(json.dumps(record))
     (places.state / "public").mkdir()
@@ -294,7 +294,7 @@ def test_an_installed_factory_is_upgraded_and_the_form_says_from_what_and_what_i
         healthchecks.keys_path(places.state).write_text("{}")
 
     first = console_page.install_form(offered, None, None, None, checked, places)
-    record = {"commit": "a" * 40, "subject": "The old one", "drills": [], "product": "/home/o/product"}
+    record = {"commit": "a" * 40, "subject": "The old one", "product": "/home/o/product"}
     upgrade = console_page.install_form(offered, None, None, record, checked, places)
 
     assert (first["heading"], first["installed"], first["kept"]) == ("Install", None, None)

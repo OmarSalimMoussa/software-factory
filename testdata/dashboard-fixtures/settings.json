@@ -1203,61 +1203,6 @@
     ]
    },
    {
-    "key": "sandbox",
-    "title": "Sandbox",
-    "hint": "Applies to each agent that starts after you save.",
-    "rows": [
-     {
-      "key": "sandbox.allowed_domains",
-      "label": "Sites agents may reach",
-      "control": "list",
-      "value": [
-       "github.com",
-       "api.github.com",
-       "pypi.org"
-      ],
-      "saved": [
-       "github.com",
-       "api.github.com",
-       "pypi.org"
-      ],
-      "default": [
-       "github.com",
-       "api.github.com",
-       "pypi.org"
-      ],
-      "applied": [
-       "github.com",
-       "api.github.com",
-       "pypi.org"
-      ],
-      "pending": null,
-      "low": null,
-      "high": null,
-      "step": null,
-      "hint": null,
-      "options": null,
-      "when": "At once"
-     },
-     {
-      "key": "sandbox.prod_health_url",
-      "label": "Prod health address",
-      "control": "text",
-      "value": "https://acme-app.example/health",
-      "saved": "https://acme-app.example/health",
-      "default": "https://acme-app.example/health",
-      "applied": "https://acme-app.example/health",
-      "pending": null,
-      "low": null,
-      "high": null,
-      "step": null,
-      "hint": "A full https address.",
-      "options": null,
-      "when": "At once"
-     }
-    ]
-   },
-   {
     "key": "install",
     "title": "Install",
     "hint": "Set by the installer. Change them by reinstalling.",

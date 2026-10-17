@@ -28,15 +28,15 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `routing` | Slices per rung, open proposals at once, the estimate's window, tries to confirm a cause |
 | `slots` | How many, the first port, the output an agent sees, how long a run may take, the keys slots take from your env file |
 | `budget` | The slice's memory and CPU, and the memory a test run needs |
+| `checks` | How long a check and one test may run, how much of a report an agent sees, and the tool caches a check may write |
 | `vitals`, `watch` | Amber and red levels; probe, loop, grace and silence times |
 | `errors` | How often the warden reads prod's, staging's and slot 0's new GlitchTip issues into requests, and how many pages one read covers |
 | `reports` | How often the warden reads prod's report export, how long it waits for it, and the largest it takes |
 | `telemetry` | What `factory errors` and `factory traces` give an agent: how many items, how large, how long a call |
 | `cost`, `prices` | The daily budget (past it, only severe work starts that day), the plan-limit levels, and dollars per million tokens per model |
-| `sandbox` | The hosts a session may reach, and the tool caches in the agent's home it may write |
 | `dashboard` | Port, refresh and stale times, the code lock, page size, the hosts it answers |
 | `gc` | The nightly prune's hour, how long images stay, the Docker disk budget |
-| `install` | The drills' model, time and how many run at once, the guard's timeout, the check-ins' grace, the product's toolchain, how long publishing the dashboard may wait |
+| `install` | The guard's timeout, the check-ins' grace, the product's toolchain, how long publishing the dashboard may wait |
 
 `models.allowed` and `prices` are set at install and are read-only on the dashboard. Staging's and prod's health
 addresses are not settings: the warden reads them from `factory.toml` in the product's checkout at every probe.
@@ -44,10 +44,11 @@ addresses are not settings: the warden reads them from `factory.toml` in the pro
 `install.toolchain` names the programs the product's scripts need, such as `uv` and `node`. The install copies each
 one from the owner's PATH, so the agents and the stack run the same tools as the owner.
 
-`sandbox.writable_caches` names the folders in the agent's home where sessions may write, besides their own
-worktree: the caches of the tools the product's tests run, such as `~/.cache/uv` and `~/.npm`. The setting names
-each folder from the home folder down, without the `~/`. The install makes each folder for the agent user. A cache cannot lie in `.claude`, `.config`, `.local`, `.ssh` or `bin`, because a session
-that wrote there could act outside its sandbox.
+`checks.writable_caches` names the folders in the agent's home a check may write, besides the checkout it checks:
+the caches of the tools the product's tests run, such as `~/.cache/uv` and `~/.npm`. The setting names each folder
+from the home folder down, without the `~/`. A check writes a cache only once the agents' tools have made it. A cache
+cannot lie in `.claude`, `.config`, `.local`, `.ssh` or `bin`, because a check that wrote there could act outside its
+walls.
 
 ## When a change takes effect
 
@@ -60,7 +61,7 @@ that wrote there could act outside its sandbox.
 | The slot count | At the next slot claim |
 | The repo | At the next orchestrator start; stop the old one first |
 | The dashboard's threads, and the warden's (`factory.warden_threads`) | At the next warden start |
-| The sandbox's writable caches and the `install` group | At the next install |
+| The `install` group | At the next install |
 | The dashboard's port and hosts, the probe period and the loop period | Only with the install's `--set`: the install wires them into the firewall, the tailnet's link and the check-in periods, so the Settings page shows them read-only |
 
 The dashboard shows the value running now beside one that waits, such as "4 at the next slot claim".

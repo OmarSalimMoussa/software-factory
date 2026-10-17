@@ -25,7 +25,6 @@ dist_to_src = {}
 "runtime/cli/factory.py" = "the factory command: its stderr and exit status reach the session or the owner who ran it"
 "runtime/guard/commit_check.py" = "git's hook: its stderr and exit status reach the session that committed"
 "runtime/guard/hook.py" = "the guard, a Claude Code hook: its stderr and exit status reach the session"
-"runtime/system/drill_probe.py" = "the drills' probe: what it prints is the drill's evidence, and the drill reads its exit"
 "runtime/system/install.py" = "the installer, run by the owner with sudo: its stderr and exit status reach the owner"
 "runtime/system/uninstall.py" = "the uninstaller, run by the owner with sudo: its stderr and exit status reach the owner"
 "runtime/system/owner_commit.py" = "factory-own, run by the owner with sudo: its stderr and exit status reach the owner"

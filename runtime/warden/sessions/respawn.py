@@ -2,8 +2,8 @@
 
 Claude Code starts a copy of a background session resumed with any option, so the warden passes none: `claude respawn`
 restarts the session with the options it started with, and the message follows once it runs again. Those options name
-the sandbox settings file its start wrote, under the start's pending id. The warden writes that file again first, from
-today's settings, so the sandbox also walls off the worktrees of agents started since.
+the settings file its start wrote, under the start's pending id. The warden writes that file again first, so the
+session comes back under today's.
 
 Its agent definitions are in the options themselves, so a respawn keeps the ones it started with. When those differ
 from today's, the warden asks for the copy instead: `claude --bg --resume <id>` with today's options, from the
@@ -37,7 +37,7 @@ def _start_id(ctx: Context, sid: str) -> str:
     for row in store.read_jsonl(ctx.places.history):
         if row.get("session") == sid and isinstance(row.get("was"), str):
             return str(row["was"])
-    raise LaunchError("its start is not in the history, so its sandbox settings are unknown: stop it, start a new one")
+    raise LaunchError("its start is not in the history, so its settings file is unknown: stop it, start a new one")
 
 
 def resume(ctx: Context, s: Session, message: str) -> str:
@@ -48,7 +48,7 @@ def resume(ctx: Context, s: Session, message: str) -> str:
     if session_settings.fingerprint(agents) != s.definitions:
         return _renew(ctx, s, message, agents)
     settings = ctx.settings()
-    session_settings.write(settings, ctx.places, _start_id(ctx, s.id), s.role, Path(s.worktree), launch.agent_home())
+    session_settings.write(ctx.places, _start_id(ctx, s.id), s.role)
     code, output = ctx.launcher.agent_command(["claude", "respawn", s.id[:8]], settings.get_str("repo.path"))
     if code != 0:
         raise LaunchError(f"claude respawn failed: {output.strip()[-300:]}")

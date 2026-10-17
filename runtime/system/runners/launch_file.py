@@ -2,7 +2,7 @@
 anything runs, and the effective settings and sessions the warden published beside it.
 
 The warden is the only writer of public/, so these checks are a second wall: a command of any shape but the few the
-warden runs, a path outside the agent's home or the product checkout, a flag where a value belongs, sandbox settings
+warden runs, a path outside the agent's home or the product checkout, a flag where a value belongs, session settings
 the warden did not write, or a slot that does not exist is refused, and the runner exits without running anything.
 """
 
@@ -88,8 +88,8 @@ def _inside(path: Path, root: Path) -> bool:
 
 
 def _carried_ok(values: dict[str, Any], state: Path) -> None:
-    """A session's options: plain values, the sandbox settings the warden wrote for it, and agent definitions as one
-    JSON object."""
+    """A session's options: plain values, the settings the warden wrote for it, and agent definitions as one JSON
+    object."""
     for _, key in launch.CARRIED:
         _value(values, key)
     allowed = layout.public(state) / "session-settings"
@@ -104,7 +104,7 @@ def _carried_ok(values: dict[str, Any], state: Path) -> None:
 
 
 def _plugin(state: Path) -> list[str]:
-    """The skills, from the folder the warden renders: never one a request names, as plugin hooks run unsandboxed."""
+    """The skills, from the folder the warden renders: never one a request names, as a plugin's hooks run too."""
     return ["--plugin-dir", str(Places.for_runner(_INSTALL, state).rendered_plugin)]
 
 
@@ -214,9 +214,8 @@ def unit_token(credentials: str | None) -> str:
 def claude_env(inherited: dict[str, str], credentials: str | None) -> tuple[dict[str, str], tuple[int, ...]]:
     """The unit's environment for claude, and the descriptors to pass it: a pipe holding the sign-in token systemd
     loaded for the unit. Claude Code reads the pipe to its end, so the token is in no environment and no descriptor
-    a shell it starts could read. Never the token in the environment with CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: that also
-    runs every command sandboxed, the excluded `factory` too, which then cannot reach the warden. ``inherited`` is the
-    unit's own environment, handed on; ``credentials`` the folder systemd loaded the token into."""
+    a shell it starts could read. ``inherited`` is the unit's own environment, handed on; ``credentials`` the folder
+    systemd loaded the token into."""
     token = unit_token(credentials)
     read, write = os.pipe()
     with os.fdopen(write, "w", encoding="utf-8") as pipe:

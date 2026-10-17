@@ -1,10 +1,9 @@
 """What each session starts with: its own settings file (--settings) and its agent definitions (--agents).
 
-The settings file outranks the project's and the user's. It forces the sandbox on and walls the session into its
-worktree: shell commands write only there and in their tools' caches in the agent's home, read no other worktree
-and not Claude Code's sign-in token, and reach only the allowed hosts. The one command let out of the sandbox is the
-factory's own, so it can reach the warden. The orchestrator's file also runs the status line that records the plan's
-limits.
+The settings file outranks the project's and the user's. A session runs with no sandbox, every tool allowed and no
+permission prompt, and no auto-memory: the guard is its one wall. Claude Code honours bypass mode in a background
+session only with consent in the managed settings, which the install writes. The orchestrator's file also runs the
+status line that records the plan's limits.
 
 The agent definitions come from the plugin's rendered launchers, passed as JSON because Claude Code ignores a plugin
 agent's mcpServers and initialPrompt (the browser testers need their browser server). A session gets its own
@@ -22,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.shared import lanes, store
-from runtime.shared.paths import Places, stored_signin
+from runtime.shared.paths import Places
 from runtime.shared.settings import Settings
 
 ORCHESTRATOR = "orchestrator"
@@ -35,44 +34,13 @@ def worktrees(repo: Path) -> Path:
     return repo / ".claude" / "worktrees"
 
 
-def _siblings(folder: Path, worktree: Path) -> list[str]:
-    """Every other session's worktree there now."""
-    try:
-        return sorted(str(p) for p in folder.iterdir() if p.is_dir() and p.resolve() != worktree.resolve())
-    # telemetry: expected — before the first session's worktree the folder does not exist
-    except FileNotFoundError:
-        return []
-
-
-def render(settings: Settings, places: Places, role: str, worktree: Path, agent_home: Path) -> dict[str, Any]:
-    repo = Path(settings.get_str("repo.path"))
-    others = worktrees(repo)
-    credentials = stored_signin(agent_home)
-    # The whole folder: the mount hiding a denied file comes off in a running command when the file is replaced.
-    hidden = credentials.parent
-    caches = [str(agent_home / cache) for cache in settings.get_list("sandbox.writable_caches")]
-    filesystem: dict[str, list[str]] = {"allowWrite": [str(worktree), *caches]}
-    if role == ORCHESTRATOR:
-        # Its worktree is the main checkout, which holds every session's worktree: none of them is its to touch.
-        filesystem["denyRead"] = [str(others), str(hidden)]
-        filesystem["denyWrite"] = [str(others)]
-    else:
-        # Each other worktree is denied by name, never the folder that holds them all: a worktree read back inside a
-        # denied folder is mounted read-only, and the sandbox then cannot even start a command in it.
-        filesystem["denyRead"] = [*_siblings(others, worktree), str(hidden)]
+def render(places: Places, role: str) -> dict[str, Any]:
     body: dict[str, Any] = {
-        "sandbox": {
-            "enabled": True,
-            "failIfUnavailable": True,
-            "allowUnsandboxedCommands": False,
-            # Matched against the call's text: only a call that is `factory` alone, no redirect or pipe, runs outside.
-            "excludedCommands": ["factory", "factory *"],
-            "network": {"allowedDomains": settings.get_list("sandbox.allowed_domains")},
-            "filesystem": filesystem,
-        },
-        "permissions": {"deny": [f"Read(/{credentials})"]},  # "//" starts an absolute path in a permission rule
+        "sandbox": {"enabled": False},
+        "permissions": {"defaultMode": "bypassPermissions"},
+        "autoMemoryEnabled": False,
         # Claude Code's own isolation would refuse the orchestrator every write in the main checkout, its .factory/
-        # too; the guard and the sandbox wall each session in. A misspelt value is dropped unread: a test pins it.
+        # too; the guard walls each session in. A misspelt value is dropped unread: a test pins it.
         "worktree": {"bgIsolation": "none"},
     }
     if role == ORCHESTRATOR:
@@ -82,14 +50,14 @@ def render(settings: Settings, places: Places, role: str, worktree: Path, agent_
 
 
 def folder(places: Places) -> Path:
-    """Where sessions' settings go: the install makes it the warden's, as the drills write there first, as root."""
+    """Where sessions' settings go, in a folder the install makes the warden's."""
     return places.state / "public" / "session-settings"
 
 
-def write(settings: Settings, places: Places, request_id: str, role: str, worktree: Path, agent_home: Path) -> Path:
+def write(places: Places, request_id: str, role: str) -> Path:
     """Write the session's settings where the agent user can read them; the path to pass with --settings."""
     path = folder(places) / f"{request_id}.json"
-    store.write_json(path, render(settings, places, role, worktree, agent_home))
+    store.write_json(path, render(places, role))
     return path
 
 

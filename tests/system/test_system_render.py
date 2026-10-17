@@ -122,10 +122,12 @@ def test_a_stack_verb_reads_its_input_from_the_wardens_own_folder() -> None:
     assert "StandardInput=file:/var/lib/software-factory/runs/%i.in" in lines
 
 
-def test_managed_settings_hold_only_the_guard_and_the_rulebook_loader() -> None:
+def test_managed_settings_hold_the_guard_the_rulebook_loader_and_consent_to_bypass_mode() -> None:
     body = json.loads(render.managed_settings(PLACES, settings(), HERE))
 
-    assert set(body) == {"hooks"}
+    # A background session drops the bypass mode its own settings ask for unless the managed settings consent.
+    assert body["skipDangerousModePermissionPrompt"] is True
+    assert set(body) == {"hooks", "skipDangerousModePermissionPrompt"}
     assert set(body["hooks"]) == {"PreToolUse", "SessionStart", "SubagentStart", "Stop", "SubagentStop"}
     commands = {hook["command"] for groups in body["hooks"].values() for group in groups for hook in group["hooks"]}
     assert commands == {

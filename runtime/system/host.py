@@ -101,9 +101,6 @@ class Host(ABC):
         screen("")
         self.journal.line(f"the key for {key.repo} was shown to add by hand")
 
-    def show_folder(self, label: str, folder: Path) -> None:
-        self.journal.line(f"{label}: {folder}")
-
     @abstractmethod
     def run(
         self,

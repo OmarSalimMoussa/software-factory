@@ -48,7 +48,7 @@ def save(ctx: Context, **args: Any) -> dict[str, Any]:
         ({"dashboard.port": 9000}, None, "settings"),  # wired into the firewall and the tailnet at install
         ({"qa.widths": []}, None, "settings"),  # a tester browser needs a width
         ({"qa.widths": [1440, "wide"]}, None, "settings"),
-        ({"sandbox.allowed_domains": ["example.org", " "]}, None, "settings"),
+        ({"install.toolchain": ["uv", " "]}, None, "settings"),
     ],
 )
 @pytest.mark.usefixtures("install")

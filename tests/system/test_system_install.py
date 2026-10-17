@@ -205,25 +205,12 @@ def test_the_install_gives_the_warden_its_queue_in_the_agents_checkout_and_never
         assert f"make: {queue}/ (755, software-warden:software-warden)" in job.host.actions
 
 
-def test_the_install_makes_each_tool_cache_a_session_may_write_for_the_agent(tmp_path: Path) -> None:
-    job = dry_job(tmp_path)
-
-    install.run(job)
-
-    assert isinstance(job.host, DryHost)
-    made = [action for action in job.host.actions if action.startswith("make: /home/software-agent/.")]
-    agent = "(700, software-agent:software-agent)"
-    assert made == [
-        f"make: /home/software-agent/{folder}/ {agent}" for folder in (".claude", ".cache", ".cache/uv", ".npm")
-    ]
-
-
 @pytest.mark.parametrize(
     "cache", ["/var/cache/uv", "../software-stack/.cache", ".", ".claude/cache", ".config/git", "bin"]
 )
-def test_a_writable_cache_must_be_a_folder_of_the_agents_home_no_session_could_escape_through(cache: str) -> None:
-    with pytest.raises(SettingsError, match="sandbox.writable_caches"):
-        settings(**{"sandbox.writable_caches": [".npm", cache]})
+def test_a_writable_cache_must_be_a_folder_of_the_agents_home_no_check_could_escape_through(cache: str) -> None:
+    with pytest.raises(SettingsError, match="checks.writable_caches"):
+        settings(**{"checks.writable_caches": [".npm", cache]})
 
 
 @pytest.mark.parametrize(
@@ -438,29 +425,6 @@ def test_the_install_keeps_the_operator_it_clears_and_the_uninstall_puts_it_back
 
 
 @pytest.mark.parametrize(
-    ("said", "refused"),
-    [("2.1.296 (Claude Code)", ""), ("2.1.900 (Claude Code)", ""), ("2.1.10 (Claude Code)", "Your Claude Code is"),
-     ("2.2.0 (Claude Code)", "drilled with 2.1.296 up to below 2.2.0"), ("command not found", "did not say")],
-)  # fmt: skip
-def test_only_a_claude_code_the_drills_passed_with_is_installed_for_the_agents(
-    tmp_path: Path, said: str, refused: str
-) -> None:
-    job = dry_job(tmp_path)
-    assert isinstance(job.host, DryHost)
-    steps_prepare.check_machine(job)
-    steps_prepare.settle_settings(job)
-    job.tools["claude"] = claude = "/home/owner/.local/bin/claude"
-    job.host.dry = False  # decides like a real install; a dry host still changes nothing
-    job.host.answers[f"{claude} --version"] = (0, said + "\n")
-
-    if refused:
-        with pytest.raises(Refused, match=refused):
-            steps_machine.claude_version(job)
-    else:
-        steps_machine.claude_version(job)
-
-
-@pytest.mark.parametrize(
     ("meta", "refused"),
     [({"ssh_keys": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"]}, False),
      ({"ssh_keys": []}, True), (OSError("no network"), True)],
@@ -569,7 +533,7 @@ def test_an_upgrade_moves_the_agents_product_to_its_factory_in_one_commit_root_r
     assert pins._pin(git, job.places, head.strip()) == set(pin["blobs"])  # the warden lets exactly this through
 
 
-def test_the_session_settings_folder_is_the_wardens_though_the_drills_write_there_first_as_root(tmp_path: Path) -> None:
+def test_the_session_settings_folder_is_the_wardens(tmp_path: Path) -> None:
     job = dry_job(tmp_path)
 
     steps_machine.state_tree(job)

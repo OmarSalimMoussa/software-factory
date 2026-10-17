@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import pwd
-import re
 import subprocess
 import uuid
 from collections.abc import Callable
@@ -37,8 +36,6 @@ AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
 CHECK_UNIT = "software-check-run@{}.service"
 CHECK_REQUEST, STACK_REQUEST = "check-", "stack-"
-# What `claude --bg` prints for the session it started; the install drills it on the Claude Code it installs.
-BACKGROUNDED = re.compile(r"^backgrounded · ([0-9a-f]{8})\b", re.MULTILINE)
 
 Run = Callable[[list[str]], subprocess.CompletedProcess[str]]
 
@@ -127,14 +124,10 @@ class Units:
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
         """Start a session and wait for `claude --bg` to hand it to the daemon; its request and output are removed
         then, so none is left behind for anyone to read."""
-        code, output = self.start_waiting(request_id, launch)
+        self._request(request_id, {"kind": "session", **launch})
+        code, output = self._wait(AGENT_UNIT.format(request_id), request_id)
         if code != 0:
             raise LaunchError(f"the session did not start (exit {code}): {output.strip()[-300:]}")
-
-    def start_waiting(self, request_id: str, launch: dict[str, Any]) -> tuple[int, str]:
-        """A session's start, waited on: how it exited and what `claude --bg` printed (the install's drill reads it)."""
-        self._request(request_id, {"kind": "session", **launch})
-        return self._wait(AGENT_UNIT.format(request_id), request_id)
 
     def agent_command(self, argv: list[str], cwd: str) -> tuple[int, str]:
         request_id = f"cmd-{uuid.uuid4().hex}"
@@ -221,8 +214,8 @@ def definitions(ctx: Context, role: str, model: str, effort: str) -> dict[str, A
 
 
 def options(ctx: Context, request_id: str, s: Session, agents: dict[str, Any]) -> dict[str, str]:
-    """What session ``s`` runs under: its model, ``agents``, and sandbox settings written now for ``request_id``."""
-    path = session_settings.write(ctx.settings(), ctx.places, request_id, s.role, Path(s.worktree), agent_home())
+    """What session ``s`` runs under: its model, ``agents``, and settings written now for ``request_id``."""
+    path = session_settings.write(ctx.places, request_id, s.role)
     return {"model": s.model, "effort": s.effort, "agent": s.role, "settings": str(path), "agents": json.dumps(agents)}
 
 
