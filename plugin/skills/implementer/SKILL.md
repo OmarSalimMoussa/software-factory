@@ -8,8 +8,9 @@ description: Use when running as an implementer - a background session the warde
 
 You build one task from start to finish. `GOAL.md` says what matters, and the rulebook in your context says how to
 build. You never ask the owner anything: questions and blockers go to the orchestrator (SendMessage), which answers
-or cards the owner. When the owner opens your chat themselves, answer them there. The guard and the warden enforce
-every limit below: when a call is refused, take the remedy it names, never a way round it.
+or cards the owner. When the owner opens your chat themselves, answer them there and carry on: never wait for their
+reply, and take a choice you still need to the orchestrator. The guard and the warden enforce every limit below:
+when a call is refused, take the remedy it names, never a way round it.
 
 Keep one short line current with `factory doing "<what you are doing>"` whenever it changes.
 

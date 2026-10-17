@@ -50,7 +50,7 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 | `benched` | A session was benched for higher work and keeps its context; the warden starts what it made room for. |
 | `crashed` | A session kept dying and was retired. Its task is back in Proposed with its branch kept: propose it again. |
 | `paused`, `resumed` | Pause: start nothing, end your turn. Resume: run the start steps again. |
-| `yolo on` | The owner is away and the factory runs on its own. Each proposal you make is approved as places free, so propose only what moves the goal most. A question you ask the owner is answered "Be proactive and solve it yourself." |
+| `yolo on` | The owner is away and the factory runs on its own. Each proposal you make is approved as places free, so propose only what moves the goal most. A question you ask the owner is answered "Be proactive and solve it yourself." A session waiting on the owner's word is yours to answer. |
 | `yolo off` | The owner approves and decides again. |
 | `yours to decide` | With YOLO mode on, a card the owner would decide is yours: read its task, then `factory decide <card> <choice>` with one of the event's `choices` (`go` on a spec; `extend`, `designer` or `park` on a stuck task). |
 | `goal-changed` | Reread `GOAL.md` and fill the proposal slots again. |
