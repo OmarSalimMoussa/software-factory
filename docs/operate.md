@@ -152,11 +152,11 @@ warden's state on this machine, and only what reads that value reloads. See [set
 
 ## Improve the factory
 
-The factory never changes itself. Read the Self-reflect page: misses, friction, discoveries, misroutes and incidents.
-To act on one:
+The factory never changes itself: Claude or the owner changes it. Read Self-reflect, on its page or through the MCP
+([mcp.md](mcp.md)): misses, friction, discoveries, misroutes and incidents. To act on one:
 
-1. Change the factory's repo by hand: branch, test, merge, push. Run the self-check (`pytest -m self_check`) and the
-   browser drives (`node tests/dashboard_ui/run.cjs`) before you push.
+1. Change the factory's repo: branch, test, merge, push. Run the self-check (`pytest -m self_check`) and the browser
+   drives (`node tests/dashboard_ui/run.cjs`) before you push.
 2. Upgrade to the pushed commit with `factory.upgrade`. The upgrade also commits the product's `.github/factory-ref`
    and CI workflows for the new factory; that commit waits on Home for your Push to staging, like any other.
 3. Run the server set-up again from a factory checkout at that commit (`python3 -m standard.server.setup --product
