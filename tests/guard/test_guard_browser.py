@@ -111,10 +111,10 @@ def test_no_code_runs_in_the_browser_server(kit: Kit) -> None:
     assert kit.rule("mcp__qa-browser__browser_run_code_unsafe", {"code": "x"}, **UI_TESTER) == "qa-browser"
 
 
-def test_a_browser_call_that_names_a_file_loses_the_name(kit: Kit) -> None:
+def test_a_browser_call_that_names_a_file_is_refused_so_the_tester_reports_the_name_it_got(kit: Kit) -> None:
     asked = {"filename": "GOAL.md", "type": "png"}
     decision = kit.decide("mcp__qa-browser__browser_take_screenshot", asked, **UI_TESTER)
-    assert isinstance(decision, Rewrite) and decision.updated_input == {"type": "png"}
+    assert isinstance(decision, Refusal) and decision.rule == "qa-browser" and "its answer says" in decision.reason
 
 
 @pytest.mark.parametrize(

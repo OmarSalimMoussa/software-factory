@@ -103,7 +103,7 @@ def _server(call: Call) -> Decision:
         return Refusal("qa-browser", "code in the browser server runs outside the page; run a page script instead")
     # A named file lands wherever the name says; without one it lands in the run's own evidence folder.
     if "filename" in call.tool_input:
-        return Rewrite({k: v for k, v in call.tool_input.items() if k != "filename"})
+        return Refusal("qa-browser", "name no file: the browser names it, and its answer says the name to report")
     return None
 
 
