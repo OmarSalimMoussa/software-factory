@@ -66,9 +66,10 @@ def checkout(tmp_path: Path) -> Path:
         shutil.copy(FIXTURE / name, root / name)
     (root / "scripts" / "dev").write_text(DEV)
     (root / "scripts" / "dev").chmod(0o755)
-    services = Places.under(tmp_path).services
-    services.mkdir(parents=True)
-    (services / "services.env").write_text(SERVICES)
+    places = Places.under(tmp_path)
+    places.services.mkdir(parents=True)
+    (places.services / "services.env").write_text(SERVICES)
+    places.keys.mkdir(parents=True)
     return root
 
 
@@ -149,7 +150,7 @@ def test_a_slot_takes_the_owners_copied_keys_and_names_a_placeholder_left(
     with (checkout / "notes.env.template").open("a") as template:
         template.write("NOTES_SYNC_KEY=REPLACE_ME\n")
     if copied is not None:
-        (places.services / SLOT_KEYS).write_text(copied)
+        (places.keys / SLOT_KEYS).write_text(copied)
 
     assert _verb(tmp_path, checkout, Shared(checkout), monkeypatch, "up") == 0
 
@@ -166,9 +167,9 @@ def test_a_key_the_owner_withdraws_leaves_the_slot_at_its_next_command(
     places = Places.under(tmp_path)
     with (checkout / "notes.env.template").open("a") as template:
         template.write("NOTES_SYNC_KEY=REPLACE_ME\n")
-    (places.services / SLOT_KEYS).write_text("NOTES_SYNC_KEY=sk-real\n")
+    (places.keys / SLOT_KEYS).write_text("NOTES_SYNC_KEY=sk-real\n")
     _verb(tmp_path, checkout, Shared(checkout), monkeypatch, "up")
-    (places.services / SLOT_KEYS).unlink()
+    (places.keys / SLOT_KEYS).unlink()
 
     _verb(tmp_path, checkout, Shared(checkout), monkeypatch, "up")
 
@@ -228,6 +229,24 @@ def test_the_events_verb_prints_each_slot_containers_stop_as_one_line(
     assert printed == [{"action": "die", "at": 1791000000000000000, "id": "0123456789ab", "name": "web", "slot": "2",
                         "exit": "137"}]  # fmt: skip
     assert asked[0][:5] == ["events", "--since", "1791000000", "--until", "1791000300"] and len(asked) == 1
+
+
+def test_the_nightly_prune_removes_only_slot_images_since_prods_share_the_docker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    asked: list[list[str]] = []
+
+    def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+        asked.append(args)
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(stack_run, "_docker", docker)
+
+    assert stack_run.prune("168", 30) == 0
+
+    images = [args for args in asked if args[0] == "image"]
+    assert images == [["image", "prune", "-a", "-f", "--filter", "label=software.slot", "--filter", "until=168h"]]
+    assert [args[0] for args in asked] == ["builder", "image"]
 
 
 # scripts/dev listing the verbs in verbs.txt beside it; its run records its label, then sleeps the seconds it ends with.

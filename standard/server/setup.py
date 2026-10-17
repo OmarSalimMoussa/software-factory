@@ -21,7 +21,6 @@ from standard.config import FACTORY_REF, FACTORY_REF_LINE, FILE, ConfigError, lo
 from standard.server import setup_machine as machine
 from standard.server.setup_machine import FACTORY, Host, SetupError
 from standard.server.setup_steps import (
-    SERVICES,
     Job,
     clean_up,
     code,
@@ -33,7 +32,7 @@ from standard.server.setup_steps import (
     tailnet,
     users,
 )
-from standard.services import provision, stack
+from standard.services import host_paths, provision, stack
 
 _PING = re.compile(r"^https://[A-Za-z0-9.-]+/[A-Za-z0-9/_-]+$")
 
@@ -95,14 +94,14 @@ def run(job: Job) -> None:
 
 def summary(job: Job) -> None:
     config, changes = job.config, job.host.changes
-    env = f"{SERVICES}/{stack.ENV_FILE}"
+    env = f"{host_paths.FOLDER}/{stack.ENV_FILE}"
     print()
     if job.host.dry_run:
         print(f"Dry run: nothing was changed; a real run would make {len(changes)} changes.")
     else:
         print("Changed nothing: the server already matched." if not changes else f"Made {len(changes)} changes.")
-    print(f"GlitchTip  {stack.public_url(config, 'server', stack.PORTS['glitchtip'])}")
-    print(f"Langfuse   {stack.public_url(config, 'server', stack.PORTS['langfuse'])}")
+    print(f"GlitchTip  {stack.public_url(config, stack.PORTS['glitchtip'])}")
+    print(f"Langfuse   {stack.public_url(config, stack.PORTS['langfuse'])}")
     print(f"  Sign in to both as {config.services.owner_email}. The passwords are GLITCHTIP_OWNER_PASSWORD and")
     print(f"  LANGFUSE_INIT_USER_PASSWORD in {env} on the server (readable by {config.server.admin}).")
     if job.ci_key is None:

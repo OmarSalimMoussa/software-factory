@@ -152,7 +152,7 @@ def main() -> int:
     try:
         error_reports.install(places, timeout=current.get_int("watch.http_timeout_seconds"))
     except (error_reports.DsnError, OSError) as exc:
-        log.critical("warden: it does not start without the factory's own GlitchTip: %s", exc)
+        log.critical("warden: it does not start without the factory's GlitchTip project: %s", exc)
         return 2
     clock = Clock()
     owner, agent_home = _owner(places), launch.agent_home()

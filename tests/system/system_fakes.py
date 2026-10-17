@@ -10,6 +10,7 @@ from runtime.system.host import Account, DryHost
 from runtime.system.install_steps import steps_prepare
 from runtime.system.job import REPO_ROOT, Install
 from standard.server import edge
+from standard.services import provision, stack
 
 FIXTURE = REPO_ROOT / "testdata" / "fixture-product"
 
@@ -18,6 +19,7 @@ PUBLIC_HOST = "factory.example.com"
 GIVEN: dict[str, Any] = {"dashboard.hosts": ["127.0.0.1", "localhost", PUBLIC_HOST]}
 PRODUCT_ORIGIN = "git@github.com:acme/shop.git"
 FACTORY_ORIGIN = "git@github.com:acme/software-factory.git"
+INSPECT = " ".join(["docker", "inspect", "--format", "{{.Name}} {{.State.Running}}", *provision.SHARED])
 
 
 def settings(**changes: Any) -> Settings:
@@ -32,15 +34,17 @@ def dry_job(tmp_path: Path, *, healthchecks: bool = False) -> Install:
     product = tmp_path / "shop"
     product.mkdir(exist_ok=True)
     shutil.copy(FIXTURE / "factory.toml", product / "factory.toml")
+    places = Places.under(tmp_path / "root")
     host = DryHost(
-        paths={edge.SITES},
+        paths={edge.SITES, places.services / stack.ENV_FILE},
         answers={
             f"git -C {REPO_ROOT} remote get-url origin": (0, FACTORY_ORIGIN),
             f"git -C {product} remote get-url origin": (0, PRODUCT_ORIGIN),
+            INSPECT: (0, "".join(f"/{name} true\n" for name in provision.SHARED)),
         },
     )
     owner = Account("owner", 1000, 1000, tmp_path / "home", ("owner",), "/bin/bash")
-    return Install(host, Places.under(tmp_path / "root"), REPO_ROOT, product, "main", owner, dict(GIVEN), healthchecks)
+    return Install(host, places, REPO_ROOT, product, "main", owner, dict(GIVEN), healthchecks)
 
 
 SHA = "0123456789abcdef0123456789abcdef01234567"

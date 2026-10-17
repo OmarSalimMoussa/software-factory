@@ -1,12 +1,12 @@
 """Read-only telemetry for agents, `factory errors` and `factory traces`, and the GlitchTip reads the errors import
 shares.
 
-The warden holds every key and asks GlitchTip and Langfuse itself; an agent sees only the answer. Prod and staging
-live on the server's shared services, reached with the keys in the secrets' server.json that the server set-up wrote;
-a laptop slot lives on the laptop's, reached with laptop-glitchtip.json and laptop-langfuse.json, both from the
-installer. A workspace's GlitchTip projects are named for it (prod-…, staging-…, slot3-…)
-and its Langfuse traces carry its name as their environment, so a read never strays into another workspace. Every
-answer is cut to telemetry.max_kib. A key never appears in an answer, an error or a log line.
+The warden holds every key and asks GlitchTip and Langfuse itself; an agent sees only the answer. Every workspace,
+prod, staging and each slot, lives on this machine's shared services, reached with the keys in the secrets'
+server.json that the server set-up wrote. A workspace's GlitchTip projects are named for it (prod-…, staging-…,
+slot3-…) and its Langfuse traces carry its name as their environment, so a read never strays into another workspace,
+or into the factory's own project. Every answer is cut to telemetry.max_kib. A key never appears in an answer, an
+error or a log line.
 """
 
 from __future__ import annotations
@@ -95,24 +95,16 @@ def server_json(places: Places) -> Path:
     return layout.secrets(places.state) / layout.SERVER_KEYS
 
 
-def laptop_glitchtip_json(places: Places) -> Path:
-    return layout.secrets(places.state) / layout.LAPTOP_GLITCHTIP
-
-
-def laptop_langfuse_json(places: Places) -> Path:
-    return layout.secrets(places.state) / layout.LAPTOP_LANGFUSE
-
-
 def read_keys(path: Path, section: str, names: tuple[str, ...], missing: str) -> dict[str, str]:
-    """The named values of one section of a JSON key file (the whole file when ``section`` is empty)."""
+    """The named values of one section of a JSON key file."""
     try:
         raw = store.read_json(path)
     except FileNotFoundError as exc:
         raise NotSetUp(missing) from exc
     except store.StoreError as exc:
         raise TelemetryError(f"{path} is not JSON") from exc
-    found = raw.get(section) if section and isinstance(raw, dict) else raw
-    where = f"{path.name} {section}".rstrip()
+    found = raw.get(section) if isinstance(raw, dict) else None
+    where = f"{path.name} {section}"
     if not isinstance(found, dict):
         raise TelemetryError(f"{where} is not an object")
     bad = [name for name in names if not isinstance(found.get(name), str) or not found[name]]
@@ -124,22 +116,14 @@ def read_keys(path: Path, section: str, names: tuple[str, ...], missing: str) ->
     return {name: str(found[name]).rstrip("/") if name == "url" else str(found[name]) for name in names}
 
 
-def glitchtip(places: Places, workspace: str) -> GlitchTip:
-    if workspace in (PROD, STAGING):
-        keys = read_keys(server_json(places), "glitchtip", ("url", "org", "token"), "the server set-up has not run")
-    else:
-        keys = read_keys(laptop_glitchtip_json(places), "", ("url", "org", "token"),
-                         "the laptop's GlitchTip is not set up: reinstall the factory")  # fmt: skip
+def glitchtip(places: Places) -> GlitchTip:
+    keys = read_keys(server_json(places), "glitchtip", ("url", "org", "token"), "the server set-up has not run")
     return GlitchTip(keys["url"], keys["org"], keys["token"])
 
 
-def langfuse(places: Places, workspace: str) -> Langfuse:
-    if workspace in (PROD, STAGING):
-        keys = read_keys(server_json(places), "langfuse", ("url", "public_key", "secret_key"),
-                         "the server set-up has not run")  # fmt: skip
-        return Langfuse(keys["url"], keys["public_key"], keys["secret_key"])
-    keys = read_keys(laptop_langfuse_json(places), "", ("url", "public_key", "secret_key"),
-                     "the laptop's Langfuse is not set up: reinstall the factory")  # fmt: skip
+def langfuse(places: Places) -> Langfuse:
+    keys = read_keys(server_json(places), "langfuse", ("url", "public_key", "secret_key"),
+                     "the server set-up has not run")  # fmt: skip
     return Langfuse(keys["url"], keys["public_key"], keys["secret_key"])
 
 
@@ -327,7 +311,7 @@ def errors(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
     workspace = workspace_of(ctx, args)
     timeout = float(settings.get_int("telemetry.timeout_seconds"))
     try:
-        service = glitchtip(ctx.places, workspace)
+        service = glitchtip(ctx.places)
         if "issue" in args:
             answer = {"where": workspace, **_latest(service, workspace, args["issue"], timeout)}
         else:
@@ -345,7 +329,7 @@ def traces(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
     workspace = workspace_of(ctx, args)
     timeout = float(settings.get_int("telemetry.timeout_seconds"))
     try:
-        service = langfuse(ctx.places, workspace)
+        service = langfuse(ctx.places)
         answer: dict[str, Any] = {"where": workspace}
         if "trace" in args:
             answer["trace"] = _trace(service, workspace, args["trace"], timeout)

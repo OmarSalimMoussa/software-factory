@@ -16,7 +16,7 @@ from standard import config as config_mod
 from standard.server import deploy_steps as steps
 from standard.server import edge, gc
 from standard.server.deploy_steps import SHORT, Get
-from standard.services import provision
+from standard.services import host_paths, provision, stack
 from standard.services.provision import Run
 
 _COMMIT = re.compile(r"[0-9a-f]{8,40}")
@@ -60,10 +60,10 @@ def utc_now() -> datetime:
 class Paths:
     srv: Path = Path("/srv")  # each workspace lives in <srv>/<product>/<workspace>/
     lock: Path = Path("/srv/factory/state/deploy.lock")
-    services_env: Path = Path("/srv/factory/services/services.env")
+    services_env: Path = host_paths.FOLDER / stack.ENV_FILE
     edge_sites: Path = edge.SITES
     product_toml: Path = Path("/etc/software-factory/product.toml")
-    docker_socket: str = "/var/run/docker.sock"
+    docker_socket: str = host_paths.DOCKER_SOCKET
     gc_log: Path = gc.LOG
 
 

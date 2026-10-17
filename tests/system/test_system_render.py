@@ -11,11 +11,11 @@ from runtime.system import layout, render
 
 HERE = render.HERE
 PLACES = Places.system()
-AGENT_UID, STACK_UID, ERRORS_UID = "1001", "1002", "1003"
+AGENT_UID = "1001"
 
 
 def _values(**changes: object) -> dict[str, str]:
-    return render.values(PLACES, settings(**changes), agent_uid=AGENT_UID, stack_uid=STACK_UID, errors_uid=ERRORS_UID)
+    return render.values(PLACES, settings(**changes), agent_uid=AGENT_UID)
 
 
 def _unit(name: str, **changes: object) -> str:
@@ -41,23 +41,19 @@ def test_the_slice_takes_its_budget_from_the_settings(changes: dict[str, object]
 
 def test_every_unit_renders_whole() -> None:
     given = _values()
-    for item in (*render.UNIT_FILES, render.stack_wall(STACK_UID), render.POLKIT, render.FIREWALL):
+    for item in (*render.UNIT_FILES, render.POLKIT, render.FIREWALL):
         assert render.TOKEN.search(render.artifact(item, HERE, given)) is None, item.source
 
 
 @pytest.mark.parametrize(
-    ("name", "user", "uid", "runner"),
+    ("name", "user", "runner"),
     [
-        ("software-agent-run@.service", "software-agent", AGENT_UID,
-         "runners/agent_run.py /var/lib/software-factory %i"),
-        ("software-stack-run@.service", "software-stack", STACK_UID,
-         "runners/stack_run.py /var/lib/software-factory %i"),
-        ("software-agent-daemon.service", "software-agent", AGENT_UID, "runners/with_token.py"),
-        ("software-services.service", "software-stack", STACK_UID, "runners/services_run.py up"),
-        ("software-errors.service", "software-errors", ERRORS_UID, "runners/errors_run.py up"),
+        ("software-agent-run@.service", "software-agent", "runners/agent_run.py /var/lib/software-factory %i"),
+        ("software-stack-run@.service", "software-stack", "runners/stack_run.py /var/lib/software-factory %i"),
+        ("software-agent-daemon.service", "software-agent", "runners/with_token.py"),
     ],
-)  # fmt: skip
-def test_agent_and_stack_units_fix_their_user_home_and_slice(name: str, user: str, uid: str, runner: str) -> None:
+)
+def test_agent_and_stack_units_fix_their_user_home_and_slice(name: str, user: str, runner: str) -> None:
     lines = _unit(name).splitlines()
 
     assert f"User={user}" in lines
@@ -66,17 +62,23 @@ def test_agent_and_stack_units_fix_their_user_home_and_slice(name: str, user: st
     # Of the warden's state, only public/ is visible, read-only.
     assert "TemporaryFileSystem=/var/lib/software-factory:ro" in lines
     # %U and %h name root in a system unit, whatever User= says: the user's own id and home are written in.
-    assert f"Environment=XDG_RUNTIME_DIR=/run/user/{uid}" in lines
     assert f"BindPaths=/home/{user}" in lines
-    # ProtectHome=tmpfs hides /run/user too: without this bind the user's Docker socket and runtime folder vanish.
-    assert f"BindPaths=/run/user/{uid}" in lines
+    # ProtectHome=tmpfs hides /run/user too: without this bind the agent's runtime folder vanishes.
+    assert (f"BindPaths=/run/user/{AGENT_UID}" in lines) is (user == "software-agent")
     # Product code finds the product's toolchain first, never the owner's home it was copied from.
     assert "Environment=PATH=/opt/software-factory-toolchain/bin:/usr/local/bin:/usr/bin:/bin" in lines
     # uv finds the product's Python among the toolchain's copies, and never downloads one.
     uv = "UV_PYTHON_INSTALL_DIR=/opt/software-factory-toolchain/python UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy"
     assert f"Environment={uv}" in lines
-    if user in ("software-stack", "software-errors"):
-        assert f"Environment=DOCKER_HOST=unix:///run/user/{uid}/docker.sock" in lines
+
+
+def test_a_stack_request_runs_on_the_machines_own_docker_and_only_it_reaches_that() -> None:
+    stack = _unit("software-stack-run@.service").splitlines()
+
+    assert "Environment=DOCKER_HOST=unix:///var/run/docker.sock" in stack
+    assert not any("docker.sock" in line for line in stack if line.startswith("InaccessiblePaths="))
+    for name in ("software-agent-run@.service", "software-agent-daemon.service", "software-check-run@.service"):
+        assert "InaccessiblePaths=-/run/docker.sock" in _unit(name).splitlines(), name
 
 
 def test_the_warden_reads_transcripts_but_writes_only_its_state_and_the_agents_queue() -> None:
@@ -143,11 +145,10 @@ def test_a_template_naming_an_unknown_value_fails_loudly(tmp_path: Path) -> None
         render.render("User=@nobody_gave_this@\n", _values())
 
 
-def test_neither_user_that_runs_agent_code_reaches_the_dashboard_the_factorys_glitchtip_or_the_tailnet() -> None:
+def test_neither_user_that_runs_agent_code_reaches_the_dashboard_or_the_tailnet() -> None:
     text = render.artifact(render.FIREWALL, HERE, _values(**{"dashboard.port": 8400}))
     for user in ("software-agent", "software-stack"):
         assert f'meta skuid "{user}" tcp dport 8400 reject with tcp reset' in text
-        assert f'meta skuid "{user}" tcp dport 8210 reject with tcp reset' in text
         assert f'meta skuid "{user}" ip daddr 100.64.0.0/10 meta l4proto tcp reject with tcp reset' in text
         assert f'meta skuid "{user}" ip6 daddr fd7a:115c:a1e0::/48 meta l4proto tcp reject with tcp reset' in text
 
@@ -165,13 +166,6 @@ def test_the_firewall_loads_after_nftables_again_on_its_timer_and_the_kernel_wal
     assert {"OnActiveSec=45s", "OnUnitActiveSec=45s", "WantedBy=timers.target"} <= set(timer)
     slice_ = _unit("software-factory.slice").splitlines()
     assert "IPAddressDeny=100.64.0.0/10 fd7a:115c:a1e0::/48" in slice_
-    # The stack user's own systemd runs every container outside the slice: the same wall, for that user alone.
-    wall = render.stack_wall(STACK_UID)
-    assert wall.dest == Path(f"/etc/systemd/system/user@{STACK_UID}.service.d/software-tailnet.conf")
-    walled = render.artifact(wall, HERE, _values()).splitlines()
-    assert [line for line in walled if line.startswith("IPAddress")] == [
-        line for line in slice_ if line.startswith("IPAddress")
-    ]
 
 
 def test_the_agents_daemon_starts_only_with_the_firewall_loaded_and_never_restarts_with_it() -> None:

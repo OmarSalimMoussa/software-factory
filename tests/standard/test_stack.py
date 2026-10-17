@@ -4,7 +4,6 @@ import json
 import re
 import subprocess
 from pathlib import Path
-from typing import Literal
 
 import pytest
 
@@ -83,22 +82,17 @@ def test_the_compose_file_names_the_containers_reads_every_value_and_publishes_o
     assert {body["container_name"] for body in services.values()} >= CONTAINERS
     published = [port for body in services.values() for port in body.get("ports", [])]
     assert published and all(port.startswith("127.0.0.1:") for port in published)
-    assert services["edge"]["profiles"] == ["edge"] and services["edge"]["network_mode"] == "host"
-    # The provisioner reads the owner's GlitchTip password, and EDGE records the host kind; compose reads the rest.
-    made = set(stack.generate_env(CONFIG, kind="server", existing={})) - {"EDGE", "GLITCHTIP_OWNER_PASSWORD"}
+    assert services["edge"]["network_mode"] == "host"
+    read_by_the_provisioner_alone = {"GLITCHTIP_OWNER_PASSWORD"}
+    made = set(stack.generate_env(CONFIG, existing={})) - read_by_the_provisioner_alone
     assert set(re.findall(r"\$\{([A-Z0-9_]+):\?\}", text)) == made
 
 
-@pytest.mark.parametrize(
-    ("kind", "base", "edge"),
-    [("server", "https://shop-box.tail0.ts.net", "true"), ("laptop", "http://127.0.0.1", "false")],
-)
-def test_generate_env_keeps_existing_secrets_fills_missing_ones_and_follows_the_host(
-    kind: Literal["server", "laptop"], base: str, edge: str
-) -> None:
+def test_generate_env_keeps_existing_secrets_fills_missing_ones_and_follows_the_host() -> None:
     existing = {"POSTGRES_PASSWORD": "kept", "NEXTAUTH_URL": "http://old", "GONE": "x"}
+    base = "https://shop-box.tail0.ts.net"
 
-    values = stack.generate_env(CONFIG, kind=kind, existing=existing)
+    values = stack.generate_env(CONFIG, existing=existing)
 
     assert values["POSTGRES_PASSWORD"] == "kept"
     assert re.fullmatch(r"pk-lf-[0-9a-f]{32}", values["LANGFUSE_INIT_PROJECT_PUBLIC_KEY"])
@@ -108,14 +102,12 @@ def test_generate_env_keeps_existing_secrets_fills_missing_ones_and_follows_the_
     assert values["LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT"] == f"{base}:9090"
     assert (values["LANGFUSE_INIT_ORG_ID"], values["LANGFUSE_INIT_PROJECT_ID"]) == ("shop", "shop")
     assert values["LANGFUSE_INIT_USER_EMAIL"] == "owner@acme.dev" and values["ACME_EMAIL"] == "ops@acme.dev"
-    assert values["EDGE"] == edge and "GONE" not in values
-    assert stack.generate_env(CONFIG, kind=kind, existing=values) == values
+    assert "GONE" not in values
+    assert stack.generate_env(CONFIG, existing=values) == values
 
 
 def test_up_names_the_service_that_did_not_turn_healthy(tmp_path: Path) -> None:
-    rows = [
-        {"Service": name, "State": "running", "Health": "healthy", "ExitCode": 0} for name in stack.services(edge=False)
-    ]
+    rows = [{"Service": name, "State": "running", "Health": "healthy", "ExitCode": 0} for name in stack.services()]
     rows = [r | {"State": "exited"} if r["Service"] in stack.ONE_SHOT else r for r in rows]
     rows = [r | {"Health": "unhealthy"} if r["Service"] == "langfuse" else r for r in rows]
     calls: list[list[str]] = []
@@ -127,7 +119,7 @@ def test_up_names_the_service_that_did_not_turn_healthy(tmp_path: Path) -> None:
         return subprocess.CompletedProcess(argv, 0, "\n".join(json.dumps(r) for r in rows), "")
 
     with pytest.raises(stack.StackError, match=r"langfuse \(running, unhealthy\)"):
-        stack.up(run, tmp_path, edge=False)
+        stack.up(run, tmp_path)
 
     assert calls[0] == [
         "docker", "compose", "-p", "factory-services", "--env-file", f"{tmp_path}/services.env",

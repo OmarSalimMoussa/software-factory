@@ -61,20 +61,15 @@ PHASES: tuple[Phase, ...] = (
         ("Checking the tools this computer needs", steps_prepare.check_machine),
         ("Checking that no agent is at work", steps_prepare.refuse_live_sessions),
         ("Checking the copy the install runs from", steps_prepare.sealed_copy),
+        ("Checking the shared services run here", steps_services.check),
         ("Checking the settings", steps_prepare.settle_settings),
     )),
     Phase("Preparing this computer", (
         ("Installing the system packages", steps_machine.packages),
         ("Creating the factory's users", steps_machine.users),
+        ("Letting the slots read the shared services' settings", steps_services.share),
         ("Stopping the running factory", steps_prepare.stop_factory),
         ("Making the factory's folders", steps_machine.state_tree),
-    )),
-    # Downloading the services takes longest on a first install, so it starts here and runs in the background
-    # while the owner answers the questions and the factory is set up.
-    Phase("Fetching the services", (
-        ("Setting up the services' own Docker", steps_machine.rootless_docker),
-        ("Placing the services", steps_services.place),
-        ("Downloading the services", steps_services.pull),
     )),
     Phase("Connecting your accounts", (
         ("Setting up your keys and accounts", steps_secrets.secrets),
@@ -97,8 +92,7 @@ PHASES: tuple[Phase, ...] = (
         ("Publishing the dashboard on the edge", steps_wire.edge),
     )),
     Phase("Starting up", (
-        ("Starting the services", steps_services.start),
-        ("Connecting the services", steps_services.keys),
+        ("Giving the factory's errors a GlitchTip project", steps_services.errors_project),
         ("Starting the factory", steps_wire.start),
     )),
     Phase("Finishing", (
@@ -168,7 +162,6 @@ def perform(ctx: Install, *, keep: bool) -> str | None:
         if not isinstance(exc, Refused | CommandError | KeyboardInterrupt):
             ctx.host.say("".join(traceback.format_exception(exc)))
         ctx.host.fail(problem)
-        ctx.cancel_pending()
         if rolls_back(ctx, keep=keep):
             roll_back(ctx)
         return problem

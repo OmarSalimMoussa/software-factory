@@ -1,14 +1,15 @@
 """Prod's, staging's and slot 0's GlitchTip issues, filed as requests in the agents inbox: each issue once, and again
 when it comes back after its fix reached that environment.
 
-The loop calls poll on every tick; every errors.poll_minutes it reads the server's GlitchTip for prod and staging, and
-the laptop's for slot 0, each with its read-only token, and keeps each environment's unresolved issues (its projects'
-slugs start with its name). Its first read takes the issues open then as known, each filed once GlitchTip sees it
-again. Another issue not filed before is filed from glitchtip. One filed before is filed again when
-GlitchTip saw it after the task its request became reached that environment (on staging for staging, promoted for
-prod, checked for slot 0). Its severity comes from the issue: a fatal one, or one with at least errors.severe_events
-events, is severe and goes to intake at once. Each environment keeps its own record, errors-<env>.json: the issues it
-knows with their request, since when it reads, and the timer runtime/warden/imports.py keeps.
+The loop calls poll on every tick; every errors.poll_minutes it reads this machine's shared GlitchTip for each
+environment with its read-only token, and keeps the environment's unresolved issues: its projects' slugs start with
+its name, so the factory's own project (error_reports.PROJECT) is no environment's. Its first read takes the issues
+open then as known, each filed once GlitchTip sees it again. Another issue not filed before is filed from glitchtip.
+One filed before is filed again when GlitchTip saw it after the task its request became reached that environment (on
+staging for staging, promoted for prod, checked for slot 0). Its severity comes from the issue: a fatal one, or one
+with at least errors.severe_events events, is severe and goes to intake at once. Each environment keeps its own
+record, errors-<env>.json: the issues it knows with their request, since when it reads, and the timer
+runtime/warden/imports.py keeps.
 """
 
 from __future__ import annotations
@@ -71,7 +72,7 @@ def poll(ctx: Context) -> None:
 
         def work(env: str = env, state: dict[str, Any] = state) -> str:
             try:
-                service = telemetry.glitchtip(ctx.places, env)
+                service = telemetry.glitchtip(ctx.places)
             # telemetry: surfaced — no GlitchTip until its set-up runs: `work` returns which as its note
             except telemetry.NotSetUp as exc:
                 return str(exc)

@@ -1,10 +1,10 @@
 """Slot containers that stopped when nothing asked them to: each one that ran out of memory, or died with a failing
-exit and no kill before it. The warden reports each to its own GlitchTip, once.
+exit and no kill before it. The warden reports each to the factory's GlitchTip project, once.
 
-Docker belongs to the stack user, so the stack unit reads its events (leases.EVENTS) for the span since the last
-read, every ``watch.container_events_minutes``. Every stop the factory makes (a rebuild, down, empty, a sweep) kills
-the container first, so a death after a kill was asked for. The first read starts the span: what came before it is
-not judged.
+The stack user's runs reach Docker, so the stack unit reads the slots' events (leases.EVENTS) for the span since the
+last read, every ``watch.container_events_minutes``. Every stop the factory makes (a rebuild, down, empty, a sweep)
+kills the container first, so a death after a kill was asked for. The first read starts the span: what came before it
+is not judged.
 """
 
 from __future__ import annotations

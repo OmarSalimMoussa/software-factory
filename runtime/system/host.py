@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from runtime.system import qr
-from runtime.system.background import Answered, Pending
 from runtime.system.journal import Journal
 
 
@@ -123,10 +122,6 @@ class Host(ABC):
         """Commands as ``user`` for code that reads each exit code itself; each is printed as it runs."""
 
     @abstractmethod
-    def background(self, argv: list[str], *, user: str, env: Mapping[str, str]) -> Pending:
-        """Start a command as ``user`` and return at once; its output goes to the log once it is waited for."""
-
-    @abstractmethod
     def pipe(self, source: list[str], user: str, sink: list[str]) -> None:
         """``source``, run as ``user``, writes its bytes into ``sink``, run as root; CommandError when either fails."""
 
@@ -216,10 +211,6 @@ class DryHost(Host):
             return subprocess.CompletedProcess(argv, code, out, "")
 
         return run
-
-    def background(self, argv: list[str], *, user: str, env: Mapping[str, str]) -> Pending:
-        self._do(f"start in the background: {' '.join(argv)} (as {user})")
-        return Answered(self.answers.get(" ".join(argv), (0, "")))
 
     def pipe(self, source: list[str], user: str, sink: list[str]) -> None:
         self._do(f"run: {' '.join(source)} (as {user}) | {' '.join(sink)}")

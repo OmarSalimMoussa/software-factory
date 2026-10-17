@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from standard.services import host_paths
+
 INSTALL = Path("/opt/software-factory")
 STATE = Path("/var/lib/software-factory")
 RUN = Path("/run/software-factory")
@@ -44,12 +46,13 @@ def stored_signin(home: Path) -> Path:
 # contract: added by FB5. The stack user's own folder of slots: each slot's env file and provisioning state, which
 # the stack user's runs write.
 STACK_SLOTS = Path("/home/software-stack/slots")
-# contract: added by FB5. The laptop's shared services: their compose file and services.env, root's, read by the stack
-# user. Not in the state folder, whose 0700 the stack user's Docker could not pass to bind a file from it.
-SERVICES = Path("/var/lib/software-factory-services")
-SLOT_KEYS = "slot-keys.env"  # in SERVICES: the keys slots take from the owner's env file
-# The factory's own GlitchTip, apart from the shared services: its compose file and errors.env.
-ERRORS = Path("/var/lib/software-factory-errors")
+# The shared services the server set-up runs on this machine: their compose file and services.env, which each slot's
+# provisioning reads.
+SERVICES = host_paths.FOLDER
+# Root's, read by the stack user's runs: the keys slots take from the owner's env file. Not in the state folder, which
+# the stack unit hides.
+KEYS = Path("/var/lib/software-factory-keys")
+SLOT_KEYS = "slot-keys.env"  # in KEYS
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +62,7 @@ class Places:
     run: Path
     stack_slots: Path = STACK_SLOTS
     services: Path = SERVICES
-    errors: Path = ERRORS
+    keys: Path = KEYS
     firewall: Path = FIREWALL
     upgrade: Path = UPGRADE
 
@@ -76,7 +79,7 @@ class Places:
             root / "run",
             root / "stack-slots",
             root / "services",
-            root / "errors",
+            root / "keys",
             root / "firewall",
             root / "upgrade",
         )

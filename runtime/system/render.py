@@ -16,7 +16,7 @@ from runtime.shared import error_reports
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, MANAGED_SETTINGS, SLICE, WARDEN_USER, Places
 from runtime.shared.settings import Settings
 from runtime.system import layout
-from runtime.system.errors import instance
+from standard.services import host_paths
 
 HERE = Path(__file__).resolve().parent
 TOKEN = re.compile(r"@([a-z_]+)@")
@@ -49,18 +49,9 @@ UNIT_FILES = (
     Artifact(f"units/{layout.SLOT_KEYS_UNIT}", layout.UNITS_DIR / layout.SLOT_KEYS_UNIT, 0o644),
     Artifact(f"units/{layout.CHECK_RUN}", layout.UNITS_DIR / layout.CHECK_RUN, 0o644),
     Artifact(f"units/{layout.UPGRADE_RUN}", layout.UNITS_DIR / layout.UPGRADE_RUN, 0o644),
-    Artifact(f"units/{layout.SERVICES_UNIT}", layout.UNITS_DIR / layout.SERVICES_UNIT, 0o644),
-    Artifact(f"units/{layout.ERRORS_UNIT}", layout.UNITS_DIR / layout.ERRORS_UNIT, 0o644),
     Artifact("units/system-sleep.sh", layout.SLEEP_HOOK, 0o755),
 )
 POLKIT = Artifact("polkit/50-software-factory.rules", layout.POLKIT_RULE, 0o644)
-
-
-def stack_wall(stack_uid: str) -> Artifact:
-    """The drop-in that walls the stack user's own systemd off the tailnet; its place names the user's id."""
-    return Artifact("units/stack-user-tailnet.conf", layout.stack_wall(stack_uid), 0o644)
-
-
 FIREWALL = Artifact("nftables/software-factory.nft", layout.NFT_FILE, 0o644)
 APPARMOR = Artifact("apparmor/software-bwrap", layout.APPARMOR_PROFILE, 0o644)
 MANAGED = Artifact("managed-settings.json", MANAGED_SETTINGS, 0o644)
@@ -73,7 +64,7 @@ def render(text: str, values: Mapping[str, str]) -> str:
     return TOKEN.sub(lambda found: values[found.group(1)], text)
 
 
-def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str, errors_uid: str) -> dict[str, str]:
+def values(places: Places, settings: Settings, *, agent_uid: str) -> dict[str, str]:
     """Every value a unit, rule or firewall template may name. The users' ids are the machine's, so a unit never
     uses %U or %h: in a system unit those name root, whatever its User= says."""
     return {
@@ -85,7 +76,7 @@ def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str
         "secrets": str(layout.secrets(places.state)),
         "factory_dsn": str(error_reports.dsn_path(places)),
         "slots": str(places.slots),
-        "services": str(places.services),
+        "keys": str(places.keys),
         "slot_keys_unit": layout.SLOT_KEYS_UNIT,
         "run_name": places.run.name,
         "claude": str(layout.CLAUDE_BIN),
@@ -99,13 +90,7 @@ def values(places: Places, settings: Settings, *, agent_uid: str, stack_uid: str
         "agent_home": str(layout.AGENT_HOME),
         "stack_home": str(layout.STACK_HOME),
         "agent_uid": agent_uid,
-        "stack_uid": stack_uid,
-        "stack_socket": layout.rootless_socket(stack_uid),
-        "errors_user": layout.ERRORS_USER,
-        "errors_home": str(layout.ERRORS_HOME),
-        "errors_uid": errors_uid,
-        "errors_socket": layout.rootless_socket(errors_uid),
-        "errors_port": str(instance.PORT),
+        "docker_socket": host_paths.DOCKER_SOCKET,
         "path": layout.UNIT_PATH,
         "uv_env": " ".join(f"{key}={value}" for key, value in layout.UV_ENV.items()),
         "slice": SLICE,

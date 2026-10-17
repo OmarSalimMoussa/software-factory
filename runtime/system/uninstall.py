@@ -5,12 +5,12 @@ From the owner's clone of the factory, or from the installed copy in /opt/softwa
 
 It refuses while any session is working or waiting. It stops and removes the factory's units, rules, firewall table,
 AppArmor profile, managed settings, commands and programs, the dashboard's site on the edge, and the sealed copies
-installs ran from; the warden's state (its secrets and the 6-digit code's secret included), the laptop's shared
-services and the factory's own GlitchTip with their data; the factory's users with their homes (the agents' clone and
-each Docker user's Docker data); and the factory's git hooks setting in the owner's checkout. It never removes
-packages, the owner's own files, the install logs, what the server set-up placed (the edge and /etc/software-factory
-among it), or anything on GitHub, where it says what to remove. Like the installer, it shows a few phases and logs the
-rest.
+installs ran from; the warden's state (its secrets and the 6-digit code's secret included) and the keys slots took;
+the factory's users with their homes (the agents' clone among them); and the factory's git hooks setting in the
+owner's checkout. The shared services the server set-up runs stay, with their data, and their services.env is its
+admin's alone again. It never removes packages, the owner's own files, the install logs, what else the server set-up
+placed (the edge and /etc/software-factory among it), or anything on GitHub, where it says what to remove. Like the
+installer, it shows a few phases and logs the rest.
 """
 
 from __future__ import annotations
@@ -35,7 +35,9 @@ from runtime.system.install_steps import steps_prepare
 from runtime.system.job import REPO_ROOT, Install
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
+from runtime.system.runners.stack_run import SLOT_LABEL
 from standard.server import edge as server_edge
+from standard.services import stack
 
 PROGRAM = "uninstall.py"
 
@@ -47,8 +49,6 @@ UNITS = (
     layout.FIREWALL_TIMER,
     layout.FIREWALL_REFRESH,
     layout.FIREWALL_UNIT,
-    layout.SERVICES_UNIT,
-    layout.ERRORS_UNIT,
     layout.SLOT_KEYS_UNIT,
 )
 TEMPLATES = (layout.AGENT_RUN, layout.STACK_RUN, layout.CHECK_RUN, layout.UPGRADE_RUN)
@@ -94,7 +94,7 @@ def stop(host: Host) -> None:
     instances = [f"{unit.removesuffix('.service')}*" for unit in TEMPLATES]
     _try(host, ["systemctl", "stop", *UNITS, *instances])
     _try(host, ["systemctl", "disable", *UNITS])
-    for user in (*layout.DOCKER_USERS, AGENT_USER):
+    for user in (layout.STACK_USER, AGENT_USER):
         account = host.account(user)
         if account is None:
             continue
@@ -109,9 +109,6 @@ def system_files(host: Host) -> None:
     for name in (*UNITS, *TEMPLATES, f"{SLICE}"):
         _remove(host, layout.UNITS_DIR / name)
     _remove(host, layout.SLICE_CONTROL / f"{SLICE}.d")
-    stack = host.account(layout.STACK_USER)
-    if stack is not None:
-        _remove(host, layout.stack_wall(str(stack.uid)).parent)
     _remove(host, layout.SLEEP_HOOK)
     _try(host, ["systemctl", "daemon-reload"])
     _try(host, ["systemctl", "reset-failed"])
@@ -161,12 +158,15 @@ def sealed_copies(host: Host) -> None:
 
 def state(host: Host, places: Places) -> None:
     _remove(host, places.state)
-    _remove(host, paths.SERVICES)
-    _remove(host, paths.ERRORS)
+    _remove(host, places.keys)
+    # The shared services are the server set-up's, and prod's: only the stack user's group is taken off their settings.
+    env = places.services / stack.ENV_FILE
+    if host.exists(env):
+        host.run(["chmod", "0600", str(env)])
 
 
 def users(host: Host) -> None:
-    for user in (AGENT_USER, *layout.DOCKER_USERS):
+    for user in (AGENT_USER, layout.STACK_USER):
         if host.account(user) is not None:
             host.run(["userdel", "--remove", user])
         for home in _with_leftovers(Path("/home") / user):
@@ -199,14 +199,15 @@ STEPS = (
     "Stopping the factory",
     "Removing its services, rules and firewall",
     "Removing its programs",
-    "Removing its data and its services",
+    "Removing its data",
     "Removing its users",
     "Taking its git hooks off your checkout",
 )
 LEFT_FOR_YOU = (
     f"Left for you: on GitHub, the warden's deploy key on the product (titled '{WARDEN_TITLE}' or as you named it), "
-    f"which the next install replaces. What the server set-up placed stays, and so do the install logs in "
-    f"{layout.LOGS}."
+    f"which the next install replaces; on this machine's Docker, the slots' containers, networks and volumes (labelled "
+    f"{SLOT_LABEL}) and their databases in the shared Postgres. What the server set-up placed stays, and so do the "
+    f"install logs in {layout.LOGS}."
 )
 
 

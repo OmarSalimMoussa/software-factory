@@ -1,5 +1,5 @@
-# One `scripts/dev` verb the warden wrote to public/launch/<id>.json, run as the stack user with its rootless Docker.
-# Product code runs here, never as root: a container's root is this user on the host.
+# One `scripts/dev` verb the warden wrote to public/launch/<id>.json, run as the stack user on this machine's own
+# Docker, beside prod and the shared services every slot joins. Through that Docker, product code here can act as root.
 [Unit]
 Description=software factory: stack request %i
 CollectMode=inactive-or-failed
@@ -13,8 +13,7 @@ Group=@stack_user@
 # The slots' group reads their env files; the agent's group reads the checkout the verb builds.
 SupplementaryGroups=@slots_group@ @agent_user@
 Slice=@slice@
-Environment=XDG_RUNTIME_DIR=/run/user/@stack_uid@
-Environment=DOCKER_HOST=unix://@stack_socket@
+Environment=DOCKER_HOST=unix://@docker_socket@
 Environment=PATH=@path@
 Environment=@uv_env@
 ExecStart=@python@ -I @install@/runtime/system/runners/stack_run.py @state@ %i
@@ -32,10 +31,7 @@ BindPaths=@runs@
 BindReadOnlyPaths=@public@ @slots@
 ProtectHome=tmpfs
 BindPaths=@stack_home@
-# ProtectHome=tmpfs also hides /run/user: the user's runtime folder (its sockets) is bound back in.
-BindPaths=/run/user/@stack_uid@
 BindReadOnlyPaths=@agent_home@
-InaccessiblePaths=-/run/docker.sock
 NoNewPrivileges=yes
 ProtectSystem=full
 ProtectKernelModules=yes

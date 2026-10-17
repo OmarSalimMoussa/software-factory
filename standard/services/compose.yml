@@ -1,10 +1,10 @@
 # The factory's shared services: one stack per host, compose project factory-services.
 #
-# Postgres for the products' databases (one per workspace or slot), pgweb, Langfuse v3 and GlitchTip, and on a
-# server the edge (profile edge). Every value that differs between hosts comes from services.env, which the factory
-# writes (standard/services/stack.py). Container names and volume names are fixed: there is one of each per host,
-# and the provisioner reaches factory-postgres, factory-langfuse and factory-glitchtip by name over each
-# workspace's own network. Ports are published on 127.0.0.1 only; a server serves them to its tailnet.
+# Postgres for the products' databases (one per workspace or slot), pgweb, Langfuse v3, GlitchTip and the edge. Every
+# value that differs between hosts comes from services.env, which the server set-up writes (standard/services/
+# stack.py). Container names and volume names are fixed: there is one of each per host, and the provisioner reaches
+# factory-postgres, factory-langfuse and factory-glitchtip by name over each workspace's own network. Ports are
+# published on 127.0.0.1 only; the server serves them to its tailnet.
 # Services reach each other by container name, never by service key: a workspace network a shared container joins
 # could hold a product service with the same key.
 name: factory-services
@@ -73,7 +73,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      # No login of its own: loopback on a laptop, the tailnet on a server.
+      # No login of its own: it answers on the loopback and the tailnet alone.
       PGWEB_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?}@factory-postgres:5432/postgres?sslmode=disable
     ports:
       - "127.0.0.1:8081:8081"
@@ -119,11 +119,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 60
-      # The first start migrates its databases, slower still on rootless Docker: failures in this
-      # window do not count, so a first boot is never declared unhealthy halfway through.
+      # The first start migrates its databases, which is slow: failures in this window do not count, so a first
+      # boot is never declared unhealthy halfway through.
       start_period: 600s
     ports:
-      # 3100, not 3000: a laptop's Next.js dev server usually owns 3000.
       - "127.0.0.1:3100:3000"
     networks:
       - langfuse
@@ -151,8 +150,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
-      # The first start migrates its databases, slower still on rootless Docker: failures in this
-      # window do not count, so a first boot is never declared unhealthy halfway through.
+      # The first start migrates its databases, which is slow: failures in this window do not count, so a first
+      # boot is never declared unhealthy halfway through.
       start_period: 600s
     networks:
       - langfuse
@@ -184,8 +183,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-      # The first start migrates its databases, slower still on rootless Docker: failures in this
-      # window do not count, so a first boot is never declared unhealthy halfway through.
+      # The first start migrates its databases, which is slow: failures in this window do not count, so a first
+      # boot is never declared unhealthy halfway through.
       start_period: 600s
     networks:
       - langfuse
@@ -321,8 +320,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
-      # The first start migrates its databases, slower still on rootless Docker: failures in this
-      # window do not count, so a first boot is never declared unhealthy halfway through.
+      # The first start migrates its databases, which is slow: failures in this window do not count, so a first
+      # boot is never declared unhealthy halfway through.
       start_period: 600s
     ports:
       - "127.0.0.1:8200:8000"
@@ -389,9 +388,8 @@ services:
           memory: 64M
 
   # A server's front door: owns 80 and 443 for every workspace on the host, ends TLS and passes each host name to
-  # that workspace's own loopback port through the site files deploys write. A laptop never runs it.
+  # that workspace's own loopback port through the site files deploys write.
   edge:
-    profiles: [edge]
     image: docker.io/library/caddy:2.10.2-alpine
     container_name: factory-edge
     restart: unless-stopped

@@ -27,12 +27,11 @@ from standard import config as settings
 from standard import envfile, environment, probe, yaml_subset
 from standard.config_records import Config, Expect
 from standard.probe import Result, Run, State
-from standard.services import provision, stack
+from standard.services import host_paths, provision, stack
 from standard.services.provision import POSTGRES
 
 WORKSPACE = "smoke"
 DEAD = "http://127.0.0.1:9"  # the discard port: nothing listens, so every telemetry send fails
-DOCKER_SOCKET = "/var/run/docker.sock"
 POLL_SECONDS = 2
 LOG_LINES = 50
 
@@ -200,7 +199,7 @@ class Smoke:
             commit=self.short,
             dir=self.repo,
             env_dir=self.env_dir,
-            docker_socket=DOCKER_SOCKET,
+            docker_socket=host_paths.DOCKER_SOCKET,
         )
         try:
             notes = envfile.write(

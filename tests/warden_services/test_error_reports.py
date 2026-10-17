@@ -98,7 +98,7 @@ def test_without_the_dsn_the_service_refuses_to_start_naming_the_file(tmp_path: 
         error_reports.install(Places.under(tmp_path), timeout=3)
 
     assert str(refused.value) == (
-        f"{tmp_path}/state/secrets/factory-dsn is missing: the address of the factory's own GlitchTip, which the "
+        f"{tmp_path}/state/secrets/factory-dsn is missing: the address of the factory's GlitchTip project, which the "
         "install writes. Install the factory again."
     )
 
@@ -117,7 +117,7 @@ def test_without_the_dsn_the_warden_and_the_dashboard_do_not_start(
 
     with caplog.at_level(logging.CRITICAL):
         assert main() == 2
-    assert f"{service}: it does not start without the factory's own GlitchTip" in caplog.text
+    assert f"{service}: it does not start without the factory's GlitchTip project" in caplog.text
 
 
 @pytest.mark.parametrize(

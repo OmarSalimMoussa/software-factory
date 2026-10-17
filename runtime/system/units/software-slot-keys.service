@@ -1,5 +1,5 @@
-# Before each stack run, which wants it: the keys the owner names, copied from the owner's own env file into the
-# shared services' folder, where every slot's env file takes them. Root reads the owner's home, so no factory user
+# Before each stack run, which wants it: the keys the owner names, copied from the owner's own env file into root's
+# keys folder, where every slot's env file takes them. Root reads the owner's home, so no factory user
 # has to, and only the named keys leave it. A copy that fails keeps the last one.
 [Unit]
 Description=software factory: the keys slots take from the owner's env file
@@ -12,7 +12,7 @@ UMask=0077
 PrivateNetwork=yes
 PrivateTmp=yes
 ProtectSystem=strict
-ReadWritePaths=@services@
+ReadWritePaths=@keys@
 ProtectHome=read-only
 NoNewPrivileges=yes
 ProtectKernelModules=yes

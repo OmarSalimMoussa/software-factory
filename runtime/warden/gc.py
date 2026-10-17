@@ -1,8 +1,9 @@
 """The nightly prune, at ``gc.prune_hour``: QA evidence past ``qa.evidence_days``, then Docker's build cache and old
-unused images, keeping the factory's Docker data under ``gc.docker_budget_gib``.
+unused slot images, keeping this machine's Docker data under ``gc.docker_budget_gib``.
 
-Docker belongs to the stack user, so both Docker verbs run through the stack unit. Volumes are never pruned: the
-host singletons keep theirs, and a reap removes a slot's own. The disk reading is kept for the Guard page.
+The stack user's runs reach Docker, so both Docker verbs run through the stack unit. Prod shares that Docker, so only
+images a slot labelled are pruned. Volumes are never pruned: the shared services keep theirs, and a reap removes a
+slot's own. The disk reading is kept for the Guard page.
 """
 
 from __future__ import annotations

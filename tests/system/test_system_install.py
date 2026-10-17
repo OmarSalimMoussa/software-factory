@@ -13,9 +13,9 @@ from runtime.shared import network, upgrades
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import SettingsError
-from runtime.system import factory_repo, install, layout, render, root_commits, uninstall
+from runtime.system import factory_repo, install, layout, root_commits, uninstall
 from runtime.system.host import CommandError, DryHost
-from runtime.system.install_steps import steps_machine, steps_prepare, steps_secrets, steps_services, steps_wire
+from runtime.system.install_steps import steps_machine, steps_prepare, steps_secrets, steps_wire
 from runtime.system.job import REPO_ROOT, Install
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
@@ -86,50 +86,6 @@ def test_a_failure_shows_one_plain_sentence_and_the_log_keeps_the_command(
     assert out.splitlines() == ["  \u2713 Checking this computer", "  \u2717 Preparing this computer", "", problem]
     kept = log.read_text(encoding="utf-8")
     assert "$ false --secret-flag" in kept and "exit 1 after" in kept and "--secret-flag" not in out
-
-
-def test_the_shared_services_are_downloaded_early_and_started_and_keyed_before_the_factory_starts(
-    tmp_path: Path,
-) -> None:
-    job = dry_job(tmp_path)
-
-    install.run(job)
-
-    steps = [step for _, step in install.STEPS]
-    order = [steps_machine.rootless_docker, steps_services.place, steps_services.pull, steps_secrets.secrets,
-             steps_wire.units, steps_services.start, steps_services.keys, steps_wire.start]  # fmt: skip
-    assert [steps.index(step) for step in order] == sorted(steps.index(step) for step in order)
-    root = tmp_path / "root"
-    assert isinstance(job.host, DryHost)
-    pulled = next(n for n, a in enumerate(job.host.actions) if a.startswith("start in the background: docker compose"))
-    started = job.host.actions.index("run: systemctl reload-or-restart software-services.service")
-    assert job.host.actions[pulled].endswith("pull --quiet (as software-stack)") and pulled < started
-    for action in (
-        f"write: {root}/services/services.env (640, root:software-stack)",
-        f"write: {root}/state/secrets/laptop-glitchtip.json (600, software-warden:software-warden)",
-        f"write: {root}/state/secrets/laptop-langfuse.json (600, software-warden:software-warden)",
-        f"write: {root}/state/secrets/factory-dsn (640, software-warden:software-dashboard)",
-    ):
-        assert action in job.host.actions
-
-
-def test_the_factorys_own_glitchtip_gets_an_account_a_docker_and_a_unit_of_its_own(tmp_path: Path) -> None:
-    job = dry_job(tmp_path)
-
-    install.run(job)
-
-    assert isinstance(job.host, DryHost)
-    acts, user, root = job.host.actions, layout.ERRORS_USER, tmp_path / "root"
-    assert f"run: useradd --create-home --home-dir /home/{user} --shell /usr/sbin/nologin --user-group {user}" in acts
-    assert f"run: {layout.ROOTLESS_SETUP} install (as {user})" in acts
-    assert f"run: loginctl enable-linger {user}" in acts
-    assert f"write: {root}/errors/errors.env (640, root:{user})" in acts
-    pulled = next(
-        n for n, a in enumerate(acts) if a.startswith("start in the background:") and a.endswith(f"(as {user})")
-    )
-    started = acts.index(f"run: systemctl reload-or-restart {layout.ERRORS_UNIT}")
-    assert "factory-errors" in acts[pulled] and pulled < started
-    assert f"run: systemctl enable {layout.ERRORS_UNIT}" in acts
 
 
 def _session(state: str) -> Session:
@@ -456,33 +412,6 @@ def test_the_warden_trusts_github_only_by_the_host_keys_github_publishes_over_ht
     else:
         steps_machine.github_host_keys(job)
         assert written[job.places.github_known_hosts].startswith("github.com ssh-ed25519 AAAA")
-
-
-@pytest.mark.parametrize(
-    ("walled", "running", "restarts"),
-    [(False, False, False), (False, True, True), (True, True, False)],
-    ids=["first-start-is-walled", "running-without-it-restarts", "unchanged-leaves-it-running"],
-)
-def test_the_stack_users_systemd_is_walled_off_the_tailnet_before_its_containers_run(
-    tmp_path: Path, walled: bool, running: bool, restarts: bool
-) -> None:
-    job = dry_job(tmp_path)
-    assert isinstance(job.host, DryHost)
-    job.settings = settings()
-    values = steps_wire.given(job)
-    wall = render.stack_wall(values["stack_uid"])
-    unit = f"user@{values['stack_uid']}.service"
-    if walled:
-        job.host.files[wall.dest] = render.artifact(wall, job.templates(), values)
-    job.host.answers[f"systemctl is-active --quiet {unit}"] = (0 if running else 3, "")
-
-    steps_machine.rootless_docker(job)
-
-    acts = job.host.actions
-    wrote = next((n for n, a in enumerate(acts) if a.startswith(f"write: {wall.dest}")), None)
-    started = acts.index(f"run: systemctl start {unit}")
-    assert (wrote is not None) is (not walled) and (wrote is None or wrote < started)
-    assert (f"run: systemctl restart {unit}" in acts) is restarts
 
 
 def _product(tmp_path: Path) -> Path:

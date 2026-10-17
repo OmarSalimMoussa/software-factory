@@ -4,7 +4,6 @@ import html
 import http.client
 import json
 import os
-import subprocess
 import sys
 import threading
 from http.server import ThreadingHTTPServer
@@ -19,10 +18,9 @@ from runtime.shared import upgrades
 from runtime.shared.paths import Places, stored_signin
 from runtime.system import layout, root_commits
 from runtime.system.install_steps import steps_machine
-from runtime.system.runners import errors_run, record_exit, services_run, trust, upgrading, with_token
 from runtime.system.runners import launch_file as lf
+from runtime.system.runners import record_exit, trust, upgrading, with_token
 from runtime.system.runners.stack_run import size_bytes
-from standard.services import provision
 
 STATE = Path("/var/lib/software-factory")
 HOME = Path("/home/software-agent")
@@ -232,36 +230,6 @@ def test_the_install_gives_the_agents_checkout_the_factorys_git_identity(tmp_pat
         f"run: git -C {job.checkout()} config user.name {root_commits.GIT_NAME} (as software-agent)",
         f"run: git -C {job.checkout()} config user.email {root_commits.GIT_EMAIL} (as software-agent)",
     ]
-
-
-@pytest.mark.parametrize(("verb", "code", "status"), [("up", 0, 0), ("up", 1, 1), ("stop", 0, 0), ("stop", 1, 1)])
-def test_the_factorys_own_glitchtip_starts_and_stops_on_its_own_and_says_when_it_did_not(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], verb: str, code: int, status: int
-) -> None:
-    ran: list[list[str]] = []
-
-    def run(argv: list[str], stdin: str | None = None) -> subprocess.CompletedProcess[str]:
-        ran.append(argv)
-        return subprocess.CompletedProcess(argv, code, "", "glitchtip is unhealthy")
-
-    monkeypatch.setattr(provision, "real_run", run)
-
-    assert errors_run.main([verb]) == status
-    assert ran and all(argv[:4] == ["docker", "compose", "-p", "factory-errors"] for argv in ran)
-    if status:
-        assert "the factory's own GlitchTip" in capsys.readouterr().out
-
-
-def test_stopping_the_shared_services_leaves_the_factorys_own_glitchtip_running(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    ran: list[list[str]] = []
-    monkeypatch.setattr(
-        provision, "real_run", lambda argv, stdin=None: ran.append(argv) or subprocess.CompletedProcess(argv, 0, "", "")
-    )
-
-    assert services_run.main(["stop"]) == 0
-    assert ran and not any("factory-errors" in argv for argv in ran)
 
 
 def _ask(server: ThreadingHTTPServer, path: str, method: str = "GET") -> tuple[int, bytes]:

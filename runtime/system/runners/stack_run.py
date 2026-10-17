@@ -1,4 +1,4 @@
-"""software-stack-run@<id>.service: one stack request as the stack user, with its rootless Docker.
+"""software-stack-run@<id>.service: one stack request as the stack user, on this machine's own Docker.
 
 Run as ``/usr/bin/python3 -I <install>/runtime/system/runners/stack_run.py <state> <id>``. A product verb runs the
 checkout's own ``scripts/dev`` with its slot's facts in the environment. Before each one, the slot gets its share of
@@ -6,13 +6,12 @@ the shared services (its network, database and error projects) and its env file,
 a verb never runs on a slot half provisioned. After a successful ``empty``, the slot's database and env file go; what
 ``scripts/dev`` wrote beside the env file is the product's own to clear.
 Three verbs are the factory's and never reach the product: sweeping a slot's labelled Docker objects (and the
-containers still on its networks), the nightly prune, and Docker's disk use. Stdlib only.
+containers still on its networks), the nightly prune of slots' images alone, and Docker's disk use. Stdlib only.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
 import sys
@@ -25,12 +24,11 @@ from runtime.shared import environment
 from runtime.shared.paths import SLOT_KEYS, Places
 from runtime.shared.settings import Settings
 from runtime.slots import leases
-from runtime.system import layout
 from runtime.system.runners import launch_file as lf
 from standard import config as product_config
 from standard import envfile
 from standard.config_records import Config
-from standard.services import provision, stack
+from standard.services import host_paths, provision, stack
 
 SLOT_LABEL = "software.slot"
 RUN_LABEL = "software.run"
@@ -91,7 +89,8 @@ def prune(hours: str, timeout: int) -> int:
         print("prune: name the age in whole hours", flush=True)
         return lf.REFUSED
     status = 0
-    for args in (["builder", "prune", "-f"], ["image", "prune", "-a", "-f"]):
+    # Prod's images share this Docker: only an image a slot labelled is ever pruned, so prod can always push back.
+    for args in (["builder", "prune", "-f"], ["image", "prune", "-a", "-f", "--filter", f"label={SLOT_LABEL}"]):
         done = _docker([*args, "--filter", f"until={hours}h"], timeout)
         print(done.stdout.strip() or done.stderr.strip(), flush=True)
         status |= done.returncode
@@ -163,7 +162,7 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
         keys, given, notes = _slot_keys(places, config, values, env_file, checkout / config.env.template)
         placeholders = envfile.placeholder_values(workspace=workspace, origin=origin, port=port, commit=commit,
                                                   dir=checkout, env_dir=env_dir,
-                                                  docker_socket=layout.rootless_socket(os.getuid()))  # fmt: skip
+                                                  docker_socket=host_paths.DOCKER_SOCKET)  # fmt: skip
         notes += envfile.write(config, template=checkout / config.env.template, target=env_file,
                                placeholders=placeholders, services=values | keys, server=False)  # fmt: skip
         written, problems = envfile.parse_values(env_file.read_text(encoding="utf-8"), str(env_file))
@@ -205,7 +204,7 @@ def _slot_keys(
 ) -> tuple[dict[str, str], list[str], list[str]]:
     """The owner's keys to write (software-slot-keys.service), their names, and a note on any the factory sets itself.
     A key the last write gave and this one does not takes the template's value, so a withdrawn key leaves the slot."""
-    keys = places.services / SLOT_KEYS
+    keys = places.keys / SLOT_KEYS
     copied = envfile.parse_values(keys.read_text(encoding="utf-8"), str(keys))[0] if keys.exists() else {}
     own = values.keys() | {key for key, _ in config.env.set}
     given = {name: value for name, value in copied.items() if name not in own}

@@ -14,7 +14,7 @@ sudo python3 runtime/system/install.py --commit HEAD --repo <your checkout of th
 
 The install seals the commit into a new copy under `/var/lib/software-factory-stage/` (owned by root, read-only,
 removed when it ends) and runs every step from it. It prints each phase with a check mark: checking this computer,
-preparing it, fetching the services, connecting your accounts, setting up the factory, starting up and finishing.
+preparing it, connecting your accounts, setting up the factory, starting up and finishing.
 
 - **Questions** come as the install reaches them: the 6-digit code's secret as a QR code to scan, with its key to type
   instead; your GitHub token, a read-only token for the factory's repo, and the agents' Claude token. With your `gh`
@@ -81,11 +81,11 @@ with a tree that passed `factory check`.
 
 ## Errors and traces
 
-Every product gets a database, traces (Langfuse) and errors (GlitchTip) from the factory: on the server for staging
-and prod ([server.md](server.md)), and on the laptop for the stack slots ([laptop-services.md](laptop-services.md)).
+Every product gets a database, traces (Langfuse) and errors (GlitchTip) from one copy of the shared services on its
+server, for prod, staging and the stack slots alike ([server.md](server.md), [shared-services.md](shared-services.md)).
 Each new prod error arrives once as a request in the agents' inbox, for triage beside your feedback. Agents read
-errors and traces with `factory errors` and `factory traces`. The factory's own failures report to a GlitchTip of its
-own on the laptop, which no agent reaches ([laptop-services.md](laptop-services.md)).
+errors and traces with `factory errors` and `factory traces`. The factory's own failures report to a GlitchTip
+project of its own there, `factory`, which no agent reads.
 
 ## The product's tools
 

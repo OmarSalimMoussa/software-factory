@@ -5,11 +5,11 @@ from pathlib import Path
 import pytest
 from system_fakes import dry_job
 
-from runtime.shared import paths
 from runtime.shared.paths import MANAGED_SETTINGS, Places
 from runtime.system import install, layout, uninstall
 from runtime.system.host import Account, DryHost
 from standard.server import setup_steps
+from standard.services import stack
 
 
 @pytest.mark.parametrize(
@@ -51,18 +51,20 @@ def test_the_uninstall_removes_every_sealed_copy_but_the_one_it_runs_from(
         assert gone == {str(stale)}
 
 
-def test_the_uninstall_takes_the_factorys_own_glitchtip_away_with_its_account_and_its_data(tmp_path: Path) -> None:
-    host = DryHost(dry=False)
-    for uid, user in ((1002, layout.STACK_USER), (1003, layout.ERRORS_USER)):
-        host.users[user] = Account(user, uid, uid, Path("/home") / user, (user,), "")
-    host.paths.add(paths.ERRORS)
+def test_the_uninstall_leaves_the_shared_services_and_their_data_and_their_settings_the_admins_alone(
+    tmp_path: Path,
+) -> None:
+    places = Places.under(tmp_path)
+    env = places.services / stack.ENV_FILE
+    host = DryHost(dry=False, paths={places.state, places.keys, places.services, env})
+    host.users[layout.STACK_USER] = Account(layout.STACK_USER, 1002, 1002, layout.STACK_HOME, (), "")
 
-    uninstall.state(host, Places.under(tmp_path))
+    uninstall.state(host, places)
     uninstall.users(host)
 
-    assert f"remove: {paths.ERRORS}" in host.actions
-    assert f"run: userdel --remove {layout.ERRORS_USER}" in host.actions
-    assert layout.ERRORS_UNIT in uninstall.UNITS
+    assert f"remove: {places.keys}" in host.actions and f"run: chmod 0600 {env}" in host.actions
+    assert not any(action.startswith(f"remove: {places.services}") for action in host.actions)
+    assert f"run: userdel --remove {layout.STACK_USER}" in host.actions
 
 
 def test_taking_back_a_failed_first_install_leaves_the_server_set_ups_config_alone(

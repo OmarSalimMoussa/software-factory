@@ -22,7 +22,7 @@ from standard.config_records import Config
 from standard.server import edge
 from standard.server import heartbeat as heartbeat_mod
 from standard.server.setup_machine import Host, SetupError, ensure_dirs, ensure_file, remote_text
-from standard.services import provision, stack
+from standard.services import host_paths, provision, stack
 from standard.services.provision import Run
 
 CODE = "/usr/local/lib/software-factory"
@@ -38,9 +38,6 @@ CRON = "/etc/cron.d/factory-gc"
 
 
 HEARTBEAT_CRON = "/etc/cron.d/factory-heartbeat"
-
-
-SERVICES = Path("/srv/factory/services")
 
 
 CI_USER = "ci"
@@ -199,7 +196,7 @@ def _wrapper(name: str) -> str:
 
 def folders(job: Job) -> None:
     owner, name = job.admin, job.config.product.name
-    wanted = [(path, owner, "755") for path in ("/srv/factory", "/srv/factory/services", "/srv/factory/edge")]
+    wanted = [(path, owner, "755") for path in ("/srv/factory", str(host_paths.FOLDER), "/srv/factory/edge")]
     wanted += [(path, owner, "755") for path in (str(edge.SITES), "/srv/factory/state", f"/srv/{name}")]
     for ws in job.config.workspaces:
         base = f"/srv/{name}/{ws.name}"
@@ -210,20 +207,22 @@ def folders(job: Job) -> None:
 
 def shared_services(job: Job) -> None:
     host, owner = job.host, job.admin
-    changed = ensure_file(host, f"{SERVICES}/compose.yml", stack.COMPOSE.read_text(), owner=owner, mode="644")
+    changed = ensure_file(host, f"{host_paths.FOLDER}/compose.yml", stack.COMPOSE.read_text(), owner=owner, mode="644")
     # The edge holds this file through a bind mount, which keeps the inode it started with: write it in place.
     caddyfile = stack.EDGE_CADDYFILE.read_text()
-    edge_changed = ensure_file(host, f"{SERVICES}/edge.Caddyfile", caddyfile, owner=owner, mode="644", in_place=True)
-    env_path = f"{SERVICES}/{stack.ENV_FILE}"
+    edge_changed = ensure_file(
+        host, f"{host_paths.FOLDER}/edge.Caddyfile", caddyfile, owner=owner, mode="644", in_place=True
+    )
+    env_path = f"{host_paths.FOLDER}/{stack.ENV_FILE}"
     found = remote_text(host, env_path)
     existing = stack.parse_env(found[1], env_path) if found else {}
-    job.services = stack.generate_env(job.config, kind="server", existing=existing)
+    job.services = stack.generate_env(job.config, existing=existing)
     changed |= ensure_file(host, env_path, stack.render_env(job.services), owner=owner, mode="600")
-    bad = stack.unhealthy(host.run, SERVICES, edge=True)
+    bad = stack.unhealthy(host.run, host_paths.FOLDER)
     if bad:
         print("   found: not up and healthy: " + ", ".join(bad))
     if bad or changed:
-        host.act("bring the shared services up and wait until healthy", lambda: stack.up(host.run, SERVICES, edge=True))
+        host.act("bring the shared services up and wait until healthy", lambda: stack.up(host.run, host_paths.FOLDER))
     else:
         print("   found: every shared service up and healthy")
     if edge_changed:
@@ -304,12 +303,12 @@ def laptop(job: Job) -> None:
     config, path = job.config, job.home / "server.json"
     data = {
         "glitchtip": {
-            "url": stack.public_url(config, "server", stack.PORTS["glitchtip"]),
+            "url": stack.public_url(config, stack.PORTS["glitchtip"]),
             "org": config.product.name,
             "token": job.token,
         },
         "langfuse": {
-            "url": stack.public_url(config, "server", stack.PORTS["langfuse"]),
+            "url": stack.public_url(config, stack.PORTS["langfuse"]),
             "public_key": job.services["LANGFUSE_INIT_PROJECT_PUBLIC_KEY"],
             "secret_key": job.services["LANGFUSE_INIT_PROJECT_SECRET_KEY"],
         },
@@ -338,7 +337,7 @@ def _report_export(job: Job) -> dict[str, str] | None:
             f"which {env_path} does not hold yet"
         )
         return None
-    url = stack.public_url(config, "server", reports.port) + reports.path
+    url = stack.public_url(config, reports.port) + reports.path
     return {"url": url, "header": reports.header, "token": token}
 
 

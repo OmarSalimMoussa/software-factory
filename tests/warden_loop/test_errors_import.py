@@ -1,4 +1,5 @@
-"""Prod's, staging's and slot 0's unresolved GlitchTip issues become requests from glitchtip: each issue once."""
+"""Prod's, staging's and slot 0's unresolved GlitchTip issues become requests from glitchtip: each issue once, and
+the factory's own never."""
 
 from __future__ import annotations
 
@@ -18,7 +19,6 @@ from runtime.shared.network import Answer
 from runtime.warden.health import errors_import, telemetry
 
 GLITCHTIP = "https://box.test:8200"
-LAPTOP = {"url": "http://127.0.0.1:8200", "org": "notes", "token": "tok-laptop"}
 SERVER = {
     "glitchtip": {"url": GLITCHTIP, "org": "notes", "token": "tok-read"},
     "langfuse": {"url": "https://box.test:3100", "public_key": "pk-lf-1", "secret_key": "sk-lf-1"},
@@ -39,13 +39,13 @@ LAST = f'<{GLITCHTIP}/x>; rel="previous"; results="true"; cursor="c1", <{GLITCHT
 
 TWO_PAGES = {
     "": ([issue(1, "prod-app"), issue(2, "staging-app")], FIRST),
-    "c2": ([issue(3, "prod-web"), issue(4, "slot1-app"), issue(5, "slot0-app")], LAST),
+    "c2": ([issue(3, "prod-web"), issue(4, "slot1-app"), issue(5, "slot0-app"), issue(6, "factory")], LAST),
 }
 
 
 @dataclasses.dataclass
 class GlitchTips:
-    """The pages the server's and the laptop's GlitchTip both answer, and the URLs they were asked."""
+    """The pages the shared GlitchTip answers, and the URLs it was asked."""
 
     pages: dict[str, Any]
     asked: list[str]
@@ -53,13 +53,12 @@ class GlitchTips:
 
 @pytest.fixture
 def glitchtips(world: World, monkeypatch: pytest.MonkeyPatch) -> GlitchTips:
-    """The server and the laptop are set up; at first each GlitchTip answers one page with no issue."""
+    """The server is set up; at first its GlitchTip answers one page with no issue."""
     store.write_json(telemetry.server_json(world.ctx.places), SERVER)
-    store.write_json(telemetry.laptop_glitchtip_json(world.ctx.places), LAPTOP)
     found = GlitchTips({"": ([], LAST)}, [])
 
     def http_get(url: str, headers: dict[str, str], timeout: float) -> Answer:
-        assert headers["Authorization"] == ("Bearer tok-laptop" if url.startswith(LAPTOP["url"]) else "Bearer tok-read")
+        assert headers["Authorization"] == "Bearer tok-read"
         found.asked.append(url)
         body, header = found.pages[parse_qs(urlsplit(url).query).get("cursor", [""])[0]]
         return Answer(200, {"link": header}, json.dumps(body).encode())
@@ -93,9 +92,9 @@ def test_each_prod_staging_and_slot_zero_issue_is_filed_once_across_polls(world:
         "prod-web:app.notes in show",
         "slot0-app:app.notes in show",
         "staging-app:app.notes in show",
-    ]  # slot 1's issue is no environment's
+    ]  # slot 1's issue and the factory's own are no environment's
     assert {(r.inbox, r.from_role, r.severity) for r in requests} == {("agents", "glitchtip", "normal")}
-    assert {url.split("/api/0/organizations/notes/issues/?")[0] for url in asked} == {GLITCHTIP, LAPTOP["url"]}
+    assert {url.split("/api/0/organizations/notes/issues/?")[0] for url in asked} == {GLITCHTIP}
 
 
 @pytest.mark.parametrize(

@@ -32,7 +32,7 @@ OWNER_FILE = "# the owner's own\nMODEL_KEY=sk-real\nSPARE_KEY=<your key>\nOTHER=
 def test_only_the_named_keys_with_a_real_value_leave_the_owners_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, names: list[str], status: int, copied: str | None, said: str
 ) -> None:
-    source, target = tmp_path / "owner.env", tmp_path / "services" / "slot-keys.env"
+    source, target = tmp_path / "owner.env", tmp_path / "keys" / "slot-keys.env"
     source.write_text(OWNER_FILE)
     target.parent.mkdir()
     target.write_text("STALE_KEY=old\n")

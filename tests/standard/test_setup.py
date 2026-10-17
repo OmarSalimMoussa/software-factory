@@ -16,7 +16,7 @@ from standard.config import ConfigError, parse_text
 from standard.server import heartbeat, setup, setup_steps
 from standard.server import setup_machine as machine
 from standard.server.setup_machine import Host, SetupError
-from standard.services import provision, stack
+from standard.services import host_paths, provision, stack
 
 KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOwner ci@laptop"
 UFW_READY = "Status: active\n\nTo  Action  From\n--  ------  ----\n" + "".join(
@@ -114,9 +114,7 @@ class Server:
         if "up" in argv:
             self.ups += 1
             return _cp(argv)
-        rows = [
-            {"Service": s, "State": "running", "Health": "healthy", "ExitCode": 0} for s in stack.services(edge=True)
-        ]
+        rows = [{"Service": s, "State": "running", "Health": "healthy", "ExitCode": 0} for s in stack.services()]
         rows = [r | {"State": "exited"} if r["Service"] in stack.ONE_SHOT else r for r in rows]
         return _cp(argv, 0, "\n".join(json.dumps(r) for r in rows) if self.ups else "")
 
@@ -329,14 +327,14 @@ def test_the_server_needs_the_python_the_factorys_pyproject_declares(
 
 
 def test_shared_service_secrets_are_kept_never_made_anew_over_a_blank_or_unreadable_file(make_job: Any) -> None:
-    held = stack.generate_env(CONFIG, kind="server", existing={})
+    held = stack.generate_env(CONFIG, existing={})
     blank = {**held, "POSTGRES_PASSWORD": ""}
     with pytest.raises(stack.StackError, match="POSTGRES_PASSWORD empty"):
-        stack.generate_env(CONFIG, kind="server", existing=blank)
-    assert stack.generate_env(CONFIG, kind="server", existing=held)["POSTGRES_PASSWORD"] == held["POSTGRES_PASSWORD"]
+        stack.generate_env(CONFIG, existing=blank)
+    assert stack.generate_env(CONFIG, existing=held)["POSTGRES_PASSWORD"] == held["POSTGRES_PASSWORD"]
 
     server = Server()
-    env_file = f"{setup_steps.SERVICES}/{stack.ENV_FILE}"
+    env_file = f"{host_paths.FOLDER}/{stack.ENV_FILE}"
     server.answers[("sudo", "-n", "sh", "-c", machine.READ_FILE, "read", env_file)] = (1, "", "cat: Permission denied")
     with pytest.raises(SetupError, match="on the server but cannot be read"):
         setup.run(make_job(server))

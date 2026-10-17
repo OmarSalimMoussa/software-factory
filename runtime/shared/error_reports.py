@@ -1,5 +1,5 @@
-"""The factory's own errors, sent in Sentry's envelope format to the factory's own GlitchTip: an instance apart from
-the one the products' slots report to (runtime/system/errors/).
+"""The factory's own errors, sent in Sentry's envelope format to the factory's own project in this machine's shared
+GlitchTip, where prod and the slots keep projects of their own.
 
 The warden and the dashboard call ``install`` once at start, and refuse to start without the project's address (the
 ``factory-dsn`` secret the install writes): every log record at ERROR or above goes there as one event. Sending
@@ -27,6 +27,8 @@ from runtime.shared import network
 from runtime.shared.paths import Places
 
 ENVIRONMENT = "factory"
+# The GlitchTip project the install makes for the factory's own errors: no workspace's name, so no import files them.
+PROJECT = "factory"
 CLIENT = "software-factory/1"
 CONTENT_TYPE = "application/x-sentry-envelope"
 log = logging.getLogger("factory.errors")
@@ -174,7 +176,7 @@ def install(places: Places, *, timeout: float, send: Send = send_event) -> Repor
     try:
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
-        raise DsnError(f"{path} is missing: the address of the factory's own GlitchTip, which the install writes. "
+        raise DsnError(f"{path} is missing: the address of the factory's GlitchTip project, which the install writes. "
                        "Install the factory again.") from exc  # fmt: skip
     dsn = parse_dsn(text)
     commit = places.install / "COMMIT"

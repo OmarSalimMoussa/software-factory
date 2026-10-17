@@ -2,7 +2,7 @@
 
 The owner names the file (slots.keys_from) and the keys (slots.keys) at install, and this reads both from root's own
 record of that install, never from the warden. Run as root, it reads the file in the owner's home, which no factory
-user may, and writes only the named keys into the shared services' folder, where each slot's env write takes them. A
+user may, and writes only the named keys into root's keys folder, where each slot's env write takes them. A
 key the file lacks or holds as a placeholder is left out: the slot keeps the template's value and its stack commands
 name it. A file that cannot be read leaves the last copy as it was. It prints key names, never a value.
 """
@@ -66,7 +66,7 @@ def main(argv: list[str]) -> int:
     except (OSError, ValueError, store.StoreError, settings_module.SettingsError) as exc:
         print(f"slot keys: not copied: {exc}", flush=True)
         return 1
-    status, said = copy(settings, places.services / SLOT_KEYS, grp.getgrnam(layout.STACK_USER).gr_gid)
+    status, said = copy(settings, places.keys / SLOT_KEYS, grp.getgrnam(layout.STACK_USER).gr_gid)
     print(said, flush=True)
     return status
 

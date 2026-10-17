@@ -17,7 +17,6 @@ SERVER = {
     "glitchtip": {"url": "https://box.test:8200", "org": "notes", "token": "tok-server"},
     "langfuse": {"url": "https://box.test:3100", "public_key": "pk-lf-1", "secret_key": "sk-lf-1"},
 }
-LAPTOP = {"url": "http://127.0.0.1:8200", "org": "notes", "token": "tok-laptop"}
 
 
 def issue(n: int, project: str, title: str = "KeyError") -> dict[str, Any]:
@@ -38,16 +37,16 @@ def answering(monkeypatch: pytest.MonkeyPatch, body: Any) -> list[tuple[str, str
     return asked
 
 
-def test_a_slot_reads_the_laptops_glitchtip_and_only_its_own_projects(
+def test_a_slot_reads_the_shared_glitchtip_and_only_its_own_projects(
     ctx: Context, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     store.write_json(telemetry.server_json(ctx.places), SERVER)
-    store.write_json(telemetry.laptop_glitchtip_json(ctx.places), LAPTOP)
-    asked = answering(monkeypatch, [issue(1, "slot3-app"), issue(2, "slot1-app"), issue(3, "prod-app")])
+    found = [issue(1, "slot3-app"), issue(2, "slot1-app"), issue(3, "prod-app"), issue(4, "factory")]
+    asked = answering(monkeypatch, found)
     answer = telemetry.errors(ctx, {"where": "slot", "slot": 3}, None)
     assert [row["id"] for row in answer["issues"]] == ["1"] and answer["where"] == "slot3"
     assert [(url.split("?")[0], auth) for url, auth in asked] == [
-        ("http://127.0.0.1:8200/api/0/organizations/notes/issues/", "Bearer tok-laptop")
+        ("https://box.test:8200/api/0/organizations/notes/issues/", "Bearer tok-server")
     ]
 
 

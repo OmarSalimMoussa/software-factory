@@ -15,8 +15,8 @@ Claude agents, holds the code to one standard set of checks, ships to staging, a
 - **The plugin** carries the roles (orchestrator, designers, implementers, intake, triage, critics and testers).
 
 - **The standard build and deploy** in `standard/`: the build plan and smoke test CI runs, the server's set-up and
-  deploy command, and the shared services every product gets (a database, traces and errors), on the server and on
-  the laptop.
+  deploy command, and the shared services every product gets (a database, traces and errors), on the server, where
+  the factory's slots use them too.
 
 Set up the product's server first, from the owner's laptop: `python3 -m standard.server.setup --product <path>`
 ([docs/server.md](docs/server.md)). Then install the factory from a clone of its repo, with your GitHub CLI signed in:

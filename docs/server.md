@@ -106,10 +106,10 @@ Sign in to GlitchTip and Langfuse with `[services] owner_email`.
 
 ## Where the secrets live
 
-- **On the server**, in `/srv/factory/services/services.env` (the admin user's, mode 0600): every shared service's
-  passwords and keys, your GlitchTip password (`GLITCHTIP_OWNER_PASSWORD`), your Langfuse password
-  (`LANGFUSE_INIT_USER_PASSWORD`) and the Postgres password (`POSTGRES_PASSWORD`). They are made once and kept: the
-  databases were created with them. Read one with `ssh <admin>@<host> grep <KEY> /srv/factory/services/services.env`.
+- **On the server**, in `/srv/factory/services/services.env` (the admin user's; the factory's stack user's group may
+  read it too, [shared-services.md](shared-services.md)): every shared service's passwords and keys, your GlitchTip
+  password (`GLITCHTIP_OWNER_PASSWORD`), your Langfuse password (`LANGFUSE_INIT_USER_PASSWORD`) and the Postgres
+  password (`POSTGRES_PASSWORD`). They are made once and kept: the databases were created with them. Read one with `ssh <admin>@<host> grep <KEY> /srv/factory/services/services.env`.
 - **On your laptop**, the CI key pair and `server.json`, in `~/.config/software-factory/`.
 - **In GitHub**, `SERVER_DEPLOY_KEY`, which only you put there.
 

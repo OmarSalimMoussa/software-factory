@@ -15,7 +15,6 @@ from typing import Any
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
-from runtime.system.background import Pending
 from runtime.system.host import Account, Host
 
 RULE = "install"
@@ -60,17 +59,6 @@ class Install:
     factory_origin: str = ""
     tools: dict[str, str] = field(default_factory=dict)  # the owner's uv and claude
     doing: str = ""  # what the running step does, in the owner's words
-    pending: dict[str, Pending] = field(default_factory=dict)  # commands left running for a later step
-
-    def await_pending(self, name: str) -> tuple[int, str]:
-        """The result of the command started for ``name``; a step that needs it calls this."""
-        if name not in self.pending:
-            raise refuse(f"nothing was started for {name} before this step")
-        return self.pending.pop(name).wait()
-
-    def cancel_pending(self) -> None:
-        for name in list(self.pending):
-            self.pending.pop(name).cancel()
 
     def tree(self) -> Path:
         """The factory's files at the commit; a dry run reads the copy it runs from."""

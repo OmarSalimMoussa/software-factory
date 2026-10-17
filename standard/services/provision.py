@@ -120,8 +120,7 @@ def ensure_network(run: Run, name: str, present: set[str]) -> bool:
 
 
 def bootstrap(config: Config, services: dict[str, str], run: Run) -> dict[str, str]:
-    """The host's GlitchTip organization, owner, team and read-only token. No project of the factory's own lives
-    here: the factory reports to its own GlitchTip on the laptop."""
+    """The host's GlitchTip organization, owner, team and read-only token."""
     params = glitchtip.bootstrap_params(
         config.product.name, config.services.owner_email, services["GLITCHTIP_OWNER_PASSWORD"]
     )
@@ -146,12 +145,8 @@ def workspace(
     name = database(config, workspace)
     password = _password(state, name)
     checked(run, PSQL, _create_sql(name, password))
-    slugs = {errors: f"{workspace}-{errors}" for errors in config.services.errors}
-    dsns = glitchtip_call(run, GLITCHTIP, glitchtip.workspace_params(config.product.name, slugs)).get("dsns")
-    if not isinstance(dsns, dict) or set(dsns) != set(slugs) or not all(isinstance(v, str) for v in dsns.values()):
-        raise ProvisionError(f"GlitchTip's answer lacks a DSN for some of {', '.join(slugs)}")
+    keys = projects(config, run, {errors: f"{workspace}-{errors}" for errors in config.services.errors})
     public = urlsplit(origin)
-    keys = {errors: _dsn_parts(dsns[errors]) for errors in config.services.errors}
     return env_values(
         config, workspace=workspace, commit=commit, networks=(net, telemetry_net),
         database_url=f"postgresql://{name}:{password}@{POSTGRES}:5432/{name}", langfuse=(LANGFUSE_HOST,
@@ -161,6 +156,14 @@ def workspace(
         public_dsn=lambda errors: f"{public.scheme}://{keys[errors][0]}@{public.netloc}"
         f"{config.services.errors_public_path}/{keys[errors][1]}",
     )  # fmt: skip
+
+
+def projects(config: Config, run: Run, slugs: dict[str, str]) -> dict[str, tuple[str, str]]:
+    """Each GlitchTip project ``slugs`` names, made unless it is there: its DSN's public key and project id."""
+    dsns = glitchtip_call(run, GLITCHTIP, glitchtip.workspace_params(config.product.name, slugs)).get("dsns")
+    if not isinstance(dsns, dict) or set(dsns) != set(slugs) or not all(isinstance(v, str) for v in dsns.values()):
+        raise ProvisionError(f"GlitchTip's answer lacks a DSN for some of {', '.join(slugs)}")
+    return {name: _dsn_parts(dsns[name]) for name in slugs}
 
 
 def env_values(

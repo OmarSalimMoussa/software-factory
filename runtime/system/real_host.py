@@ -19,9 +19,15 @@ from typing import Any
 
 from runtime.shared import environment
 from runtime.system import layout
-from runtime.system.background import Pending, Running, shown
 from runtime.system.host import Account, CommandError, Host, Runner, as_user
 from runtime.system.journal import Journal
+
+_ARGV_CHARS = 300  # of one command line in the log; a script passed with -c can be long
+
+
+def shown(argv: list[str]) -> list[str]:
+    line = " ".join(argv)
+    return [line if len(line) <= _ARGV_CHARS else line[:_ARGV_CHARS] + " ..."]
 
 
 class RealHost(Host):
@@ -98,10 +104,6 @@ class RealHost(Host):
             return subprocess.CompletedProcess(argv, done.returncode, done.stdout, done.stderr)
 
         return run
-
-    def background(self, argv: list[str], *, user: str, env: Mapping[str, str]) -> Pending:
-        command, child_env = self._spawn(argv, user, env)
-        return Running(self.journal, argv, user, command, child_env)
 
     def pipe(self, source: list[str], user: str, sink: list[str]) -> None:
         made, made_env = self._spawn(source, user, None)
