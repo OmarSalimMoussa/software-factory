@@ -214,6 +214,7 @@ SCHEMA: dict[str, Spec] = {
     "factory.warden_threads": Spec("int", 2, 64, when="Next warden start"),  # contract: added by 1B-3
     # contract: added by builder 3, read by the installer only.
     "install.hook_timeout_seconds": Spec("int", 2, 60, when="Next install"),
+    "install.mcp_start_seconds": Spec("int", 10, 600, when="Next install"),
     "install.firewall_refresh_seconds": Spec("int", 10, 600, when="Next install"),
     "install.healthchecks_grace_minutes": Spec("int", 1, 120, when="Next install"),
     "install.upgrade_wait_minutes": Spec("int", 5, 240),

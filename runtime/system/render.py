@@ -133,7 +133,8 @@ def product_org(settings: Settings) -> str:
 def managed_settings(places: Places, settings: Settings, source: Path) -> str:
     """Claude Code's managed settings: the guard on every tool call, every start and stop of a session or a
     subagent, and the rulebook loader at every start. They also consent to bypass mode, which a background session
-    takes from its own settings only with consent in the managed or the user's settings."""
+    takes from its own settings only with consent in the managed or the user's settings, and give every MCP server,
+    such as a tester's browser, install.mcp_start_seconds to start on a loaded machine."""
     guard = f"{layout.PYTHON} -I {places.install}/runtime/guard/hook.py"
     loader = (
         f"{layout.PYTHON} -I {places.install}/plugin/hooks/rulebook_loader.py"
@@ -143,6 +144,7 @@ def managed_settings(places: Places, settings: Settings, source: Path) -> str:
         "guard": json.dumps(guard)[1:-1],
         "loader": json.dumps(loader)[1:-1],
         "hook_timeout": str(settings.get_int("install.hook_timeout_seconds")),
+        "mcp_start_ms": str(settings.get_int("install.mcp_start_seconds") * 1000),
     }
     text = artifact(MANAGED, source, given)
     try:

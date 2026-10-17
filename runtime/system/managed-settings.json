@@ -1,5 +1,6 @@
 {
   "skipDangerousModePermissionPrompt": true,
+  "env": {"MCP_TIMEOUT": "@mcp_start_ms@"},
   "hooks": {
     "PreToolUse": [
       {"matcher": "*", "hooks": [{"type": "command", "command": "@guard@", "timeout": @hook_timeout@}]}

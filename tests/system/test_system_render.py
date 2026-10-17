@@ -129,7 +129,8 @@ def test_managed_settings_hold_the_guard_the_rulebook_loader_and_consent_to_bypa
 
     # A background session drops the bypass mode its own settings ask for unless the managed settings consent.
     assert body["skipDangerousModePermissionPrompt"] is True
-    assert set(body) == {"hooks", "skipDangerousModePermissionPrompt"}
+    assert set(body) == {"env", "hooks", "skipDangerousModePermissionPrompt"}
+    assert body["env"] == {"MCP_TIMEOUT": str(settings().get_int("install.mcp_start_seconds") * 1000)}
     assert set(body["hooks"]) == {"PreToolUse", "SessionStart", "SubagentStart", "Stop", "SubagentStop"}
     commands = {hook["command"] for groups in body["hooks"].values() for group in groups for hook in group["hooks"]}
     assert commands == {

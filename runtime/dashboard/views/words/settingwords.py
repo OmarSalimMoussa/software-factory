@@ -343,6 +343,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         "Read by the installer: a change applies at the next install.",
         [
             ("install.hook_timeout_seconds", "Seconds Claude Code waits for the guard"),
+            ("install.mcp_start_seconds", "Seconds Claude Code waits for a tester's browser to start"),
             ("install.firewall_refresh_seconds", "Load the firewall again every, seconds"),
             ("install.healthchecks_grace_minutes", "Minutes a check-in may be late"),
             ("install.upgrade_wait_minutes", "Minutes an upgrade waits for the agents to settle"),
