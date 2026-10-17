@@ -335,27 +335,101 @@ def test_the_dashboard_goes_on_the_edge_by_its_public_names_and_the_uninstall_ta
     assert asked == [" ".join(server_edge.RELOAD)]
 
 
-def test_a_dashboard_site_the_edge_refuses_comes_off_the_edge_before_the_install_stops(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+STAGING = "http://203.0.113.7:8090"
+
+
+@pytest.mark.parametrize(
+    ("zero_origin", "before", "done"),
+    [
+        (STAGING, None, ["write", "reload", "ufw allow 8090/tcp"]),
+        (STAGING, "8091", ["ufw delete allow 8091/tcp", "write", "reload", "ufw allow 8090/tcp"]),
+        ("", "8091", ["ufw delete allow 8091/tcp", "remove", "reload"]),
+        ("", None, []),
+    ],
+    ids=["opens", "moves", "closes", "stays-shut"],
+)
+def test_staging_opens_on_the_boxs_own_address_and_an_empty_setting_takes_its_site_and_port_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, zero_origin: str, before: str | None, done: list[str]
 ) -> None:
     job = dry_job(tmp_path)
+    assert isinstance(job.host, DryHost)
+    job.changes["slots.zero_origin"] = zero_origin
+    toml = job.product / "factory.toml"
+    toml.write_text(toml.read_text().replace("blocked_paths = []", 'blocked_paths = ["/admin/export*"]'))
+    steps_prepare.check_machine(job)
+    steps_prepare.settle_settings(job)
+    if before:
+        job.host.files[layout.SLOT0_SITE] = server_edge.site([f"http://203.0.113.7:{before}"], 8100, bind="203.0.113.7")
+    written: dict[Path, str] = {}
+
+    def write(path: Path, text: str, **kw: object) -> None:
+        job.host.actions.append(f"write: {path}")
+        written[path] = text
+
+    monkeypatch.setattr(job.host, "write", write)
+
+    steps_wire.edge(job)
+
+    words = {f"run: {' '.join(server_edge.RELOAD)}": "reload", f"write: {layout.SLOT0_SITE}": "write",
+             f"remove: {layout.SLOT0_SITE}": "remove"}  # fmt: skip
+    # After the dashboard's site and its reload.
+    assert [words.get(action, action.removeprefix("run: ")) for action in job.host.actions[2:]] == done
+    if "write" in done:
+        lines = written[layout.SLOT0_SITE].splitlines()
+        port = settings().get_int("slots.port_base")
+        assert lines[1:5] == [f"{STAGING} {{", "\tbind 203.0.113.7", "\trespond /admin/export* 404",
+                              f"\treverse_proxy 127.0.0.1:{port} {{"]  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("zero_origin", "refused", "site", "said"),
+    [("", 1, layout.EDGE_SITE, "the dashboard's site"), (STAGING, 2, layout.SLOT0_SITE, "staging's site")],
+    ids=["dashboard", "staging"],
+)
+def test_a_site_the_edge_refuses_comes_off_the_edge_before_the_install_stops(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, zero_origin: str, refused: int, site: Path, said: str
+) -> None:
+    job = dry_job(tmp_path)
+    job.changes["slots.zero_origin"] = zero_origin
     steps_prepare.check_machine(job)
     steps_prepare.settle_settings(job)
     done: list[str] = []
 
     def run(argv: list[str], **kw: object) -> str:
-        done.append("reload")
-        if done == ["reload"]:
+        done.append("reload" if argv == server_edge.RELOAD else " ".join(argv))
+        if len(done) == refused:
             raise CommandError(argv, 1, "Error: adapting config using caddyfile: ambiguous site definition")
         return ""
 
     monkeypatch.setattr(job.host, "run", run)
     monkeypatch.setattr(job.host, "remove", lambda path: done.append(f"remove {path}"))
 
-    with pytest.raises(Refused, match="The edge refused the dashboard's site, which is off the edge again"):
+    with pytest.raises(Refused, match=f"The edge refused {said}, which is off the edge again"):
         steps_wire.edge(job)
 
-    assert done == ["reload", f"remove {layout.EDGE_SITE}", "reload"]
+    assert done == ["reload"] * refused + [f"remove {site}", "reload"]
+
+
+@pytest.mark.parametrize(
+    ("changes", "said"),
+    [
+        ({"slots.zero_origin": "https://203.0.113.7:8090"}, "slots.zero_origin must be http://<the box's IPv4"),
+        ({"slots.zero_origin": "http://staging.example.com:8090"}, "slots.zero_origin must be http://<the box's IPv4"),
+        ({"slots.zero_origin": "http://203.0.113.7"}, "slots.zero_origin must be http://<the box's IPv4"),
+        ({"slots.zero_origin": STAGING, "slots.port_base": 8089}, "zero_origin's port 8090 must be clear of"),
+        ({"slots.zero_origin": STAGING, "dashboard.port": 8090}, "zero_origin's port 8090 must be clear of"),
+    ],
+    ids=["https", "a-name", "no-port", "a-slots-port", "the-dashboards-port"],
+)
+def test_the_install_refuses_a_staging_address_that_is_no_ipv4_origin_or_takes_a_port_in_use(
+    tmp_path: Path, changes: dict[str, object], said: str
+) -> None:
+    job = dry_job(tmp_path)
+    job.changes |= changes
+    steps_prepare.check_machine(job)
+
+    with pytest.raises(Refused, match=re.escape(said)):
+        steps_prepare.settle_settings(job)
 
 
 @pytest.mark.parametrize(

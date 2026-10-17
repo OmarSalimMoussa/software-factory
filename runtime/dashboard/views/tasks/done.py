@@ -73,7 +73,7 @@ def _button(snap: Snap, slot: dict[str, Any]) -> dict[str, Any]:
     label = f"Open {settings.get_str('repo.github').split('/')[-1]}"
     if not address:
         return {"label": label, "url": None, "title": "Set the test address you sign in as under Settings, Slots."}
-    return {"label": label, "url": "/api/slot/open", "title": f"Opens slot 0 on this laptop, signed in as {address}"}
+    return {"label": label, "url": "/api/slot/open", "title": f"Opens staging, signed in as {address}"}
 
 
 def _master(snap: Snap, found: dict[str, Any]) -> dict[str, Any]:

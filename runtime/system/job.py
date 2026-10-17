@@ -16,6 +16,8 @@ from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.system.host import Account, Host
+from standard import config as product_config
+from standard.config_records import Config
 
 RULE = "install"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -75,6 +77,14 @@ class Install:
         if self.settings is None:
             raise refuse("the settings were not settled before this step")
         return self.settings
+
+    def product_config(self) -> Config:
+        """The product's factory.toml, from the owner's checkout of it."""
+        try:
+            return product_config.load(self.product)
+        except product_config.ConfigError as exc:
+            raise refuse(f"The product's {product_config.FILE} cannot be used ({exc}): fix it in the product, then "
+                         "install again") from exc  # fmt: skip
 
     def checkout(self) -> Path:
         """The agent user's own checkout of the product, where every session works."""

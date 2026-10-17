@@ -22,3 +22,10 @@ def test_the_site_answers_blocked_paths_first_and_keeps_websockets_through_a_rel
     assert (tmp_path / "notes-routes.caddy").read_text() == (
         f"{edge.HEADER}\napi.notes.example.com {{\n\tredir https://notes.example.com{{uri}} permanent\n}}\n"
     )
+
+
+def test_a_site_bound_to_one_address_listens_there_alone() -> None:
+    text = edge.site(["http://203.0.113.7:8090"], 8100, bind="203.0.113.7")
+
+    # A wildcard would collide with a site on the same port elsewhere, and answer on every bridge gateway too.
+    assert text.splitlines()[1:3] == ["http://203.0.113.7:8090 {", "\tbind 203.0.113.7"]

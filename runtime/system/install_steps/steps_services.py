@@ -14,7 +14,6 @@ from runtime.shared import error_reports
 from runtime.shared.paths import DASHBOARD_USER, WARDEN_USER
 from runtime.system import layout
 from runtime.system.job import Install, refuse
-from standard import config as product_config
 from standard.services import provision, stack
 
 SET_UP = "set the server up first (python3 -m standard.server.setup), then install again"
@@ -44,12 +43,7 @@ def share(ctx: Install) -> None:
 def errors_project(ctx: Install) -> None:
     """The factory's own project in the shared GlitchTip, and its address on this machine's loopback, written for the
     warden and the dashboard, where their own errors go."""
-    host = ctx.host
-    try:
-        config = product_config.load(ctx.product)
-    except product_config.ConfigError as exc:
-        raise refuse(f"The product's {product_config.FILE} cannot be used ({exc}): fix it in the product, then "
-                     "install again") from exc  # fmt: skip
+    host, config = ctx.host, ctx.product_config()
     name = error_reports.PROJECT
     if host.dry:
         host.say(f"would make the shared GlitchTip's {name} project in {config.product.name}'s organization")

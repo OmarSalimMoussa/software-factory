@@ -108,6 +108,30 @@ def test_a_verb_runs_on_a_provisioned_slot_and_a_successful_empty_drops_it(
     assert (env_file.parent / "seeds" / "users.json").exists()
 
 
+@pytest.mark.parametrize(
+    ("slot", "zero_origin", "origin"),
+    [
+        (0, "http://203.0.113.7:8090", "http://203.0.113.7:8090"),
+        (2, "http://203.0.113.7:8090", "http://127.0.0.1:8102"),
+        (0, "", "http://127.0.0.1:8100"),
+    ],
+    ids=["staging", "another-slot", "no-address"],
+)
+def test_staging_tells_its_product_the_boxs_address_and_every_other_slot_its_loopback(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch, slot: int, zero_origin: str, origin: str
+) -> None:
+    monkeypatch.setenv("DEV_EXIT", "0")
+    shared = Shared(checkout)
+    monkeypatch.setattr(provision, "workspace", shared.workspace)
+    places = Places.under(tmp_path)
+
+    stack_run.product_verb(places, settings(**{"slots.zero_origin": zero_origin}), slot, ["up"], checkout,
+                           run=_never, timeout=60, request=REQUEST)  # fmt: skip
+
+    assert shared.calls[0][1]["origin"] == origin
+    assert f"NOTES_ORIGIN={origin}\n" in (places.slot_env_dir(slot) / "notes.env").read_text()
+
+
 def test_a_slot_that_cannot_be_provisioned_runs_no_verb(
     tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

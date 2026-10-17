@@ -51,7 +51,7 @@
    "button": {
     "label": "Open acme-app",
     "url": "/api/slot/open",
-    "title": "Opens slot 0 on this laptop, signed in as owner@example.com"
+    "title": "Opens staging, signed in as owner@example.com"
    }
   },
   "rows": [

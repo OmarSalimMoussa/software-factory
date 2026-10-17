@@ -225,12 +225,12 @@ def seed(root: Path, now: float = T0) -> Places:
     places.state.mkdir(parents=True, exist_ok=True)
     places.totp_secret.write_text(totp.new_secret())
     # Rows per page as the UI's drives page them, the implementers' cap raised from its default, an estimate as soon
-    # as a rung has one landed run, and the test address Open signs in as.
+    # as a rung has one landed run, and the test address Open signs in as, to staging on the box's address.
     store.write_text(
         places.overrides,
         "[caps]\nimplementers = 4\n\n[dashboard]\npage_size = 25\n\n[routing]\n"
         "estimate_min_runs = 1\n\n"
-        '[slots]\nowner_address = "owner@example.com"\n',
+        '[slots]\nowner_address = "owner@example.com"\nzero_origin = "http://203.0.113.7:8090"\n',
     )
     settings = settings_module.load(places.defaults, places.overrides)
     public.write_settings(places, settings)

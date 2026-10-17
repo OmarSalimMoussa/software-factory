@@ -2,7 +2,7 @@
 
 The edge (container factory-edge) imports every file in the sites folder. Each workspace's site sends its domain to
 the loopback port its own stack publishes; the blocked paths answer 404 before anything reaches the stack. The
-factory's install adds one more site there, for its dashboard.
+factory's install adds its dashboard's site there and, when the box opens staging to the world, staging's.
 """
 
 from __future__ import annotations
@@ -20,12 +20,13 @@ RELOAD = ["docker", "exec", EDGE, "caddy", "reload", "--config", "/etc/caddy/Cad
 HEADER = "# Written by the factory; do not edit."
 
 
-def site(names: Sequence[str], port: int, blocked: Sequence[str] = ()) -> str:
-    """One site: its names, the paths that answer 404 first, and the loopback port that serves the rest."""
+def site(names: Sequence[str], port: int, blocked: Sequence[str] = (), bind: str | None = None) -> str:
+    """One site: its names, its one address (``bind``), the paths that answer 404 first, and its loopback port."""
     return "\n".join(
         [
             HEADER,
             f"{', '.join(names)} {{",
+            *([f"\tbind {bind}"] if bind else []),
             # Caddy matches the decoded, lowercased path with doubled slashes merged, so no spelling slips past.
             *(f"\trespond {path} 404" for path in blocked),
             f"\treverse_proxy 127.0.0.1:{port} {{",
@@ -36,6 +37,10 @@ def site(names: Sequence[str], port: int, blocked: Sequence[str] = ()) -> str:
             "",
         ]
     )
+
+
+def names(site_text: str) -> list[str]:
+    return site_text.splitlines()[1].removesuffix(" {").split(", ")
 
 
 def routes_text(config: Config) -> str:

@@ -8,7 +8,7 @@ from system_fakes import dry_job
 from runtime.shared.paths import MANAGED_SETTINGS, Places
 from runtime.system import install, layout, uninstall
 from runtime.system.host import Account, DryHost
-from standard.server import setup_steps
+from standard.server import edge, setup_steps
 from standard.services import stack
 
 
@@ -49,6 +49,18 @@ def test_the_uninstall_removes_every_sealed_copy_but_the_one_it_runs_from(
         # A copy an earlier failed install kept goes; the one this runs from goes when it ends.
         gone = {action.removeprefix("remove: ") for action in host.actions if action.startswith("remove: ")}
         assert gone == {str(stale)}
+
+
+def test_the_uninstall_takes_stagings_site_off_the_edge_and_closes_its_port(monkeypatch: pytest.MonkeyPatch) -> None:
+    site = edge.site(["http://203.0.113.7:8090"], 8100, bind="203.0.113.7")
+    host = DryHost(dry=False, files={layout.SLOT0_SITE: site})
+    asked: list[str] = []
+    monkeypatch.setattr(host, "query", lambda argv, **kw: asked.append(" ".join(argv)) or (0, ""))
+
+    uninstall.programs(host)
+
+    assert [action for action in host.actions if str(edge.SITES) in action] == [f"remove: {layout.SLOT0_SITE}"]
+    assert asked == ["ufw delete allow 8090/tcp", " ".join(edge.RELOAD)]
 
 
 def test_the_uninstall_leaves_the_shared_services_and_their_data_and_their_settings_the_admins_alone(

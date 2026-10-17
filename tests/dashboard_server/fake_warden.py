@@ -56,9 +56,9 @@ class Launcher:
         self.calls.append(("message", (session_id, text)))
 
     def run_stack(self, slot: int, verb: list[str], session: str, given: str = "") -> StackResult:
-        """Slot 0's sign-in prints a one-time link on its own port; every other verb prints nothing."""
+        """Slot 0's sign-in prints a one-time link on its own address; every other verb prints nothing."""
         settings = settings_module.load(self.places.defaults, self.places.overrides)
-        link = f"http://127.0.0.1:{leases.port(settings, slot)}/sign-in/once"
+        link = f"{leases.origin(settings, slot)}/sign-in/once"
         return StackResult(exit=0, tail=link if verb[:1] == ["sign-in"] else "", log="stack.log")
 
     def start_upgrade(self, commit: str) -> None:

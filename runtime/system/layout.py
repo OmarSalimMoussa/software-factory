@@ -63,8 +63,9 @@ POLKIT_RULE = Path("/etc/polkit-1/rules.d/50-software-factory.rules")
 # A file of the factory's own: /etc/software-factory holds the server set-up's product.toml and heartbeat-ping.
 NFT_FILE = Path("/etc/software-firewall.nft")
 NFT_TABLE = "software_factory"
-# The dashboard's site on the box's edge, which the server set-up runs; a deploy writes only its workspaces' sites.
+# The dashboard's and staging's sites on the box's edge, which the server set-up runs; a deploy writes only its own.
 EDGE_SITE = edge.SITES / "factory.caddy"
+SLOT0_SITE = edge.SITES / "factory-slot0.caddy"
 APPARMOR_DIR = Path("/etc/apparmor.d")
 APPARMOR_PROFILE = APPARMOR_DIR / "software-bwrap"
 BWRAP = Path("/usr/bin/bwrap")

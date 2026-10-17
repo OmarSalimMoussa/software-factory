@@ -4,13 +4,13 @@ From the owner's clone of the factory, or from the installed copy in /opt/softwa
     sudo python3 runtime/system/uninstall.py [--repo <product checkout>] [--dry-run] [--verbose]
 
 It refuses while any session is working or waiting. It stops and removes the factory's units, rules, firewall table,
-AppArmor profile, managed settings, commands and programs, the dashboard's site on the edge, and the sealed copies
-installs ran from; the warden's state (its secrets and the 6-digit code's secret included) and the keys slots took;
-the factory's users with their homes (the agents' clone among them); and the factory's git hooks setting in the
-owner's checkout. The shared services the server set-up runs stay, with their data, and their services.env is its
-admin's alone again. It never removes packages, the owner's own files, the install logs, what else the server set-up
-placed (the edge and /etc/software-factory among it), or anything on GitHub, where it says what to remove. Like the
-installer, it shows a few phases and logs the rest.
+AppArmor profile, managed settings, commands and programs, the dashboard's and staging's sites on the edge (and
+staging's port in ufw), and the sealed copies installs ran from; the warden's state (its secrets and the 6-digit
+code's secret included) and the keys slots took; the factory's users with their homes (the agents' clone among them);
+and the factory's git hooks setting in the owner's checkout. The shared services the server set-up runs stay, with
+their data, and their services.env is its admin's alone again. It never removes packages, the owner's own files, the
+install logs, what else the server set-up placed (the edge and /etc/software-factory among it), or anything on
+GitHub, where it says what to remove. Like the installer, it shows a few phases and logs the rest.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from runtime.shared.protocol import Refused
 from runtime.system import layout
 from runtime.system.github_keys import WARDEN_TITLE
 from runtime.system.host import Account, CommandError, DryHost, Host
-from runtime.system.install_steps import steps_prepare
+from runtime.system.install_steps import steps_prepare, steps_wire
 from runtime.system.job import REPO_ROOT, Install
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
@@ -137,8 +137,13 @@ def programs(host: Host) -> None:
                  paths.UPGRADE):  # fmt: skip
         _remove(host, path)
     sealed_copies(host)
-    if host.exists(layout.EDGE_SITE):
-        host.remove(layout.EDGE_SITE)
+    opened = steps_wire.opened_port(host)
+    if opened is not None:
+        _try(host, ["ufw", "delete", *steps_wire.opening(opened)])
+    sites = [site for site in (layout.EDGE_SITE, layout.SLOT0_SITE) if host.exists(site)]
+    for site in sites:
+        host.remove(site)
+    if sites:
         _try(host, server_edge.RELOAD)
 
 

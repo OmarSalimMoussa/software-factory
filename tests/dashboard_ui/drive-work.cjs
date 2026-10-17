@@ -103,14 +103,16 @@ drive('work', async t => {
   await p.click('[data-worktab="checks"]'); await ready(p);
   t.check((await p.$$('.scen i')).length === 80, 'check strips wrong');
   t.check((await p.$$('.legend span')).length === 3, 'check legend wrong');
-  // Done: each finished task with how far it reached; its commits; Open opens slot 0's sign-in link in a new tab
+  // Done: each finished task with how far it reached; its commits; Open opens staging's sign-in link in a new tab,
+  // on whatever address the warden answers with
   await p.click('[data-worktab="done"]'); await ready(p);
   t.check((await p.$$('.done-row')).length === 4, 'the done tasks are not listed');
   t.check((await p.$$eval('.done-row:first-child .stages .chip', els => els.map(e => e.className))).join() === 'chip good,chip good,chip good,chip ', 'the stages are wrong');
   await t.shot(p, 'work-done-1440.png');
-  await p.context().route('http://127.0.0.1:8100/**', r => r.fulfill({body: 'signed in'}));
-  const [slot] = await Promise.all([p.context().waitForEvent('page'), p.click('[data-slot-open]')]);
-  t.check(await slot.waitForURL('http://127.0.0.1:8100/sign-in/once').then(() => true, () => false), 'Open did not open slot 0 signed in');
+  await p.context().route('**/sign-in/once', r => r.fulfill({body: 'signed in'}));
+  const [answer, slot] = await Promise.all([p.waitForResponse(r => r.url().endsWith('/api/slot/open')), p.context().waitForEvent('page'), p.click('[data-slot-open]')]);
+  const link = (await answer.json()).open;
+  t.check(await slot.waitForURL(link).then(() => true, () => false), 'Open did not open staging signed in');
   await slot.close();
   await p.click('[data-done-view="commits"]'); await ready(p);
   t.check((await p.$$('#page .commit-row')).length === 11, 'the commits are not listed');

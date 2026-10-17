@@ -59,4 +59,4 @@ def test_the_open_button_says_why_it_cannot_open_slot_0(
 def test_open_answers_with_the_link_the_page_opens(rig: Rig) -> None:
     reply = rig.post("/api/slot/open", {"idempotency_key": "open-slot-01"})
 
-    assert json.loads(reply.body)["open"] == "http://127.0.0.1:8100/sign-in/once"
+    assert json.loads(reply.body)["open"] == "http://203.0.113.7:8090/sign-in/once"

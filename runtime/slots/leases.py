@@ -108,6 +108,12 @@ def port(settings: Settings, n: int) -> int:
     return settings.get_int("slots.port_base") + n
 
 
+def origin(settings: Settings, n: int) -> str:
+    """Where slot ``n``'s product says it is: staging (slot 0) at ``slots.zero_origin`` when set, else on loopback."""
+    public = settings.get_str("slots.zero_origin")
+    return public if n == 0 and public else f"http://127.0.0.1:{port(settings, n)}"
+
+
 def stand_in(n: int) -> str:
     """The commit a slot's env file names: a slot's images carry this tag, and only the image knows its commit."""
     return f"dev-slot{n}"

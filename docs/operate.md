@@ -54,7 +54,7 @@ or from `/opt/software-factory`.
   another task's check to pass is on hold, and comes back by itself.
 - **Boost** any queued task or request on the Work page to make it the next proposal.
 - **Done**, on the Work page, lists each finished task and how far it has reached: local, GitHub, staging, prod.
-  Its Open button opens slot 0 on this laptop, signed in as the test address you set under Settings, Slots.
+  Its Open button opens staging, which is slot 0, signed in as the test address you set under Settings, Slots.
 - **Talk to the orchestrator** in its chat. What you ask becomes a request in your words. What you say about the
   factory itself goes to `SELF_REFLECT.md`.
 

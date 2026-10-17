@@ -1,15 +1,16 @@
 """The steps that wire the factory in: managed settings, units, polkit, the firewall, the factory command, the git
-hooks, the dashboard's site on the box's edge, starting it, and the record a finished install leaves."""
+hooks, the dashboard's and staging's sites on the box's edge, starting it, and the record a finished install leaves."""
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from runtime.shared import network, upgrades
 from runtime.shared.paths import AGENT_USER, MANAGED_SETTINGS, SCRATCH, SLICE, WARDEN_USER
 from runtime.shared.protocol import Refused
 from runtime.system import layout, render, root_commits
-from runtime.system.host import CommandError
+from runtime.system.host import CommandError, Host
 from runtime.system.job import Install, github_name, refuse
 from standard.server import edge as server_edge
 
@@ -133,16 +134,54 @@ def edge(ctx: Install) -> None:
     """Root writes the dashboard's site on the box's edge, so no agent can reroute the owner's dashboard. The edge
     fetches each name's certificate itself once the name's DNS points at the box. A site the edge refuses comes off
     again at once: left there, it would fail every reload of prod's deploys, and the edge's next start."""
-    settings, host = ctx.need_settings(), ctx.host
+    settings = ctx.need_settings()
     site = server_edge.site(public_hosts(settings.get_list("dashboard.hosts")), settings.get_int("dashboard.port"))
-    host.write(layout.EDGE_SITE, site, mode=0o644)
+    _publish(ctx.host, layout.EDGE_SITE, site, "the dashboard's site", "dashboard.hosts")
+    _staging(ctx)
+
+
+def _staging(ctx: Install) -> None:
+    """Slot 0, which is staging, at ``slots.zero_origin``: a site listening on the box's own address alone, with the
+    product's blocked paths, and its port open in ufw, which the edge obeys on the host's network. The port the last
+    site opened closes first, so neither a new port nor an empty setting leaves it open."""
+    settings, host = ctx.need_settings(), ctx.host
+    origin = settings.get_str("slots.zero_origin")
+    opened = opened_port(host)
+    if opened is not None:
+        host.run(["ufw", "delete", *opening(opened)])
+    if not origin:
+        if opened is not None:
+            host.remove(layout.SLOT0_SITE)
+            host.run(server_edge.RELOAD)
+        return
+    address, _, port = origin.removeprefix("http://").partition(":")
+    blocked = ctx.product_config().edge.blocked_paths
+    site = server_edge.site([origin], settings.get_int("slots.port_base"), blocked, bind=address)
+    _publish(host, layout.SLOT0_SITE, site, "staging's site", "slots.zero_origin")
+    host.run(["ufw", *opening(port)])
+
+
+def opened_port(host: Host) -> str | None:
+    """The port staging's site on the edge serves, from its address; None when it has no site."""
+    if not host.exists(layout.SLOT0_SITE):
+        return None
+    return server_edge.names(host.read(layout.SLOT0_SITE))[0].rpartition(":")[2]
+
+
+def opening(port: str) -> list[str]:
+    """The ufw rule that lets the internet reach ``port``."""
+    return ["allow", f"{port}/tcp"]
+
+
+def _publish(host: Host, path: Path, site: str, what: str, setting: str) -> None:
+    host.write(path, site, mode=0o644)
     try:
         host.run(server_edge.RELOAD)
     except CommandError as exc:
-        host.remove(layout.EDGE_SITE)
+        host.remove(path)
         host.run(server_edge.RELOAD)
-        raise refuse(f"The edge refused the dashboard's site, which is off the edge again ({exc}): put dashboard.hosts "
-                     "right with --set, then install again") from exc  # fmt: skip
+        raise refuse(f"The edge refused {what}, which is off the edge again ({exc}): put {setting} right with --set, "
+                     "then install again") from exc  # fmt: skip
 
 
 def start(ctx: Install) -> None:

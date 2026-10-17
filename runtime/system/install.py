@@ -89,7 +89,7 @@ PHASES: tuple[Phase, ...] = (
         ("Installing the factory commands", steps_wire.factory_command),
         ("Adding the factory's checks to the product", steps_wire.git_hooks),
         ("Moving the product to this factory", steps_wire.product_pin),
-        ("Publishing the dashboard on the edge", steps_wire.edge),
+        ("Publishing the dashboard and staging on the edge", steps_wire.edge),
     )),
     Phase("Starting up", (
         ("Giving the factory's errors a GlitchTip project", steps_services.errors_project),

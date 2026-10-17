@@ -92,7 +92,8 @@ If one fails, the set-up stops before it changes anything and says what to do.
 
 One stack per server, compose project `factory-services`. Each workspace gets its own database, GlitchTip projects
 and Langfuse environment from it at every deploy ([deploy.md](deploy.md)). Every port is bound to the server's
-loopback address; only the tailnet reaches them, and only the edge answers on the internet (80 and 443).
+loopback address; only the tailnet reaches them, and only the edge answers on the internet (80 and 443, and
+staging's port when the factory's `slots.zero_origin` names one).
 
 | Service | Address on the tailnet |
 |---|---|

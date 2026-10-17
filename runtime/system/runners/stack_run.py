@@ -149,7 +149,7 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
         print(f"stack-run: slot {slot} ran nothing: {why}", flush=True)
         return lf.REFUSED
     workspace, port = f"slot{slot}", leases.port(settings, slot)
-    origin, commit = f"http://127.0.0.1:{port}", leases.stand_in(slot)
+    origin, commit = leases.origin(settings, slot), leases.stand_in(slot)
     env_dir, state = places.slot_env_dir(slot), places.slot_state_dir(slot)
     try:
         config = product_config.load(checkout)

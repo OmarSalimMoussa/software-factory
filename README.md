@@ -35,6 +35,7 @@ product's scripts need (the setting `install.toolchain`) as your own shell finds
 fnm), and refuses one whose version differs from the product's `.nvmrc` or `.node-version`. It copies the Python the
 product asks for from your uv, so the agents and the stack run the same tools you do. It puts the dashboard on the
 server's edge, at each name in `dashboard.hosts` that is not loopback (give yours with `--set`), and refuses a machine
-with no edge. The uninstall takes the dashboard off the edge again, and leaves what the server set-up placed.
+with no edge. With `slots.zero_origin` set, it opens staging there too, on the box's own address. The uninstall takes
+both off the edge again, and leaves what the server set-up placed.
 
 How to run it: [docs/operate.md](docs/operate.md). The shape a product must take: [docs/repo-shape.md](docs/repo-shape.md).

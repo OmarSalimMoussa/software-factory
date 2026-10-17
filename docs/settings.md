@@ -26,7 +26,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `replay` | How a tester's run is replayed for the owner: the builder's timings, how long the picture stays hidden after a sign-in link is typed, and the player's pace |
 | `intake` | Batch size and wait, the fast lane's time, the score's weights |
 | `routing` | Slices per rung, open proposals at once, the estimate's window, tries to confirm a cause |
-| `slots` | How many, the first port, the output an agent sees, how long a run may take, the keys slots take from your env file |
+| `slots` | How many, the first port, the output an agent sees, how long a run may take, the keys slots take from your env file, staging's address on the internet |
 | `budget` | The slice's memory and CPU, and the memory a test run needs |
 | `checks` | How long a check and one test may run, how much of a report an agent sees, and the tool caches a check may write |
 | `vitals`, `watch` | Amber and red levels; probe, loop, grace and silence times |
@@ -40,6 +40,11 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 
 `models.allowed` and `prices` are set at install and are read-only on the dashboard. Staging's and prod's health
 addresses are not settings: the warden reads them from `factory.toml` in the product's checkout at every probe.
+
+`slots.zero_origin` is where staging, which is slot 0, opens to the internet: `http://<the box's IPv4 address>:<port>`,
+on a port clear of the dashboard's and the slots'. The install puts a site for it on the box's edge, listening on that
+address alone, and opens the port in ufw. Slot 0's product is told that address, and Open on the Done tab takes a
+sign-in link only there. Empty, staging stays on the box's loopback, and the install takes the site and the port off.
 
 `install.toolchain` names the programs the product's scripts need, such as `uv` and `node`. The install copies each
 one from the owner's PATH, so the agents and the stack run the same tools as the owner.
@@ -62,6 +67,6 @@ walls.
 | The repo | At the next orchestrator start; stop the old one first |
 | The dashboard's threads, and the warden's (`factory.warden_threads`) | At the next warden start |
 | The `install` group | At the next install |
-| The dashboard's port and hosts, the probe period and the loop period | Only with the install's `--set`: the install wires them into the firewall, the edge's site and the check-in periods, so the Settings page shows them read-only |
+| The dashboard's port and hosts, staging's address, the probe period and the loop period | Only with the install's `--set`: the install wires them into the firewall, the edge's sites and the check-in periods, so the Settings page shows them read-only |
 
 The dashboard shows the value running now beside one that waits, such as "4 at the next slot claim".

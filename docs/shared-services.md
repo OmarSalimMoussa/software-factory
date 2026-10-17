@@ -40,9 +40,9 @@ the share is made once and then kept.
   runs master, so the warden files each new issue of its projects as a request, as it does prod's and staging's.
 - **Its traces** in the product's one Langfuse project, under the environment `slot<n>`.
 - **Its env file**, written from the product's env template. It holds the slot's own values: the workspace
-  `slot<n>`, the origin `http://127.0.0.1:<port>`, the commit `dev-slot<n>` and the Docker socket
-  `/var/run/docker.sock`, plus the shared services' keys and your slot keys. `scripts/dev` finds it in
-  `FACTORY_ENV_FILE`, beside `FACTORY_SLOT`, `FACTORY_PORT` and `FACTORY_SLOT_DIR`.
+  `slot<n>`, the origin `http://127.0.0.1:<port>` (slot 0's is `slots.zero_origin` when set), the commit `dev-slot<n>`
+  and the Docker socket `/var/run/docker.sock`, plus the shared services' keys and your slot keys. `scripts/dev` finds
+  it in `FACTORY_ENV_FILE`, beside `FACTORY_SLOT`, `FACTORY_PORT` and `FACTORY_SLOT_DIR`.
 
 The env file and the database user's password live in the stack user's own folder, `/home/software-stack/slots/<n>/`,
 which no other user can open. When the share cannot be made, the command does not run, and its output says why.

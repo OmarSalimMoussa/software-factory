@@ -8,6 +8,8 @@ else in the runtime reads a number, model or time from anywhere but here.
 from __future__ import annotations
 
 import copy
+import ipaddress
+import re
 import tomllib
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
@@ -36,6 +38,7 @@ _PRICE_KEYS = ("input", "output", "cache_read", "cache_write")
 # would act outside its walls the next time something read it, so no writable cache lies under these.
 _UNWRITABLE = frozenset({".claude", ".config", ".local", ".ssh", "bin"})
 _WEIGHT_KEYS = ("severity", "goal", "requests", "users", "age")
+_ORIGIN = re.compile(r"http://(?P<host>[0-9.]+):(?P<port>[0-9]{1,5})")
 _KIB = {"K": 1, "M": 1024, "G": 1024**2, "T": 1024**3}
 
 
@@ -283,11 +286,32 @@ def _between(tree: dict[str, Any]) -> list[str]:
             "budget.test_memory_ceiling_mib and budget.test_reserve_mib must fit under budget.slice_memory_high, "
             "or no check could run the tests"
         )
-    return problems + [
+    return problems + _zero_origin(tree) + [
         f"checks.writable_caches: {path!r} must be a folder inside the agent's home, such as .cache/uv, and not "
         f"under {', '.join(sorted(_UNWRITABLE))}"
         for path in tree["checks"]["writable_caches"] if not _home_folder(path)
     ]  # fmt: skip
+
+
+def _zero_origin(tree: dict[str, Any]) -> list[str]:
+    """Staging's address on the internet: none, or the box's own IPv4 address on a port no other part listens on."""
+    origin = _leaf(tree, "slots.zero_origin")
+    if not origin:
+        return []
+    bad = ["slots.zero_origin must be http://<the box's IPv4 address>:<port>, such as http://203.0.113.7:8090"]
+    found = _ORIGIN.fullmatch(origin)
+    if found is None or not 0 < int(found["port"]) < 65536:
+        return bad
+    try:
+        ipaddress.IPv4Address(found["host"])
+    # telemetry: surfaced — a host that is no IPv4 address is the `bad` problem returned
+    except ValueError:
+        return bad
+    port, base, count = int(found["port"]), _leaf(tree, "slots.port_base"), _leaf(tree, "slots.count")
+    if port == _leaf(tree, "dashboard.port") or base <= port < base + count:
+        return [f"slots.zero_origin's port {port} must be clear of dashboard.port and the slots' ports, {base} to "
+                f"{base + count - 1}"]  # fmt: skip
+    return []
 
 
 def load(defaults_path: Path, overrides_path: Path | None) -> Settings:
