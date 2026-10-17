@@ -1,8 +1,8 @@
-// What the warden may ask systemd and logind for, and nothing more: start and stop the three template units that run
-// as the agent and stack users (a request, a stack verb, a check), restart the agents' Claude daemon (so it loads the
-// token of the account the owner switched to), set the factory slice's budget, start an upgrade to a commit (the one
-// unit it starts as root, whose runner downloads that commit from GitHub itself), and hold the sleep and lid locks
-// while agents work. No unit of any other name.
+// What the warden may ask systemd and logind for, and nothing more: start and stop the four template units that run
+// one request each (a request or a check as the agent, a stack verb as the stack user, a deploy of prod as the box's
+// admin), restart the agents' Claude daemon (so it loads the token of the account the owner switched to), set the
+// factory slice's budget, start an upgrade to a commit (the one unit it starts as root, whose runner downloads that
+// commit from GitHub itself), and hold the sleep and lid locks while agents work. No unit of any other name.
 polkit.addRule(function (action, subject) {
   if (subject.user !== "@warden_user@") {
     return polkit.Result.NOT_HANDLED;
@@ -10,7 +10,7 @@ polkit.addRule(function (action, subject) {
   if (action.id === "org.freedesktop.systemd1.manage-units") {
     var unit = action.lookup("unit") || "";
     var verb = action.lookup("verb") || "";
-    if (/^software-(agent|stack|check)-run@[A-Za-z0-9_-]+\.service$/.test(unit) && (verb === "start" || verb === "stop")) {
+    if (/^software-(agent|stack|check|deploy)-run@[A-Za-z0-9_-]+\.service$/.test(unit) && (verb === "start" || verb === "stop")) {
       return polkit.Result.YES;
     }
     if (/^software-upgrade@[0-9a-f]{40}\.service$/.test(unit) && verb === "start") {

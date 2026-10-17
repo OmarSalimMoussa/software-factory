@@ -15,7 +15,7 @@ AGENT_UID = "1001"
 
 
 def _values(**changes: object) -> dict[str, str]:
-    return render.values(PLACES, settings(**changes), agent_uid=AGENT_UID)
+    return render.values(PLACES, settings(**changes), agent_uid=AGENT_UID, owner_user="deploy")
 
 
 def _unit(name: str, **changes: object) -> str:
@@ -182,6 +182,15 @@ def test_the_one_unit_the_warden_starts_as_root_is_the_upgrade_to_a_full_commit(
     assert {"User=root", "ExecStart=/usr/bin/python3 -I /opt/software-factory/runtime/system/runners/upgrade.py %i",
             "TimeoutStartSec=90min"} <= set(unit)  # fmt: skip
     assert not any(line.startswith("Slice=") for line in unit)
+
+
+def test_a_deploy_runs_as_the_owner_outside_the_slice_with_no_time_limit_that_could_cut_it_off() -> None:
+    lines = _unit(layout.DEPLOY_RUN).splitlines()
+
+    runner = "/usr/bin/python3 -I /opt/software-factory/runtime/system/runners/deploy_run.py"
+    assert {"User=deploy", "TimeoutStartSec=infinity", f"ExecStart={runner} /var/lib/software-factory %i"} <= set(lines)
+    # An install stops the factory's slice and restarts the warden: neither may cut a deploy off half way.
+    assert not any(line.startswith(("Slice=", "BindsTo=", "PartOf=")) for line in lines)
 
 
 def test_the_dashboards_stand_in_holds_its_port_never_starts_alone_and_gives_way_to_the_dashboard() -> None:

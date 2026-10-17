@@ -159,7 +159,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("watch.outage_after", "Failed prod probes in a row that mean an outage"),
             ("watch.http_timeout_seconds", "Seconds before a probe times out"),
             ("watch.inbox_wait_seconds", "Seconds the orchestrator's inbox wait lasts"),
-            ("watch.push_wait_minutes", "Minutes a push to prod may take"),
+            ("watch.push_wait_minutes", "Minutes prod may take to build, deploy and answer"),
             ("watch.deploy_minutes", "Minutes staging's deploy of a push may take"),
             ("watch.ci_poll_minutes", "Ask GitHub about CI's run of a push every, minutes"),
             ("watch.ci_log_kib", "KiB of a failed CI job's log its request quotes"),

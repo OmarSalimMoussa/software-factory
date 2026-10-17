@@ -1,14 +1,13 @@
-"""The build plan: which images CI builds for a commit, in what order, and which files a deploy needs.
+"""The build plan: which images prod's deploy builds for a commit, in what order, and which files it needs.
 
 Every compose service with a build section is an image named after the service, and so is each of
 ``[build].extra_images``. An image whose Dockerfile builds FROM another product image tagged ``${tag_arg}`` derives
-from it and builds after it; that base must not derive from a third (one level only). CI has no product env, so a
-build arg may name only ``commit_arg`` or ``tag_arg``, which become the short commit; ``commit_arg`` is always passed,
-and ``tag_arg`` too for a derived image. The files are ``[deploy].files``, every after-deploy hook and factory.toml.
+from it and builds after it; that base must not derive from a third (one level only). The build has no product env,
+so a build arg may name only ``commit_arg`` or ``tag_arg``, which become the short commit; ``commit_arg`` is always
+passed, and ``tag_arg`` too for a derived image. The files are ``[deploy].files``, every after-deploy hook and
+factory.toml.
 
-CI runs ``PYTHONPATH=<factory> python3 -m standard.plan --repo . --commit <sha> --factory-commit <sha> --out
-plan.json [--github-output]``; the last appends ``base``, ``derived`` (compact JSON lists of images), ``short`` and
-``has_derived`` to $GITHUB_OUTPUT.
+``python3 -m standard.plan --repo . --commit <sha> --out plan.json`` writes a checkout's plan and prints its images.
 """
 
 from __future__ import annotations
@@ -26,12 +25,10 @@ from typing import Any
 
 from standard import compose as compose_mod
 from standard import config as config_mod
-from standard import environment
 from standard.compose import Compose, ComposeError
 from standard.config import ConfigError
 from standard.config_records import Config
 
-DEPLOY_IMAGE = "deploy"
 SHORT = 8
 _SHA = re.compile(r"^[0-9a-f]{40}$")
 _IMAGE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
@@ -65,7 +62,6 @@ class Plan:
     registry: str
     commit: str
     short: str
-    factory_commit: str
     images: tuple[Image, ...]  # every base image, then every derived one
     files: tuple[str, ...]
 
@@ -91,7 +87,7 @@ def files(config: Config) -> tuple[str, ...]:
 
 
 def images(repo: Path, config: Config, compose: Compose, short: str) -> tuple[Image, ...]:
-    """Every image CI builds, base images first; PlanError lists every problem."""
+    """Every image a deploy builds, base images first; PlanError lists every problem."""
     problems: list[str] = []
     sources = _sources(config, compose, problems)
     known = {s.name for s in sources}
@@ -134,47 +130,17 @@ def _derivation_problems(source: _Source, by_name: dict[str, _Source]) -> list[s
     return problems
 
 
-def make(repo: Path, commit: str, factory_commit: str) -> Plan:
-    shas = (("--commit", commit), ("--factory-commit", factory_commit))
-    problems = [f"{what} must be a full 40-character lowercase sha, not {sha!r}" for what, sha in shas
-                if not _SHA.match(sha)]  # fmt: skip
-    if problems:
-        raise PlanError(problems)
-    try:
-        config = config_mod.load(repo)
-    except ConfigError as exc:
-        raise PlanError([f"{config_mod.FILE}: {p}" for p in exc.problems]) from exc
+def make(repo: Path, config: Config, commit: str) -> Plan:
+    """The plan of ``commit``, checked out at ``repo``, with ``config``: a push back passes the server's settings."""
+    if not _SHA.match(commit):
+        raise PlanError([f"the commit must be a full 40-character lowercase sha, not {commit!r}"])
     try:
         compose = compose_mod.read(repo / compose_mod.FILE)
     except ComposeError as exc:
         raise PlanError([f"{compose_mod.FILE}: {p}" for p in exc.problems]) from exc
     short = commit[:SHORT]
     found = images(repo, config, compose, short)
-    return Plan(config.product.name, config.product.registry, commit, short, factory_commit, found, files(config))
-
-
-def read(data: object) -> Plan:
-    """A plan.json as this factory writes it, or PlanError: its fields must be exactly a Plan's, and each image's
-    exactly an Image's. The server deploys any build whose plan has this shape, whichever factory commit planned it,
-    so pushing prod back to a build an older factory planned works for as long as the shape holds."""
-    want, want_image = [f.name for f in dataclasses.fields(Plan)], [f.name for f in dataclasses.fields(Image)]
-    if not isinstance(data, dict) or sorted(data) != sorted(want):
-        found = sorted(data) if isinstance(data, dict) else type(data).__name__
-        raise PlanError([f"want exactly the fields {want}, not {found}"])
-    images, problems = data["images"], []
-    if not isinstance(images, list) or not images:
-        raise PlanError(["images is not a list of images"])
-    for n, image in enumerate(images):
-        if not isinstance(image, dict) or sorted(image) != sorted(want_image):
-            problems.append(f"image {n + 1} wants exactly the fields {want_image}")
-        elif not isinstance(image["ref"], str) or not isinstance(image["name"], str):
-            problems.append(f"image {n + 1}'s name and ref are not text")
-    files = data["files"]
-    if not isinstance(files, list) or not all(isinstance(f, str) for f in files):
-        problems.append("files is not a list of paths")
-    if problems:
-        raise PlanError(problems)
-    return Plan(**{**data, "images": tuple(Image(**i) for i in images), "files": tuple(files)})
+    return Plan(config.product.name, config.product.registry, commit, short, found, files(config))
 
 
 def image_ref(config: Config, image: str) -> str:
@@ -197,7 +163,7 @@ def _sources(config: Config, compose: Compose, problems: list[str]) -> list[_Sou
         context = _repo_path(where, "build.context", build.context, problems)
         dockerfile = _repo_path(where, "build.dockerfile", os.path.join(build.context, build.dockerfile), problems)
         if build.target is not None and "$" in build.target:
-            problems.append(f"{where}: build.target {build.target!r} names a variable CI cannot fill; write it out")
+            problems.append(f"{where}: build.target {build.target!r} names a variable the build cannot fill")
         found.append(_Source(service.name, service.name, where, context, dockerfile, build.target, build.args))
     for extra in config.build.extra_images:
         where = f"factory.toml: [build].extra_images {extra.name}"
@@ -208,8 +174,6 @@ def _sources(config: Config, compose: Compose, problems: list[str]) -> list[_Sou
     for source in found:
         if not _IMAGE.fullmatch(source.name):
             problems.append(f"{source.where}: {source.name!r} cannot name an image; use lowercase letters, digits, -")
-        if source.name == DEPLOY_IMAGE:
-            problems.append(f"{source.where}: '{DEPLOY_IMAGE}' is the factory's own image; rename the service")
         if source.name in seen:
             problems.append(f"{source.where}: the image {source.name} is built twice; rename one of them")
         seen.add(source.name)
@@ -218,7 +182,7 @@ def _sources(config: Config, compose: Compose, problems: list[str]) -> list[_Sou
 
 def _repo_path(where: str, key: str, value: str, problems: list[str]) -> str:
     if "$" in value:
-        problems.append(f"{where}: {key} {value!r} names a variable CI cannot fill; write the path out")
+        problems.append(f"{where}: {key} {value!r} names a variable the build cannot fill; write the path out")
         return value
     path = os.path.normpath(value)
     if os.path.isabs(path) or path == ".." or path.startswith("../") or "://" in value:
@@ -269,7 +233,7 @@ def _expand(text: str, values: Mapping[str, str | None], keep: str) -> str:
 
 
 def _args(config: Config, source: _Source, short: str, problems: list[str]) -> dict[str, str]:
-    """The build args with the commit filled in; any other variable is a problem, as CI has no product env."""
+    """The build args with the commit filled in; any other variable is a problem, as the build has no product env."""
     own = (config.build.commit_arg, config.build.tag_arg)
     found: dict[str, str] = {}
     for key, value in source.args:
@@ -277,53 +241,41 @@ def _args(config: Config, source: _Source, short: str, problems: list[str]) -> d
             if key in own:
                 found[key] = short
             else:
-                problems.append(f"{source.where}: build arg {key} takes its value from the environment, which CI "
-                                "does not have; give it a literal value")  # fmt: skip
+                problems.append(f"{source.where}: build arg {key} takes its value from the environment, which the "
+                                "build does not have; give it a literal value")  # fmt: skip
             continue
         strangers = [m.group(1) or m.group(3) for m in _REFERENCE.finditer(value) if m.group(0) != "$$"]
         unknown = [name for name in strangers if name not in own]
         if unknown:
-            problems.append(f"{source.where}: build arg {key} names ${{{unknown[0]}}}, which CI cannot fill (it "
-                            f"has no product env); write a literal value, or name ${{{own[0]}}} or "
+            problems.append(f"{source.where}: build arg {key} names ${{{unknown[0]}}}, which the build cannot fill "
+                            f"(it has no product env); write a literal value, or name ${{{own[0]}}} or "
                             f"${{{own[1]}}}")  # fmt: skip
             continue
         found[key] = _REFERENCE.sub(lambda m: "$" if m.group(0) == "$$" else short, value)
     return found
 
 
-def _github_output(plan: Plan) -> str:
-    def compact(items: list[Image]) -> str:
-        return json.dumps([dataclasses.asdict(i) for i in items], separators=(",", ":"))
-
-    base = [i for i in plan.images if i.after is None]
-    derived = [i for i in plan.images if i.after is not None]
-    return (f"base={compact(base)}\nderived={compact(derived)}\nshort={plan.short}\n"
-            f"has_derived={'true' if derived else 'false'}\n")  # fmt: skip
+def _settings(repo: Path) -> Config:
+    try:
+        return config_mod.load(repo)
+    except ConfigError as exc:
+        raise PlanError([f"{config_mod.FILE}: {p}" for p in exc.problems]) from exc
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="python3 -m standard.plan", description=__doc__.splitlines()[0])
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--commit", required=True)
-    parser.add_argument("--factory-commit", required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--github-output", action="store_true", help="append the outputs to $GITHUB_OUTPUT")
     args = parser.parse_args(argv)
-    output = environment.github_output() if args.github_output else None
-    if args.github_output and not output:
-        print("plan: --github-output needs GITHUB_OUTPUT, the file GitHub Actions reads outputs from", file=sys.stderr)
-        return 2
     try:
-        plan = make(args.repo, args.commit, args.factory_commit)
+        plan = make(args.repo, _settings(args.repo), args.commit)
     except PlanError as exc:
         print("plan: the product cannot be built:", file=sys.stderr)
         for problem in exc.problems:
             print(f"  {problem}", file=sys.stderr)
         return 1
     args.out.write_text(json.dumps(plan.as_json(), indent=2) + "\n", encoding="utf-8")
-    if output:
-        with open(output, "a", encoding="utf-8") as sink:
-            sink.write(_github_output(plan))
     for image in plan.images:
         print(f"{image.ref}:{plan.short}" + (f" after {image.after}" if image.after else ""))
     return 0

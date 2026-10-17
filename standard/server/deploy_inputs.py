@@ -1,5 +1,5 @@
 """What one deploy is given: its arguments, refused when they are not a deploy the command takes; the server's
-paths; the tools it acts with, which a test replaces; and its log, printed and kept in the workspace's deploy log.
+paths; the tools it acts with, which a test replaces; and its log, printed and kept in prod's deploy log.
 """
 
 from __future__ import annotations
@@ -12,17 +12,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from standard import config as config_mod
 from standard.server import deploy_steps as steps
-from standard.server import edge, gc
+from standard.server import edge, gc, heartbeat
 from standard.server.deploy_steps import SHORT, Get
 from standard.services import host_paths, provision, stack
 from standard.services.provision import Run
 
-_COMMIT = re.compile(r"[0-9a-f]{8,40}")
-
-
-_REF = re.compile(r"-|[A-Za-z0-9._/][A-Za-z0-9._/-]{0,99}")
+_COMMIT = re.compile(r"[0-9a-f]{40}")
+BACK = "back"
 
 
 Hook = Callable[[list[str], Path, dict[str, str]], subprocess.CompletedProcess[str]]
@@ -58,11 +55,12 @@ def utc_now() -> datetime:
 
 @dataclass(frozen=True, slots=True)
 class Paths:
+    mirror: Path
     srv: Path = Path("/srv")  # each workspace lives in <srv>/<product>/<workspace>/
     lock: Path = Path("/srv/factory/state/deploy.lock")
     services_env: Path = host_paths.FOLDER / stack.ENV_FILE
     edge_sites: Path = edge.SITES
-    product_toml: Path = Path("/etc/software-factory/product.toml")
+    product_toml: Path = heartbeat.PRODUCT_TOML
     docker_socket: str = host_paths.DOCKER_SOCKET
     gc_log: Path = gc.LOG
 
@@ -70,6 +68,7 @@ class Paths:
 @dataclass(frozen=True, slots=True)
 class Tools:
     run: Run = provision.real_run  # every docker call
+    git: Run = provision.real_run
     get: Get = steps.http_get
     hook: Hook = run_hook
     now: Callable[[], float] = time.monotonic
@@ -79,9 +78,8 @@ class Tools:
 
 @dataclass(frozen=True, slots=True)
 class Args:
-    workspace: str
     commit: str
-    mode: str | None  # "follow", "pin <ref>", or None for prod
+    back: bool  # a push back: it deploys with the server's product.toml as it is
 
     @property
     def short(self) -> str:
@@ -102,20 +100,11 @@ class Log:
 
 
 def parse_args(argv: list[str]) -> Args:
-    if len(argv) < 2 or argv[0] not in config_mod.WORKSPACES:
-        raise Refused("name the workspace (staging or prod) and the commit")
-    workspace, commit, rest = argv[0], argv[1], argv[2:]
-    if not _COMMIT.fullmatch(commit):
-        raise Refused(f"{commit!r} is not a commit: give 8 to 40 lowercase hex characters")
-    if workspace == "prod":
-        if rest:
-            raise Refused("prod takes no follow or pin")
-        return Args(workspace, commit, None)
-    if rest == ["follow"]:
-        return Args(workspace, commit, "follow")
-    if len(rest) == 2 and rest[0] == "pin" and _REF.fullmatch(rest[1]):
-        return Args(workspace, commit, f"pin {rest[1]}")
-    raise Refused("staging needs follow, or pin with a ref (or - to follow the default branch again)")
+    if not argv or argv[1:] not in ([], [BACK]):
+        raise Refused(f"name one commit, and {BACK} for a push back")
+    if not _COMMIT.fullmatch(argv[0]):
+        raise Refused(f"{argv[0]!r} is not a commit: give all 40 lowercase hex characters")
+    return Args(argv[0], argv[1:] == [BACK])
 
 
 def stamp(moment: datetime) -> str:

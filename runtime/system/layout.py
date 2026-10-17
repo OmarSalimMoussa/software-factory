@@ -83,6 +83,7 @@ STACK_RUN = "software-stack-run@.service"
 SLOT_KEYS_UNIT = "software-slot-keys.service"
 CHECK_RUN = "software-check-run@.service"
 UPGRADE_RUN = paths.UPGRADE_UNIT.format("")
+DEPLOY_RUN = paths.DEPLOY_UNIT.format("")
 SERVICES = (WARDEN_UNIT, DASHBOARD_UNIT, DAEMON_UNIT)
 
 PACKAGES = ("bubblewrap", "nftables", "apparmor-utils")

@@ -109,7 +109,7 @@ def test_push_reads_the_agents_checkout_though_another_user_owns_it(
     # Git's own test switch makes every repository another user's; the global config trusts the warden's mirror and
     # GitHub's stand-in, never the agent's checkout.
     config = github_repo.parent / "gitconfig"
-    mirror = github_push.mirror_path(world.ctx.places)
+    mirror = world.ctx.places.mirror
     config.write_text(config.read_text() + f"[safe]\n\tdirectory = {mirror}\n\tdirectory = {github_repo}\n")
     monkeypatch.setenv("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
 

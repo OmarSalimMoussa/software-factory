@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-import base64
-import hashlib
-import io
 import json
 import subprocess
-import tarfile
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +14,6 @@ from standard.server import setup_machine as machine
 from standard.server.setup_machine import Host, SetupError
 from standard.services import host_paths, provision, stack
 
-KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOwner ci@laptop"
 UFW_READY = "Status: active\n\nTo  Action  From\n--  ------  ----\n" + "".join(
     f"{port}/tcp{v6}  ALLOW  Anywhere{v6}\n" for v6 in ("", " (v6)") for port in (22, 80, 443)
 )
@@ -46,10 +41,8 @@ class Server:
         self.answers |= {tuple(CHECKS[name]): answer for name, answer in checks.items()}
         self.files: dict[str, tuple[str, str]] = {}
         self.dirs: dict[str, str] = {}
-        self.code: dict[str, str] = {}
         self.networks: dict[str, list[str]] = {}
         self.groups = ["deploy", "sudo"]
-        self.ci = False
         self.ups = 0
         self.calls: list[list[str]] = []
         ports = {str(p): {"HTTPS": True} for p in setup_steps.SERVE_HTTPS} | {"5434": {"TCPForward": "127.0.0.1:5434"}}
@@ -100,14 +93,6 @@ class Server:
         if script == machine.MAKE_DIR:
             self.dirs[args[0]] = f"{args[1]} {args[2]}"
             return _cp(argv)
-        if script == setup_steps._MANIFEST:
-            return _cp(argv, 0, "".join(f"{digest}  {path}\n" for path, digest in self.code.items()))
-        if script == setup_steps._INSTALL_CODE:
-            assert stdin is not None
-            with tarfile.open(fileobj=io.BytesIO(base64.b64decode(stdin))) as tar:
-                files = [(m.name, tar.extractfile(m)) for m in tar.getmembers() if m.isfile()]
-                self.code = {f"./{name}": hashlib.sha256(f.read()).hexdigest() for name, f in files if f}
-            return _cp(argv)
         raise AssertionError(f"unknown script: {argv}")
 
     def compose(self, argv: list[str]) -> subprocess.CompletedProcess[str]:
@@ -119,17 +104,12 @@ class Server:
         return _cp(argv, 0, "\n".join(json.dumps(r) for r in rows) if self.ups else "")
 
     def users(self, argv: list[str]) -> subprocess.CompletedProcess[str] | None:
-        if argv == ["id", "-gn", "deploy"] or argv == ["id", "-gn", "ci"]:
+        if argv == ["id", "-gn", "deploy"]:
             return _cp(argv, 0, f"{argv[2]}\n")
         if argv == ["id", "-nG", "deploy"]:
             return _cp(argv, 0, " ".join(self.groups) + "\n")
         if argv == ["sudo", "-n", "usermod", "-aG", "docker", "deploy"]:
             self.groups.append("docker")
-            return _cp(argv)
-        if argv == ["getent", "passwd", "ci"]:
-            return _cp(argv, 0, "ci:x:1001:1001::/home/ci:/bin/bash\n") if self.ci else _cp(argv, 2)
-        if argv[:3] == ["sudo", "-n", "useradd"]:
-            self.ci = True
             return _cp(argv)
         return None
 
@@ -137,20 +117,16 @@ class Server:
 @pytest.fixture
 def make_job(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     factory = tmp_path / "factory"
-    (factory / "standard").mkdir(parents=True)
-    (factory / "standard" / "config.py").write_text("print('the factory')\n")
-    key = tmp_path / "ci.pub"
-    key.write_text(KEY + "\n")
     bootstrap = {"token": "read-token"}
     monkeypatch.setattr(provision, "bootstrap", lambda config, services, run: bootstrap)
 
     def make(server: Server, *, dirty: str = "", fresh: bool = False, ref: str = "a" * 40) -> setup_steps.Job:
         def local(argv: list[str], stdin: str | None) -> subprocess.CompletedProcess[str]:
-            answers = {"status": dirty, "rev-parse": "a" * 40 + "\n", "ls-files": "standard/config.py\0"}
+            answers = {"status": dirty, "rev-parse": "a" * 40 + "\n"}
             return _cp(argv, 0, answers[argv[3]])
 
         host = Host(server, dry_run=False)
-        return setup_steps.Job(CONFIG, FACTORY_TOML, host, local, fresh, key, tmp_path / "home", factory, ref)
+        return setup_steps.Job(CONFIG, FACTORY_TOML, host, local, fresh, tmp_path / "home", factory, ref)
 
     return make
 
@@ -199,19 +175,21 @@ def test_a_second_run_changes_nothing_and_says_so(make_job: Any, capsys: pytest.
     assert (first.home / "server.json").stat().st_mode & 0o777 == 0o600
 
 
-def test_the_ci_key_is_the_one_key_and_can_only_run_the_gate(make_job: Any) -> None:
+def test_the_admin_owns_the_product_settings_its_deploys_refresh_and_no_ci_user_key_or_rule_is_placed(
+    make_job: Any,
+) -> None:
     server = Server()
 
     setup.run(make_job(server))
 
-    gate = 'command="/usr/local/bin/factory-ci-gate",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding'
-    assert server.files["/home/ci/.ssh/authorized_keys"] == ("ci:ci 600", f"{gate} {KEY}\n")
-    assert server.files[setup_steps.SUDOERS] == (
-        "root:root 440",
-        "ci ALL=(deploy) NOPASSWD: /usr/local/bin/factory-deploy *\n",
-    )
-    write = next(c for c in server.calls if setup_steps.SUDOERS in c and machine.WRITE_FILE in c)
-    assert write[-1] == "visudo -cq -f"
+    assert server.files[setup_steps.PRODUCT_TOML] == ("deploy:deploy 644", FACTORY_TOML)
+    assert sorted(path for path in server.files if path.startswith("/usr/local/")) == [
+        "/usr/local/bin/factory-gc",
+        "/usr/local/bin/factory-heartbeat",
+    ]
+    assert 'sys.path.insert(0, "/opt/software-factory")' in server.files["/usr/local/bin/factory-gc"][1]
+    assert not [path for path in server.files if path.startswith(("/home/", "/etc/sudoers.d/"))]
+    assert not [argv for argv in server.calls if "ci" in argv or "useradd" in argv]
 
 
 @pytest.mark.parametrize(

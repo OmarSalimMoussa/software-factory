@@ -252,6 +252,25 @@ def test_all_a_session_held_under_its_id_follows_its_copy_and_its_old_id_finds_i
     assert lifecycle.find(world.ctx(), registry.read(world.places), s.id).id == back
 
 
+@pytest.mark.parametrize("back", [False, True])
+def test_a_deploy_names_the_full_commit_and_a_push_back_and_hands_back_how_it_ended(world: World, back: bool) -> None:
+    sha, asked = "a" * 40, []
+
+    def systemctl(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        unit, launched = argv[-1], world.places.state / "public" / "launch"
+        request = unit.split("@", 1)[1].removesuffix(".service")
+        asked.append((argv[:2], unit.split("@")[0], json.loads((launched / f"{request}.json").read_text())))
+        store.write_text(world.places.state / "runs" / f"{request}.log", "build app: step 1\nfailed: no space\n")
+        store.write_text(world.places.state / "runs" / f"{request}.exit", "1\n")
+        return subprocess.CompletedProcess(argv, 1, "", "")
+
+    done = launch.Units(world.places, lambda: world.settings, systemctl).deploy_prod(sha, back)
+
+    assert asked == [(["--wait", "start"], "software-deploy-run", {"kind": "deploy", "sha": sha, "back": back})]
+    assert done == (1, "build app: step 1\nfailed: no space\n")
+    assert not list((world.places.state / "runs").iterdir())
+
+
 @pytest.mark.parametrize("text", ["x" * 61, "<b>bold</b>", "a & b", "\x1b[31mred"])
 def test_a_session_own_doing_line_stays_short_and_plain(text: str) -> None:
     with pytest.raises(Refused):

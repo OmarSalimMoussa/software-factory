@@ -16,6 +16,7 @@ UNITS, UPGRADE = (re.compile(found) for found in re.findall(r"if \(/(.+?)/\.test
         ("software-agent-run@abc123.service", True),
         ("software-stack-run@stack-9f8e.service", True),
         ("software-check-run@check-9f8e.service", True),
+        ("software-deploy-run@deploy-9f8e.service", True),
         ("software-root-run@x.service", False),
         ("software-agent-run@.service", False),
         ("software-warden.service", False),
@@ -28,7 +29,7 @@ UNITS, UPGRADE = (re.compile(found) for found in re.findall(r"if \(/(.+?)/\.test
         ("software-agent-run@a.timer", False),
     ],
 )
-def test_the_warden_may_start_only_the_three_templates(unit: str, allowed: bool) -> None:
+def test_the_warden_may_start_only_the_four_templates(unit: str, allowed: bool) -> None:
     assert (UNITS.fullmatch(unit) is not None) is allowed
 
 

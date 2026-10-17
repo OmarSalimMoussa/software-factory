@@ -1,62 +1,60 @@
 # Deploys
 
-A deploy puts one workspace on the server, staging or prod, on one commit. CI starts it after the commit's images
-are built and its smoke test passed. Nothing on the server is built or checked out: a deploy only pulls images.
+A deploy puts prod on one commit. The owner starts it with Push to prod, or with Push back to the commit prod ran
+before. It builds the commit's images on the server, from a clean copy of the commit, and never at `up`.
 
-## How CI reaches the server
+## How the warden starts it
 
-CI connects over SSH as the `ci` user. That user's key may run one thing: the gate, `factory-ci-gate`. The gate lets
-through exactly three requests and refuses everything else, writing the refusal to the system log:
-
-- `deploy staging <commit> follow`: staging follows the default branch.
-- `deploy staging <commit> pin <ref>`: staging shows one branch until it is pinned again. `pin -` unpins it.
-- `deploy prod <commit>`.
-
-A commit is 7 to 40 lowercase hex characters; the deploy itself needs at least 8, the length of an image tag. A ref
-is letters, digits and `. _ / -`, at most 100, and does not start with `-`. The gate then runs `factory-deploy` as
-the admin user. CI sends its registry token on standard input. It reaches the deploy untouched and never lands on
-disk outside Docker's own login, which the deploy removes when it ends.
+The warden cannot run Docker itself. It writes the request, the full commit and whether it is a push back, to
+`public/launch/<id>.json` and starts `software-deploy-run@<id>.service`. That unit runs the deploy as the server's
+admin user, who owns prod's folders and the edge's sites and is in the docker group. The unit is outside the factory's
+slice and bound to no warden, so an install or a warden restart never stops a deploy half way, and it has no time
+limit of its own: the deploy fits itself into `watch.push_wait_minutes` (step 3). Its output, every line of which the
+deploy also keeps in its log, and its exit status go back to the warden. A failure's line starts `failed:`.
 
 ## The steps
 
 Only one deploy runs on a server at a time; a second one waits. Each step stops the deploy if it fails.
 
-1. **Pin.** A `follow` while staging is pinned says so and ends without touching anything. `pin <ref>` records the
-   pin; `pin -` removes it. Then the deploy goes on.
-2. **Deploy files.** It pulls the commit's deploy image and copies its files out. It refuses the image when its
-   commit is not the one asked for, when its `plan.json` has a shape the server's factory does not read, or when
-   its `factory.toml` differs from the server's copy in a setting the server set-up acts on (`[product]`,
-   `[services]`, `[server]`, each workspace's domain and port, `[deploy] health`, `[edge] routes`). The fix for the
-   last two is to run the server set-up again. Every other setting is the build's own: the deploy uses the copy in
-   its image, so pushing prod back deploys the older build with the settings it shipped with. The files then go
-   into the workspace's stack folder in place: each file is overwritten, never swapped, and a file the commit no
-   longer has is deleted. Containers that mount a file keep seeing it.
-3. **Settings.** It gives the workspace its share of the shared services (below), then writes the env file.
-4. **Images.** It pulls every image the commit's plan names.
-5. **Drain.** It asks the running stack's health address how much work is busy. While work is busy it waits, in
+1. **Settings.** The deploy checks that the warden's mirror holds the commit. A push to prod reads the commit's
+   `factory.toml`; one that does not parse fails the push, naming why, and prod stays as it is, as it does when the
+   server's copy, `/etc/software-factory/product.toml`, differs and is not the admin user's to rewrite. A push back
+   deploys with the server's copy as it is: the factory may not parse an older commit's `factory.toml`.
+2. **Source.** It writes the commit's files from the mirror into a new folder beside prod's stack.
+3. **Images.** It plans the build with those settings and builds each image of the plan that Docker lacks at the
+   commit, base images first, passing only the plan's build args. A push back usually builds nothing. No image gets a
+   label, so the nightly prune of the slots' images never reaches prod's, and nothing is pushed anywhere. A build that
+   leaves less of `watch.push_wait_minutes` than `[deploy].drain_minutes` and `answer_seconds` need fails the deploy,
+   and prod stays as it is.
+4. **Deploy files.** It copies the plan's files, `[deploy].files` with every after-deploy hook and `factory.toml`, into
+   prod's stack folder in place: each file is overwritten, never swapped, and a file the commit no longer has is
+   deleted. Containers that mount a file keep seeing it. A link, or the env file itself, among them fails the deploy.
+5. **Env file.** It gives prod its share of the shared services (below), then writes the env file.
+6. **Drain.** It asks the running stack's health address how much work is busy. While work is busy it waits, in
    10-second steps, up to `[deploy].drain_minutes`, then goes on with a warning. Nothing answering means nothing
    runs. A healthy answer without a busy count fails the deploy: the product's health answer must report it.
-6. **Stack.** It creates any outside network the compose file names, then starts the stack with Docker Compose,
-   using only the pulled images.
-7. **Edge.** It writes the workspace's site for the server's edge and reloads it.
-8. **Answer.** It waits up to `[deploy].answer_seconds` for the public address to answer as this workspace at this
-   commit. Another answer fails the deploy, naming what did answer.
-9. **After-deploy hooks.** It runs the workspace's hooks from the stack folder, in order. A failing hook fails the
-   deploy, but the stack stays live and no image is removed, so a rollback needs no download.
-10. **Record.** It records the commit as deployed, adds a line to the history and removes old images.
+7. **Stack.** It creates any outside network the compose file names, then starts the stack with Docker Compose,
+   using only the images it holds. A service whose mounted file changed restarts.
+8. **Edge.** It writes prod's site for the server's edge and reloads it.
+9. **Answer.** It waits up to `[deploy].answer_seconds` for the public address to answer as `prod` at this commit.
+   Another answer fails the deploy, naming what did answer.
+10. **After-deploy hooks.** It runs prod's hooks from the stack folder, in order. A failing hook fails the deploy, but
+    the stack stays live and no image is removed, so a push back builds nothing.
+11. **Record.** It records the commit as deployed, adds a line to the history and removes old images. A push to prod
+    then makes the server's `product.toml` the commit's `factory.toml`, so it always holds what prod runs.
 
-The last line of a deploy that succeeded reads `deployed <workspace> <commit> previous <commit or ->`.
+The last line of a deploy that succeeded reads `deployed prod <commit> previous <commit or ->`.
 
 ## The env file
 
-Each workspace has one env file, written from the product's template at every deploy. The template's comments are
+Prod has one env file, written from the product's template at every deploy. The template's comments are
 kept. For each key:
 
 - `[env.set]` keys are filled in for the workspace: `{workspace}`, `{origin}`, `{port}`, `{commit}`, `{dir}`,
   `{env_dir}`, `{docker_socket}`.
 - The factory's service keys (below) are always written. Those the template lacks go in a block at the end.
 - Any other key keeps a value set by hand. A key that still holds the default the template had at the last write
-  takes the template's current default, so a changed default reaches staging, prod and every slot. The defaults
+  takes the template's current default, so a changed default reaches prod and every slot. The defaults
   of the last write are kept beside the file, in `<file>.defaults`.
 - A key the template no longer has is removed, and the deploy log says so.
 - `generate-with-openssl-rand-hex-<N>` becomes N random bytes in hex, keeping any text before it (`pk-lf-`).
@@ -86,24 +84,18 @@ The env keys the factory writes are `FACTORY_SERVICES_NETWORK`, `DATABASE_URL`, 
 `SENTRY_INGEST_URL` and, for each errors name, `SENTRY_DSN_<NAME>`. With `[services].errors_public_path` set, each
 also gets `SENTRY_PUBLIC_DSN_<NAME>`, which reaches GlitchTip through the workspace's own address.
 
-## Staging pins
-
-Staging follows the default branch unless it is pinned. Dispatching CI on another branch pins staging to it and
-deploys it; pushes to the default branch then leave staging alone. Dispatching CI on the default branch unpins it.
-The pin is the file `pinned` in staging's state folder.
-
 ## The deploy log and the history
 
-Each workspace has a state folder, `/srv/<product>/<workspace>/state/`:
+Prod has a state folder, `/srv/<product>/prod/state/`:
 
 - `deploy.log`: every line every deploy printed, each with its time in UTC.
-- `history.jsonl`: one line per deploy that answered: when (`at`), the `commit`, the `previous` commit and the
-  `mode` (`follow`, `pin <ref>`, or none for prod).
+- `history.jsonl`: one line per deploy that answered: when (`at`), the `commit`, the `previous` commit and whether
+  it was a push `back`.
 - `deployed`: the commit that runs now.
 
 ## Old images
 
-After a deploy succeeds, the server keeps the product's images of the last `[deploy].keep_images` commits of each
-workspace, together, and every image a container still uses. It removes the product's other commit-tagged images.
+After a deploy succeeds, the server keeps the product's images of the last `[deploy].keep_images` commits prod ran,
+and every image a container still uses. It removes the product's other commit-tagged images.
 Other images, and tags that are not commits, are never touched. A weekly clean-up removes old build cache and
 dangling images ([server.md](server.md)).

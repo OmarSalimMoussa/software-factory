@@ -1,5 +1,5 @@
-"""The build plan CI reads: a derived image builds after its base, one level only, and build args never need the
-product's env."""
+"""The build plan prod's deploy builds: a derived image builds after its base, one level only, and build args never
+need the product's env."""
 
 from __future__ import annotations
 
@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from standard import compose, plan
+from standard import compose, config, plan
 
 FIXTURE = Path(__file__).resolve().parents[2] / "testdata" / "fixture-product"
-COMMIT, FACTORY = "0123456789abcdef0123456789abcdef01234567", "89abcdef0123456789abcdef0123456789abcdef"
+COMMIT = "0123456789abcdef0123456789abcdef01234567"
 REF = "ghcr.io/owner/notes-"
 
 
@@ -39,9 +39,9 @@ def product(root: Path, *, app_from: str, extras: dict[str, str], args: str) -> 
             REF + "base:${NOTES_IMAGE_TAG}",
             {"base": "python:3.12-slim"},
             '        NOTES_BUILD_COMMIT: "${NOTES_BUILD_COMMIT:?}"\n        MODE: "$$quiet"\n',
-            {"base": [{"name": "base", "after": None, "args": {"NOTES_BUILD_COMMIT": "01234567"}}],
-             "derived": [{"name": "app", "after": "base", "args": {"NOTES_BUILD_COMMIT": "01234567", "MODE": "$quiet",
-                                                                    "NOTES_IMAGE_TAG": "01234567"}}]},
+            [{"name": "base", "after": None, "args": {"NOTES_BUILD_COMMIT": "01234567"}},
+             {"name": "app", "after": "base", "args": {"NOTES_BUILD_COMMIT": "01234567", "MODE": "$quiet",
+                                                        "NOTES_IMAGE_TAG": "01234567"}}],
         ),
         (
             REF + "mid:${NOTES_IMAGE_TAG:-dev}",
@@ -53,37 +53,28 @@ def product(root: Path, *, app_from: str, extras: dict[str, str], args: str) -> 
             "python:3.12-slim",
             {},
             "        API_URL: ${API_URL}\n",
-            "build arg API_URL names ${API_URL}, which CI cannot fill",
+            "build arg API_URL names ${API_URL}, which the build cannot fill",
         ),
         (REF + "base:latest", {"base": "python:3.12-slim"}, "", "so its tag must be ${NOTES_IMAGE_TAG}"),
     ],
     ids=["derived-after-base", "two-levels", "env-arg", "fixed-tag"],
 )  # fmt: skip
 def test_a_derived_image_builds_after_its_base_and_nothing_needs_the_products_env(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, app_from: str, extras: dict[str, str], args: str,
-    outcome: dict[str, list[dict[str, object]]] | str,
-) -> None:  # fmt: skip
+    tmp_path: Path, app_from: str, extras: dict[str, str], args: str, outcome: list[dict[str, object]] | str
+) -> None:
     root = product(tmp_path / "repo", app_from=app_from, extras=extras, args=args)
-    output = tmp_path / "github-output"
-    output.write_text("")
-    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
-    argv = ["--repo", str(root), "--commit", COMMIT, "--factory-commit", FACTORY, "--out", str(tmp_path / "plan.json")]
+    argv = ["--repo", str(root), "--commit", COMMIT, "--out", str(tmp_path / "plan.json")]
     if isinstance(outcome, str):
         with pytest.raises(plan.PlanError) as refused:
-            plan.make(root, COMMIT, FACTORY)
+            plan.make(root, config.load(root), COMMIT)
         assert any(outcome in p for p in refused.value.problems), refused.value.problems
-        assert plan.main([*argv, "--github-output"]) == 1 and output.read_text() == ""
+        assert plan.main(argv) == 1 and not (tmp_path / "plan.json").exists()
         return
-    assert plan.main([*argv, "--github-output"]) == 0
-    lines = dict(line.split("=", 1) for line in output.read_text().splitlines())
-    assert lines["short"] == "01234567" and lines["has_derived"] == "true"
-    for group, wanted in outcome.items():
-        got = json.loads(lines[group])
-        assert [{k: image[k] for k in ("name", "after", "args")} for image in got] == wanted
+    assert plan.main(argv) == 0
     written = json.loads((tmp_path / "plan.json").read_text())
-    assert [i["name"] for i in written["images"]] == ["base", "app"]
+    assert [{k: image[k] for k in ("name", "after", "args")} for image in written["images"]] == outcome
     assert written["files"] == ["compose.yml", "notes.env.template", "factory.toml"]
-    assert written["images"][1]["ref"] == REF + "app" and written["factory_commit"] == FACTORY
+    assert written["images"][1]["ref"] == REF + "app" and written["short"] == "01234567"
 
 
 @pytest.mark.parametrize(

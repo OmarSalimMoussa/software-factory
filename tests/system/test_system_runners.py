@@ -43,6 +43,8 @@ def _parse(raw: dict[str, Any]) -> object:
         return lf.command_argv(raw, HOME, STATE)
     if kind == lf.CHECK:
         return lf.check_parts(raw, HOME)
+    if kind == lf.DEPLOY:
+        return lf.deploy_argv(raw)
     slot, _, session = lf.stack_parts(raw, settings())
     return lf.checkout_for(session, settings(), SESSIONS)
 
@@ -70,6 +72,8 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
     assert copy[3:7] == ["--bg", "--resume", COPY["resume"], "--name"] and "--worktree" not in copy
     assert lf.session_cwd(COPY, settings()) == REPO / ".claude" / "worktrees" / "impl-cart"
     assert lf.session_cwd({**COPY, "worktree": ""}, settings()) == REPO
+    assert lf.deploy_argv({"kind": "deploy", "sha": "a" * 40, "back": True}) == ["a" * 40, "back"]
+    assert lf.deploy_argv({"kind": "deploy", "sha": "a" * 40, "back": False}) == ["a" * 40]
 
 
 @pytest.mark.parametrize(
@@ -109,6 +113,11 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
         {"kind": "check", "checkout": str(REPO), "args": ["--only"]},
         {"kind": "check", "checkout": str(REPO), "args": ["--only", "--all"]},
         {"kind": "check", "checkout": str(REPO), "args": ["--since", "HEAD; rm -rf ~"]},
+        {"kind": "deploy", "sha": "abcdef12", "back": False},
+        {"kind": "deploy", "sha": "a" * 40 + "\n", "back": False},
+        {"kind": "deploy", "sha": "--help", "back": False},
+        {"kind": "deploy", "sha": "a" * 40, "back": "back"},
+        {"kind": "deploy", "sha": "a" * 40},
     ],
 )
 def test_a_request_outside_its_bounds_is_refused_before_anything_runs(raw: dict[str, Any]) -> None:

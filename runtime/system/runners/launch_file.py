@@ -24,8 +24,9 @@ from runtime.shared.settings_schema import SCHEMA
 from runtime.slots import leases
 from runtime.system import layout
 from runtime.warden.sessions import launch, session_settings
+from standard.server.deploy_inputs import BACK
 
-SESSION, COMMAND, STACK, MESSAGE, CHECK = "session", "command", "stack", "message", "check"
+SESSION, COMMAND, STACK, MESSAGE, CHECK, DEPLOY = "session", "command", "stack", "message", "check", "deploy"
 REFUSED = 2
 TIMED_OUT = 124
 TOKEN_FD = "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR"  # where Claude Code finds the descriptor of its sign-in token
@@ -43,6 +44,7 @@ SWEEP, PRUNE, DISK, EVENTS = leases.SWEEP, leases.PRUNE, leases.DISK, leases.EVE
 OWN_VERBS = frozenset({SWEEP, PRUNE, DISK, EVENTS})
 _INSTALL = Path(__file__).resolve().parents[3]  # the runner runs from the install it belongs to
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+_SHA = re.compile(r"[0-9a-f]{40}")
 _SESSION_REF = re.compile(r"^[0-9a-f][0-9a-f-]{5,35}$")  # a short id or a uuid, as `claude stop`, `rm`, `respawn` take
 
 
@@ -188,6 +190,14 @@ def check_parts(raw: dict[str, Any], home: Path) -> tuple[Path, list[str]]:
         if word != "--all" and not _CHECK_WORD.match(next(words, "")):
             raise BadRequest(f"{word} takes check ids or a commit")
     return path, list(args)
+
+
+def deploy_argv(raw: dict[str, Any]) -> list[str]:
+    """The deploy's arguments: one full commit, then ``back`` for a push back."""
+    sha, back = raw.get("sha"), raw.get("back")
+    if not isinstance(sha, str) or not _SHA.fullmatch(sha) or not isinstance(back, bool):
+        raise BadRequest("a deploy names one full commit, and whether it is a push back")
+    return [sha, BACK] if back else [sha]
 
 
 def checkout_for(session: str, settings: Settings, sessions: dict[str, Any]) -> Path:

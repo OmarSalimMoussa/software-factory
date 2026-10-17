@@ -43,10 +43,6 @@ _LOOKED: dict[str, float] = {}  # when each warden last looked, by its state fol
 _ASKED: dict[str, str] = {}  # each state folder's tip the orchestrator was last asked to check
 
 
-def mirror_path(places: Places) -> Path:
-    return places.state / "mirror.git"
-
-
 def deploy_key(places: Places) -> Path:
     return places.state / "secrets" / "deploy.key"
 
@@ -281,7 +277,7 @@ class Git:
         key = deploy_key(ctx.places)
         if not key.is_file():
             raise Refused("push-failed", f"there is no deploy key at {key}: reinstall to write it")
-        self.mirror = mirror_path(ctx.places)
+        self.mirror = ctx.places.mirror
         self.timeout = ctx.settings().get_int("watch.push_wait_minutes") * 60
         self.env = {
             **environment.handed_on(),

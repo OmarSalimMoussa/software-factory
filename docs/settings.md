@@ -67,6 +67,6 @@ walls.
 | The repo | At the next orchestrator start; stop the old one first |
 | The dashboard's threads, and the warden's (`factory.warden_threads`) | At the next warden start |
 | The `install` group | At the next install |
-| The dashboard's port and hosts, staging's address, the probe period and the loop period | Only with the install's `--set`: the install wires them into the firewall, the edge's sites and the check-in periods, so the Settings page shows them read-only |
+| The dashboard's port and hosts, staging's address, the probe period, the loop period and a push to prod's time | Only with the install's `--set`: the install wires them into the firewall, the edge's sites, the check-in periods and the deploy unit, so the Settings page shows them read-only |
 
 The dashboard shows the value running now beside one that waits, such as "4 at the next slot claim".

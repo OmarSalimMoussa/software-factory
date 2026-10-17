@@ -1,11 +1,15 @@
-"""The deploy command: one workspace on the server to one commit.
+"""Prod's deploy: one commit, built on the box from the warden's mirror, and prod put on it.
 
-    factory-deploy <workspace> <commit> [follow | pin <ref>]
+    main([<40-character commit>])          the owner's Push to prod
+    main([<40-character commit>, "back"])  the owner's Push back
 
-CI runs it as the admin user through the ci user's forced command; the registry token arrives on standard input.
-Staging needs follow or pin; prod takes neither. One deploy runs at a time on a server, and every line it prints
-also goes to the workspace's deploy log. Exit 0: deployed, or a pinned staging ignored a follow; 1: failed; 2: refused
-arguments. docs/deploy.md walks through the steps.
+The deploy-run unit runs it as the box's admin user, for the warden (runtime/system/runners/deploy_run.py). A push to
+prod takes its settings from the commit's factory.toml, and makes the server's product.toml that copy once prod runs
+the commit; a push back deploys with product.toml as it is, since this factory may not parse an older commit's
+factory.toml. The build gets what ``wait_seconds`` leaves after the drain and the answer wait, so the whole deploy fits
+in it. One deploy runs at a time on a server, and every line it prints also goes to prod's deploy log; a failure's
+line starts `failed:`.
+Exit 0: deployed; 1: failed; 2: refused arguments. docs/deploy.md walks through the steps.
 """
 
 from __future__ import annotations
@@ -13,12 +17,11 @@ from __future__ import annotations
 import fcntl
 import json
 import os
-import sys
+import shutil
 import tempfile
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TextIO
 
 from standard import compose as compose_mod
 from standard import config as config_mod
@@ -28,113 +31,107 @@ from standard.compose import ComposeError
 from standard.config import ConfigError
 from standard.config_records import Config
 from standard.envfile import EnvError, atomic_write
-from standard.plan import DEPLOY_IMAGE, PlanError
+from standard.plan import PlanError
+from standard.server import build, edge, gc
 from standard.server import deploy_steps as steps
-from standard.server import edge, gc
-from standard.server.deploy_inputs import Args, Log, Paths, Refused, Tools, parse_args, stamp
+from standard.server.deploy_inputs import BACK, Args, Log, Paths, Refused, Tools, parse_args, stamp
 from standard.server.deploy_steps import SHORT, DeployError, Get
 from standard.services import provision
-from standard.services.provision import ProvisionError, checked
+from standard.services.provision import ProvisionError, Run
 
-USAGE = "usage: factory-deploy <staging|prod> <commit> [follow | pin <ref|->]"
-
-
-def server_owned(config: Config) -> dict[str, object]:
-    """The settings the server set-up acts on, each named as the owner finds it in factory.toml. A build that changes
-    one needs the set-up run again; every other setting is the build's own, read from its deploy image."""
-    return {
-        "[product]": config.product,
-        "[services]": config.services,
-        "[server]": config.server,
-        "[workspaces] domains and ports": [(ws.name, ws.domain, ws.port) for ws in config.workspaces],
-        "[deploy] health": config.deploy.health,  # the server's heartbeat asks prod's
-        "[edge] routes": config.edge.routes,  # one redirects file serves both workspaces
-    }
+WORKSPACE = "prod"
+USAGE = f"usage: deploy <40-character commit> [{BACK}]"
 
 
-def main(argv: list[str], paths: Paths | None = None, tools: Tools | None = None, stdin: TextIO | None = None) -> int:
-    paths, tools = paths or Paths(), tools or Tools()
+def main(argv: list[str], paths: Paths, wait_seconds: int, tools: Tools | None = None) -> int:
+    tools = tools or Tools()
     try:
         args = parse_args(argv)
-    # telemetry: surfaced — the refusal is printed with the `USAGE` for CI to show, and the deploy exits 2
+    # telemetry: surfaced — the refusal is `print`ed for the warden's push to show, and the deploy exits 2
     except Refused as exc:
-        print(f"factory-deploy: refused: {exc}\n{USAGE}", flush=True)
+        print(f"failed: the deploy was refused: {exc}\n{USAGE}", flush=True)
         return 2
     try:
-        config = config_mod.parse(paths.product_toml)
-    # telemetry: surfaced — the reason is printed for CI to show (`print`), and the deploy exits 1
-    except ConfigError as exc:
-        print(f"factory-deploy: the server's copy of factory.toml is unusable ({exc}): run the server set-up again")
+        config, fresh = _settings(args, paths, tools.git)
+    # telemetry: surfaced — the reason is `print`ed for the warden's push to show, and the deploy exits 1
+    except DeployError as exc:
+        print(f"failed: {exc}", flush=True)
         return 1
-    root = paths.srv / config.product.name / args.workspace
+    started, root = tools.now(), paths.srv / config.product.name / WORKSPACE
     log = Log(root / "state" / "deploy.log", tools.utc)
-    log(f"deploy {args.workspace} {args.short}" + (f" {args.mode}" if args.mode else ""))
+    log(f"deploy {WORKSPACE} {args.short}" + (f" {BACK}" if args.back else ""))
     try:
-        return _Deploy(config, args, paths, tools, log, root).run(stdin or sys.stdin)
-    # telemetry: surfaced — the failure goes to the deploy's `log`, which CI shows and the server keeps
-    except (DeployError, ProvisionError, OSError) as exc:
+        return _Deploy(config, args, paths, tools, log, root).run(fresh, started + wait_seconds)
+    # telemetry: surfaced — the failure goes to the deploy's `log`, which the warden's push shows and the server keeps
+    except (DeployError, ProvisionError, OSError, EnvError, PlanError, ConfigError, ComposeError) as exc:
         log(f"failed: {exc}")
-    # telemetry: surfaced — each problem goes to the deploy's `log`, which CI shows and the server keeps
-    except EnvError as exc:
-        log("failed:\n" + "\n".join(f"  {problem}" for problem in exc.problems))
-    # telemetry: surfaced — each problem goes to the deploy's `log`, which CI shows and the server keeps
-    except (ConfigError, ComposeError) as exc:
-        log(f"failed: {exc.path}:\n" + "\n".join(f"  {problem}" for problem in exc.problems))
     return 1
+
+
+def _settings(args: Args, paths: Paths, git: Run) -> tuple[Config, str | None]:
+    """The settings the deploy runs with, and for a push to prod the factory.toml that product.toml becomes."""
+    if not build.holds(git, paths.mirror, args.commit):
+        raise DeployError(f"the warden's mirror holds no commit {args.commit}")
+    if args.back:
+        try:
+            return config_mod.parse(paths.product_toml), None
+        except ConfigError as exc:
+            raise DeployError(f"the server's factory.toml does not parse ({exc}); a push to prod rewrites it") from exc
+    text = build.read(git, paths.mirror, args.commit, config_mod.FILE)
+    try:
+        return config_mod.parse_text(text, Path(f"{config_mod.FILE} at {args.short}")), text
+    except ConfigError as exc:
+        raise DeployError(f"{exc}; prod stays on the build it runs") from exc
 
 
 class _Deploy:
     def __init__(self, config: Config, args: Args, paths: Paths, tools: Tools, log: Log, root: Path) -> None:
         self.config, self.args, self.paths, self.tools, self.log = config, args, paths, tools, log
-        self.ws = config.workspace(args.workspace)
+        self.ws = config.workspace(WORKSPACE)
         self.root, self.stack, self.env_dir, self.state = root, root / "stack", root / "env", root / "state"
         self.env_file = self.env_dir / config.env.file
 
-    def run(self, stdin: TextIO) -> int:
-        pinned = self.state / "pinned"
-        if self.args.mode == "follow" and pinned.exists():
-            self.log(f"staging is pinned to {pinned.read_text().strip()}: this follow changes nothing")
-            return 0
+    def run(self, fresh: str | None, deadline: float) -> int:
         with _lock(self.paths.lock, self.log):
-            # The server has no mail: a failed weekly clean-up shows in every deploy's log, CI's, until one passes.
+            # The server has no mail: a failed weekly clean-up shows in every deploy's log until one passes.
             failed = gc.last_failure(self.paths.gc_log)
             if failed is not None:
                 self.log(f"warning: the weekly clean-up failed ({failed}); the server's disk fills until it passes")
             for folder, mode in ((self.stack, 0o755), (self.env_dir, 0o700), (self.state, 0o755)):
                 folder.mkdir(parents=True, exist_ok=True, mode=mode)
-            token = stdin.read().strip()
-            if not token:
-                raise DeployError("no registry token arrived on standard input")
-            host = self.config.product.registry.split("/", 1)[0]
-            checked(self.tools.run, ["docker", "login", host, "-u", "github-actions", "--password-stdin"], token)
-            try:
-                done = self.deploy()
-                if done == 0:
-                    self.pin(pinned)
-                return done
-            finally:
-                if self.tools.run(["docker", "logout", host], None).returncode != 0:
-                    self.log(
-                        f"warning: docker logout {host} failed; the token stays in docker's config till it expires"
-                    )
+            target = self.paths.product_toml
+            if fresh is not None and self.stale(fresh) and not os.access(target, os.W_OK):
+                why = "as the server's set-up makes it: chown it to the admin user; prod stays on the build it runs"
+                raise DeployError(f"{target} is not this user's to rewrite, {why}")
+            return self.deploy(fresh, deadline)
 
-    def pin(self, pinned: Path) -> None:
-        """A run by hand pins staging to its ref, or lifts the pin, only once its deploy succeeded: staging is never
-        pinned to a commit it does not run."""
-        if self.args.mode == "pin -":
-            pinned.unlink(missing_ok=True)
-            self.log("staging follows the default branch again")
-        elif self.args.mode is not None and self.args.mode.startswith("pin "):
-            atomic_write(pinned, self.args.mode[4:] + "\n", 0o644)
-            self.log(f"staging is pinned to {self.args.mode[4:]}")
+    def stale(self, text: str) -> bool:
+        target = self.paths.product_toml
+        return not target.exists() or target.read_text(encoding="utf-8") != text
 
-    def deploy(self) -> int:
+    def refresh(self, text: str) -> None:
+        if not self.stale(text):
+            return
+        # In place: its folder is root's, and the server set-up gave the admin user this one file.
+        with self.paths.product_toml.open("w", encoding="utf-8") as file:
+            file.write(text)
+        self.log(f"settings: {self.paths.product_toml} is now {config_mod.FILE} at {self.args.short}")
+
+    def deploy(self, fresh: str | None, deadline: float) -> int:
         short, run, log = self.args.short, self.tools.run, self.log
-        commit, images, changed = self.deploy_files()
+        # Every image is built before the stack's files change: a build that fails leaves prod as it was.
+        with tempfile.TemporaryDirectory(dir=self.root, prefix=".deploy-") as temp:
+            source = build.unpack(self.tools.git, self.paths.mirror, self.args.commit, Path(temp))
+            plan = plan_mod.make(source, self.config, self.args.commit)
+            build.images(run, plan, source, log)
+            switch = self.config.deploy.drain_minutes * 60 + self.config.deploy.answer_seconds
+            if self.tools.now() + switch > deadline:
+                raise DeployError(
+                    "the build took too long to leave time for the drain and the answer wait in "
+                    "watch.push_wait_minutes; prod stays on the build it runs"
+                )
+            changed = self.deploy_files(source, plan.files, Path(temp) / "deploy")
         values = self.settings()
-        for ref in images:
-            checked(run, ["docker", "pull", "-q", f"{ref}:{short}"])
-        log(f"images: pulled {len(images)} at {short}")
         health = self.config.deploy.health
         steps.drain(f"http://127.0.0.1:{self.ws.port}{health}", self.config.deploy.drain_minutes, *self.waits())
         self.up(values, changed)
@@ -144,7 +141,9 @@ class _Deploy:
         want = f"{self.ws.name} at {short}"
         steps.answer(f"{self.ws.origin}{health}", want, self.config.deploy.answer_seconds, *self.waits())
         failed = self.hooks()
-        previous = self.record(commit)
+        previous = self.record()
+        if fresh is not None:
+            self.refresh(fresh)
         if failed:
             log(f"failed: {failed}; {self.ws.name} is live at {short}, and every image stays for a rollback")
             return 1
@@ -155,57 +154,27 @@ class _Deploy:
     def waits(self) -> tuple[Get, Callable[[], float], Callable[[float], None], Callable[[str], None]]:
         return self.tools.get, self.tools.now, self.tools.sleep, self.log
 
-    def deploy_files(self) -> tuple[str, list[str], set[str]]:
-        """Copy the deploy image's files into the stack folder: the full commit, the plan's images, what changed."""
-        run = self.tools.run
-        image = self.config.image(DEPLOY_IMAGE, self.args.short)
-        checked(run, ["docker", "pull", "-q", image])
-        with tempfile.TemporaryDirectory(dir=self.root, prefix=".deploy-") as temp:
-            incoming = Path(temp) / "deploy"
-            container = checked(run, ["docker", "create", image, "/none"]).strip()
-            try:
-                checked(run, ["docker", "cp", f"{container}:/deploy", str(incoming)])
-            finally:
-                run(["docker", "rm", container], None)
-            commit, images, shipped = self.check_image(incoming, image)
-            # Every setting the set-up does not act on is the build's own: a push back deploys with its own.
-            self.config, self.ws = shipped, shipped.workspace(self.ws.name)
-            self.env_file = self.env_dir / shipped.env.file
-            changed = steps.sync(incoming, self.stack, keep={self.config.env.file})
+    def deploy_files(self, source: Path, files: tuple[str, ...], incoming: Path) -> set[str]:
+        for rel in files:
+            found, copy = source / rel, incoming / rel
+            if not found.exists() and not found.is_symlink():
+                raise DeployError(f"{rel}: the plan names it, but the commit has no such file or folder")
+            copy.parent.mkdir(parents=True, exist_ok=True)
+            if found.is_dir() and not found.is_symlink():
+                shutil.copytree(found, copy, symlinks=True, dirs_exist_ok=True)
+            else:
+                shutil.copy2(found, copy, follow_symlinks=False)
+        if (incoming / self.config.env.file).exists():
+            raise DeployError(f"the deploy files hold {self.config.env.file}, the env file the factory writes")
+        changed = steps.sync(incoming, self.stack, keep={self.config.env.file})
         link, target = self.stack / self.config.env.file, f"../{self.env_dir.name}/{self.config.env.file}"
         if not link.is_symlink() or os.readlink(link) != target:
             temp_link = link.with_name(f".{link.name}.link")
             temp_link.unlink(missing_ok=True)
             os.symlink(target, temp_link)
             os.replace(temp_link, link)
-        self.log(f"deploy files: {commit} in {self.stack} ({len(changed)} changed)")
-        return commit, images, changed
-
-    def check_image(self, incoming: Path, image: str) -> tuple[str, list[str], Config]:
-        """The build's full commit, its images and its own settings; DeployError if the server cannot deploy it."""
-        commit = (incoming / "COMMIT").read_text(encoding="utf-8").strip()
-        if not commit.startswith(self.args.commit):
-            raise DeployError(f"{image} holds commit {commit!r}, not {self.args.commit}: the tag names another build")
-        try:
-            plan = plan_mod.read(json.loads((incoming / "plan.json").read_text(encoding="utf-8")))
-        except ValueError as exc:
-            raise DeployError(f"{image}'s plan.json is not JSON: {exc}") from exc
-        except PlanError as exc:
-            raise DeployError(
-                f"{image}'s plan.json is not a plan the server's factory reads ({exc}): the factory that planned it "
-                "writes another shape. Run the server set-up from the factory commit .github/factory-ref names"
-            ) from exc
-        shipped = config_mod.parse(incoming / config_mod.FILE)
-        ours, theirs = server_owned(self.config), server_owned(shipped)
-        differ = [what for what in ours if ours[what] != theirs[what]]
-        if differ:
-            raise DeployError(
-                f"factory.toml at this commit differs from the server's copy in {', '.join(differ)}, which the "
-                "server set-up acts on: run the server set-up again"
-            )
-        if (incoming / shipped.env.file).exists():
-            raise DeployError(f"the deploy files hold {shipped.env.file}, the env file the factory writes")
-        return commit, [i.ref for i in plan.images], shipped
+        self.log(f"deploy files: {self.args.commit} in {self.stack} ({len(changed)} changed)")
+        return changed
 
     def settings(self) -> dict[str, str]:
         """Provision the workspace's shared services, then write its env file; the env file's values."""
@@ -295,12 +264,12 @@ class _Deploy:
                 return f"after-deploy hook {hook} failed (exit {done.returncode})"
         return ""
 
-    def record(self, commit: str) -> str | None:
+    def record(self) -> str | None:
         """Write what now runs and add it to the history; the commit that ran before, if any."""
-        deployed = self.state / "deployed"
+        deployed, commit = self.state / "deployed", self.args.commit
         previous = deployed.read_text(encoding="utf-8").strip() if deployed.exists() else None
         atomic_write(deployed, commit + "\n", 0o644)
-        entry = {"at": stamp(self.tools.utc()), "commit": commit, "previous": previous, "mode": self.args.mode}
+        entry = {"at": stamp(self.tools.utc()), "commit": commit, "previous": previous, "back": self.args.back}
         with (self.state / "history.jsonl").open("a", encoding="utf-8") as file:
             file.write(json.dumps(entry) + "\n")
         return previous
@@ -317,7 +286,3 @@ def _lock(path: Path, log: Log) -> Iterator[None]:
             log("another deploy is running on this server; waiting for it to end")
             fcntl.flock(handle, fcntl.LOCK_EX)
         yield
-
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))

@@ -1,12 +1,13 @@
 """How the warden starts sessions, and the real Launcher under it.
 
-The warden runs anything only by writing a request to public/launch/<id>.json and starting one of the three template
+The warden runs anything only by writing a request to public/launch/<id>.json and starting one of the four template
 units polkit lets it start. The one other unit action polkit allows it is a restart of the agents' Claude daemon, when
 the owner switches Claude accounts.
 
 ``software-agent-run@<id>.service`` runs as the agent user: a new session (``kind: session``) or one short command
 (``kind: command``). ``software-stack-run@<id>.service`` runs ``scripts/dev`` as the stack user (``kind: stack``).
 ``software-check-run@<id>.service`` runs `factory check` as the agent user, walled into the checkout (``kind: check``).
+``software-deploy-run@<id>.service`` builds and deploys prod as the box's admin user (``kind: deploy``).
 The units write their output to ``runs/<id>.log`` and their exit status to ``runs/<id>.exit`` in the warden's state
 (systemd opens both as root, so the unit's own user never reaches the warden's state).
 """
@@ -23,7 +24,7 @@ from typing import Any
 
 from runtime.shared import store
 from runtime.shared.models import PENDING, WORKING, Session
-from runtime.shared.paths import AGENT_USER, UPGRADE_UNIT, Places, stored_signin
+from runtime.shared.paths import AGENT_USER, DEPLOY_UNIT, UPGRADE_UNIT, Places, stored_signin
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.slots import leases
@@ -35,7 +36,7 @@ from runtime.warden.spend import cost
 AGENT_UNIT = "software-agent-run@{}.service"
 STACK_UNIT = "software-stack-run@{}.service"
 CHECK_UNIT = "software-check-run@{}.service"
-CHECK_REQUEST, STACK_REQUEST = "check-", "stack-"
+CHECK_REQUEST, STACK_REQUEST, DEPLOY_REQUEST = "check-", "stack-", "deploy-"
 
 Run = Callable[[list[str]], subprocess.CompletedProcess[str]]
 
@@ -92,7 +93,7 @@ def _systemctl(argv: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 class Units:
-    """Launcher through the two template units and the daemon's restart. ``run`` runs one systemctl command (a test
+    """Launcher through the template units and the daemon's restart. ``run`` runs one systemctl command (a test
     passes a fake)."""
 
     def __init__(self, places: Places, settings: Callable[[], Settings], run: Run = _systemctl) -> None:
@@ -153,6 +154,14 @@ class Units:
         request_id = f"{CHECK_REQUEST}{uuid.uuid4().hex}"
         self._request(request_id, {"kind": "check", "checkout": checkout, "args": args})
         return self._wait(CHECK_UNIT.format(request_id), request_id)
+
+    def deploy_prod(self, sha: str, back: bool) -> tuple[int, str]:
+        """Build and deploy prod at the full commit ``sha`` in the deploy-run unit, and wait for it; its exit status
+        and what it printed. A push to prod (``back`` false) first makes the server's product.toml the commit's
+        factory.toml; a push back deploys with it as it is."""
+        request_id = f"{DEPLOY_REQUEST}{uuid.uuid4().hex}"
+        self._request(request_id, {"kind": "deploy", "sha": sha, "back": back})
+        return self._wait(DEPLOY_UNIT.format(request_id), request_id)
 
     def start_upgrade(self, commit: str) -> None:
         """Start the upgrade to ``commit``, as root, and return at once: the install it runs stops this warden."""

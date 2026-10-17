@@ -1,4 +1,5 @@
-"""The parts of a deploy that stand alone: syncing the deploy files, reading the health answer, pruning old images."""
+"""The parts of a deploy that stand alone: syncing the deploy files, reading the health answer, listing and pruning
+the product's images."""
 
 from __future__ import annotations
 
@@ -57,7 +58,7 @@ def sync(source: Path, target: Path, keep: set[str]) -> set[str]:
         for name in folders + files:
             src, dst = Path(here) / name, target / rel / name
             if src.is_symlink() or not (src.is_dir() or src.is_file()):
-                raise DeployError(f"the deploy image holds {rel / name}, which is not a plain file or folder")
+                raise DeployError(f"the deploy files hold {rel / name}, which is not a plain file or folder")
             wanted.add(rel / name)
             if dst.is_symlink() or (dst.exists() and dst.is_dir() != src.is_dir()):
                 _remove(dst)
@@ -154,8 +155,7 @@ def prune(run: Run, config: Config, product_dir: Path, say: Say) -> None:
     used = set(checked(run, ["docker", "ps", "-a", "--format", "{{.Image}}"]).split())
     prefix = f"{config.product.registry}/{config.product.name}-"
     removed = 0
-    for line in checked(run, ["docker", "images", "--format", "{{.Repository}}:{{.Tag}}\t{{.ID}}"]).splitlines():
-        ref, _, image_id = line.partition("\t")
+    for ref, image_id in held_images(run):
         tag = ref.rsplit(":", 1)[-1]
         if not ref.startswith(prefix) or not _TAG.fullmatch(tag) or tag[:SHORT] in keep or {ref, image_id} & used:
             continue
@@ -163,6 +163,11 @@ def prune(run: Run, config: Config, product_dir: Path, say: Say) -> None:
         removed += 1
     checked(run, ["docker", "image", "prune", "--force"])
     say(f"images: removed {removed} old tags; each workspace keeps its last {count} commits")
+
+
+def held_images(run: Run) -> list[tuple[str, str]]:
+    listed = checked(run, ["docker", "images", "--format", "{{.Repository}}:{{.Tag}}\t{{.ID}}"]).splitlines()
+    return [(ref, image_id) for ref, _, image_id in (line.partition("\t") for line in listed)]
 
 
 def field(body: bytes, key: str) -> Any:

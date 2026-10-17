@@ -1,18 +1,13 @@
-"""The set-up's steps, each printing what it found on the server (or this laptop) and what it changed: the users and
-the CI key, the factory's code and commands, the folders, the shared services, the weekly clean-up, prod's heartbeat,
-the tailnet and the warden's copy on this laptop. A Job carries what every step reads.
+"""The set-up's steps, each printing what it found on the server (or this laptop) and what it changed: the admin user,
+the product's settings, the folders, the shared services, the weekly clean-up, prod's heartbeat, the tailnet and the
+warden's copy on this laptop. A Job carries what every step reads.
 """
 
 from __future__ import annotations
 
-import base64
-import hashlib
-import io
 import json
 import os
-import re
 import shlex
-import tarfile
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,13 +20,10 @@ from standard.server.setup_machine import Host, SetupError, ensure_dirs, ensure_
 from standard.services import host_paths, provision, stack
 from standard.services.provision import Run
 
-CODE = "/usr/local/lib/software-factory"
+CODE = "/opt/software-factory"
 
 
-PRODUCT_TOML = "/etc/software-factory/product.toml"
-
-
-SUDOERS = "/etc/sudoers.d/factory-ci"
+PRODUCT_TOML = str(heartbeat_mod.PRODUCT_TOML)
 
 
 CRON = "/etc/cron.d/factory-gc"
@@ -40,15 +32,7 @@ CRON = "/etc/cron.d/factory-gc"
 HEARTBEAT_CRON = "/etc/cron.d/factory-heartbeat"
 
 
-CI_USER = "ci"
-
-
-GATE = 'command="/usr/local/bin/factory-ci-gate",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding'
-
-
 COMMANDS = {
-    "factory-deploy": "standard.server.deploy",
-    "factory-ci-gate": "standard.server.ci_gate",
     "factory-gc": "standard.server.gc",
     "factory-heartbeat": "standard.server.heartbeat",
 }
@@ -70,18 +54,6 @@ runpy.run_module("{module}", run_name="__main__", alter_sys=True)
 """
 
 
-_MANIFEST = 'cd "$1" 2>/dev/null || exit 0; find . -type f -print0 | xargs -0 -r sha256sum'
-
-
-_INSTALL_CODE = (
-    'set -e; rm -rf "$1.new" "$1.old"; mkdir -m 755 "$1.new"; base64 -d | tar -x --no-same-owner -C "$1.new"; '
-    'if [ -e "$1" ]; then mv "$1" "$1.old"; fi; mv "$1.new" "$1"; rm -rf "$1.old"'
-)
-
-
-_KEY = re.compile(r"^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(?:256|384|521)) [A-Za-z0-9+/=]+( [^\n]*)?$")
-
-
 @dataclass
 class Job:
     config: Config
@@ -89,11 +61,9 @@ class Job:
     host: Host
     local: Run
     fresh: bool
-    ci_key: Path | None  # None: a pair made in ``home``
     home: Path  # the owner's ~/.config/software-factory
     factory: Path
     factory_ref: str  # the factory commit the product's CI plans every build with
-    code: dict[str, bytes] = field(default_factory=dict)  # path under CODE -> content
     admin_group: str = ""
     services: dict[str, str] = field(default_factory=dict)
     token: str = ""
@@ -119,75 +89,12 @@ def users(job: Job) -> None:
         print(f"   found: {admin} is in the docker group")
     else:
         host.change(f"add {admin} to the docker group", ["sudo", "-n", "usermod", "-aG", "docker", admin])
-    found = host.read(["getent", "passwd", CI_USER])
-    if found.returncode == 0:
-        home = found.stdout.strip().split(":")[5]
-        group = host.must(["id", "-gn", CI_USER], "reading the ci user's group").strip()
-        print(f"   found: the {CI_USER} user, home {home}")
-    else:
-        home, group = f"/home/{CI_USER}", CI_USER
-        host.change(
-            f"create the {CI_USER} user", ["sudo", "-n", "useradd", "-m", "-d", home, "-s", "/bin/bash", CI_USER]
-        )
-    key = _ci_key(job)
-    ensure_dirs(host, [(f"{home}/.ssh", f"{CI_USER}:{group}", "700")])
-    ensure_file(host, f"{home}/.ssh/authorized_keys", f"{GATE} {key}\n", owner=f"{CI_USER}:{group}", mode="600")
 
 
-def _ci_key(job: Job) -> str:
-    """The public half of the key CI deploys with: the owner's, or a pair kept on this laptop."""
-    if job.ci_key is not None:
-        text = job.ci_key.read_text().strip()
-        if not _KEY.fullmatch(text):
-            raise SetupError([f"{job.ci_key} is not one SSH public key line (type, key, comment)"])
-        return text
-    private = job.home / "ci_ed25519"
-    public = private.with_name("ci_ed25519.pub")
-    if public.exists():
-        print(f"   found: the CI key pair {private}")
-    elif job.host.dry_run:
-        print(f"   would make the CI key pair {private}")
-        return "(the new key)"
-    else:
-        job.home.mkdir(mode=0o700, parents=True, exist_ok=True)
-        comment = f"factory-ci@{job.config.product.name}"
-        on_laptop(job, ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", comment, "-f", str(private)], "ssh-keygen")
-        print(f"   changed: made the CI key pair {private}")
-    return public.read_text().strip()
-
-
-def _tarball(files: dict[str, bytes]) -> str:
-    buffer = io.BytesIO()
-    with tarfile.open(fileobj=buffer, mode="w") as tar:
-        folders = sorted({str(p) for name in files for p in Path(name).parents if str(p) != "."})
-        for name in folders:
-            info = tarfile.TarInfo(name)
-            info.type, info.mode = tarfile.DIRTYPE, 0o755
-            tar.addfile(info)
-        for name, content in sorted(files.items()):
-            info = tarfile.TarInfo(name)
-            info.size, info.mode = len(content), 0o644
-            tar.addfile(info, io.BytesIO(content))
-    return base64.b64encode(buffer.getvalue()).decode()
-
-
-def code(job: Job) -> None:
-    host, admin = job.host, job.config.server.admin
-    want = {f"./{name}": hashlib.sha256(content).hexdigest() for name, content in job.code.items()}
-    listed = host.read(["sudo", "-n", "sh", "-c", _MANIFEST, "manifest", CODE]).stdout
-    found = {path: digest for digest, _, path in (line.partition("  ") for line in listed.splitlines())}
-    commit = job.code["COMMIT"].decode().strip()[:8]
-    if found == want:
-        print(f"   found: {CODE} holds commit {commit}")
-    else:
-        what = f"install the factory's code at commit {commit} in {CODE}"
-        host.change(what, ["sudo", "-n", "sh", "-c", _INSTALL_CODE, "install", CODE], _tarball(job.code))
-    for name in ("factory-deploy", "factory-ci-gate"):
-        ensure_file(host, f"/usr/local/bin/{name}", _wrapper(name), owner="root:root", mode="755")
-    ensure_dirs(host, [(str(Path(PRODUCT_TOML).parent), "root:root", "755")])
-    ensure_file(host, PRODUCT_TOML, job.product_toml, owner="root:root", mode="644")
-    sudoers = f"{CI_USER} ALL=({admin}) NOPASSWD: /usr/local/bin/factory-deploy *\n"
-    ensure_file(host, SUDOERS, sudoers, owner="root:root", mode="440", check="visudo -cq -f")
+def product_settings(job: Job) -> None:
+    """The server's factory.toml, the admin's: prod's deploy runs as the admin and refreshes it at each push."""
+    ensure_dirs(job.host, [(str(Path(PRODUCT_TOML).parent), "root:root", "755")])
+    ensure_file(job.host, PRODUCT_TOML, job.product_toml, owner=job.admin, mode="644")
 
 
 def _wrapper(name: str) -> str:

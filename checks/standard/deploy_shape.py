@@ -168,6 +168,6 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
     # telemetry: surfaced — the compose file's problems go into `out`, which the check reports
     except ComposeError as exc:
         return out + [f"{compose_mod.FILE}: {p}" for p in exc.problems]
-    built = {s.name for s in compose.built()} | {e.name for e in config.build.extra_images} | {plan_mod.DEPLOY_IMAGE}
+    built = {s.name for s in compose.built()} | {e.name for e in config.build.extra_images}
     out += image_problems(repo, config, compose) + file_problems(repo, config, compose)
     return out + _named_images(repo, config, built) + port_problems(compose)

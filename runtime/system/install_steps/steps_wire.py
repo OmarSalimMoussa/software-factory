@@ -27,7 +27,7 @@ def managed_settings(ctx: Install) -> None:
 
 def given(ctx: Install) -> dict[str, str]:
     """The values every rendered artifact is filled from."""
-    return render.values(ctx.places, ctx.need_settings(), agent_uid=ctx.uid(AGENT_USER))
+    return render.values(ctx.places, ctx.need_settings(), agent_uid=ctx.uid(AGENT_USER), owner_user=ctx.owner.name)
 
 
 def units(ctx: Install) -> None:

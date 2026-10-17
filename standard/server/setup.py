@@ -1,7 +1,6 @@
 """The server set-up kit, run on the owner's laptop from a factory checkout, against the product's one server.
 
-    python3 -m standard.server.setup --product <checkout> [--fresh] [--dry-run] [--ci-key <file.pub>]
-                                     [--healthchecks-ping <url>]
+    python3 -m standard.server.setup --product <checkout> [--fresh] [--dry-run] [--healthchecks-ping <url>]
     python3 -m standard.server.setup --product <checkout> --lockdown
 
 It signs in as [server] admin over SSH, trusting only [server] host_key, and uses `sudo -n`. Each step prints what
@@ -23,11 +22,11 @@ from standard.server.setup_machine import FACTORY, Host, SetupError
 from standard.server.setup_steps import (
     Job,
     clean_up,
-    code,
     folders,
     heartbeat,
     laptop,
     on_laptop,
+    product_settings,
     shared_services,
     tailnet,
     users,
@@ -50,7 +49,7 @@ def factory_ref(product: Path) -> str:
 
 
 def prepare(job: Job) -> None:
-    """Everything read on the laptop, before the server is touched: the code it will run must be a commit."""
+    """Everything read on the laptop before the server is touched: the checkout must be the commit the product names."""
     git = ["git", "-C", str(job.factory)]
     dirty = on_laptop(job, [*git, "status", "--porcelain"], "reading the factory checkout").strip()
     if dirty:
@@ -62,16 +61,13 @@ def prepare(job: Job) -> None:
         raise SetupError([f"the factory checkout is at {head[:8]}, and the product's {FACTORY_REF} names "
                           f"{job.factory_ref[:8]}: check out that commit, so the server runs the factory the product's "
                           "CI plans its builds with"])  # fmt: skip
-    files = on_laptop(job, [*git, "ls-files", "-z", "--", "standard"], "listing the factory's code").split("\0")
-    job.code = {"COMMIT": f"{head}\n".encode()}
-    job.code |= {name: (job.factory / name).read_bytes() for name in files if name}
-    print(f"Factory commit {head[:8]}, {len(job.code) - 1} files of standard/.")
+    print(f"Factory commit {head[:8]}.")
 
 
 STEPS: tuple[tuple[str, Callable[[Job], None]], ...] = (
     ("The machine", lambda job: job.todo.extend(machine.check(job.host, job.config, fresh=job.fresh))),
-    ("Users and the CI key", users),
-    ("The factory's code and commands", code),
+    ("The admin user", users),
+    ("The product's settings", product_settings),
     ("Folders", folders),
     ("The shared services", shared_services),
     ("The weekly clean-up", clean_up),
@@ -104,14 +100,9 @@ def summary(job: Job) -> None:
     print(f"Langfuse   {stack.public_url(config, stack.PORTS['langfuse'])}")
     print(f"  Sign in to both as {config.services.owner_email}. The passwords are GLITCHTIP_OWNER_PASSWORD and")
     print(f"  LANGFUSE_INIT_USER_PASSWORD in {env} on the server (readable by {config.server.admin}).")
-    if job.ci_key is None:
-        private = job.home / "ci_ed25519"
-        print(f"CI key: save the whole of {private} as the product's GitHub secret SERVER_DEPLOY_KEY.")
-    else:
-        print(f"CI key: save the private half of {job.ci_key} as the product's GitHub secret SERVER_DEPLOY_KEY.")
     for item in job.todo:
         print(f"Still to do: {item}")
-    print("Next: push the product's default branch; its CI checks it, builds it and deploys staging.")
+    print("Next: install the factory on the server; its Push to prod builds prod there and deploys it.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -119,7 +110,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--product", type=Path, required=True, help="the product's checkout, holding factory.toml")
     parser.add_argument("--fresh", action="store_true", help="also set the machine up: only for a new server")
     parser.add_argument("--dry-run", action="store_true", help="read everything, change nothing")
-    parser.add_argument("--ci-key", type=Path, help="the public key CI deploys with (default: a pair kept here)")
     parser.add_argument("--lockdown", action="store_true", help="only: sshd takes keys only, and no root")
     parser.add_argument("--healthchecks-ping", default="", help="prod's Healthchecks.io ping address, once")
     args = parser.parse_args(argv)
@@ -139,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
             home = Path.home() / ".config" / "software-factory"
             product_toml = (args.product / FILE).read_text()
             ref = factory_ref(args.product)
-            job = Job(config, product_toml, host, provision.real_run, args.fresh, args.ci_key, home, FACTORY, ref)
+            job = Job(config, product_toml, host, provision.real_run, args.fresh, home, FACTORY, ref)
             job.ping = args.healthchecks_ping
             run(job)
     except ConfigError as exc:

@@ -1,10 +1,10 @@
-"""Fakes for the server-side tests: a product's settings, a Docker that keeps state, a clock and a health address."""
+"""Fakes for the server-side tests: a product's settings and repo, a Docker that keeps state, a clock and a health
+address."""
 
 from __future__ import annotations
 
 import ast
 import json
-import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -84,6 +84,11 @@ DATABASE_URL=postgresql://laptop
 COMPOSE = """services:
   app:
     image: ghcr.io/owner/notes-app:${NOTES_IMAGE_TAG}
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+      args:
+        NOTES_BUILD_COMMIT: ${NOTES_IMAGE_TAG:?}
     networks: [shared]
 networks:
   shared:
@@ -105,6 +110,24 @@ def config(text: str = FACTORY_TOML) -> Config:
     return parse_text(text)
 
 
+def commit(repo: Path, files: dict[str, str]) -> str:
+    for name, text in files.items():
+        (repo / name).parent.mkdir(parents=True, exist_ok=True)
+        (repo / name).write_text(text)
+        (repo / name).chmod(0o755 if name.endswith(".sh") else 0o644)
+
+    def git(*argv: str) -> str:
+        done = subprocess.run(["git", "-C", str(repo), *argv], check=True, capture_output=True, text=True)
+        return done.stdout.strip()
+
+    if not (repo / ".git").exists():
+        git("init", "-q")
+    git("add", "-A")
+    who = ["-c", "user.name=Owner", "-c", "user.email=owner@example.com", "-c", "commit.gpgsign=false"]
+    git(*who, "commit", "-q", "--no-verify", "-m", "change")
+    return git("rev-parse", "HEAD")
+
+
 def ok(stdout: str = "") -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess([], 0, stdout, "")
 
@@ -113,23 +136,30 @@ def ok(stdout: str = "") -> subprocess.CompletedProcess[str]:
 class FakeDocker:
     """Answers the docker commands the factory runs, keeping networks and images as Docker would."""
 
-    deploy_files: Path | None = None
     networks: dict[str, set[str]] = field(default_factory=dict)
     images: list[str] = field(default_factory=list)
     in_use: list[str] = field(default_factory=list)
     calls: list[tuple[list[str], str | None]] = field(default_factory=list)
     project_ids: dict[str, int] = field(default_factory=dict)
     glitchtip_params: list[dict[str, Any]] = field(default_factory=list)
+    build_exit: int = 0
+    build_seconds: float = 0  # how long each build takes on ``clock``
+    clock: FakeClock | None = None
 
     def __call__(self, argv: list[str], stdin: str | None = None) -> subprocess.CompletedProcess[str]:
         self.calls.append((argv, stdin))
+        if argv[1] == "build" and self.clock is not None:
+            self.clock.at += self.build_seconds
+        if argv[1] == "build" and self.build_exit:
+            return subprocess.CompletedProcess(
+                argv, self.build_exit, "#5 RUN pip install\n", "ERROR: failed to solve\n"
+            )
         if argv[1] == "network":
             return self.network(argv)
         if argv[1:4] == ["exec", "-i", "factory-glitchtip"]:
             return ok("noise from Django\n" + self.glitchtip(stdin or ""))
-        if argv[1] == "cp":
-            assert self.deploy_files is not None
-            shutil.copytree(self.deploy_files, argv[3])
+        if argv[1] == "build":
+            self.images.append(argv[argv.index("--tag") + 1])
         elif argv[1:3] == ["image", "rm"]:
             self.images.remove(argv[3])
         return ok(self.listed(argv[1]))
@@ -152,9 +182,7 @@ class FakeDocker:
         return ok()
 
     def listed(self, verb: str) -> str:
-        """What docker create, ps and images print; nothing for the other commands."""
-        if verb == "create":
-            return "container-1\n"
+        """What docker ps and images print; nothing for the other commands."""
         if verb == "ps":
             return "\n".join(self.in_use) + "\n"
         if verb == "images":

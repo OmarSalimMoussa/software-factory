@@ -1,0 +1,20 @@
+# One deploy of prod the warden wrote to public/launch/<id>.json, run as the box's admin user, who owns prod's folders
+# and the edge's sites and is in the docker group: it builds the commit from the warden's mirror and puts prod on it.
+# Outside the factory's slice, and bound to no warden: an install stops what runs there and restarts the warden, and
+# neither may cut a deploy off half way.
+[Unit]
+Description=software factory: deploy request %i
+CollectMode=inactive-or-failed
+
+[Service]
+Type=oneshot
+User=@owner_user@
+Environment=DOCKER_HOST=unix://@docker_socket@
+ExecStart=@python@ -I @install@/runtime/system/runners/deploy_run.py @state@ %i
+# append, not truncate: systemd opens the file again for the exit recorder, and truncating would empty it.
+StandardOutput=append:@runs@/%i.log
+StandardError=inherit
+ExecStopPost=+@python@ -I @install@/runtime/system/runners/record_exit.py @runs@/%i.exit
+# No time limit of its own: the deploy fits its build into watch.push_wait_minutes, and bounds every later wait.
+TimeoutStartSec=infinity
+UMask=0022

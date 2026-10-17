@@ -1,17 +1,16 @@
 # The server set-up
 
-The set-up readies the product's one server for the standard deploy: staging and prod, the shared services, and the
-key CI deploys with. You run it on your laptop, from a checkout of the factory, against the server named in the
-product's `factory.toml`. It is safe to run again at any time: it changes only what differs, and says so.
+The set-up readies the product's one server for the standard deploy: prod's folders and settings, and the shared
+services. You run it on your laptop, from a checkout of the factory, against the server named in the product's
+`factory.toml`. It is safe to run again at any time: it changes only what differs, and says so.
 
 ```bash
 python3 -m standard.server.setup --product <product checkout> --dry-run   # read everything, change nothing
 python3 -m standard.server.setup --product <product checkout>             # do it
 ```
 
-Options: `--fresh` also sets up the machine itself (a new server only). `--ci-key <file.pub>` uses your own key for
-CI instead of a pair the set-up makes. `--healthchecks-ping <url>` gives prod's heartbeat its Healthchecks.io ping
-address. `--lockdown` only locks SSH down, as its own step.
+Options: `--fresh` also sets up the machine itself (a new server only). `--healthchecks-ping <url>` gives prod's
+heartbeat its Healthchecks.io ping address. `--lockdown` only locks SSH down, as its own step.
 
 ## Before you start
 
@@ -36,7 +35,7 @@ On a new server, run the set-up with `--fresh`. It does what an existing server 
    list `tag:server` under `tagOwners`. Joining with the tag also turns the server's key expiry off, so it never drops
    off the tailnet. The tailnet also needs MagicDNS and HTTPS certificates turned on in its DNS settings.
 
-The set-up never installs git: the server runs images, never a checkout.
+The set-up never installs a checkout of the product: prod's deploy builds each commit from the factory's own copy.
 
 Lock SSH down last, as a separate run. First check from another terminal that `ssh <admin>@<host>` signs you in with
 your key. Then run the set-up with `--lockdown`. SSH then takes keys only and refuses root. The set-up checks the
@@ -58,15 +57,12 @@ If one fails, the set-up stops before it changes anything and says what to do.
 
 ## What the set-up places
 
-- **Users.** The admin user joins the docker group. A `ci` user gets exactly one key, which can only run the
-  factory's deploy gate: no shell, no terminal, no forwarding. The gate accepts only a deploy of staging or prod.
-- **The CI key.** Without `--ci-key`, the set-up makes a key pair once, in `~/.config/software-factory/`, and keeps
-  it. Save the private half as the product's GitHub secret `SERVER_DEPLOY_KEY`; the summary names the file.
-- **The factory's code.** The factory's `standard/` folder and its commit, in `/usr/local/lib/software-factory/`,
-  owned by root. The commands `factory-deploy`, `factory-ci-gate` and `factory-gc` in `/usr/local/bin/` run that
-  code. A copy of the product's `factory.toml` goes to `/etc/software-factory/product.toml`, a folder the factory's
-  own install and uninstall leave alone. One sudo rule lets `ci` run `factory-deploy` as the admin user, and nothing
-  else; it is checked before it is placed.
+- **The admin user.** It joins the docker group. Prod's deploys run as it ([deploy.md](deploy.md)).
+- **The product's settings.** A copy of the product's `factory.toml` goes to `/etc/software-factory/product.toml`, a
+  folder the factory's own install and uninstall leave alone. The admin user owns the file: each Push to prod makes it
+  the pushed commit's `factory.toml`.
+- **Two commands.** `factory-heartbeat` and `factory-gc` in `/usr/local/bin/`, for the two jobs below. Each runs
+  the code of the factory installed on the server, in `/opt/software-factory/`.
 - **Folders.** `/srv/factory/` for the shared services, the edge's site files and the deploy lock, and
   `/srv/<product>/<workspace>/` for each workspace's stack, env file and deploy records. The admin user owns them.
   The factory's install adds one site file of its own, `factory.caddy`, for its dashboard; a deploy never touches it.
@@ -76,8 +72,7 @@ If one fails, the set-up stops before it changes anything and says what to do.
 - **Prod's heartbeat.** Every five minutes, as the admin user, the server asks prod's public health address and
   checks it answers as `prod`. Then it checks in with Healthchecks.io, or tells it at once that prod failed. When
   the check-ins stop, Healthchecks.io tells you, even when the server is down. Give the check's ping address once,
-  with `--healthchecks-ping <url>`; it is kept in `/etc/software-factory/heartbeat-ping`. Running on the server, the
-  heartbeat uses none of GitHub's Actions minutes.
+  with `--healthchecks-ping <url>`; it is kept in `/etc/software-factory/heartbeat-ping`.
 - **The weekly clean-up.** Every Sunday at 04:17, as the admin user. It drops build cache older than a week and
   images no tag names, and logs one line to `/srv/factory/state/gc.log`. It never removes volumes or tagged images:
   volumes hold the databases and certificates, and tagged images are what a deploy or a rollback runs.
@@ -111,18 +106,16 @@ Sign in to GlitchTip and Langfuse with `[services] owner_email`.
   read it too, [shared-services.md](shared-services.md)): every shared service's passwords and keys, your GlitchTip
   password (`GLITCHTIP_OWNER_PASSWORD`), your Langfuse password (`LANGFUSE_INIT_USER_PASSWORD`) and the Postgres
   password (`POSTGRES_PASSWORD`). They are made once and kept: the databases were created with them. Read one with `ssh <admin>@<host> grep <KEY> /srv/factory/services/services.env`.
-- **On your laptop**, the CI key pair and `server.json`, in `~/.config/software-factory/`.
-- **In GitHub**, `SERVER_DEPLOY_KEY`, which only you put there.
+- **On your laptop**, `server.json`, in `~/.config/software-factory/`.
 
 ## Run it again
 
 Run the set-up again, from a factory checkout at the right commit:
 
 - **After a factory change** the product moves to. The set-up refuses a factory checkout at any other commit than
-  the one the product's `.github/factory-ref` names, so move that first. A deploy refuses a build whose plan has a
-  shape the server's factory does not read.
-- **After a change to `factory.toml`** that touches the server: a deploy refuses while the server's copy of the
-  settings the set-up acts on differs from the one the build ships ([deploy.md](deploy.md)).
+  the one the product's `.github/factory-ref` names, so move that first.
+- **After a change to `factory.toml`** that touches what the set-up places: the server's folders, the shared
+  services or the tailnet. Push to prod refreshes the server's copy of the file itself.
 - **After a change to the shared services**, which comes with a factory change. The set-up brings them up again and
   joins them back to each workspace's networks.
 

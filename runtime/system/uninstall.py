@@ -51,7 +51,7 @@ UNITS = (
     layout.FIREWALL_UNIT,
     layout.SLOT_KEYS_UNIT,
 )
-TEMPLATES = (layout.AGENT_RUN, layout.STACK_RUN, layout.CHECK_RUN, layout.UPGRADE_RUN)
+TEMPLATES = (layout.AGENT_RUN, layout.STACK_RUN, layout.CHECK_RUN, layout.UPGRADE_RUN, layout.DEPLOY_RUN)
 GUARD = "/opt/software-factory/runtime/guard/hook.py"  # the installed guard, named in the factory's managed settings
 HOOKS = str(paths.INSTALL / "checks" / "git-hooks")
 

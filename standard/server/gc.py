@@ -6,7 +6,7 @@ the `until` filter: without it the sweep reaches only cache no image shares, a s
 
 Never add `docker volume prune`: compose leaves a volume unreferenced while a deploy replaces its container, and the
 volumes are the products' databases, the shared services' data and the edge's certificates. Never add
-`docker image prune -a`: it removes every image no running container uses, so the next deploy or rollback re-pulls
+`docker image prune -a`: it removes every image no running container uses, so the next deploy or push back rebuilds
 everything. `docker system prune` reaches both. Old product images go at each deploy, which keeps the last few.
 """
 
