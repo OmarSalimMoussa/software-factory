@@ -5,11 +5,10 @@ implementer has the slot it claimed, and its testers share it. A stack command b
 answer carries scripts/dev's exit status and the tail of its output; the full log stays the owner's.
 
 A tester only reads its slot, signs in and opens its desktop: seeds and the stack are its parent's. The slot's own
-session, an implementer or the orchestrator, may run one command in a new container of a service, such as a
-scenario's set-up; so may its backend and security testers, to look from inside the slot's network.
-One tester holds a slot's desktop at a time, from its `desktop up` until it hands back (its row retires) or its
-parent takes the desktop down; another tester's `desktop up` waits, so no one's new password cuts off a tester
-mid-step.
+session, an implementer or the orchestrator, may run one command in a new container of a service, such as a scenario's
+set-up; so may its backend and security testers, to look from inside the slot's network. One tester holds a slot's
+desktop at a time, until its parent or, once it hands back, the warden takes it down; another tester's `desktop up`
+waits, so no one's new password cuts off a tester mid-step.
 """
 
 from __future__ import annotations
@@ -17,6 +16,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from runtime.guard.facts import read_desktops
 from runtime.shared import store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.protocol import Refused, ok
@@ -106,27 +106,22 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     return _answer(ctx, n, result)
 
 
-def _desktops(ctx: Context) -> dict[str, str]:
-    raw = store.read_json_or(public.desktops_path(ctx.places), {})
-    if not isinstance(raw, dict) or not all(isinstance(v, str) for v in raw.values()):
-        raise store.StoreError(f"{public.desktops_path(ctx.places)}: not a holder per slot")
-    return raw
-
-
 def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> None:
-    """A tester's `desktop up` takes the slot's desktop while no other live tester holds it, and while fewer than
-    caps.desktops_at_once desktops are up on the machine; its parent's `desktop down` frees it."""
+    """A tester's `desktop up` takes the slot's desktop while no other tester holds it, within caps.desktops_at_once."""
     agent = ctx.caller.agent_id
     if agent and verb[1] != "up":
         raise Refused("slot", "a tester opens the desktop; its implementer takes it down")
     with ctx.lock:
-        held = _desktops(ctx)
+        held = read_desktops(ctx.places)
         if not agent:
             held.pop(str(n), None)
         else:
             sessions = registry.read(ctx.places)
             holder = sessions.get(held.get(str(n), ""))
-            if holder is not None and holder.id != agent and holder.state != RETIRED:
+            if holder is not None and holder.id != agent:
+                if holder.state == RETIRED:
+                    raise Refused("desktop", f"slot {n}'s desktop is going down after {holder.name} handed back; "
+                                             "try again in a minute")  # fmt: skip
                 raise Refused("desktop", f"slot {n}'s desktop is {holder.name}'s until it hands back; test what "
                                          "needs no desktop first, then try again")  # fmt: skip
             up = [s for slot, s in held.items() if slot != str(n) and s in sessions and sessions[s].state != RETIRED]

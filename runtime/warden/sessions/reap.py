@@ -1,11 +1,11 @@
 """Reaping: removing what a retired session and its slot made, as soon as it retires, so nothing waits to be cleaned.
 
-Only a retired session is reaped; anything else is refused. The slot whose lease names it is emptied (so a slot
-another session claimed is never touched): the product's ``scripts/dev empty``, then every Docker object labelled
-with the slot, both through the stack unit, then the lease goes. A reap that failed is tried again after
-watch.reap_retry_minutes. Its worktree is removed as
-the agent user only when git calls it clean and no live session works in it; a dirty one is held, with git's reason,
-for the next session on the same task. Its branch goes once merged. QA evidence ages out in the nightly gc.
+Only a retired session is reaped; anything else is refused. The slot whose lease names it is emptied (so a slot another
+session claimed is never touched): the product's ``scripts/dev empty``, then every Docker object labelled with the slot,
+both through the stack unit, then the lease goes. A reap that failed is tried again after watch.reap_retry_minutes. Its
+worktree is removed as the agent user only when git calls it clean and no live session works in it; a dirty one is held,
+with git's reason, for the next session on the same task. Its branch goes once merged. A tester's desktop goes down once
+it has handed back. QA evidence ages out in the nightly gc.
 """
 
 from __future__ import annotations
@@ -15,14 +15,16 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from runtime.guard.facts import read_desktops
 from runtime.queue import formats
 from runtime.shared import store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
+from runtime.warden import public
 from runtime.warden.context import Context
-from runtime.warden.sessions import registry
+from runtime.warden.sessions import launch, registry
 from runtime.warden.verbs import ORCH
 
 log = logging.getLogger("factory.warden")
@@ -123,6 +125,30 @@ def reap(ctx: Context, session_id: str) -> dict[str, str]:
     return outcome
 
 
+def _left_desktops(places: Places, sessions: dict[str, Session]) -> dict[str, str]:
+    return {slot: agent for slot, agent in read_desktops(places).items()
+            if agent not in sessions or sessions[agent].state == RETIRED}  # fmt: skip
+
+
+def close_desktops(ctx: Context) -> None:
+    """Take down each desktop whose tester handed back, from its parent's worktree. Its lease holds till then, so no
+    `desktop up` starts it half-way, and goes even when the desktop would not go down, which reports."""
+    for slot, agent in sorted(_left_desktops(ctx.places, registry.read(ctx.places)).items()):
+        try:
+            exit_code = ctx.launcher.run_stack(int(slot), ["desktop", "down"], agent).exit
+        except launch.LaunchError as exc:
+            log.warning("warden: slot %s's desktop down did not run after %s handed back: %s", slot, agent, exc)
+        else:
+            if exit_code != 0:
+                log.warning("warden: slot %s's desktop did not go down after %s handed back (exit %d)", slot, agent,
+                            exit_code)  # fmt: skip
+        with ctx.lock:
+            held = read_desktops(ctx.places)
+            if held.get(slot) == agent:
+                del held[slot]
+                store.write_json(public.desktops_path(ctx.places), held)
+
+
 def _retry_due(ctx: Context, record: dict[str, str], retry: int) -> bool:
     """A reap that left something undone (its slot, or the whole reap) runs again once ``retry`` seconds passed."""
     failed = "failed" in record or str(record.get("slot", "")).startswith("failed")
@@ -130,7 +156,7 @@ def _retry_due(ctx: Context, record: dict[str, str], retry: int) -> bool:
 
 
 class Reaper:
-    """Reaps every retired session not yet reaped, in a thread of its own so a slow stack never delays a tick."""
+    """Reaps every retired session not yet reaped, and takes their desktops down, in a thread of its own."""
 
     def __init__(self) -> None:
         self._thread: threading.Thread | None = None
@@ -143,11 +169,15 @@ class Reaper:
         retry = ctx.settings().get_int("watch.reap_retry_minutes") * 60
         due = sorted(sid for sid, s in sessions.items()
                      if s.state == RETIRED and (sid not in done or _retry_due(ctx, done[sid], retry)))  # fmt: skip
-        if due:
+        if due or _left_desktops(ctx.places, sessions):
             self._thread = threading.Thread(target=self._reap_all, args=(ctx, due), name="reap", daemon=True)
             self._thread.start()
 
     def _reap_all(self, ctx: Context, due: list[str]) -> None:
+        try:
+            close_desktops(ctx)
+        except Exception as exc:
+            log.exception("warden: taking the left desktops down failed (%s)", type(exc).__name__)
         for session_id in due:
             try:
                 reap(ctx, session_id)

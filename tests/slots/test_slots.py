@@ -11,7 +11,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.slots.verbs import slot
 from runtime.warden.context import StackResult
-from runtime.warden.sessions import registry
+from runtime.warden.sessions import reap, registry
 
 
 def _implementer(world: World, n: int) -> None:
@@ -142,7 +142,7 @@ def test_the_orchestrator_frees_only_a_finished_sessions_slot(world: World) -> N
     assert world.launcher.stacks == [(1, ["empty"]), (1, [leases.SWEEP])] and leases.read(world.places, 1) is None
 
 
-def test_one_tester_holds_a_slots_desktop_until_it_hands_back_or_its_parent_takes_it_down(world: World) -> None:
+def test_one_tester_holds_a_slots_desktop_until_the_warden_or_its_parent_takes_it_down(world: World) -> None:
     _implementer(world, 1)
     for agent in ("agent-qa-1", "agent-qa-2", "agent-qa-3"):
         world.session(agent, "qa-ux", f"impl-t-0001.{agent}", "t-0001", "/wt/impl-t-0001", agent_id=agent)
@@ -156,11 +156,15 @@ def test_one_tester_holds_a_slots_desktop_until_it_hands_back_or_its_parent_take
     sessions = registry.read(world.places)
     sessions["agent-qa-1"].state = RETIRED
     registry.write(world.places, sessions)
-    slot(world.ctx("implementer", "s-1", "agent-qa-2"), up, None)  # the first handed back
+    with pytest.raises(Refused, match="going down after impl-t-0001.agent-qa-1 handed back"):
+        slot(world.ctx("implementer", "s-1", "agent-qa-2"), up, None)
+    reap.close_desktops(world.ctx())
+    slot(world.ctx("implementer", "s-1", "agent-qa-2"), up, None)  # the warden took the first's down
     slot(world.ctx("implementer", "s-1"), {"op": "desktop", "desktop": ["down"]}, None)
     slot(world.ctx("implementer", "s-1", "agent-qa-3"), up, None)  # its parent took it down
-    assert [verb[:2] for _, verb in world.launcher.stacks] == [["desktop", "up"], ["desktop", "up"],
-                                                                ["desktop", "down"], ["desktop", "up"]]  # fmt: skip
+    assert [verb[:2] for _, verb in world.launcher.stacks] == [
+        ["desktop", "up"], ["desktop", "down"], ["desktop", "up"], ["desktop", "down"], ["desktop", "up"]
+    ]  # fmt: skip
 
 
 def test_the_machine_runs_at_most_its_cap_of_desktops_and_a_finished_testers_counts_for_nothing(world: World) -> None:

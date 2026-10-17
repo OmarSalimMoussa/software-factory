@@ -6,9 +6,12 @@ from typing import Any
 import pytest
 from warden_fakes import FakeLauncher
 
+from runtime.guard.facts import read_desktops
+from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
+from runtime.warden import public
 from runtime.warden.context import Context, StackResult
 from runtime.warden.sessions import reap, registry
 
@@ -98,3 +101,22 @@ def test_a_reap_that_could_not_empty_the_slot_is_tried_again_after_its_wait(
     del launcher.stack["empty"]
     pass_()
     assert reap.reaped(ctx.places)["s1"]["slot"] == "emptied" and not held.exists()
+
+
+@pytest.mark.parametrize("exit_code", [0, 1])
+def test_a_desktop_its_tester_handed_back_goes_down_and_its_lease_goes_even_when_it_would_not(
+    ctx: Context, launcher: FakeLauncher, caplog: pytest.LogCaptureFixture, exit_code: int
+) -> None:
+    registry.write(ctx.places, {"s1": session("s1", WORKING, "/wt"), "a1": session("a1", RETIRED, "/wt"),
+                                "a2": session("a2", WORKING, "/wt")})  # fmt: skip
+    store.write_json(public.desktops_path(ctx.places), {"2": "a1", "3": "a2"})
+    launcher.stack["desktop"] = StackResult(exit=exit_code, tail="", log="stack.log")
+    reaper = reap.Reaper()
+
+    reaper.run_pass(ctx)
+    assert reaper._thread is not None
+    reaper._thread.join()
+
+    assert [c[1] for c in launcher.calls if c[0] == "stack"] == [(2, ["desktop", "down"], "a1")]
+    assert read_desktops(ctx.places) == {"3": "a2"}
+    assert ("did not go down" in caplog.text) is bool(exit_code)
