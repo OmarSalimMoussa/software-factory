@@ -1,9 +1,9 @@
 """Reading a product's compose.yml and the Dockerfiles it builds, for the build plan, the deploy and the checks.
 
 Only what those read is kept: each service's build section, image, relative bind mounts, published ports, networks,
-network mode and whether it has a healthcheck; the top-level networks; and each Dockerfile's FROM lines with the ARG
-defaults above them. Values stay as written, ``${VAR}`` and all: the reader that knows the env resolves them.
-ComposeError lists every problem at once.
+network mode, restart policy and whether it has a healthcheck; the top-level networks; and each Dockerfile's FROM lines
+with the ARG defaults above them. Values stay as written, ``${VAR}`` and all: the reader that knows the env resolves
+them. ComposeError lists every problem at once.
 """
 
 from __future__ import annotations
@@ -57,6 +57,7 @@ class Service:
     ports: tuple[Port, ...]
     networks: tuple[str, ...]
     network_mode: str | None
+    restart: str | None
     healthcheck: bool
 
 
@@ -129,6 +130,10 @@ def _service(name: str, entry: dict[str, Any], problems: list[str]) -> Service:
     if not isinstance(nets, list | dict):
         problems.append(f"{where}: networks must be a list or a mapping")
         nets = []
+    restart = entry.get("restart")
+    if restart is not None and not isinstance(restart, str):
+        problems.append(f"{where}: restart must be a string")
+        restart = None
     health = entry.get("healthcheck")
     healthcheck = isinstance(health, dict) and health.get("disable") is not True and health.get("test") != ["NONE"]
     return Service(
@@ -139,6 +144,7 @@ def _service(name: str, entry: dict[str, Any], problems: list[str]) -> Service:
         _ports(where, entry.get("ports"), problems),
         tuple(str(n) for n in nets),
         mode,
+        restart,
         healthcheck,
     )
 

@@ -57,6 +57,8 @@ deploy. Each hook is committed and executable.
   it has one, else its context's `.dockerignore`. Agents' worktrees live there, and Claude Code leaves folders there
   that the user building the slots cannot read.
 - **Every published port binds 127.0.0.1.** The edge is the only way in.
+- **Every service says `restart: unless-stopped`.** Docker then brings back a service that stopped on its own and
+  counts it, and the factory reports each one it counts ([shared-services.md](shared-services.md)).
 - **A service that uses the shared services** (Postgres, Langfuse, GlitchTip) joins the external network named
   `${FACTORY_SERVICES_NETWORK}`, which the factory creates for each workspace and slot.
 - **`[deploy].files` lists what a deploy copies into prod's stack folder**: compose.yml, the env template, and every

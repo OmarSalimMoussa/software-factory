@@ -230,31 +230,55 @@ def test_the_sweep_removes_the_containers_still_on_a_slots_network_before_the_ne
     assert "removed 2 container(s) still on slot 2's network n-slot2: agent-7, agent-8" in capsys.readouterr().out
 
 
-def test_the_events_verb_prints_each_slot_containers_stop_as_one_line_but_a_runs(
+def _inspected(cid: str, name: str, restarts: int, labels: dict[str, str] | None) -> str:
+    return json.dumps({"id": cid, "name": f"/{name}", "restarts": restarts, "labels": labels})
+
+
+def test_the_restarts_verb_prints_each_containers_count_as_one_line_but_a_runs(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    seen = {
-        "Action": "die",
-        "timeNano": 1791000000000000000,
-        "Actor": {"ID": "0123456789abcdef", "Attributes": {"name": "web", "software.slot": "2", "exitCode": "137"}},
-    }
+    project = stack_run.COMPOSE_PROJECT
+    inspected = [
+        _inspected("0123456789abcdef", "notes-slot2-app", 3, {stack_run.SLOT_LABEL: "2", project: "notes-slot2"}),
+        _inspected("fedcba9876543210", "notes-slot2-run-1", 1, {stack_run.SLOT_LABEL: "2", stack_run.RUN_LABEL: "r-1"}),
+        _inspected("00aa11bb22cc33dd", "notes-prod-app", 0, {project: "notes-prod"}),
+        _inspected("99ee88ff77aa66bb", "loose", 0, None),
+    ]
     asked: list[list[str]] = []
 
     def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
         asked.append(args)
-        run = {**seen, "Actor": {"ID": "fedcba9876543210", "Attributes": {
-            "name": "web-run-1", "software.slot": "2", "exitCode": "1", stack_run.RUN_LABEL: "r-1"}}}  # fmt: skip
-        return subprocess.CompletedProcess(args, 0, json.dumps(seen) + "\n" + json.dumps(run) + "\n", "")
+        if args[:2] == ["container", "ls"]:
+            return subprocess.CompletedProcess(args, 0, "0123456789abcdef\nfedcba9876543210\ngone\n", "")
+        # A container removed between the list and the inspect is gone, which fails nothing.
+        return subprocess.CompletedProcess(args, 1, "\n".join(inspected) + "\n", "Error: No such container: gone\n")
 
     monkeypatch.setattr(stack_run, "_docker", docker)
 
-    assert stack_run.events("1791000000", "1791000300", 30) == 0
-    assert stack_run.events("yesterday", "1791000300", 30) == lf.REFUSED
+    assert stack_run.restarts(30) == 0
 
     printed = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.startswith("{")]
-    assert printed == [{"action": "die", "at": 1791000000000000000, "id": "0123456789ab", "name": "web", "slot": "2",
-                        "exit": "137"}]  # fmt: skip
-    assert asked[0][:5] == ["events", "--since", "1791000000", "--until", "1791000300"] and len(asked) == 1
+    assert printed == [
+        {"id": "0123456789ab", "name": "notes-slot2-app", "restarts": 3, "slot": "2", "project": "notes-slot2"},
+        {"id": "00aa11bb22cc", "name": "notes-prod-app", "restarts": 0, "slot": "", "project": "notes-prod"},
+        {"id": "99ee88ff77aa", "name": "loose", "restarts": 0, "slot": "", "project": ""},
+    ]
+    assert asked[1][:3] == ["container", "inspect", "--format"]
+    assert asked[1][4:] == ["0123456789abcdef", "fedcba9876543210", "gone"]
+
+
+def test_the_restarts_verb_fails_when_docker_cannot_say(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+        if args[:2] == ["container", "ls"]:
+            return subprocess.CompletedProcess(args, 0, "0123456789abcdef\n", "")
+        return subprocess.CompletedProcess(args, 1, "", "Cannot connect to the Docker daemon\n")
+
+    monkeypatch.setattr(stack_run, "_docker", docker)
+
+    assert stack_run.restarts(30) == 1
+    assert "restarts: inspecting the containers failed: Cannot connect to the Docker daemon" in capsys.readouterr().out
 
 
 def test_the_nightly_prune_removes_only_slot_images_since_prods_share_the_docker(

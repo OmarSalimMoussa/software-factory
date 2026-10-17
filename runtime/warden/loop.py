@@ -27,7 +27,7 @@ from runtime.shared.protocol import Refused, ok
 from runtime.warden import inbox
 from runtime.warden.context import Context
 from runtime.warden.delivery import deploys, github_push, outage, prod_push
-from runtime.warden.health import container_events, errors_import, heartbeat, probes, vitals
+from runtime.warden.health import container_deaths, errors_import, heartbeat, probes, vitals
 
 log = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def run_tick(
         ("rescore", lambda: _rescore(ctx, now)),
         ("errors import", lambda: errors_import.poll(ctx)),
         ("daily qa-prod", lambda: _qa_prod_due(ctx, now)),
-        ("container events", lambda: container_events.run_pass(ctx)),
+        ("container deaths", lambda: container_deaths.run_pass(ctx)),
     ]
     for name, step in steps:
         run_once(ctx, f"the tick's {name} step", step)

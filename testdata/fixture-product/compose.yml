@@ -9,6 +9,7 @@ services:
         NOTES_BUILD_COMMIT: ${NOTES_IMAGE_TAG:?}
     env_file:
       - notes.env
+    restart: unless-stopped
     ports:
       - "127.0.0.1:${NOTES_PORT:?}:8000"
     networks:

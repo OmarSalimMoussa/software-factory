@@ -1047,8 +1047,8 @@
       "when": "At once"
      },
      {
-      "key": "watch.container_events_minutes",
-      "label": "Minutes between checks for slot containers that stopped",
+      "key": "watch.container_deaths_minutes",
+      "label": "Minutes between counts of containers that stopped",
       "control": "number",
       "value": 5,
       "saved": 5,

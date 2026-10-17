@@ -44,7 +44,7 @@ class NetworkFailure(Exception):
 
 
 class NoAddress(Exception):
-    """factory.toml in the main checkout cannot give an environment's health address; the message says why."""
+    """factory.toml in the main checkout cannot be read, so it gives no health address; the message says why."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +69,7 @@ def http_get(url: str, timeout: float) -> Answer:
     return Answer(found.status, found.body)
 
 
-def _product(ctx: Context) -> Config:
+def product(ctx: Context) -> Config:
     """factory.toml in the main checkout (repo.path), read without following a symlink as GOAL.md is."""
     settings = ctx.settings()
     repo = Path(settings.get_str("repo.path"))
@@ -95,16 +95,16 @@ def _origin(ctx: Context, product: Config, env: str) -> str:
 
 def address(ctx: Context, env: str) -> str:
     """``env``'s health address."""
-    product = _product(ctx)
-    return f"{_origin(ctx, product, env)}{product.deploy.health}"
+    found = product(ctx)
+    return f"{_origin(ctx, found, env)}{found.deploy.health}"
 
 
 def origins(ctx: Context) -> dict[str, str]:
     """Where a tester opens prod and staging, and the health path both answer on. The probe reads slot 0 on loopback,
     but a browser opens it where its product says it is, or its sign-in refuses the request's origin."""
-    product = _product(ctx)
-    where = {PROD: _origin(ctx, product, PROD), STAGING: leases.origin(ctx.settings(), 0)}
-    return where | {"health": product.deploy.health}
+    found = product(ctx)
+    where = {PROD: _origin(ctx, found, PROD), STAGING: leases.origin(ctx.settings(), 0)}
+    return where | {"health": found.deploy.health}
 
 
 def take(ctx: Context, env: str, fetch: Fetch) -> Probe:

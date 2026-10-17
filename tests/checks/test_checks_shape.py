@@ -127,6 +127,8 @@ def test_the_fixture_has_the_standard_deploy_shape(fixture_product: Path) -> Non
         (_edit("notes.env.template", "NOTES_ORIGIN=\n", ""), "[env.set] writes NOTES_ORIGIN, which notes.env.template"),
         (_edit("compose.yml", '"127.0.0.1:${NOTES_PORT:?}:8000"', '"${NOTES_PORT:?}:8000"'),
          "service app publishes '${NOTES_PORT:?}:8000' beyond this machine"),
+        (_edit("compose.yml", "restart: unless-stopped", "restart: always"),
+         "service app must say `restart: unless-stopped`"),
         (_edit(".dockerignore", "**/.claude\n", ""), ".dockerignore does not leave out **/.claude, so the build of"),
         (_remove(".dockerignore"), ".dockerignore is missing (or not committed), so the build of app"),
         (_edit(".dockerignore", "**/.claude\n", "**/.claude\n!README.md\n!**/keep\n"),
@@ -134,8 +136,8 @@ def test_the_fixture_has_the_standard_deploy_shape(fixture_product: Path) -> Non
         (_add("app/Dockerfile.dockerignore", "**/__pycache__\n"), "app/Dockerfile.dockerignore does not leave out"),
     ],
     ids=["settings", "hook", "extra-image", "two-levels", "image-name", "bind-mount",
-         "untracked-file", "deploy-files", "named-image", "env-key", "port", "claude-folders", "no-ignore-file",
-         "wildcard-back-in", "dockerfiles-own-ignore"],
+         "untracked-file", "deploy-files", "named-image", "env-key", "port", "restart", "claude-folders",
+         "no-ignore-file", "wildcard-back-in", "dockerfiles-own-ignore"],
 )  # fmt: skip
 def test_a_product_off_the_standard_deploy_fails_naming_what_to_do(
     fixture_product: Path, commit: Callable[[Path, str], None], damage: Break, said: str

@@ -5,8 +5,8 @@ checkout's own ``scripts/dev`` with its slot's facts in the environment. Before 
 the shared services (its network, database and error projects) and its env file, written from the product's template;
 a verb never runs on a slot half provisioned. After a successful ``empty``, the slot's database and env file go; what
 ``scripts/dev`` wrote beside the env file is the product's own to clear.
-Three verbs are the factory's and never reach the product: sweeping a slot's labelled Docker objects (and the
-containers still on its networks), the nightly prune of slots' images alone, and Docker's disk use. Stdlib only.
+The factory's own verbs never reach the product: sweeping a slot's labelled Docker objects (and the containers still
+on its networks), the nightly prune of slots' images alone, Docker's disk use, and restart counts. Stdlib only.
 """
 
 from __future__ import annotations
@@ -32,6 +32,9 @@ from standard.services import host_paths, provision, stack
 
 SLOT_LABEL = "software.slot"
 RUN_LABEL = "software.run"
+COMPOSE_PROJECT = "com.docker.compose.project"
+# Only these fields, so nothing a container's settings hold (its environment's secrets) is ever printed.
+_COUNT = '{"id":{{json .Id}},"name":{{json .Name}},"restarts":{{.RestartCount}},"labels":{{json .Config.Labels}}}'
 EMPTY = "empty"
 # docker system df prints go-units sizes: decimal steps of 1000, such as 0B, 512kB, 1.25GB.
 _SIZE = re.compile(r"^([\d.]+)\s*([kKMGTPEZY]?)B$")
@@ -97,25 +100,29 @@ def prune(hours: str, timeout: int) -> int:
     return 1 if status else 0
 
 
-def events(since: str, until: str, timeout: int) -> int:
-    if not (since.isdigit() and until.isdigit()):
-        print("events: name the span in whole seconds since the epoch", flush=True)
-        return lf.REFUSED
-    span = ["--since", since, "--until", until, "--format", "{{json .}}", "--filter", "type=container"]
-    wanted = [word for event in ("kill", "die", "oom") for word in ("--filter", f"event={event}")]
-    done = _docker(["events", *span, "--filter", f"label={SLOT_LABEL}", *wanted], timeout)
-    if done.returncode != 0:
-        print(f"events: docker events failed: {done.stderr.strip()[-300:]}", flush=True)
+def restarts(timeout: int) -> int:
+    """Each container's restart count, a `run`'s aside, one line each: Docker counts only a stop nobody asked for."""
+    listed = _docker(["container", "ls", "-aq", "--no-trunc"], timeout)
+    if listed.returncode != 0:
+        print(f"restarts: listing the containers failed: {listed.stderr.strip()[-300:]}", flush=True)
+        return 1
+    ids = listed.stdout.split()
+    if not ids:
+        return 0
+    done = _docker(["container", "inspect", "--format", _COUNT, *ids], timeout)
+    # A container removed since the list is gone, which is no failure.
+    said = [line for line in done.stderr.splitlines() if line.strip()]
+    if done.returncode != 0 and (not said or any("No such container" not in line for line in said)):
+        print(f"restarts: inspecting the containers failed: {done.stderr.strip()[-300:]}", flush=True)
         return 1
     for line in done.stdout.splitlines():
         raw = json.loads(line)
-        actor = raw["Actor"]
-        attributes = actor.get("Attributes", {})
-        if RUN_LABEL in attributes:  # a `run`'s exit is its command's, answered to whoever ran it
+        labels = raw["labels"] or {}
+        if RUN_LABEL in labels:  # a `run`'s exit is its command's, answered to whoever ran it
             continue
-        print(json.dumps({"action": raw["Action"], "at": raw["timeNano"], "id": actor["ID"][:12],
-                          "name": attributes.get("name", ""), "slot": attributes.get(SLOT_LABEL, ""),
-                          "exit": attributes.get("exitCode", "")}), flush=True)  # fmt: skip
+        found = {"id": raw["id"][:12], "name": raw["name"].lstrip("/"), "restarts": raw["restarts"]}
+        print(json.dumps(found | {"slot": labels.get(SLOT_LABEL, ""), "project": labels.get(COMPOSE_PROJECT, "")}),
+              flush=True)  # fmt: skip
     return 0
 
 
@@ -270,9 +277,8 @@ def _own_verb(slot: int, verb: list[str], timeout: int) -> int | None:
         return prune(verb[1] if len(verb) == 2 else "", timeout)
     if verb[0] == lf.DISK:
         return disk(timeout)
-    if verb[0] == lf.EVENTS:
-        since, until = verb[1:3] if len(verb) == 3 else ("", "")
-        return events(since, until, timeout)
+    if verb[0] == lf.RESTARTS:
+        return restarts(timeout)
     return None
 
 

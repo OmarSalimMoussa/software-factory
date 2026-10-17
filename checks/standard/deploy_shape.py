@@ -3,7 +3,8 @@
 factory.toml loads; every hook factory.toml names is tracked and executable; the build plan can be made, and each
 image's ignore file leaves out .claude folders; every built service runs the image the deploy builds for the commit;
 the deploy files are tracked and hold compose.yml, the env template and every relative bind mount; every product image
-a tracked file names is built; every [env.set] key is in the env template; and every published port binds 127.0.0.1.
+a tracked file names is built; every [env.set] key is in the env template; every published port binds 127.0.0.1; and
+every service restarts unless stopped.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ VALUES_FILE = None
 VALUES = None
 
 LOOPBACK = "127.0.0.1"
+RESTART = "unless-stopped"
 _ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
 LEFT_OUT = "**/.claude"
 _WILDCARD = re.compile(r"[*?\[]")
@@ -144,6 +146,14 @@ def port_problems(compose: Compose) -> list[str]:
             for service in compose.services.values() for port in service.ports if port.host_ip != LOOPBACK]  # fmt: skip
 
 
+def restart_problems(compose: Compose) -> list[str]:
+    said = (
+        f"must say `restart: {RESTART}`: Docker then brings back the service when it stops on its own and counts it, "
+        "which is how the factory learns it stopped"
+    )
+    return [f"{compose_mod.FILE}: service {s.name} {said}" for s in compose.services.values() if s.restart != RESTART]
+
+
 def run(repo: Repo, values: dict[str, Any]) -> list[str]:
     try:
         config = config_mod.load(repo.root)
@@ -160,4 +170,4 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
         return out + [f"{compose_mod.FILE}: {p}" for p in exc.problems]
     built = {s.name for s in compose.built()} | {e.name for e in config.build.extra_images}
     out += image_problems(repo, config, compose) + file_problems(repo, config, compose)
-    return out + _named_images(repo, config, built) + port_problems(compose)
+    return out + _named_images(repo, config, built) + port_problems(compose) + restart_problems(compose)

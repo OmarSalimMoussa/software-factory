@@ -40,8 +40,8 @@ _CHECK_WORD = re.compile(r"^[a-z0-9][a-z0-9,-]{0,511}$")
 DEV_VERBS = frozenset(
     {"up", "down", "empty", "health", "sign-in", "seed", "desktop", "reports", "verbs", *leases.OPTIONAL}
 )
-SWEEP, PRUNE, DISK, EVENTS = leases.SWEEP, leases.PRUNE, leases.DISK, leases.EVENTS
-OWN_VERBS = frozenset({SWEEP, PRUNE, DISK, EVENTS})
+SWEEP, PRUNE, DISK, RESTARTS = leases.SWEEP, leases.PRUNE, leases.DISK, leases.RESTARTS
+OWN_VERBS = frozenset({SWEEP, PRUNE, DISK, RESTARTS})
 _INSTALL = Path(__file__).resolve().parents[3]  # the runner runs from the install it belongs to
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 _SHA = re.compile(r"[0-9a-f]{40}")
