@@ -267,6 +267,13 @@ def test_settings_cover_every_key_of_the_schema(rig: Rig) -> None:
     assert sorted(rows) == sorted(SCHEMA) == sorted(LABELS)
 
 
+def test_a_change_to_a_setting_the_factory_has_taken_out_stays_in_the_history(rig: Rig) -> None:
+    change = {"key": "install.gone_hours", "was": 24, "now": 0}
+    store.append_jsonl(rig.places.audit, {"at": iso(T0), "by": "owner", "changes": [change]})
+
+    assert rig.parts("/api/settings")["settings"]["data"]["audit"][0]["what"] == "install.gone_hours 24 → 0"
+
+
 def test_a_file_that_cannot_be_read_fails_only_its_own_part(rig: Rig) -> None:
     rig.places.cards.write_text("{not json")
     parts = rig.parts("/api/home")

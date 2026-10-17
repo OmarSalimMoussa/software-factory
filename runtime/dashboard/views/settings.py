@@ -158,6 +158,8 @@ def page(snap: Snap) -> dict[str, Any]:
 
 def _change_words(change: dict[str, Any]) -> str:
     key = change["key"]
+    if key not in SCHEMA:  # a setting a later factory took out: its record stays, in the words it was saved in
+        return f"{key} {_plain(change['was'])} → {_plain(change['now'])}"
     label = LABELS.get(key, key)
     was, now = shown(key, change["was"]), shown(key, change["now"])
     if SCHEMA[key].kind == "model":
