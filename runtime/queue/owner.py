@@ -11,7 +11,7 @@ from typing import Any
 from runtime.queue import approvals, cards, documents, formats, intake, proposals, route, tasks, turn
 from runtime.queue.book import Queue, request_rel, task_rel
 from runtime.queue.formats import dump_request, one_line
-from runtime.queue.statuses import OWNER, WARDEN
+from runtime.queue.statuses import OWNER
 from runtime.shared.models import RETIRED, STOPPED, Task
 from runtime.shared.protocol import Refused
 from runtime.warden import inbox
@@ -37,11 +37,7 @@ def approve(ctx: Context, task_id: str, by: str = "you") -> dict[str, Any]:
         approval = approvals.record(ctx.places, task, model, ctx.clock.iso(), routed)
         try:
             said = f"approved at rung {task.run} on {model}" + ("" if by == "you" else f", by {by}")
-            approved = tasks.transition(ctx, queue, task, "approved", "approve", OWNER, said)
-            run = registry.holding(registry.read(ctx.places).values(), task_id)
-            if run is not None:  # nothing starts it: its run goes on
-                to = "building" if run.role == permits.IMPL else "designing"
-                tasks.transition(ctx, queue, approved, to, "start", WARDEN, f"its run goes on: now {to}")
+            tasks.transition(ctx, queue, task, "approved", "approve", OWNER, said)
         except BaseException:
             approvals.void(ctx.places, task_id)
             raise

@@ -46,10 +46,21 @@ def run_pass(ctx: Context) -> None:
         return
     if not permits.at_work(registry.read(ctx.places).values()):
         return
+    _going_on(ctx)
     waiting: dict[str, str] = {}
     for role in (IMPL, DESIGN):
         _role(ctx, role, waiting)
     store.write_json(waits_path(ctx.places), waiting)
+
+
+def _going_on(ctx: Context) -> None:
+    """An approved task whose run still holds its place, as one does when a facts change voided its approval, goes on
+    with that run: nothing would start it, so it is building, or designing, again."""
+    sessions = registry.read(ctx.places).values()
+    for task_id in permits.approved_order(ctx):
+        run = registry.holding(sessions, task_id)
+        if run is not None and permits.read_task(ctx, task_id).status == "approved":
+            permits.move_task(ctx, task_id, "building" if run.role == IMPL else "designing", "start")
 
 
 def _candidates(ctx: Context, sessions: dict[str, Session], role: str) -> list[tuple[Task, Session | None]]:

@@ -75,7 +75,7 @@ def test_yolo_approves_again_a_task_whose_own_run_holds_its_place_though_no_othe
 
     yolo.run_pass(world.ctx())
 
-    assert world.queue().task(held).status == "building" and world.queue().task(other).status == "proposed"
+    assert proposals.read(world.places).approved == [held]
 
 
 def test_yolo_answers_a_question_asked_of_the_owner_as_the_owner(world: World) -> None:

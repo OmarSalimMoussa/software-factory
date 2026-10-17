@@ -9,7 +9,6 @@ from queue_kit import PICTURE, World
 
 from runtime.queue import approvals, owner, proposals, tasks
 from runtime.queue.propose import propose
-from runtime.queue.statuses import WARDEN
 
 
 def _approved(world: World) -> str:
@@ -40,19 +39,6 @@ def test_a_changed_title_sends_the_card_back_to_the_owner(world: World) -> None:
     assert approvals.current(world.places, task_id) is None
     found = proposals.read(world.places)
     assert (found.open[0], found.approved) == (task_id, [])
-
-
-@pytest.mark.parametrize(("run", "status"), [(True, "building"), (False, "approved")], ids=["run-goes-on", "run-ended"])
-def test_a_task_approved_again_while_its_run_goes_on_is_building_again(world: World, run: bool, status: str) -> None:
-    task_id = _approved(world)
-    tasks.move(world.ctx(), task_id, "building", "start", WARDEN)
-    if run:
-        world.session("s-impl", "implementer", f"impl-{task_id}", task_id, "/wt/x")
-    tasks.set_facts(world.ctx(), task_id, {"title": "Sign-in loops on Safari"})
-
-    owner.approve(world.owner(), task_id)
-
-    assert world.queue().task(task_id).status == status
 
 
 def test_approving_records_the_model_of_the_rung_and_frees_the_place(world: World) -> None:

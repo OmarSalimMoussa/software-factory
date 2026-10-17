@@ -37,6 +37,17 @@ def test_an_approved_run_starts_on_the_next_pass_with_the_brief_it_was_proposed_
     assert world.launcher.started[0][1]["prompt"].endswith("Fix the loop; keep the old link.")
 
 
+def test_an_approved_task_whose_run_still_holds_its_place_goes_on_building_with_that_run(world: World) -> None:
+    world.approve("t-0001")
+    _approved(world, "t-0001")
+    world.seat("5e550001", task="t-0001")  # a facts change voided its approval while it ran
+
+    schedule.run_pass(world.ctx())
+
+    assert world.queue.tasks["t-0001"].status == "building" and _live(world, "t-0001") == [WORKING]
+    assert world.launcher.started == []
+
+
 def test_a_word_held_for_a_run_reaches_its_next_start_after_the_brief_and_only_once(world: World) -> None:
     world.approve("t-0001")
     _approved(world, "t-0001")
