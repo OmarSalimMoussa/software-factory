@@ -25,7 +25,7 @@ from typing import Any
 from checks.runner import catalog
 from runtime.queue.book import Queue
 from runtime.shared import store, upgrades
-from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, Session
+from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, WAITING, WORKING, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.shared.settings import places_for_test_runs
@@ -183,7 +183,8 @@ def _since(ctx: Context, checkout: str) -> list[str]:
 
 @contextmanager
 def _place(ctx: Context, session: Session, only: list[str] | None, counted: bool) -> Iterator[int | None]:
-    """A place held while a check runs tests, asked after the merge turn; none free refuses it. Yields the runs left."""
+    """A place held while a check runs tests, asked after the merge turn; it waits checks.place_wait_minutes for
+    one to free. Yields the runs left."""
     if only is not None and "tests" not in only:
         yield None
         return
@@ -197,12 +198,16 @@ def _place(ctx: Context, session: Session, only: list[str] | None, counted: bool
             "the factory's memory holds no check's tests: budget.slice_memory_high less budget.test_reserve_mib is "
             f"below the installed test ceiling, {ceiling} MiB. Raise the first, lower the second, or install again",
         )
-    held = ctx.check_places.take(places, session.name)
+    wait = ctx.settings().get_int("checks.place_wait_minutes")
+    held = ctx.check_places.take(places, session.name, wait * 60)
     if held is not None:
-        who = f"{', '.join(held)} {'is' if len(held) == 1 else 'are'} running tests"
+        who = f"{', '.join(held)} {'is' if len(held) == 1 else 'are'} still running tests after {wait} minutes"
         room = f"the factory's memory holds {places} such check{'' if places == 1 else 's'} at a time"
         raise Refused("check-places", f"{who}, and {room}: run again when one ends")
     try:
+        now = registry.read(ctx.places).get(session.id)
+        if now is None or now.state not in (WORKING, WAITING):
+            raise Refused(BENCH_PENDING, "you were benched while your check waited for room: commit and stop")
         yield _count_run(ctx, session, spend=True) if counted else None
     finally:
         ctx.check_places.give_back(session.name)

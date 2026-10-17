@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import threading
 
 import pytest
 from queue_kit import World
@@ -192,6 +193,7 @@ def test_on_the_default_branch_a_check_covers_what_changed_since_the_newest_comm
 def test_a_check_that_runs_tests_needs_a_place_in_the_factorys_memory_and_one_refused_costs_no_run(
     world: World, git: dict[str, str]
 ) -> None:
+    world.with_settings(checks__place_wait_minutes=0)
     _implementer(world, "turn")
     world.session("s-two", "implementer", "impl-b", worktree=OTHER)
     world.session("s-three", "implementer", "impl-c", task=world.task().id, worktree=THIRD)
@@ -200,7 +202,7 @@ def test_a_check_that_runs_tests_needs_a_place_in_the_factorys_memory_and_one_re
 
     def run(checkout: str, argv: list[str]) -> tuple[int, str]:
         if checkout == OTHER:  # while impl-b's tests run
-            with pytest.raises(Refused, match="impl-b is running tests"):
+            with pytest.raises(Refused, match="impl-b is still running tests after 0 minutes"):
                 checks.check(turn, {}, None)
             with pytest.raises(Refused, match="merge turn"):
                 checks.check(off_turn, {}, None)
@@ -214,6 +216,32 @@ def test_a_check_that_runs_tests_needs_a_place_in_the_factorys_memory_and_one_re
     assert world.launcher.checks == [(OTHER, ["--only", "tests"]), (WORKTREE, ["--only", "size-ceilings"])]
     limit = world.settings.get_int("rounds.check_runs")
     assert f"{limit - 1} whole runs left" in checks.check(turn, {}, None)["output"]
+
+
+@pytest.mark.parametrize(
+    ("benched", "said"),
+    [(False, "ran"), (True, "you were benched while your check waited for room: commit and stop")],
+    ids=["runs-once-a-place-frees", "benched-meanwhile"],
+)
+def test_a_check_that_finds_every_place_held_waits_for_one(
+    world: World, git: dict[str, str], benched: bool, said: str
+) -> None:
+    _implementer(world, "turn")
+    assert world.check_places.take(1, "impl-b", 0) is None  # impl-b's tests hold the only place
+
+    def freed() -> None:
+        if benched:
+            _put(world, DEPRIORITIZED)
+        world.check_places.give_back("impl-b")
+
+    threading.Timer(0.05, freed).start()
+    world.launcher.check = lambda checkout, argv: (0, "ran")
+    try:
+        answer = checks.check(world.ctx("implementer", "s-impl"), {"only": ["tests"]}, None)["output"]
+    except Refused as refused:
+        answer = refused.reason
+
+    assert answer.startswith(said) and world.check_places.holders() == []
 
 
 @pytest.mark.parametrize("ends", ["failed", "could-not-start"])
@@ -239,13 +267,12 @@ def test_a_ceiling_saved_since_the_install_adds_no_place_before_an_install_appli
 ) -> None:
     world.session("s-impl", "implementer", "impl-a", worktree=WORKTREE)
     world.session("s-two", "implementer", "impl-b", worktree=OTHER)
-    world.with_settings(
-        budget__test_memory_ceiling_mib=3584
-    )  # two places, once an install gives the units that ceiling
+    # Two places, once an install gives the units that ceiling.
+    world.with_settings(budget__test_memory_ceiling_mib=3584, checks__place_wait_minutes=0)
 
     def run(checkout: str, argv: list[str]) -> tuple[int, str]:
         if checkout == WORKTREE:
-            with pytest.raises(Refused, match="impl-a is running tests"):
+            with pytest.raises(Refused, match="impl-a is still running tests"):
                 checks.check(world.ctx("implementer", "s-two"), {"only": ["tests"]}, None)
         return 0, ""
 

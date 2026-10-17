@@ -163,6 +163,7 @@ SCHEMA: dict[str, Spec] = {
     "queue.max_upload_kib": Spec("int", 16, 8192),
     "queue.max_brief_kib": Spec("int", 256, 12288),
     "checks.run_minutes": Spec("int", 1, 240),
+    "checks.place_wait_minutes": Spec("int", 0, 240),
     "checks.test_seconds": Spec("int", 1, 600),
     "checks.output_kib": Spec("int", 4, 1024),
     "checks.writable_caches": Spec("list"),  # folders in the agent's home a check may write

@@ -97,7 +97,7 @@ def test_an_agent_check_or_push_that_never_settles_stops_the_upgrade_before_it_s
     working = {"s1": type("S", (), {"name": "impl-t-0001", "state": "working"})()} if busy == "agent" else {}
     monkeypatch.setattr(factory_upgrade.registry, "read", lambda places: working)  # a session the pause can't bench
     if busy == "check":
-        assert ctx.check_places.take(1, "orchestrator") is None  # stopping the factory would kill its run
+        assert ctx.check_places.take(1, "orchestrator", 0) is None  # stopping the factory would kill its run
     if busy == "push":
         monkeypatch.setattr(factory_upgrade.prod_push, "running", lambda ctx: "op-1")
     monkeypatch.setattr(factory_upgrade, "_pause", lambda ctx: "paused")

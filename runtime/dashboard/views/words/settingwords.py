@@ -251,6 +251,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         "Applies to the next check.",
         [
             ("checks.run_minutes", "Minutes one check may take"),
+            ("checks.place_wait_minutes", "Minutes a check waits for room to run its tests"),
             ("checks.test_seconds", "Seconds one test may take"),
             ("checks.output_kib", "Most of a check's report an agent sees, KiB"),
             ("checks.writable_caches", "Tool caches a check may write, in the agent's home"),

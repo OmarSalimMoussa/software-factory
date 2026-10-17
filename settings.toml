@@ -183,6 +183,7 @@ claude-haiku-5-5 = { input = 0.1, output = 0.5, cache_read = 0.01, cache_write =
 
 [checks]                # `factory check`, which the warden runs in its own unit
 run_minutes = 30        # the longest one check may run before it is stopped
+place_wait_minutes = 30 # how long a check waits for room to run its tests before it is refused
 test_seconds = 45       # the longest one test may run: scripts/dev test gets it as FACTORY_TEST_SECONDS
 output_kib = 1024       # the most of a check's report a session sees; the end is kept. Claude Code keeps what
                         # passes its own limit in a file and gives the agent the path

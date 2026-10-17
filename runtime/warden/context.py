@@ -76,23 +76,25 @@ class CheckPlaces:
     """The sessions whose checks run tests now: the factory's memory holds only so many at once."""
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._freed = threading.Condition()
         self._held: list[str] = []
 
-    def take(self, places: int, holder: str) -> list[str] | None:
-        """A place for ``holder``, answering None; when all ``places`` are held, none, answering who holds them."""
-        with self._lock:
-            if len(self._held) >= places:
+    def take(self, places: int, holder: str, wait_seconds: float) -> list[str] | None:
+        """A place for ``holder``, answering None; when all ``places`` stay held for ``wait_seconds``, none, answering
+        who holds them."""
+        with self._freed:
+            if not self._freed.wait_for(lambda: len(self._held) < places, timeout=wait_seconds):
                 return list(self._held)
             self._held.append(holder)
             return None
 
     def give_back(self, holder: str) -> None:
-        with self._lock:
+        with self._freed:
             self._held.remove(holder)
+            self._freed.notify_all()
 
     def holders(self) -> list[str]:
-        with self._lock:
+        with self._freed:
             return list(self._held)
 
 
