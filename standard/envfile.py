@@ -5,7 +5,8 @@ write. Every other key keeps a value set by hand; one that still holds the defau
 takes the template's current value, so a changed default reaches every workspace and slot. The defaults of the last
 write are kept beside the file (``<file>.defaults``); a file written before that record existed keeps every value.
 Generated secrets are filled once, then kept. A key the template no longer has is dropped. On a server, a key under a
-`# server: <why>` line must be set by hand, and no key may hold a placeholder.
+`# server: <why>` line must be set by hand, sharing no comma-separated item with the template's value (quotes, spaces
+and letter case aside), and no key may hold a placeholder.
 """
 
 from __future__ import annotations
@@ -124,13 +125,21 @@ def _clashes(rendered: dict[str, str], services: dict[str, str]) -> list[str]:
 
 
 def _unset_on_a_server(line: _Line, value: str) -> list[str]:
-    if line.server_why and value == "":
+    held = _items(value)
+    if line.server_why and not held:
         return [f"{line.key} is empty; a server workspace sets it by hand: {line.server_why}"]
-    if line.server_why and value == line.value:
-        return [f"{line.key} still holds the template's value; a server workspace sets it by hand: {line.server_why}"]
+    if line.server_why and held & _items(line.value):
+        return [
+            f"{line.key} still holds the template's value, or part of it; a server workspace sets it by hand: "
+            f"{line.server_why}"
+        ]
     if placeholders({line.key: value}):
         return [f"{line.key} holds a placeholder (REPLACE_ME or one <name>); a server workspace sets it by hand"]
     return []
+
+
+def _items(value: str) -> set[str]:
+    return {item.strip(" \t'\"").lower() for item in value.split(",")} - {""}
 
 
 def placeholders(values: dict[str, str]) -> list[str]:

@@ -113,6 +113,34 @@ def test_a_server_refuses_every_marked_key_left_at_the_template_value(tmp_path: 
     write(tmp_path, template, server=False)  # a laptop slot keeps the laptop value
 
 
+@pytest.mark.parametrize(
+    ("held", "problem"),
+    [
+        ('"admin@notes.test,qa@notes.test"', "ADMINS still holds the template's value, or part of it"),
+        ("admin@notes.test,qa@notes.test ", "ADMINS still holds the template's value, or part of it"),
+        ("qa@notes.test,admin@notes.test", "ADMINS still holds the template's value, or part of it"),
+        ("qa@notes.test", "ADMINS still holds the template's value, or part of it"),
+        ("ADMIN@notes.test,qa@notes.test", "ADMINS still holds the template's value, or part of it"),
+        ("owner@notes.example.com, 'Admin@Notes.test'", "ADMINS still holds the template's value, or part of it"),
+        ("' , '", "ADMINS is empty"),
+    ],
+)
+def test_a_server_refuses_a_marked_key_sharing_any_item_with_the_template(
+    tmp_path: Path, held: str, problem: str
+) -> None:
+    template = TEMPLATE + "# server: the laptop's admins are nobody real\nADMINS=admin@notes.test,qa@notes.test\n"
+    target = tmp_path / "env" / "notes.env"
+    target.parent.mkdir()
+    target.write_text(f"MAIL_HOST=mail.example.com\nADMINS={held}\n")
+
+    with pytest.raises(EnvError) as refused:
+        write(tmp_path, template, server=True)
+
+    assert [p.split(";")[0] for p in refused.value.problems[:-1]] == [problem]
+    target.write_text(target.read_text().replace(f"ADMINS={held}", "ADMINS=owner@notes.example.com"))
+    write(tmp_path, template, server=True)
+
+
 def test_a_server_refuses_a_placeholder_in_any_key(tmp_path: Path) -> None:
     template = TEMPLATE + "MODEL_KEY=REPLACE_ME\nAGENT_KEY='<agent-key>'\nMOTTO=<b>bold</b>\n"
 

@@ -73,7 +73,9 @@ kept. For each key:
   `generate-with-python-fernet` becomes a Fernet key. Each is made once and kept.
 
 A line `# server: <why>` directly above a key marks a value that is only right on a laptop. A server deploy refuses
-while that key is empty or still holds the template's value, and lists every such key with its reason. It refuses
+while that key is empty or still holds the template's value or any part of it, and lists every such key with its
+reason. Each comma-separated item counts on its own, with quotes, spaces and letter case set aside, so
+`'QA@notes.test'` still holds the laptop's `admin@notes.test,qa@notes.test`. It refuses
 any key, marked or not, that holds a placeholder: `REPLACE_ME` in its value, or one `<name>`. The file is written
 first, so the owner can set those keys in it and deploy again.
 
