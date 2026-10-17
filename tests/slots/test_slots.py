@@ -83,7 +83,7 @@ def test_the_holder_restarts_the_services_it_names(world: World) -> None:
     assert world.launcher.stacks == [(1, ["restart", "web", "worker"])]
 
 
-def test_an_implementer_and_its_security_tester_run_any_command_in_its_slot_and_no_one_else_runs_one(
+def test_an_implementer_and_its_backend_and_security_testers_run_any_command_in_its_slot_and_no_one_else_runs_one(
     world: World,
 ) -> None:
     _implementer(world, 1)
@@ -94,13 +94,14 @@ def test_an_implementer_and_its_security_tester_run_any_command_in_its_slot_and_
     run = {"op": "run", "service": "web", "command": command}
 
     answer = slot(world.ctx("implementer", "s-1"), run, None)
-    slot(world.ctx("implementer", "s-1", "agent-sec-1", "qa-security"), run, None)
+    for agent_id, kind in (("agent-api-1", "qa-backend"), ("agent-sec-1", "qa-security")):
+        slot(world.ctx("implementer", "s-1", agent_id, kind), run, None)
 
-    assert answer["tail"] == "4.0K /app\n" and world.launcher.stacks == [(1, ["run", "web", "--", *command])] * 2
+    assert answer["tail"] == "4.0K /app\n" and world.launcher.stacks == [(1, ["run", "web", "--", *command])] * 3
     with pytest.raises(Refused, match="slot run is an implementer's"):
         slot(world.ctx(), run, None)
-    with pytest.raises(Refused, match="a qa-backend may run"):
-        slot(world.ctx("implementer", "s-1", "agent-api-1", "qa-backend"), run, None)
+    with pytest.raises(Refused, match="a qa-ux may run"):
+        slot(world.ctx("implementer", "s-1", "agent-ux-1", "qa-ux"), run, None)
 
 
 @pytest.mark.parametrize(

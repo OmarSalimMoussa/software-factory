@@ -16,8 +16,8 @@ SESSIONS = frozenset({ORCH, IMPL, DESIGN})
 ANY = frozenset({ORCH, IMPL, DESIGN, OWNER})
 # Subagent kinds, by what they may do: the testers that record a verdict on an implementer's head, every tester, and
 # the readers that place work in the code and the telemetry.
-SECURITY = "qa-security"
-VERDICTS = frozenset({"qa-backend", SECURITY, "qa-ui-function", "qa-ux", "qa-visual"})
+BACKEND, SECURITY = "qa-backend", "qa-security"
+VERDICTS = frozenset({BACKEND, SECURITY, "qa-ui-function", "qa-ux", "qa-visual"})
 TESTERS = VERDICTS | {"qa-regression", "qa-prod"}
 INTAKE, TRIAGE = "intake", "triage"
 READERS = TESTERS | {INTAKE, TRIAGE}

@@ -25,6 +25,10 @@ before you probe. Drive the API with the `slot-api` tools: they reach your imple
 in as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/sign-in.md` says. Keep every request you send: it is your evidence.
 With no `slot-api` tools, report "no slot-api" as your whole result.
 
+To look inside the slot, such as at what a record holds or what a job printed, run one command in a new container
+of a service: `factory slot run <service> -- <command>`. It has the service's image, settings and network. It stops
+at `slots.run_seconds` and its container is removed after; no command opens a shell in a running container.
+
 ## What you look for
 
 - **Behaviour against the spec:** every check it names, the happy path and every error path.

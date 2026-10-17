@@ -4,10 +4,11 @@ The slot is always worked out from the caller's lease, never from an argument: s
 implementer has the slot it claimed, and its testers share it. A stack command before ``claim`` is refused. The
 answer carries scripts/dev's exit status and the tail of its output; the full log stays the owner's.
 
-A tester only reads its slot, signs in and opens its desktop: seeds and the stack are its parent's. A security tester
-may also run one command in a new container of a service, to probe from inside the slot's network. One tester holds
-a slot's desktop at a time, from its `desktop up` until it hands back (its row retires) or its parent takes the
-desktop down; another tester's `desktop up` waits, so no one's new password cuts off a tester mid-step.
+A tester only reads its slot, signs in and opens its desktop: seeds and the stack are its parent's. A backend or
+security tester may also run one command in a new container of a service, to look from inside the slot's network.
+One tester holds a slot's desktop at a time, from its `desktop up` until it hands back (its row retires) or its
+parent takes the desktop down; another tester's `desktop up` waits, so no one's new password cuts off a tester
+mid-step.
 """
 
 from __future__ import annotations
@@ -22,13 +23,13 @@ from runtime.slots import leases
 from runtime.warden import public
 from runtime.warden.context import Context, StackResult
 from runtime.warden.sessions import registry
-from runtime.warden.verbs import IMPL, ORCH, SECURITY
+from runtime.warden.verbs import BACKEND, IMPL, ORCH, SECURITY
 
 WORD = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@+-]{0,127}$")
 EMAIL = re.compile(r"^[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
 # Verbs a tester may run on its implementer's slot; the rest change the stack and are the implementer's own.
 TESTER_OPS = frozenset({"list", "which", "sign-in", "desktop"})
-SECURITY_OPS = TESTER_OPS | {leases.RUN}
+RUNNER_OPS = TESTER_OPS | {leases.RUN}
 
 
 def _session(ctx: Context) -> Session:
@@ -72,7 +73,7 @@ def _answer(ctx: Context, n: int, result: StackResult) -> dict[str, Any]:
 def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     op = args.get("op")
     session = _session(ctx)
-    allowed = SECURITY_OPS if ctx.caller.agent_kind == SECURITY else TESTER_OPS
+    allowed = RUNNER_OPS if ctx.caller.agent_kind in (BACKEND, SECURITY) else TESTER_OPS
     if ctx.caller.agent_id and op not in allowed:
         raise Refused("slot", f"a {ctx.caller.agent_kind or 'tester'} may run {', '.join(sorted(allowed))} on its "
                               f"slot, not {op}")  # fmt: skip
@@ -98,7 +99,7 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
         failed = leases.empty(ctx, n, session.id)
         return ok(slot=n, released=not failed, **({"failed": failed} if failed else {}))
     if op == leases.RUN and session.role != IMPL:
-        raise Refused("slot", "slot run is an implementer's, and its security tester's, on its own slot")
+        raise Refused("slot", "slot run is an implementer's, and its backend and security testers', on its own slot")
     verb = _verb(op, args)
     if op == "desktop":
         _desktop_lease(ctx, n, verb)
