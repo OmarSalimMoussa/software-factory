@@ -19,7 +19,8 @@ own: it only supplies the values a check compares against, in `check-values/`.
 - A merge whose tree already has a pass is not checked again: the merge hook finds the pass.
 - Tests run through the product's `scripts/dev test [path…]`. The factory picks the paths from the diff with
   `check-values/test-map.toml`. On the laptop the whole run stops after `checks.run_minutes`, and the script gets
-  `FACTORY_TEST_SECONDS` (`checks.test_seconds`): the product's test runner stops any one test that runs longer.
+  `FACTORY_TEST_SECONDS` (`checks.test_seconds`): the product's test runner stops any one test that runs longer. It
+  also gets `FACTORY_TEST_WORKERS` (`checks.test_workers`): the test processes it may run at once.
   The check's unit holds the memory ceiling, `budget.test_memory_ceiling_mib`. Only as many checks run tests at
   once as fit under `budget.slice_memory_high` after `budget.test_reserve_mib`: one, by default. A check that
   finds every place taken waits up to `checks.place_wait_minutes` for one. Still none, it is refused, names who holds

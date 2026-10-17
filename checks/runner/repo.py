@@ -70,9 +70,9 @@ class Repo:
     base: str | None = None
     # (ceiling MiB, reserve MiB) a test run must fit in, from the budget.test_* settings; None with no settings.
     test_memory: tuple[int, int] | None = None
-    # (seconds one test may take, seconds the whole test run may take), from the checks.* settings; None with no
-    # settings.
-    test_seconds: tuple[int, int] | None = None
+    # (seconds one test may take, seconds the whole test run may take, test processes at once), from the checks.*
+    # settings; None with no settings.
+    test_limits: tuple[int, int, int] | None = None
     _baseline: dict[str, Any] | None = field(default=None, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _excluded: frozenset[str] | None = field(default=None, repr=False)

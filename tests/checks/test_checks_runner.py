@@ -83,26 +83,29 @@ def test_an_uncommitted_change_is_refused(fixture_product: Path, commit: Callabl
 
 @pytest.mark.parametrize(
     ("script", "said"),
-    [("sleep 5", "passed 1 s, so it was stopped"), ('echo "per test: $FACTORY_TEST_SECONDS"; exit 1', "per test: 45")],
-    ids=["hung-run", "per-test-limit-given"],
+    [
+        ("sleep 5", "passed 1 s, so it was stopped"),
+        ('echo "per test: $FACTORY_TEST_SECONDS, at once: $FACTORY_TEST_WORKERS"; exit 1', "per test: 45, at once: 2"),
+    ],
+    ids=["hung-run", "per-test-limit-and-workers-given"],
 )
 def test_a_test_run_on_the_laptop_has_its_time_limits(make_repo: Callable[..., Path], script: str, said: str) -> None:
     root = make_repo({"scripts/dev*": f"#!/bin/sh\n{script}\n"})
     repo = Repo.open(root)
-    repo.test_seconds = (45, 1)
+    repo.test_limits = (45, 1, 2)
     values = {"always": [], "full": [], "skip_suffixes": [], "readers": {}}
 
     problems = tests_check.run(repo, values)
     assert len(problems) == 1 and said in problems[0]
 
 
-@pytest.mark.parametrize("limits", [None, (45, 60)], ids=["no-limits", "laptop-limits"])
+@pytest.mark.parametrize("limits", [None, (45, 60, 2)], ids=["no-limits", "laptop-limits"])
 def test_a_failed_test_runs_report_holds_what_it_printed_in_order_so_its_summary_ends_it(
-    make_repo: Callable[..., Path], limits: tuple[int, int] | None
+    make_repo: Callable[..., Path], limits: tuple[int, int, int] | None
 ) -> None:
     script = "echo noise >&2; echo 'FAIL relay/shutdown.test.ts'; echo more noise >&2; echo '1 failed'; exit 1"
     repo = Repo.open(make_repo({"scripts/dev*": f"#!/bin/sh\n{script}\n"}))
-    repo.test_seconds = limits
+    repo.test_limits = limits
 
     [problem] = tests_check.run(repo, {"always": [], "full": [], "skip_suffixes": [], "readers": {}})
 

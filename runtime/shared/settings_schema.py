@@ -170,6 +170,7 @@ SCHEMA: dict[str, Spec] = {
     "checks.run_minutes": Spec("int", 1, 240),
     "checks.place_wait_minutes": Spec("int", 0, 240),
     "checks.test_seconds": Spec("int", 1, 600),
+    "checks.test_workers": Spec("int", 1, 64),
     "checks.output_kib": Spec("int", 4, 1024),
     "checks.writable_caches": Spec("list"),  # folders in the agent's home a check may write
     "errors.poll_minutes": Spec("int", 1, 120),  # contract: added by FB6, prod's GlitchTip issues become requests

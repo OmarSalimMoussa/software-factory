@@ -138,7 +138,11 @@ def run(argv: list[str], cwd: Path, settings: Settings | None, out: TextIO) -> i
     if settings is not None:
         ceiling = settings.get_int("budget.test_memory_ceiling_mib")
         repo.test_memory = (ceiling, settings.get_int("budget.test_reserve_mib"))
-        repo.test_seconds = (settings.get_int("checks.test_seconds"), settings.get_int("checks.run_minutes") * 60)
+        repo.test_limits = (
+            settings.get_int("checks.test_seconds"),
+            settings.get_int("checks.run_minutes") * 60,
+            settings.get_int("checks.test_workers"),
+        )
     started = time.monotonic()
     scope = "everything" if changed is None else f"{len(changed)} changed path(s)"
     out.write(f"factory check: {len(ids)} check(s) over {scope}\n")

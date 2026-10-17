@@ -6,7 +6,8 @@ every test and says so (map it). ``always`` joins every selection; a changed fil
 selects nothing. --all runs every test. On a shared machine a run starts only when its memory ceiling and the reserve
 for every other session are free (the budget.test_* settings); the check's own unit holds that ceiling, and a test
 that passes it is killed. There the run also stops after checks.run_minutes, and scripts/dev test gets
-checks.test_seconds as FACTORY_TEST_SECONDS, the time one test may take, for the product's test runner to enforce.
+checks.test_seconds as FACTORY_TEST_SECONDS, the time one test may take, and checks.test_workers as
+FACTORY_TEST_WORKERS, the test processes it may run at once, for the product's test runner to enforce.
 Its output and errors come back as one stream, in the order printed: an agent sees the report's end, where the test
 runner's summary is.
 """
@@ -72,12 +73,12 @@ def _oom_kills() -> int:
 
 
 def _run(repo: Repo, command: list[str]) -> tuple[int, str]:
-    if repo.test_seconds is None:
+    if repo.test_limits is None:
         done = subprocess.run(command, cwd=repo.root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                               check=False)  # fmt: skip
         return done.returncode, done.stdout.strip()
-    per_test, whole = repo.test_seconds
-    env = {**environment.handed_on(), "FACTORY_TEST_SECONDS": str(per_test)}
+    per_test, whole, workers = repo.test_limits
+    env = {**environment.handed_on(), "FACTORY_TEST_SECONDS": str(per_test), "FACTORY_TEST_WORKERS": str(workers)}
     killed = _oom_kills()
     try:
         done = subprocess.run(command, cwd=repo.root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
