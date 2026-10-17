@@ -60,11 +60,10 @@ def run_pass(ctx: Context) -> int:
         if not where:
             continue
         counts[container["id"]] = container["restarts"]
-        stopped = container["restarts"] - last["restarts"].get(container["id"], 0) if last is not None else 0
-        if stopped > 0:
-            times = "once" if stopped == 1 else f"{stopped} times"
-            log.error("warden: %s container %s stopped %s when nothing asked; Docker restarted it", where,
-                      container["name"], times)  # fmt: skip
+        if last is not None and container["restarts"] > last["restarts"].get(container["id"], 0):
+            # One text per container, so GlitchTip keeps one issue for it however often it stops.
+            said = "warden: %s container %s stopped when nothing asked; Docker restarted it"
+            log.error(said, where, container["name"])
             reported += 1
     store.write_json(_counts(ctx.places), {"at": now, "restarts": counts})
     return reported

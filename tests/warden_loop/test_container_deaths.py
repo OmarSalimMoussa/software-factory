@@ -75,8 +75,8 @@ def test_a_count_that_rose_since_the_last_list_is_logged_as_an_error(
     assert stack_unit.calls == [[leases.RESTARTS], [leases.RESTARTS]]
     said = [r.getMessage() for r in caplog.records]
     assert said == [
-        "warden: slot 2 container notes-slot2-c1 stopped 2 times when nothing asked; Docker restarted it",
-        "warden: prod container notes-prod-c2 stopped once when nothing asked; Docker restarted it",
+        "warden: slot 2 container notes-slot2-c1 stopped when nothing asked; Docker restarted it",
+        "warden: prod container notes-prod-c2 stopped when nothing asked; Docker restarted it",
     ]
 
 
