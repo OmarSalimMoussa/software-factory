@@ -87,6 +87,8 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    anything the owner said. `factory propose <task> --picture <file> --why "<why now, one line>" --brief <file>`,
    adding `--run <N> --reason "<why>"` for a rung other than the route's. When nothing else is worth proposing,
    `factory propose --none`.
+5. Settle the task's title, rung and picture before you propose: its approval covers them, so changing one later
+   with `factory queue task facts` sends the task back to Proposed and ends its run.
 
 ## Starting and steering runs
 
