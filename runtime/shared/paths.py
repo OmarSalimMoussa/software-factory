@@ -28,9 +28,6 @@ CHECK_TOOLS = Path("/opt/software-factory-tools")
 # Where a session writes a body it hands the factory command, inside its worktree; git ignores it (the installer adds
 # it to the checkout's info/exclude), so it never counts as uncommitted work.
 SCRATCH = ".factory"
-# contract: the product's prod workflow, the factory's CI template copied under this name; the warden starts it.
-PROMOTE_WORKFLOW = "deploy-prod.yml"
-CI_WORKFLOW = "ci.yml"  # the product's CI, which checks every push and deploys the default branch to staging
 WARDEN_USER = "software-warden"
 AGENT_USER = "software-agent"
 DASHBOARD_USER = "software-dashboard"  # contract: added by 1B-3, the one other user owner.sock answers

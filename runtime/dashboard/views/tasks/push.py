@@ -11,7 +11,7 @@ from runtime.dashboard.views.tasks.task import built_from
 from runtime.dashboard.views.words import taskwords
 from runtime.shared.models import ON_STAGING
 
-WANTS = ("settings", "probes", "queue", "deploys", "ci", "sessions", "cost", "cards", "qa", "specs", "rules", "outage")
+WANTS = ("settings", "probes", "queue", "deploys", "sessions", "cost", "cards", "qa", "specs", "rules", "outage")
 
 
 def _build(snap: Snap, env: str) -> dict[str, Any]:

@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from runtime.shared import store
 from runtime.warden.context import Clock, Context, StackResult
-from runtime.warden.delivery.github import GitHubError
 from runtime.warden.health.probes import Answer
 
 
@@ -24,41 +24,6 @@ class FakeClock(Clock):
 @dataclass
 class FakeGitHub:
     up: bool = True
-    on_run: Callable[[], None] | None = None
-    dispatched: list[str] = field(default_factory=list)
-    released: list[str] = field(default_factory=list)  # what each dispatch said the last releases ran at
-    releases: str = "success"  # how the prod workflow's jobs after its deploy job end
-    ci: dict[str, Any] | None = None  # CI's run of a pushed commit, once GitHub started one
-    logs: dict[str, str] = field(default_factory=dict)  # each job's log by its id; a job without one is refused
-
-    def dispatch_promote(self, sha: str, released: str) -> str:
-        self.dispatched.append(sha)
-        self.released.append(released)
-        return "42"
-
-    def full_sha(self, sha: str) -> str:
-        return sha + "f" * (40 - len(sha))
-
-    def ci_run(self, sha: str) -> str | None:
-        return None if self.ci is None else "ci-7"
-
-    def run(self, run_id: str) -> dict[str, Any]:
-        if run_id == "ci-7" and self.ci is not None:
-            return self.ci
-        if self.on_run is not None:
-            self.on_run()
-        return {
-            "id": run_id,
-            "status": "completed",
-            "conclusion": self.releases,
-            "url": "https://github.test/42",
-            "jobs": {"deploy": {"status": "completed", "conclusion": "success"}},
-        }
-
-    def job_log(self, job_id: str, most: int) -> str:
-        if job_id not in self.logs:
-            raise GitHubError(f"GitHub refused GET /repos/o/n/actions/jobs/{job_id}/logs: HTTP 410 Gone")
-        return self.logs[job_id]
 
     def reachable(self) -> bool:
         return self.up
@@ -122,6 +87,11 @@ def commit(checkout: Path, change: Callable[[Path], None]) -> str:
     git(checkout, "add", "-A")
     git(checkout, "commit", "-q", "-m", "change")
     return git(checkout, "rev-parse", "HEAD")
+
+
+def passed(world: World, tree: str) -> None:
+    """The warden's record of a whole check that passed on ``tree``."""
+    store.write_json(world.ctx.places.check_passes, [{"tree": tree, "commit": "", "branch": "", "task": "", "at": ""}])
 
 
 def write(rel: str) -> Callable[[Path], None]:

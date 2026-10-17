@@ -7,7 +7,6 @@ SETTINGS = "settings"
 REPO = "repo"
 PUSH = "push"
 PUSH_BACK = "push back"
-STAGING_PUSH = "staging push"
 PAUSE = "pause"
 RESUME = "resume"
 ACCOUNT = "account"
@@ -15,4 +14,4 @@ MESSAGE = "message"
 WORD = "word"
 UPGRADE = "upgrade"
 
-KINDS = (SETTINGS, REPO, PUSH, PUSH_BACK, STAGING_PUSH, PAUSE, RESUME, ACCOUNT, MESSAGE, WORD, UPGRADE)
+KINDS = (SETTINGS, REPO, PUSH, PUSH_BACK, PAUSE, RESUME, ACCOUNT, MESSAGE, WORD, UPGRADE)

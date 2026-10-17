@@ -215,7 +215,7 @@ def mode(snap: Snap) -> dict[str, Any]:
             "text": "The factory runs without you until you switch this off. It approves its own proposals as places "
             "free, its orchestrator says Go on specs and decides stuck tasks, and any question an agent asks you is "
             "answered: be proactive and solve it yourself. Nothing is pushed: the work waits on Home for your Push to "
-            "staging. The daily budget still applies.",
+            "prod. The daily budget still applies.",
             "button": "Turn on",
         },
     }

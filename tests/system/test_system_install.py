@@ -19,7 +19,6 @@ from runtime.system.install_steps import steps_machine, steps_prepare, steps_sec
 from runtime.system.job import REPO_ROOT, Install
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
-from runtime.warden.delivery import pins
 from runtime.warden.sessions import registry, session_settings
 from standard.server import edge as server_edge
 
@@ -535,7 +534,6 @@ def test_an_upgrade_moves_the_agents_product_to_its_factory_in_one_commit_root_r
     assert not (repo / ".github" / "workflows" / "heartbeat.yml").exists() and git("status", "--porcelain") == ""
     [pin] = upgrades.read_pins(job.places)
     assert (pin["commit"], pin["parent"]) == (head.strip(), before.strip())
-    assert pins._pin(git, job.places, head.strip()) == set(pin["blobs"])  # the warden lets exactly this through
 
 
 def test_the_session_settings_folder_is_the_wardens(tmp_path: Path) -> None:

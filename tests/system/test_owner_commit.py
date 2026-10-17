@@ -17,7 +17,6 @@ from runtime.system import owner_commit, root_commits
 from runtime.system.host import CommandError, Host
 from runtime.system.journal import Journal
 from runtime.system.real_host import RealHost
-from runtime.warden.delivery import pins
 
 TOML = '[product]\nname = "shop"\n'
 
@@ -68,7 +67,7 @@ def reports(root: Path) -> None:
     (root / "app.py").write_text("print('shop, with reports')\n")
 
 
-def test_the_owners_patch_lands_as_one_commit_of_theirs_that_the_push_lets_through(
+def test_the_owners_patch_lands_as_one_commit_of_theirs_that_root_records(
     tmp_path: Path, agents: Path, host: Host
 ) -> None:
     places, before = Places.under(tmp_path / "root"), git(agents, "rev-parse", "HEAD").strip()
@@ -85,7 +84,6 @@ def test_the_owners_patch_lands_as_one_commit_of_theirs_that_the_push_lets_throu
     assert git(agents, "status", "--porcelain") == ""
     [record] = upgrades.read_owned(places)
     assert (record["commit"], record["parent"]) == (made, before)
-    assert pins.allowed(lambda *argv: git(agents, *argv), places, before, made) == {"factory.toml", "app.py"}
 
 
 def _rename(root: Path) -> None:
@@ -207,13 +205,12 @@ def test_a_file_moved_in_a_patch_without_renames_lands_as_a_removal_and_a_new_fi
 def test_a_change_already_on_the_branch_is_recorded_as_the_owners_but_never_a_merge_or_another_branchs(
     tmp_path: Path, agents: Path, host: Host
 ) -> None:
-    places, before = Places.under(tmp_path / "root"), git(agents, "rev-parse", "HEAD").strip()
+    places = Places.under(tmp_path / "root")
     reports(agents)
     git(agents, "-c", "user.name=Owner", "-c", "user.email=o@invalid", "commit", "-q", "-am", "Reports")
     made = git(agents, "rev-parse", "HEAD").strip()
 
     assert owner_commit.from_commit(host, places, agents, "master", made[:9]) == made
-    assert pins.allowed(lambda *argv: git(agents, *argv), places, before, made) == {"factory.toml", "app.py"}
     with pytest.raises(owner_commit.Refusal, match="already recorded"):
         owner_commit.from_commit(host, places, agents, "master", made)
     git(agents, "checkout", "-q", "-b", "side")

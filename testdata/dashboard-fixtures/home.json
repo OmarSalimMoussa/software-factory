@@ -18,7 +18,6 @@
      "tone": "accent"
     }
    ],
-   "deployment_url": "https://github.com/acme/acme-app/actions/runs/11872341205",
    "commit_url": "https://github.com/acme/acme-app/commit/a1b2c3d"
   },
   "prod": {
@@ -35,7 +34,6 @@
      "tone": "muted"
     }
    ],
-   "deployment_url": "https://github.com/acme/acme-app/actions/runs/11829911873",
    "commit_url": "https://github.com/acme/acme-app/commit/9f8e7d1"
   },
   "to_push": 4,
@@ -59,27 +57,6 @@
      "label": "Power",
      "pct": 100,
      "value": "Mains"
-    }
-   ]
-  },
-  "ready": {
-   "sha": "ffffffffffffffffffffffffffffffffffffffff",
-   "label": "Push 2 to staging",
-   "note": "Each passed its check. CI deploys staging; prod moves only when you push it.",
-   "items": [
-    {
-     "chip": {
-      "text": "t-0013",
-      "tone": "accent"
-     },
-     "title": "Retry an upload that timed out"
-    },
-    {
-     "chip": {
-      "text": "factory",
-      "tone": ""
-     },
-     "title": "Factory upgrade"
     }
    ]
   }

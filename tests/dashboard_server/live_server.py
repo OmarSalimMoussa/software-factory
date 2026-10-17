@@ -4,9 +4,8 @@ Run: python3 tests/dashboard_server/live_server.py [--port 0]. It prints "listen
 the drives' test routes as the UI's own fixture server does: GET /__calls, POST /__reset and POST /__switch. Each
 switch makes its broken state for real where the warden can (down, scenarios, bump, saved, a failing push); a
 failure of the dashboard itself (fail_path, fail_part, api, refuse) is injected around the server. The clock starts
-at 14:02 UTC on the fixtures' day, an orchestrator stand-in refills free proposal places, a push to staging is noted
-as made without reaching GitHub, a push to prod takes the build as named and deploys it at once, and a device signs in
-with the code 123456.
+at 14:02 UTC on the fixtures' day, an orchestrator stand-in refills free proposal places, a push to prod takes the
+build as named and deploys it at once, and a device signs in with the code 123456.
 """
 
 from __future__ import annotations
@@ -41,7 +40,7 @@ from runtime.shared import models, store
 from runtime.shared import settings as settings_module
 from runtime.warden import public
 from runtime.warden.context import Caller, Clock
-from runtime.warden.delivery import deploys, github_push, prod_push
+from runtime.warden.delivery import deploys, prod_push
 from runtime.warden.owner import ops, settings_save
 from runtime.warden.sessions import crashwatch, registry
 
@@ -76,7 +75,6 @@ class Live:
         self.timers: list[threading.Timer] = []
         self._launch = ops.launch
         ops.launch = self.paced  # type: ignore[assignment]  # the drives set how long each step of an operation takes
-        github_push._push = self.pushed  # type: ignore[assignment]  # GitHub is out of a drive's reach
         prod_push._cleared = lambda ctx, kind, sha: sha  # type: ignore[assignment]  # the seeded checkout has no git
         self.app = self.fresh()
 
@@ -89,10 +87,6 @@ class Live:
             return lambda: (time.sleep(wait), act())[1]
 
         return self._launch(ctx, kind, [(text, slow(act)) for text, act in steps], result)
-
-    def pushed(self, ctx: Any, sha: str) -> str:
-        github_push.waiting_path(ctx.places).unlink()
-        return f"pushed; CI takes {sha[:12]} to staging"
 
     def deployed(self, sha: str) -> tuple[int, str]:
         """Prod's build and deploy: prod then answers on the new build, which the warden's tick would log, unless told

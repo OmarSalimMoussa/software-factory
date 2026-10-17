@@ -140,7 +140,6 @@ VERBS: dict[str, Verb] = {
     "rule.switch": _o("runtime.warden.owner.settings_save:switch_rule"),
     "push.prod": _o("runtime.warden.delivery.prod_push:push_prod"),
     "push.back": _o("runtime.warden.delivery.prod_push:push_back"),
-    "staging.push": _o("runtime.warden.delivery.github_push:owner_push"),
     "slot.open": _o("runtime.warden.owner.slot_sign_in:open_slot"),
     "yolo.switch": _o("runtime.warden.owner.yolo:owner_switch"),
     # contract: added by FB9, the agents' Claude accounts. No code: only the owner's own uid reaches owner.sock.

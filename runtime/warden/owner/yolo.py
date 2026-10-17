@@ -4,7 +4,7 @@ While it is on, the warden approves the orchestrator's proposals in the seat ord
 its role: the role's cap, less the runs that hold a place, the benched ones and the runs approved or designed and
 waiting. So YOLO never starts a run the next one benches. It answers each question asked of the owner with ANSWER,
 as the owner, and hands each spec's Go and each stuck task to the orchestrator to decide (`factory decide`). It never
-pushes: what waits for the owner's push to staging keeps waiting. The daily budget, the guard and every other limit
+pushes: what waits for the owner's push to prod keeps waiting. The daily budget, the guard and every other limit
 stay as they are.
 """
 

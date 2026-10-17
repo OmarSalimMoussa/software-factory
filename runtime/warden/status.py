@@ -10,7 +10,6 @@ from runtime.shared import models
 from runtime.slots import leases
 from runtime.warden import schedule
 from runtime.warden.context import Context
-from runtime.warden.delivery import ci_watch
 from runtime.warden.health import errors_import, probes
 from runtime.warden.owner import codes, settings_save
 from runtime.warden.sessions import registry
@@ -43,7 +42,6 @@ def status(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
         **health,
         "plan": plan.reading(ctx),
         "errors_import": errors_import.note(ctx.places),
-        "ci": ci_watch.read(ctx.places),
         "reports_import": reports.note(ctx),
         "code_locked_until": None
         if until is None

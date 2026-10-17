@@ -13,8 +13,7 @@ from runtime.queue import format_check, turn
 from runtime.queue.book import Queue
 from runtime.shared.models import BENCH_PENDING, FINISHED, RETIRED, WORKING
 from runtime.warden import checks, loop
-from runtime.warden.delivery import deploys, github_push
-from runtime.warden.owner import ops
+from runtime.warden.delivery import deploys, done
 from runtime.warden.sessions import crashwatch, registry
 
 TASK = "t-0001"
@@ -71,9 +70,9 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
 
     testers = _built_and_tested(r, impl, worktree)
 
-    merge = _merged_and_pushed(r, orch, impl, worktree, branch)
+    merge = _merged_and_mirrored(r, orch, impl, worktree, branch)
 
-    # The warden's tick sees staging answer on the pushed commit, and logs it; prod still runs the first build.
+    # The warden's tick sees staging answer on the merge, and logs it; prod still runs the first build.
     proc, power = kernel(tmp_path)
     loop.run_tick(r.warden(), r.health(staging=merge, prod=first), proc, power)
     logged = {env: deploys.builds(r.places, env)["current"] for env in ("staging", "prod")}
@@ -81,7 +80,7 @@ def test_one_request_goes_from_the_inbox_to_staging(rehearsal: Rehearsal, tmp_pa
 
     # The orchestrator's loop pass: its inbox, staging's health in its status, then its tick.
     events = [e["kind"] for e in r.session(orch, ["inbox"])["events"]]
-    assert events == ["orchestrator-started", "proposal-slot-free", "approved", "pushed", "loop due"]
+    assert events == ["orchestrator-started", "proposal-slot-free", "approved", "loop due"]
     status = r.session(orch, ["status"])
     assert (status["staging"]["ok"], status["staging"]["commit"], status["prod"]["commit"]) == (True, merge, first)
     r.session(orch, ["tick"])
@@ -161,7 +160,7 @@ def _built_and_tested(r: Rehearsal, impl: str, worktree: Path) -> list[str]:
     return testers
 
 
-def _merged_and_pushed(r: Rehearsal, orch: str, impl: str, worktree: Path, branch: str) -> str:
+def _merged_and_mirrored(r: Rehearsal, orch: str, impl: str, worktree: Path, branch: str) -> str:
     # The orchestrator gives the merge turn, and the warden tells the implementer; it rebases and its check passes.
     assert r.session(orch, ["turn", "next"])["task"] == TASK
     assert registry.read(r.places)[impl].merge_turn
@@ -169,8 +168,8 @@ def _merged_and_pushed(r: Rehearsal, orch: str, impl: str, worktree: Path, branc
     git(worktree, "rebase", "-q", "master")
     assert r.session(impl, ["check"])["passed"]
 
-    # The orchestrator merges; the warden finds the merge. The passing check of master marks the task checked, the
-    # warden offers the push of the newest checked commit, and the owner pushes it from Home.
+    # The orchestrator merges; the warden finds the merge. The passing check of master marks the task checked, and
+    # the Done refresh mirrors master to GitHub.
     git(r.repo, "merge", "-q", "--no-ff", branch, "-m", f"Merge {branch}: new notes show first")
     merge = git(r.repo, "rev-parse", "HEAD")
     assert checks.passed(r.places, git(r.repo, "rev-parse", "HEAD^{tree}"))
@@ -179,10 +178,7 @@ def _merged_and_pushed(r: Rehearsal, orch: str, impl: str, worktree: Path, branc
     assert registry.read(r.places)[impl].state == BENCH_PENDING
     report = r.body(r.repo, "check.md", REPORT.encode())
     assert r.session(orch, ["queue", "check", merge, "--body", report])["checked"] == TASK
-    github_push.offer(r.warden())
-    held = github_push.waiting(r.places)
-    assert held is not None and (held["sha"], held["commits"]) == (merge, 2)
     assert git(r.github, "rev-parse", "master") != merge
-    ops.join(r.dashboard("staging.push", {"sha": merge})["op"])
+    done.refresh(r.warden())
     assert git(r.github, "rev-parse", "master") == merge
     return merge

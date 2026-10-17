@@ -263,8 +263,6 @@ WRITES: list[tuple[re.Pattern[str], Write]] = [
     _w("push/back", "push.back", _push_back_args, lambda a, s: _said(a, "Pushing prod back."), ["home", "shell"],
        wants=("deploys",)),
     _w("slot/open", "slot.open", lambda b, r, s: {}, lambda a, s: "Opening slot 0, signed in.", []),
-    _w("staging/push", "staging.push", lambda b, r, s: {"sha": _text(b, "sha")},
-       lambda a, s: _said(a, "Pushing to staging."), ["home", "shell"]),
     _w("yolo", "yolo.switch", _yolo_args, lambda a, s: "YOLO mode is on." if a["on"] else "YOLO mode is off.",
        ["home", "settings", "shell"]),
     _w("accounts", "account.add", lambda b, r, s: {"name": _account_name(b), "switch": b.get("switch") is True},

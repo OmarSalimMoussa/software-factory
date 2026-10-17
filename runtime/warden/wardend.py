@@ -25,7 +25,7 @@ from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, Places
 from runtime.shared.settings import Settings
 from runtime.warden import gc, imports, inbox, loop, public, schedule, server, upgrade
 from runtime.warden.context import Caller, CheckPlaces, Clock, Context
-from runtime.warden.delivery import ci_watch, done, github, github_push
+from runtime.warden.delivery import done, github
 from runtime.warden.dispatch import Dispatcher, Doors, resolve
 from runtime.warden.owner import ops, reflections, settings_save, yolo
 from runtime.warden.sessions import crashwatch, launch, reap, registry
@@ -70,18 +70,8 @@ def run_passes(ctx: Context, passes: Sequence[tuple[str, Pass]]) -> None:
         loop.run_once(ctx, f"the {name} pass", partial(run, ctx))
 
 
-def _watch_ci(ctx: Context) -> None:
-    # In its own thread: a failed run's request reads its jobs' logs from GitHub.
-    loop.run_once(ctx, "the CI watch", lambda: ci_watch.poll(ctx))
-
-
-def _offer_push(ctx: Context) -> None:
-    # In its own thread: a look fetches from GitHub and the agents' checkout.
-    loop.run_once(ctx, "the staging push's offer", lambda: github_push.offer(ctx))
-
-
 def _refresh_done(ctx: Context) -> None:
-    # In its own thread: it waits for a push to end.
+    # In its own thread: it waits for a push to end, and mirrors GitHub.
     loop.run_once(ctx, "the done list", lambda: done.refresh(ctx))
 
 
@@ -103,8 +93,6 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
         ("sessions", crashwatch.SessionsWatch(imports.in_thread("benches")).run_pass),
         # It runs the product's scripts on a slot, for up to slots.verb_minutes: never inside the tick.
         ("reports", imports.Background(_pull_reports, imports.in_thread("reports")).run_pass),
-        ("offer", imports.Background(_offer_push, imports.in_thread("offer")).run_pass),
-        ("ci", imports.Background(_watch_ci, imports.in_thread("ci")).run_pass),
         ("done", imports.Background(_refresh_done, imports.in_thread("done")).run_pass),
         (
             "replays",
@@ -151,7 +139,7 @@ def main() -> int:
     clock = Clock()
     owner, agent_home = _owner(places), launch.agent_home()
     doors = Doors(places, settings, clock, launch.Units(places, settings),
-                  github.RestGitHub(places, settings, github.transport), inbox.poster(places, clock),
+                  github.RestGitHub(settings, github.transport), inbox.poster(places, clock),
                   threading.RLock(), CheckPlaces())  # fmt: skip
     dispatcher = Dispatcher(doors, resolve(VERBS))
     ops.recover(places, clock)

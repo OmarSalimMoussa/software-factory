@@ -16,15 +16,6 @@ drive('home', async t => {
   const sizes = [...new Set(await heights(p, '#props .prop, #needs .need'))]; t.check(sizes.length === 1, 'Home cards differ in height: ' + sizes);
   const bw = await p.$$eval('.prop-a .btn:not(.sq)', els => [...new Set(els.map(e => Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height)))]); t.check(bw.length === 1, 'Home action buttons differ: ' + bw);
   await t.shot(p, 'home-full-1440.png', {fullPage: true});
-  // Push to staging: what the orchestrator asked for waits for the owner; the panel lists it, one click pushes it
-  const stagingH = await p.$eval('.env', e => e.getBoundingClientRect().height);
-  t.check((await p.textContent('.env [data-action="push-staging"]')).includes('Push 2 to staging'), 'no Push to staging on the Staging card');
-  await p.click('[data-action="push-staging"]'); await settle(p);
-  t.check((await p.textContent('#sheet-body')).includes('Factory upgrade') && !(await p.$('#code-0')), 'the staging panel does not list what goes out, or asks for a code');
-  await t.confirm(p);
-  await p.waitForFunction(() => !document.querySelector('[data-action="push-staging"]') && !document.querySelector('#sheet').classList.contains('open'), null, {timeout: 8000}).catch(() => t.errors.push('Push to staging stayed after the push'));
-  const staged = await lastCall('/api/staging/push'); t.check(staged && staged.body.sha === 'f'.repeat(40), 'the staging push did not send the commit it showed');
-  t.check(await p.$eval('.env', e => e.getBoundingClientRect().height) === stagingH, 'the Staging card changed height');
   // reorder: the server is told the order this device showed, and the card moves when it answers
   const v24 = await p.evaluate(() => propCardOf('t-0024').version);
   await p.click('[data-prop-move="-1"][data-id="t-0024"]'); await settle(p);

@@ -58,21 +58,6 @@ class FakeLauncher:
 
 
 class FakeGitHub:
-    def dispatch_promote(self, sha: str, released: str) -> str:
-        return "run"
-
-    def ci_run(self, sha: str) -> str | None:
-        return None  # CI has not started on it
-
-    def full_sha(self, sha: str) -> str:
-        return sha + "f" * (40 - len(sha))
-
-    def run(self, run_id: str) -> dict[str, Any]:
-        return {}
-
-    def job_log(self, job_id: str, most: int) -> str:
-        raise AssertionError("no CI run fails here")
-
     def reachable(self) -> bool:
         return True
 

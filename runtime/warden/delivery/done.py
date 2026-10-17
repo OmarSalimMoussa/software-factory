@@ -3,9 +3,9 @@ its commits and how far the merge has reached; the branch's latest commits, each
 slot 0 runs, against the branch's tip.
 
 Every ``watch.done_minutes`` the warden's mirror fetches the agents' checkout, which needs no network, under the
-push lock, and a pass of its own writes the finished list for the dashboard to draw. GitHub's branch is the one the
-mirror last fetched for a push: unknown before the first. Staging, which is slot 0, and prod are the builds their
-health answers named. A merge's commits never change, so each merge's are read once and kept.
+push lock, brings GitHub's branch up to it, and a pass of its own writes the finished list for the dashboard to draw.
+GitHub's branch is the one the mirror last saw: unknown until GitHub first answers. Staging, which is slot 0, and prod
+are the builds their health answers named. A merge's commits never change, so each merge's are read once and kept.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from runtime.shared import slices, store
 from runtime.shared.paths import Places
 from runtime.warden.context import Context
 from runtime.warden.delivery import deploys
-from runtime.warden.delivery.github_push import REVERTS, Git, fetch_checkout, pushing
+from runtime.warden.delivery.github_push import REVERTS, Git, ask_for_check, fetch_checkout, mirror, pushing
 from runtime.warden.health import probes
 
 _FIELD, _END = "\x1f", "\x1e"
@@ -45,7 +45,7 @@ def _tried_path(places: Places) -> Path:
 
 def refresh(ctx: Context) -> None:
     """Write the list again once ``watch.done_minutes`` have passed since the last try, whether or not it worked: it
-    waits for a push to end, so it runs in a thread of its own."""
+    waits for a push to end and mirrors GitHub, so it runs in a thread of its own."""
     tried = store.read_json_or(_tried_path(ctx.places), None)
     if tried is not None and ctx.clock.age(tried["at"]) < ctx.settings().get_int("watch.done_minutes") * 60:
         return
@@ -54,7 +54,9 @@ def refresh(ctx: Context) -> None:
     with pushing:
         git = Git(ctx)
         local = fetch_checkout(ctx, git)
-        github = _full(git, f"refs/github/{branch}")
+        ask_for_check(ctx, git, local)
+    mirror(ctx, git, local)
+    github = _full(git, f"refs/github/{branch}")
     recorded = merges(ctx.places)
     lines = git.run("log", "--first-parent", "--merges", "--format=%H %ct", local).splitlines()
     landed = [(sha, int(at)) for sha, at in (line.split() for line in lines) if sha in recorded]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -12,10 +13,8 @@ from runtime.queue import turn
 from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.protocol import Refused
-from runtime.warden.delivery import deploys, done, github_push
+from runtime.warden.delivery import deploys, done
 from runtime.warden.health import probes
-
-GITHUB = "git@github.com:owner/name.git"
 
 
 def merge(world: World, task: str, slices: int) -> str:
@@ -49,12 +48,9 @@ def test_a_task_is_done_while_its_newest_merge_stays_and_each_shows_how_far_it_r
     world: World, github_repo: Path
 ) -> None:
     first = merge(world, "t-0001", 2)
-    git(world.checkout, "push", "-q", str(github_repo), "master")
     taken_back = merge(world, "t-0002", 1)
     git(world.checkout, "revert", "-m", "1", "--no-edit", taken_back)
     merge(world, "t-0003", 1)
-    with github_push.pushing:
-        github_push.Git(world.ctx).run("fetch", "--quiet", GITHUB, "+refs/heads/master:refs/github/master")
     deploys.record(world.ctx.places, probes.STAGING, first[:7], world.clock.iso())
     staging(world, first[:7])
 
@@ -62,7 +58,7 @@ def test_a_task_is_done_while_its_newest_merge_stays_and_each_shows_how_far_it_r
 
     found = listed(world)
     assert [(t["task"], t["github"], t["staging"], t["prod"]) for t in found["tasks"]] == [
-        ("t-0003", False, False, None),
+        ("t-0003", True, False, None),
         ("t-0001", True, True, None),
     ]
     assert [c["slice"] for c in found["tasks"][1]["commits"]] == ["2/2", "1/2"]
@@ -71,16 +67,14 @@ def test_a_task_is_done_while_its_newest_merge_stays_and_each_shows_how_far_it_r
         ('Revert "Merge t-0002"', None),
         ("t-0002 part 1", "t-0002"),
     }
-    after_the_push = 5  # t-0002's commit and merge, the revert, t-0003's commit and merge
-    assert (found["ahead"], found["slot0"]) == (
-        after_the_push,
-        {"commit": first[:7], "behind": after_the_push, "why": None},
-    )
+    after_slot0 = 5  # t-0002's commit and merge, the revert, t-0003's commit and merge
+    assert (found["ahead"], found["slot0"]) == (0, {"commit": first[:7], "behind": after_slot0, "why": None})
 
 
 @pytest.mark.parametrize("error", ["", "HTTP 502"], ids=["never-probed", "red"])
 def test_what_the_warden_has_not_seen_stays_unknown(world: World, github_repo: Path, error: str) -> None:
     merge(world, "t-0001", 1)
+    shutil.rmtree(github_repo)  # GitHub never answered
     if error:
         staging(world, "", error)
 

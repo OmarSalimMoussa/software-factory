@@ -11,7 +11,6 @@ from runtime.dashboard.views.shell import STATE_COLOR, github_url, health, prod_
 from runtime.dashboard.views.tasks import proposals
 from runtime.dashboard.views.words import agentwords, taskwords
 from runtime.shared.models import ON_STAGING, QA_CLEAN, RETIRED, WAITING
-from runtime.shared.paths import PROMOTE_WORKFLOW
 
 WANTS = (
     "settings",
@@ -26,11 +25,9 @@ WANTS = (
     "goal",
     "factory",
     "deploys",
-    "ci",
     "rules",
     "triage",
     "upgrade",
-    "staging_push",
     "yolo",
 )
 SPARK_DAYS = 14
@@ -60,10 +57,6 @@ def env_card(snap: Snap, env: str) -> dict[str, Any]:
         ahead = sum(1 for t in snap.get("queue")["tasks"] if t["status"] == ON_STAGING)
         if ahead:
             chips.append({"text": f"{ahead} {'task' if ahead == 1 else 'tasks'} ahead of prod", "tone": "accent"})
-        ci = snap.get("ci")
-        if ci is not None and ci["conclusion"] in ("failure", "timed_out", "cancelled", "startup_failure"):
-            jobs = ", ".join(ci["failed"]) or "a job"
-            chips.append({"text": f"CI failed on {ci['commit'][:8]}: {jobs}", "tone": "bad"})
     elif "prod-frozen" not in snap.get("rules")["off"]:
         chips.append({"text": "frozen", "tone": "muted"})
     current = snap.get("deploys")[env]["current"]
@@ -76,8 +69,6 @@ def env_card(snap: Snap, env: str) -> dict[str, Any]:
         "sha": pill["sha"],
         "deployed": when(epoch(current["at"])) if current else None,
         "chips": chips,
-        # Only prod's deploying workflow is known: staging's is the product's own CI.
-        "deployment_url": f"{github_url(snap)}/actions/workflows/{PROMOTE_WORKFLOW}" if env == "prod" else None,
         "commit_url": f"{github_url(snap)}/commit/{pill['sha']}" if pill["sha"] else None,
     }
 
@@ -140,41 +131,6 @@ def envs(snap: Snap) -> dict[str, Any]:
         # Between the cards when no task waits on staging: staging can still differ from prod (a push back, a pin).
         "step_word": "in step" if prod_runs_staging(snap) else "differs",
         "laptop": laptop(snap),
-        "ready": staging_ready(snap),
-    }
-
-
-def staging_ready(snap: Snap) -> dict[str, Any] | None:
-    """What waits for the owner to push to staging, as the Staging card's button and its panel say it; None when
-    nothing waits."""
-    held = snap.get("staging_push")
-    if held is None:
-        return None
-    tasks, found = taskwords.tasks(snap), snap.get("outage")
-    fix = found["task"] if found else ""
-    items = []
-    for item in held["items"]:
-        task = tasks.get(item["task"])
-        title = task["title"] if task else "A merge no task names"
-        if item["kind"] == "factory":
-            items.append({"chip": {"text": "factory", "tone": ""}, "title": "Factory upgrade"})
-        elif item["kind"] == "owner":
-            items.append({"chip": {"text": "you", "tone": ""}, "title": "Your own change"})
-        elif item["kind"] == "revert":
-            items.append({"chip": {"text": "revert", "tone": "warn"}, "title": f"Takes back: {title}"})
-        elif fix and item["task"] == fix:
-            items.append({"chip": {"text": "outage fix", "tone": "bad"}, "title": title})
-        else:
-            items.append({"chip": {"text": item["task"] or "merge", "tone": "accent"}, "title": title})
-    count = len(items) or held["commits"]
-    label = (
-        "Push the outage fix" if fix and any(i["task"] == fix for i in held["items"]) else f"Push {count} to staging"
-    )
-    return {
-        "sha": held["sha"],
-        "label": label,
-        "items": items,
-        "note": "Each passed its check. CI deploys staging; prod moves only when you push it.",
     }
 
 

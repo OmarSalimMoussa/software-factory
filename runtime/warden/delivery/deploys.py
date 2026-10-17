@@ -72,9 +72,3 @@ def in_flight(places: Places, env: str, now: float) -> bool:
     """Whether a deploy to ``env`` is still landing: not answered on yet, and within its time."""
     flight = _flights(places).get(env)
     return flight is not None and not flight["landed"] and now < float(flight["until"])
-
-
-def last_push(places: Places, env: str) -> str | None:
-    """The commit the warden last pushed toward ``env``, landed or not; None before its first push."""
-    flight = _flights(places).get(env)
-    return str(flight["commit"]) if flight is not None else None
