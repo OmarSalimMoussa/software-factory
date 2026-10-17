@@ -59,8 +59,8 @@ def test_the_mirror_reads_the_agents_checkout_though_another_user_owns_it(
     assert git(github_repo, "rev-parse", "master") == tip
 
 
-@pytest.mark.parametrize("trouble", ["github-moved", "github-gone"])
-def test_a_branch_github_moved_on_its_own_or_github_not_answering_is_left_and_logged_once(
+@pytest.mark.parametrize("trouble", ["github-moved", "github-gone", "github-refuses"])
+def test_a_branch_github_moved_on_its_own_refused_or_not_answering_is_left_and_logged_once_with_githubs_reason(
     world: World, github_repo: Path, tmp_path: Path, caplog: pytest.LogCaptureFixture, trouble: str
 ) -> None:
     held = git(github_repo, "rev-parse", "master")
@@ -69,6 +69,10 @@ def test_a_branch_github_moved_on_its_own_or_github_not_answering_is_left_and_lo
         git(tmp_path, "clone", "-q", str(github_repo), str(elsewhere))
         held = commit(elsewhere, write("src/other.py"))
         git(elsewhere, "push", "-q", "origin", "master")
+    elif trouble == "github-refuses":
+        hook = github_repo / "hooks" / "pre-receive"
+        hook.write_text("#!/bin/sh\necho 'error: GH013: Repository rule violations found' >&2\nexit 1\n")
+        hook.chmod(0o755)
     else:
         shutil.rmtree(github_repo)
     tip = commit(world.checkout, write("src/app.py"))
@@ -77,11 +81,17 @@ def test_a_branch_github_moved_on_its_own_or_github_not_answering_is_left_and_lo
         refresh(world)
         found = refresh(world)
 
-    said = {"github-moved": "has commits the checkout lacks", "github-gone": "git fetch failed"}[trouble]
+    said = {
+        "github-moved": "has commits the checkout lacks",
+        "github-gone": "git fetch failed",
+        "github-refuses": "git push failed: remote: error: GH013: Repository rule violations found",
+    }[trouble]
     assert [r.levelname for r in caplog.records] == ["WARNING"] and said in caplog.records[0].getMessage()
     assert found["local"] == tip  # the list is written all the same
+    if trouble != "github-gone":
+        assert git(github_repo, "rev-parse", "master") == held
     if trouble == "github-moved":
-        assert git(github_repo, "rev-parse", "master") == held and found["github"] == held
+        assert found["github"] == held
 
 
 @pytest.mark.parametrize(

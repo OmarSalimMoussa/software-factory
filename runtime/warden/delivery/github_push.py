@@ -149,8 +149,10 @@ class Git:
     def run(self, *argv: str) -> str:
         done = self._exec(list(argv), cwd=self.mirror)
         if done.returncode != 0:
-            lines = done.stderr.strip().splitlines()
-            said = next((line for line in lines if line.startswith(("fatal:", "error:"))), lines[-1] if lines else "")
+            lines = [line.strip() for line in done.stderr.strip().splitlines()]
+            # The remote's own refusal says why; git's closing "error: failed to push some refs" never does.
+            said = next((line for marks in _REASONS for line in lines if line.startswith(marks)),
+                        lines[-1] if lines else "")  # fmt: skip
             raise Refused("push-failed", f"git {_verb(list(argv))} failed: {(said or f'exit {done.returncode}')[:300]}")
         return done.stdout
 
@@ -162,6 +164,9 @@ class Git:
         if done.returncode not in (0, 1):
             raise Refused("push-failed", f"git merge-base failed: {done.stderr.strip()[-300:]}")
         return done.returncode == 0
+
+
+_REASONS = (("remote: error", "! ["), ("fatal:", "error:"))
 
 
 def _verb(argv: list[str]) -> str:
