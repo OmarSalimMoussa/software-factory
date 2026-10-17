@@ -65,6 +65,7 @@ VERBS: dict[str, Verb] = {
     # contract: added by FB6, read-only telemetry; the guard lets only intake, triage and testers among subagents ask
     "errors": _v("runtime.warden.health.telemetry:errors", *SESSIONS, kinds=READERS),
     "traces": _v("runtime.warden.health.telemetry:traces", *SESSIONS, kinds=READERS),
+    "logs": _v("runtime.warden.health.logs:logs", *SESSIONS, kinds=READERS),
     # the queue (1C)
     "request.new": _v("runtime.queue.verbs:request_new", *ANY),
     "triage.apply": _v("runtime.queue.verbs:triage_apply", ORCH),

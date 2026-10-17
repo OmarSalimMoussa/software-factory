@@ -1,5 +1,5 @@
-"""Read-only telemetry for agents, `factory errors` and `factory traces`, and the GlitchTip reads the errors import
-shares.
+"""Read-only telemetry for agents, `factory errors` and `factory traces`, and the GlitchTip reads the errors import and
+`factory logs` share.
 
 The warden holds every key and asks GlitchTip and Langfuse itself; an agent sees only the answer. Every workspace,
 prod and each slot (slot 0 is staging), lives on this machine's shared services, reached with the keys in the secrets'
@@ -127,7 +127,7 @@ def langfuse(places: Places) -> Langfuse:
     return Langfuse(keys["url"], keys["public_key"], keys["secret_key"])
 
 
-def _bearer(service: GlitchTip) -> dict[str, str]:
+def bearer(service: GlitchTip) -> dict[str, str]:
     return {"Authorization": f"Bearer {service.token}"}
 
 
@@ -169,7 +169,7 @@ def unresolved(service: GlitchTip, prefix: str, timeout: float, max_pages: int, 
     base = f"{service.url}/api/0/organizations/{urllib.parse.quote(service.org, safe='')}/issues/"
     for _ in range(max_pages):
         query = {"query": "is:unresolved", "sort": "-last_seen", **({"cursor": cursor} if cursor else {})}
-        page, headers = get_json("GlitchTip", f"{base}?{urllib.parse.urlencode(query)}", _bearer(service), timeout)
+        page, headers = get_json("GlitchTip", f"{base}?{urllib.parse.urlencode(query)}", bearer(service), timeout)
         if not isinstance(page, list):
             raise TelemetryError("GlitchTip's issue list is not a list")
         found += [issue for issue in map(_issue, page) if issue.project.startswith(prefix)]
@@ -191,9 +191,7 @@ def _dicts(value: Any) -> list[dict[str, Any]]:
     return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
 
-def _event(raw: Any) -> dict[str, Any]:
-    if not isinstance(raw, dict):
-        raise TelemetryError("GlitchTip's latest event is not an object")
+def _event(raw: dict[str, Any]) -> dict[str, Any]:
     exceptions = []
     for entry in _dicts(raw.get("entries")):
         data = entry.get("data")
@@ -208,19 +206,23 @@ def _event(raw: Any) -> dict[str, Any]:
             exceptions.append({"type": _text(value, "type"), "value": _text(value, "value"),
                                "frames_innermost_first": frames[::-1]})  # fmt: skip
     tags = {str(t["key"]): t.get("value") for t in _dicts(raw.get("tags")) if isinstance(t.get("key"), str)}
-    return {"title": _text(raw, "title"), "message": _text(raw, "message"), "exceptions": exceptions, "tags": tags}
+    request = next((e.get("data") for e in _dicts(raw.get("entries")) if e.get("type") == "request"), None)
+    return {"title": _text(raw, "title"), "message": _text(raw, "message"), "exceptions": exceptions, "tags": tags,
+            "request": request}  # fmt: skip
 
 
-def _latest(service: GlitchTip, workspace: str, issue_id: Any, timeout: float) -> dict[str, Any]:
+def _latest(service: GlitchTip, workspace: str, issue_id: Any, timeout: float, whole: bool) -> dict[str, Any]:
     if not isinstance(issue_id, str) or not _ISSUE_ID.match(issue_id):
         raise Refused("args", "--issue is a GlitchTip issue number")
-    detail, _ = get_json("GlitchTip", f"{service.url}/api/0/issues/{issue_id}/", _bearer(service), timeout)
+    detail, _ = get_json("GlitchTip", f"{service.url}/api/0/issues/{issue_id}/", bearer(service), timeout)
     issue = _issue(detail)
     if not issue.project.startswith(f"{workspace}-"):
         raise Refused("telemetry", f"issue {issue_id} is not one of {workspace}'s")
-    event, _ = get_json("GlitchTip", f"{service.url}/api/0/issues/{issue_id}/events/latest/", _bearer(service),
+    event, _ = get_json("GlitchTip", f"{service.url}/api/0/issues/{issue_id}/events/latest/", bearer(service),
                         timeout)  # fmt: skip
-    return {"issue": _issue_row(issue), "latest_event": _event(event)}
+    if not isinstance(event, dict):
+        raise TelemetryError("GlitchTip's latest event is not an object")
+    return {"issue": _issue_row(issue), "latest_event": event if whole else _event(event)}
 
 
 def _trace_row(raw: dict[str, Any]) -> dict[str, Any]:
@@ -306,14 +308,17 @@ def _places(node: Any) -> list[tuple[Any, Any]]:
 
 
 def errors(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """`factory errors`: a workspace's unresolved GlitchTip issues, newest first, or one issue and its latest event."""
+    """`factory errors`: a workspace's unresolved GlitchTip issues, newest first, or one issue and its latest event,
+    whole when asked."""
     settings = ctx.settings()
     workspace = workspace_of(ctx, args)
     timeout = float(settings.get_int("telemetry.timeout_seconds"))
     try:
         service = glitchtip(ctx.places)
         if "issue" in args:
-            answer = {"where": workspace, **_latest(service, workspace, args["issue"], timeout)}
+            answer = {"where": workspace, **_latest(service, workspace, args["issue"], timeout, "whole" in args)}
+        elif "whole" in args:
+            raise Refused("args", "--whole reads one issue's newest event: name the issue with --issue")
         else:
             found = unresolved(service, f"{workspace}-", timeout, settings.get_int("errors.max_pages"),
                                settings.get_int("telemetry.max_items"))  # fmt: skip

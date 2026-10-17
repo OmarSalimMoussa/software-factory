@@ -86,8 +86,8 @@ The installer keeps these in the warden's secrets folder:
 - `server.json`: the shared GlitchTip's address, organization and read-only token, Langfuse's address and the
   product project's keys, and prod's report export with its token. The install copies it from
   `~/.config/software-factory/server.json`, which the server set-up writes on the machine it runs from. On the server
-  itself, its addresses are loopback ones (`http://127.0.0.1:<port>`). `factory errors` and `factory traces` read
-  every workspace through it, each slot's too. Only the warden reads it. Until the server set-up has run, the
-  installer says so, and the warden imports no errors and no users' reports.
+  itself, its addresses are loopback ones (`http://127.0.0.1:<port>`). `factory errors`, `factory logs` and
+  `factory traces` read every workspace through it, each slot's too. Only the warden reads it. Until the server
+  set-up has run, the installer says so, and the warden imports no errors and no users' reports.
 - `factory-dsn`: the address of the factory's GlitchTip project, where the factory's own errors go. Only the warden
   and the dashboard read it.

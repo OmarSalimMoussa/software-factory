@@ -194,7 +194,7 @@ max_brief_kib = 8192    # a designer's brief, one HTML page with its pictures in
 
 [errors]                # prod's and staging's (slot 0's) unresolved GlitchTip issues, filed as requests from glitchtip
 poll_minutes = 5        # how often the warden reads them
-max_pages = 5           # pages of issues one read covers, newest first
+max_pages = 5           # pages of a GlitchTip list one read covers: issues newest first, or the projects
 severe_events = 100     # an issue seen this many times is severe and goes to intake at once, as a fatal one does
 
 [reports]               # the users' reports: the warden reads prod's export, the product's optional verb sorts it
@@ -202,8 +202,8 @@ poll_minutes = 10       # how often the warden asks for new ones
 fetch_seconds = 20      # how long prod's export may take to answer
 max_mib = 8             # the largest export the warden takes; a larger one fails the pull until the export pages
 
-[telemetry]             # `factory errors` and `factory traces`: agents read GlitchTip and Langfuse through the warden
-max_items = 20          # issues or traces one answer lists
+[telemetry]             # `factory errors`, `logs` and `traces`: agents read GlitchTip and Langfuse through the warden
+max_items = 20          # issues, log lines or traces one answer lists
 max_kib = 64            # the largest answer an agent gets; longer lists and texts are cut to fit
 timeout_seconds = 20    # one call to GlitchTip or Langfuse
 

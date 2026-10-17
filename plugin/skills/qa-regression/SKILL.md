@@ -30,7 +30,9 @@ them.
 3. Set up each precondition through the UI. If you cannot reach it, the scenario is `blocked`, not passed: say what
    stopped you. A step that needs a `factory slot` command other than `sign-in` or `desktop up` is the
    orchestrator's: report the scenario blocked at that step. A step that reads the error tracker is
-   `factory errors --where slot 0`: never sign in to it.
+   `factory errors --where slot 0`, with `--issue <id>` for an issue's newest event and its Request section and
+   `--whole` for that event's JSON; its Logs view is `factory logs --where slot 0 --find <text> --since <time>`.
+   Never sign in to it.
 4. Do each step exactly. At each expected result, check it in the page (a snapshot or a page script), take a
    screenshot (never naming a file, never opening one afterwards), and decide pass or fail. Read the console and the
    requests after each scenario, and at the end `factory errors --where slot 0` for new issues your walk raised.

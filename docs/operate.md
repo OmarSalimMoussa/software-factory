@@ -100,8 +100,9 @@ agents' sessions, so your commit lands.
 Every product gets a database, traces (Langfuse) and errors (GlitchTip) from one copy of the shared services on its
 server, for prod and every stack slot, staging among them ([server.md](server.md),
 [shared-services.md](shared-services.md)). Each new prod error arrives once as a request in the agents' inbox, for
-triage beside your feedback. Agents read errors and traces with `factory errors` and `factory traces`. The factory's
-own failures report to a GlitchTip project of its own there, `factory`, which no agent reads.
+triage beside your feedback. Agents read errors, log lines and traces with `factory errors`, `factory logs` and
+`factory traces`. The factory's own failures report to a GlitchTip project of its own there, `factory`, which no agent
+reads.
 
 ## The product's tools
 

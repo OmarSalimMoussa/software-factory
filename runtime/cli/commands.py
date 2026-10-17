@@ -158,6 +158,12 @@ def _telemetry(sub: Any) -> None:
         parser = sub.add_parser(verb, help=f"{verb} of prod or a slot (slot 0 is staging), or {what}; read-only")
         parser.add_argument("--where", nargs="+", default=["prod"], metavar="prod|slot N")
         parser.add_argument(flag, dest="one")
+        if verb == "errors":
+            parser.add_argument("--whole", action="store_true", help="with --issue: the newest event, all of it")
+    logs = sub.add_parser("logs", help="log lines of prod or a slot (slot 0 is staging), newest first; read-only")
+    logs.add_argument("--where", nargs="+", default=["prod"], metavar="prod|slot N")
+    logs.add_argument("--find", help="only lines whose text holds this")
+    logs.add_argument("--since", help="only lines from this time on, such as 2026-10-17T09:17:00Z")
 
 
 def _slot(sub: Any) -> None:

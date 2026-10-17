@@ -165,8 +165,12 @@ def _telemetry_call(ns: argparse.Namespace) -> Call:
         args = {"where": "slot", "slot": int(where[1])}
     else:
         raise CliError("--where is prod or slot <n>; staging is slot 0")
-    if ns.one is not None:
+    if ns.cmd == "logs":
+        args.update({key: value for key in ("find", "since") if (value := getattr(ns, key)) is not None})
+    elif ns.one is not None:
         args["issue" if ns.cmd == "errors" else "trace"] = ns.one
+    if ns.cmd == "errors" and ns.whole:
+        args["whole"] = True
     return Call(ns.cmd, args)
 
 
@@ -237,6 +241,7 @@ _CALLS: dict[str, Callable[[argparse.Namespace, Callable[[str], bytes]], Call]] 
     "settings": lambda ns, _: Call("settings.show", {}),
     "errors": lambda ns, _: _telemetry_call(ns),
     "traces": lambda ns, _: _telemetry_call(ns),
+    "logs": lambda ns, _: _telemetry_call(ns),
     "request": _request_call,
     "triage": _triage_call,
     "queue": _queue_call,
