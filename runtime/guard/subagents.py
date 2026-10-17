@@ -34,8 +34,9 @@ from runtime.warden.verbs import VERBS, VERDICTS
 
 INTAKE = "intake"
 SLOT_API = "mcp__slot-api__slot_api"
-# Claude Code's own timeouts when a call names none, in milliseconds.
+# Claude Code's waits, in milliseconds: its defaults, and its longest, for a `factory` call the warden bounds itself.
 _TIMED_TOOLS = {"Bash": ("timeout", 120_000), "Monitor": ("timeout_ms", 300_000)}
+_LONGEST_BASH = 600_000
 REPORT = "record what you found with `factory qa finding`, run `factory qa result`, then hand back"
 _REPORTS = frozenset({"qa.finding", "qa.result"})
 
@@ -309,6 +310,8 @@ def check_tester_time(call: Call) -> Decision:
     if timed is None:
         return browser.cap_wait(call, left)
     name, default = timed
+    if call.tool == "Bash" and factory_calls.plain_words(str(call.tool_input.get("command", ""))) is not None:
+        default = _LONGEST_BASH
     asked = call.tool_input.get(name)
     current = asked if isinstance(asked, int) and not isinstance(asked, bool) and asked > 0 else default
     updated = {**call.tool_input, name: max(1_000, min(current, int(left * 1000)))}

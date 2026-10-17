@@ -252,6 +252,22 @@ def test_a_testers_time_runs_out_and_its_shell_timeouts_are_cut_but_its_report_g
     assert isinstance(walker, Refusal) and walker.reason.endswith("hand back your report now")
 
 
+@pytest.mark.parametrize(
+    ("command", "waits"),
+    [("factory slot desktop up qa-admin@notes.test", 600_000), ("sleep 5", 120_000)],
+    ids=["a-factory-call-waits-its-time-left", "another-keeps-claude-codes-default"],
+)
+def test_a_testers_factory_call_is_not_cut_at_claude_codes_default_wait(
+    tmp_path: Path, command: str, waits: int
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.settings(qa__setup_seconds=180, qa__seconds_per_item=120)
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=60), "user", "Scenarios and checks: 10")])
+    decided = kit.decide("Bash", {"command": command}, **TESTER)
+    assert isinstance(decided, Rewrite) and decided.updated_input["timeout"] == waits
+
+
 def test_a_testers_slot_api_session_carries_its_id_and_the_implementers_keeps_its_name(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer")
