@@ -58,6 +58,27 @@ class Shared:
         self.calls.append(("drop", kw))
 
 
+# docker as a stand-in: logs each call and answers a listing; slot 2's network still holds two unlabelled containers.
+DOCKER = f"""#!{sys.executable}
+import os, sys
+with open(os.environ["DOCKER_LOG"], "a") as log:
+    log.write(" ".join(sys.argv[1:]) + "\\n")
+answers = {{"container ls": "c-web", "network ls": "n-slot2", "network inspect": "agent-7 agent-8 "}}
+print(answers.get(" ".join(sys.argv[1:3]), ""))
+"""
+
+
+@pytest.fixture(autouse=True)
+def docker_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Every docker call a test makes reaches the stand-in, never this machine's Docker."""
+    (tmp_path / "bin").mkdir()
+    (tmp_path / "bin" / "docker").write_text(DOCKER)
+    (tmp_path / "bin" / "docker").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path / 'bin'}:/usr/bin:/bin")
+    monkeypatch.setenv("DOCKER_LOG", str(tmp_path / "docker.log"))
+    return tmp_path / "docker.log"
+
+
 @pytest.fixture
 def checkout(tmp_path: Path) -> Path:
     root = tmp_path / "checkout"
@@ -203,28 +224,12 @@ def test_a_key_the_owner_withdraws_leaves_the_slot_at_its_next_command(
     assert "placeholder in NOTES_SYNC_KEY" in capsys.readouterr().out
 
 
-# docker as a stand-in: logs each call and answers a listing; slot 2's network still holds two unlabelled containers.
-DOCKER = f"""#!{sys.executable}
-import os, sys
-with open(os.environ["DOCKER_LOG"], "a") as log:
-    log.write(" ".join(sys.argv[1:]) + "\\n")
-answers = {{"container ls": "c-web", "network ls": "n-slot2", "network inspect": "agent-7 agent-8 "}}
-print(answers.get(" ".join(sys.argv[1:3]), ""))
-"""
-
-
 def test_the_sweep_removes_the_containers_still_on_a_slots_network_before_the_network(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    docker_log: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / "bin").mkdir()
-    (tmp_path / "bin" / "docker").write_text(DOCKER)
-    (tmp_path / "bin" / "docker").chmod(0o755)
-    monkeypatch.setenv("PATH", f"{tmp_path / 'bin'}:/usr/bin:/bin")
-    monkeypatch.setenv("DOCKER_LOG", str(tmp_path / "docker.log"))
-
     status = stack_run.sweep(SLOT, 60)
 
-    removals = [line for line in (tmp_path / "docker.log").read_text().splitlines() if " rm " in f" {line} "]
+    removals = [line for line in docker_log.read_text().splitlines() if " rm " in f" {line} "]
     assert status == 0
     assert removals == ["container rm -f c-web", "container rm -f agent-7 agent-8", "network rm n-slot2"]
     assert "removed 2 container(s) still on slot 2's network n-slot2: agent-7, agent-8" in capsys.readouterr().out
@@ -344,6 +349,7 @@ def test_a_run_needs_the_products_run_verb_and_one_past_its_time_leaves_no_conta
     checkout: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    docker_log: Path,
     verbs: str,
     seconds: str,
     status: int,
@@ -351,11 +357,6 @@ def test_a_run_needs_the_products_run_verb_and_one_past_its_time_leaves_no_conta
 ) -> None:
     (checkout / "scripts" / "dev").write_text(RUN_DEV)
     (checkout / "scripts" / "verbs.txt").write_text(verbs)
-    (tmp_path / "bin").mkdir()
-    (tmp_path / "bin" / "docker").write_text(DOCKER)
-    (tmp_path / "bin" / "docker").chmod(0o755)
-    monkeypatch.setenv("PATH", f"{tmp_path / 'bin'}:/usr/bin:/bin")
-    monkeypatch.setenv("DOCKER_LOG", str(tmp_path / "docker.log"))
     monkeypatch.setattr(provision, "workspace", Shared(checkout).workspace)
     run = ["run", "web", "--", "sleep", seconds]
 
@@ -363,11 +364,50 @@ def test_a_run_needs_the_products_run_verb_and_one_past_its_time_leaves_no_conta
         Places.under(tmp_path), settings(), SLOT, run, checkout, run=_never, timeout=1, request=REQUEST
     )
 
-    log = tmp_path / "docker.log"
-    calls = log.read_text().splitlines() if log.exists() else []
+    calls = docker_log.read_text().splitlines() if docker_log.exists() else []
     ran = checkout / "scripts" / "ran.json"
     assert answer == status and said in capsys.readouterr().out
     assert (ran.read_text() if ran.exists() else None) == (None if status == lf.REFUSED else f"software.run={REQUEST}")
     # Only the run's own container goes: another run, or a job the stack started, carries no such label.
     gone = [f"container ls -aq --filter label=software.run={REQUEST}", "container rm -f c-web"]
     assert calls == (gone if status == lf.TIMED_OUT else [])
+
+
+@pytest.mark.parametrize(
+    ("verb", "update", "status", "said"),
+    [
+        ("up", (0, ""), 0, "slot 2's 2 running container(s) take 64 CPU shares to prod's 1024 each"),
+        ("desktop", (0, ""), 0, "slot 2's 2 running container(s) take 64 CPU shares"),
+        ("up", (1, "Error: No such container: c-gone\n"), 0, "take 64 CPU shares"),
+        ("up", (1, "Cannot connect to the Docker daemon\n"), 1, "may share the CPU with prod's as equals: Cannot"),
+        ("down", (0, ""), 0, ""),
+    ],
+    ids=["up", "desktop", "one-gone-since", "docker-failed", "down"],
+)
+def test_a_verb_that_starts_a_slots_containers_puts_them_below_prods_on_the_cpu(
+    tmp_path: Path,
+    checkout: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    verb: str,
+    update: tuple[int, str],
+    status: int,
+    said: str,
+) -> None:
+    asked: list[list[str]] = []
+
+    def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+        asked.append(args)
+        if args[:2] == ["container", "ls"]:
+            return subprocess.CompletedProcess(args, 0, "c-web\nc-gone\n", "")
+        return subprocess.CompletedProcess(args, update[0], "", update[1])
+
+    monkeypatch.setattr(stack_run, "_docker", docker)
+    monkeypatch.setenv("DEV_EXIT", "0")
+
+    assert _verb(tmp_path, checkout, Shared(checkout), monkeypatch, verb) == status
+
+    lowered = [["container", "ls", "-q", "--filter", "label=software.slot=2"],
+               ["container", "update", "--cpu-shares", "64", "c-web", "c-gone"]]  # fmt: skip
+    assert asked == (lowered if said else [])
+    assert said in capsys.readouterr().out

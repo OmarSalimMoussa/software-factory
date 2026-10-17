@@ -55,8 +55,9 @@ SERVICES_ENV = (
     "POSTGRES_PASSWORD=pg\nLANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-1\nLANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-1\n"
     "GLITCHTIP_OWNER_PASSWORD=gt\n"
 )
-# docker as a slot's provisioning drives it: networks are made and joined, psql takes its statements, and GlitchTip's
-# shell answers with a DSN for each project it is asked for. Anything else fails, naming itself.
+# docker as a slot's provisioning and start drive it: networks are made and joined, psql takes its statements,
+# GlitchTip's shell answers with a DSN for each project it is asked for, and no container runs. Anything else fails,
+# naming itself.
 DOCKER = f"""#!{sys.executable}
 import ast, json, re, sys
 sys.path.insert(0, {str(ROOT)!r})
@@ -67,6 +68,8 @@ if args[:2] in (["network", "ls"], ["network", "create"], ["network", "connect"]
     sys.exit(0)
 if args[:2] == ["network", "inspect"]:
     sys.exit(print("{{}}"))
+if args[:2] in (["container", "ls"], ["container", "update"]):
+    sys.exit(0)
 if args[:4] == ["exec", "-i", "factory-postgres", "psql"]:
     sys.stdin.read()
     sys.exit(0)

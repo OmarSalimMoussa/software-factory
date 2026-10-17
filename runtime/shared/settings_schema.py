@@ -119,6 +119,7 @@ SCHEMA: dict[str, Spec] = {
     "slots.verb_minutes": Spec("int", 1, 240),  # contract: added by builder 3, one scripts/dev verb
     "slots.run_seconds": Spec("int", 10, 3600),
     "slots.tail_max_kib": Spec("int", 1, 1024),
+    "slots.cpu_shares": Spec("int", 2, 1024),
     "slots.owner_address": Spec("str"),
     "slots.zero_origin": Spec("str", when=AT_INSTALL),
     "slots.keys_from": Spec("str", when=AT_INSTALL),  # read by root (software-slot-keys.service)

@@ -119,6 +119,7 @@ api_max_kib = 256       # the largest slot API answer a session sees
 verb_minutes = 30       # the longest one scripts/dev verb may run before it is stopped
 run_seconds = 300       # the longest `factory slot run` may take; its service is built first with `factory slot up`
 tail_max_kib = 64       # the most of one slot command's output an agent sees
+cpu_shares = 64         # each slot container's share of the CPU against prod's 1024, set as it starts
 owner_address = ""      # the test address Open on the Done tab signs you in to slot 0 as; empty: the button waits
 zero_origin = ""        # where staging (slot 0) opens to the world, http://<the box's IPv4>:<port>; empty: loopback
 keys_from = ""          # the owner's env file slots take keys from, set at install; empty: the template's values

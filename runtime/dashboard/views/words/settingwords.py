@@ -240,6 +240,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("slots.verb_minutes", "Minutes one stack command may take"),
             ("slots.run_seconds", "Seconds one command run in a slot may take"),
             ("slots.tail_max_kib", "Most output an agent sees, KiB"),
+            ("slots.cpu_shares", "A slot container's share of the CPU, against 1024 for prod's"),
             ("slots.owner_address", "Test address Open signs you in to slot 0 as"),
             ("slots.zero_origin", "Staging's address on the internet"),
             ("slots.keys_from", "Your env file slots take keys from"),

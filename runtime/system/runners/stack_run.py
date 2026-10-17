@@ -36,6 +36,8 @@ COMPOSE_PROJECT = "com.docker.compose.project"
 # Only these fields, so nothing a container's settings hold (its environment's secrets) is ever printed.
 _COUNT = '{"id":{{json .Id}},"name":{{json .Name}},"restarts":{{.RestartCount}},"labels":{{json .Config.Labels}}}'
 EMPTY = "empty"
+# The verbs that start a slot's containers; each then runs below prod's, so prod answers first on a busy machine.
+_STARTS = frozenset({"up", "desktop", leases.RESTART})
 # docker system df prints go-units sizes: decimal steps of 1000, such as 0B, 512kB, 1.25GB.
 _SIZE = re.compile(r"^([\d.]+)\s*([kKMGTPEZY]?)B$")
 _STEPS = "kmgtpezy"
@@ -110,9 +112,7 @@ def restarts(timeout: int) -> int:
     if not ids:
         return 0
     done = _docker(["container", "inspect", "--format", _COUNT, *ids], timeout)
-    # A container removed since the list is gone, which is no failure.
-    said = [line for line in done.stderr.splitlines() if line.strip()]
-    if done.returncode != 0 and (not said or any("No such container" not in line for line in said)):
+    if _failed(done):
         print(f"restarts: inspecting the containers failed: {done.stderr.strip()[-300:]}", flush=True)
         return 1
     for line in done.stdout.splitlines():
@@ -123,6 +123,33 @@ def restarts(timeout: int) -> int:
         found = {"id": raw["id"][:12], "name": raw["name"].lstrip("/"), "restarts": raw["restarts"]}
         print(json.dumps(found | {"slot": labels.get(SLOT_LABEL, ""), "project": labels.get(COMPOSE_PROJECT, "")}),
               flush=True)  # fmt: skip
+    return 0
+
+
+def _failed(done: subprocess.CompletedProcess[str]) -> bool:
+    """Whether a command on listed containers failed; one removed since the list is gone, which is no failure."""
+    said = [line for line in done.stderr.splitlines() if line.strip()]
+    return done.returncode != 0 and (not said or any("No such container" not in line for line in said))
+
+
+def _below_prod(slot: int, verb: str, shares: int, timeout: int) -> int:
+    if verb not in _STARTS:
+        return 0
+    equals = f"slot {slot}'s containers may share the CPU with prod's as equals"
+    try:
+        found = _docker(["container", "ls", "-q", "--filter", f"label={SLOT_LABEL}={slot}"], timeout)
+        ids = found.stdout.split()
+        update = ["container", "update", "--cpu-shares", str(shares), *ids]
+        done = _docker(update, timeout) if found.returncode == 0 and ids else found
+    # telemetry: surfaced — the timeout is `print`ed to the run's log, and the exit says so
+    except subprocess.TimeoutExpired:
+        print(f"stack-run: docker did not answer in time, so {equals}", flush=True)
+        return 1
+    if _failed(done):
+        print(f"stack-run: {equals}: {done.stderr.strip()[-300:]}", flush=True)
+        return 1
+    print(f"stack-run: slot {slot}'s {len(ids)} running container(s) take {shares} CPU shares to prod's 1024 each",
+          flush=True)  # fmt: skip
     return 0
 
 
@@ -187,6 +214,8 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
     label = f"{RUN_LABEL}={request}"
     env = {**environment.handed_on(), **leases.env(places, settings, slot, env_file), leases.RUN_LABEL_ENV: label}
     status = lf.run([str(checkout / "scripts" / "dev"), *verb], checkout, env, timeout)
+    lowered = _below_prod(slot, verb[0], settings.get_int("slots.cpu_shares"), timeout)
+    status = status or lowered
     if verb[0] == leases.RUN and status == lf.TIMED_OUT:
         _stop_run(slot, label, timeout)
     held = envfile.placeholders(written)
