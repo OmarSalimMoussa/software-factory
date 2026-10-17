@@ -159,12 +159,12 @@ def _propose_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> 
 
 def _telemetry_call(ns: argparse.Namespace) -> Call:
     where = _words(ns.where)
-    if where in (["prod"], ["staging"]):
-        args: dict[str, Any] = {"where": where[0]}
+    if where == ["prod"]:
+        args: dict[str, Any] = {"where": "prod"}
     elif len(where) == 2 and where[0] == "slot" and where[1].isdigit():
         args = {"where": "slot", "slot": int(where[1])}
     else:
-        raise CliError("--where is prod, staging or slot <n>")
+        raise CliError("--where is prod or slot <n>; staging is slot 0")
     if ns.one is not None:
         args["issue" if ns.cmd == "errors" else "trace"] = ns.one
     return Call(ns.cmd, args)

@@ -3,13 +3,11 @@
   "prod": {
    "sha": "9f8e7d1",
    "deployed": "Oct 7, 10:05 UTC",
-   "run_url": "https://github.com/acme/acme-app/actions/runs/11829911873",
    "commit_url": "https://github.com/acme/acme-app/commit/9f8e7d1"
   },
   "staging": {
    "sha": "a1b2c3d",
    "deployed": "Oct 9, 11:18 UTC",
-   "run_url": "https://github.com/acme/acme-app/actions/runs/11872341205",
    "commit_url": "https://github.com/acme/acme-app/commit/a1b2c3d",
    "healthy_for": "3 h 12 min"
   },

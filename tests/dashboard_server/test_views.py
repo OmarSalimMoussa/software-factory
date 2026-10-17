@@ -26,7 +26,6 @@ from runtime.shared import operations as kinds
 from runtime.shared import settings as settings_module
 from runtime.shared.models import OPEN_SEVERITIES
 from runtime.shared.settings_schema import SCHEMA
-from runtime.warden.delivery import deploys
 
 BROKEN = {"broken", "id", "error"}
 
@@ -302,13 +301,11 @@ def test_the_push_sheet_says_prod_runs_staging_only_when_prod_answers_on_staging
     assert rig.parts("/api/push")["push"]["data"]["prod_runs_staging"] is runs
 
 
-@pytest.mark.parametrize("on_default", [True, False, None], ids=["on-it", "pinned-off-it", "unknown"])
-def test_the_push_sheet_says_a_staging_build_off_the_default_branch_cannot_go_to_prod(
-    rig: Rig, on_default: bool | None
-) -> None:
-    deploys.note_branch(rig.places, "staging", STAGING, on_default, rig.clock.now())
+@pytest.mark.parametrize(("ok", "says"), [(True, None), (False, "staging is red (HTTP 502)")], ids=["green", "red"])
+def test_the_push_sheet_says_why_the_warden_would_refuse_the_push(rig: Rig, ok: bool, says: str | None) -> None:
+    probe = models.Probe(iso(rig.clock.now()), "staging", ok, STAGING if ok else "", 80, "" if ok else "HTTP 502")
+    store.append_jsonl(rig.places.probes, models.dump(probe))
     blocked = rig.parts("/api/push")["push"]["data"]["blocked"]
-    says = {True: None, False: "only master's checked work goes to prod", None: "GitHub did not answer"}[on_default]
     assert blocked is None if says is None else says in blocked
 
 

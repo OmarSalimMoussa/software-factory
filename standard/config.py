@@ -238,7 +238,7 @@ class _Reader(Fields):
         )
 
     def workspaces(self, data: dict[str, Any]) -> tuple[Workspace, ...]:
-        t = self.table(data, "workspaces", "", WORKSPACES)
+        t = self.table(data, "workspaces", "", keys=("prod",), optional=("staging",))
         found = []
         for name in WORKSPACES:
             item = t.get(name)

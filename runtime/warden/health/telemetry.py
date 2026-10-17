@@ -2,8 +2,8 @@
 shares.
 
 The warden holds every key and asks GlitchTip and Langfuse itself; an agent sees only the answer. Every workspace,
-prod, staging and each slot, lives on this machine's shared services, reached with the keys in the secrets'
-server.json that the server set-up wrote. A workspace's GlitchTip projects are named for it (prod-…, staging-…,
+prod and each slot (slot 0 is staging), lives on this machine's shared services, reached with the keys in the secrets'
+server.json that the server set-up wrote. A workspace's GlitchTip projects are named for it (prod-…, slot0-…,
 slot3-…) and its Langfuse traces carry its name as their environment, so a read never strays into another workspace,
 or into the factory's own project. Every answer is cut to telemetry.max_kib. A key never appears in an answer, an
 error or a log line.
@@ -29,7 +29,7 @@ from runtime.slots import leases
 from runtime.system import layout
 from runtime.warden.context import Context
 
-PROD, STAGING, SLOT = "prod", "staging", "slot"
+PROD, SLOT = "prod", "slot"
 _ISSUE_ID = re.compile(r"^[0-9]{1,20}$")
 _TRACE_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 _LINK = re.compile(r'<[^>]*>((?:\s*;\s*[A-Za-z]+="[^"]*")*)')
@@ -257,17 +257,17 @@ def _trace(service: Langfuse, workspace: str, trace_id: Any, timeout: float) -> 
 
 
 def workspace_of(ctx: Context, args: dict[str, Any]) -> str:
-    """prod, staging or slot<n> from ``--where``; a slot must be slot 0 or one of the slots."""
+    """prod or slot<n> from ``--where``; a slot must be slot 0, which is staging, or one of the slots."""
     where = args.get("where")
-    if where in (PROD, STAGING):
-        return str(where)
+    if where == PROD:
+        return PROD
     if where == SLOT:
         n = args.get("slot")
         slots = [0, *leases.numbers(ctx.places, ctx.settings())]
         if isinstance(n, int) and not isinstance(n, bool) and n in slots:
             return f"slot{n}"
         raise Refused("args", f"--where slot names one of the slots: {', '.join(map(str, slots))}")
-    raise Refused("args", "--where is prod, staging or slot <n>")
+    raise Refused("args", "--where is prod or slot <n>; staging is slot 0")
 
 
 def fit(answer: dict[str, Any], limit: int) -> dict[str, Any]:

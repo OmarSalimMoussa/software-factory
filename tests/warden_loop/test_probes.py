@@ -6,8 +6,9 @@ from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
-from loop_fakes import World, healthy
+from loop_fakes import World, answers, healthy
 
+from runtime.slots import leases
 from runtime.warden.health import probes
 from runtime.warden.health.probes import Answer, NetworkFailure, http_get
 
@@ -51,16 +52,17 @@ def test_a_refused_connection_is_a_network_failure_not_a_timeout() -> None:
 
 
 @pytest.mark.parametrize(
-    ("factory_toml", "asked", "error"),
+    ("factory_toml", "env", "asked", "error"),
     [
-        (None, ["https://staging.notes.example.com/healthz"], ""),
-        ("", [], "no health address: factory.toml is missing"),
-        ("[product]\nname = 'Notes!'\n", [], "no health address: factory.toml is not usable: "),
+        (None, probes.PROD, ["https://notes.example.com/healthz"], ""),
+        (None, probes.STAGING, ["http://127.0.0.1:{slot0}/healthz"], ""),
+        ("", probes.PROD, [], "no health address: factory.toml is missing"),
+        ("[product]\nname = 'Notes!'\n", probes.STAGING, [], "no health address: factory.toml is not usable: "),
     ],
-    ids=["from-the-checkout", "missing", "broken"],
+    ids=["prod-from-the-checkout", "staging-is-slot-0-on-loopback", "missing", "broken"],
 )
 def test_the_health_address_comes_from_the_checkouts_factory_toml_and_is_never_guessed(
-    world: World, factory_toml: str | None, asked: list[str], error: str
+    world: World, factory_toml: str | None, env: str, asked: list[str], error: str
 ) -> None:
     path = world.checkout / "factory.toml"
     if factory_toml == "":
@@ -73,6 +75,24 @@ def test_the_health_address_comes_from_the_checkouts_factory_toml_and_is_never_g
         urls.append(url)
         return healthy("a" * 40)
 
-    probe = probes.take(world.ctx, probes.STAGING, fetch)
-    assert urls == asked
+    probe = probes.take(world.ctx, env, fetch)
+    assert urls == [url.format(slot0=leases.port(world.ctx.settings(), 0)) for url in asked]
     assert probe.ok == (not error) and not probe.counts and probe.error.startswith(error)
+
+
+@pytest.mark.parametrize(
+    ("env", "reply", "counts"),
+    [
+        (probes.STAGING, Answer(502, b""), False),
+        (probes.STAGING, TimeoutError(), False),
+        (probes.PROD, Answer(502, b""), True),
+        (probes.PROD, TimeoutError(), True),
+    ],
+    ids=["staging-answers-wrongly", "staging-times-out", "prod-answers-wrongly", "prod-times-out"],
+)
+def test_only_prods_failures_count_toward_an_outage(
+    world: World, env: str, reply: Answer | Exception, counts: bool
+) -> None:
+    probe = probes.take(world.ctx, env, answers(reply))
+
+    assert (probe.ok, probe.counts) == (False, counts)

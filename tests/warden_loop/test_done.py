@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -10,10 +9,9 @@ import pytest
 from loop_fakes import World, git, write
 
 from runtime.queue import turn
-from runtime.shared import store
+from runtime.shared import models, store
+from runtime.shared.models import Probe
 from runtime.shared.protocol import Refused
-from runtime.slots import health, leases
-from runtime.warden.context import StackResult
 from runtime.warden.delivery import deploys, done, github_push
 from runtime.warden.health import probes
 
@@ -35,14 +33,10 @@ def merge(world: World, task: str, slices: int) -> str:
     return sha
 
 
-class Slot0:
-    """scripts/dev on slot 0, whose health prints the slot's address."""
-
-    def __init__(self, port: int) -> None:
-        self.port = port
-
-    def run_stack(self, slot: int, verb: list[str], session: str, given: str = "") -> StackResult:
-        return StackResult(0, f"http://127.0.0.1:{self.port}/healthz\n", "")
+def staging(world: World, commit: str, error: str = "") -> None:
+    """Staging's probe, which is slot 0's: its build, or why it gave none."""
+    store.append_jsonl(world.ctx.places.probes, models.dump(Probe(world.clock.iso(), "staging", not error, commit, 40,
+                                                                  error)))  # fmt: skip
 
 
 def listed(world: World) -> dict[str, Any]:
@@ -52,7 +46,7 @@ def listed(world: World) -> dict[str, Any]:
 
 
 def test_a_task_is_done_while_its_newest_merge_stays_and_each_shows_how_far_it_reached(
-    world: World, github_repo: Path, monkeypatch: pytest.MonkeyPatch
+    world: World, github_repo: Path
 ) -> None:
     first = merge(world, "t-0001", 2)
     git(world.checkout, "push", "-q", str(github_repo), "master")
@@ -62,8 +56,7 @@ def test_a_task_is_done_while_its_newest_merge_stays_and_each_shows_how_far_it_r
     with github_push.pushing:
         github_push.Git(world.ctx).run("fetch", "--quiet", GITHUB, "+refs/heads/master:refs/github/master")
     deploys.record(world.ctx.places, probes.STAGING, first[:7], world.clock.iso())
-    world.ctx.launcher = Slot0(leases.port(world.ctx.settings(), 0))  # type: ignore[assignment]  # health alone
-    monkeypatch.setattr(health, "http_get", lambda url, timeout, limit: json.dumps({"build_commit": first}).encode())
+    staging(world, first[:7])
 
     done.refresh(world.ctx)
 
@@ -81,19 +74,22 @@ def test_a_task_is_done_while_its_newest_merge_stays_and_each_shows_how_far_it_r
     after_the_push = 5  # t-0002's commit and merge, the revert, t-0003's commit and merge
     assert (found["ahead"], found["slot0"]) == (
         after_the_push,
-        {"commit": first, "behind": after_the_push, "why": None},
+        {"commit": first[:7], "behind": after_the_push, "why": None},
     )
 
 
-def test_what_the_warden_has_not_seen_stays_unknown(world: World, github_repo: Path) -> None:
+@pytest.mark.parametrize("error", ["", "HTTP 502"], ids=["never-probed", "red"])
+def test_what_the_warden_has_not_seen_stays_unknown(world: World, github_repo: Path, error: str) -> None:
     merge(world, "t-0001", 1)
+    if error:
+        staging(world, "", error)
 
     done.refresh(world.ctx)
 
     found = listed(world)
     row = found["tasks"][0]
     assert (found["github"], found["ahead"], row["github"], row["staging"], row["prod"]) == (None,) * 5
-    assert found["slot0"]["commit"] is None and "bring the slot up first" in found["slot0"]["why"]
+    assert found["slot0"] == {"commit": None, "behind": None, "why": error or "staging has not been probed yet"}
 
 
 def test_the_list_is_read_again_once_its_period_has_passed(world: World, github_repo: Path) -> None:

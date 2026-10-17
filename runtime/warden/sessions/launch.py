@@ -46,10 +46,10 @@ class LaunchError(Exception):
 
 
 def forget_requests(places: Places) -> None:
-    """Drops the check and stack requests, inputs and results a warden left: none has a reader, and a restarted check
-    then finds none."""
+    """Drops the check, stack and deploy requests, inputs and results a warden left: none has a reader, and a restarted
+    check then finds none."""
     for folder in (places.state / "public" / "launch", places.state / "runs"):
-        for prefix in (CHECK_REQUEST, STACK_REQUEST):
+        for prefix in (CHECK_REQUEST, STACK_REQUEST, DEPLOY_REQUEST):
             for path in folder.glob(f"{prefix}*"):
                 path.unlink()
 

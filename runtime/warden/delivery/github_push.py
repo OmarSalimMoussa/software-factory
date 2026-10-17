@@ -19,10 +19,8 @@ from typing import Any
 
 from runtime.guard.writes import UnknownProtectedPaths, is_protected, protected_paths
 from runtime.queue import turn
-from runtime.queue.book import Queue
 from runtime.queue.turn import merges
 from runtime.shared import environment, operations, store, upgrades
-from runtime.shared.models import ON_STAGING
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.shared.settings import Settings
@@ -34,9 +32,6 @@ from runtime.warden.owner import ops, reflections
 
 # What `git revert` writes into the message of the commit that takes a merge back.
 REVERTS = re.compile(r"This reverts commit ([0-9a-f]{40})")
-# A task whose merge passed its check of the default branch. A closed task's merge ships only on a saved check of
-# that merge that passed: a task may be closed before its check.
-SHIPPABLE = frozenset({"checked", ON_STAGING, "promoted"})
 # One push at a time, of either kind: the check that none runs and the start happen together.
 pushing = threading.Lock()
 _LOOKED: dict[str, float] = {}  # when each warden last looked, by its state folder: a look fetches from GitHub
@@ -96,9 +91,11 @@ def offer(ctx: Context) -> None:
 
 def _ask_for_check(ctx: Context, git: Git) -> None:
     """Ask the orchestrator, once a tip, to check a tip that waits on nothing else: no unchecked merge, no turn held."""
+    from runtime.warden.delivery.prod_push import unchecked_merges  # prod_push imports this module
+
     branch = ctx.settings().get_str("repo.default_branch")
     remote, tip = (git.run("rev-parse", f"refs/{side}/{branch}").strip() for side in ("github", "checkout"))
-    if tip == remote or turn.holder(ctx.places) is not None or _unchecked_merges(ctx, git, remote, tip):
+    if tip == remote or turn.holder(ctx.places) is not None or unchecked_merges(ctx, git, remote, tip):
         return
     if checks.passed(ctx.places, git.run("rev-parse", f"{tip}^{{tree}}").strip()):
         return
@@ -146,6 +143,8 @@ def _push(ctx: Context, sha: str) -> str:
 def _cleared(ctx: Context, git: Git, sha: str | None) -> tuple[str, str, int]:
     """Fetch GitHub's branch and the checkout's, and check the commit as a push must: the commit cleared to ship
     (``sha``, or the newest shippable), GitHub's tip, and how many commits it adds. Refused, saying why, otherwise."""
+    from runtime.warden.delivery.prod_push import unchecked_merges  # prod_push imports this module
+
     settings = ctx.settings()
     branch = settings.get_str("repo.default_branch")
     url = f"git@github.com:{settings.get_str('repo.github')}.git"
@@ -161,7 +160,7 @@ def _cleared(ctx: Context, git: Git, sha: str | None) -> tuple[str, str, int]:
         return sha, remote, 0
     if not git.is_ancestor(remote, sha):
         raise Refused("push", f"{branch} on GitHub has commits {sha[:12]} lacks: merge them, check, then push")
-    unchecked = _unchecked_merges(ctx, git, remote, sha)
+    unchecked = unchecked_merges(ctx, git, remote, sha)
     if unchecked:
         raise Refused("unchecked", f"{sha[:12]} would ship {', '.join(unchecked)}, whose check of the default "
                                    "branch has not passed: check it first, or revert it")  # fmt: skip
@@ -232,39 +231,20 @@ def includes(ctx: Context) -> Callable[[str, str], bool | None]:
     return check
 
 
-def _unchecked_merges(ctx: Context, git: Git, remote: str, head: str) -> list[str]:
-    """The merges on the default branch between GitHub's branch and ``head`` that are not cleared to ship: one the
-    warden never saw land for a task, or whose task's check has not passed. A merge reverted within the range ships
-    nothing of its own."""
-    reverted = set(REVERTS.findall(git.run("log", "--format=%B", f"{remote}..{head}")))
-    found = merges(ctx.places)
-    queue = Queue.of(ctx)
-    passed = {c.commit for c in queue.checks()[0] if all(r.result == "pass" for r in c.rows)}
-    out = []
-    for merge in git.run("rev-list", "--first-parent", "--merges", f"{remote}..{head}").split():
-        if merge in reverted:
-            continue
-        task = found.get(merge)
-        status = queue.task(task).status if task else ""
-        if status not in SHIPPABLE and not (status == "closed" and merge in passed):
-            out.append(f"merge {merge[:12]}" + (f" ({task}, {status})" if task else " (no task's merge)"))
-    return out
-
-
 def _newest_shippable(ctx: Context, git: Git, remote: str, tip: str) -> str:
     """The newest first-parent commit after GitHub's branch whose tree passed and whose range ships only checked
     merges; refused, with why the tip is not shippable, when there is none."""
+    from runtime.warden.delivery.prod_push import unchecked_merges  # prod_push imports this module
+
     candidates = git.run("rev-list", "--first-parent", f"{remote}..{tip}").split()
     for commit in candidates:
         passed = checks.passed(ctx.places, git.run("rev-parse", f"{commit}^{{tree}}").strip())
-        if (passed or pins.tree_passes(git.run, ctx.places, commit)) and not _unchecked_merges(
-            ctx, git, remote, commit
-        ):
+        if (passed or pins.tree_passes(git.run, ctx.places, commit)) and not unchecked_merges(ctx, git, remote, commit):
             return commit
     if not candidates:
         return remote
     tree = git.run("rev-parse", f"{candidates[0]}^{{tree}}").strip()
-    why = ", ".join(_unchecked_merges(ctx, git, remote, candidates[0])) or (
+    why = ", ".join(unchecked_merges(ctx, git, remote, candidates[0])) or (
         "its tree never passed factory check" if not checks.passed(ctx.places, tree) else "nothing"
     )
     raise Refused("unchecked", f"nothing new is ready to ship: the default branch's tip waits on {why}")

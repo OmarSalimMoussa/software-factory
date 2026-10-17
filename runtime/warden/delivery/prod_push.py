@@ -1,14 +1,16 @@
 """The owner's push to prod, and back: an operation the dashboard follows step by step.
 
-It starts the product's prod workflow (the factory's template, copied in) for exactly the commit staging runs, or the
-one prod ran before as the deploy log has it, waits for prod to answer on it, then asks the orchestrator for a qa-prod
-pass. The owner's code is the only lock on it. While a push to prod is in flight, and for watch.loop_minutes after it
-lands, the loop probes prod every tick.
+A push to prod takes slot 0's build, the commit staging's last probe named, once it is cleared: staging answers on it,
+it is on the checkout's default branch, its tree passed factory check, every merge since prod's build passed its
+check, and prod does not run it yet. Push back takes the build prod ran before, and needs only that it is on the
+branch, since going back must work while staging is red. The deploy unit builds the commit on this machine and
+deploys it; the push then waits for prod to answer on it and asks the orchestrator for a qa-prod pass. The owner's code
+is the only lock on it. While a push to prod is in flight, and for watch.loop_minutes after it lands, the loop probes
+prod every tick.
 """
 
 from __future__ import annotations
 
-import logging
 import re
 import threading
 import time
@@ -16,23 +18,25 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from runtime.queue.book import Queue
+from runtime.queue.turn import merges
 from runtime.shared import operations, store
-from runtime.shared.models import Probe
-from runtime.shared.paths import PROMOTE_JOB, Places
+from runtime.shared.models import ON_STAGING, Probe
+from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
-from runtime.shared.settings import Settings
-from runtime.shared.upgrades import FULL_SHA
-from runtime.warden import inbox
+from runtime.warden import checks, inbox
 from runtime.warden.context import Context
 from runtime.warden.delivery import deploys
-from runtime.warden.delivery.github import GitHubError
-from runtime.warden.delivery.github_push import Git, pushing
+from runtime.warden.delivery.github_push import REVERTS, Git, fetch_checkout, pushing
 from runtime.warden.health import probes
 from runtime.warden.owner import ops
+from runtime.warden.sessions.launch import LaunchError
 
-log = logging.getLogger(__name__)
 _SHA = re.compile(r"^[0-9a-f]{7,40}$")
 _watch_lock = threading.Lock()
+# A task whose merge passed its check of the default branch. A closed task's merge ships only on a saved check of
+# that merge that passed: a task may be closed before its check.
+SHIPPABLE = frozenset({"checked", ON_STAGING, "promoted"})
 
 
 def _watch_path(places: Places) -> Path:
@@ -40,20 +44,17 @@ def _watch_path(places: Places) -> Path:
 
 
 def push_prod(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Push the commit staging runs to prod; ``expected_staging_sha`` is the build the owner saw on staging."""
+    """Push slot 0's build to prod; ``expected_staging_sha`` is the build the owner saw on staging."""
     expected = _sha_arg(args, "expected_staging_sha")
     with pushing:
-        sha = _staging_build(ctx)
+        sha = _slot0_build(ctx)
         if sha != expected:
             raise Refused("stale", f"staging now runs {sha[:12]}, not {expected[:12]}: look again, then push")
         return _start(ctx, operations.PUSH, sha)
 
 
 def push_back(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Redeploy the commit prod ran before; ``expected_sha`` is that commit as the owner saw it.
-
-    Staging's health does not matter here: going back must work when staging is red too.
-    """
+    """Redeploy the commit prod ran before; ``expected_sha`` is that commit as the owner saw it."""
     expected = _sha_arg(args, "expected_sha")
     previous = _previous_prod(ctx)
     with pushing:
@@ -72,7 +73,18 @@ def promote_cli(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
         with pushing:
             return _start(ctx, operations.PUSH_BACK, previous)
     with pushing:
-        return _start(ctx, operations.PUSH, _staging_build(ctx))
+        return _start(ctx, operations.PUSH, _slot0_build(ctx))
+
+
+def push_refused(ctx: Context) -> str | None:
+    """Why a push to prod would be refused, as far as the probes tell: staging red or unknown, or prod running its
+    build; None otherwise. The push asks git about the commit when it starts."""
+    try:
+        _not_on_prod(ctx, _slot0_build(ctx))
+    # telemetry: surfaced — the push sheet draws `exc.reason` in place of its button
+    except Refused as exc:
+        return exc.reason
+    return None
 
 
 def watching(ctx: Context) -> bool:
@@ -98,68 +110,61 @@ def _latest(ctx: Context, env: str) -> Probe | None:
     return found[0] if found else None
 
 
-def _staging_build(ctx: Context) -> str:
+def _slot0_build(ctx: Context) -> str:
+    """The build slot 0 runs, as staging's last probe named it; refused while staging is red or unknown."""
     staging = _latest(ctx, probes.STAGING)
     if staging is None:
         raise Refused("staging-unknown", "staging has not been probed yet: wait a minute, then push")
     if not staging.ok:
         raise Refused("staging-red", f"staging is red ({staging.error}): fix staging before pushing it to prod")
-    # Only a build known to be on GitHub's default branch goes.
-    on_default = deploys.on_default(ctx.places, probes.STAGING)
-    if on_default is not True:
-        raise Refused("staging-pinned", staging_off_default(ctx.settings(), on_default))
-    prod = _latest(ctx, probes.PROD)
-    if prod is not None and prod.ok and prod.commit == staging.commit:
-        raise Refused("nothing-to-push", f"prod already runs {staging.commit[:12]}, the build staging runs")
     return staging.commit
 
 
-def staging_off_default(settings: Settings, on_default: bool | None) -> str:
-    """Why staging's build may not go to prod, when it is not known to be on the default branch."""
-    branch = settings.get_str("repo.default_branch")
-    if on_default is False:
-        return (f"Staging runs a build that is not on {branch} as GitHub has it: only {branch}'s checked work goes "
-                f"to prod. Run CI on {branch} to put staging back on it.")  # fmt: skip
-    return (
-        f"The factory cannot tell yet whether staging's build is on {branch}: GitHub did not answer. It asks "
-        f"again every {settings.get_int('watch.branch_retry_minutes')} minutes; the push waits until then."
-    )
+def _not_on_prod(ctx: Context, sha: str) -> None:
+    prod = _latest(ctx, probes.PROD)
+    if prod is not None and prod.ok and prod.commit == sha:
+        raise Refused("nothing-to-push", f"prod already runs {sha[:12]}")
 
 
-def ask_branch(ctx: Context) -> None:
-    """The warden's branch pass, in a thread of its own, since a fetch can take minutes: whether staging's build is
-    on the default branch, which a push to prod needs. Asked once for a build, and again every
-    watch.branch_retry_minutes while GitHub has not said, so one failed fetch never holds a build back."""
-    current = deploys.builds(ctx.places, probes.STAGING)["current"]
-    if current is None:
-        return
-    commit = str(current["commit"])
-    asked = deploys.branch_asked(ctx.places, probes.STAGING, commit)
-    retry = ctx.settings().get_int("watch.branch_retry_minutes") * 60
-    if asked is not None and (asked[0] is not None or ctx.clock.now() - asked[1] < retry):
-        return
-    answer: bool | None
-    try:
-        answer = on_default(ctx, commit)
-    except Refused as exc:
-        answer = None
-        if asked is None:
-            log.warning("warden: whether staging's build %s is on the default branch is unknown (%s)", commit[:12],
-                        exc.reason)  # fmt: skip
-    deploys.note_branch(ctx.places, probes.STAGING, commit, answer, ctx.clock.now())
-
-
-def on_default(ctx: Context, commit: str) -> bool:
-    """Whether ``commit`` is on GitHub's default branch, from a fresh fetch into the warden's mirror: False for one
-    the branch does not hold. Raises Refused when GitHub or the mirror did not answer."""
-    settings = ctx.settings()
-    branch = settings.get_str("repo.default_branch")
+def _cleared(ctx: Context, kind: str, sha: str) -> str:
+    """The full commit of ``sha``, from a fresh fetch of the agents' checkout, once it may go: on the default branch,
+    and for a push to prod, with a tree that passed factory check and only checked merges since prod's build. The
+    caller holds pushing."""
+    branch = ctx.settings().get_str("repo.default_branch")
     git = Git(ctx)
-    git.run("fetch", "--no-tags", "--quiet", f"git@github.com:{settings.get_str('repo.github')}.git",
-            f"+refs/heads/{branch}:refs/github/{branch}")  # fmt: skip
-    if git._exec(["cat-file", "-e", f"{commit}^{{commit}}"], cwd=git.mirror).returncode != 0:
-        return False
-    return git.is_ancestor(commit, f"refs/github/{branch}")
+    tip = fetch_checkout(ctx, git)
+    if not git.knows(sha) or not git.is_ancestor(sha, tip):
+        raise Refused("off-branch", f"{sha[:12]} is not on {branch} in the checkout: only {branch}'s work goes to prod")
+    full = git.run("rev-parse", "--verify", f"{sha}^{{commit}}").strip()
+    if kind == operations.PUSH_BACK:
+        return full
+    if not checks.passed(ctx.places, git.run("rev-parse", f"{full}^{{tree}}").strip()):
+        raise Refused("unchecked", f"{sha[:12]} has not passed factory check: run factory check on {branch}, then push")
+    prod = deploys.builds(ctx.places, probes.PROD)["current"]
+    unchecked = [] if prod is None else unchecked_merges(ctx, git, prod["commit"], full)
+    if unchecked:
+        raise Refused("uncleared", f"{sha[:12]} would ship {', '.join(unchecked)}, whose check of the default "
+                                   "branch has not passed: check it first, or revert it")  # fmt: skip
+    return full
+
+
+def unchecked_merges(ctx: Context, git: Git, base: str, head: str) -> list[str]:
+    """The merges on the default branch between ``base`` and ``head`` that are not cleared to ship: one the warden
+    never saw land for a task, or whose task's check has not passed. A merge reverted within the range ships nothing
+    of its own."""
+    reverted = set(REVERTS.findall(git.run("log", "--format=%B", f"{base}..{head}")))
+    found = merges(ctx.places)
+    queue = Queue.of(ctx)
+    passed = {c.commit for c in queue.checks()[0] if all(r.result == "pass" for r in c.rows)}
+    out = []
+    for merge in git.run("rev-list", "--first-parent", "--merges", f"{base}..{head}").split():
+        if merge in reverted:
+            continue
+        task = found.get(merge)
+        status = queue.task(task).status if task else ""
+        if status not in SHIPPABLE and not (status == "closed" and merge in passed):
+            out.append(f"merge {merge[:12]}" + (f" ({task}, {status})" if task else " (no task's merge)"))
+    return out
 
 
 def _pushes_path(places: Places) -> Path:
@@ -189,46 +194,37 @@ def _previous_prod(ctx: Context) -> str:
 
 
 def _start(ctx: Context, kind: str, sha: str) -> dict[str, Any]:
-    """Start the operation; the caller holds pushing."""
-    current = store.read_json_or(_watch_path(ctx.places), None)
-    if isinstance(current, dict) and _running(ctx, current.get("op")):
-        raise Refused("push-running", f"a push to prod is already running ({current['op']}): let it finish")
+    """Start the operation once ``sha`` is cleared to go; the caller holds pushing."""
+    current = running(ctx)
+    if current is not None:
+        raise Refused("push-running", f"a push to prod is already running ({current}): let it finish")
+    _not_on_prod(ctx, sha)
+    full = _cleared(ctx, kind, sha)
     settings = ctx.settings()
     wait_s = settings.get_int("watch.push_wait_minutes") * 60
     watch_s = settings.get_int("watch.loop_minutes") * 60
     deploys.expect(ctx.places, probes.PROD, sha, ctx.clock.now(), settings.get_int("watch.push_wait_minutes"))
-    running = deploys.builds(ctx.places, probes.PROD)["current"]
+    live = deploys.builds(ctx.places, probes.PROD)["current"]
     store.append_jsonl(_pushes_path(ctx.places), {"at": ctx.clock.iso(), "kind": kind, "to": sha,
-                                                   "from": running["commit"] if running else ""})  # fmt: skip
+                                                   "from": live["commit"] if live else ""})  # fmt: skip
     with _watch_lock:  # the last step moves watch_until; it waits for this record to exist
-        op_id = ops.launch(ctx, kind, _steps(ctx, kind, sha, wait_s, watch_s), {"sha": sha})
+        op_id = ops.launch(ctx, kind, _steps(_Push(ctx, kind, sha, full, watch_s)), {"sha": sha})
         until = ctx.clock.now() + wait_s + watch_s
         store.write_json(_watch_path(ctx.places), {"op": op_id, "kind": kind, "sha": sha, "watch_until": until})
     return ok(op=op_id, sha=sha, message=f"Pushing {sha[:12]} to prod; its steps show on the dashboard")
 
 
-def _running(ctx: Context, op_id: object) -> bool:
+def running(ctx: Context) -> str | None:
+    """The push to prod or back that is still running, by its operation's id; None when none is."""
+    current = store.read_json_or(_watch_path(ctx.places), None)
+    op_id = current.get("op") if isinstance(current, dict) else None
     if not isinstance(op_id, str):
-        return False
+        return None
     try:
-        return bool(ops.get(ctx, {"id": op_id}, None)["op"]["state"] == ops.RUNNING)
+        return op_id if ops.get(ctx, {"id": op_id}, None)["op"]["state"] == ops.RUNNING else None
     # telemetry: expected — its record was pruned, so the operation ended long ago
     except Refused:
-        return False
-
-
-def released_path(places: Places) -> Path:
-    return places.state / "released.json"
-
-
-def released(places: Places) -> str | None:
-    """The commit the last releases that finished ran at; None before any did."""
-    found = store.read_json_or(released_path(places), None)
-    if found is None:
         return None
-    if not isinstance(found, dict) or not isinstance(found.get("commit"), str):
-        raise store.StoreError(f"{released_path(places)}: want a commit")
-    return str(found["commit"])
 
 
 def qa_prod_path(places: Places) -> Path:
@@ -255,90 +251,54 @@ def _watch_until(ctx: Context, until: float) -> None:
         store.write_json(_watch_path(ctx.places), raw)
 
 
-def _steps(ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> list[tuple[str, Callable[[], str]]]:
-    push = _Push(ctx, kind, sha, wait_s, watch_s)
+def _failure(output: str, code: int) -> str:
+    """What the deploy's log says went wrong: its last `failed:` line, and the problems listed under it."""
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    marks = [n for n, line in enumerate(lines) if line.startswith("failed:")]
+    if not marks:
+        return f"the build and deploy exited {code}, and its log names no failure"
+    return " ".join(lines[marks[-1] :]).removeprefix("failed:").strip()[:300]
+
+
+def _steps(push: _Push) -> list[tuple[str, Callable[[], str]]]:
     return [
-        ("Starting the push workflow", push.dispatch),
-        (f"Redeploying prod at {sha[:12]}", push.redeploy),
+        (f"Building and deploying prod at {push.sha[:12]}", push.deploy),
         ("Waiting for prod to answer on the new build", push.answer),
         ("Starting a qa-prod pass", push.qa_prod),
-        ("Releasing what changed", push.releases),
     ]
 
 
-def _deploy_job(state: dict[str, Any]) -> dict[str, Any] | None:
-    """Prod's deploy is the workflow's `deploy` job; the releases after it must not decide whether prod moved."""
-    job = state["jobs"].get(PROMOTE_JOB)
-    if job is not None and job["status"] == "completed":
-        return {**job, "url": state["url"]}
-    if state["status"] == "completed":
-        return {"conclusion": f"without a {PROMOTE_JOB} job", "url": state["url"]}
-    return None
-
-
 class _Push:
-    """One push's steps, sharing its workflow run and one deadline for every wait."""
+    """One push's steps."""
 
-    def __init__(self, ctx: Context, kind: str, sha: str, wait_s: int, watch_s: int) -> None:
-        self.ctx, self.kind, self.sha, self.wait_s, self.watch_s = ctx, kind, sha, wait_s, watch_s
+    def __init__(self, ctx: Context, kind: str, sha: str, full: str, watch_s: int) -> None:
+        self.ctx, self.kind, self.sha, self.full, self.watch_s = ctx, kind, sha, full, watch_s
         self.tick = ctx.settings().get_int("watch.tick_seconds")
-        self.deadline = time.monotonic() + wait_s
-        self.run_id = ""
-        self.full_sha = sha
 
-    def dispatch(self) -> str:
-        ctx = self.ctx
+    def deploy(self) -> str:
+        """The deploy unit builds the images the commit lacks on this machine, then deploys them; it is handed the
+        full commit, since the probes name a build by its short one."""
         try:
-            self.full_sha = self.sha if FULL_SHA.match(self.sha) else ctx.github.full_sha(self.sha)
-            self.run_id = ctx.github.dispatch_promote(self.full_sha, released(ctx.places) or "-")
-        except GitHubError as exc:
+            code, output = self.ctx.launcher.deploy_prod(self.full, self.kind == operations.PUSH_BACK)
+        except LaunchError as exc:
             raise ops.StepError(str(exc)) from exc
-        return f"workflow run {self.run_id}"
-
-    def _finished(self, what: str, done: Callable[[dict[str, Any]], dict[str, Any] | None]) -> dict[str, Any]:
-        """Ask GitHub about the run until ``done`` finds what finished in it; GitHub's own trouble is retried."""
-        trouble = ""
-        while True:
-            try:
-                state = self.ctx.github.run(self.run_id)
-            # telemetry: surfaced — the run goes on at GitHub; `trouble` names GitHub's last word if the wait ends
-            except GitHubError as exc:
-                trouble = f"; GitHub last said: {exc}"
-            else:
-                found = done(state)
-                if found is not None:
-                    return found
-            if time.monotonic() > self.deadline:
-                raise ops.StepError(
-                    f"the push workflow's {what} did not finish in {self.wait_s // 60} minutes{trouble}"
-                )
-            time.sleep(self.tick)
-
-    def redeploy(self) -> str:
-        job = self._finished("deploy", _deploy_job)
-        if job["conclusion"] == "success":
-            return f"the deploy finished: {job['url']}"
-        raise ops.StepError(f"the deploy ended {job['conclusion']}: {job['url']}")
-
-    def releases(self) -> str:
-        state = self._finished("releases", lambda state: state if state["status"] == "completed" else None)
-        if state["conclusion"] == "success":
-            # The next push's releases compare with this commit; one that failed is tried again then.
-            store.write_json(released_path(self.ctx.places), {"commit": self.full_sha, "at": self.ctx.clock.iso()})
-            return f"the releases finished: {state['url']}"
-        raise ops.StepError(
-            f"prod is live at {self.sha[:12]}, but the releases ended {state['conclusion']}: {state['url']}"
-        )
+        if code != 0:
+            raise ops.StepError(_failure(output, code))
+        return f"prod is deployed at {self.full[:12]}"
 
     def answer(self) -> str:
-        since, sha = self.ctx.clock.iso(), self.sha
+        """The warden's own probe sees prod on the build, as the deploy did, within the time its probes take to count
+        an outage."""
+        settings = self.ctx.settings()
+        wait = settings.get_int("watch.probe_seconds") * settings.get_int("watch.outage_after") + self.tick
+        since, sha, deadline = self.ctx.clock.iso(), self.sha, time.monotonic() + wait
         while True:
             last = _latest(self.ctx, probes.PROD)
             if last is not None and last.at >= since and last.ok and last.commit == sha:
                 return f"prod answers on {sha[:12]}"
-            if time.monotonic() > self.deadline:
+            if time.monotonic() > deadline:
                 said = "nothing yet" if last is None else (last.commit[:12] if last.ok else last.error)
-                raise ops.StepError(f"prod did not answer on {sha[:12]} in {self.wait_s // 60} minutes; it said {said}")
+                raise ops.StepError(f"prod did not answer on {sha[:12]} in {wait} seconds; it said {said}")
             time.sleep(self.tick)
 
     def qa_prod(self) -> str:

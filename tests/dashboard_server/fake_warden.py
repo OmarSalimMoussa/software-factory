@@ -41,6 +41,7 @@ class Launcher:
     def __init__(self, places: Places) -> None:
         self.calls: list[tuple[str, Any]] = []
         self.places = places
+        self.deploy: Callable[[str], tuple[int, str]] = lambda sha: (0, "")  # prod's build and deploy
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
         self.calls.append(("start", request_id))
@@ -63,6 +64,10 @@ class Launcher:
 
     def start_upgrade(self, commit: str) -> None:
         self.calls.append(("upgrade", commit))
+
+    def deploy_prod(self, sha: str, back: bool) -> tuple[int, str]:
+        self.calls.append(("deploy", sha))
+        return self.deploy(sha)
 
     def restart_daemon(self) -> None:
         self.calls.append(("restart", None))
@@ -104,7 +109,7 @@ class GitHub:
 class FakeWarden:
     """Serves owner.sock until stopped; ``accept`` is a code every coded verb takes, for the browser drives."""
 
-    def __init__(self, places: Places, clock: Clock, accept: str | None = None, github: Any = None,
+    def __init__(self, places: Places, clock: Clock, accept: str | None = None,
                  on_event: Callable[[str, dict[str, Any]], None] | None = None) -> None:  # fmt: skip
         self.places, self.clock = places, clock
         self.events: list[tuple[str, dict[str, Any]]] = []
@@ -115,7 +120,7 @@ class FakeWarden:
             if on_event is not None:
                 on_event(kind, data)
 
-        self.doors = Doors(places, self._settings, clock, self.launcher, github or GitHub(), post,
+        self.doors = Doors(places, self._settings, clock, self.launcher, GitHub(), post,
                            threading.RLock(), CheckPlaces())  # fmt: skip
         owner = {name: verb for name, verb in VERBS.items() if verb.owner_socket}
         self.dispatcher = Dispatcher(self.doors, resolve(owner), owner)

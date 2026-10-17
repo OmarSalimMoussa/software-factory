@@ -1,5 +1,5 @@
-"""Prod's, staging's and slot 0's unresolved GlitchTip issues become requests from glitchtip: each issue once, and
-the factory's own never."""
+"""Prod's and slot 0's unresolved GlitchTip issues become requests from glitchtip: each issue once, and the factory's
+own never. Slot 0 is staging."""
 
 from __future__ import annotations
 
@@ -82,17 +82,16 @@ def asked(world: World, glitchtips: GlitchTips) -> list[str]:
     return glitchtips.asked
 
 
-def test_each_prod_staging_and_slot_zero_issue_is_filed_once_across_polls(world: World, asked: list[str]) -> None:
+def test_each_prod_and_slot_zero_issue_is_filed_once_across_polls(world: World, asked: list[str]) -> None:
     errors_import.poll(world.ctx)
     _next_poll(world)
     requests, broken = Queue.of(world.ctx).requests()
-    assert not broken and len(asked) == 12  # both polls read both pages, for each environment
+    assert not broken and len(asked) == 8  # both polls read both pages, for each environment
     assert sorted(r.where for r in requests) == [
         "prod-app:app.notes in show",
         "prod-web:app.notes in show",
         "slot0-app:app.notes in show",
-        "staging-app:app.notes in show",
-    ]  # slot 1's issue and the factory's own are no environment's
+    ]  # slot 1's issue, a staging-… project's and the factory's own are no environment's
     assert {(r.inbox, r.from_role, r.severity) for r in requests} == {("agents", "glitchtip", "normal")}
     assert {url.split("/api/0/organizations/notes/issues/?")[0] for url in asked} == {GLITCHTIP}
 
@@ -107,7 +106,7 @@ def test_a_fatal_or_frequent_issue_is_severe(level: str | None, count: str | Non
 
 
 @pytest.mark.parametrize(
-    ("env", "project", "reached"), [("prod", "prod-app", "promoted"), ("slot0", "slot0-app", "checked")]
+    ("env", "project", "reached"), [("prod", "prod-app", "promoted"), ("slot0", "slot0-app", "on-staging")]
 )
 def test_an_issue_seen_after_its_fix_reached_its_environment_is_filed_again(
     world: World, asked: list[str], env: str, project: str, reached: str

@@ -249,12 +249,6 @@ def _factory(ctx: Context, args: dict[str, Any]) -> Any:
     return {"paused": paused, "locked_until": until, "triage": triage}
 
 
-def _staging_pinned(ctx: Context) -> str | None:
-    """Why staging's build may not go to prod, as the push would refuse it; None when it may."""
-    on_default = deploys.on_default(ctx.places, probes.STAGING)
-    return None if on_default is True else prod_push.staging_off_default(ctx.settings(), on_default)
-
-
 def _proposals(ctx: Context, args: dict[str, Any]) -> dict[str, Any]:
     found = proposals.read(ctx.places)
     # An empty place is the orchestrator choosing only while it is at work.
@@ -276,8 +270,7 @@ READERS: dict[str, Reader] = {
     "deploys": lambda ctx, args: {
         **{env: deploys.builds(ctx.places, env) for env in probes.ENVS},
         "push_back": prod_push.push_back_target(ctx),
-        # Why staging's build may not go to prod, as the push would refuse it; None when it may.
-        "staging_pinned": _staging_pinned(ctx),
+        "push_refused": prod_push.push_refused(ctx),
     },
     "ci": lambda ctx, args: ci_watch.read(ctx.places),
     "staging_push": lambda ctx, args: github_push.waiting(ctx.places),

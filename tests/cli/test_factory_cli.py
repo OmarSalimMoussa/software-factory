@@ -63,7 +63,7 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["settings", "show"],
         ["errors"],
         ["errors", "--where", "slot", "3", "--issue", "12"],
-        ["traces", "--where", "staging", "--trace", "abc"],
+        ["traces", "--where", "slot", "0", "--trace", "abc"],
         ["request", "new", "--from", "owner", "--severity", "normal", "--where", "the sign-in page", "--body", FILE],
         ["triage", "apply", "--body", FILE],
         ["queue", "next"],
@@ -123,6 +123,12 @@ def test_a_step_mark_names_its_step_as_a_finding_does() -> None:
     # Words after an option are lost to Python 3.12's argparse, which the factory runs on: the step is an option.
     with pytest.raises(CliError, match="--step <item>:<n>"):
         _build(["qa", "step", "cart", "2", "--head", "abc1234"])
+
+
+def test_telemetry_is_read_from_prod_or_a_slot_and_staging_is_slot_0() -> None:
+    assert _build(["errors", "--where", "slot", "0"]).args == {"where": "slot", "slot": 0}
+    with pytest.raises(CliError, match="staging is slot 0"):
+        _build(["errors", "--where", "staging"])
 
 
 def test_propose_none_names_no_task() -> None:

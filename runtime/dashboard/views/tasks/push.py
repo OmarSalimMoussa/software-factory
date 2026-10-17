@@ -20,7 +20,6 @@ def _build(snap: Snap, env: str) -> dict[str, Any]:
     return {
         "sha": card["sha"],
         "deployed": when(epoch(current["at"]), utc=True) if current else None,
-        "run_url": card["deployment_url"],
         "commit_url": card["commit_url"],
     }
 
@@ -47,12 +46,6 @@ def push(snap: Snap) -> dict[str, Any]:
             else {"text": f"rung {n}", "tone": "info"}
         )
         tasks.append({"id": task["id"], "title": task["title"], "chip": chip, "built_from": built_from(snap, task)})
-    blocked = {
-        "down": "Staging is red: the push waits until it is healthy.",
-        "unknown": "Staging's health is unknown: the push waits for its next probe.",
-    }.get(pill["state"])
-    if blocked is None:
-        blocked = snap.get("deploys")["staging_pinned"]
     return {
         "prod": _build(snap, "prod"),
         "staging": staging,
@@ -61,7 +54,7 @@ def push(snap: Snap) -> dict[str, Any]:
         "prod_runs_staging": same,
         "previous_prod": previous[:7] if previous else None,
         "expected_staging_sha": expected,
-        "blocked": blocked,
+        "blocked": snap.get("deploys")["push_refused"],
     }
 
 

@@ -1,11 +1,12 @@
-"""Probing staging's and prod's health addresses, and telling a failure of the host from a failure on this side.
+"""Probing staging's and prod's health addresses, and telling a failure of prod's host from a failure on this side.
 
-Each address is https://<domain><[deploy].health>, from factory.toml in the product's main checkout, read at every
-probe: only a person changes that file. A probe asks it for a JSON object naming the running commit as build_commit.
-A failure counts toward an outage only when the host itself answered wrongly (an HTTP error, a redirect or an answer
-with no build_commit) or timed out, and the control probe reached GitHub at that moment. A failure to reach the host
-at all (no name, refused, unreachable, TLS) is this side's network and never counts, and neither is a factory.toml
-that cannot be read: the probe then has no address, says why, and never guesses one.
+Staging is slot 0, asked on this machine's loopback at http://127.0.0.1:<slot 0's port><[deploy].health>; prod at
+https://<prod's domain><[deploy].health>. Both come from factory.toml in the product's main checkout, read at every
+probe: only a person changes that file. A probe asks for a JSON object naming the running commit as build_commit.
+Staging's failures never count toward an outage. Prod's counts only when its host answered wrongly (an HTTP error, a
+redirect or an answer with no build_commit) or timed out, and the control probe reached GitHub at that moment. A
+failure to reach the host at all (no name, refused, unreachable, TLS) is this side's network and never counts, and
+neither is a factory.toml that cannot be read: the probe then has no address, says why, and never guesses one.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from runtime.shared import models, network, store
 from runtime.shared.models import Probe
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
+from runtime.slots import leases
 from runtime.warden.context import Context
 from runtime.warden.delivery import deploys
 from standard import config
@@ -85,18 +87,24 @@ def _product(ctx: Context) -> Config:
     return product
 
 
+def _origin(ctx: Context, product: Config, env: str) -> str:
+    if env == STAGING:
+        return f"http://127.0.0.1:{leases.port(ctx.settings(), 0)}"
+    return f"https://{product.workspace(env).domain}"
+
+
 def address(ctx: Context, env: str) -> str:
     """``env``'s health address."""
     product = _product(ctx)
-    return f"https://{product.workspace(env).domain}{product.deploy.health}"
+    return f"{_origin(ctx, product, env)}{product.deploy.health}"
 
 
 def origins(ctx: Context) -> dict[str, str]:
-    """Prod's and staging's addresses, and the health path both answer on."""
+    """Where a tester opens prod and staging, and the health path both answer on. The probe reads slot 0 on loopback,
+    but a browser opens it where its product says it is, or its sign-in refuses the request's origin."""
     product = _product(ctx)
-    return {env: f"https://{product.workspace(env).domain}" for env in ("prod", "staging")} | {
-        "health": product.deploy.health
-    }
+    where = {PROD: _origin(ctx, product, PROD), STAGING: leases.origin(ctx.settings(), 0)}
+    return where | {"health": product.deploy.health}
 
 
 def take(ctx: Context, env: str, fetch: Fetch) -> Probe:
@@ -130,6 +138,8 @@ def take(ctx: Context, env: str, fetch: Fetch) -> Probe:
 
 
 def _failed(ctx: Context, at: str, env: str, ms: int, error: str) -> Probe:
+    if env == STAGING:
+        return Probe(at, env, False, "", ms, error)
     if ctx.github.reachable():
         return Probe(at, env, False, "", ms, error, counts=True)
     return Probe(at, env, False, "", ms, f"{error}; GitHub did not answer either, so it is not counted")

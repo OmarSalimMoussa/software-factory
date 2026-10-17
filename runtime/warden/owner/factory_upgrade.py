@@ -1,9 +1,9 @@
 """An upgrade of the factory to any commit of its repo on GitHub, started with the owner's factory.upgrade.
 
 The verb takes the commit's full sha. It pauses the factory, waits for every agent to settle and every check running
-tests to end, and starts root's upgrade unit, which downloads that commit itself and installs it. No commit need be
-newer than the one installed, so installing the commit before is the way back. The warden stops while the install
-runs: what was asked for stays here for the page, and root's progress record says how it went.
+tests and push to prod to end, and starts root's upgrade unit, which downloads that commit itself and installs it. No
+commit need be newer than the one installed, so installing the commit before is the way back. The warden stops while the
+install runs: what was asked for stays here for the page, and root's progress record says how it went.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from runtime.shared.models import RESTING
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.warden.context import Context
+from runtime.warden.delivery import prod_push
 from runtime.warden.owner import ops
 from runtime.warden.sessions import lifecycle, registry, revive
 
@@ -98,14 +99,16 @@ def _pause(ctx: Context) -> str:
 
 
 def _settled(ctx: Context) -> str:
-    """Every agent benched or ended, and no check running tests: the install refuses while any agent works, waits, or
-    is between the two, and stopping the factory would kill a check run half way, which a benched agent may hold."""
+    """Every agent benched or ended, no check running tests and no push to prod: the install refuses while any agent
+    works, waits, or is between the two; stopping the factory would kill a check run half way, which a benched agent
+    may hold; and a push's deploy goes on without the warden, which would not see it end."""
     settings = ctx.settings()
     wait = settings.get_int("install.upgrade_wait_minutes")
     deadline = ctx.clock.now() + wait * 60
     while True:
         busy = sorted(s.name for s in registry.read(ctx.places).values() if s.state not in RESTING)
         busy += [f"{name}'s check" for name in ctx.check_places.holders()]
+        busy += ["the push to prod"] if prod_push.running(ctx) is not None else []
         if not busy:
             return "every agent has settled"
         if ctx.clock.now() >= deadline:

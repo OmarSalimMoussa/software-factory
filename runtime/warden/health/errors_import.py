@@ -1,15 +1,15 @@
-"""Prod's, staging's and slot 0's GlitchTip issues, filed as requests in the agents inbox: each issue once, and again
-when it comes back after its fix reached that environment.
+"""Prod's and slot 0's GlitchTip issues, filed as requests in the agents inbox: each issue once, and again when it
+comes back after its fix reached that environment. Slot 0 is staging.
 
 The loop calls poll on every tick; every errors.poll_minutes it reads this machine's shared GlitchTip for each
 environment with its read-only token, and keeps the environment's unresolved issues: its projects' slugs start with
 its name, so the factory's own project (error_reports.PROJECT) is no environment's. Its first read takes the issues
 open then as known, each filed once GlitchTip sees it again. Another issue not filed before is filed from glitchtip.
-One filed before is filed again when GlitchTip saw it after the task its request became reached that environment (on
-staging for staging, promoted for prod, checked for slot 0). Its severity comes from the issue: a fatal one, or one
-with at least errors.severe_events events, is severe and goes to intake at once. Each environment keeps its own
-record, errors-<env>.json: the issues it knows with their request, since when it reads, and the timer
-runtime/warden/imports.py keeps.
+One filed before is filed again when GlitchTip saw it after the task its request became reached that environment
+(promoted for prod, on staging for slot 0). Its severity comes from the issue: a fatal one, or one with at least
+errors.severe_events events, is severe and goes to intake at once. Each environment keeps its own record,
+errors-<env>.json: the issues it knows with their request, since when it reads, and the timer runtime/warden/imports.py
+keeps.
 """
 
 from __future__ import annotations
@@ -34,9 +34,9 @@ log = logging.getLogger(__name__)
 
 SENDER = "glitchtip"
 SLOT_ZERO = f"{telemetry.SLOT}0"
-ENVS = (telemetry.PROD, telemetry.STAGING, SLOT_ZERO)
+ENVS = (telemetry.PROD, SLOT_ZERO)
 # The status a task reaches when its fix runs in the environment: an issue seen after that came back.
-REACHED = {telemetry.PROD: "promoted", telemetry.STAGING: ON_STAGING, SLOT_ZERO: "checked"}
+REACHED = {telemetry.PROD: "promoted", SLOT_ZERO: ON_STAGING}
 _FRESH: dict[str, Any] = {"filed": {}, "since": None, **imports.fresh()}
 
 

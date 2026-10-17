@@ -31,8 +31,6 @@ SCRATCH = ".factory"
 # contract: the product's prod workflow, the factory's CI template copied under this name; the warden starts it.
 PROMOTE_WORKFLOW = "deploy-prod.yml"
 CI_WORKFLOW = "ci.yml"  # the product's CI, which checks every push and deploys the default branch to staging
-# The job in it that moves prod; the template names it so, and the warden judges a push by it alone.
-PROMOTE_JOB = "deploy"
 WARDEN_USER = "software-warden"
 AGENT_USER = "software-agent"
 DASHBOARD_USER = "software-dashboard"  # contract: added by 1B-3, the one other user owner.sock answers

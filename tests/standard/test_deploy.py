@@ -125,19 +125,21 @@ def test_a_push_builds_the_commit_takes_its_files_in_place_and_ends_with_the_dep
 
 
 CHANGED = FACTORY_TOML.replace("/admin/export*", "/old-admin*")
+STAGING = FACTORY_TOML[FACTORY_TOML.index("[workspaces.staging]") : FACTORY_TOML.index("[workspaces.prod]")]
 
 
 @pytest.mark.parametrize(
     ("toml", "back", "trouble", "said"),
     [
         (CHANGED, False, "", ""),
+        (CHANGED.replace(STAGING, ""), False, "", ""),
         ("[product\n", False, "", "factory.toml at {short}: is not valid TOML"),
         ("[product\n", True, "", ""),
         (CHANGED, False, "read-only", "product.toml is not this user's to rewrite"),
         (CHANGED, False, "build-fails", "failed (exit 1): ERROR: failed to solve"),
     ],
-    ids=["push-refreshes", "push-of-a-file-that-does-not-parse", "back-keeps-the-servers-copy",
-         "servers-copy-not-the-admins", "build-fails"],
+    ids=["push-refreshes", "push-of-a-file-without-staging", "push-of-a-file-that-does-not-parse",
+         "back-keeps-the-servers-copy", "servers-copy-not-the-admins", "build-fails"],
 )  # fmt: skip
 def test_a_push_makes_the_servers_copy_its_factory_toml_once_prod_runs_it_and_a_push_back_keeps_it(
     server: Server, capsys: pytest.CaptureFixture[str], toml: str, back: bool, trouble: str, said: str

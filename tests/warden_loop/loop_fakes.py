@@ -66,17 +66,24 @@ class FakeGitHub:
 
 @dataclass
 class FakeStack:
-    """scripts/dev on slot 0, for the tick's report pull: the product lists the verbs ``verbs`` names."""
+    """scripts/dev on slot 0, for the tick's report pull: the product lists the verbs ``verbs`` names. Prod's build
+    and deploy answer as ``deploy`` says, by default at once and well."""
 
     logs: Path
     verbs: str = "up down health"
     calls: list[tuple[int, list[str], str]] = field(default_factory=list)
+    deployed: list[tuple[str, bool]] = field(default_factory=list)  # each deploy's commit, and whether it went back
+    deploy: Callable[[str], tuple[int, str]] = lambda sha: (0, "")
 
     def run_stack(self, slot: int, verb: list[str], session: str, given: str = "") -> StackResult:
         self.calls.append((slot, verb, session))
         log = self.logs / f"stack-{len(self.calls)}.log"
         log.write_text(self.verbs if verb == ["verbs"] else "")
         return StackResult(0, "", str(log))
+
+    def deploy_prod(self, sha: str, back: bool) -> tuple[int, str]:
+        self.deployed.append((sha, back))
+        return self.deploy(sha)
 
 
 @dataclass
@@ -86,6 +93,7 @@ class World:
     clock: FakeClock
     events: list[tuple[str, dict[str, Any]]]
     checkout: Path
+    launcher: FakeStack
 
 
 def answers(*replies: Answer | Exception) -> Callable[[str, float], Answer]:

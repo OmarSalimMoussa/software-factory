@@ -4,8 +4,8 @@ slot 0 runs, against the branch's tip.
 
 Every ``watch.done_minutes`` the warden's mirror fetches the agents' checkout, which needs no network, under the
 push lock, and a pass of its own writes the finished list for the dashboard to draw. GitHub's branch is the one the
-mirror last fetched for a push: unknown before the first. Staging and prod are the builds their health answers named.
-A merge's commits never change, so each merge's are read once and kept.
+mirror last fetched for a push: unknown before the first. Staging, which is slot 0, and prod are the builds their
+health answers named. A merge's commits never change, so each merge's are read once and kept.
 """
 
 from __future__ import annotations
@@ -17,13 +17,11 @@ from typing import Any
 from runtime.queue.turn import merges
 from runtime.shared import slices, store
 from runtime.shared.paths import Places
-from runtime.slots import health, leases
 from runtime.warden.context import Context
 from runtime.warden.delivery import deploys
 from runtime.warden.delivery.github_push import REVERTS, Git, fetch_checkout, pushing
 from runtime.warden.health import probes
 
-SESSION = "done-list"  # who asked slot 0 for its commit, in the stack unit's log
 _FIELD, _END = "\x1f", "\x1e"
 
 
@@ -47,7 +45,7 @@ def _tried_path(places: Places) -> Path:
 
 def refresh(ctx: Context) -> None:
     """Write the list again once ``watch.done_minutes`` have passed since the last try, whether or not it worked: it
-    waits for a push to end and runs slot 0's health script, so it runs in a thread of its own."""
+    waits for a push to end, so it runs in a thread of its own."""
     tried = store.read_json_or(_tried_path(ctx.places), None)
     if tried is not None and ctx.clock.age(tried["at"]) < ctx.settings().get_int("watch.done_minutes") * 60:
         return
@@ -149,14 +147,13 @@ def _slice(body: str) -> str | None:
 
 
 def _slot0(ctx: Context, git: Git, local: str) -> dict[str, Any]:
-    """The commit slot 0 runs and how many commits it is behind the branch's tip; or why it gave none."""
-    try:
-        commit = health.running(ctx, 0, SESSION)
-    # telemetry: surfaced — the Done tab draws `why` slot 0 gave no commit
-    except health.SlotUnread as exc:
-        return {"commit": None, "behind": None, "why": str(exc)}
-    if commit == leases.stand_in(0):
-        return {"commit": None, "behind": None, "why": f"it answers {commit}, its env file's stand-in for a commit"}
+    """The commit slot 0 runs, as staging's last probe named it, and how many commits it is behind the branch's tip;
+    or why it gave none."""
+    found = probes.recent(ctx.places, probes.STAGING, 1)
+    if not found or not found[0].ok:
+        why = found[0].error if found else "staging has not been probed yet"
+        return {"commit": None, "behind": None, "why": why}
+    commit = found[0].commit
     full = _full(git, commit)
     on_branch = full is not None and git.is_ancestor(full, local)
     behind = int(git.run("rev-list", "--count", f"{full}..{local}")) if on_branch else None

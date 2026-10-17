@@ -5,7 +5,8 @@ the drives' test routes as the UI's own fixture server does: GET /__calls, POST 
 switch makes its broken state for real where the warden can (down, scenarios, bump, saved, a failing push); a
 failure of the dashboard itself (fail_path, fail_part, api, refuse) is injected around the server. The clock starts
 at 14:02 UTC on the fixtures' day, an orchestrator stand-in refills free proposal places, a push to staging is noted
-as made without reaching GitHub, and a device signs in with the code 123456.
+as made without reaching GitHub, a push to prod takes the build as named and deploys it at once, and a device signs in
+with the code 123456.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from dashboard_seed import blocked, seed
-from fake_warden import FakeWarden, GitHub
+from fake_warden import FakeWarden
 from seed_kit import FIXTURES, iso
 
 from runtime.dashboard import server
@@ -40,7 +41,7 @@ from runtime.shared import models, store
 from runtime.shared import settings as settings_module
 from runtime.warden import public
 from runtime.warden.context import Caller, Clock
-from runtime.warden.delivery import deploys, github_push
+from runtime.warden.delivery import deploys, github_push, prod_push
 from runtime.warden.owner import ops, settings_save
 from runtime.warden.sessions import crashwatch, registry
 
@@ -65,29 +66,6 @@ class Running(Clock):
         self.skipped += seconds
 
 
-class Deploys(GitHub):
-    """GitHub whose push workflow redeploys prod: prod then answers on the new build, which the warden's tick would
-    log, unless told to fail."""
-
-    def __init__(self, live: Live) -> None:
-        self.live = live
-
-    def run(self, run_id: str) -> dict[str, Any]:
-        if self.live.switches.get("op_fail"):
-            return {
-                "id": run_id,
-                "status": "completed",
-                "conclusion": "failure",
-                "url": "https://github.invalid/r",
-                "jobs": {"deploy": {"status": "completed", "conclusion": "failure"}},
-            }
-        sha = store.read_json(self.live.places.state / "push.json")["sha"]
-        at = iso(self.live.clock.now() + 2)
-        store.append_jsonl(self.live.places.probes, models.dump(models.Probe(at, "prod", True, sha, 80)))
-        deploys.record(self.live.places, "prod", sha, at)
-        return super().run(run_id)
-
-
 class Live:
     def __init__(self) -> None:
         self.clock = Running()
@@ -99,6 +77,7 @@ class Live:
         self._launch = ops.launch
         ops.launch = self.paced  # type: ignore[assignment]  # the drives set how long each step of an operation takes
         github_push._push = self.pushed  # type: ignore[assignment]  # GitHub is out of a drive's reach
+        prod_push._cleared = lambda ctx, kind, sha: sha  # type: ignore[assignment]  # the seeded checkout has no git
         self.app = self.fresh()
 
     def paced(self, ctx: Any, kind: str, steps: Any, result: dict[str, Any] | None = None) -> str:
@@ -114,6 +93,16 @@ class Live:
     def pushed(self, ctx: Any, sha: str) -> str:
         github_push.waiting_path(ctx.places).unlink()
         return f"pushed; CI takes {sha[:12]} to staging"
+
+    def deployed(self, sha: str) -> tuple[int, str]:
+        """Prod's build and deploy: prod then answers on the new build, which the warden's tick would log, unless told
+        to fail."""
+        if self.switches.get("op_fail"):
+            return 1, f"building {sha}\nfailed: the build of web exited 1\n"
+        at = iso(self.clock.now() + 2)
+        store.append_jsonl(self.places.probes, models.dump(models.Probe(at, "prod", True, sha, 80)))
+        deploys.record(self.places, "prod", sha, at)
+        return 0, ""
 
     def remove(self, *_: Any) -> None:
         """The drive stops the server with SIGTERM: every seeded folder goes, once no stand-in still writes to it."""
@@ -139,7 +128,8 @@ class Live:
             shutil.copytree(Path(__file__).resolve().parents[2] / folder, places.install / folder)
         self._publish()
         settings_save.render_plugin(places, self._settings())
-        self.warden = FakeWarden(places, self.clock, accept=CODE, github=Deploys(self), on_event=self.on_event)
+        self.warden = FakeWarden(places, self.clock, accept=CODE, on_event=self.on_event)
+        self.warden.launcher.deploy = self.deployed
         self.warden.start()
         return server.App(server.PublicSettings(places), Warden(self.warden.address, lambda: 5.0), self.clock.now)
 

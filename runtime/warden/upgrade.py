@@ -19,10 +19,9 @@ from runtime.shared import claude_accounts, store
 from runtime.shared.models import SEVERITIES
 from runtime.slots import leases
 from runtime.system import layout
-from runtime.warden import imports
+from runtime.warden import imports, loop
 from runtime.warden.context import Context
-from runtime.warden.delivery import deploys, prod_push
-from runtime.warden.health import errors_import, probes
+from runtime.warden.health import errors_import
 from runtime.warden.sessions import older_skills, registry
 
 log = logging.getLogger(__name__)
@@ -35,7 +34,7 @@ def migrate(ctx: Context) -> list[str]:
     """Bring every old shape over; what each step did."""
     done: list[str] = []
     steps: list[Callable[[Context], str]] = [
-        _inbox_cursor, _leases, _errors_filed, _errors_since, _turn, _merges, _released, _typed_verdicts,
+        _inbox_cursor, _leases, _errors_filed, _errors_since, _turn, _merges, _staging_red, _typed_verdicts,
         _approvals_routed, _briefs_home, _active_account, _older_skills,
     ]  # fmt: skip
     for step in steps:
@@ -179,15 +178,14 @@ def _merges(ctx: Context) -> str:
     return f"{len(found)} merges"
 
 
-def _released(ctx: Context) -> str:
-    """The commit the last releases ran at: prod's current build, which the old factory released against."""
-    if prod_push.released(ctx.places) is not None:
+def _staging_red(ctx: Context) -> str:
+    """The loop's memo drops the request it kept for staging's red spell: staging is slot 0, which never goes red."""
+    raw = store.read_json_or(loop.memo_path(ctx.places), None)
+    if not isinstance(raw, dict) or "staging_red" not in raw:
         return ""
-    current = deploys.builds(ctx.places, probes.PROD)["current"]
-    if current is None:
-        return ""
-    store.write_json(prod_push.released_path(ctx.places), {"commit": current["commit"], "at": ctx.clock.iso()})
-    return "the last released commit"
+    del raw["staging_red"]
+    store.write_json(loop.memo_path(ctx.places), raw)
+    return "the loop's memo"
 
 
 def _typed_verdicts(ctx: Context) -> str:

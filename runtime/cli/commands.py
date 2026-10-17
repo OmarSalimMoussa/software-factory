@@ -155,8 +155,8 @@ def _queue(sub: Any) -> None:
 
 def _telemetry(sub: Any) -> None:
     for verb, flag, what in (("errors", "--issue", "a GlitchTip issue"), ("traces", "--trace", "a Langfuse trace")):
-        parser = sub.add_parser(verb, help=f"{verb} of prod, staging or a slot, or {what}; read-only")
-        parser.add_argument("--where", nargs="+", default=["prod"], metavar="prod|staging|slot N")
+        parser = sub.add_parser(verb, help=f"{verb} of prod or a slot (slot 0 is staging), or {what}; read-only")
+        parser.add_argument("--where", nargs="+", default=["prod"], metavar="prod|slot N")
         parser.add_argument(flag, dest="one")
 
 

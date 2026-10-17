@@ -22,7 +22,6 @@ from runtime.shared.protocol import ok
 from runtime.warden.context import Clock, Context
 
 LOOP_DUE = "loop due"
-STAGING_RED = "staging red"
 PROD_RED = "prod red"
 SEVERE_REQUEST = "severe request"
 TRIAGE_DUE = "triage due"
@@ -48,7 +47,6 @@ OWNER_DECISIONS = (
 KINDS = frozenset(
     {
         LOOP_DUE,
-        STAGING_RED,
         PROD_RED,
         SEVERE_REQUEST,
         TRIAGE_DUE,

@@ -32,7 +32,7 @@ from runtime.cli import factory as cli
 from runtime.qa import qa_browser
 from runtime.shared import protocol, store, upgrades
 from runtime.shared.paths import SCRATCH, Places
-from runtime.slots import health
+from runtime.slots import health, leases
 from runtime.system.runners import launch_file
 from runtime.warden import inbox, public, server, wardend
 from runtime.warden.context import Caller, CheckPlaces, Clock, Context
@@ -291,10 +291,12 @@ class Rehearsal:
         return session_id
 
     def health(self, staging: str, prod: str) -> Any:
-        """Staging and prod, answering on the health addresses the product's factory.toml names."""
+        """Staging, which is slot 0 on loopback, and prod, answering on the health paths the product's factory.toml
+        names."""
         product = config.load(self.repo)
-        addresses = {f"https://{product.workspace(env).domain}{product.deploy.health}": commit
-                     for env, commit in (("staging", staging), ("prod", prod))}  # fmt: skip
+        slot0 = leases.port(self.warden().settings(), 0)
+        addresses = {f"http://127.0.0.1:{slot0}{product.deploy.health}": staging,
+                     f"https://{product.workspace('prod').domain}{product.deploy.health}": prod}  # fmt: skip
 
         def fetch(url: str, timeout: float) -> Answer:
             return Answer(200, json.dumps({"build_commit": addresses[url]}).encode())

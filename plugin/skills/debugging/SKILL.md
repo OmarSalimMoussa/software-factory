@@ -8,8 +8,8 @@ description: Use when a test fails, a bug is reported, or the product behaves wr
 A fix without a cause is a guess. Find the cause first, then fix it once.
 
 1. **Confirm the bug where it was reported.** A report about staging or prod is checked against its error-tracker
-   issue first: `factory errors --where staging` (or prod), then `--issue <id>` for its latest event. Do not inherit
-   the claim from a doc, a task or another agent.
+   issue first: `factory errors` for prod, `--where slot 0` for staging, then `--issue <id>` for its latest event.
+   Do not inherit the claim from a doc, a task or another agent.
 2. **Reproduce it on your own slot.** A tester walks it through the product's screens or its API; an implementer
    never drives the product itself. Write down the exact steps and what the tester saw. No reproduction, no fix:
    tell the orchestrator what was tried.

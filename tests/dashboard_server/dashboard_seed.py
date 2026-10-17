@@ -156,7 +156,6 @@ def _seed_health(places: Places, now: float) -> None:
     for when, env, commit in (("Oct 5, 09:12", "prod", PREVIOUS), ("Oct 7, 10:05", "prod", PROD),
                               ("Oct 9, 11:18", "staging", STAGING)):  # fmt: skip
         deploys.record(places, env, commit, iso(fixture_time(when, now)))
-    deploys.note_branch(places, "staging", STAGING, True, now)  # as the tick notes a build on the default branch
     store.write_json(
         places.plan,
         {

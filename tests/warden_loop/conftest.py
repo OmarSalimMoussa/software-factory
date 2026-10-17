@@ -27,18 +27,18 @@ def world(tmp_path: Path) -> World:
     # The product's factory.toml names the health addresses the probes ask.
     shutil.copy(FACTORY_TOML, checkout / "factory.toml")
     settings = settings_mod.build(defaults, {"repo.path": str(checkout), "repo.github": "owner/name"})
-    github, clock = FakeGitHub(), FakeClock()
+    github, clock, launcher = FakeGitHub(), FakeClock(), FakeStack(tmp_path)
     events: list[tuple[str, dict[str, Any]]] = []
     ctx = Context(
         places=Places.under(tmp_path),
         settings=lambda: settings,
         caller=Caller("owner", role="owner"),
         clock=clock,
-        launcher=FakeStack(tmp_path),  # type: ignore[arg-type]  # the tick runs only scripts/dev on slot 0
+        launcher=launcher,  # type: ignore[arg-type]  # the loop runs only scripts/dev on slot 0 and prod's deploy
         github=github,
         post_event=lambda kind, data: events.append((kind, data)),
     )
-    return World(ctx, github, clock, events, checkout)
+    return World(ctx, github, clock, events, checkout, launcher)
 
 
 @pytest.fixture

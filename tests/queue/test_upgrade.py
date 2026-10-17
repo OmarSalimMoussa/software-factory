@@ -12,10 +12,9 @@ from runtime.queue import approvals, cards, formats, intake, records, turn
 from runtime.queue.book import Queue, spec_rel, task_rel
 from runtime.shared import store
 from runtime.slots import leases
-from runtime.warden import inbox, upgrade
+from runtime.warden import inbox, loop, upgrade
 from runtime.warden.context import Caller
-from runtime.warden.delivery import deploys, prod_push
-from runtime.warden.health import errors_import, probes
+from runtime.warden.health import errors_import
 
 FULL = "f" * 40
 
@@ -41,8 +40,9 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
         task_rel(in_turn.id), formats.dump_task(dataclasses.replace(in_turn, status="turn", branch="b", run=1))
     )
     queue.log(merged.id, "2026-10-09T11:00:00Z", "orchestrator", "merged", "merged as abcdef1", commit="abcdef1")
-    # Prod's build, released against; and a verdict a tester typed with one blocker.
-    deploys.record(places, probes.PROD, "c" * 40, "2026-10-09T09:00:00Z")
+    # The loop's memo, with the request of staging's red spell; and a verdict a tester typed with one blocker.
+    memo = {"probed": {}, "deployed": {}, "staging_red": "r-1", "loop_due": None, "triage_due": None, "goal": None}
+    store.write_json(loop.memo_path(places), memo)
     world.session("s-impl", "implementer", "impl-t-0001", task=in_turn.id)
     typed = {"head": FULL, "tester": "qa-ux", "blockers": 1, "majors": 0, "minors": 0, "at": "x"}
     store.append_jsonl(places.results_of("s-impl"), typed)
@@ -62,7 +62,7 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
     assert errors_import.note(places) is None  # each record reads, and none has read yet
     assert turn.holder(places) == {"task": in_turn.id, "branch": "b", "base": FULL}
     assert turn.merges(places) == {FULL: merged.id}
-    assert prod_push.released(places) == "c" * 40
+    assert "staging_red" not in json.loads(loop.memo_path(places).read_text())
     assert findings.open_count(ctx, in_turn.id, FULL, "qa-ux") == 1
     approval = approvals.current(places, merged.id)
     assert approval is not None and approval.routed == 2

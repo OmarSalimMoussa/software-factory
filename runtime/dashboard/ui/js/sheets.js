@@ -202,7 +202,7 @@ function builtFromHTML(o, taskId) {
 }
 
 /* ---------- Push to prod ---------- */
-const envBox = (label, env, accent) => `<div class="card" ${accent ? 'style="border-color:var(--accent)"' : ''}><div class="label">${label}</div><div class="mono" style="font-size:16px;font-weight:650;margin-top:6px">${esc(env.sha || 'unknown')}</div><div class="muted" style="font-size:12px">deployed ${esc(env.deployed || 'unknown')}${env.healthy_for ? ` · healthy for ${esc(env.healthy_for)}` : ''}</div><div class="env-links" style="margin-top:8px">${env.run_url ? `<a href="${esc(env.run_url)}" target="_blank" rel="noopener">${icon('rocket-launch', 'sm')}Deployment</a>` : ''}${env.commit_url ? `<a href="${esc(env.commit_url)}" target="_blank" rel="noopener">${icon('code-bracket', 'sm')}GitHub</a>` : ''}</div></div>`;
+const envBox = (label, env, accent) => `<div class="card" ${accent ? 'style="border-color:var(--accent)"' : ''}><div class="label">${label}</div><div class="mono" style="font-size:16px;font-weight:650;margin-top:6px">${esc(env.sha || 'unknown')}</div><div class="muted" style="font-size:12px">deployed ${esc(env.deployed || 'unknown')}${env.healthy_for ? ` · healthy for ${esc(env.healthy_for)}` : ''}</div><div class="env-links" style="margin-top:8px">${env.commit_url ? `<a href="${esc(env.commit_url)}" target="_blank" rel="noopener">${icon('code-bracket', 'sm')}GitHub</a>` : ''}</div></div>`;
 async function openPromote() {
   let env;
   try { env = await fetchEnv('sheet:push', '/api/push'); } catch (e) { loadFailed(e, 'Push to prod', openPromote); return; }
