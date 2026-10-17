@@ -15,6 +15,7 @@ from runtime.slots import leases
 from runtime.warden import inbox, loop, upgrade
 from runtime.warden.context import Caller
 from runtime.warden.health import errors_import
+from runtime.warden.owner import reflections
 
 FULL = "f" * 40
 
@@ -98,3 +99,16 @@ def test_an_errors_record_that_has_read_reads_on_and_one_that_never_read_takes_w
     upgrade.migrate(dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden")))
     since = {env: json.loads(errors_import.path(places, env).read_text())["since"] for env in ("prod", "slot0")}
     assert since["prod"] is not None and since["slot0"] is None
+
+
+def test_self_reflect_entries_open_under_the_ids_the_library_gave_them_by_their_place(world: World) -> None:
+    old = [{"at": f"2026-10-0{n}T10:00:00Z", "kind": "miss", "who": "warden", "where": "", "text": f"Entry {n}.",
+            "repeats": 1, "last": f"2026-10-0{n}T10:00:00Z"} for n in (1, 2)]  # fmt: skip
+    store.write_json(reflections.records_path(world.places), old)
+    ctx = dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden"))
+
+    assert "2 Self-reflect entries, each open" in upgrade.migrate(ctx)
+    assert [(e["id"], e["text"], e["state"]) for e in reflections.entries(world.places)] == [
+        ("sr1", "Entry 1.", "open"), ("sr2", "Entry 2.", "open")
+    ]  # fmt: skip
+    assert upgrade.migrate(ctx) == []

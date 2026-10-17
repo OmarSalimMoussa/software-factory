@@ -1,5 +1,91 @@
 {
  "reflect": {
+  "health": {
+   "open": 30,
+   "bars": [
+    {
+     "count": 0,
+     "share": 0.0
+    },
+    {
+     "count": 0,
+     "share": 0.0
+    },
+    {
+     "count": 0,
+     "share": 0.0
+    },
+    {
+     "count": 0,
+     "share": 0.0
+    },
+    {
+     "count": 3,
+     "share": 0.75
+    },
+    {
+     "count": 3,
+     "share": 0.75
+    },
+    {
+     "count": 4,
+     "share": 1.0
+    },
+    {
+     "count": 3,
+     "share": 0.75
+    },
+    {
+     "count": 4,
+     "share": 1.0
+    },
+    {
+     "count": 3,
+     "share": 0.75
+    },
+    {
+     "count": 3,
+     "share": 0.75
+    },
+    {
+     "count": 2,
+     "share": 0.5
+    },
+    {
+     "count": 3,
+     "share": 0.75
+    },
+    {
+     "count": 2,
+     "share": 0.5
+    }
+   ],
+   "from": "Sep 26",
+   "to": "today",
+   "caption": "20 this week, 10 the week before"
+  },
+  "states": [
+   {
+    "key": "open",
+    "label": "Open",
+    "count": 30
+   },
+   {
+    "key": "fixed",
+    "label": "Fixed",
+    "count": 0
+   },
+   {
+    "key": "ignored",
+    "label": "Ignored",
+    "count": 0
+   },
+   {
+    "key": "all",
+    "label": "All",
+    "count": 30
+   }
+  ],
   "kinds": [
    {
     "key": "miss",
@@ -34,274 +120,694 @@
   ],
   "entries": [
    {
+    "id": "sr30",
     "kind": "miss",
     "tone": "bad",
     "who": "implementer",
     "where": "sign-in loop",
     "when": "Oct 9, 14:02",
     "repeats": 3,
-    "text": "A visual tester passed a menu that overflowed at 390 px: the phone-width check was not in its brief."
+    "text": "A visual tester passed a menu that overflowed at 390 px: the phone-width check was not in its brief.",
+    "state": null,
+    "note": "",
+    "came_back": true,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr29",
     "kind": "owner-feedback",
     "tone": "accent",
     "who": "orchestrator",
     "where": "from chat",
     "when": "Oct 9, 11:40",
     "repeats": 1,
-    "text": "“Testers should never wait on a build; give them a seed to start from instead.”"
+    "text": "“Testers should never wait on a build; give them a seed to start from instead.”",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr28",
     "kind": "friction",
     "tone": "warn",
     "who": "implementer",
     "where": "slow export",
     "when": "Oct 8, 19:20",
     "repeats": 1,
-    "text": "Three check runs were not enough after a rebase onto a moved migration."
+    "text": "Three check runs were not enough after a rebase onto a moved migration.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr27",
     "kind": "misroute",
     "tone": "violet",
     "who": "orchestrator",
     "where": "slow export",
     "when": "Oct 8, 16:00",
     "repeats": 1,
-    "text": "Routed to rung 1, but the cause spanned two services; the intake verdict named only one."
+    "text": "Routed to rung 1, but the cause spanned two services; the intake verdict named only one.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr26",
     "kind": "incident",
     "tone": "amber",
     "who": "warden",
     "where": "orchestrator",
     "when": "Oct 8, 03:12",
     "repeats": 1,
-    "text": "Restarted the orchestrator after 41 minutes of silence while idle."
+    "text": "Restarted the orchestrator after 41 minutes of silence while idle.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr25",
     "kind": "discovery",
     "tone": "good",
     "who": "designer",
     "where": "empty states",
     "when": "Oct 7, 13:30",
     "repeats": 1,
-    "text": "Critics read the whole spec each round; a changed-sections note would cut each round by half."
+    "text": "Critics read the whole spec each round; a changed-sections note would cut each round by half.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr24",
     "kind": "friction",
     "tone": "warn",
     "who": "tester",
     "where": "qa-ui-function",
     "when": "Oct 7, 10:10",
     "repeats": 4,
-    "text": "Two minutes per item is too short for a scenario that waits for a large upload."
+    "text": "Two minutes per item is too short for a scenario that waits for a large upload.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr23",
     "kind": "miss",
     "tone": "bad",
     "who": "orchestrator",
     "where": "merge of t-0012",
     "when": "Oct 6, 18:00",
     "repeats": 1,
-    "text": "A regression check ran before the slot had rebuilt, and passed on the old build."
+    "text": "A regression check ran before the slot had rebuilt, and passed on the old build.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr22",
     "kind": "miss",
     "tone": "bad",
     "who": "implementer",
     "where": "invoice list",
     "when": "Oct 6, 09:00",
     "repeats": 1,
-    "text": "A tester brief named a page that had moved."
+    "text": "A tester brief named a page that had moved.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr21",
     "kind": "owner-feedback",
     "tone": "accent",
     "who": "tester",
     "where": "phone pages",
     "when": "Oct 6, 02:00",
     "repeats": 2,
-    "text": "The slot rebuilt twice for one merge."
+    "text": "The slot rebuilt twice for one merge.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr20",
     "kind": "friction",
     "tone": "warn",
     "who": "designer",
     "where": "import",
     "when": "Oct 5, 19:00",
     "repeats": 3,
-    "text": "A critic asked for a diagram the spec already had."
+    "text": "A critic asked for a diagram the spec already had.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr19",
     "kind": "discovery",
     "tone": "good",
     "who": "orchestrator",
     "where": "billing",
     "when": "Oct 5, 12:00",
     "repeats": 1,
-    "text": "Triage parked a request that a goal item names."
+    "text": "Triage parked a request that a goal item names.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr18",
     "kind": "misroute",
     "tone": "violet",
     "who": "implementer",
     "where": "invoice list",
     "when": "Oct 5, 05:00",
     "repeats": 2,
-    "text": "A tester brief named a page that had moved."
+    "text": "A tester brief named a page that had moved.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr17",
     "kind": "incident",
     "tone": "amber",
     "who": "tester",
     "where": "phone pages",
     "when": "Oct 4, 22:00",
     "repeats": 3,
-    "text": "The slot rebuilt twice for one merge."
+    "text": "The slot rebuilt twice for one merge.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr16",
     "kind": "miss",
     "tone": "bad",
     "who": "designer",
     "where": "import",
     "when": "Oct 4, 15:00",
     "repeats": 1,
-    "text": "A critic asked for a diagram the spec already had."
+    "text": "A critic asked for a diagram the spec already had.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr15",
     "kind": "owner-feedback",
     "tone": "accent",
     "who": "orchestrator",
     "where": "billing",
     "when": "Oct 4, 08:00",
     "repeats": 2,
-    "text": "Triage parked a request that a goal item names."
+    "text": "Triage parked a request that a goal item names.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr14",
     "kind": "friction",
     "tone": "warn",
     "who": "implementer",
     "where": "invoice list",
     "when": "Oct 4, 01:00",
     "repeats": 3,
-    "text": "A tester brief named a page that had moved."
+    "text": "A tester brief named a page that had moved.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr13",
     "kind": "discovery",
     "tone": "good",
     "who": "tester",
     "where": "phone pages",
     "when": "Oct 3, 18:00",
     "repeats": 1,
-    "text": "The slot rebuilt twice for one merge."
+    "text": "The slot rebuilt twice for one merge.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr12",
     "kind": "misroute",
     "tone": "violet",
     "who": "designer",
     "where": "import",
     "when": "Oct 3, 11:00",
     "repeats": 2,
-    "text": "A critic asked for a diagram the spec already had."
+    "text": "A critic asked for a diagram the spec already had.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr11",
     "kind": "incident",
     "tone": "amber",
     "who": "orchestrator",
     "where": "billing",
     "when": "Oct 3, 04:00",
     "repeats": 3,
-    "text": "Triage parked a request that a goal item names."
+    "text": "Triage parked a request that a goal item names.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr10",
     "kind": "miss",
     "tone": "bad",
     "who": "implementer",
     "where": "invoice list",
     "when": "Oct 2, 21:00",
     "repeats": 1,
-    "text": "A tester brief named a page that had moved."
+    "text": "A tester brief named a page that had moved.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr9",
     "kind": "owner-feedback",
     "tone": "accent",
     "who": "tester",
     "where": "phone pages",
     "when": "Oct 2, 14:00",
     "repeats": 2,
-    "text": "The slot rebuilt twice for one merge."
+    "text": "The slot rebuilt twice for one merge.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr8",
     "kind": "friction",
     "tone": "warn",
     "who": "designer",
     "where": "import",
     "when": "Oct 2, 07:00",
     "repeats": 3,
-    "text": "A critic asked for a diagram the spec already had."
+    "text": "A critic asked for a diagram the spec already had.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr7",
     "kind": "discovery",
     "tone": "good",
     "who": "orchestrator",
     "where": "billing",
     "when": "Oct 2, 00:00",
     "repeats": 1,
-    "text": "Triage parked a request that a goal item names."
+    "text": "Triage parked a request that a goal item names.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr6",
     "kind": "misroute",
     "tone": "violet",
     "who": "implementer",
     "where": "invoice list",
     "when": "Oct 1, 17:00",
     "repeats": 2,
-    "text": "A tester brief named a page that had moved."
+    "text": "A tester brief named a page that had moved.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr5",
     "kind": "incident",
     "tone": "amber",
     "who": "tester",
     "where": "phone pages",
     "when": "Oct 1, 10:00",
     "repeats": 3,
-    "text": "The slot rebuilt twice for one merge."
+    "text": "The slot rebuilt twice for one merge.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr4",
     "kind": "miss",
     "tone": "bad",
     "who": "designer",
     "where": "import",
     "when": "Oct 1, 03:00",
     "repeats": 1,
-    "text": "A critic asked for a diagram the spec already had."
+    "text": "A critic asked for a diagram the spec already had.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr3",
     "kind": "owner-feedback",
     "tone": "accent",
     "who": "orchestrator",
     "where": "billing",
     "when": "Sep 30, 20:00",
     "repeats": 2,
-    "text": "Triage parked a request that a goal item names."
+    "text": "Triage parked a request that a goal item names.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr2",
     "kind": "friction",
     "tone": "warn",
     "who": "implementer",
     "where": "invoice list",
     "when": "Sep 30, 13:00",
     "repeats": 3,
-    "text": "A tester brief named a page that had moved."
+    "text": "A tester brief named a page that had moved.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    },
    {
+    "id": "sr1",
     "kind": "discovery",
     "tone": "good",
     "who": "tester",
     "where": "phone pages",
     "when": "Sep 30, 06:00",
     "repeats": 1,
-    "text": "The slot rebuilt twice for one merge."
+    "text": "The slot rebuilt twice for one merge.",
+    "state": null,
+    "note": "",
+    "came_back": false,
+    "actions": [
+     {
+      "state": "fixed",
+      "label": "Fixed"
+     },
+     {
+      "state": "ignored",
+      "label": "Ignore"
+     }
+    ]
    }
   ],
   "more": false

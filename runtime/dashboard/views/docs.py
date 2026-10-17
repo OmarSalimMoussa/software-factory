@@ -43,10 +43,6 @@ def spec_id(task_id: str) -> str:
     return "s-" + task_id.removeprefix("t-")
 
 
-def reflection_id(n: int) -> str:
-    return f"sr{n}"
-
-
 def request_status(text: str) -> str:
     found = outcome(text)
     return "task" if found.task else found.kind
@@ -83,11 +79,11 @@ def index(snap: Snap) -> list[Doc]:
         status = "fail" if any(r["result"] == "fail" for r in c["rows"]) else "pass"
         text = " ".join([c["title"], c["commit"], c["notes"], *(r["scenario"] for r in c["rows"])])
         docs.append(Doc(c["id"], "check", c["title"], status, None, epoch(c["at"]), text, c))
-    for n, e in enumerate(snap.get("reflections"), 1):
+    for e in snap.get("reflections"):
         title = e["text"] if len(e["text"]) <= 72 else e["text"][:70].rstrip() + "…"
         docs.append(
             Doc(
-                reflection_id(n),
+                e["id"],
                 "reflection",
                 title,
                 e["kind"],

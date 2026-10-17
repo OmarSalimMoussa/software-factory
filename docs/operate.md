@@ -179,6 +179,10 @@ The factory never changes itself: Claude or the owner changes it. Read Self-refl
    factory checkout at that commit (`python3 -m standard.server.setup --product <path>`).
 4. **Restart the factory** on Home: every agent comes back with its work. One whose subagents the upgrade changed
    comes back as a copy that has the new ones, with its whole conversation; its chat link changes.
+5. Mark the entries it addressed fixed, with the commit as the note: on the Self-reflect page, or
+   `call reflections.mark {"ids": ["sr12"], "state": "fixed", "note": "<commit>: what changed"}`. Mark one that needs
+   no change ignored. An entry that comes back opens again, so the open count and the new entries per day on the page
+   show whether the factory is getting healthier.
 
 ## When something is wrong
 

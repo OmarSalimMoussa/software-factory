@@ -210,6 +210,7 @@ timeout_seconds = 20    # one call to GlitchTip or Langfuse
 [reflect]
 fold_hours = 24         # the same kind and text within this window bumps a count instead of a new entry
 max_chars = 600         # the longest reflection an agent may write
+chart_days = 14         # the days the Self-reflect page counts new entries over
 
 [dashboard]
 port = 8300

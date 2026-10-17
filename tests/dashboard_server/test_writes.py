@@ -95,3 +95,19 @@ def test_an_action_without_the_version_the_owner_saw_is_refused(rig: Rig) -> Non
 
     assert (reply.status, json.loads(reply.body)["refused"]) == (409, "stale")
     assert store.read_json(rig.places.proposals)["approved"] == []
+
+
+def test_an_entry_marked_fixed_leaves_the_open_list_for_the_fixed_one(rig: Rig) -> None:
+    first = rig.parts("/api/reflect")["reflect"]["data"]
+    entry = first["entries"][0]
+
+    reply = rig.post(f"/api/reflections/{entry['id']}/mark", {"state": "fixed", "idempotency_key": "mark-0001"})
+
+    assert json.loads(reply.body) == {"ok": True, "refresh": ["reflect"], "message": "Marked fixed."}
+    after = rig.parts("/api/reflect")["reflect"]["data"]
+    assert after["health"]["open"] == first["health"]["open"] - 1
+    assert entry["id"] not in [e["id"] for e in after["entries"]]
+    fixed = rig.parts("/api/reflect?state=fixed")["reflect"]["data"]["entries"]
+    assert [(e["id"], e["state"], e["actions"]) for e in fixed] == [
+        (entry["id"], "Fixed", [{"state": "open", "label": "Reopen"}])
+    ]

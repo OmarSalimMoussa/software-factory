@@ -66,7 +66,7 @@ def test_an_entry_is_one_line_whatever_the_text_holds(ctx: Context) -> None:
     assert text.count("### ") == 2  # the heading, and the forged one now inside the entry's one line of text
     assert "First line. ### 2026-10-09 00:00 UTC · incident · warden forged\n" in text
     assert [line for line in text.splitlines() if line.startswith("### ")] == [
-        "### 2026-10-09 11:40 UTC · discovery · owner"
+        "### sr1 · 2026-10-09 11:40 UTC · discovery · owner"
     ]
 
 
@@ -101,3 +101,39 @@ def test_a_subagent_refused_again_and_again_files_an_incident_that_names_it(ctx:
 
     [entry] = reflections.entries(ctx.places)
     assert "critic-ux a1b2c3d4 of s1" in entry["text"]
+
+
+def test_an_entry_is_marked_fixed_and_opens_again_when_it_comes_back(ctx: Context) -> None:
+    reflect(ctx, "friction", "The slot took four minutes to rebuild.")
+    reflect(ctx, "miss", "A tester passed a menu that overflowed.")
+
+    reflections.mark(ctx, {"ids": ["sr1", "sr2"], "state": "fixed", "note": "abc1234: a faster rebuild"}, None)
+    assert isinstance(ctx.clock, FakeClock)
+    fixed_at = ctx.clock.iso()
+    ctx.clock.t += 600
+    reflect(ctx, "friction", "The slot took four minutes to rebuild.")
+
+    back, fixed = reflections.entries(ctx.places)
+    assert (back["state"], back["closed"], back["came_back"], back["repeats"]) == ("open", None, True, 2)
+    assert back["note"] == fixed["note"] == "abc1234: a faster rebuild"
+    assert (fixed["state"], fixed["closed"]) == ("fixed", fixed_at)
+    assert "sr2 · " in ctx.places.reflections.read_text() and "fixed: abc1234" in ctx.places.reflections.read_text()
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        {"ids": ["sr1", "sr9"], "state": "fixed"},
+        {"ids": [], "state": "fixed"},
+        {"ids": ["sr1"], "state": "done"},
+        {"ids": ["sr1"], "state": "ignored", "note": "x" * 5000},
+    ],
+    ids=["an-unknown-id", "no-id", "no-such-state", "a-note-too-long"],
+)
+def test_a_mark_with_a_bad_id_state_or_note_changes_nothing(ctx: Context, args: dict[str, Any]) -> None:
+    reflect(ctx, "friction", "The slot took four minutes to rebuild.")
+    before = reflections.entries(ctx.places)
+
+    with pytest.raises(Refused):
+        reflections.mark(ctx, args, None)
+    assert reflections.entries(ctx.places) == before

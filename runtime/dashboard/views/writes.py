@@ -12,7 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from runtime.dashboard.views import settings
+from runtime.dashboard.views import reflect, settings
 from runtime.dashboard.views.agent import agent_version
 from runtime.dashboard.views.kit import PartError, Snap, plural
 from runtime.dashboard.views.tasks import proposals
@@ -55,6 +55,13 @@ def _brief_comment(body: Body, task: str) -> dict[str, Any]:
         raise PartError("Select text in the brief first.")
     return {"task": task, "version": shown, "quote": _text(body, "quote"), "prefix": around[0], "suffix": around[1],
             "note": _text(body, "note")}  # fmt: skip
+
+
+def _mark_state(body: Body) -> str:
+    state = body.get("state")
+    if state not in reflect.MARKED:
+        raise PartError(f"Send state: {', '.join(reflect.MARKED)}.")
+    return str(state)
 
 
 def _direction(body: Body) -> str:
@@ -256,6 +263,8 @@ WRITES: list[tuple[re.Pattern[str], Write]] = [
     _w("settings", "settings.save", _settings_args, lambda a, s: "Saving.", ["settings"], wants=("settings",)),
     _w("settings/repo", "repo.change", lambda b, r, s: {"changes": {"repo.path": _text(b, "path")}},
        lambda a, s: "Changing the repo.", ["settings"]),
+    _w(f"reflections/{_P}/mark", "reflections.mark", lambda b, r, s: {"ids": [r], "state": _mark_state(b)},
+       lambda a, s: reflect.MARKED[a["state"]], ["reflect"]),
     _w(f"rules/{_P}", "rule.switch", lambda b, r, s: {"rule": r, "on": b.get("on")},
        lambda a, s: f"{a['rule']} is {'on' if a['on'] else 'off'}.", ["guard"]),
     _w("push", "push.prod", lambda b, r, s: {"expected_staging_sha": _text(b, "expected_staging_sha")},

@@ -139,6 +139,7 @@ VERBS: dict[str, Verb] = {
     "settings.save": _o("runtime.warden.owner.settings_save:save"),
     "repo.change": _o("runtime.warden.owner.settings_save:change_repo"),
     "rule.switch": _o("runtime.warden.owner.settings_save:switch_rule"),
+    "reflections.mark": _o("runtime.warden.owner.reflections:mark"),
     "push.prod": _o("runtime.warden.delivery.prod_push:push_prod"),
     "push.back": _o("runtime.warden.delivery.prod_push:push_back"),
     "slot.open": _o("runtime.warden.owner.slot_sign_in:open_slot"),

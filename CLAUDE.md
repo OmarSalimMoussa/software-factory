@@ -6,8 +6,9 @@ that works on the factory itself.
 
 - **Claude drives it** through the dashboard's MCP ([docs/mcp.md](docs/mcp.md)): `snapshot` reads the factory,
   Self-reflect included, and `call` runs any owner action. Self-reflect and the `factory` project in the server's
-  GlitchTip say what to fix next. SSH to the server as its admin user is the way in when the MCP is down: the units
-  are `software-*`, and `factory status` shows the vitals.
+  GlitchTip say what to fix next. Once a fix is installed, mark the entries it addressed fixed with the commit as the
+  note (`call reflections.mark`), and those that need no change ignored. SSH to the server as its admin user is the
+  way in when the MCP is down: the units are `software-*`, and `factory status` shows the vitals.
 - **Agents never edit the factory,** and the factory never works on its own repo. A change is Claude's or the
   owner's: branch, test, merge to main, push to GitHub, then `call factory.upgrade {"commit": "<full sha>"}`. Root's
   upgrade unit installs any commit of the repo on GitHub, so installing the commit before is the way back.

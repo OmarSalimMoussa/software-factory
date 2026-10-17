@@ -177,6 +177,7 @@ SCHEMA: dict[str, Spec] = {
     "telemetry.timeout_seconds": Spec("int", 1, 120),
     "reflect.fold_hours": Spec("int", 1, 168),
     "reflect.max_chars": Spec("int", 80, 4000),  # contract: added by 1B-3
+    "reflect.chart_days": Spec("int", 7, 90),
     "cost.daily_budget_usd": Spec("float", 1, 100000),
     "cost.plan_stale_minutes": Spec("int", 5, 240),
     "cost.plan_amber_percent": Spec("int", 1, 100),

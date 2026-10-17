@@ -118,6 +118,8 @@ document.addEventListener('click', e => {
   if (d.slice) { UI.sliceKey = d.slice; UI.slicePages = 1; viewChanged(); return; }
   if (d.librange) { libFilter({range: d.librange}); return; }
   if (d.rkind) { UI.reflectKind = UI.reflectKind === d.rkind ? 'all' : d.rkind; UI.reflectPages = 1; viewChanged(); return; }
+  if (d.rstate) { UI.reflectState = d.rstate; UI.reflectPages = 1; viewChanged(); return; }
+  if (d.rmark) { e.stopPropagation(); act(`/api/reflections/${encodeURIComponent(d.rmark)}/mark`, {state: d.to}, {btn: t}); return; }
   if (d.step) { stepSetting(d.key, +d.step); return; }
   if (d.resetkey) { resetSetting(d.resetkey); return; }
   if (d.default) { defaultSetting(d.default); return; }

@@ -7,6 +7,9 @@ warden's own state folder, which no other user may open.
 Entries are kept as records in reflections.json and SELF_REFLECT.md is rendered from them after every change, newest
 first. The same kind and text within ``reflect.fold_hours`` of an entry bumps that entry's count instead of adding
 one. Text loses its newlines, so an entry is always one line the dashboard draws as plain text.
+
+Each entry is open until the owner, or Claude for them, marks it fixed or ignored. One that comes back while it folds
+opens again, marked as come back with the note of the fix that did not hold.
 """
 
 from __future__ import annotations
@@ -29,13 +32,16 @@ from runtime.warden.verbs import ORCH, OWNER
 log = logging.getLogger(__name__)
 
 KINDS = ("owner-feedback", "miss", "friction", "discovery", "incident", "misroute")
+OPEN, FIXED, IGNORED = "open", "fixed", "ignored"
+STATES = (OPEN, FIXED, IGNORED)
 ORCHESTRATOR_KINDS = frozenset({"owner-feedback", "misroute"})
 INCIDENT = "incident"
-_FIELDS = {"at", "kind", "who", "where", "text", "repeats", "last"}
+_FIELDS = {"id", "at", "kind", "who", "where", "text", "repeats", "last", "state", "closed", "note", "came_back"}
+ID_PREFIX = "sr"
 _lock = threading.Lock()
 
 
-def _records_path(places: Places) -> Path:
+def records_path(places: Places) -> Path:
     return places.state / "reflections.json"
 
 
@@ -44,10 +50,10 @@ def _stamp(iso: str) -> float:
 
 
 def entries(places: Places) -> list[dict[str, Any]]:
-    """Every entry, oldest first: at, kind, who, where, text, repeats, last."""
-    raw = store.read_json_or(_records_path(places), [])
+    """Every entry, oldest first; ``closed`` is None while an entry is open."""
+    raw = store.read_json_or(records_path(places), [])
     if not isinstance(raw, list) or not all(isinstance(e, dict) and set(e) == _FIELDS for e in raw):
-        raise store.StoreError(f"{_records_path(places)}: every entry needs {', '.join(sorted(_FIELDS))}")
+        raise store.StoreError(f"{records_path(places)}: every entry needs {', '.join(sorted(_FIELDS))}")
     return raw
 
 
@@ -62,10 +68,16 @@ def _render(records: list[dict[str, Any]]) -> str:
         meta = [e["where"]] if e["where"] else []
         if e["repeats"] > 1:
             meta.append(f"repeated {e['repeats']} times, last {e['last'].replace('T', ' ')[:16]} UTC")
-        blocks.append(
-            "\n".join([f"### {when} · {e['kind']} · {e['who']}", e["text"], *([" · ".join(meta)] if meta else [])])
-        )
+        if e["state"] != OPEN:
+            meta.append(f"{e['state']}{': ' + e['note'] if e['note'] else ''}")
+        head = f"### {e['id']} · {when} · {e['kind']} · {e['who']}"
+        blocks.append("\n".join([head, e["text"], *([" · ".join(meta)] if meta else [])]))
     return "# SELF_REFLECT\n\n" + "\n\n".join(blocks) + ("\n" if blocks else "")
+
+
+def save(places: Places, records: list[dict[str, Any]]) -> None:
+    store.write_json(records_path(places), records, mode=0o600)
+    store.write_text(places.reflections, _render(records), mode=0o600)
 
 
 def add(ctx: Context, kind: str, who: str, where: str, text: str) -> dict[str, Any]:
@@ -80,14 +92,40 @@ def add(ctx: Context, kind: str, who: str, where: str, text: str) -> dict[str, A
         if same is not None:
             same["repeats"] += 1
             same["last"] = ctx.clock.iso()
+            if same["state"] != OPEN:
+                same.update(state=OPEN, closed=None, came_back=True)
             entry = same
         else:
-            entry = {"at": ctx.clock.iso(), "kind": kind, "who": who, "where": where, "text": text, "repeats": 1,
-                     "last": ctx.clock.iso()}  # fmt: skip
+            ident = f"{ID_PREFIX}{1 + max((int(e['id'].removeprefix(ID_PREFIX)) for e in records), default=0)}"
+            entry = {"id": ident, "at": ctx.clock.iso(), "kind": kind, "who": who, "where": where, "text": text,
+                     "repeats": 1, "last": ctx.clock.iso(), "state": OPEN, "closed": None, "note": "",
+                     "came_back": False}  # fmt: skip
             records.append(entry)
-        store.write_json(_records_path(ctx.places), records, mode=0o600)
-        store.write_text(ctx.places.reflections, _render(records), mode=0o600)
+        save(ctx.places, records)
     return entry
+
+
+def mark(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
+    """The owner's `reflections.mark`: entries become fixed, ignored or open, all of them or, on a bad id, none."""
+    ids, state, note = args.get("ids"), args.get("state"), args.get("note", "")
+    if not isinstance(ids, list) or not ids or not all(isinstance(i, str) for i in ids):
+        raise Refused("args", "ids lists the entries to mark, such as sr12")
+    if state not in STATES:
+        raise Refused("args", f"state is one of {', '.join(STATES)}")
+    limit = ctx.settings().get_int("reflect.max_chars")
+    if not isinstance(note, str) or len(one_line(note)) > limit:
+        raise Refused("args", f"a note is one line of at most {limit} characters")
+    with _lock:
+        records = entries(ctx.places)
+        found = {e["id"]: e for e in records}
+        unknown = sorted(set(ids) - set(found))
+        if unknown:
+            raise Refused("args", f"no Self-reflect entry {', '.join(unknown)}")
+        for ident in ids:
+            found[ident].update(state=state, closed=None if state == OPEN else ctx.clock.iso(),
+                                note="" if state == OPEN else one_line(note), came_back=False)  # fmt: skip
+        save(ctx.places, records)
+    return ok(marked=len(set(ids)), state=state)
 
 
 def append(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:

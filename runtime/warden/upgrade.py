@@ -22,6 +22,7 @@ from runtime.system import layout
 from runtime.warden import imports, loop
 from runtime.warden.context import Context
 from runtime.warden.health import errors_import
+from runtime.warden.owner import reflections
 from runtime.warden.sessions import older_skills, registry
 
 log = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ def migrate(ctx: Context) -> list[str]:
     done: list[str] = []
     steps: list[Callable[[Context], str]] = [
         _inbox_cursor, _leases, _errors_filed, _errors_since, _turn, _merges, _staging_red, _typed_verdicts,
-        _approvals_routed, _briefs_home, _active_account, _older_skills,
+        _approvals_routed, _briefs_home, _active_account, _older_skills, _reflection_states,
     ]  # fmt: skip
     for step in steps:
         try:
@@ -47,6 +48,20 @@ def migrate(ctx: Context) -> list[str]:
             log.info("warden: brought the state over: %s", said)
             done.append(said)
     return done
+
+
+def _reflection_states(ctx: Context) -> str:
+    """A Self-reflect entry with no state opens, under the id the Library gave it by its place."""
+    raw = store.read_json_or(reflections.records_path(ctx.places), [])
+    old = [n for n, e in enumerate(raw, 1) if isinstance(e, dict) and "state" not in e] if isinstance(raw, list) else []
+    for n in old:
+        raw[n - 1].update(id=f"{reflections.ID_PREFIX}{n}", state=reflections.OPEN, closed=None, note="",
+                          came_back=False)  # fmt: skip
+    if not old:
+        return ""
+    reflections.save(ctx.places, raw)
+    reflections.entries(ctx.places)
+    return f"{len(old)} Self-reflect entries, each open"
 
 
 def _older_skills(ctx: Context) -> str:

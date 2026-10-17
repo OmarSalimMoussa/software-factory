@@ -262,9 +262,14 @@ def seed(root: Path, now: float = T0) -> Places:
                 "text": e["text"],
                 "repeats": e["repeats"],
                 "last": at,
+                "state": "open",
+                "closed": None,
+                "note": "",
+                "came_back": e["came_back"],
             }
         )
-    store.write_json(places.state / "reflections.json", sorted(entries, key=lambda e: e["at"]))
+    entries.sort(key=lambda e: e["at"])
+    store.write_json(places.state / "reflections.json", [{"id": f"sr{n}", **e} for n, e in enumerate(entries, 1)])
     for rule, count in (("tester-time", 9), ("subagents-at-once", 6), ("git-bypass", 3)):
         for _ in range(count):
             store.append_jsonl(
