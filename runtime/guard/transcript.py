@@ -294,6 +294,17 @@ def refused_ids(path: Path, marker: str) -> set[str]:
     }
 
 
+def answered(path: Path) -> dict[str, datetime]:
+    """When each tool call in a transcript got its result, by the call's id."""
+    found: dict[str, datetime] = {}
+    for entry in entries(path):
+        when = _when(entry)
+        for block in _blocks(entry):
+            if when is not None and block.get("type") == "tool_result":
+                found[str(block.get("tool_use_id", ""))] = when
+    return found
+
+
 def tool_uses(path: Path, names: frozenset[str]) -> list[ToolUse]:
     """Every call of the named tools in a transcript, oldest first."""
     found: list[ToolUse] = []

@@ -10,6 +10,7 @@ call the guard refused never ran.
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 from runtime.guard import branches, browser, factory_calls, scratch, shell, transcript
 from runtime.guard.facts import (
@@ -120,8 +121,9 @@ def _browsers(call: Call, kind: str) -> Decision:
     if kind not in personas:
         return None
     alive = {sid for sid, s in call.sessions.items() if s.state in ("working", "waiting")}
-    # No tester runs past its items' time and a lost hand-back's quiet: an older row holds no browser, whatever it says.
-    longest = _budget(call, call.settings.get_int("qa.max_items")) + call.settings.get_int("qa.stale_seconds")
+    # No tester outlasts its items' time, a desktop's start and a lost hand-back's quiet: older rows hold no browser.
+    waits = call.settings.get_int("slots.verb_minutes") * 60 + call.settings.get_int("qa.stale_seconds")
+    longest = _budget(call, call.settings.get_int("qa.max_items")) + waits
     running = [s for s in call.sessions.values() if s.parent in alive and s.state == "working" and s.role in personas
                and (call.now - _when(s.started)).total_seconds() < longest]  # fmt: skip
     cap = call.settings.get_int("caps.browsers_at_once")
@@ -363,13 +365,25 @@ def _time_left(call: Call) -> float | Refusal:
         return _time_up(call, f"your time budget cannot be read ({exc})")
     budget = float(_budget(call, items))
     desktop_s = call.settings.get_int("qa.desktop_seconds")
-    spent = (call.now - started).total_seconds()
+    spent = (call.now - started).total_seconds() - _desktop_starts(call, path)
     # Desktop time is a tester's that holds a slot's desktop lease: a mouse step on a web page is no desktop use.
     if call.agent_id in read_desktops(call.places).values():
         if spent >= desktop_s:
             return _time_up(call, f"the remote desktop is for a tester's first {desktop_s} s")
         budget = min(budget, desktop_s)
     return budget - spent if budget > spent else _time_up(call, "your time is up")
+
+
+def _desktop_starts(call: Call, path: Path) -> float:
+    """Seconds in `factory slot desktop up` (one running counts to now): the factory's time, not the tester's."""
+    ups = [use for use in transcript.tool_uses(path, frozenset({"Bash"})) if _starts_desktop(use.args.get("command"))]
+    answered = transcript.answered(path) if ups else {}
+    return sum((answered.get(use.tool_use_id, call.now) - use.when).total_seconds() for use in ups)
+
+
+def _starts_desktop(command: object) -> bool:
+    words = factory_calls.plain_words(command) if isinstance(command, str) else None
+    return words is not None and words[1:4] == ["slot", "desktop", "up"]
 
 
 def _time_up(call: Call, why: str) -> Refusal:

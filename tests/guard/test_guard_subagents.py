@@ -326,6 +326,30 @@ def test_a_tester_holding_a_desktop_stops_at_its_desktop_time(
 
 
 @pytest.mark.parametrize(
+    ("command", "answered", "refused"),
+    [
+        ("factory slot desktop up qa-admin@notes.test", 100, False),
+        ("factory slot desktop up qa-admin@notes.test", None, False),
+        ("factory slot sign-in qa-admin@notes.test", 100, True),
+    ],
+    ids=["its-desktop-took-200-s", "its-desktop-still-starts", "another-wait-counts"],
+)
+def test_a_testers_clock_stops_while_the_factory_starts_its_desktop(
+    tmp_path: Path, command: str, answered: int | None, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    lines = [entry(NOW - timedelta(seconds=310), "user", "Scenarios and checks: 10"),
+             entry(NOW - timedelta(seconds=300), "assistant", [bash_use("d1", command)])]  # fmt: skip
+    if answered is not None:
+        lines.append(entry(NOW - timedelta(seconds=answered), "user", [result("d1", "view: http://x password: p")]))
+    kit.subagent(TESTER_ID, lines)
+    store.write_json(kit.public / "desktops.json", {"2": TESTER_ID})
+    tester = {"agent_id": TESTER_ID, "agent_type": "qa-ui-function"}
+    assert (kit.rule("mcp__computer-use__screenshot", {}, **tester) == "tester-time") is refused
+
+
+@pytest.mark.parametrize(
     ("running", "age", "level", "refused"),
     [
         (3, 60, "green", False),
