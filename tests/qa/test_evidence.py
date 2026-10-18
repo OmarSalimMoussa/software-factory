@@ -78,12 +78,13 @@ def test_a_run_whose_agent_copy_stays_is_still_taken_and_the_warden_says_so(
 
 @pytest.fixture
 def orchestrator(world: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> World:
-    """The orchestrator, run on as a copy once, whose checkout knows the merge its check names."""
+    """The orchestrator, run on as a copy once, whose checkout knows the merge its check names, as the default
+    branch's one commit, with no scenario yet."""
     world.session(ORCH, "orchestrator", "orchestrator")
     sessions = registry.read(world.places)
     sessions[ORCH] = dataclasses.replace(sessions[ORCH], copied_from=BEFORE)
     registry.write(world.places, sessions)
-    world.launcher.git = lambda argv: (0, f"{MERGE}\n")
+    world.launcher.git = lambda argv: (1, "") if "grep" in argv else (0, f"{MERGE}\n")
     monkeypatch.setattr(qa_browser, "runs_root", lambda: tmp_path / "runs")
     return world
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,7 @@ from seed_kit import FIXTURES, PRICES, ROOT, fixture, fixture_time, iso, write
 from seed_queue import seed_checks, seed_requests, seed_tasks
 from settings_text import set_line
 
-from runtime.queue import formats, records
+from runtime.queue import formats, records, turn
 from runtime.shared import claude_accounts, models, store, totp
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import Places
@@ -333,7 +334,16 @@ def merged(repo: Path, places: Places, task_id: str, commit: str, at: str) -> No
     """The warden found ``task_id``'s merge, ``commit``: its implementer waits, benched, for the merge's check."""
     entry = {"at": at, "actor": "warden", "event": "merged", "text": f"merged as {commit}", "to": "merged"}
     _move(repo, task_id, {**entry, "commit": commit})
+    store.write_json(turn.merges_path(places), {**turn.merges(places), commit: task_id})
     _bench_for_own(places, task_id)
+
+
+def saved_check(repo: Path, commit: str, at: float, results: dict[str, str]) -> None:
+    """The orchestrator saved a check of ``commit``, the default branch walked there: each scenario's result."""
+    name = f"c-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime(at))}-{commit[:7]}"
+    rows = [records.ScenarioRow(scenario, result, 3, "evidence/x") for scenario, result in results.items()]
+    record = records.CheckRecord(name, commit, iso(at), "Every scenario of the default branch, walked.", rows)
+    write(repo / "queue" / "checks" / f"{name}.md", records.dump_check(record))
 
 
 def held(repo: Path, places: Places, task_id: str, after: list[str], at: str) -> None:

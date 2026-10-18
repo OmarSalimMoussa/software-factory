@@ -28,20 +28,27 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    implementer, which rebases and has the warden run `factory check`, at most `rounds.check_runs` times. The
    orchestrator merges with `--no-ff`; the merge hook lets only the turn's branch land, with the pass for its tree.
    The warden finds the merge itself.
-9. **Check the default branch.** Slot 0 comes up at the merge, whole, and regression testers walk the scenarios
-   it could break, in parallel. Their runs go into the evidence with the saved check, so its page in Work shows each
-   tester's screenshots and the replay of its walk. A failure reverts the merge only when that merge is the one change
-   to the scenario's code since its last pass; any other failure becomes a request. A check with no failure marks the
-   task checked. A scenario that could not run reverts the merge too. When only the owner can give what it lacks (a key,
-   an account, leave to use an outside site), the task is blocked: it waits on Home for the owner's **Fixed, carry
-   on**, its implementer benched and written to SELF_REFLECT, while other work goes on. When another open task makes
-   it, the task is on hold, and the warden sends it back once that task is checked, or closed or parked; the
-   orchestrator may release a hold whose task cannot pass soon, and it then no longer waits for it. Anything
-   else the factory can make (a seed, a scenario out of date) goes back to the implementer as a failure does. A
-   fix the merge carried for what every task shares, such as a build or ignore file, is applied again right after
-   the revert, in one commit of its own; one that no longer applies cleanly becomes a request.
-10. **Staging** is slot 0: the check leaves it up at the default branch's tip, so it always runs the newest merge.
-    The warden mirrors the default branch to GitHub; no agent pushes, asks for a push or waits on one.
+9. **Check the default branch, in bundles.** A merge waits for its check from when the warden finds it. A bundle is
+   the oldest waiting merges, at most `rounds.bundle_merges`, walked together at one commit: the one just before the
+   next merge, or the tip. Slot 0 comes up there, whole, from a worktree of its own when that commit is older than
+   the tip, and regression testers walk, in parallel, every scenario whose `protects` names a path one of them
+   changed. Their runs go into the evidence with the saved check, so its page in Work shows each tester's
+   screenshots and the replay of its walk. A check clears every merge waiting up to its commit, at once, only when
+   every row passed, each of those scenarios has a row, slot 0 ran that commit, and they are within the cap;
+   anything less clears none. No merge turn goes while the cap of merges waits, until their bundle's check failed.
+   Each row that did not pass says what comes next: walk it again once what blocked it is fixed (a block is never a
+   revert); walk it alone at the bundle's base, or between its suspects (the merges since its last pass whose
+   changed paths it protects); revert the one suspect left, which sends its task back to its implementer; or, when
+   it fails at the base too, wait for its fix, which takes the next turn and joins the bundle past the cap. When
+   only the owner can give what a merge needs (a key, an account, leave to use an outside site), it is reverted and
+   its task blocked: it waits on Home for the owner's **Fixed, carry on**, its implementer benched and written to
+   SELF_REFLECT, while other work goes on. When another open task makes it, the task is on hold, and the warden
+   sends it back once that task is checked, or closed or parked; the orchestrator may release a hold whose task
+   cannot pass soon, and it then no longer waits for it. A fix the merge carried for what every task shares, such
+   as a build or ignore file, is applied again right after the revert, in one commit of its own; one that no longer
+   applies cleanly becomes a request.
+10. **Staging** is slot 0: after each check it comes back up at the default branch's tip, so it runs the newest
+    merge. The warden mirrors the default branch to GitHub; no agent pushes, asks for a push or waits on one.
 11. **Prod.** Only the owner pushes to prod, from the dashboard, at exactly the commit staging runs, once every merge
     since prod's build passed its check. The factory builds that commit on the server and deploys it. Pushing back
     redeploys the commit prod ran before.

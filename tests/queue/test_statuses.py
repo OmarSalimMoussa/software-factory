@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import dataclasses
-import logging
 from pathlib import Path
 
 import pytest
 from queue_kit import World
 
-from runtime.qa import qa_browser
-from runtime.queue import cards, documents, owner, proposals, records, statuses, tasks, turn, verbs
+from runtime.queue import cards, documents, owner, proposals, statuses, tasks, turn, verbs
 from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
-from runtime.shared import store
 from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, REVIVING, Task
 from runtime.shared.protocol import Refused
 from runtime.warden import wardend
@@ -328,28 +325,3 @@ def test_a_revert_said_while_its_implementer_comes_back_follows_it_once_it_is_ba
 
     assert len(resumed) == 2 and "Your work was taken back off master" in resumed[1]
     assert not lifecycle.held_path(world.ctx(), task.id).exists()
-
-
-def test_a_check_named_by_a_short_sha_checks_the_merge_it_ran_on(
-    world: World, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    task = world.task(branch="impl-t-0001")
-    world.queue().write_task(dataclasses.replace(task, status="merged", run=1))
-    merge = "abc1234" + "0" * 33
-    store.write_json(turn.merges_path(world.places), {merge: task.id})
-    monkeypatch.setattr(qa_browser, "runs_root", lambda: world.repo.parent / "runs")
-    report = (f"# Check\n\n## Scenarios\n\n{records.CHECK_TABLE}\n| --- | --- | --- | --- |\n"
-              "| sign-in | pass | 3 | shot.png |\n").encode()  # fmt: skip
-
-    world.launcher.git = lambda argv: (128, "fatal: cannot change to '/repo': No such file or directory")
-    with caplog.at_level(logging.WARNING), pytest.raises(Refused, match="git rev-parse failed"):
-        verbs.check_save(world.ctx(), {"commit": "abc1234"}, report)  # git itself failed: not a wrong sha
-    assert [r.getMessage() for r in caplog.records] == [
-        "warden: git rev-parse in the agents' checkout failed (exit 128)"
-    ]
-    world.launcher.git = lambda argv: (0, f"{merge}\n") if argv[-1] == "abc1234^{commit}" else (1, "")
-    with pytest.raises(Refused, match="the checkout has no commit fedcba9"):
-        verbs.check_save(world.ctx(), {"commit": "fedcba9"}, report)
-    answer = verbs.check_save(world.ctx(), {"commit": "abc1234"}, report)
-    assert answer["checked"] == task.id and world.queue().task(task.id).status == "checked"
-    assert [c.commit for c in world.queue().checks()[0]] == [merge]

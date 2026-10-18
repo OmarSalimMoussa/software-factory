@@ -21,7 +21,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `models` | The allowed models and efforts, and the model and effort of every role |
 | `caps` | Implementers, designers and subagents at once, and the browsers and remote desktops testers run at once |
 | `subagents` | Which subagent kinds each role may start |
-| `rounds` | QA rounds, critic rounds, check runs, and how far one extension goes |
+| `rounds` | QA rounds, critic rounds, check runs, how far one extension goes, and how many merges one check of the default branch clears together |
 | `qa` | Time per item and to start, items per brief, desktop time, widths, evidence days, the desktop tester's screen and the pause between its typed keys and how long its click holds, how long a held request may wait, how long a free browser place waits for the session told of it, how a wait reloads and how long it may last |
 | `replay` | How a tester's run is replayed for the owner: the builder's timings, how long the picture stays hidden after a sign-in link is typed, and the player's pace |
 | `intake` | Batch size and wait, the fast lane's time, the score's weights |

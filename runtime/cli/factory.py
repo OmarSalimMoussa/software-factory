@@ -129,10 +129,8 @@ def _check_call(ns: argparse.Namespace, _: Callable[[str], bytes]) -> Call:
 
 
 def _queue_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
-    if ns.queue_cmd == "next":
-        return Call("queue.next", {})
-    if ns.queue_cmd == "check":
-        return Call("queue.check", {"commit": ns.commit}, read_file(ns.body))
+    if ns.queue_cmd in ("next", "check", "bundle"):
+        return _default_branch_call(ns, read_file)
     if ns.task_cmd == "new":
         return Call("task.new", {"requests": _words(ns.requests), **_fact_args(ns)}, read_file(ns.body))
     if ns.task_cmd == "show":
@@ -142,6 +140,15 @@ def _queue_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Ca
     args = {"task": ns.task, "to": ns.to, **({"event": ns.event} if ns.event else {})}
     told = {**({"note": ns.note} if ns.note else {}), **({"after": ns.after} if ns.after else {})}
     return Call("task.status", {**args, **told})
+
+
+def _default_branch_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
+    """`queue next`, and a check of the default branch: its bundle, and the check saved."""
+    if ns.queue_cmd == "next":
+        return Call("queue.next", {})
+    if ns.queue_cmd == "check":
+        return Call("queue.check", {"commit": ns.commit}, read_file(ns.body))
+    return Call("queue.bundle", {"through": ns.through} if ns.through else {})
 
 
 def _propose_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:

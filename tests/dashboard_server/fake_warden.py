@@ -42,13 +42,14 @@ class Launcher:
         self.calls: list[tuple[str, Any]] = []
         self.places = places
         self.deploy: Callable[[str], tuple[int, str]] = lambda sha: (0, "")  # prod's build and deploy
+        self.git: Callable[[list[str]], tuple[int, str]] = lambda argv: (0, "")
 
     def start_agent(self, request_id: str, launch: dict[str, Any]) -> None:
         self.calls.append(("start", request_id))
 
     def agent_command(self, argv: list[str], cwd: str) -> tuple[int, str]:
         self.calls.append(("command", argv))
-        return 0, ""
+        return self.git(argv) if argv[:1] == ["git"] else (0, "")
 
     def stop_session(self, session_id: str) -> None:
         self.calls.append(("stop", session_id))

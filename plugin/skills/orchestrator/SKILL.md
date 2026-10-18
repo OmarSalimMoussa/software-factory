@@ -126,29 +126,38 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
 
 1. **Turn.** One branch at a time. When a task is `qa-clean` and no task holds the turn, `factory turn next` gives
    it to the next one by `after`, then the one order, and the warden tells its implementer. Hold the default branch
-   still until it merges.
+   still until it merges. No turn goes while `rounds.bundle_merges` merges wait for their check, until the check of
+   their bundle failed: check them first.
 2. **Merge.** When it asks, with its tree's pass: `git merge-base --is-ancestor <default branch> <branch>` must
    hold. Then two separate commands: `git merge --no-ff --no-commit <branch>`, and after it
    `git commit -m "Merge <branch>: <the outcome in one line>"`. The commit's hook lets only the branch holding the
    turn land, with the pass for its tree. The warden finds the merge and records it.
-3. **Check.** Bring slot 0 up at the merge, whole (`factory slot up`). Pick the scenarios whose
-   `protects` names a path the merge changed (`git diff --name-only <merge>^1 <merge>`), the one that waited longest,
-   and the merged spec's own checks. Load the seeds they need (`factory slot seed load <name>`), and do a
-   scenario's set-up that writes inside a service with `factory slot run <service> -- <command>`. Start the
-   `qa-regression` testers at once, the scenarios split between them, each signed in as its own test address. Start
-   each in its own lane, `qa-regression`, then `qa-regression-2` and on, as its `subagent_type`: two in one lane share
-   one browser, and a lane named only in the brief changes nothing. When the machine's browser places are full, the
-   factory messages you once one frees. A brief names scenarios, never an earlier
-   report's results or causes, nor a desktop's password: a tester brings the desktop up itself. A check of slot 0's
-   health is read in the tester's browser: no tester's shell reaches a slot. Save each tester's report to a file and run
-   `factory queue check <merge sha> --body <that file>`.
-4. **A failure** reverts the merge only when that merge is the one change to the scenario's code since its last
-   pass: revert it as `${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md` says, then `factory queue task status
-   <task> building --note "<why>; reverted as <the revert's sha>"`. The warden tells its implementer, or starts a
-   new one once it has ended. Any other failure becomes a request. A saved check with no failure moves the task to
-   `checked` by itself.
-   **Blocked**, with nothing failed: a scenario that could not run, for a cause a tester saw in this check (never one
-   copied from an earlier report: run it again first). Revert the merge the same way, then one of three:
+3. **Check, in bundles,** as soon as a merge lands. `factory queue bundle` names the oldest merges waiting for their
+   check, at most `rounds.bundle_merges`, the commit to walk them at, and each scenario whose `protects` names a
+   path one of them changed; with none, the one that waited longest. Add the merged specs' own checks. Bring slot 0
+   up there, whole, as its answer says (`factory slot up --at <commit>` for one older than the tip). Load the seeds
+   (`factory slot seed load <name>`), and do a set-up that writes inside a service with `factory slot run <service>
+   -- <command>`. Start the `qa-regression` testers at once, the scenarios split between them, each signed in as its
+   own test address; a scenario that restarts or stops services walks alone. Start each in its own lane,
+   `qa-regression`, then `qa-regression-2` and on, as its `subagent_type`: two in one lane share one browser, and a
+   lane named only in the brief changes nothing. When the machine's browser places are full, the factory messages
+   you once one frees. A brief names scenarios, never an earlier report's results or causes, nor a desktop's
+   password: a tester brings the desktop up itself. A check of slot 0's health is read in the tester's browser: no
+   tester's shell reaches a slot. Put every tester's rows, as they wrote them, in one report, and run
+   `factory queue check <that commit> --body <file>` before slot 0 moves. It clears every merge waiting up to that
+   commit at once, within the cap, when every row passed and each scenario they protect has a row; anything less
+   clears none. A row you doubt is walked again by a tester, never changed by you. Then `factory slot up` for the tip.
+4. **A row that did not pass** comes back with `next`, and `factory queue bundle` says it again:
+   - `again`: walk it again once what blocked it is fixed (a tester's time, the desktop, a set-up): never a revert.
+   - `walk`: walk that scenario alone at the commit `at` names and save that check; then read the bundle again.
+   - `revert`: that one merge broke it. Revert it as `${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md` says, then
+     `factory queue task status <task> building --note "<the row>; reverted as <the revert's sha>"`. The warden tells
+     its implementer, or starts a new one once it has ended. Check the bundle again.
+   - `wait`: it fails before every merge waiting. File it as a request if nothing tracks it; its fix takes the next
+     turn, and once it merges, `factory queue bundle --through <its merge>` takes it in past the cap.
+   - `request`: no merge waits up to that commit: file it. `read`: a check of the brief's own: read its evidence.
+   **Blocked** by what the merge needs and the factory cannot make, seen in this check (never copied from an earlier
+   report): revert that merge the same way, then one of two:
    - Only the owner can give it (a key, an account, a paid service, leave to use an outside site):
      `factory queue task status <task> blocked --note "<what stopped it and what would fix it>; reverted as <sha>"`.
      The warden benches its implementer, writes it to SELF_REFLECT and puts it on Home for the owner's Fixed.
@@ -157,15 +166,13 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
      passes, or, told why, once that task is closed or parked. When that task cannot pass soon and this one does
      not truly need it, release the hold: `factory queue task status <task> building --note "<why it need not
      wait>"`. It goes back to work and no longer waits to merge after the other.
-   - Anything else the factory can make (a seed, a scenario out of date, a page a slot can serve): send it back to
-     building, as a failure, with what to make in the note.
    A revert keeps a fix the merge carried for what every task shares (a build or ignore file, a shared script):
    the procedure says how, in the revert's one commit. Then move on to other work. A blocker an implementer reports
    before its merge goes the same ways, with nothing to revert.
-5. **Staging is slot 0.** Each check leaves slot 0 up at the default branch's tip, so staging always runs the newest
-   merge; there is no push to staging. A revert follows `${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md`. Prod
-   moves only when the owner pushes it from Home, or the owner's own Claude does it for them; never you. Never ask
-   for a push or wait for one.
+5. **Staging is slot 0.** After each check, slot 0 comes back up at the default branch's tip, so staging runs the
+   newest merge; there is no push to staging. A revert follows `${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md`.
+   Prod moves only when the owner pushes it from Home, or the owner's own Claude does it for them; never you. Never
+   ask for a push or wait for one.
 
 ## When something is red
 

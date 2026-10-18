@@ -39,15 +39,17 @@ OWN_WAIT = {
     "blocked": "Blocked · comes back when you mark it fixed",
     "on-hold": "On hold · comes back when the task it waits for passes its check",
 }
-# What a merged task's check did, each with its dot's tone: a line under a benched implementer's doing.
+# Where a merged task's check stands, each with its dot's tone: a line under a benched implementer's doing. A check
+# walks a bundle of merges at one commit, the {sha} named.
 CHECK = {
     "running": ("accent", "Check running on {sha}, started {ago}"),
     "pass": ("good", "Check passed on {sha}, {ago}"),
     "fail": ("bad", "Check failed on {sha}, {ago}: {scenarios}"),
     "blocked": ("warn", "Check blocked on {sha}, {ago}: {scenarios}"),
-    "none": ("ring", "Check not started on {sha}, merged {ago}"),
-    "unsure": ("ring", "Check on {sha} may be running: which build staging runs is not known"),
-    "no-commit": ("ring", "Which commit its merge made is not known"),
+    "next": ("ring", "Not checked yet · in the next check"),
+    "later": ("ring", "Not checked yet · {ahead} ahead of it"),
+    "unsure": ("ring", "Its check may be running: which build staging runs is not known"),
+    "no-commit": ("ring", "Its merge is not found on the default branch"),
     "unread": ("ring", "Its check cannot be read. {why}"),
 }
 NOT_IN_QUEUE = "Not in the queue"

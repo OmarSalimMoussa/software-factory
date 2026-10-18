@@ -121,7 +121,7 @@ drive('agents', async t => {
   const w = await t.open(1440, 900, 'agents');
   await w.click('[data-agent="impl-staging-down"] .nname'); await settle(w);
   const said = await texts(w, '#sheet-body .wait-line');
-  t.check(said.length === 1 && /^Check failed on a1b2c3d, .+ ago: phone-lists$/.test(said[0]), 'a merged implementer does not say its check failed: ' + said);
+  t.check(said.length === 1 && /^Check failed on [0-9a-f]{7}, 1 h ago: phone-lists$/.test(said[0]), 'a merged implementer does not say its check failed: ' + said);
   const top = () => w.$eval('#sheet-body .wait-line', e => Math.round(e.getBoundingClientRect().top));
   const before = await top();
   await w.evaluate(() => refreshSheet(['all'])); await settle(w);

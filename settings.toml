@@ -46,6 +46,7 @@ qa = 4
 critic = 4
 check_runs = 3
 extend_by = 2
+bundle_merges = 5       # merges one check of the default branch clears together; no merge turn goes past it
 
 [qa]
 seconds_per_item = 120

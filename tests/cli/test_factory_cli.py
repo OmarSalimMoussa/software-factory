@@ -70,6 +70,8 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["request", "new", "--from", "owner", "--severity", "normal", "--where", "the sign-in page", "--body", FILE],
         ["triage", "apply", "--body", FILE],
         ["queue", "next"],
+        ["queue", "bundle"],
+        ["queue", "bundle", "--through", "abc1234"],
         ["queue", "check", "abc1234", "--body", FILE],
         ["queue", "task", "new", "--body", FILE, "--requests", "r-2026-10-09-0001", "--title", "T", "--goal-item", "G1",
          "--severity", "major", "--surfaces", "ui,api", "--cause", "x.py:1", "--slices", "1", "--owner-class", "none"],

@@ -14,7 +14,7 @@ from runtime.queue.book import Queue
 from runtime.shared.models import BENCH_PENDING, FINISHED, RETIRED, WORKING
 from runtime.warden import checks, loop
 from runtime.warden.delivery import deploys, done
-from runtime.warden.health import cpu_budget
+from runtime.warden.health import cpu_budget, probes
 from runtime.warden.sessions import crashwatch, registry
 
 TASK = "t-0001"
@@ -170,16 +170,17 @@ def _merged_and_mirrored(r: Rehearsal, orch: str, impl: str, worktree: Path, bra
     git(worktree, "rebase", "-q", "master")
     assert r.session(impl, ["check"])["passed"]
 
-    # The orchestrator merges; the warden finds the merge. The passing check of master marks the task checked, and
-    # the Done refresh mirrors master to GitHub.
+    # The orchestrator merges; the warden finds the merge. Slot 0 comes up at it, the passing check of master walked
+    # there marks the task checked, and the Done refresh mirrors master to GitHub.
     git(r.repo, "merge", "-q", "--no-ff", branch, "-m", f"Merge {branch}: new notes show first")
     merge = git(r.repo, "rev-parse", "HEAD")
     assert checks.passed(r.places, git(r.repo, "rev-parse", "HEAD^{tree}"))
     turn.find_merge(r.warden())
     assert not registry.read(r.places)[impl].merge_turn
     assert registry.read(r.places)[impl].state == BENCH_PENDING
+    probes.take(r.warden(), probes.STAGING, r.health(staging=merge, prod=merge))
     report = r.body(r.repo, "check.md", REPORT.encode())
-    assert r.session(orch, ["queue", "check", merge, "--body", report])["checked"] == TASK
+    assert r.session(orch, ["queue", "check", merge, "--body", report])["cleared"] == [TASK]
     assert git(r.github, "rev-parse", "master") != merge
     done.refresh(r.warden())
     assert git(r.github, "rev-parse", "master") == merge

@@ -51,6 +51,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("rounds.critic", "Critic rounds"),
             ("rounds.check_runs", "Check runs on a merge turn"),
             ("rounds.extend_by", "One extension adds"),
+            ("rounds.bundle_merges", "Merges one check of the default branch clears together"),
         ],
     ),
     (

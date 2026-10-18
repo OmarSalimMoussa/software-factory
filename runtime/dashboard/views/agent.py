@@ -7,18 +7,17 @@ from typing import Any
 
 from runtime.dashboard.views import messaging
 from runtime.dashboard.views.agents import history_row, in_tree
-from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, ago, epoch, version
+from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, ago, epoch, plural, version
 from runtime.dashboard.views.shell import factory_state
 from runtime.dashboard.views.words import agentwords as words
 from runtime.dashboard.views.words import taskwords
-from runtime.queue.tasks import ON_HOLD, last_merge
+from runtime.queue.tasks import ON_HOLD
 from runtime.queue.turn import MERGED
 from runtime.shared.models import DEPRIORITIZED, RETIRED
-from runtime.warden.health.probes import STAGING
 from runtime.warden.verbs import REGRESSION
 
 WANTS = ("settings", "sessions", "queue", "cost", "factory", "yolo")
-_WAITS = ("logs", "deploys", "proposals")
+_WAITS = ("bundle", "proposals")
 _DEPRI = "Deprioritized. It holds no slot and keeps its full context."
 _RETIRED = "Retired. It can never be resumed. It moves to History in a few minutes."
 
@@ -110,28 +109,28 @@ def waits(snap: Snap, row: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _check(snap: Snap, task: dict[str, Any]) -> dict[str, str]:
-    """The check of the task's merge: running on staging now, else the last one saved, else not started."""
+    """The check of the bundle the task's merge is in: running on staging now, else the newest one saved whose walk had
+    it in, else where it waits among the merges to check."""
     try:
-        merge = last_merge(snap.get("logs").get(task["id"], []))
+        bundle = snap.get("bundle")
     # telemetry: surfaced — `_said` puts why in the line the panel draws, and the rest of the panel still draws
     except PartError as exc:
         return _said("unread", why=str(exc))
-    if merge is None:
+    place = next((n for n, m in enumerate(bundle["waiting"]) if m["task"] == task["id"]), None)
+    if place is None:
         return _said("no-commit")
-    commit, now = str(merge["commit"]), snap.now
-    sha, since, staging = commit[:7], _walk_since(snap), _staging(snap)
-    if since is not None and staging is None:
-        return _said("unsure", sha=sha)
-    if since is not None and staging is not None and (commit.startswith(staging) or staging.startswith(commit)):
-        return _said("running", sha=sha, ago=ago(since, now))
-    saved = [c for c in snap.get("queue")["checks"] if c["commit"] == commit]
-    if not saved:
-        return _said("none", sha=sha, ago=ago(epoch(merge["at"]), now))
-    last = max(saved, key=lambda c: str(c["at"]))
+    merge, since, now = bundle["waiting"][place], _walk_since(snap), snap.now
+    if since is not None and merge["on_staging"] is None:
+        return _said("unsure")
+    if since is not None and merge["on_staging"]:
+        return _said("running", sha=bundle["staging"][:7], ago=ago(since, now))
+    last = next((c for c in snap.get("queue")["checks"] if c["id"] == merge["check"]), None)
+    if last is None:
+        return _said("next") if place < bundle["cap"] else _said("later", ahead=plural(place, "merge"))
     failed = [r["scenario"] for r in last["rows"] if r["result"] == "fail"]
     blocked = [r["scenario"] for r in last["rows"] if r["result"] != "pass"]
     kind, names = ("fail", failed) if failed else ("blocked", blocked) if blocked else ("pass", [])
-    return _said(kind, sha=sha, ago=ago(epoch(last["at"]), now), scenarios=", ".join(names))
+    return _said(kind, sha=last["commit"][:7], ago=ago(epoch(last["at"]), now), scenarios=", ".join(names))
 
 
 def _said(kind: str, **values: str) -> dict[str, str]:
@@ -148,15 +147,6 @@ def _walk_since(snap: Snap) -> float | None:
     if not any(s["state"] != RETIRED for s in walk):
         return None
     return min(epoch(s["started"]) for s in walk)
-
-
-def _staging(snap: Snap) -> str | None:
-    try:
-        current = snap.get("deploys")[STAGING]["current"]
-    # telemetry: surfaced — the build is `None`, unknown, and the check's line says whether it runs is not known
-    except PartError:
-        return None
-    return None if current is None else str(current["commit"])
 
 
 def stopping(snap: Snap, row: dict[str, Any]) -> list[dict[str, Any]]:
@@ -219,10 +209,9 @@ def record(snap: Snap, row: dict[str, Any]) -> dict[str, Any]:
 
 
 def wants(query: Query) -> dict[str, Any]:
-    # Only for the panel that is open: the thread, from the agent's transcript, and the merged tasks' logs, for waits.
+    # Only for the panel that is open: the thread, from the agent's transcript, and the merges to check, for waits.
     if query.get("view", "agent") == "agent":
-        want = [*WANTS, "thread", *_WAITS]
-        return {"want": want, "days": 1, "session": query.get("id", ""), "statuses": [MERGED]}
+        return {"want": [*WANTS, "thread", *_WAITS], "days": 1, "session": query.get("id", "")}
     return {"want": list(WANTS), "days": 1}
 
 

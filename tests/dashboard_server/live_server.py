@@ -29,8 +29,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from dashboard_seed import STAGING, blocked, held, merged, seed
+from dashboard_seed import blocked, held, merged, saved_check, seed
 from fake_warden import FakeWarden
+from product_git import STANDING, ProductGit, run
 from seed_kit import FIXTURES, iso
 
 from runtime.dashboard import server
@@ -201,8 +202,12 @@ class Live:
         blocked(self.repo, self.places, "t-0020", "The approved-workflow seed is missing", iso(now))
 
     def _waits(self, now: float) -> None:
-        """The deploy fix merged as staging's build, whose check failed; t-0020 waits for it, on hold."""
-        merged(self.repo, self.places, "t-0021", STAGING.ljust(40, "0"), iso(now - 900))
+        """The deploy fix merged on the default branch, whose check failed; t-0020 waits for it, on hold."""
+        assert self.warden is not None
+        self.warden.launcher.git = run
+        commit, _ = ProductGit(self.repo, {"phone-lists": STANDING}).merge("web/deploy.js")
+        merged(self.repo, self.places, "t-0021", commit, iso(now - 900))
+        saved_check(self.repo, commit, now - 3600, {"phone-lists": "fail"})
         held(self.repo, self.places, "t-0020", ["t-0021"], iso(now - 600))
 
     def _outage(self, now: float) -> None:

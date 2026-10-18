@@ -60,10 +60,10 @@ or from `/opt/software-factory`.
 
 ## Ship
 
-Staging is slot 0, on this machine. After each merge the orchestrator brings slot 0 up at the default branch's tip
-and checks it there, so staging always runs the newest merge. GitHub holds a mirror: every `watch.done_minutes` the
-warden fast-forwards GitHub's default branch to the checkout's. A branch that took commits on GitHub itself stays as
-it is, and the warden logs that once.
+Staging is slot 0, on this machine. After each merge the orchestrator checks the waiting merges in bundles
+([dev-cycle.md](dev-cycle.md)), then brings slot 0 back to the default branch's tip, so staging runs the newest merge
+(an older one while a check walks it). GitHub holds a mirror: every `watch.done_minutes` the warden fast-forwards
+GitHub's default branch to the checkout's. A branch that took commits on GitHub itself stays as it is, logged once.
 
 When staging looks right, press Push to prod in the top bar, then Push to prod in the panel. It shows both builds and
 what prod gains. The warden pushes staging's build only once it is cleared: staging answers on it, it is on the default

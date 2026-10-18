@@ -19,7 +19,7 @@ from typing import Any
 from runtime.guard.rules import RULES
 from runtime.qa import evidence as qa_evidence
 from runtime.qa.replay import reader as replay_reader
-from runtime.queue import approvals, cards, files, goal, intake, pictures, proposals, records, triage
+from runtime.queue import approvals, bundle, cards, files, goal, intake, pictures, proposals, records, triage
 from runtime.queue.book import Queue
 from runtime.queue.formats import CHECK_ID, TASK_ID
 from runtime.shared import models, protocol, store
@@ -292,6 +292,7 @@ READERS: dict[str, Reader] = {
     "refusals": _refusals,
     "slots": _slots,
     "queue": _queue,
+    "bundle": bundle.view,
     "logs": _logs,
     "specs": _spec_text,
     "qa": _qa,

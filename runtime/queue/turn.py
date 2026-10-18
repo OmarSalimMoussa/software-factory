@@ -3,9 +3,9 @@
 `factory turn next` gives the turn to the next qa-clean task whose `after` tasks have landed, in the one order, and
 tells its implementer; while a task holds it no other task may. The holder and its branch are published for the
 merge hook, which refuses any other branch. The warden finds the merge itself, each tick: the first-parent merge on
-the default branch, since the turn was given, whose second parent is on the holder's branch. A saved check of that
-merge with no failure moves the task to checked. The warden benches the merged task's implementer, which holds no
-place while the check runs. The orchestrator keeps the merge itself and the call to revert or block; the warden sends
+the default branch, since the turn was given, whose second parent is on the holder's branch; a check clears it with
+the merges bundled with it (bundle.py). The warden benches the merged task's implementer, which holds no place while
+the check runs. The orchestrator keeps the merge itself and the call to revert or block; the warden sends
 a reverted task, or a blocked one at the owner's Fixed, back to its implementer, or, once that has ended, to a new
 one.
 """
@@ -77,7 +77,8 @@ def merges(places: Places) -> dict[str, str]:
     return raw
 
 
-def _git(ctx: Context, *args: str) -> str:
+def git(ctx: Context, *args: str) -> str:
+    """What git prints in the agents' checkout; a failure is refused with git's own last words."""
     repo = ctx.settings().get_str("repo.path")
     code, out = ctx.launcher.agent_command(["git", "-C", repo, *args], repo)
     if code != 0:
@@ -105,7 +106,7 @@ def held(ctx: Context, task: Task) -> None:
     if holder(ctx.places) is not None:
         raise Refused("one-turn", "another task holds the merge turn; the next one goes when it merges")
     default = ctx.settings().get_str("repo.default_branch")
-    record = {"task": task.id, "branch": task.branch, "base": _git(ctx, "rev-parse", f"refs/heads/{default}")}
+    record = {"task": task.id, "branch": task.branch, "base": git(ctx, "rev-parse", f"refs/heads/{default}")}
     store.write_json(_path(ctx.places), record, mode=0o600)
     store.write_json(ctx.places.public_turn, {"task": task.id, "branch": task.branch})
 
@@ -158,8 +159,8 @@ def find_merge(ctx: Context) -> None:
     if found is None:
         return
     default = ctx.settings().get_str("repo.default_branch")
-    on_branch = set(_git(ctx, "rev-list", f"{found['base']}..refs/heads/{found['branch']}").split())
-    for line in _git(
+    on_branch = set(git(ctx, "rev-list", f"{found['base']}..refs/heads/{found['branch']}").split())
+    for line in git(
         ctx, "rev-list", "--first-parent", "--merges", "--parents", f"{found['base']}..{default}"
     ).splitlines():
         commit, *parents = line.split()
@@ -181,18 +182,6 @@ def _bench(ctx: Context, task_id: str, why: str) -> None:
             return
         lifecycle.begin_bench(ctx, sessions[impl.id], lifecycle.WARDEN, why, task_id)
         registry.write(ctx.places, sessions)
-
-
-def check_saved(ctx: Context, commit: str, passed: bool) -> str:
-    """A check of the default branch was saved: the task that merge landed is checked when nothing failed. The task
-    moved, or ""."""
-    task_id = merges(ctx.places).get(commit, "")
-    if not task_id or not passed:
-        return ""
-    if Queue.of(ctx).task(task_id).status != MERGED:
-        return ""
-    tasks.move(ctx, task_id, CHECKED, "checked", statuses.WARDEN, f"the check of {commit[:12]} passed")
-    return task_id
 
 
 def take_off_course(ctx: Context, task_id: str, to: str, event: str, note: str, after: str) -> Task:

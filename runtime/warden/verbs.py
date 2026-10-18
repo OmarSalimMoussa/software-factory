@@ -90,8 +90,9 @@ VERBS: dict[str, Verb] = {
     "brief.comments": _v("runtime.warden.owner.briefs:comments", DESIGN),
     "brief.reply": _v("runtime.warden.owner.briefs:reply", DESIGN),
     "needs-owner": _v("runtime.queue.verbs:needs_owner", ORCH, DESIGN),
-    "turn.next": _v("runtime.queue.turn:next_turn", ORCH),
+    "turn.next": _v("runtime.queue.bundle:next_turn", ORCH),
     "queue.check": _v("runtime.queue.verbs:check_save", ORCH),  # contract: a saved check of the default branch
+    "queue.bundle": _v("runtime.queue.bundle:show", ORCH),  # contract: the merges a check of the default branch clears
     # slots and QA (1C)
     "slot": _v("runtime.slots.verbs:slot", ORCH, IMPL, kinds=TESTERS),
     "qa.plan": _v("runtime.qa.verbs:qa_plan", IMPL),

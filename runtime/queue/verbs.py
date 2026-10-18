@@ -8,7 +8,7 @@ import logging
 from typing import Any
 
 from runtime.qa import evidence, qa_browser
-from runtime.queue import cards, documents, formats, intake, owner, records, tasks, triage, turn
+from runtime.queue import bundle, cards, documents, formats, intake, owner, records, tasks, triage, turn
 from runtime.queue import propose as proposing
 from runtime.queue import route as ladders
 from runtime.queue.book import Queue
@@ -162,17 +162,20 @@ def needs_owner(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
 
 
 def check_save(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
-    """A check of the default branch, its testers' runs in the evidence; its merge's task is checked if none failed."""
-    record = documents.save_check(ctx, turn.full_commit(ctx, _text(args, "commit")), data)
+    """A check of the default branch, its testers' runs in the evidence: what it clears, as bundle.py says."""
+    commit = turn.full_commit(ctx, _text(args, "commit"))
+    found = bundle.line(ctx)
+    bundle.on_line(ctx, found, commit)
+    record = documents.save_check(ctx, commit, data)
     failed = [r.scenario for r in record.rows if r.result != "pass"]
-    checked = turn.check_saved(ctx, record.commit, not failed)
+    settled = bundle.settle(ctx, found, record)
     try:
         taken: list[str] | None = evidence.intake_check(ctx, qa_browser.runs_root(), record)
     except (OSError, store.StoreError) as exc:
         log.warning("warden: the runs of check %s could not be taken into the evidence (%s)", record.id,
                     type(exc).__name__)  # fmt: skip
         taken = None
-    return ok(check=record.id, scenarios=len(record.rows), not_passed=failed, checked=checked or None, runs=taken)
+    return ok(check=record.id, scenarios=len(record.rows), not_passed=failed, **settled, runs=taken)
 
 
 # The owner's decisions, from the dashboard over owner.sock.
