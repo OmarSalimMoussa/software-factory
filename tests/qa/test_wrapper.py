@@ -99,6 +99,7 @@ def test_the_trace_starts_before_the_first_call_and_the_tester_can_neither_see_n
         "browser_resize",
         "browser_type",
         "browser_mouse_click_xy",
+        "browser_wait_for",
         "browser_sign_in",
         "browser_wait_until",
         "browser_open_desktop",

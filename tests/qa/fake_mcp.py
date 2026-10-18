@@ -19,6 +19,7 @@ TOOLS = [
     "browser_resize",
     "browser_type",
     "browser_mouse_click_xy",
+    "browser_wait_for",
     "browser_close",
     "browser_start_tracing",
     "browser_stop_tracing",

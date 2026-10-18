@@ -28,7 +28,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from runtime.qa.wrapper import SERVER_CODE, ServerError
+from runtime.qa.wrapper import SERVER_CODE, WAIT_FOR, ServerError
 
 SIGN_IN, WAIT_UNTIL, OPEN_DESKTOP = "browser_sign_in", "browser_wait_until", "browser_open_desktop"
 COLOUR, TYPE_KEYS, HOLD = "browser_color_scheme", "browser_type_keys", "browser_hold_request"
@@ -60,6 +60,9 @@ NOTES = {
     "symbols and keys sent fast.",
     "browser_mouse_click_xy": f"On a remote desktop's live view, click with {PRESS} instead: a click this short may "
     "not take there.",
+    WAIT_FOR: "A text or textGone wait gives up after a few seconds, and time sleeps before either, so a message that "
+    f"shows briefly can pass unseen: wait on its text alone, right after the step. {WAIT_UNTIL} waits longer, but "
+    "reloads the page.",
 }
 
 TOOLS: list[dict[str, Any]] = [
