@@ -6,7 +6,7 @@ A slot is one running copy of the product on the laptop. The factory decides who
 | Command | Who | Does |
 | --- | --- | --- |
 | `factory slot claim` | an implementer | Takes a free slot (1 and up) and records you as its holder |
-| `factory slot up [service…]` | the holder | Builds and starts the slot's stack, or only the named services. A running service whose image is unchanged keeps running. Slot 0, which is staging, comes up whole |
+| `factory slot up [service…]` | the holder | Builds and starts the slot's stack, or only the named services. A running service whose image is unchanged keeps running. An up that would change nothing (the same checkout, env file and words as the slot's last good up, with every container it left still running) runs nothing and says so; `down` first to build again. Slot 0, which is staging, comes up whole |
 | `factory slot restart <service…>` | the holder | Restarts the named services, which must be running |
 | `factory slot down` | the holder | Stops it, keeping its data |
 | `factory slot run <service> -- <command…>` | the holder and its backend and security testers | Runs one command in a new container of the service and answers with its output. Bring the service up first, so the run is not spent building it |

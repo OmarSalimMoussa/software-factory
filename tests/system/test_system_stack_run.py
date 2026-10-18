@@ -4,7 +4,9 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -12,7 +14,7 @@ from system_fakes import FIXTURE, settings
 
 from runtime.shared.paths import SLOT_KEYS, Places
 from runtime.system.runners import launch_file as lf
-from runtime.system.runners import stack_run
+from runtime.system.runners import same_up, stack_run
 from standard import envfile
 from standard.services import provision
 
@@ -452,3 +454,66 @@ def test_a_verb_that_starts_a_slots_containers_puts_them_below_prods_on_the_cpu(
                ["container", "update", "--cpu-shares", "64", "c-web", "c-gone"]]  # fmt: skip
     assert asked == (lowered if said else [])
     assert said in capsys.readouterr().out
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(root), *args], check=True)
+
+
+@pytest.mark.parametrize(
+    ("change", "skipped"),
+    [
+        ("nothing", True),
+        ("edited", False),
+        ("untracked", False),
+        ("committed", False),
+        ("restarted", False),
+        ("unhealthy", False),
+        ("stale", False),
+        ("off", False),
+        ("first-failed", False),
+    ],  # fmt: skip
+)
+def test_an_up_that_would_change_nothing_runs_nothing(
+    tmp_path: Path,
+    checkout: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    change: str,
+    skipped: bool,
+) -> None:
+    (checkout / "app.py").write_text("print(1)\n")
+    (checkout / ".gitignore").write_text("ran.json\n")
+    for args in (["init", "-q"], ["add", "-A"], ["commit", "-qm", "base"]):
+        _git(checkout, *args)
+    started = {"c-web": "2026-10-18T04:00:00Z healthy", "c-db": "2026-10-18T04:00:01Z"}
+
+    def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+        listed = "".join(f"{c} {at}\n" for c, at in started.items()) if args[:2] == ["container", "inspect"] else ""
+        return subprocess.CompletedProcess(args, 0, listed or "".join(f"{c}\n" for c in started), "")
+
+    monkeypatch.setattr(stack_run, "_docker", docker)
+    monkeypatch.setattr(provision, "workspace", Shared(checkout).workspace)
+    monkeypatch.setenv("DEV_EXIT", "1" if change == "first-failed" else "0")
+    minutes = 0 if change == "off" else 240
+    up = [Places.under(tmp_path), settings(**{"slots.same_up_minutes": minutes}), SLOT, ["up"], checkout]
+    stack_run.product_verb(*up, run=_never, timeout=60, request=REQUEST)
+    (checkout / "scripts" / "ran.json").unlink()
+    monkeypatch.setenv("DEV_EXIT", "0")
+    if change == "edited":
+        (checkout / "app.py").write_text("print(2)\n")
+    if change in ("untracked", "committed"):
+        (checkout / "new.py").write_text("print(3)\n")
+    if change == "committed":
+        _git(checkout, "add", "-A")
+        _git(checkout, "commit", "-qm", "next")
+    if change in ("restarted", "unhealthy"):
+        started["c-web"] = "2026-10-18T04:09:00Z healthy" if change == "restarted" else "2026-10-18T04:00:00Z unhealthy"
+    if change == "stale":
+        monkeypatch.setattr(same_up, "time", SimpleNamespace(time=lambda: time.time() + 240 * 60))
+    capsys.readouterr()
+
+    assert stack_run.product_verb(*up, run=_never, timeout=60, request=REQUEST) == 0
+
+    assert (checkout / "scripts" / "ran.json").exists() is not skipped
+    assert ("slot 2 ran nothing: its last good up" in capsys.readouterr().out) is skipped

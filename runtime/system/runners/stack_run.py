@@ -3,8 +3,9 @@
 Run as ``/usr/bin/python3 -I <install>/runtime/system/runners/stack_run.py <state> <id>``. A product verb runs the
 checkout's own ``scripts/dev`` with its slot's facts in the environment. Before each one, the slot gets its share of
 the shared services (its network, database and error projects) and its env file, written from the product's template;
-a verb never runs on a slot half provisioned. After a successful ``empty``, the slot's database and env file go; what
-``scripts/dev`` wrote beside the env file is the product's own to clear.
+a verb never runs on a slot half provisioned. An ``up`` that would change nothing runs nothing (same_up.py). After a
+successful ``empty``, the slot's database and env file go; what ``scripts/dev`` wrote beside the env file is the
+product's own to clear.
 The factory's own verbs never reach the product: sweeping a slot's labelled Docker objects (and the containers still
 on its networks), the nightly prune of slots' images alone, Docker's disk use, and restart counts. Stdlib only.
 """
@@ -25,6 +26,7 @@ from runtime.shared.paths import SLOT_KEYS, Places
 from runtime.shared.settings import Settings
 from runtime.slots import leases
 from runtime.system.runners import launch_file as lf
+from runtime.system.runners import same_up
 from standard import config as product_config
 from standard import envfile
 from standard.config_records import Config
@@ -37,9 +39,9 @@ COMPOSE_PROJECT = "com.docker.compose.project"
 _COUNT = '{"id":{{json .Id}},"name":{{json .Name}},"restarts":{{.RestartCount}},"labels":{{json .Config.Labels}}}'
 _STATS = "{{.ID}} {{.Name}} {{.CPUPerc}} CPU, {{.MemUsage}}"
 _MEMBERS = "{{range $id, $c := .Containers}}{{$id}} {{end}}"
-EMPTY = "empty"
+EMPTY, UP = "empty", "up"
 # The verbs that start a slot's containers; each then runs below prod's, so prod answers first on a busy machine.
-_STARTS = frozenset({"up", "desktop", leases.RESTART})
+_STARTS = frozenset({UP, "desktop", leases.RESTART})
 # docker system df prints go-units sizes: decimal steps of 1000, such as 0B, 512kB, 1.25GB.
 _SIZE = re.compile(r"^([\d.]+)\s*([kKMGTPEZY]?)B$")
 _STEPS = "kmgtpezy"
@@ -241,13 +243,7 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
         return 1
     for note in notes:
         print(f"stack-run: {note}", flush=True)
-    label = f"{RUN_LABEL}={request}"
-    env = {**environment.handed_on(), **leases.env(places, settings, slot, env_file), leases.RUN_LABEL_ENV: label}
-    status = lf.run([str(checkout / "scripts" / "dev"), *verb], checkout, env, timeout)
-    lowered = _below_prod(slot, verb[0], settings.get_int("slots.cpu_shares"), timeout)
-    status = status or lowered
-    if verb[0] == leases.RUN and status == lf.TIMED_OUT:
-        _stop_run(slot, label, timeout)
+    status = _dev(places, settings, slot, verb, checkout, env_file, timeout=timeout, request=request)
     held = envfile.placeholders(written)
     if held and verb[0] != EMPTY:
         print(f"stack-run: slot {slot} runs with a placeholder in {', '.join(held)}, so a call that needs one fails "
@@ -265,6 +261,27 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
         return 1
     print(f"stack-run: slot {slot}'s database and env file are gone", flush=True)
     return 0
+
+
+def _dev(places: Places, settings: Settings, slot: int, verb: list[str], checkout: Path, env_file: Path, *,
+         timeout: int, request: str) -> int:  # fmt: skip
+    """``scripts/dev <verb>`` on the provisioned slot, or nothing for an up that would change nothing; its exit."""
+    same = (places.slot_state_dir(slot), f"label={SLOT_LABEL}={slot}", _docker, timeout)
+    seconds = settings.get_int("slots.same_up_minutes") * 60 if verb[0] == UP else 0
+    stamp, why = same_up.check(*same, checkout=checkout, env_file=env_file, verb=verb, seconds=seconds)
+    if why:
+        print(f"stack-run: slot {slot} ran nothing: {why}", flush=True)
+        return 0
+    label = f"{RUN_LABEL}={request}"
+    env = {**environment.handed_on(), **leases.env(places, settings, slot, env_file), leases.RUN_LABEL_ENV: label}
+    status = lf.run([str(checkout / "scripts" / "dev"), *verb], checkout, env, timeout)
+    lowered = _below_prod(slot, verb[0], settings.get_int("slots.cpu_shares"), timeout)
+    status = status or lowered
+    if verb[0] == leases.RUN and status == lf.TIMED_OUT:
+        _stop_run(slot, label, timeout)
+    if stamp and status == 0:
+        same_up.record(*same, stamp)
+    return status
 
 
 def _slot_keys(
