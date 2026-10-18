@@ -108,6 +108,7 @@ def _qa(sub: Any) -> None:
     ready = sub.add_parser("qa-ready")
     ready.add_argument("head")
     ready.add_argument("--slices", nargs="+", help="one commit per slice; by default each slice's Slice: n/N commit")
+    ready.add_argument("--reproduce", action="store_true", help="before your first commit: testers reproduce a bug")
     sub.add_parser("qa-clean")
     sub.add_parser("ready-check")
     check = sub.add_parser("check", help="the standard checks on your checkout; the warden runs them")

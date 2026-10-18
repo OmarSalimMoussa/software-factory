@@ -135,6 +135,36 @@ def test_qa_clean_waits_for_a_second_tester_of_a_kind_still_testing(ready_world:
     qa.qa_clean(impl, {}, None)
 
 
+@pytest.mark.parametrize(
+    ("own", "slices", "refused"), [("0", None, False), ("2", None, True), ("0", [HEAD[:7]], True)],
+    ids=["before-the-first-commit", "after-a-commit", "naming-a-slice"],
+)  # fmt: skip
+def test_a_reproduction_comes_before_the_first_commit_and_none_of_its_results_is_qa(
+    ready_world: World, monkeypatch: pytest.MonkeyPatch, own: str, slices: list[str] | None, refused: bool
+) -> None:
+    answers = {"rev-parse": HEAD, "show": PREFIXES, "diff": "web/page.ts\n", "merge-base": "", "rev-list": own}
+    ready_world.launcher.git = lambda argv: (0, answers[argv[3]])
+    impl = ready_world.ctx("implementer", IMPL_ID)
+    args = {"head": HEAD[:12], "reproduce": True, **({"slices": slices} if slices else {})}
+    if refused:
+        with pytest.raises(Refused, match="before your first commit"):
+            qa.qa_ready(impl, args, None)
+        return
+    qa.qa_ready(impl, args, None)
+    _result(ready_world, "ag-fn")
+    with pytest.raises(Refused, match="no ready record of your built slices"):
+        qa.qa_clean(impl, {}, None)
+    assert ready_world.queue().task("t-0001").status == "building"
+
+    # The fix touches no screen, yet the reproduction's verdict on the screens never carries to its head.
+    head2 = "b" * 40
+    answers.update({"rev-parse": head2, "diff": "server/api/cart.py\n"})
+    monkeypatch.setattr(health, "http_get", lambda url, timeout, limit: json.dumps({"build_commit": head2}).encode())
+    qa.qa_ready(impl, {"head": head2[:12], "slices": [head2[:7]]}, None)
+    with pytest.raises(Refused, match="no result from qa-ui-function"):
+        qa.qa_clean(impl, {}, None)
+
+
 def _no_answer(url: str, timeout: int, limit: int) -> bytes:
     raise ConnectionRefusedError("refused")
 

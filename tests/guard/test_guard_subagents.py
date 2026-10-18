@@ -181,8 +181,14 @@ def test_qa_waits_for_a_ready_record_of_the_exact_head(tmp_path: Path) -> None:
     assert kit.rule("Agent", _agent("qa-backend")) is None
 
 
-@pytest.mark.parametrize(("extended", "rule"), [(0, "qa-rounds"), (1, None)])
-def test_a_fifth_head_of_testers_is_refused_unless_extended(tmp_path: Path, extended: int, rule: str | None) -> None:
+@pytest.mark.parametrize(
+    ("extended", "reproduction", "rule"),
+    [(0, None, "qa-rounds"), (1, None, None), (0, 0, None), (0, 4, None)],
+    ids=["fifth-head", "extended", "the-first-a-reproduction", "this-one-a-reproduction"],
+)
+def test_a_fifth_head_of_testers_is_refused_unless_extended_or_a_reproduction(
+    tmp_path: Path, extended: int, reproduction: int | None, rule: str | None
+) -> None:
     kit = Kit(tmp_path)
     kit.git_product()
     kit.session("implementer", extensions={"qa": extended})
@@ -192,7 +198,10 @@ def test_a_fifth_head_of_testers_is_refused_unless_extended(tmp_path: Path, exte
         records.append({"head": str(i) * 40, "slices": [], "at": at.isoformat()})
         lines.append(entry(at + timedelta(minutes=1), "assistant", [agent_use(f"t{i}", "qa-backend")]))
         lines.append(entry(at + timedelta(minutes=2), "user", [result(f"t{i}", "done")]))
-    kit.ready(*records, {"head": kit.head(), "slices": [], "at": NOW.isoformat()})
+    records.append({"head": kit.head(), "slices": [], "at": NOW.isoformat()})
+    if reproduction is not None:
+        records[reproduction]["reproduce"] = True
+    kit.ready(*records)
     kit.transcript(lines)
     assert kit.rule("Agent", _agent("qa-backend")) == rule
 

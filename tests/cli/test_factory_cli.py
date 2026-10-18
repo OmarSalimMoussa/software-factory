@@ -98,6 +98,7 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["qa", "finding", "--head", "abc1234", "--severity", "major", "--where", "/cart", "--body", FILE],
         ["qa", "waive", "t-0001", "f-2", "--why", "the spec asks for it"],
         ["qa-ready", "abc1234", "--slices", "abc1234", "def5678"],
+        ["qa-ready", "abc1234", "--reproduce"],
         ["qa-clean"],
         ["ready-check"],
     ],
@@ -111,6 +112,11 @@ def test_every_command_asks_for_a_verb_the_warden_and_the_guard_know(argv: list[
 def test_a_slot_run_hands_on_every_word_after_the_double_dash() -> None:
     call = _build(["slot", "run", "web", "--", "python", "-c", "print(1)", "--verbose"])
     assert call.args == {"op": "run", "service": "web", "command": ["python", "-c", "print(1)", "--verbose"]}
+
+
+def test_a_reproduction_asks_for_one_and_a_ready_head_does_not() -> None:
+    assert _build(["qa-ready", "abc1234", "--reproduce"]).args == {"head": "abc1234", "reproduce": True}
+    assert _build(["qa-ready", "abc1234"]).args == {"head": "abc1234"}
 
 
 def test_task_facts_arrive_typed() -> None:

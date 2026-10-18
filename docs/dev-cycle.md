@@ -18,7 +18,8 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    saves a brief, one page kept on this machine with the task. The orchestrator signs off rung 3. Rung 4 goes to the
    owner, who reads the brief on the dashboard, selects text to comment on, and presses Go.
 6. **Build.** An implementer works in its own worktree and slot, reproduces a bug before fixing it, and builds every
-   slice tests first.
+   slice tests first. A bug only a browser shows is reproduced by testers after `factory qa-ready <head> --reproduce`,
+   before the branch's first commit: no QA round, and none of their results counts toward `qa-clean`.
 7. **QA.** `factory qa-ready` records the head; every tester the change's surfaces require runs at once. A round is
    a head. Rounds end when one finds no new blocker or major, at most `rounds.qa`. `factory qa-clean` is refused
    until every required tester passed on the final head.

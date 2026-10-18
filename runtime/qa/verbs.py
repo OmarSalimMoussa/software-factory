@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from runtime.guard.facts import REPRODUCE
 from runtime.qa import evidence, findings, plan, qa_browser, steps
 from runtime.queue import tasks
 from runtime.queue.formats import SHA
@@ -79,13 +80,14 @@ def qa_plan(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str,
 
 def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """Every slice is built and the slot runs the head: testers may start on it. The task records the worktree's
-    branch here: its merge turn names it, and the warden finds its merge by it."""
+    branch here: its merge turn names it, and the warden finds its merge by it. A reproduction comes before the
+    branch's first commit: its testers show a bug before its fix, in no QA round, and no result of theirs counts."""
     session = _implementer(ctx)
-    asked, slices = args.get("head"), args.get("slices")
+    asked, slices, reproduce = args.get("head"), args.get("slices"), args.get("reproduce") is True
     if not isinstance(asked, str) or not SHA.match(asked):
         raise Refused("qa-ready", "qa-ready names the head: qa-ready <head>")
     task = tasks.read(ctx, session.task)
-    slices = _ready_slices(ctx, session, asked, task, slices)
+    slices = _unbuilt(ctx, session, asked, slices) if reproduce else _ready_slices(ctx, session, asked, task, slices)
     head = _head(ctx, session)
     if not head.startswith(asked):
         raise Refused("qa-ready", f"{asked[:9]} is not your branch's head ({head[:9]}): commit, then ask again")
@@ -107,13 +109,24 @@ def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     testers = testers_for(ctx, session, task)
     with ctx.lock:
         records = ready_records(ctx, session)
-        record = {"head": head, "slices": slices, "at": ctx.clock.iso(), "slot": lease.slot, "testers": list(testers)}
+        record = {"head": head, "slices": slices, "at": ctx.clock.iso(), "slot": lease.slot, "testers": list(testers),
+                  **({REPRODUCE: True} if reproduce else {})}  # fmt: skip
         store.write_json(_ready_path(ctx, session), {"records": [*records, record]})
-        rounds = len({str(r["head"]) for r in [*records, record]})
-        doing.record(ctx.places, session.id, slice=len(slices), slices=len(slices), qa_round=rounds)
-    if task.status == "building":
+        rounds = len({str(r["head"]) for r in [*records, record] if not r.get(REPRODUCE)})
+        if not reproduce:
+            doing.record(ctx.places, session.id, slice=len(slices), slices=len(slices), qa_round=rounds)
+    if task.status == "building" and not reproduce:
         tasks.move(ctx, task.id, "qa", "qa-ready", IMPL, f"ready for QA at {head[:9]}", branch=branch)
     return ok(head=head, slot=lease.slot, testers=[{"tester": t, "why": why} for t, why in testers.items()])
+
+
+def _unbuilt(ctx: Context, session: Session, asked: str, slices: Any) -> list[str]:
+    """A reproduction's slices: none, on a branch with no commit of its own yet."""
+    default = ctx.settings().get_str("repo.default_branch")
+    if slices is not None or _git(ctx, session.worktree, "rev-list", "--count", f"{default}..{asked}") != "0":
+        raise Refused("qa-ready", "a reproduction comes before your first commit and names no slice; once the fix "
+                                  "is built, run qa-ready on its head")  # fmt: skip
+    return []
 
 
 def _ready_slices(ctx: Context, session: Session, asked: str, task: Task, slices: Any) -> list[str]:
@@ -245,15 +258,18 @@ def qa_clean(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     verdict on an earlier head carries forward when the commits since it touch none of that tester's surfaces."""
     session = _implementer(ctx)
     records = ready_records(ctx, session)
-    if not records:
-        raise Refused("qa-clean", "no ready record: run factory qa-ready first")
+    if not records or records[-1].get(REPRODUCE):
+        raise Refused("qa-clean", "no ready record of your built slices: run factory qa-ready on your head first")
     head = str(records[-1]["head"])
     if _head(ctx, session) != head:
         raise Refused("qa-clean", f"your head moved past {head[:9]}: run qa-ready on it and test it again")
     task = tasks.read(ctx, session.task)
     latest: dict[str, str] = {}  # each tester's newest head with a verdict
     reported: set[str] = set()
+    reproduced = {str(r["head"]) for r in records if r.get(REPRODUCE)}
     for result in store.read_jsonl(_results_path(ctx, session)):
+        if result["head"] in reproduced:
+            continue
         latest[str(result["tester"])] = str(result["head"])
         reported |= {str(result["agent"])} if result["head"] == head else set()
     # Two testers of one kind may test at once, each in its own browser lane: one's verdict is not the other's.

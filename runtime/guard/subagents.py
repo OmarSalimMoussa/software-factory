@@ -18,6 +18,7 @@ from runtime.guard.facts import (
     DESIGNER,
     IMPLEMENTER,
     ORCHESTRATOR,
+    REPRODUCE,
     Call,
     Decision,
     Refusal,
@@ -206,7 +207,7 @@ def _qa(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
         short = head[:9] if head else "your head"
         remedy = f"build every slice, then run `factory qa-ready {short} --slices …`"
         return Refusal("qa-ready", f"no ready record for {short}: {remedy}")
-    if call.off("qa-rounds"):
+    if call.off("qa-rounds") or records[-1].get(REPRODUCE):
         return None
     # A round its subagents were interrupted in, when the session was benched, does not count, unless it is the
     # round this start continues.
@@ -215,7 +216,7 @@ def _qa(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     for agent in calls:
         if agent.subagent_type.startswith(TESTER):
             active = [r for r in records if _when(r["at"]) <= agent.started]
-            if active:
+            if active and not active[-1].get(REPRODUCE):
                 started_on = str(active[-1]["head"])
                 heads[started_on] = heads.get(started_on, False) or agent.agent_id in interrupted
     rounds = sum(1 for h, cut in heads.items() if h == head or not cut)

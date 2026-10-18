@@ -253,7 +253,12 @@ _CALLS: dict[str, Callable[[argparse.Namespace, Callable[[str], bytes]], Call]] 
     "slot": lambda ns, _: _slot_call(ns),
     "qa": _qa_call,
     "qa-ready": lambda ns, _: Call(
-        "qa-ready", {"head": ns.head, **({"slices": _words(ns.slices)} if ns.slices else {})}
+        "qa-ready",
+        {
+            "head": ns.head,
+            **({"slices": _words(ns.slices)} if ns.slices else {}),
+            **({"reproduce": True} if ns.reproduce else {}),
+        },
     ),
     "check": _check_call,
 }

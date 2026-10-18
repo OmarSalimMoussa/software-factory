@@ -140,6 +140,10 @@ def read_settings(places: Places) -> Settings:
     return settings_module.build(tree, {})
 
 
+# A ready record's mark: its testers reproduce a bug before its fix, and are no QA.
+REPRODUCE = "reproduce"
+
+
 def read_ready(places: Places, session_id: str) -> list[dict[str, Any]]:
     """A session's ready records, oldest first: ``{"records": [{"head", "slices", "at"}, ...]}``."""
     path = places.ready(session_id)

@@ -12,8 +12,10 @@ A fix without a cause is a guess. Find the cause first, then fix it once.
    and `factory logs --find <text>` for the log lines around it.
    Do not inherit the claim from a doc, a task or another agent.
 2. **Reproduce it on your own slot.** A tester walks it through the product's screens or its API; an implementer
-   never drives the product itself. Write down the exact steps and what the tester saw. No reproduction, no fix:
-   tell the orchestrator what was tried.
+   never drives the product itself. Before your first commit, bring your slot up at your head, run
+   `factory qa-ready <head> --reproduce`, and start the tester with the exact steps: no QA round, and its result
+   never counts toward `qa-clean`. Write down the steps and what the tester saw. No reproduction, no fix: tell the
+   orchestrator what was tried.
 3. **Find the root cause.**
    - Read the whole error and its trace, and the logs around it for the service that raised it.
    - Trace the wrong value back to where it is made, not where it shows.
