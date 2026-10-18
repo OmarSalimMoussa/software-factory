@@ -19,7 +19,7 @@ from runtime.shared import claude_accounts, store
 from runtime.shared.models import SEVERITIES
 from runtime.slots import leases
 from runtime.system import layout
-from runtime.warden import imports, loop
+from runtime.warden import gc, imports, loop
 from runtime.warden.context import Context
 from runtime.warden.health import errors_import
 from runtime.warden.owner import reflections
@@ -37,6 +37,7 @@ def migrate(ctx: Context) -> list[str]:
     steps: list[Callable[[Context], str]] = [
         _inbox_cursor, _leases, _errors_filed, _errors_since, _failing_since, _turn, _merges, _staging_red,
         _typed_verdicts, _approvals_routed, _briefs_home, _active_account, _older_skills, _reflection_states,
+        _gc_record,
     ]  # fmt: skip
     for step in steps:
         try:
@@ -48,6 +49,18 @@ def migrate(ctx: Context) -> list[str]:
             log.info("warden: brought the state over: %s", said)
             done.append(said)
     return done
+
+
+def _gc_record(ctx: Context) -> str:
+    """The nightly prune's day and its Docker reading go: the clean-up, which starts at once, writes its own record."""
+    docker, raw = ctx.places.state / "docker-disk.json", gc.record(ctx.places)
+    old = raw is not None and "measured" not in raw
+    if not old and not docker.exists():
+        return ""
+    docker.unlink(missing_ok=True)
+    if old:
+        gc.record_path(ctx.places).unlink()
+    return "the nightly prune's records"
 
 
 def _reflection_states(ctx: Context) -> str:

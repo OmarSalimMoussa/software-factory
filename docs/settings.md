@@ -35,7 +35,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `telemetry` | What `factory errors` and `factory logs` give an agent: how many items, how large, how long a call |
 | `cost`, `prices` | The daily budget (past it, only severe work starts that day), the plan-limit levels, and dollars per million tokens per model |
 | `dashboard` | Port, refresh and stale times, the code lock, page size, the hosts it answers |
-| `gc` | The nightly prune's hour, how long images stay, the Docker disk budget |
+| `gc` | How often the clean-up runs, how long images stay, the Docker disk budget |
 | `install` | The guard's timeout, the check-ins' grace, the product's toolchain |
 
 `models.allowed` and `prices` are set at install and are read-only on the dashboard. Prod's health address is not a

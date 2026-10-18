@@ -169,18 +169,19 @@ def _seed_health(places: Places, now: float) -> None:
         },
     )
     readings = [
-        ("memory", "green", "11.8 GiB free", 11.8),
-        ("cpu", "green", "34% of every CPU in use on average", 34.0),
-        ("power", "green", "on mains power", None),
-        ("install", "green", "install 0123456789ab", None),
-        ("hooks", "green", "the checkout runs the factory's hooks", None),
-        ("daemon", "green", "inside the slice", None),
+        ("memory", "green", "11.8 GiB free", 11.8, None),
+        ("cpu", "green", "34% of every CPU in use on average", 34.0, None),
+        ("disk", "green", "112 GiB free of 193 GiB", 112.0, 193.0),
+        ("power", "green", "on mains power", None, None),
+        ("install", "green", "install 0123456789ab", None, None),
+        ("hooks", "green", "the checkout runs the factory's hooks", None, None),
+        ("daemon", "green", "inside the slice", None, None),
     ]
-    rows = [{"name": n, "level": lv, "value": v, "figure": f} for n, lv, v, f in readings]
+    rows = [{"name": n, "level": lv, "value": v, "figure": f, "whole": w} for n, lv, v, f, w in readings]
     store.write_json(places.vitals, {"at": iso(now), "level": "green", "why": "", "readings": rows})
-    store.write_json(
-        places.state / "docker-disk.json", {"at": iso(now), "bytes": 38 * 1024**3, "budget_bytes": 60 * 1024**3}
-    )
+    use = {"worktrees": 23 * 1024**3, "docker": 38 * 1024**3, "qa": 2 * 1024**3, "transcripts": 1024**3}
+    store.write_json(places.state / "gc.json", {"started": iso(now - 7200), "ended": iso(now - 7100), "use": use,
+                                                "measured": iso(now - 7100)})  # fmt: skip
     store.write_json(
         places.state / "triage-last.json",
         {

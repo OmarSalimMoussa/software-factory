@@ -23,9 +23,9 @@ Only one deploy runs on a server at a time; a second one waits. Each step stops 
 2. **Source.** It writes the commit's files from the mirror into a new folder beside prod's stack.
 3. **Images.** It plans the build with those settings and builds each image of the plan that Docker lacks at the
    commit, base images first, passing only the plan's build args. A push back usually builds nothing. No image gets a
-   label, so the nightly prune of the slots' images never reaches prod's, and nothing is pushed anywhere. A build that
-   leaves less of `watch.push_wait_minutes` than `[deploy].drain_minutes` and `answer_seconds` need fails the deploy,
-   and prod stays as it is.
+   label, so the warden's clean-up of the slots' images never reaches prod's, and nothing is pushed anywhere. A build
+   that leaves less of `watch.push_wait_minutes` than `[deploy].drain_minutes` and `answer_seconds` need fails the
+   deploy, and prod stays as it is.
 4. **Deploy files.** It copies the plan's files, `[deploy].files` with every after-deploy hook and `factory.toml`, into
    prod's stack folder in place: each file is overwritten, never swapped, and a file the commit no longer has is
    deleted. Containers that mount a file keep seeing it. A link, or the env file itself, among them fails the deploy.

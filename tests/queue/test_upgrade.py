@@ -12,7 +12,7 @@ from runtime.queue import approvals, cards, formats, intake, records, reports, t
 from runtime.queue.book import Queue, spec_rel, task_rel
 from runtime.shared import store
 from runtime.slots import leases
-from runtime.warden import inbox, loop, upgrade
+from runtime.warden import gc, inbox, loop, upgrade
 from runtime.warden.context import Caller
 from runtime.warden.health import errors_import
 from runtime.warden.owner import reflections
@@ -51,11 +51,15 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
     store.write_json(places.approvals / f"{merged.id}.json", {"task": merged.id, "rung": 2, "model": "m",
                                                              "by": "owner", "at": "x", "digest": "d"})  # fmt: skip
     store.write_json(places.approvals / f"{in_turn.id}.go.json", {"task": in_turn.id, "by": "owner", "at": "x"})
+    # The nightly prune's day, and its Docker reading.
+    store.write_json(gc.record_path(places), {"last_day": "2026-10-09"})
+    store.write_json(places.state / "docker-disk.json", {"at": "x", "bytes": 1, "budget_bytes": 2})
 
     ctx = dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden"))
     done = upgrade.migrate(ctx)
 
-    assert len(done) == 9, done
+    assert len(done) == 10, done
+    assert gc.record(places) is None and not (places.state / "docker-disk.json").exists()
     assert inbox.unacknowledged(places) == []
     assert leases.read(places, 1) is not None
     filed = json.loads(errors_import.path(places, "prod").read_text())["filed"]

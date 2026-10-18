@@ -1,6 +1,6 @@
-"""The machine's vitals, read every tick: memory, CPU use against its budget (cpu_budget), power, the install, the
-git hooks, the agent's Claude daemon and the firewall. Each reading is green, amber, red or unknown; unknown is treated
-as amber, never as fine. A machine with no battery listed, a desktop or a VM, is on mains power.
+"""The machine's vitals, read every tick: memory, CPU use against its budget (cpu_budget), free disk, power, the
+install, the git hooks, the agent's Claude daemon and the firewall. Each reading is green, amber, red or unknown;
+unknown is treated as amber, never as fine. A machine with no battery listed, a desktop or a VM, is on mains power.
 
 The permits read vitals.json: red blocks every start; amber blocks all but severe work. The published copy carries
 the CPU use too, which holds back new walks (runtime/guard/walk_hold.py). Readers take the kernel's folders as
@@ -10,6 +10,7 @@ arguments, so tests feed samples.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import subprocess
 from dataclasses import asdict, dataclass
@@ -30,6 +31,7 @@ LEVELS = (GREEN, AMBER, UNKNOWN, RED)  # worst last
 PROC = Path("/proc")
 POWER = Path("/sys/class/power_supply")
 _GIB_KB = 1024 * 1024
+_GIB = 1024**3
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,9 +39,10 @@ class Reading:
     name: str
     level: str
     value: str  # in words, for factory status
-    # The reading's number, for the dashboard: free memory in GiB, CPU use and battery charge in percent; None
-    # for a reading without one, one not read, and the power of a machine on mains.
+    # The reading's number, for the dashboard: free memory and disk in GiB, CPU use and battery charge in percent;
+    # None for a reading without one, one not read, and the power of a machine on mains.
     figure: float | None = None
+    whole: float | None = None  # what the figure is a part of: the disk's size in GiB
 
 
 def worst(readings: list[Reading]) -> str:
@@ -75,6 +78,21 @@ def cpu(use: float, settings: Settings) -> Reading:
         said = f"{percent:.0f}% of every CPU in use on average, past the {target:.0f}% budget"
         return Reading("cpu", AMBER, said, percent)
     return Reading("cpu", GREEN, f"{percent:.0f}% of every CPU in use on average", percent)
+
+
+def disk(paths: list[Path], settings: Settings) -> Reading:
+    """The free space of the fullest filesystem ``paths`` sit on: the factory's state and the agents' work."""
+    try:
+        found = [os.statvfs(path) for path in paths]
+    # telemetry: surfaced — the disk vital's `Reading` is unknown, naming why
+    except OSError as exc:
+        return Reading("disk", UNKNOWN, f"cannot read the free disk space: {type(exc).__name__}")
+    fullest = min(found, key=lambda s: s.f_bavail * s.f_frsize)
+    free, size = fullest.f_bavail * fullest.f_frsize / _GIB, fullest.f_blocks * fullest.f_frsize / _GIB
+    said = f"{free:.0f} GiB free of {size:.0f} GiB"
+    if free < settings.get_int("vitals.disk_red_gib"):
+        return Reading("disk", RED, said, free, size)
+    return Reading("disk", AMBER if free < settings.get_int("vitals.disk_amber_gib") else GREEN, said, free, size)
 
 
 def power(supplies: Path, settings: Settings) -> Reading:
@@ -268,6 +286,7 @@ def refresh(
     readings = [
         memory(_text(proc / "meminfo"), settings),
         cpu_use,
+        disk([ctx.places.state, Path(settings.get_str("repo.path"))], settings),
         power(supplies, settings),
         install(ctx.places),
         hooks(ctx.places, Path(settings.get_str("repo.path")), settings.get_int("watch.tick_seconds")),

@@ -298,6 +298,8 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("vitals.battery_amber", "Battery that turns amber, %"),
             ("vitals.battery_red", "Battery that turns red, %"),
             ("vitals.firewall_stale_seconds", "Firewall last loaded longer ago than this turns red, seconds"),
+            ("vitals.disk_amber_gib", "Free disk that turns amber, GiB"),
+            ("vitals.disk_red_gib", "Free disk that turns red, GiB"),
         ],
     ),
     (
@@ -326,10 +328,10 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
     ),
     (
         "gc",
-        "Nightly prune",
-        "Applies to the next prune.",
+        "Clean-up",
+        "Applies to the next clean-up.",
         [
-            ("gc.prune_hour", "Prune at, hour"),
+            ("gc.every_hours", "Clean up every, hours"),
             ("gc.images_keep_days", "Days unused images are kept"),
             ("gc.docker_budget_gib", "Docker disk budget, GiB"),
         ],

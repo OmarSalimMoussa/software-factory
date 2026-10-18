@@ -2,7 +2,7 @@
 Docker lacks, built from that copy.
 
 The mirror is the warden's bare repository, which the admin user may read but does not own, so git takes it only with
-safe.directory. A build passes the plan's args and nothing else; it never labels an image, as the nightly prune of
+safe.directory. A build passes the plan's args and nothing else; it never labels an image, as the factory's prune of
 slots' images keys on their label and prod's images must stay for a push back; and it pushes nothing.
 """
 

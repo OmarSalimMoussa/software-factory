@@ -76,14 +76,15 @@ def env_card(snap: Snap, env: str) -> dict[str, Any]:
 def laptop(snap: Snap) -> dict[str, Any]:
     vitals = snap.get("vitals")["reading"]
     if vitals is None:
-        rows = [{"label": label, "pct": None, "value": "unknown"} for label in ("Memory", "CPU", "Power")]
+        rows = [{"label": label, "pct": None, "value": "unknown"} for label in ("Memory", "CPU", "Power", "Disk")]
         return {"state": "amber", "tone": "warn", "label": "unknown", "rows": rows}
     readings = {r["name"]: r for r in vitals["readings"]}
     state, label, tone = _LAPTOP[vitals["level"]]
     cpu, power = readings["cpu"], readings["power"]
     cpu_pct, power_pct = cpu["figure"], power["figure"]
     mains = on_mains(power)
-    used = memory_used(snap)
+    used, disk = memory_used(snap), disk_free(readings.get("disk"))
+    disk_used = None if disk is None else 100 - disk[1]
     cpu_words = f"{cpu_pct:.0f}%" if cpu_pct is not None else "unknown"
     power_words = "Mains" if mains else f"{power_pct:.0f}%" if power_pct is not None else power["value"]
     return {
@@ -98,6 +99,7 @@ def laptop(snap: Snap) -> dict[str, Any]:
                 "pct": 100 if mains else (round(power_pct) if power_pct is not None else None),
                 "value": "unknown" if power["level"] == "unknown" else power_words,
             },
+            {"label": "Disk", "pct": disk_used, "value": "unknown" if disk_used is None else f"{disk_used}%"},
         ],
     }
 
@@ -115,6 +117,13 @@ def memory_free(snap: Snap) -> tuple[float, int] | None:
     if free is None or not vitals["memory"]:
         return None
     return free, round(free * 1024 * 1024 / vitals["memory"] * 100)
+
+
+def disk_free(reading: dict[str, Any] | None) -> tuple[float, int] | None:
+    """Free disk in GiB and as a share of the disk, from the warden's last reading: None until a reading has both."""
+    if reading is None or reading["figure"] is None or not reading["whole"]:
+        return None
+    return reading["figure"], round(reading["figure"] / reading["whole"] * 100)
 
 
 def memory_used(snap: Snap) -> int | None:

@@ -57,7 +57,7 @@ Prod comes first on the CPU. Each time a slot's containers start (`up`, `restart
 one `slots.cpu_shares` (64) against Docker's 1024 for each of prod's, so prod still answers on a busy server. A
 container a slot's service starts by itself later keeps Docker's 1024.
 
-The warden's nightly prune removes only images a slot labelled, never prod's, which Push back needs.
+The warden's clean-up removes only images a slot labelled, never prod's, which Push back needs.
 `gc.docker_budget_gib` counts all of the server's Docker data, prod's included.
 
 ## Slot keys

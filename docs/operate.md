@@ -196,5 +196,5 @@ The factory never changes itself: Claude or the owner changes it. Read Self-refl
   prod, or push back. Stop the fix from the band if you prefer to handle it yourself.
 - **The warden unreachable:** the dashboard keeps its last known state, marked old, and refuses every change until
   the warden answers. Check its service on the laptop.
-- **Vitals red:** nothing starts until memory, CPU or power recover, or the install hash matches an upgrade.
+- **Vitals red:** nothing starts until memory, CPU, disk or power recover, or the install hash matches an upgrade.
 - **The server stops answering under load:** its host has held it down. Restart it from the host's panel, then pause.

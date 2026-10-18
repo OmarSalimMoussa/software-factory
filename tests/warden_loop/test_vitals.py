@@ -67,6 +67,35 @@ def test_the_machines_level_names_the_readings_that_set_it() -> None:
 
 
 @pytest.mark.parametrize(
+    ("free_gib", "level", "said"),
+    [
+        ((120, 31), vitals.GREEN, "31 GiB free of 193 GiB"),
+        ((120, 30), vitals.GREEN, "30 GiB free of 193 GiB"),
+        ((120, 29.5), vitals.AMBER, "30 GiB free of 193 GiB"),  # the fullest disk sets it
+        ((10, 120), vitals.AMBER, "10 GiB free of 193 GiB"),
+        ((9.5, 120), vitals.RED, "10 GiB free of 193 GiB"),
+        (None, vitals.UNKNOWN, "cannot read the free disk space: PermissionError"),
+    ],
+    ids=["plenty", "at-amber", "under-amber", "at-red", "under-red", "unreadable"],
+)
+def test_the_disk_vital_turns_amber_then_red_as_the_fullest_disk_the_factory_writes_to_fills(
+    world: World, monkeypatch: pytest.MonkeyPatch, free_gib: tuple[float, float] | None, level: str, said: str
+) -> None:
+    state, work = Path("/state"), Path("/work")
+
+    def statvfs(path: Path) -> os.statvfs_result:
+        if free_gib is None:
+            raise PermissionError(path)
+        free = free_gib[[state, work].index(path)] * 1024**3
+        return os.statvfs_result((4096, 4096, 193 * 1024**3 // 4096, 0, int(free) // 4096, 0, 0, 0, 0, 255))
+
+    monkeypatch.setattr(vitals.os, "statvfs", statvfs)
+    reading = vitals.disk([state, work], world.ctx.settings())
+    assert (reading.level, reading.value) == (level, said)
+    assert reading.whole == (None if free_gib is None else 193)
+
+
+@pytest.mark.parametrize(
     ("use", "level"),
     [(0.30, vitals.GREEN), (0.54, vitals.GREEN), (0.56, vitals.AMBER), (0.91, vitals.RED)],
     ids=["under-budget", "just-under-budget", "past-budget", "past-the-red-line"],

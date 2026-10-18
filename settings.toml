@@ -157,6 +157,9 @@ cpu_red_percent = 90.0  # the machine's average CPU use, % of all CPUs, past whi
 battery_amber = 30
 battery_red = 15
 firewall_stale_seconds = 180  # the firewall loaded longer ago than this is red: every start waits
+disk_amber_gib = 30     # free disk, on the fullest one the factory writes to, under which only severe work starts:
+                        # about a day of the agents' busiest growth
+disk_red_gib = 10       # under this nothing starts: prod shares the disk, and its database stops on a full one
 
 [watch]
 tick_seconds = 15
@@ -257,8 +260,8 @@ message_max_chars = 4000  # the longest message the owner sends a session
 thread_messages = 10    # the owner's last messages a session's thread shows, each with the agent's reply
 thread_tail_kib = 2048  # how much of the end of a transcript the thread reads
 
-[gc]                    # the nightly prune; reaping a retired session is immediate
-prune_hour = 3
+[gc]                    # the clean-up; reaping a retired session is immediate
+every_hours = 6         # how often it runs; each run then measures what fills the disk, for the disk vital's detail
 images_keep_days = 7
 docker_budget_gib = 60
 

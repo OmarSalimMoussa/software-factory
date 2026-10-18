@@ -300,7 +300,7 @@ READERS: dict[str, Reader] = {
     "replay": replay_reader.read,
     "goal": _goal,
     "triage": lambda ctx, args: dataclasses.asdict(triage.batch(ctx)),
-    "docker": lambda ctx, args: store.read_json_or(gc.disk_path(ctx.places), None),
+    "gc": lambda ctx, args: gc.record(ctx.places),
     "reflections": lambda ctx, args: reflections.entries(ctx.places),
     "history": _history,
     "brief": _brief,

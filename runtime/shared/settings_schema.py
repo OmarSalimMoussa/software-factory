@@ -148,6 +148,8 @@ SCHEMA: dict[str, Spec] = {
     "vitals.battery_amber": Spec("int", 0, 100),
     "vitals.battery_red": Spec("int", 0, 100),
     "vitals.firewall_stale_seconds": Spec("int", 30, 3600),
+    "vitals.disk_amber_gib": Spec("int", 1, 100000),
+    "vitals.disk_red_gib": Spec("int", 1, 100000),
     "watch.tick_seconds": Spec("int", 5, 120),
     "watch.probe_seconds": Spec("int", 15, 600, when=AT_INSTALL),
     "watch.outage_after": Spec("int", 2, 5),
@@ -222,7 +224,7 @@ SCHEMA: dict[str, Spec] = {
     "dashboard.message_max_chars": Spec("int", 100, 20000),  # contract: the longest message the owner sends
     "dashboard.thread_messages": Spec("int", 1, 50),  # contract: the owner's messages a session's thread shows
     "dashboard.thread_tail_kib": Spec("int", 64, 65536),  # contract: how much of a transcript the thread reads
-    "gc.prune_hour": Spec("int", 0, 23),
+    "gc.every_hours": Spec("int", 1, 168),
     "gc.images_keep_days": Spec("int", 1, 90),
     "gc.docker_budget_gib": Spec("int", 5, 2000),
     # The factory's own repo on GitHub (owner/name), which it never works on; the installer sets it.

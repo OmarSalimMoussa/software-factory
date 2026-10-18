@@ -7,7 +7,7 @@ a verb never runs on a slot half provisioned. An ``up`` that would change nothin
 successful ``empty``, the slot's database and env file go; what ``scripts/dev`` wrote beside the env file is the
 product's own to clear.
 The factory's own verbs never reach the product: sweeping a slot's labelled Docker objects (and the containers still
-on its networks), the nightly prune of slots' images alone, Docker's disk use, and restart counts. Stdlib only.
+on its networks), the clean-up's prune of slots' images alone, Docker's disk use, and restart counts. Stdlib only.
 """
 
 from __future__ import annotations

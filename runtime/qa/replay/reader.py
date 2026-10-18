@@ -39,7 +39,7 @@ def read(ctx: Context, args: dict[str, Any]) -> dict[str, Any]:
     entry = next((e for e in evidence.entries(ctx.places) if _names(e) == named), None)
     if entry is None:
         raise Refused("replay", f"{of} has no run {run} by {tester}; it may have aged out")
-    # The nightly prune deletes a run's files and leaves its line in the index.
+    # The clean-up deletes a run's files and leaves its line in the index.
     if not (ctx.places.evidence / of / head / tester / run).is_dir():
         raise Refused("replay", f"{tester}'s run {run} on {of} has aged out of the evidence")
     try:

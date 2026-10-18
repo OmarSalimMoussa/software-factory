@@ -1,17 +1,19 @@
-"""Guard: the laptop's vitals and Docker disk, the slots, what was refused today, and every rule with its switch."""
+"""Guard: the machine's vitals and Docker disk, the slots, what was refused today, and every rule with its switch."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from runtime.dashboard.views.home import memory_free, on_mains
-from runtime.dashboard.views.kit import Parts, Query, Snap
+from runtime.dashboard.views.home import disk_free, memory_free, on_mains
+from runtime.dashboard.views.kit import Parts, Query, Snap, ago, epoch
 from runtime.dashboard.views.words import agentwords
 from runtime.shared.models import RETIRED
 
-WANTS = ("settings", "vitals", "slots", "sessions", "queue", "refusals", "rules", "docker")
+WANTS = ("settings", "vitals", "slots", "sessions", "queue", "refusals", "rules", "gc")
 _TONES = {"green": "good", "amber": "warn", "red": "bad", "unknown": ""}
 _GIB = 1024**3
+_KINDS =(("worktrees", "Agents' worktrees"), ("docker", "Docker"), ("qa", "QA recordings"),
+          ("transcripts", "transcripts"))  # fmt: skip
 
 
 def vitals(snap: Snap) -> list[dict[str, Any]]:
@@ -26,6 +28,17 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
             "value": "unknown" if memory is None else f"{memory[0]:.1f} GiB",
             "pct": None if memory is None else memory[1],
             "tone": _TONES[level],
+            "hint": None,
+        }
+    )
+    disk = disk_free(found.get("disk"))
+    out.append(
+        {
+            "label": "Disk free",
+            "value": "unknown" if disk is None else f"{disk[0]:.0f} GiB",
+            "pct": None if disk is None else disk[1],
+            "tone": _TONES[found.get("disk", {}).get("level", "unknown")],
+            "hint": disk_detail(snap),
         }
     )
     cpu = found.get("cpu")
@@ -36,11 +49,12 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
             "value": f"{pct:.0f}%" if pct is not None else "unknown",
             "pct": round(pct) if pct is not None else None,
             "tone": _TONES[cpu["level"] if cpu else "unknown"],
+            "hint": None,
         }
     )
     power = found.get("power")
     if power is None or power["level"] == "unknown":
-        out.append({"label": "Power", "value": "unknown", "pct": None, "tone": ""})
+        out.append({"label": "Power", "value": "unknown", "pct": None, "tone": "", "hint": None})
     else:
         battery = power["figure"]
         mains = on_mains(power)
@@ -50,6 +64,7 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
                 "value": "On mains" if mains else f"Battery {battery:.0f}%" if battery is not None else "On battery",
                 "pct": 100 if mains else round(battery) if battery is not None else None,
                 "tone": _TONES[power["level"]],
+                "hint": None,
             }
         )
     install = found.get("install", {"level": "unknown"})
@@ -60,9 +75,20 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
             "value": words.get(install["level"], "unknown"),
             "pct": None if install["level"] == "unknown" else 100,
             "tone": _TONES[install["level"]],
+            "hint": None,
         }
     )
     return out
+
+
+def disk_detail(snap: Snap) -> str:
+    found = snap.get("gc")
+    if found is None or found["measured"] is None:
+        every = snap.settings.get_int("gc.every_hours")
+        return f"What fills the disk is not measured yet: the clean-up measures it every {every} h."
+    use = found["use"]
+    sizes = [f"{word} {'unknown' if use[kind] is None else f'{use[kind] / _GIB:.1f} GiB'}" for kind, word in _KINDS]
+    return f"{', '.join(sizes)}, measured {ago(epoch(found['measured']), snap.now)}."
 
 
 def slots(snap: Snap) -> list[dict[str, Any]]:
@@ -106,15 +132,15 @@ def rules(snap: Snap) -> list[dict[str, Any]]:
 
 
 def docker(snap: Snap) -> dict[str, Any] | None:
-    found = snap.get("docker")
-    if found is None:
+    found = snap.get("gc")
+    if found is None or found["measured"] is None:
         return None
-    budget = found["budget_bytes"]
-    if found["bytes"] is None:
+    used, budget = found["use"]["docker"], snap.settings.get_int("gc.docker_budget_gib") * _GIB
+    if used is None:
         return {"used": "unknown", "budget": f"{budget / _GIB:.0f} GiB", "pct": None, "tone": ""}
-    pct = round(found["bytes"] / budget * 100)
-    tone = "bad" if found["bytes"] > budget else "good"
-    return {"used": f"{found['bytes'] / _GIB:.0f} GiB", "budget": f"{budget / _GIB:.0f} GiB", "pct": pct, "tone": tone}
+    pct = round(used / budget * 100)
+    tone = "bad" if used > budget else "good"
+    return {"used": f"{used / _GIB:.0f} GiB", "budget": f"{budget / _GIB:.0f} GiB", "pct": pct, "tone": tone}
 
 
 def wants(query: Query) -> dict[str, Any]:

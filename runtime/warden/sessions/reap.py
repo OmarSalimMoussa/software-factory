@@ -5,7 +5,7 @@ session claimed is never touched): the product's ``scripts/dev empty``, then eve
 both through the stack unit, then the lease goes. A reap that failed is tried again after watch.reap_retry_minutes. Its
 worktree is removed as the agent user only when git calls it clean and no live session works in it; a dirty one is held,
 with git's reason, for the next session on the same task. Its branch goes once merged. A tester's desktop goes down once
-it has handed back. QA evidence ages out in the nightly gc.
+it has handed back. QA evidence ages out in the clean-up (gc.py).
 """
 
 from __future__ import annotations

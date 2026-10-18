@@ -6,8 +6,8 @@ wrapper (wrapper.py), which talks to Claude Code over standard input and output,
 output. The wrapper traces the whole run: every frame the screen showed and every action, on the browser's own clock,
 from which the warden builds the run's replay. A page recorder (recorder.js) runs in every page and notes where each
 click landed and what each read touched. When the tester reports its result, or the orchestrator saves the check a
-regression tester walked for, the warden copies the folder into its evidence, where only the owner looks; its nightly
-prune removes a run nothing took.
+regression tester walked for, the warden copies the folder into its evidence, where only the owner looks; its
+clean-up removes a run nothing took.
 """
 
 from __future__ import annotations

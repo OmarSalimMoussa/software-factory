@@ -84,6 +84,11 @@
      "label": "Power",
      "pct": 100,
      "value": "Mains"
+    },
+    {
+     "label": "Disk",
+     "pct": 42,
+     "value": "42%"
     }
    ]
   }

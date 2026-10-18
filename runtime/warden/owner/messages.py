@@ -105,7 +105,7 @@ def thread(ctx: Context, s: Session) -> list[dict[str, Any]]:
     Read from the end of the transcript only (dashboard.thread_tail_kib): an older message has left the thread.
     """
     settings = ctx.settings()
-    path = cost.transcript([launch.agent_home() / ".claude" / "projects"], s)
+    path = cost.transcript([launch.transcripts(launch.agent_home())], s)
     if path is None:
         return []
     tail = settings.get_int("dashboard.thread_tail_kib") * 1024

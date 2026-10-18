@@ -58,6 +58,10 @@ def agent_home() -> Path:
     return Path(pwd.getpwnam(AGENT_USER).pw_dir)
 
 
+def transcripts(home: Path) -> Path:
+    return home / ".claude" / "projects"
+
+
 def agent_uid() -> int | None:
     try:
         return pwd.getpwnam(AGENT_USER).pw_uid
@@ -193,7 +197,7 @@ class Units:
 
     def answered(self, session_id: str, since: float) -> str | None:
         """How a session's first model call since ``since`` went (cost.call_outcome); None while it has made none."""
-        found = sorted((agent_home() / ".claude" / "projects").glob(f"*/{session_id}.jsonl"))
+        found = sorted(transcripts(agent_home()).glob(f"*/{session_id}.jsonl"))
         lines = found[0].read_text(encoding="utf-8", errors="replace").splitlines() if found else []
         return next((said for line in lines if (said := cost.call_outcome(line, since)) is not None), None)
 

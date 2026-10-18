@@ -469,3 +469,29 @@ def test_power_reads_mains_only_when_the_reading_has_no_charge(
     rows = rig.parts("/api/guard")["vitals"]["data"]
     assert [r["value"] for r in laptop["rows"] if r["label"] == "Power"] == [home]
     assert [r["value"] for r in rows if r["label"] == "Power"] == [guard]
+
+
+SIZES = "Agents' worktrees 23.0 GiB, Docker {docker}, QA recordings 2.0 GiB, transcripts 1.0 GiB, measured 2 h ago."
+
+
+@pytest.mark.parametrize(
+    ("measured", "docker", "hint"),
+    [
+        (True, 38 * 1024**3, SIZES.format(docker="38.0 GiB")),
+        (True, None, SIZES.format(docker="unknown")),
+        (False, None, "What fills the disk is not measured yet: the clean-up measures it every 6 h."),
+    ],
+    ids=["measured", "docker-unread", "not-yet"],
+)
+def test_the_disk_shows_its_free_space_and_what_fills_it_one_click_behind(
+    rig: Rig, measured: bool, docker: int | None, hint: str
+) -> None:
+    record = store.read_json(rig.places.state / "gc.json")
+    record["use"]["docker"] = docker
+    store.write_json(rig.places.state / "gc.json", record if measured else {**record, "measured": None})
+
+    [disk] = [g for g in rig.parts("/api/guard")["vitals"]["data"] if g["label"] == "Disk free"]
+    laptop = rig.parts("/api/home")["envs"]["data"]["laptop"]
+
+    assert (disk["value"], disk["pct"], disk["tone"], disk["hint"]) == ("112 GiB", 58, "good", hint)
+    assert [r["value"] for r in laptop["rows"] if r["label"] == "Disk"] == ["42%"]

@@ -2,7 +2,7 @@
 
 Settings are checked at start, and the start stops with every problem listed. Each pass runs the loop (vitals,
 probes, outage, inbox events), the session watch (backstop, benches, crashes), cost, plan limits, reaping and the
-nightly prune, in that order. A pass that fails is logged with its class and the next one still runs; systemd
+clean-up, in that order. A pass that fails is logged with its class and the next one still runs; systemd
 restarts the warden if the process itself dies.
 """
 
@@ -88,7 +88,7 @@ def _pull_reports(ctx: Context) -> None:
 
 def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> list[tuple[str, Pass]]:
     watch = plan.PlanWatch(plan.source(agent_home, places))
-    reaper, nightly = reap.Reaper(), gc.Nightly()
+    reaper, cleanup = reap.Reaper(), gc.Cleanup()
     return [
         ("loop", loop.run_tick),
         ("sessions", crashwatch.SessionsWatch(imports.in_thread("benches")).run_pass),
@@ -106,7 +106,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),
         ("plan", watch.run_pass),
         ("reap", reaper.run_pass),
-        ("gc", nightly.run_pass),
+        ("gc", cleanup.run_pass),
     ]
 
 
@@ -169,7 +169,7 @@ def main() -> int:
 
     server.serve_refusals(places.refusal_socket, refused)
     ready(environment.take_notify_socket())
-    transcripts = [agent_home / ".claude" / "projects", Path(owner.pw_dir) / ".claude" / "projects"]
+    transcripts = [launch.transcripts(agent_home), launch.transcripts(Path(owner.pw_dir))]
     every = passes(places, transcripts, agent_home)
     log.info("warden: serving; passes %s", ", ".join(name for name, _ in every))
     while True:

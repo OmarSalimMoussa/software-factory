@@ -1,16 +1,16 @@
 'use strict';
-/* Guard: the laptop's vitals and Docker disk, the slots, what was refused today, and every rule with its switch. */
+/* Guard: the machine's vitals and Docker disk, the slots, what was refused today, and every rule with its switch. */
 
 PAGE.guard = {
   url: () => '/api/guard',
   render: env => `<div class="page-h"><div><h1>Guard</h1></div></div>
-    ${part(env, 'vitals', v => `<div class="gauges ${env.parts.docker ? 'five' : ''}">${v.map(gauge).join('')}${dockerCard(env.parts.docker)}</div>`)}
+    ${part(env, 'vitals', v => `<div class="gauges ${env.parts.docker ? 'six' : ''}">${v.map(gauge).join('')}${dockerCard(env.parts.docker)}</div>`)}
     <section class="section"><div class="sec-h"><div class="label">Slots</div></div>${part(env, 'slots', s => s.length ? `<div class="slots-row">${s.map(slotCard).join('')}</div>` : '<div class="card empty">No slot is set up.</div>')}</section>
     <section class="section"><div class="sec-h"><div class="label">Most refusals today</div></div>${part(env, 'refusals', refusalBars)}</section>
     <section class="section"><div class="sec-h"><div class="label">Rules</div></div>${part(env, 'rules', rs => `<div class="rules">${rs.map(ruleCard).join('')}</div>`)}</section>`
 };
 const meterHTML = (pct, tone) => pct == null ? '<div class="meter unknown"></div>' : `<div class="meter"><i style="width:${pct}%;background:${toneColor(tone)}"></i></div>`;
-const gauge = g => `<div class="card gauge"><div class="label">${esc(g.label)}</div><div class="big" style="font-size:24px">${esc(g.value)}</div>${meterHTML(g.pct, g.tone)}</div>`;
+const gauge = g => `<div class="card gauge"><div class="label">${esc(g.label)}${g.hint ? ' ' + hint(g.hint) : ''}</div><div class="big" style="font-size:24px">${esc(g.value)}</div>${meterHTML(g.pct, g.tone)}</div>`;
 function dockerCard(p) {
   if (!p) return '';
   if (!p.ok) return failedPart(p.error, 'card gauge');

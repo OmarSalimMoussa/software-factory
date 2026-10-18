@@ -4,25 +4,36 @@
    "label": "Memory free",
    "value": "11.8 GiB",
    "pct": 70,
-   "tone": "good"
+   "tone": "good",
+   "hint": null
+  },
+  {
+   "label": "Disk free",
+   "value": "112 GiB",
+   "pct": 58,
+   "tone": "good",
+   "hint": "Agents' worktrees 23.0 GiB, Docker 45.3 GiB, QA recordings 2.1 GiB, transcripts 1.5 GiB, measured 2 h ago."
   },
   {
    "label": "CPU use",
    "value": "34%",
    "pct": 34,
-   "tone": "good"
+   "tone": "good",
+   "hint": null
   },
   {
    "label": "Power",
    "value": "On mains",
    "pct": 100,
-   "tone": "good"
+   "tone": "good",
+   "hint": null
   },
   {
    "label": "Install",
    "value": "Matches",
    "pct": 100,
-   "tone": "good"
+   "tone": "good",
+   "hint": null
   }
  ],
  "slots": [
