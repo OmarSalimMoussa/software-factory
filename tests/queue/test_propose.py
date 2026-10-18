@@ -35,14 +35,19 @@ def test_no_more_proposals_than_places(world: World) -> None:
     assert proposals.read(world.places).open == [third.id, second.id]
 
 
-def test_a_task_the_owner_boosted_goes_first_even_when_every_place_is_held(world: World) -> None:
+@pytest.mark.parametrize("why", ["boosted", "severe"])
+def test_a_task_the_owner_boosted_or_a_severe_one_goes_first_even_when_every_place_is_held(
+    world: World, why: str
+) -> None:
     world.with_settings(routing__max_proposals=2)
-    first, second, boosted = world.task(), world.task(), world.task()
+    first, second = world.task(), world.task()
+    urgent = world.task(severity="severe") if why == "severe" else world.task()
     _propose(world, first.id)
     _propose(world, second.id)
-    owner.boost(world.owner(), boosted.id, on=True)
-    _propose(world, boosted.id)
-    assert proposals.read(world.places).open == [boosted.id, first.id, second.id]
+    if why == "boosted":
+        owner.boost(world.owner(), urgent.id, on=True)
+    _propose(world, urgent.id)
+    assert proposals.read(world.places).open == [urgent.id, first.id, second.id]
 
 
 @pytest.mark.parametrize(

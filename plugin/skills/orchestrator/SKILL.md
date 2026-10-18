@@ -34,7 +34,7 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 | Event | What you do |
 | --- | --- |
 | `loop due` | One loop pass (below). |
-| `severe request` | Start intake on it at once (one subagent place is always kept for intake). Route its task next. |
+| `severe request` | Start intake on it at once (one subagent place is always kept for intake). Route its task next, and propose it: a severe task goes first, even when every slot is held. |
 | `prod red` | As "When something is red" says. |
 | `triage due` | Start one `triage` subagent on the batch the event names (its request ids). When it hands back, `factory triage apply`; give each new task a light intake pass. |
 | `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed, giving it the event's `since`, `prod` and `staging` addresses (staging is slot 0) and `health` path. |

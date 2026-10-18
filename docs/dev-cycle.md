@@ -12,7 +12,8 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    The rest wait for a batch, which a triage agent turns into a few tasks: each request becomes a new task, joins
    one, is noise, or is parked. `factory triage apply` checks the plan and writes all of it or none.
 3. **Proposals.** The orchestrator picks at most `routing.max_proposals` tasks that take the owner closest to the
-   goal, plans each on the cheapest rung that can do it, and proposes it with a small picture and why now.
+   goal, plans each on the cheapest rung that can do it, and proposes it with a small picture and why now. A task
+   the owner boosted, or a severe one, goes first, even when every place is held.
 4. **Approval.** The owner approves, reorders or says not now on the dashboard. Only an approved run starts.
 5. **Design, at rung 3 or 4.** A designer writes the spec, runs critics until a round raises nothing new, and
    saves a brief, one page kept on this machine with the task. The orchestrator signs off rung 3. Rung 4 goes to the

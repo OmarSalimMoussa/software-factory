@@ -44,8 +44,9 @@ def propose(
         if event == "rung-up" and (task.run is None or run <= task.run):
             raise Refused("rung-up", f"{task_id} is {task.status}; it comes back only a rung up from {task.run}")
         before = proposals.read(ctx.places)
-        if event == "propose" and not task.boosted_at:
-            # A new proposal takes the first free place; a run back a rung up, or a boosted task, goes to the top.
+        if event == "propose" and not task.boosted_at and task.severity != "severe":
+            # A new proposal takes the first free place; a run back a rung up, or a boosted or severe task, goes to the
+            # top, held off by no proposal of less weight.
             found = proposals.read(ctx.places)
             proposals.place(found, task_id, settings.get_int("routing.max_proposals"))
             proposals.write(ctx.places, found)
