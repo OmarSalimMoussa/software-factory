@@ -270,6 +270,14 @@ def test_a_sessions_own_desktop_waits_while_the_machines_cpu_use_is_past_the_hol
     assert refused.value.rule == "cpu-hold" and world.launcher.stacks == []
 
 
+def test_a_testers_desktop_up_answers_with_its_desktop_time_and_a_sessions_own_with_none(world: World) -> None:
+    up = _desktop_slot(world)
+    world.with_settings(qa__desktop_seconds=420)
+    _cpu(world, 20.0)
+    assert slot(world.ctx("implementer", "s-1", "agent-qa-1"), up, None)["desktop_seconds"] == 420
+    assert "desktop_seconds" not in slot(world.ctx("implementer", "s-1"), up, None)
+
+
 def test_a_testers_desktop_is_part_of_the_walk_the_hold_let_start_so_it_never_waits(world: World) -> None:
     up = _desktop_slot(world)
     _cpu(world, None)

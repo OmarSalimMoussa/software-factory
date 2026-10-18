@@ -112,10 +112,9 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     verb = _verb(op, args)
     if op in _CHANGES_STACK:
         _may_change(ctx, session, n, verb)
-    if op == "desktop":
-        _desktop_lease(ctx, n, verb)
+    extra = _desktop_lease(ctx, n, verb) if op == "desktop" else {}
     result = ctx.launcher.run_stack(n, verb, session.id)
-    return _answer(ctx, n, result)
+    return {**_answer(ctx, n, result), **extra}
 
 
 def _may_change(ctx: Context, session: Session, n: int, verb: list[str]) -> None:
@@ -127,8 +126,8 @@ def _may_change(ctx: Context, session: Session, n: int, verb: list[str]) -> None
         raise Refused("slot", f"{names} still testing slot {n}: change its stack once they report")
 
 
-def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> None:
-    """A tester's `desktop up` takes the slot's desktop while no other tester holds it, within caps.desktops_at_once."""
+def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> dict[str, int]:
+    """A tester's `desktop up` takes a desktop no other tester holds, within caps.desktops_at_once; its time too."""
     agent = ctx.caller.agent_id
     if agent and verb[1] != "up":
         raise Refused("slot", "the factory takes your desktop down once you hand back: nothing to run")
@@ -144,6 +143,7 @@ def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> None:
         else:
             held.pop(str(n), None)
         store.write_json(public.desktops_path(ctx.places), held)
+    return {"desktop_seconds": ctx.settings().get_int("qa.desktop_seconds")} if agent else {}
 
 
 def _may_take(ctx: Context, n: int, agent: str, held: dict[str, str]) -> None:

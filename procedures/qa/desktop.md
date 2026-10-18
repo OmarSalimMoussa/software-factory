@@ -5,9 +5,9 @@ per slot: a real desktop whose view is a live video in a web page. A tester work
 a screenshot, then a click or a key at a point on the video.
 
 Use it only for the steps that need it. One tester holds a slot's desktop at a time, and the machine runs only a few
-desktops at once; each tester holds one for the desktop time its brief gives in all, counted from its first
-`desktop up`. The time `desktop up` takes is not counted. When the factory refuses a desktop, test what needs none
-first, then try again.
+desktops at once. Each tester holds one for the seconds its `desktop up` answers with (`desktop_seconds`), whatever a
+brief or the product's own notes say, counted from its first `desktop up`. The time `desktop up` takes is not
+counted. When the factory refuses a desktop, test what needs none first, then try again.
 
 ## 1. Open it
 
