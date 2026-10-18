@@ -150,7 +150,11 @@ class Tools:
             if text in page:
                 return f"“{text}” shows, after {duration(waited)}.\n\n{page}"
             if waited + self.reload_seconds > ceiling:
-                return f"“{text}” did not show within {duration(ceiling)}{capped}. The page now:\n\n{page}"
+                # Said at the miss: testers take a wait that missed words in a live view as the step blocked.
+                return (
+                    f"“{text}” did not show in the page's text within {duration(ceiling)}{capped}. Words drawn in "
+                    f"a picture or a live view are no page text: a screenshot shows them. The page now:\n\n{page}"
+                )
             if cancelled.wait(self.reload_seconds):
                 raise ToolError("the wait was cancelled")
             found = PAGE_URL.search(page)

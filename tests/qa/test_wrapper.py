@@ -316,7 +316,10 @@ def test_a_wait_never_lasts_past_the_factorys_ceiling() -> None:
     browser = Browser(["- Page URL: https://app.test/jobs/7\nBuilding"] * 3)
     said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 90}, 30, 1)
     assert not failed
-    assert said.startswith("“Ready” did not show within 1 min (the most one wait may last is 1 min). The page now:")
+    assert said.startswith(
+        "“Ready” did not show in the page's text within 1 min (the most one wait may last is 1 min). "
+        "Words drawn in a picture or a live view are no page text: a screenshot shows them."
+    )
 
 
 def test_a_cancelled_wait_stops_at_its_next_reload() -> None:
