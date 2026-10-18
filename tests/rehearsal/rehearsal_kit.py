@@ -261,7 +261,7 @@ class Rehearsal:
     def body(self, folder: Path, name: str, data: bytes) -> str:
         """A body a caller hands the factory command: a file under its checkout's .factory/, which git ignores."""
         path = folder / SCRATCH / name
-        path.parent.mkdir(exist_ok=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
         return str(path)
 

@@ -28,6 +28,13 @@ CHECK_TOOLS = Path("/opt/software-factory-tools")
 # Where a session writes a body it hands the factory command, inside its worktree; git ignores it (the installer adds
 # it to the checkout's info/exclude), so it never counts as uncommitted work.
 SCRATCH = ".factory"
+
+
+def scratch_of(agent_id: str) -> str:
+    """A tester's own scratch folder: the testers of one worktree run at once, and never write the same file."""
+    return f"{SCRATCH}/{agent_id}"
+
+
 WARDEN_USER = "software-warden"
 AGENT_USER = "software-agent"
 DASHBOARD_USER = "software-dashboard"  # contract: added by 1B-3, the one other user owner.sock answers

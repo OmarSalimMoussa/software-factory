@@ -12,6 +12,7 @@ from rehearsal_kit import Rehearsal, at_once, build, git
 from runtime.queue import format_check, turn
 from runtime.queue.book import Queue
 from runtime.shared.models import BENCH_PENDING, FINISHED, RETIRED, WORKING
+from runtime.shared.paths import scratch_of
 from runtime.warden import checks, loop
 from runtime.warden.delivery import deploys, done
 from runtime.warden.health import cpu_budget, probes
@@ -152,8 +153,8 @@ def _built_and_tested(r: Rehearsal, impl: str, worktree: Path) -> list[str]:
     for n, tester in enumerate(testers):
         agent = f"a{n}7f3c9e1d2b4a6"
         r.hook(impl, "subagent.start", {"agent_id": agent, "kind": tester})
-        r.session(impl, ["ready-check"], agent_id=agent)
-        note = r.body(worktree, f"finding-{n}.md", b"The empty list says nothing about how to add a note.\n")
+        assert r.session(impl, ["ready-check"], agent_id=agent)["folder"] == scratch_of(agent)
+        note = r.body(worktree, f"{agent}/finding-{n}.md", b"The empty list says nothing about how to add a note.\n")
         finding = ["qa", "finding", "--head", head, "--severity", "minor", "--where", "/notes", "--body", note]
         r.session(impl, finding, agent_id=agent)
         assert r.session(impl, ["qa", "result", "--head", head], agent_id=agent)["minors"] == 1

@@ -18,6 +18,7 @@ from runtime.queue.formats import SHA
 from runtime.queue.statuses import IMPL
 from runtime.shared import slices, store
 from runtime.shared.models import RETIRED, TESTER, Session, Task
+from runtime.shared.paths import scratch_of
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import health, leases
 from runtime.warden.context import Context
@@ -179,7 +180,7 @@ def _touched(ctx: Context, session: Session, task: Task, tested: str, head: str)
 
 
 def ready_check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """A tester's first step: the last ready record still holds, and the slot still runs its head."""
+    """A tester's first step: the last ready record still holds, the slot runs its head; and the tester's folder."""
     session = _implementer(ctx)
     records = ready_records(ctx, session)
     if not records:
@@ -189,7 +190,8 @@ def ready_check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
     why = health.off_head(ctx, int(latest["slot"]), session.id, head)
     if why is not None:
         raise Refused("ready-check", f"not ready: {why}")
-    return ok(head=head, slot=latest["slot"], testers=latest.get("testers", []))
+    folder = {"folder": scratch_of(ctx.caller.agent_id)} if ctx.caller.agent_id else {}
+    return ok(head=head, slot=latest["slot"], testers=latest.get("testers", []), **folder)
 
 
 def _tester_on_head(ctx: Context, args: dict[str, Any], verb: str) -> tuple[Session, Session, str]:

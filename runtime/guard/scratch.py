@@ -1,11 +1,11 @@
 """Who writes where in the product's checkouts, beyond the protected paths.
 
 A subagent reads and reports (`subagent-writes`): in any checkout of the product it writes only in its session's
-scratch folder, `.factory/` in the worktree, and it runs only git commands that read, so no tester or critic can
-reset, stash or edit the implementer's uncommitted work. The orchestrator steers and never writes product code
-(`orchestrator-writes`): in its checkout it writes only to `.factory/`, and on the default branch it commits only to
-finish a merge or a revert, while git holds MERGE_HEAD or REVERT_HEAD; a revert's commit keeps git's line naming the
-commit it takes back.
+scratch folder, `.factory/` in the worktree, a tester only in its own folder there, and it runs only git commands that
+read, so no tester or critic can reset, stash or edit the implementer's uncommitted work. The orchestrator steers and
+never writes product code (`orchestrator-writes`): in its checkout it writes only to `.factory/`, and on the default
+branch it commits only to finish a merge or a revert, while git holds MERGE_HEAD or REVERT_HEAD; a revert's commit
+keeps git's line naming the commit it takes back.
 """
 
 from __future__ import annotations
@@ -15,7 +15,8 @@ from pathlib import Path
 
 from runtime.guard import git_rules, shell, writes
 from runtime.guard.facts import ORCHESTRATOR, Call, Decision, Refusal, inside, resolve
-from runtime.shared.paths import SCRATCH
+from runtime.shared.models import TESTER
+from runtime.shared.paths import SCRATCH, scratch_of
 
 # git commands that only read, beyond git_rules.READS (which an unpermitted session may also run).
 _READS = git_rules.READS | frozenset(
@@ -33,8 +34,12 @@ def _rule(call: Call) -> str:
     return "subagent-writes" if call.in_subagent else "orchestrator-writes"
 
 
+def _folder(call: Call) -> str:
+    return scratch_of(call.agent_id) if call.in_subagent and call.agent_type.startswith(TESTER) else SCRATCH
+
+
 def in_scratch(call: Call, path: Path) -> bool:
-    return inside(Path(os.path.realpath(path)), Path(os.path.realpath(call.worktree)) / SCRATCH)
+    return inside(Path(os.path.realpath(path)), Path(os.path.realpath(call.worktree)) / _folder(call))
 
 
 def _refused_at(call: Call, path: Path) -> Refusal | None:
@@ -45,7 +50,8 @@ def _refused_at(call: Call, path: Path) -> Refusal | None:
     if not any(inside(real, root) for root in writes.product_roots(call)):
         return None
     if call.in_subagent:
-        return Refusal("subagent-writes", f"a subagent writes only in {call.worktree / SCRATCH}; report to your parent")
+        where = call.worktree / _folder(call)
+        return Refusal("subagent-writes", f"a subagent writes only in {where}; report to your parent")
     return Refusal("orchestrator-writes", f"you never write product code; write only in {call.worktree / SCRATCH}")
 
 

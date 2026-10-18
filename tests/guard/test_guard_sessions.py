@@ -106,7 +106,7 @@ def test_a_subagent_of_a_session_being_benched_is_told_to_report_and_hand_back(
 
 
 @pytest.mark.parametrize(
-    ("file", "refused"), [(".factory/f-1.md", False), ("app/notes.py", True)], ids=["its-report", "the-code"]
+    ("file", "refused"), [(".factory/a1b2c3/f-1.md", False), ("app/notes.py", True)], ids=["its-report", "the-code"]
 )
 def test_a_tester_of_a_session_being_benched_still_writes_its_report(tmp_path: Path, file: str, refused: bool) -> None:
     kit = Kit(tmp_path)

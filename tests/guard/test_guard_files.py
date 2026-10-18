@@ -260,6 +260,22 @@ def test_a_subagents_edit_tool_writes_only_in_its_sessions_scratch(tmp_path: Pat
 
 
 @pytest.mark.parametrize(
+    ("path", "rule"),
+    [(f".factory/{TESTER_ID}/f-1.md", None), (".factory/f-1.md", "subagent-writes"), (".factory/b77/f-1.md",
+     "subagent-writes")],
+    ids=["its-own-folder", "the-shared-folder", "another-testers-folder"],
+)  # fmt: skip
+def test_a_tester_writes_only_in_its_own_folder_as_testers_of_one_worktree_run_at_once(
+    tmp_path: Path, path: str, rule: str | None
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
+    asked = {"file_path": str(kit.worktree / path), "content": "Save fails."}
+    assert kit.rule("Write", asked, agent_id=TESTER_ID, agent_type="qa-visual") == rule
+
+
+@pytest.mark.parametrize(
     ("finishing", "command", "rule"),
     [
         ("", "git commit -m fix", "orchestrator-writes"),

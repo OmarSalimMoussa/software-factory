@@ -58,8 +58,8 @@ Nielsen's ten usability heuristics, and the voice `GOAL.md` sets:
 ## Report
 
 One finding per problem: severity (`blocker`, `major` or `minor`), the flow and step, what the customer would do or
-think, why it is a problem, the change you recommend (exact wording for copy), and the screenshot's file name. Record each finding as you find it, on the head `factory ready-check` named: its text to a file under
-`.factory/` with the Write tool, then `factory qa finding --head <sha> --severity <s> --where "<where>" --body
+think, why it is a problem, the change you recommend (exact wording for copy), and the screenshot's file name. Record each finding as you find it, on the head `factory ready-check` named: its text to a file in the
+folder it names, with the Write tool, then `factory qa finding --head <sha> --severity <s> --where "<where>" --body
 <file>`. Last, `factory qa result --head <sha>`: your verdict is counted from the findings you recorded.
 
 ## Never
