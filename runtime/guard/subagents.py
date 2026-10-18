@@ -358,8 +358,7 @@ def check_intake_time(call: Call) -> Decision:
 
 
 def _time_left(call: Call) -> float | Refusal:
-    """Seconds left of the tester's budget: its items' time, and at most the desktop time once it drives the
-    remote desktop."""
+    """Seconds left of the tester's budget: its items' time, and its desktop time once it drives the remote desktop."""
     path = transcript.subagent_transcript(call.transcript, call.agent_id)
     try:
         brief, started = transcript.first_brief(path)
@@ -368,21 +367,23 @@ def _time_left(call: Call) -> float | Refusal:
     except transcript.BriefError as exc:
         return _time_up(call, f"your time budget cannot be read ({exc})")
     budget = float(_budget(call, items))
-    desktop_s = call.settings.get_int("qa.desktop_seconds")
-    spent = (call.now - started).total_seconds() - _desktop_starts(call, path)
-    # Desktop time is a tester's that holds a slot's desktop lease: a mouse step on a web page is no desktop use.
+    first_up, in_ups = _desktop_starts(call, path)
+    spent = (call.now - started).total_seconds() - in_ups
+    # Only a tester holding a slot's desktop, from its first `desktop up`: web steps before it take none of that time.
     if call.agent_id in read_desktops(call.places).values():
-        if spent >= desktop_s:
+        desktop_s = call.settings.get_int("qa.desktop_seconds")
+        on_desktop = (call.now - (first_up or started)).total_seconds() - in_ups
+        if on_desktop >= desktop_s:
             return _time_up(call, f"the desktop is a tester's for {desktop_s} s, and goes down once you hand back")
-        budget = min(budget, desktop_s)
+        budget = min(budget, spent + desktop_s - on_desktop)
     return budget - spent if budget > spent else _time_up(call, "your time is up")
 
 
-def _desktop_starts(call: Call, path: Path) -> float:
-    """Seconds in `factory slot desktop up` (one running counts to now): the factory's time, not the tester's."""
+def _desktop_starts(call: Call, path: Path) -> tuple[datetime | None, float]:
+    """The tester's first `factory slot desktop up`, and the seconds in them all (the factory's, not the tester's)."""
     ups = [use for use in transcript.tool_uses(path, frozenset({"Bash"})) if _starts_desktop(use.args.get("command"))]
-    answered = transcript.answered(path) if ups else {}
-    return sum((answered.get(use.tool_use_id, call.now) - use.when).total_seconds() for use in ups)
+    done = transcript.answered(path) if ups else {}
+    return ups[0].when if ups else None, sum((done.get(u.tool_use_id, call.now) - u.when).total_seconds() for u in ups)
 
 
 def _starts_desktop(command: object) -> bool:

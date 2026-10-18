@@ -351,6 +351,22 @@ def test_a_testers_clock_stops_while_the_factory_starts_its_desktop(
     assert (kit.rule("mcp__computer-use__screenshot", {}, **tester) == "tester-time") is refused
 
 
+@pytest.mark.parametrize(("up_ago", "refused"), [(120, False), (330, True)], ids=["within", "past"])
+def test_a_testers_desktop_time_counts_from_its_first_desktop_up_so_its_web_items_take_none(
+    tmp_path: Path, up_ago: int, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    up, view = bash_use("d1", "factory slot desktop up qa-admin@notes.test"), result("d1", "view: http://x password: p")
+    lines = [entry(NOW - timedelta(seconds=900), "user", "Scenarios and checks: 10"),
+             entry(NOW - timedelta(seconds=up_ago), "assistant", [up]),
+             entry(NOW - timedelta(seconds=up_ago - 20), "user", [view])]  # fmt: skip
+    kit.subagent(TESTER_ID, lines)
+    store.write_json(kit.public / "desktops.json", {"2": TESTER_ID})
+    tester = {"agent_id": TESTER_ID, "agent_type": "qa-ui-function"}
+    assert (kit.rule("mcp__computer-use__screenshot", {}, **tester) == "tester-time") is refused
+
+
 @pytest.mark.parametrize(
     ("running", "age", "level", "refused"),
     [
