@@ -286,6 +286,47 @@ def test_the_restarts_verb_fails_when_docker_cannot_say(
     assert "restarts: inspecting the containers failed: Cannot connect to the Docker daemon" in capsys.readouterr().out
 
 
+def test_top_prints_each_container_running_for_the_slot_with_its_processes_cpu_and_names_alone(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    asked: list[list[str]] = []
+    answers = {
+        "container ls": "0123456789ab\n",
+        "network ls": "n-slot2\n",
+        "network inspect": "fedcba9876543210fedcba98 \n",  # a visit the product started, with no slot label
+        "container stats": "0123456789ab notes-slot2-web 2.10% CPU, 90MiB / 1GiB\n"
+        "fedcba987654 notes-signin-1 150.00% CPU, 600MiB / 2GiB\n",
+        "container top": "%CPU ELAPSED COMMAND\n140 01:02 neko\n 9.5 01:02 chromium\n",
+    }
+
+    def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+        asked.append(args)
+        return subprocess.CompletedProcess(args, 0, answers[" ".join(args[:2])], "")
+
+    monkeypatch.setattr(stack_run, "_docker", docker)
+
+    assert stack_run.top(SLOT, 30) == 0
+
+    printed = capsys.readouterr().out
+    assert "notes-slot2-web 2.10% CPU" in printed and "notes-signin-1 150.00% CPU" in printed
+    assert "  140 01:02 neko" in printed
+    stats = next(a for a in asked if a[:2] == ["container", "stats"])
+    assert stats[-2:] == ["0123456789ab", "fedcba987654"]
+    assert all(a[-1] == "pcpu,etime,comm" for a in asked if a[:2] == ["container", "top"])
+
+
+def test_top_fails_when_docker_cannot_list_the_slots_containers(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(args, 1, "", "Cannot connect to the Docker daemon\n")
+
+    monkeypatch.setattr(stack_run, "_docker", docker)
+
+    assert stack_run.top(SLOT, 30) == 1
+    assert "top: listing slot 2's containers failed: Cannot connect" in capsys.readouterr().out
+
+
 def test_the_nightly_prune_removes_only_slot_images_since_prods_share_the_docker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

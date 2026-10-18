@@ -22,8 +22,10 @@ KEYS = ("holder", "since", "note")
 # The stack unit's own verbs, beside the product's scripts/dev verbs. SWEEP removes every container, volume, network
 # and image labelled with the request's slot, and every container still on one of its networks. PRUNE <hours> removes
 # the build cache and the unused slot-labelled images older than that; DISK prints the bytes Docker's data takes,
-# alone on its last line. RESTARTS prints how many times Docker restarted each container.
+# alone on its last line. RESTARTS prints how many times Docker restarted each container. TOP prints the CPU of each
+# container running for the request's slot, and of each process in it.
 SWEEP, PRUNE, DISK, RESTARTS = "factory-sweep-slot", "factory-prune", "factory-disk", "factory-restarts"
+TOP = "factory-top"
 # The product's optional slot verbs, which the stack unit runs only once `scripts/dev verbs` lists them: run <service>
 # -- <command…> runs one command in a new container of a slot's service; restart <service…> restarts running ones.
 RUN, RESTART = "run", "restart"

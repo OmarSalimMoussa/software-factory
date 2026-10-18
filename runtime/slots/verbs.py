@@ -4,12 +4,13 @@ The slot is always worked out from the caller's lease, never from an argument: s
 implementer has the slot it claimed, and its testers share it. A stack command before ``claim`` is refused. The
 answer carries scripts/dev's exit status and the tail of its output; the full log stays the owner's.
 
-A tester only reads its slot, signs in and opens its desktop: seeds and the stack are its parent's. The slot's own
-session, an implementer or the orchestrator, may run one command in a new container of a service, such as a scenario's
-set-up; so may its backend and security testers, to look from inside the slot's network. One tester holds a slot's
-desktop at a time, until its parent or, once it hands back, the warden takes it down; another tester's `desktop up`
-waits, so no one's new password cuts off a tester mid-step. Slot 0 is staging, so it comes up whole: one build of the
-stack, never a service at a time. No stack changes under a tester still walking it.
+A tester only reads its slot and what runs on it, signs in and opens its desktop: seeds and the stack are its
+parent's. The slot's own session, an implementer or the orchestrator, may run one command in a new container of a
+service, such as a scenario's set-up; so may its backend and security testers, to look from inside the slot's
+network. One tester holds a slot's desktop at a time, until its parent or, once it hands back, the warden takes it
+down; another tester's `desktop up` waits, so no one's new password cuts off a tester mid-step. Slot 0 is staging, so
+it comes up whole: one build of the stack, never a service at a time. No stack changes under a tester still walking
+it.
 """
 
 from __future__ import annotations
@@ -30,9 +31,10 @@ from runtime.warden.verbs import BACKEND, IMPL, ORCH, SECURITY
 WORD = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@+-]{0,127}$")
 EMAIL = re.compile(r"^[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
 # Verbs a tester may run on its implementer's slot; the rest change the stack and are the implementer's own.
-TESTER_OPS = frozenset({"list", "which", "sign-in", "desktop"})
+TESTER_OPS = frozenset({"list", "which", "sign-in", "desktop", "top"})
 RUNNER_OPS = TESTER_OPS | {leases.RUN}
 _CHANGES_STACK = frozenset({"up", "down", leases.RESTART})
+_FIXED = {"down": ["down"], "top": [leases.TOP]}
 
 
 def _session(ctx: Context) -> Session:
@@ -150,8 +152,8 @@ def _verb(op: object, args: dict[str, Any]) -> list[str]:
     """The scripts/dev command line for one slot operation, from checked words only."""
     if op in ("up", leases.RESTART):
         return _services_verb(str(op), args)
-    if op == "down":
-        return ["down"]
+    if isinstance(op, str) and op in _FIXED:
+        return list(_FIXED[op])
     if op == "sign-in":
         return ["sign-in", _email(args.get("email"))]
     if op == "seed":
@@ -163,7 +165,7 @@ def _verb(op: object, args: dict[str, Any]) -> list[str]:
     raise Refused(
         "args",
         f"{op!r} is not a slot verb: claim, up, down, restart <service…>, release, free, list, sign-in, seed, "
-        "desktop, run",
+        "desktop, run, top",
     )
 
 

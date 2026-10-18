@@ -137,6 +137,17 @@ def test_a_slots_own_session_and_its_backend_and_security_testers_run_any_comman
         slot(world.ctx("implementer", "s-1", "agent-ux-1", "qa-ux"), run, None)
 
 
+def test_a_slots_session_and_any_of_its_testers_read_what_runs_on_it(world: World) -> None:
+    _implementer(world, 1)
+    slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)
+    world.launcher.stack = lambda n, verb: StackResult(0, "notes-slot1-web 2.0% CPU, 90MiB / 1GiB\n", "/log")
+
+    for caller in (world.ctx("implementer", "s-1"), world.ctx("implementer", "s-1", "agent-ux-1", "qa-ux")):
+        assert "2.0% CPU" in slot(caller, {"op": "top"}, None)["tail"]
+
+    assert world.launcher.stacks == [(1, [leases.TOP])] * 2
+
+
 @pytest.mark.parametrize(
     ("exit_code", "woke", "noted"),
     [(1, "2026-10-09T11:55:00Z", True), (1, "2026-10-09T11:00:00Z", False), (0, "2026-10-09T11:55:00Z", False)],

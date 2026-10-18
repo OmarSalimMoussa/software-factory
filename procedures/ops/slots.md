@@ -13,6 +13,7 @@ A slot is one running copy of the product on the laptop. The factory decides who
 | `factory slot release` | the holder | Gives the slot back once your work is checked |
 | `factory slot free <n>` | the orchestrator | Frees a slot whose work is finished |
 | `factory slot list` | anyone | Who holds which slot, since when, and why |
+| `factory slot top` | the holder and its testers | The CPU and memory of each container running for the slot, the product's own run-time ones included, and the CPU, run time and name of each process in it. Quote it to prove a change costs less CPU |
 | `factory slot sign-in`, `seed …`, `desktop …` | as their procedures say | `qa/sign-in.md`, `qa/seeds.md`, `qa/desktop.md` |
 
 - **Slot 0** belongs to the main checkout: the orchestrator's check of the default branch.

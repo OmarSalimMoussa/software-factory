@@ -175,6 +175,7 @@ def _slot(sub: Any) -> None:
     ops.add_parser("restart", help="restart the named services, running ones").add_argument("services", nargs="+")
     for name in ("down", "release", "list"):
         ops.add_parser(name)
+    ops.add_parser("top", help="the CPU of each container running for your slot, and of each process in it")
     ops.add_parser("free").add_argument("slot", type=int)
     ops.add_parser("sign-in").add_argument("email")
     seed = ops.add_parser("seed")

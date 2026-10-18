@@ -35,6 +35,8 @@ RUN_LABEL = "software.run"
 COMPOSE_PROJECT = "com.docker.compose.project"
 # Only these fields, so nothing a container's settings hold (its environment's secrets) is ever printed.
 _COUNT = '{"id":{{json .Id}},"name":{{json .Name}},"restarts":{{.RestartCount}},"labels":{{json .Config.Labels}}}'
+_STATS = "{{.ID}} {{.Name}} {{.CPUPerc}} CPU, {{.MemUsage}}"
+_MEMBERS = "{{range $id, $c := .Containers}}{{$id}} {{end}}"
 EMPTY = "empty"
 # The verbs that start a slot's containers; each then runs below prod's, so prod answers first on a busy machine.
 _STARTS = frozenset({"up", "desktop", leases.RESTART})
@@ -123,6 +125,34 @@ def restarts(timeout: int) -> int:
         found = {"id": raw["id"][:12], "name": raw["name"].lstrip("/"), "restarts": raw["restarts"]}
         print(json.dumps(found | {"slot": labels.get(SLOT_LABEL, ""), "project": labels.get(COMPOSE_PROJECT, "")}),
               flush=True)  # fmt: skip
+    return 0
+
+
+def top(slot: int, timeout: int) -> int:
+    """Each container running for the slot, its own and those still on its networks, with its CPU and memory, then
+    each of its processes' CPU, run time and name: names alone, since a command line can carry a secret."""
+    listed = _docker(["container", "ls", "-q", "--filter", f"label={SLOT_LABEL}={slot}"], timeout)
+    networks = _docker(["network", "ls", "-q", "--filter", f"label={SLOT_LABEL}={slot}"], timeout)
+    if listed.returncode != 0 or networks.returncode != 0:
+        said = (listed.stderr + networks.stderr).strip()[-300:]
+        print(f"top: listing slot {slot}'s containers failed: {said}", flush=True)
+        return 1
+    ids = {cid[:12] for cid in listed.stdout.split()}
+    for network in networks.stdout.split():
+        on = _docker(["network", "inspect", "--format", _MEMBERS, network], timeout)
+        ids |= {cid[:12] for cid in on.stdout.split()}
+    if not ids:
+        print(f"top: slot {slot} runs no container", flush=True)
+        return 0
+    stats = _docker(["container", "stats", "--no-stream", "--format", _STATS, *sorted(ids)], timeout)
+    if _failed(stats):
+        print(f"top: reading slot {slot}'s containers' CPU failed: {stats.stderr.strip()[-300:]}", flush=True)
+        return 1
+    for line in sorted(stats.stdout.splitlines()):
+        cid, _, said = line.partition(" ")
+        print(said, flush=True)
+        for row in _docker(["container", "top", cid, "-eo", "pcpu,etime,comm"], timeout).stdout.splitlines()[1:]:
+            print(f"  {row.strip()}", flush=True)
     return 0
 
 
@@ -308,6 +338,8 @@ def _own_verb(slot: int, verb: list[str], timeout: int) -> int | None:
         return disk(timeout)
     if verb[0] == lf.RESTARTS:
         return restarts(timeout)
+    if verb[0] == lf.TOP:
+        return top(slot, timeout)
     return None
 
 
