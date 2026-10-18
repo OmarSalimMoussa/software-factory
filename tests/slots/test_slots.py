@@ -12,6 +12,7 @@ from runtime.shared import store
 from runtime.shared.models import RETIRED
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
+from runtime.slots import verbs as slots_verbs
 from runtime.slots.verbs import slot
 from runtime.warden import public
 from runtime.warden.context import StackResult
@@ -186,6 +187,7 @@ def test_the_orchestrator_frees_only_a_finished_sessions_slot(world: World) -> N
 
 
 def test_one_tester_holds_a_slots_desktop_until_the_warden_or_its_parent_takes_it_down(world: World) -> None:
+    world.with_settings(qa__desktop_wait_minutes=0)
     _implementer(world, 1)
     for agent in ("agent-qa-1", "agent-qa-2", "agent-qa-3"):
         world.session(agent, "qa-ux", f"impl-t-0001.{agent}", "t-0001", "/wt/impl-t-0001", agent_id=agent)
@@ -211,7 +213,7 @@ def test_one_tester_holds_a_slots_desktop_until_the_warden_or_its_parent_takes_i
 
 
 def test_the_machine_runs_at_most_its_cap_of_desktops_and_a_finished_testers_counts_for_nothing(world: World) -> None:
-    world.with_settings(slots__count=3, caps__desktops_at_once=2)
+    world.with_settings(slots__count=3, caps__desktops_at_once=2, qa__desktop_wait_minutes=0)
     for n in (1, 2, 3):
         _implementer(world, n)
         world.session(f"agent-qa-{n}", "qa-ux", f"impl-t-000{n}.qa", f"t-000{n}", f"/wt/impl-t-000{n}",
@@ -228,6 +230,39 @@ def test_the_machine_runs_at_most_its_cap_of_desktops_and_a_finished_testers_cou
     registry.write(world.places, sessions)
     slot(world.ctx("implementer", "s-3", "agent-qa-3"), up, None)
     assert [n for n, _ in world.launcher.stacks] == [1, 2, 3]
+
+
+@pytest.mark.parametrize("frees", [True, False], ids=["its-holder-hands-back", "none-frees-in-time"])
+def test_a_testers_desktop_up_waits_for_a_desktop_to_free_then_takes_it_or_is_refused(
+    world: World, monkeypatch: pytest.MonkeyPatch, frees: bool
+) -> None:
+    world.with_settings(slots__count=2, caps__desktops_at_once=1, qa__desktop_wait_minutes=5)
+    for n in (1, 2):
+        _implementer(world, n)
+        world.session(f"agent-qa-{n}", "qa-ux", f"impl-t-000{n}.qa", f"t-000{n}", f"/wt/impl-t-000{n}",
+                      agent_id=f"agent-qa-{n}")  # fmt: skip
+        slot(world.ctx("implementer", f"s-{n}"), {"op": "claim"}, None)
+    up = {"op": "desktop", "desktop": ["up", "tester-1@example.com"]}
+    slot(world.ctx("implementer", "s-1", "agent-qa-1"), up, None)
+
+    ticks: list[float] = []
+
+    def tick(seconds: float) -> None:
+        ticks.append(seconds)
+        world.clock.at += 60
+        if frees and len(ticks) == 2:  # its holder hands back two minutes in
+            sessions = registry.read(world.places)
+            sessions["agent-qa-1"].state = RETIRED
+            registry.write(world.places, sessions)
+
+    monkeypatch.setattr(slots_verbs.time, "sleep", tick)
+    if frees:
+        slot(world.ctx("implementer", "s-2", "agent-qa-2"), up, None)
+        assert [n for n, _ in world.launcher.stacks] == [1, 2]
+    else:
+        with pytest.raises(Refused, match="1 desktops are up on this machine, its cap of 1"):
+            slot(world.ctx("implementer", "s-2", "agent-qa-2"), up, None)
+        assert [n for n, _ in world.launcher.stacks] == [1]
 
 
 def _desktop_slot(world: World) -> dict[str, object]:

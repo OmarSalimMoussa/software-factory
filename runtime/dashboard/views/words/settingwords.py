@@ -62,6 +62,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("qa.setup_seconds", "Seconds for each tester to start"),
             ("qa.max_items", "Items per brief"),
             ("qa.desktop_seconds", "Desktop seconds per tester"),
+            ("qa.desktop_wait_minutes", "Minutes a tester waits for a desktop to free"),
             ("qa.evidence_days", "Days evidence is kept"),
             ("qa.widths", "Screen widths testers use"),
             ("qa.viewport_height", "Tester screen height"),

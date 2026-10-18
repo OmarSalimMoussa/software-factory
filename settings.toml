@@ -52,6 +52,8 @@ seconds_per_item = 120
 setup_seconds = 180     # added once to each tester's time, for its start-up and sign-in
 max_items = 10
 desktop_seconds = 300
+desktop_wait_minutes = 5  # a tester's desktop up waits this long for a desktop to free before it is refused, on
+                          # the factory's time: it and desktop up's own minutes fit one shell call's longest wait
 evidence_days = 14
 widths = [1440, 1024, 390]
 quiet_seconds = 120     # a tester with no result stops holding a place after this much quiet, its budget spent

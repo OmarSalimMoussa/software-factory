@@ -18,6 +18,7 @@ stack, never a service at a time. No stack changes under a tester still walking 
 from __future__ import annotations
 
 import re
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -124,10 +125,22 @@ def _may_change(ctx: Context, session: Session, n: int, verb: list[str]) -> None
 
 
 def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> dict[str, int]:
-    """A tester's `desktop up` takes a desktop no other tester holds, within caps.desktops_at_once; its time too."""
+    """A tester's `desktop up` takes a desktop no other tester holds, within caps.desktops_at_once; its time too. One
+    taken waits for it to free, up to qa.desktop_wait_minutes: a tester's clock stops while its `desktop up` runs."""
     agent = ctx.caller.agent_id
     if agent and verb[1] != "up":
         raise Refused("slot", "the factory takes your desktop down once you hand back: nothing to run")
+    deadline = ctx.clock.now() + ctx.settings().get_int("qa.desktop_wait_minutes") * 60
+    while True:
+        try:
+            return _take_desktop(ctx, n, verb, agent)
+        except Refused as exc:
+            if not agent or exc.rule != "desktop" or ctx.clock.now() >= deadline:
+                raise
+        time.sleep(ctx.settings().get_int("watch.tick_seconds"))
+
+
+def _take_desktop(ctx: Context, n: int, verb: list[str], agent: str) -> dict[str, int]:
     with ctx.lock:
         held = read_desktops(ctx.places)
         if agent:

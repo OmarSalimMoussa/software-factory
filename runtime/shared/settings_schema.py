@@ -61,6 +61,7 @@ SCHEMA: dict[str, Spec] = {
     "qa.max_items": Spec("int", 1, 20),
     "qa.prod_every_hours": Spec("int", 1, 168),
     "qa.desktop_seconds": Spec("int", 60, 900),
+    "qa.desktop_wait_minutes": Spec("int", 0, 6),
     "qa.evidence_days": Spec("int", 1, 60),
     "qa.widths": Spec("list", 1, 6, item="int"),
     "qa.quiet_seconds": Spec("int", 30, 900),
