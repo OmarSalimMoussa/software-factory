@@ -373,7 +373,7 @@ def _time_left(call: Call) -> float | Refusal:
     # Desktop time is a tester's that holds a slot's desktop lease: a mouse step on a web page is no desktop use.
     if call.agent_id in read_desktops(call.places).values():
         if spent >= desktop_s:
-            return _time_up(call, f"the remote desktop is for a tester's first {desktop_s} s")
+            return _time_up(call, f"the desktop is a tester's for {desktop_s} s, and goes down once you hand back")
         budget = min(budget, desktop_s)
     return budget - spent if budget > spent else _time_up(call, "your time is up")
 
