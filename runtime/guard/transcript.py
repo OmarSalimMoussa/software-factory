@@ -7,6 +7,7 @@ subagents a session started and which still run, the tool calls it made, and the
 
 from __future__ import annotations
 
+import bisect
 import json
 import re
 from collections.abc import Iterator
@@ -24,6 +25,7 @@ _HANDBACK_ID = re.compile(r'<agent-message from="([A-Za-z0-9_-]+)">\s*\[Subagent
 _DONE = re.compile(r"<status>(completed|failed|killed|stopped|cancelled)</status>")
 # A real brief is a few kilobytes; a longer first line is not one Claude Code wrote.
 _FIRST_LINE_LIMIT = 1_000_000
+_NEWLINE = re.compile(b"\n")
 
 
 class BriefError(Exception):
@@ -45,8 +47,8 @@ class AgentCall:
 
 
 # One decision asks a transcript several times, and a long session's runs to megabytes, slow to parse on a busy
-# machine: the last one read stays parsed until it changes or the next decision begins (forget).
-_last: tuple[tuple[Path, int, int], list[dict[str, Any]]] | None = None
+# machine: the last one read stays read until it changes or the next decision begins (forget), each line parsed once.
+_last: tuple[tuple[Path, int, int], bytes, list[int], dict[int, dict[str, Any] | None]] | None = None
 
 
 def forget() -> None:
@@ -54,26 +56,47 @@ def forget() -> None:
     _last = None
 
 
-def entries(path: Path) -> Iterator[dict[str, Any]]:
-    """Every readable line of a transcript; a line still being written is skipped."""
+def entries(path: Path, needles: tuple[str, ...] = ()) -> Iterator[dict[str, Any]]:
+    """Each line of a transcript written whole, or only those whose JSON text holds one of ``needles``."""
     global _last
     seen = path.stat()
     key = (path, seen.st_size, seen.st_mtime_ns)
     if _last is None or _last[0] != key:
-        _last = (key, list(_parsed(path)))
-    return iter(_last[1])
+        raw = path.read_bytes()
+        _last = (key, raw, [0, *(found.end() for found in _NEWLINE.finditer(raw))], {})
+    _, raw, starts, parsed = _last
+    for n in _holding(raw, starts, needles) if needles else range(len(starts)):
+        if n not in parsed:
+            parsed[n] = _parsed(raw[starts[n] : starts[n + 1] if n + 1 < len(starts) else len(raw)])
+        entry = parsed[n]
+        if entry is not None:
+            yield entry
 
 
-def _parsed(path: Path) -> Iterator[dict[str, Any]]:
-    with path.open(encoding="utf-8", errors="replace") as lines:
-        for line in lines:
-            try:
-                entry = json.loads(line)
-            # telemetry: expected — a line still being written is skipped until it is whole
-            except ValueError:
-                continue
-            if isinstance(entry, dict):
-                yield entry
+def _holding(raw: bytes, starts: list[int], needles: tuple[str, ...]) -> list[int]:
+    """The lines, by number, holding any of ``needles``, found in the whole text at once: JSON has no raw newline."""
+    found: set[int] = set()
+    for needle in (n.encode() for n in needles):
+        at = raw.find(needle)
+        while at >= 0:
+            line = bisect.bisect_right(starts, at) - 1
+            found.add(line)
+            at = raw.find(needle, starts[line + 1]) if line + 1 < len(starts) else -1
+    return sorted(found)
+
+
+def _json(value: str) -> str:
+    """A string as Claude Code writes it into a line, as a needle: JSON-escaped, any other character as itself."""
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _parsed(line: bytes) -> dict[str, Any] | None:
+    try:
+        entry = json.loads(line.decode("utf-8", errors="replace"))
+    # telemetry: expected — a line still being written is skipped until it is whole
+    except ValueError:
+        return None
+    return entry if isinstance(entry, dict) else None
 
 
 def _when(entry: dict[str, Any]) -> datetime | None:
@@ -144,7 +167,7 @@ def agent_calls(path: Path) -> list[AgentCall]:
     calls: dict[str, AgentCall] = {}
     by_agent: dict[str, AgentCall] = {}
     done_agents: set[str] = set()
-    for entry in entries(path):
+    for entry in entries(path, (_json("Agent"), _json("tool_result"), "<task-notification>", "<agent-message ")):
         when = _when(entry)
         for text in _delivered(entry):
             _note_done(text, done_agents)
@@ -279,7 +302,7 @@ def used_any(path: Path, prefixes: tuple[str, ...]) -> bool:
     """Whether a transcript holds a call of any tool whose name starts with one of the prefixes."""
     return any(
         block.get("type") == "tool_use" and str(block.get("name", "")).startswith(prefixes)
-        for entry in entries(path)
+        for entry in entries(path, tuple(_json(prefix)[:-1] for prefix in prefixes))
         for block in _blocks(entry)
     )
 
@@ -288,7 +311,7 @@ def refused_ids(path: Path, marker: str) -> set[str]:
     """The tool calls whose result carries the marker: the calls a hook refused, which never ran."""
     return {
         str(block.get("tool_use_id", ""))
-        for entry in entries(path)
+        for entry in entries(path, (_json(marker)[1:-1],))
         for block in _blocks(entry)
         if block.get("type") == "tool_result" and marker in text_of(block.get("content"))
     }
@@ -297,7 +320,7 @@ def refused_ids(path: Path, marker: str) -> set[str]:
 def answered(path: Path) -> dict[str, datetime]:
     """When each tool call in a transcript got its result, by the call's id."""
     found: dict[str, datetime] = {}
-    for entry in entries(path):
+    for entry in entries(path, (_json("tool_result"),)):
         when = _when(entry)
         for block in _blocks(entry):
             if when is not None and block.get("type") == "tool_result":
@@ -308,7 +331,7 @@ def answered(path: Path) -> dict[str, datetime]:
 def tool_uses(path: Path, names: frozenset[str]) -> list[ToolUse]:
     """Every call of the named tools in a transcript, oldest first."""
     found: list[ToolUse] = []
-    for entry in entries(path):
+    for entry in entries(path, tuple(_json(name) for name in names)):
         when = _when(entry)
         if when is None:
             continue
