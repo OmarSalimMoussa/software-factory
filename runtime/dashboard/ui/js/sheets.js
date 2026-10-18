@@ -12,7 +12,8 @@ function openSheet(title, body, foot, fresh) {
   $('#sheet').dataset.key = '';
   $('#sheet-x').hidden = false;
   $('#sheet-title').textContent = title; $('#sheet-body').innerHTML = body; $('#sheet-foot').innerHTML = foot || ''; $('#sheet-foot').hidden = !foot; $('#sheet').classList.add('open'); $('#scrim').classList.add('open'); document.body.classList.add('sheet-open'); $('#sheet-body').scrollTop = 0; markWrites();
-  setTimeout(() => ($('#sheet-body input:not([disabled])') || $('#sheet-x')).focus(), 60);
+  // Only while the cursor is still outside: a person typing a code into the sheet keeps their place.
+  setTimeout(() => $('#sheet').contains(document.activeElement) || ($('#sheet-body input:not([disabled])') || $('#sheet-x')).focus(), 60);
 }
 function dropStack() { while (sheetStack.length) { const x = sheetStack.pop(); if (x.cleanup) x.cleanup(); } }
 function closeSheet() {

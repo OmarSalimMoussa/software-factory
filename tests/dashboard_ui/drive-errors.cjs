@@ -93,6 +93,10 @@ drive('errors', async t => {
   await p.click('#sheet-foot [data-prop-act="approve"]'); await settle(p);
   t.check((await toastText(p)).includes('This changed; here it is now.') && await p.$eval('#sheet', e => e.classList.contains('open')), 'stale action not refused in place');
   await p.keyboard.press('Escape'); await settle(p);
+  // a sheet's first field takes the cursor only while the person has not moved into the sheet: a fast typist lost a digit
+  await p.evaluate(() => { openSheet('Two fields', '<input id="f-a"><input id="f-b">', '', true); document.querySelector('#f-b').focus(); });
+  await p.waitForTimeout(200);
+  t.check(await p.evaluate(() => document.activeElement.id) === 'f-b', 'opening a sheet took the cursor back to its first field');
   await p.close();
   // wrong codes count down, then lock signing in with a time
   const l = await t.open(1440, 900, 'home', {admit: false});
