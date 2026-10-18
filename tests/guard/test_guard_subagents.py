@@ -381,7 +381,7 @@ def test_browser_testers_are_capped_across_the_machine_and_start_unless_its_vita
         kit.session("qa-ux", sid=f"tester-{n}", parent=f"other-{n}", agent_id=f"a{n}",
                     started=(NOW - timedelta(seconds=age)).isoformat())  # fmt: skip
     why = "" if level == "green" else "memory: 3.1 GiB free"
-    store.write_json(kit.public / "vitals.json", {"level": level, "why": why})
+    kit.vitals(level, why)
     brief = "Scenarios and checks: 1\nWalk the sign-in."
     decision = kit.decide("Agent", {"subagent_type": "qa-ux", "prompt": brief})
     held = decision if isinstance(decision, Refusal) and decision.rule == "subagents-at-once" else None

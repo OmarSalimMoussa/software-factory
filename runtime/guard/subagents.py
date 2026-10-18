@@ -1,7 +1,7 @@
 """The guard's rules for subagents: which kinds a role may start (`subagent-kinds`), on which model (`model`), how
 many at once (`subagents-at-once`), a tester's brief (`tester-brief`), QA only after every slice (`qa-ready`), QA and
-critic rounds (`qa-rounds`, `critic-rounds`), each tester's time (`tester-time`), and no finished subagent resumed
-(`resume-subagent`).
+critic rounds (`qa-rounds`, `critic-rounds`), a browser tester held while the CPU is busy (`cpu-hold`, in walk_hold),
+each tester's time (`tester-time`), and no finished subagent resumed (`resume-subagent`).
 
 Every count comes from the session's own transcript; the current call is left out by its ``tool_use_id``, and a
 call the guard refused never ran.
@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from runtime.guard import branches, browser, factory_calls, scratch, shell, transcript
+from runtime.guard import branches, browser, factory_calls, scratch, shell, transcript, walk_hold
 from runtime.guard.facts import (
     DESIGNER,
     IMPLEMENTER,
@@ -64,7 +64,7 @@ def check_agent(call: Call) -> Decision:
     # Starts sent in one message are all in the transcript at the first one's hook: only those before this one count.
     earlier = found[: ids.index(current)] if current in ids else found
     calls = [c for c in earlier if c.tool_use_id not in refused]
-    for rule in (_kind, _lane, _model, _at_once, _brief, _qa, _critic_rounds):
+    for rule in (_kind, _lane, _model, _at_once, _brief, _qa, _critic_rounds, walk_hold.check):
         decision = rule(call, kind, calls)
         if decision is not None:
             return decision
@@ -137,10 +137,10 @@ def _browsers(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decis
     if running >= cap:
         return Refusal("subagents-at-once", f"{running} browser testers run on this machine, its cap of {cap}; "
                                             "wait for one to report")  # fmt: skip
-    level, why = read_vitals(call.places)
-    if level == "red":
-        return Refusal("subagents-at-once", f"the machine's vitals are red ({why}): a browser tester starts once they "
-                                            "are not; test what needs no browser first")  # fmt: skip
+    vitals = read_vitals(call.places)
+    if vitals.level == "red":
+        return Refusal("subagents-at-once", f"the machine's vitals are red ({vitals.why}): a browser tester starts "
+                                            "once they are not; test what needs no browser first")  # fmt: skip
     return None
 
 

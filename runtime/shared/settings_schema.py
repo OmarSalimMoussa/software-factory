@@ -130,6 +130,8 @@ SCHEMA: dict[str, Spec] = {
     "budget.cpu_target_percent": Spec("float", 10, 100, when=MINUTE),
     "budget.cpu_floor_percent": Spec("float", 1, 100, when=MINUTE),
     "budget.cpu_window_seconds": Spec("int", 30, 3600),
+    "budget.walk_hold_percent": Spec("float", 10, 100),
+    "budget.walk_hold_minutes": Spec("int", 1, 240),
     "budget.test_memory_ceiling_mib": Spec("int", 512, 65536, when="Next install"),
     "budget.test_reserve_mib": Spec("int", 0, 65536),
     "vitals.memory_amber_gib": Spec("float", 0.5, 256),

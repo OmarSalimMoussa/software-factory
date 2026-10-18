@@ -1,14 +1,16 @@
 """The machine's CPU budget: its average use counts what the CPUs did and not what the host took back, and the
-factory's slice gets what the budget leaves after everything else, never less than its floor."""
+factory's slice gets what the budget leaves after everything else, never less than its floor; the guard reads it."""
 
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from loop_fakes import World
 
+from runtime.guard.facts import read_vitals
 from runtime.shared import store
 from runtime.warden.health import cpu_budget, vitals
 
@@ -60,3 +62,14 @@ def test_unreadable_counters_leave_the_cpu_vital_unknown_and_the_quota_as_it_was
     assert cpu["level"] == vitals.UNKNOWN and "cannot read the CPU counters" in cpu["value"]
     cpu_budget.apply(world.ctx)
     assert world.launcher.slices == []
+
+
+@pytest.mark.parametrize(("cgroup", "cpu"), [("cgroup", 40.0), ("no-cgroup", None)], ids=["read", "unreadable"])
+def test_the_warden_publishes_the_machines_cpu_use_for_the_walks_it_holds_and_none_it_cannot_read(
+    world: World, tmp_path: Path, cgroup: str, cpu: float | None
+) -> None:
+    proc, _ = _counters(tmp_path, 40 * HZ, 60 * HZ, 0, 10)
+    vitals.refresh(world.ctx, proc, tmp_path / "no-power", tmp_path / cgroup)
+    published = read_vitals(world.ctx.places)
+    assert published.cpu == (None if cpu is None else pytest.approx(cpu))
+    assert published.at == datetime.fromtimestamp(world.clock.now(), UTC)

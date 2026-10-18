@@ -27,7 +27,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `intake` | Batch size and wait, the fast lane's time, the score's weights |
 | `routing` | Slices per rung, open proposals at once, the estimate's window, tries to confirm a cause |
 | `slots` | How many, the first port, the output an agent sees, how long a run may take, their share of the CPU against prod's, the keys slots take from your env file, staging's address on the internet |
-| `budget` | The slice's memory and CPU, the machine's CPU budget, and the memory a test run needs |
+| `budget` | The slice's memory and CPU, the machine's CPU budget, the CPU use past which new walks wait and the longest they wait, and the memory a test run needs |
 | `checks` | How long a check and one test may run, how much of a report an agent sees, and the tool caches a check may write |
 | `vitals`, `watch` | Amber and red levels; probe, loop, grace and silence times |
 | `errors` | How often the warden reads prod's and staging's new GlitchTip issues into requests, and how many pages of a GlitchTip list one read covers |
@@ -50,6 +50,11 @@ sign-in link only there. Empty, staging stays on the box's loopback, and the ins
 `install.toolchain` names the programs the product's scripts need, such as `uv` and `node`. The install copies each
 one from the owner's PATH, so the agents and the stack run the same tools as the owner.
 
+`budget.walk_hold_percent` holds back new walks. While the machine's average CPU use is past it, or unknown, a new
+browser tester or remote desktop waits: what a walk starts runs outside the factory's slice, so the slice's CPU limit
+cannot slow it. A walk held `budget.walk_hold_minutes` starts anyway, so a busy machine never stalls a merge for good.
+The guard's rule `cpu-hold` switches the hold off.
+
 `checks.writable_caches` names the folders in the agent's home a check may write, besides the checkout it checks:
 the caches of the tools the product's tests run, such as `~/.cache/uv` and `~/.npm`. The setting names each folder
 from the home folder down, without the `~/`. A check writes a cache only once the agents' tools have made it. A cache
@@ -60,7 +65,7 @@ walls.
 
 | Setting | Takes effect |
 | --- | --- |
-| Caps, rounds, QA, vitals, watch, errors, reports, telemetry, intake and routing values, but those below | At once: every guard call and warden pass reads them fresh |
+| Caps, rounds, QA, vitals, watch, errors, reports, telemetry, intake and routing values, the hold on new walks, but those below | At once: every guard call and warden pass reads them fresh |
 | The replay's timings, and the QA browser's screen and waits | At the next replay built, and at the next tester's start; the player's pace at the next page load |
 | A session's or a subagent's model and effort | At its next start |
 | The slice budget | Within a minute |

@@ -263,7 +263,8 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
     (
         "budget",
         "Memory and CPU",
-        "The factory's memory cap and CPU weight apply within a minute; a check's memory at the next install.",
+        "The factory's memory cap and CPU weight apply within a minute, the hold on new walks at once; a check's "
+        "memory at the next install.",
         [
             ("budget.slice_memory_high", "Memory where the factory slows"),
             ("budget.slice_memory_max", "Factory memory cap"),
@@ -271,6 +272,8 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("budget.cpu_target_percent", "Average CPU use to keep to, % of every CPU"),
             ("budget.cpu_floor_percent", "Least CPU the factory keeps, % of every CPU"),
             ("budget.cpu_window_seconds", "Seconds the CPU average reaches back"),
+            ("budget.walk_hold_percent", "Average CPU use past which new walks wait, % of every CPU"),
+            ("budget.walk_hold_minutes", "Longest a walk waits for the CPU, minutes"),
             ("budget.test_memory_ceiling_mib", "Memory one check may use, MiB"),
             ("budget.test_reserve_mib", "Memory kept for other agents, MiB"),
         ],

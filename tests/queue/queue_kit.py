@@ -1,4 +1,5 @@
-"""A product checkout with a warden-owned queue, effective settings, and fakes for the clock, units and inbox."""
+"""A product checkout with a warden-owned queue, effective settings, green vitals, and fakes for the clock, units and
+inbox."""
 
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ from runtime.shared import settings as settings_mod
 from runtime.shared import store, upgrades
 from runtime.shared.models import Request, Session, Task
 from runtime.shared.paths import Places
+from runtime.warden import public
 from runtime.warden.context import Caller, CheckPlaces, Clock, Context, StackResult
 from runtime.warden.sessions import registry
 
@@ -170,7 +172,9 @@ def make_world(tmp_path: Path) -> World:
     places.install.mkdir(parents=True)
     places.defaults.write_text((ROOT / "settings.toml").read_text())
     store.write_json(upgrades.settings_path(places), overrides)
-    return World(places, repo, settings_mod.build(defaults, overrides), FakeClock(), FakeLauncher(), [])
+    clock = FakeClock()
+    public.write_vitals(places, "green", "", 30.0, clock.iso())
+    return World(places, repo, settings_mod.build(defaults, overrides), clock, FakeLauncher(), [])
 
 
 def set_outcome(world: World, req: Request, outcome: str) -> None:

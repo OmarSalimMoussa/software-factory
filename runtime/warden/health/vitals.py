@@ -2,8 +2,9 @@
 git hooks, the agent's Claude daemon and the firewall. Each reading is green, amber, red or unknown; unknown is treated
 as amber, never as fine. A machine with no battery listed, a desktop or a VM, is on mains power.
 
-The permits read vitals.json: red blocks every start; amber blocks all but severe work. Readers take the kernel's
-folders as arguments, so tests feed samples.
+The permits read vitals.json: red blocks every start; amber blocks all but severe work. The published copy carries
+the CPU use too, which holds back new walks (runtime/guard/walk_hold.py). Readers take the kernel's folders as
+arguments, so tests feed samples.
 """
 
 from __future__ import annotations
@@ -263,9 +264,10 @@ def refresh(
 ) -> dict[str, Any]:
     """Read every vital and write vitals.json for the permits, the dashboard and the status."""
     settings = ctx.settings()
+    cpu_use = _cpu(ctx, proc, cgroups, settings)
     readings = [
         memory(_text(proc / "meminfo"), settings),
-        _cpu(ctx, proc, cgroups, settings),
+        cpu_use,
         power(supplies, settings),
         install(ctx.places),
         hooks(ctx.places, Path(settings.get_str("repo.path")), settings.get_int("watch.tick_seconds")),
@@ -273,8 +275,8 @@ def refresh(
         records(proc, launch.agent_uid(), settings.get_int("watch.start_grace_seconds")),
         firewall(ctx.places.firewall_stamp, ctx.clock.now(), settings),
     ]
-    level, said = worst(readings), why(readings)
-    snapshot = {"at": ctx.clock.iso(), "level": level, "why": said, "readings": [asdict(r) for r in readings]}
+    level, said, at = worst(readings), why(readings), ctx.clock.iso()
+    snapshot = {"at": at, "level": level, "why": said, "readings": [asdict(r) for r in readings]}
     store.write_json(ctx.places.vitals, snapshot)
-    public.write_vitals(ctx.places, level, said)
+    public.write_vitals(ctx.places, level, said, cpu_use.figure, at)
     return snapshot

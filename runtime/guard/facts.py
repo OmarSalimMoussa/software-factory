@@ -1,7 +1,8 @@
 """What the guard knows about one call: the hook input, and what the warden published for it.
 
 The guard runs as the agent user, so it reads only the warden's public folder: the effective settings, the rule
-switches, the sessions and the ready records. A file there that cannot be read raises, and the hook refuses the call.
+switches, the sessions, the vitals and the ready records. A file there that cannot be read raises, and the hook
+refuses the call.
 """
 
 from __future__ import annotations
@@ -94,13 +95,32 @@ def read_switches(places: Places) -> frozenset[str]:
     return frozenset(off)
 
 
-def read_vitals(places: Places) -> tuple[str, str]:
-    """The vitals level the warden last published, and the readings that set it; "unknown" before its first."""
-    raw = store.read_json_or(public(places) / "vitals.json", {"level": "unknown", "why": "none read yet"})
-    found = (raw.get("level"), raw.get("why")) if isinstance(raw, dict) else (None, None)
-    if not all(isinstance(part, str) for part in found):
-        raise store.StoreError(f"{public(places) / 'vitals.json'}: holds no level and readings")
-    return str(found[0]), str(found[1])
+@dataclass(frozen=True, slots=True)
+class Vitals:
+    """The vitals the warden last published: the level, the readings that set it, the machine's average CPU use in %
+    of every CPU (None when it could not read it), and when it read them (None before its first reading)."""
+
+    level: str
+    why: str
+    cpu: float | None
+    at: datetime | None
+
+
+def read_vitals(places: Places) -> Vitals:
+    path = public(places) / "vitals.json"
+    raw = store.read_json_or(path, None)
+    if raw is None:
+        return Vitals("unknown", "none read yet", None, None)
+    fields = raw if isinstance(raw, dict) else {}
+    level, why, cpu, at = (fields.get(key) for key in ("level", "why", "cpu", "at"))
+    number = cpu is None or isinstance(cpu, int | float) and not isinstance(cpu, bool)
+    if not (isinstance(level, str) and isinstance(why, str) and number and isinstance(at, str)):
+        raise store.StoreError(f"{path}: holds no level, readings, CPU use and time")
+    try:
+        when = datetime.fromisoformat(at)
+    except ValueError as exc:
+        raise store.StoreError(f"{path}: its time {at!r} is not one") from exc
+    return Vitals(level, why, None if cpu is None else float(cpu), when)
 
 
 def read_desktops(places: Places) -> dict[str, str]:

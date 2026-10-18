@@ -20,8 +20,12 @@ PARENTS = frozenset({"main", "orchestrator"})
 REFUSAL_FIELDS = ("session", "agent_id", "agent_type", "rule", "tool", "detail")
 
 
+def marker(rule: str) -> str:
+    return f"{REFUSED} ({rule})"
+
+
 def one_line(rule: str, reason: str) -> str:
-    return f"{REFUSED} ({rule}): {' '.join(reason.split())}"
+    return f"{marker(rule)}: {' '.join(reason.split())}"
 
 
 def simple_way_out(payload: dict[str, object]) -> bool:

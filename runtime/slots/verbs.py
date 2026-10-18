@@ -8,17 +8,20 @@ A tester only reads its slot and what runs on it, signs in and opens its desktop
 parent's. The slot's own session, an implementer or the orchestrator, may run one command in a new container of a
 service, such as a scenario's set-up; so may its backend and security testers, to look from inside the slot's
 network. One tester holds a slot's desktop at a time, until its parent or, once it hands back, the warden takes it
-down; another tester's `desktop up` waits, so no one's new password cuts off a tester mid-step. Slot 0 is staging, so
-it comes up whole: one build of the stack, never a service at a time. No stack changes under a tester still walking
-it.
+down; another tester's `desktop up` waits, so no one's new password cuts off a tester mid-step. While the machine's
+CPU use is past budget.walk_hold_percent, a `desktop up` waits too (runtime/guard/walk_hold.py); the wait counts per
+slot, in the warden's memory, so a restart begins it again. Slot 0 is staging, so it comes up whole: one build of the
+stack, never a service at a time. No stack changes under a tester still walking it.
 """
 
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
 from typing import Any
 
-from runtime.guard.facts import read_desktops
+from runtime.guard import walk_hold
+from runtime.guard.facts import read_desktops, read_vitals
 from runtime.shared import store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.protocol import Refused, ok
@@ -35,6 +38,8 @@ TESTER_OPS = frozenset({"list", "which", "sign-in", "desktop", "top"})
 RUNNER_OPS = TESTER_OPS | {leases.RUN}
 _CHANGES_STACK = frozenset({"up", "down", leases.RESTART})
 _FIXED = {"down": ["down"], "top": [leases.TOP]}
+# By state folder and slot: when the CPU hold first refused that slot's desktop since it last went up.
+_HELD: dict[tuple[str, int], datetime] = {}
 
 
 def _session(ctx: Context) -> Session:
@@ -128,24 +133,45 @@ def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> None:
         raise Refused("slot", "a tester opens the desktop; its implementer takes it down")
     with ctx.lock:
         held = read_desktops(ctx.places)
-        if not agent:
-            held.pop(str(n), None)
-        else:
-            sessions = registry.read(ctx.places)
-            holder = sessions.get(held.get(str(n), ""))
-            if holder is not None and holder.id != agent:
-                if holder.state == RETIRED:
-                    raise Refused("desktop", f"slot {n}'s desktop is going down after {holder.name} handed back; "
-                                             "try again in a minute")  # fmt: skip
-                raise Refused("desktop", f"slot {n}'s desktop is {holder.name}'s until it hands back; test what "
-                                         "needs no desktop first, then try again")  # fmt: skip
-            up = [s for slot, s in held.items() if slot != str(n) and s in sessions and sessions[s].state != RETIRED]
-            cap = ctx.settings().get_int("caps.desktops_at_once")
-            if len(up) >= cap:
-                raise Refused("desktop", f"{len(up)} desktops are up on this machine, its cap of {cap}; test what "
-                                         "needs no desktop first, then try again")  # fmt: skip
+        if agent:
+            _may_take(ctx, n, agent, held)
+        # A tester that holds the desktop already walks it: taking it up again starts no new walk.
+        if verb[1] == "up" and held.get(str(n)) != agent:
+            _cpu_hold(ctx, n, bool(agent))
+        if agent:
             held[str(n)] = agent
+        else:
+            held.pop(str(n), None)
         store.write_json(public.desktops_path(ctx.places), held)
+
+
+def _may_take(ctx: Context, n: int, agent: str, held: dict[str, str]) -> None:
+    sessions = registry.read(ctx.places)
+    holder = sessions.get(held.get(str(n), ""))
+    if holder is not None and holder.id != agent:
+        if holder.state == RETIRED:
+            raise Refused("desktop", f"slot {n}'s desktop is going down after {holder.name} handed back; "
+                                     "try again in a minute")  # fmt: skip
+        raise Refused("desktop", f"slot {n}'s desktop is {holder.name}'s until it hands back; test what "
+                                 "needs no desktop first, then try again")  # fmt: skip
+    up = [s for slot, s in held.items() if slot != str(n) and s in sessions and sessions[s].state != RETIRED]
+    cap = ctx.settings().get_int("caps.desktops_at_once")
+    if len(up) >= cap:
+        raise Refused("desktop", f"{len(up)} desktops are up on this machine, its cap of {cap}; test what "
+                                 "needs no desktop first, then try again")  # fmt: skip
+
+
+def _cpu_hold(ctx: Context, n: int, tester: bool) -> None:
+    key = (str(ctx.places.state), n)
+    now = datetime.fromtimestamp(ctx.clock.now(), UTC)
+    off = walk_hold.HOLD in public.read_switches(ctx.places)
+    why = None if off else walk_hold.why_held(read_vitals(ctx.places), ctx.settings(), now, _HELD.get(key))
+    if why is None:
+        _HELD.pop(key, None)
+        return
+    _HELD.setdefault(key, now)
+    then = "test what needs no desktop first, then try again" if tester else "wait or do other work, then try again"
+    raise Refused(walk_hold.HOLD, f"{why}; {then}")
 
 
 def _verb(op: object, args: dict[str, Any]) -> list[str]:

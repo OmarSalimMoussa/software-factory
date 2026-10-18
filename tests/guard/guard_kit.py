@@ -7,7 +7,7 @@ import json
 import subprocess
 import tomllib
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -54,11 +54,16 @@ class Kit:
         (self.places.plugin / "factory-calls.md").write_text("Run factory on its own.\n")
         self.settings()
         self.transcript([])
-        store.write_json(self.public / "vitals.json", {"level": "green", "why": ""})  # the warden's last reading
+        self.vitals()
 
     @property
     def public(self) -> Path:
         return self.places.state / "public"
+
+    def vitals(self, level: str = "green", why: str = "", cpu: float | None = 30.0, age: int = 0) -> None:
+        """The vitals the warden published ``age`` seconds ago, with the machine's average CPU use."""
+        at = (NOW - timedelta(seconds=age)).isoformat()
+        store.write_json(self.public / "vitals.json", {"level": level, "why": why, "cpu": cpu, "at": at})
 
     def settings(self, **changes: Any) -> None:
         defaults = tomllib.loads((REPO_ROOT / "settings.toml").read_text())
