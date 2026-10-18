@@ -22,6 +22,14 @@ TESTERS = VERDICTS | {REGRESSION, "qa-prod"}
 INTAKE, TRIAGE = "intake", "triage"
 READERS = TESTERS | {INTAKE, TRIAGE}
 CRITICS = frozenset({"critic-architecture", "critic-product", "critic-reliability", "critic-security", "critic-ux"})
+# The slot verbs a tester may run on its implementer's slot; the rest change the stack and are the implementer's own.
+# A backend or security tester also runs one command in a service.
+SLOT_RUN = "run"
+TESTER_SLOT_OPS = frozenset({"list", "which", "sign-in", "desktop", "top"})
+
+
+def slot_ops(kind: str) -> frozenset[str]:
+    return TESTER_SLOT_OPS | {SLOT_RUN} if kind in (BACKEND, SECURITY) else TESTER_SLOT_OPS
 
 
 @dataclass(frozen=True, slots=True)

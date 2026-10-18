@@ -17,6 +17,7 @@ from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.warden.context import Context
+from runtime.warden.verbs import SLOT_RUN
 
 KEYS = ("holder", "since", "note")
 # The stack unit's own verbs, beside the product's scripts/dev verbs. SWEEP removes every container, volume, network
@@ -28,7 +29,7 @@ SWEEP, PRUNE, DISK, RESTARTS = "factory-sweep-slot", "factory-prune", "factory-d
 TOP = "factory-top"
 # The product's optional slot verbs, which the stack unit runs only once `scripts/dev verbs` lists them: run <service>
 # -- <command…> runs one command in a new container of a slot's service; restart <service…> restarts running ones.
-RUN, RESTART = "run", "restart"
+RUN, RESTART = SLOT_RUN, "restart"
 OPTIONAL = (RUN, RESTART)
 RUN_LABEL_ENV = "FACTORY_RUN_LABEL"
 

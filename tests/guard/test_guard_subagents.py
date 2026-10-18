@@ -170,6 +170,22 @@ def test_a_tester_brief_declares_its_scenarios_once(tmp_path: Path, prompt: str)
     assert kit.rule("Agent", _agent("qa-prod", prompt)) == "tester-brief"
 
 
+@pytest.mark.parametrize(
+    ("kind", "asks", "refused"),
+    [("qa-regression", "factory slot run web -- printenv START_DELAY", True), ("qa-backend", "factory slot run web",
+     False), ("qa-regression", "`factory slot sign-in tester-1@example.com`", False),
+     ("qa-regression", "factory slot up", True)],
+    ids=["run-for-a-regression-tester", "run-for-a-backend-tester", "sign-in", "up"],
+)  # fmt: skip
+def test_a_tester_brief_asks_for_no_slot_command_its_tester_cannot_run(
+    tmp_path: Path, kind: str, asks: str, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("orchestrator", worktree=kit.repo)
+    kit.switch_off("qa-ready")
+    assert (kit.rule("Agent", _agent(kind, f"Scenarios and checks: 1\nFirst {asks}.")) == "tester-brief") is refused
+
+
 def test_qa_waits_for_a_ready_record_of_the_exact_head(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.git_product()

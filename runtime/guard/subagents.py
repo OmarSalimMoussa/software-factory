@@ -10,6 +10,7 @@ call the guard refused never ran.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -33,9 +34,10 @@ from runtime.shared import lanes
 from runtime.shared.models import CRITIC, RETIRED, TESTER, WITH_PARENT
 from runtime.shared.settings import model_role
 from runtime.shared.settings_schema import SCHEMA
-from runtime.warden.verbs import VERBS, VERDICTS
+from runtime.warden.verbs import VERBS, VERDICTS, slot_ops
 
 INTAKE = "intake"
+_SLOT_OP = re.compile(r"\bfactory slot ([a-z][a-z-]*)")
 SLOT_API = "mcp__slot-api__slot_api"
 # Claude Code's waits, in milliseconds: its defaults, and its longest, for a `factory` call the warden bounds itself.
 _TIMED_TOOLS = {"Bash": ("timeout", 120_000), "Monitor": ("timeout_ms", 300_000)}
@@ -167,6 +169,10 @@ def _brief(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision
     # telemetry: surfaced — the `Refusal` names what the brief lacks
     except transcript.BriefError as exc:
         return Refusal("tester-brief", str(exc))
+    unrun = sorted(set(_SLOT_OP.findall(str(call.tool_input.get("prompt", "")))) - slot_ops(kind))
+    if unrun:
+        return Refusal("tester-brief", f"a {kind} cannot run `factory slot {unrun[0]}`: do what the brief asks of the "
+                                       "slot yourself before it starts, and give it what that showed")  # fmt: skip
     return None
 
 

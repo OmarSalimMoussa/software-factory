@@ -20,7 +20,8 @@ RULES: dict[str, str] = {
     "cpu-hold": "a new browser tester, or a session's own remote desktop, while the machine's CPU use is past "
     "budget.walk_hold_percent or unknown, until it has waited budget.walk_hold_minutes",
     "model": "an Agent call asking for any model but that kind's configured one",
-    "tester-brief": "a tester brief without one `Scenarios and checks: N` line",
+    "tester-brief": "a tester brief without one `Scenarios and checks: N` line, or asking for a slot command its "
+    "tester cannot run",
     "tester-time": "a tester's calls after its time, but for its report; command timeouts are cut to the time left",
     "intake-time": "intake's calls after intake.fast_lane_minutes, but for `factory` and its hand-back",
     "qa-ready": "a tester start with no ready record for the head",

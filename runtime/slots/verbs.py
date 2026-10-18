@@ -30,13 +30,10 @@ from runtime.slots import leases
 from runtime.warden import public
 from runtime.warden.context import Context, StackResult
 from runtime.warden.sessions import registry
-from runtime.warden.verbs import BACKEND, IMPL, ORCH, SECURITY
+from runtime.warden.verbs import IMPL, ORCH, slot_ops
 
 WORD = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@+-]{0,127}$")
 EMAIL = re.compile(r"^[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
-# Verbs a tester may run on its implementer's slot; the rest change the stack and are the implementer's own.
-TESTER_OPS = frozenset({"list", "which", "sign-in", "desktop", "top"})
-RUNNER_OPS = TESTER_OPS | {leases.RUN}
 _CHANGES_STACK = frozenset({"up", "down", leases.RESTART})
 _FIXED = {"down": ["down"], "top": [leases.TOP]}
 # By state folder and slot: when the CPU hold first refused that slot's desktop since it last went up.
@@ -84,7 +81,7 @@ def _answer(ctx: Context, n: int, result: StackResult) -> dict[str, Any]:
 def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     op = args.get("op")
     session = _session(ctx)
-    allowed = RUNNER_OPS if ctx.caller.agent_kind in (BACKEND, SECURITY) else TESTER_OPS
+    allowed = slot_ops(ctx.caller.agent_kind or "")
     if ctx.caller.agent_id and op not in allowed:
         raise Refused("slot", f"a {ctx.caller.agent_kind or 'tester'} may run {', '.join(sorted(allowed))} on its "
                               f"slot, not {op}")  # fmt: skip
