@@ -47,7 +47,8 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": WAIT_UNTIL,
         "description": "Wait until a text shows on the page, reloading the page every so often, up to a ceiling. One "
-        "call does the whole wait.",
+        "call does the whole wait. It reads the page's own text, never words drawn in a picture or a live remote "
+        "view: check those with a screenshot.",
         "inputSchema": {
             "type": "object",
             "properties": {

@@ -20,6 +20,8 @@ first, then try again.
 ## 2. Work it
 
 - **Click:** take a screenshot, click at the point, then take a screenshot again to check what happened.
+- **Check by screenshot.** The desktop's words are pixels in a video, not page text: a text wait or a snapshot never
+  sees them.
 - **Type:** click where the text goes on the video first, then `browser_type_keys` with the text: one call types
   it all, key by key, as the desktop takes it.
 - **One key,** such as Escape, right after a type.
