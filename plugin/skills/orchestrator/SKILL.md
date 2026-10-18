@@ -137,7 +137,8 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    scenario's set-up that writes inside a service with `factory slot run <service> -- <command>`. Start the
    `qa-regression` testers at once, the scenarios split between them, each signed in as its own test address. Start
    each in its own lane, `qa-regression`, then `qa-regression-2` and on, as its `subagent_type`: two in one lane share
-   one browser, and a lane named only in the brief changes nothing. A brief names scenarios, never an earlier
+   one browser, and a lane named only in the brief changes nothing. When the machine's browser places are full, the
+   factory messages you once one frees. A brief names scenarios, never an earlier
    report's results or causes, nor a desktop's password: a tester brings the desktop up itself. A check of slot 0's
    health is read in the tester's browser: no tester's shell reaches a slot. Save each tester's report to a file and run
    `factory queue check <merge sha> --body <that file>`.

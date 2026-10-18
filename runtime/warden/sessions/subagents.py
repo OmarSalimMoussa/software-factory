@@ -17,7 +17,7 @@ from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.shared.settings import model_role
 from runtime.warden.context import Caller, Context
-from runtime.warden.sessions import lifecycle, registry
+from runtime.warden.sessions import browser_waits, lifecycle, registry
 from runtime.warden.spend.cost import family_of
 from runtime.warden.verbs import SESSIONS
 
@@ -61,6 +61,8 @@ def started(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str,
             state=WORKING, started=now, started_by=parent.id, agent_id=agent_id, started_as=kind, since=now,
         )  # fmt: skip
         registry.write(ctx.places, sessions)
+        if role in ctx.settings().get_list("subagents.browser_personas"):
+            browser_waits.leave(ctx, parent.id)
     return ok(session=agent_id)
 
 

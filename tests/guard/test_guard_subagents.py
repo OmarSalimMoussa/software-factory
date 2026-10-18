@@ -400,7 +400,7 @@ def test_browser_testers_are_capped_across_the_machine_and_start_unless_its_vita
     kit.vitals(level, why)
     brief = "Scenarios and checks: 1\nWalk the sign-in."
     decision = kit.decide("Agent", {"subagent_type": "qa-ux", "prompt": brief})
-    held = decision if isinstance(decision, Refusal) and decision.rule == "subagents-at-once" else None
+    held = decision if isinstance(decision, Refusal) and decision.rule == "browsers-at-once" else None
     assert (held is not None) is refused
     assert held is None or why in held.reason  # it names the reading that holds the tester back
 
@@ -414,7 +414,7 @@ def test_browser_testers_started_in_one_message_count_against_the_machines_cap(
     kit.settings(caps__subagents_at_once=4, caps__browsers_at_once=2)
     kit.transcript(_running("qa-visual", "qa-ux", "qa-ui-function", ago=0))
     decision = kit.decide("Agent", _agent("qa-ui-function"), tool_use_id=current)
-    assert (isinstance(decision, Refusal) and decision.rule == "subagents-at-once") is refused
+    assert (isinstance(decision, Refusal) and decision.rule == "browsers-at-once") is refused
 
 
 @pytest.mark.parametrize("kind", ["intake", "Explore", "qa-backend"])

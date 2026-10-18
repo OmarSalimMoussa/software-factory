@@ -58,6 +58,7 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
    tester, never drop one. A change with no required tester goes straight to `factory qa-clean`.
 3. **All at once.** Start every required tester together with the Agent tool, `subagent_type` set to its kind and no
    model of your own, up to `caps.subagents_at_once`: when the guard refuses one more, start it after one hands back.
+   When the machine's browser places are full, the factory messages you once one frees: work on, or end your turn.
    Two testers of one browser kind start in their own lanes, such as `qa-ux` and `qa-ux-2`, as their `subagent_type`.
    One tester at a time uses the slot's remote desktop, and the factory takes it down when that tester hands back.
 4. **The brief:** one line `Scenarios and checks: N` (N from 1 to `qa.max_items`, the items you list, each by the

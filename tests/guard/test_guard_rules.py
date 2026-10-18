@@ -4,6 +4,7 @@ refuses."""
 from __future__ import annotations
 
 import ast
+import importlib
 from pathlib import Path
 
 from runtime.guard.rules import RULES
@@ -19,6 +20,10 @@ def _refused_rules() -> set[str]:
                 continue
             if node.args and isinstance(node.args[0], ast.Constant):
                 found.add(str(node.args[0].value))
+            elif node.args and isinstance(node.args[0], ast.Attribute) and isinstance(node.args[0].value, ast.Name):
+                # A rule named once for the guard and the warden, as `lanes.PLACES`: a module in runtime.shared.
+                module = importlib.import_module(f"runtime.shared.{node.args[0].value.id}")
+                found.add(str(getattr(module, node.args[0].attr)))
     return found
 
 

@@ -16,6 +16,7 @@ import time
 from collections.abc import Callable, Sequence
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 from runtime.qa.replay import pending
 from runtime.queue import reports, turn
@@ -28,7 +29,7 @@ from runtime.warden.context import Caller, CheckPlaces, Clock, Context
 from runtime.warden.delivery import done, github
 from runtime.warden.dispatch import Dispatcher, Doors, resolve
 from runtime.warden.owner import ops, reflections, settings_save, yolo
-from runtime.warden.sessions import crashwatch, launch, reap, registry
+from runtime.warden.sessions import browser_waits, crashwatch, launch, reap, registry
 from runtime.warden.spend import cost, plan
 from runtime.warden.verbs import VERBS
 
@@ -99,6 +100,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
             imports.Background(partial(_build_replays, transcripts=transcripts), imports.in_thread("replays")).run_pass,
         ),  # fmt: skip
         ("holds", turn.release_held),
+        ("browser waits", browser_waits.run_pass),
         ("schedule", schedule.run_pass),
         ("yolo", yolo.run_pass),
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),
@@ -160,7 +162,12 @@ def main() -> int:
     server.serve(places, peers, dispatcher, current.get_int("factory.warden_threads"))
     ctx = doors.context(WARDEN)
     refusals = reflections.RefusalWatch()
-    server.serve_refusals(places.refusal_socket, lambda line: refusals.record(ctx, line))
+
+    def refused(line: dict[str, Any]) -> None:
+        refusals.record(ctx, line)
+        browser_waits.refused(ctx, line)
+
+    server.serve_refusals(places.refusal_socket, refused)
     ready(environment.take_notify_socket())
     transcripts = [agent_home / ".claude" / "projects", Path(owner.pw_dir) / ".claude" / "projects"]
     every = passes(places, transcripts, agent_home)

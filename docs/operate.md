@@ -170,7 +170,8 @@ The machine's average CPU use stays near `budget.cpu_target_percent`: a host tha
 VPS, at 60%) holds the whole machine down once they run out, prod included. The factory's own work gets what the
 budget leaves after prod, the shared services and the slots, never under `budget.cpu_floor_percent`. Past the budget
 new work waits; past `budget.walk_hold_percent` so does a new browser tester or a session's own desktop, for at most
-`budget.walk_hold_minutes` ([settings.md](settings.md)); past `vitals.cpu_red_percent` nothing starts.
+`budget.walk_hold_minutes` ([settings.md](settings.md)); past `vitals.cpu_red_percent` nothing starts. A browser tester
+past `caps.browsers_at_once` waits in line: the warden tells the longest-waiting session once a place frees.
 
 ## Improve the factory
 

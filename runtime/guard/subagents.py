@@ -1,7 +1,8 @@
 """The guard's rules for subagents: which kinds a role may start (`subagent-kinds`), on which model (`model`), how
-many at once (`subagents-at-once`), a tester's brief (`tester-brief`), QA only after every slice (`qa-ready`), QA and
-critic rounds (`qa-rounds`, `critic-rounds`), a browser tester held while the CPU is busy (`cpu-hold`, in walk_hold),
-each tester's time (`tester-time`), and no finished subagent resumed (`resume-subagent`).
+many at once (`subagents-at-once`), browser testers on the machine (`browsers-at-once`), a tester's brief
+(`tester-brief`), QA only after every slice (`qa-ready`), QA and critic rounds (`qa-rounds`, `critic-rounds`), a browser
+tester held while the CPU is busy (`cpu-hold`, in walk_hold), each tester's time (`tester-time`), and no finished
+subagent resumed (`resume-subagent`).
 
 Every count comes from the session's own transcript; the current call is left out by its ``tool_use_id``, and a
 call the guard refused never ran.
@@ -43,6 +44,8 @@ REPORT = (
     "`factory qa result`, then hand back"
 )
 _REPORTS = frozenset({"qa.step-result", "qa.finding", "qa.result", "reflect"})
+# A session cannot see another's testers hand back: the warden tells it (runtime/warden/sessions/browser_waits.py).
+WOKEN = "The factory messages you once a browser tester may start: do other work, or end your turn, until then"
 
 
 def check_slot_session(call: Call) -> Decision:
@@ -64,7 +67,7 @@ def check_agent(call: Call) -> Decision:
     # Starts sent in one message are all in the transcript at the first one's hook: only those before this one count.
     earlier = found[: ids.index(current)] if current in ids else found
     calls = [c for c in earlier if c.tool_use_id not in refused]
-    for rule in (_kind, _lane, _model, _at_once, _brief, _qa, _critic_rounds, walk_hold.check):
+    for rule in (_kind, _lane, _model, _browsers, _at_once, _brief, _qa, _critic_rounds, walk_hold.check):
         decision = rule(call, kind, calls)
         if decision is not None:
             return decision
@@ -122,25 +125,18 @@ def _browsers(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decis
     """At most caps.browsers_at_once browser testers on the machine, none on red vitals: amber holds back new work.
     This session's earlier starts count too: one sent in the same message has no session row yet."""
     personas = call.settings.get_list("subagents.browser_personas")
-    if kind not in personas:
+    if kind not in personas or call.off(lanes.PLACES):
         return None
-    alive = {sid for sid, s in call.sessions.items() if s.state in ("working", "waiting")}
-    # No tester outlasts its items' time, a desktop's start and a lost hand-back's quiet: older rows hold no browser.
-    waits = call.settings.get_int("slots.verb_minutes") * 60 + call.settings.get_int("qa.stale_seconds")
-    longest = _budget(call, call.settings.get_int("qa.max_items")) + waits
-    rows = [s for s in call.sessions.values() if s.parent in alive and s.state == "working" and s.role in personas
-            and (call.now - _when(s.started)).total_seconds() < longest]  # fmt: skip
+    rows = lanes.holders(call.sessions.values(), call.settings, call.now)
     known = {s.agent_id for s in call.sessions.values() if s.agent_id}
     starting = [c for c in calls if lanes.kind_of(c.subagent_type) in personas and c.agent_id not in known
                 and _running(call, c)]  # fmt: skip
     running, cap = len(rows) + len(starting), call.settings.get_int("caps.browsers_at_once")
     if running >= cap:
-        return Refusal("subagents-at-once", f"{running} browser testers run on this machine, its cap of {cap}; "
-                                            "wait for one to report")  # fmt: skip
+        return Refusal(lanes.PLACES, f"{running} browser testers run on this machine, its cap of {cap}. {WOKEN}")
     vitals = read_vitals(call.places)
     if vitals.level == "red":
-        return Refusal("subagents-at-once", f"the machine's vitals are red ({vitals.why}): a browser tester starts "
-                                            "once they are not; test what needs no browser first")  # fmt: skip
+        return Refusal(lanes.PLACES, f"the machine's vitals are red ({vitals.why}). {WOKEN}")
     return None
 
 
@@ -151,9 +147,6 @@ def _when(iso: str) -> datetime:
 def _at_once(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     if call.off("subagents-at-once"):
         return None
-    machine = _browsers(call, kind, calls)
-    if machine is not None:
-        return machine
     running = [c for c in calls if _running(call, c)]
     cap = call.settings.get_int("caps.subagents_at_once")
     # One place is kept for intake, so a severe request is never left waiting for a tester to finish.
@@ -195,7 +188,7 @@ def _running(call: Call, agent: transcript.AgentCall) -> bool:
     if agent.subagent_type.startswith(TESTER):
         try:
             items = transcript.declared_items(agent.prompt, call.settings.get_int("qa.max_items"))
-            budget = _budget(call, items)
+            budget = lanes.tester_seconds(call.settings, items)
         # telemetry: expected — a tester started with no brief, while that rule was off, has no time budget
         except transcript.BriefError:
             budget = 0
@@ -333,11 +326,6 @@ def reports(call: Call) -> bool:
     return words is not None and factory_calls.verb_of(words) in _REPORTS
 
 
-def _budget(call: Call, items: int) -> int:
-    """A tester's seconds: its start-up once, then each item's."""
-    return call.settings.get_int("qa.setup_seconds") + items * call.settings.get_int("qa.seconds_per_item")
-
-
 def check_intake_time(call: Call) -> Decision:
     """Intake's own calls once intake.fast_lane_minutes passed since its brief: only a plain `factory` call (it writes
     what it found with one) and its hand-back still go. A model cannot tell how long it has worked."""
@@ -366,7 +354,7 @@ def _time_left(call: Call) -> float | Refusal:
     # telemetry: surfaced — `_time_up` tells the tester to report what it has
     except transcript.BriefError as exc:
         return _time_up(call, f"your time budget cannot be read ({exc})")
-    budget = float(_budget(call, items))
+    budget = float(lanes.tester_seconds(call.settings, items))
     first_up, in_ups = _desktop_starts(call, path)
     spent = (call.now - started).total_seconds() - in_ups
     # Only a tester holding a slot's desktop, from its first `desktop up`: web steps before it take none of that time.

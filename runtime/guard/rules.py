@@ -15,6 +15,8 @@ RULES: dict[str, str] = {
     "queue-status": "a task status set by anyone but the orchestrator; any write to the queue but through `factory`",
     "subagent-kinds": "a subagent kind not on the role's list; any start from inside a subagent",
     "subagents-at-once": "past the cap, or two testers in one browser lane; the orchestrator keeps a place for intake",
+    "browsers-at-once": "a browser tester past caps.browsers_at_once on the machine, or on red vitals; the warden "
+    "tells the session once one may start",
     "cpu-hold": "a new browser tester, or a session's own remote desktop, while the machine's CPU use is past "
     "budget.walk_hold_percent or unknown, until it has waited budget.walk_hold_minutes",
     "model": "an Agent call asking for any model but that kind's configured one",
