@@ -109,7 +109,7 @@ stack.
 | `health` | Prints the slot's health URL, which answers JSON naming the running commit as `build_commit` |
 | `sign-in <email>` | Prints a one-time sign-in link for a test address |
 | `seed save <id> <name>`, `seed load <name> [--as <email>]`, `seed check` | Saved inputs a tester starts from |
-| `desktop up <email>`, `desktop down` | A remote desktop for steps outside the web UI, or "not supported" |
+| `desktop up <email>`, `desktop down` | A remote desktop for steps outside the web UI, or "not supported". Its browser reaches the slot at `127.0.0.1` on `FACTORY_PORT`, as a tester's browser does, so a sign-in link the factory prints opens there |
 | `test [path…]` | Runs the product's tests: all of them, or those under the paths. When `FACTORY_TEST_SECONDS` is set, it stops any one test that runs longer and fails it; when `FACTORY_TEST_WORKERS` is set, it runs at most that many test processes at once |
 | `verbs` | Lists the verbs it supports |
 | `deps` | Optional: installs what the checks and tests read (package trees, tools); `factory check` runs it first |
