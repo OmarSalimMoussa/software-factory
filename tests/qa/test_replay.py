@@ -121,11 +121,18 @@ def test_a_step_marked_past_the_scenarios_last_still_shows_and_counts(tmp_path: 
     assert (item["verdict"], item["at"]) == ("fail", 4)
 
 
-def test_a_trace_that_names_a_picture_by_a_path_is_not_replayed(tmp_path: Path) -> None:
+def test_each_frame_plays_the_picture_the_trace_names_in_its_resources(tmp_path: Path) -> None:
+    given = replay_run.make(tmp_path / "run", tmp_path / "agent-a1.jsonl")
+    data = build.build(given)
+    assert [(given.run / f["file"]).read_bytes() for f in data["frames"]] == [f"jpeg {n}".encode() for n in range(6)]
+
+
+@pytest.mark.parametrize("name", ["../../../../etc/hostname", "/etc/hostname", "..", "x\\..\\..\\hostname"])
+def test_a_trace_that_names_a_picture_by_a_path_is_not_replayed(tmp_path: Path, name: str) -> None:
     given = replay_run.make(tmp_path / "run", tmp_path / "agent-a1.jsonl")
     trace = given.run / "traces" / "run.trace"
-    trace.write_text(trace.read_text().replace('"frame-3.jpeg"', '"../../../../etc/hostname"'))
-    with pytest.raises(ReplayError, match="names its picture by a path"):
+    trace.write_text(trace.read_text().replace(json.dumps(replay_run.picture(3)), json.dumps(name)))
+    with pytest.raises(ReplayError, match="names its picture by more than a plain name"):
         build.build(given)
 
 

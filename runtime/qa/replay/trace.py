@@ -15,7 +15,9 @@ from pathlib import Path
 from typing import Any
 
 RECORDER = "[qa-rec] "
-_PICTURE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+# One plain name in the trace's resources: Playwright names a frame's picture ``page@<the page's id>-<ms>.jpeg``.
+# No slash, backslash or leading dot, so no name reaches out of the folder.
+_PICTURE = re.compile(r"[A-Za-z0-9][A-Za-z0-9@._-]{0,127}")
 
 
 class ReplayError(Exception):
@@ -79,8 +81,10 @@ def _frame(event: dict[str, Any]) -> Frame:
     except (KeyError, TypeError, ValueError) as exc:
         raise ReplayError(f"a frame in the trace lacks its time, picture or size ({exc})") from exc
     # The tester's browser wrote the trace: a picture is named inside its resources, never by a path out of them.
-    if not _PICTURE.match(frame.file):
-        raise ReplayError("a frame in the trace names its picture by a path, so the trace cannot be trusted")
+    if not _PICTURE.fullmatch(frame.file):
+        raise ReplayError(
+            "a frame in the trace names its picture by more than a plain name, so the trace cannot be trusted"
+        )
     return frame
 
 

@@ -54,12 +54,17 @@ def _call(at: float, done: float, key: str, name: str, given: dict[str, Any], an
     ]
 
 
+def picture(n: int) -> str:
+    """Frame ``n``'s picture, named in the trace's resources as Playwright names it."""
+    return f"page@61b379a7fb0f2ca28dfab3f58d509a1c-{round((T0 + n) * 1000)}.jpeg"
+
+
 def make(run: Path, transcript: Path) -> Inputs:
     """The run's folder and the tester's transcript, written where they are named; what the builder is given."""
     (run / "traces" / "resources").mkdir(parents=True)
     events = []
     for n in range(12):
-        name = f"frame-{n}.jpeg"
+        name = picture(n)
         (run / "traces" / "resources" / name).write_bytes(f"jpeg {n}".encode())
         events.append(
             {
