@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from warden_fakes import FakeClock
@@ -77,6 +77,7 @@ def test_one_rule_refusing_one_session_again_and_again_files_one_incident(ctx: C
 
     for _ in range(limit - 1):
         watch.record(ctx, line)
+        _later(ctx)
     watch.record(ctx, {**line, "rule": "factory-alone"})
     assert reflections.entries(ctx.places) == []
     watch.record(ctx, line)
@@ -84,6 +85,21 @@ def test_one_rule_refusing_one_session_again_and_again_files_one_incident(ctx: C
     [entry] = reflections.entries(ctx.places)
     assert (entry["kind"], entry["who"]) == ("incident", "warden")
     assert "own-worktree" in entry["text"] and len(store.read_jsonl(ctx.places.refusals)) == limit + 1
+
+
+def test_one_messages_calls_refused_at_once_are_one_attempt(ctx: Context) -> None:
+    watch = reflections.RefusalWatch()
+    limit = ctx.settings().get_int("watch.refusals_to_notify")
+    line = {"session": "s1", "agent_id": "a1", "agent_type": "qa-visual", "rule": "tester-time", "tool": "Bash"}
+
+    for _ in range(limit * 2):
+        watch.record(ctx, line)
+    assert reflections.entries(ctx.places) == [] and len(store.read_jsonl(ctx.places.refusals)) == limit * 2
+
+
+def _later(ctx: Context) -> None:
+    """Past the seconds within which refusals count as one attempt."""
+    cast(FakeClock, ctx.clock).t += ctx.settings().get_int("watch.refusal_burst_seconds")
 
 
 def test_a_subagent_refused_again_and_again_files_an_incident_that_names_it(ctx: Context) -> None:
@@ -97,6 +113,7 @@ def test_a_subagent_refused_again_and_again_files_an_incident_that_names_it(ctx:
     watch.record(ctx, line)
     assert reflections.entries(ctx.places) == []
     for _ in range(limit - 1):
+        _later(ctx)
         watch.record(ctx, line)
 
     [entry] = reflections.entries(ctx.places)

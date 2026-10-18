@@ -180,6 +180,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("watch.orchestrator_busy_silent_minutes", "Restart a busy, silent orchestrator after, minutes"),
             ("watch.refusals_to_notify", "Refusals in a row that file an incident"),
             ("watch.refusal_window_minutes", "Minutes those refusals count over"),
+            ("watch.refusal_burst_seconds", "Seconds within which refusals count as one attempt"),
             ("watch.socket_read_seconds", "Seconds a caller gets to send its request"),
             ("watch.message_seconds", "Seconds your message is held out to a session"),
             ("watch.stop_seconds", "Seconds your message's delivery gets to finish"),

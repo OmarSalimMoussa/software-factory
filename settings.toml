@@ -179,6 +179,7 @@ orchestrator_silent_minutes = 40
 orchestrator_busy_silent_minutes = 120
 refusals_to_notify = 5
 refusal_window_minutes = 60  # the window for refusals_to_notify
+refusal_burst_seconds = 5  # refusals this close together are one attempt: one message's calls at once
 socket_read_seconds = 10  # a caller that has not sent its request line by then is dropped
 
 [cost]

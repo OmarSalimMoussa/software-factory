@@ -194,6 +194,9 @@ class RefusalWatch:
         key = (fields["session"], fields["agent_id"], fields["rule"])
         with self._lock:
             recent = self._recent.setdefault(key, deque())
+            # One message's calls, refused at once, are one attempt.
+            if recent and now - recent[-1] < settings.get_int("watch.refusal_burst_seconds"):
+                return
             recent.append(now)
             while recent and now - recent[0] >= window:
                 recent.popleft()
