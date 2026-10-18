@@ -358,7 +358,7 @@ def check_intake_time(call: Call) -> Decision:
 
 
 def _time_left(call: Call) -> float | Refusal:
-    """Seconds left of the tester's budget: its items' time, and its desktop time once it drives the remote desktop."""
+    """Seconds left of the tester's budget: its items' time, or its desktop time once it drives the remote desktop."""
     path = transcript.subagent_transcript(call.transcript, call.agent_id)
     try:
         brief, started = transcript.first_brief(path)
@@ -369,13 +369,13 @@ def _time_left(call: Call) -> float | Refusal:
     budget = float(lanes.tester_seconds(call.settings, items))
     first_up, in_ups = _desktop_starts(call, path)
     spent = (call.now - started).total_seconds() - in_ups
-    # Only a tester holding a slot's desktop, from its first `desktop up`: web steps before it take none of that time.
+    # On a desktop a tester works to the desktop's end, its items' time aside; that counts from its first `desktop up`.
     if call.agent_id in read_desktops(call.places).values():
         desktop_s = call.settings.get_int("qa.desktop_seconds")
         on_desktop = (call.now - (first_up or started)).total_seconds() - in_ups
         if on_desktop >= desktop_s:
             return _time_up(call, f"the desktop is a tester's for {desktop_s} s, and goes down once you hand back")
-        budget = min(budget, spent + desktop_s - on_desktop)
+        return max(budget - spent, desktop_s - on_desktop)
     return budget - spent if budget > spent else _time_up(call, "your time is up")
 
 

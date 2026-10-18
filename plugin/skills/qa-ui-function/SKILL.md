@@ -20,7 +20,8 @@ in every state, and you prove each finding with a screenshot.
   hand-back. A scenario's own timings never override this.
 - **The website first.** Use the slot's remote desktop only for steps outside the web UI, and only as the factory's
   procedure `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/desktop.md` says. One tester holds the desktop at a time, for
-  the seconds its `desktop up` answers with. Never take a password from a brief, and never put one in a report.
+  the seconds its `desktop up` answers with: while you hold it, that is your time, however long an item gets. Never
+  take a password from a brief, and never put one in a report.
 
 ## How you work
 
