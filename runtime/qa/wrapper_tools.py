@@ -137,7 +137,11 @@ TOOLS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {
                 "pattern": {"type": "string", "description": "the address, * and ** as wildcards: **/api/runs/*"},
-                "seconds": {"type": "number", "description": "the most it waits for your release"},
+                "seconds": {
+                    "type": "number",
+                    "description": "the most it waits for your release: allow for every "
+                    "call until then, at several seconds each",
+                },
             },
             "required": ["pattern", "seconds"],
         },
