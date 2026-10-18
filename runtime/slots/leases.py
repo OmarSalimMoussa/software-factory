@@ -28,9 +28,9 @@ KEYS = ("holder", "since", "note")
 SWEEP, PRUNE, DISK, RESTARTS = "factory-sweep-slot", "factory-prune", "factory-disk", "factory-restarts"
 TOP = "factory-top"
 # The product's optional slot verbs, which the stack unit runs only once `scripts/dev verbs` lists them: run <service>
-# -- <command…> runs one command in a new container of a slot's service; restart <service…> restarts running ones.
-RUN, RESTART = SLOT_RUN, "restart"
-OPTIONAL = (RUN, RESTART)
+# -- <command…> runs a command in a new container of the service; restart or stop <service…> restarts or stops them.
+RUN, RESTART, STOP = SLOT_RUN, "restart", "stop"
+OPTIONAL = (RUN, RESTART, STOP)
 RUN_LABEL_ENV = "FACTORY_RUN_LABEL"
 
 

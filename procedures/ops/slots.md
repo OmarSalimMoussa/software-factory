@@ -9,6 +9,7 @@ A slot is one running copy of the product on the laptop. The factory decides who
 | `factory slot up [service…]` | the holder | Builds and starts the slot's stack, or only the named services. A running service whose image is unchanged keeps running. An up that would change nothing (the same checkout, env file and words as the slot's last good up, with every container it left still running) runs nothing and says so; `down` first to build again. Slot 0, which is staging, comes up whole |
 | `factory slot up --at <commit>` | the orchestrator | Brings slot 0 up whole at an older commit of the default branch, for a check that walks it there: the commit a bundle names, or one between its suspects. Slot 0 builds it from a worktree of its own, and every slot 0 command runs there, until a plain `factory slot up` builds the tip again. Staging runs that commit meanwhile |
 | `factory slot restart <service…>` | the holder | Restarts the named services, which must be running |
+| `factory slot stop <service…>` | the holder | Stops the named services, keeping their data, for a set-up that needs them down; `factory slot up` starts them again |
 | `factory slot down` | the holder | Stops it, keeping its data |
 | `factory slot run <service> -- <command…>` | the holder and its backend and security testers | Runs one command in a new container of the service and answers with its output. Bring the service up first, so the run is not spent building it |
 | `factory slot release` | the holder | Gives the slot back once your work is checked |
@@ -21,10 +22,10 @@ A slot is one running copy of the product on the laptop. The factory decides who
 - **Leases do not expire.** Only the holder may bring a slot up, down or empty it. A stack command before a claim is
   refused rather than falling back to slot 0. When a session retires (finished, stopped, crashed) or is benched, the
   warden empties its slot and gives it up itself; a slot that would not empty is tried again.
-- **No change under a tester.** While a tester you started still walks the slot, `up`, `restart` and `down` are
+- **No change under a tester.** While a tester you started still walks the slot, `up`, `restart`, `stop` and `down` are
   refused: change the stack once it reports, so no tester sees the slot rebuilt mid-step.
 - **Output.** The warden answers with the command's exit status and its last lines, or a run's whole output, up to
-  `slots.tail_max_kib`; the full log is kept for the owner. A product whose `scripts/dev` has no `run` or `restart`
-  says so.
+  `slots.tail_max_kib`; the full log is kept for the owner. A product whose `scripts/dev` has no `run`, `restart`
+  or `stop` says so.
 - **Memory.** A test run starts only when free memory covers its ceiling and the reserve. Hitting the cap is a leak to
   fix, not a reason to raise it.

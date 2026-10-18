@@ -70,6 +70,9 @@ def test_the_slot_comes_from_the_lease_never_from_an_argument(world: World) -> N
         ({"op": "restart", "services": []}, ""),
         ({"op": "restart", "services": ["--force-recreate"]}, ""),
         ({"op": "restart", "services": ["web"]}, "agent-qa-1"),
+        ({"op": "stop", "services": []}, ""),
+        ({"op": "stop", "services": ["--timeout"]}, ""),
+        ({"op": "stop", "services": ["web"]}, "agent-qa-1"),
     ],
 )
 def test_only_checked_words_reach_scripts_dev(world: World, args: dict[str, object], agent_id: str) -> None:
@@ -139,7 +142,9 @@ def test_slot_0_comes_up_only_at_a_commit_of_the_default_branch(
     assert world.launcher.stacks == [] and not public.staging_at_path(world.places).exists()
 
 
-@pytest.mark.parametrize("args", [{"op": "up"}, {"op": "down"}, {"op": "restart", "services": ["web"]}])
+@pytest.mark.parametrize(
+    "args", [{"op": "up"}, {"op": "down"}, {"op": "restart", "services": ["web"]}, {"op": "stop", "services": ["web"]}]
+)
 def test_no_stack_changes_under_a_tester_still_walking_the_slot(world: World, args: dict[str, object]) -> None:
     _implementer(world, 1)
     slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)
@@ -156,13 +161,14 @@ def test_no_stack_changes_under_a_tester_still_walking_the_slot(world: World, ar
     assert len(world.launcher.stacks) == 1
 
 
-def test_the_holder_restarts_the_services_it_names(world: World) -> None:
+@pytest.mark.parametrize("op", ["restart", "stop"])
+def test_the_holder_restarts_or_stops_the_services_it_names(world: World, op: str) -> None:
     _implementer(world, 1)
     slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)
 
-    slot(world.ctx("implementer", "s-1"), {"op": "restart", "services": ["web", "worker"]}, None)
+    slot(world.ctx("implementer", "s-1"), {"op": op, "services": ["web", "worker"]}, None)
 
-    assert world.launcher.stacks == [(1, ["restart", "web", "worker"])]
+    assert world.launcher.stacks == [(1, [op, "web", "worker"])]
 
 
 def test_a_slots_own_session_and_its_backend_and_security_testers_run_any_command_in_it_and_no_other_tester_does(

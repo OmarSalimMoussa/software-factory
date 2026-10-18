@@ -186,7 +186,7 @@ def _slot_call(ns: argparse.Namespace) -> Call:
         args["note"] = ns.note
     elif ns.op == "up":
         args.update({"services": ns.services, **({"at": ns.at} if ns.at else {})})
-    elif ns.op == "restart":
+    elif ns.op in ("restart", "stop"):
         args["services"] = ns.services
     elif ns.op == "free":
         args["slot"] = ns.slot

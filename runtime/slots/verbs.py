@@ -36,7 +36,7 @@ from runtime.warden.verbs import IMPL, ORCH, slot_ops
 
 WORD = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@+-]{0,127}$")
 EMAIL = re.compile(r"^[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
-_CHANGES_STACK = frozenset({"up", "down", leases.RESTART})
+_CHANGES_STACK = frozenset({"up", "down", leases.RESTART, leases.STOP})
 _FIXED = {"down": ["down"], "top": [leases.TOP]}
 # By state folder and slot: when the CPU hold first refused that slot's desktop since it last went up.
 _HELD: dict[tuple[str, int], datetime] = {}
@@ -198,7 +198,7 @@ def _cpu_hold(ctx: Context, n: int) -> None:
 
 def _verb(op: object, args: dict[str, Any]) -> list[str]:
     """The scripts/dev command line for one slot operation, from checked words only."""
-    if op in ("up", leases.RESTART):
+    if op in ("up", leases.RESTART, leases.STOP):
         return _services_verb(str(op), args)
     if isinstance(op, str) and op in _FIXED:
         return list(_FIXED[op])
@@ -212,15 +212,15 @@ def _verb(op: object, args: dict[str, Any]) -> list[str]:
         return _run_verb(args)
     raise Refused(
         "args",
-        f"{op!r} is not a slot verb: claim, up, down, restart <service…>, release, free, list, sign-in, seed, "
-        "desktop, run, top",
+        f"{op!r} is not a slot verb: claim, up, down, restart <service…>, stop <service…>, release, free, list, "
+        "sign-in, seed, desktop, run, top",
     )
 
 
 def _services_verb(op: str, args: dict[str, Any]) -> list[str]:
     services = _words(args.get("services", []), "services")
-    if op == leases.RESTART and not services:
-        raise Refused("args", "restart <service…>: name each service to restart")
+    if op in (leases.RESTART, leases.STOP) and not services:
+        raise Refused("args", f"{op} <service…>: name each service to {op}")
     return [op, *services]
 
 
