@@ -114,4 +114,27 @@ drive('agents', async t => {
   const mh = [...new Set(await m.$$eval('#history .hist-row', rs => rs.map(r => r.clientHeight)))]; t.check(mh.length === 1, 'phone History rows differ: ' + mh);
   const kb = await m.$eval('.node-card .kill', e => { const r = e.getBoundingClientRect(); return [r.width, r.height]; }); t.check(kb[0] >= 24 && kb[1] >= 24, 'stop target under 24 px');
   await t.shot(m, 'agents-390.png');
+  await m.close();
+  // a benched implementer's panel says what it waits on, from its first draw and unmoved by a refresh: its merge's
+  // check, or, on hold, the task it waits for, which opens on a click
+  await t.srv.reset(); await t.srv.set({scenario: 'waits'});
+  const w = await t.open(1440, 900, 'agents');
+  await w.click('[data-agent="impl-staging-down"] .nname'); await settle(w);
+  const said = await texts(w, '#sheet-body .wait-line');
+  t.check(said.length === 1 && /^Check failed on a1b2c3d, .+ ago: phone-lists$/.test(said[0]), 'a merged implementer does not say its check failed: ' + said);
+  const top = () => w.$eval('#sheet-body .wait-line', e => Math.round(e.getBoundingClientRect().top));
+  const before = await top();
+  await w.evaluate(() => refreshSheet(['all'])); await settle(w);
+  t.check(await top() === before, 'the check line moved when the panel refreshed');
+  await t.shot(w, 'agent-merged-1440.png');
+  await w.keyboard.press('Escape'); await settle(w);
+  await w.click('[data-agent="impl-project-names"] .nname'); await settle(w);
+  t.check((await texts(w, '#sheet-body .wait-task')).join() === 'Staging is down after the last deploy', 'an implementer on hold does not name the task it waits for');
+  t.check((await texts(w, '#sheet-body .wait-line')).join() === said.join(), 'an implementer on hold does not say how the check of the task it waits for stands');
+  const tw = await w.$eval('#sheet-body .wait-task', e => e.getBoundingClientRect().height); t.check(tw >= 24, 'the task it waits for is a target under 24 px');
+  await t.shot(w, 'agent-on-hold-1440.png');
+  await w.setViewportSize({width: 390, height: 844}); await settle(w);
+  await t.wide(w, '390 panel of an implementer on hold'); await t.shot(w, 'agent-on-hold-390.png');
+  await w.click('#sheet-body .wait-task'); await settle(w);
+  t.check((await w.textContent('#sheet-title')).includes('Staging is down after the last deploy'), 'the task it waits for did not open');
 });

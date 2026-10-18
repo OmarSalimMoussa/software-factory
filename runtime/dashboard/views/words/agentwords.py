@@ -39,6 +39,18 @@ OWN_WAIT = {
     "blocked": "Blocked · comes back when you mark it fixed",
     "on-hold": "On hold · comes back when the task it waits for passes its check",
 }
+# What a merged task's check did, each with its dot's tone: a line under a benched implementer's doing.
+CHECK = {
+    "running": ("accent", "Check running on {sha}, started {ago}"),
+    "pass": ("good", "Check passed on {sha}, {ago}"),
+    "fail": ("bad", "Check failed on {sha}, {ago}: {scenarios}"),
+    "blocked": ("warn", "Check blocked on {sha}, {ago}: {scenarios}"),
+    "none": ("ring", "Check not started on {sha}, merged {ago}"),
+    "unsure": ("ring", "Check on {sha} may be running: which build staging runs is not known"),
+    "no-commit": ("ring", "Which commit its merge made is not known"),
+    "unread": ("ring", "Its check cannot be read. {why}"),
+}
+NOT_IN_QUEUE = "Not in the queue"
 WHY = {
     "finished": ("finished", "good"),
     WITH_PARENT: ("stopped with its parent", "bad"),

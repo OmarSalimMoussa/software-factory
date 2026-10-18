@@ -296,6 +296,12 @@ svg.ring .fg{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoff
 .hist-row .hc small{display:block;font-size:11.5px;color:var(--muted)}
 .hist-row .ts .why-sm{display:none}
 .hist-row .ts{height:22px;align-items:center}
+.waits{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.wait{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
+.wait-task{border:0;background:none;padding:0;min-height:24px;color:var(--fg);font:inherit;font-weight:600;text-align:left;cursor:pointer}
+.wait-task:hover{text-decoration:underline}
+.wait-line{display:flex;gap:8px;align-items:flex-start;color:var(--muted)}
+.wait-line .dot{margin-top:5px}
 .stoplist{display:flex;flex-direction:column;gap:6px}
 .stoplist div{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:9px}
 .node-card .toggle .icon{transition:transform .28s cubic-bezier(.2,.8,.2,1)}

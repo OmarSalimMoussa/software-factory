@@ -43,13 +43,14 @@ function histRow(h) {
 const onlyPart = env => Object.values(env.parts)[0];
 function agentBody(a) {
   const life = a.life_note ? `<div class="ro-banner"><span class="ico">${icon(a.life_note.icon)}</span><div>${esc(a.life_note.text)}</div></div>` : '';
-  return `<div style="display:flex;gap:10px;align-items:center">${ava(a.family, a.initials)}<div><b>${esc(a.role)}</b><div class="muted">${esc(a.doing)}</div></div></div>
+  return `<div style="display:flex;gap:10px;align-items:center">${ava(a.family, a.initials)}<div style="min-width:0"><b>${esc(a.role)}</b><div class="muted">${esc(a.doing)}</div>${waitsHTML(a.waits)}</div></div>
     <div class="kv">${a.kv.map(kvBox).join('')}</div>
     ${life}
     ${a.task ? `<button class="btn" data-task="${esc(a.task)}">${icon('queue-list', 'sm')}Open task ${esc(a.task)}</button>` : ''}
     ${a.kids.length ? `<div class="section"><div class="label">Under it</div><div class="card rows">${a.kids.map(k => `<div class="row" style="grid-template-columns:34px minmax(0,1fr) auto;min-height:52px" data-agent="${esc(k.id)}">${ava(k.family, k.initials, 28)}<span class="tt" style="font-weight:500">${esc(k.name)} <span class="faint">· ${esc(k.doing)}</span></span><span class="cost">${esc(k.cost)}</span></div>`).join('')}</div></div>` : ''}
     ${threadHTML(a.thread)}${a.message ? msgBox(a.message) : ''}`;
 }
+const waitsHTML = ws => ws.length ? `<div class="waits">${ws.map(w => `<div class="wait">${w.task ? `<button class="wait-task" data-task="${esc(w.task)}">${esc(w.title)}</button>` : w.title ? `<b>${esc(w.title)}</b>` : ''}<div class="wait-line"><i class="dot ${esc(w.tone)}"></i><span>${esc(w.text)}</span></div></div>`).join('')}</div>` : '';
 /* ---------- messages: the thread read back from the transcript, and the box that sends the next one ---------- */
 UI.drafts = {};
 function threadHTML(rows) {

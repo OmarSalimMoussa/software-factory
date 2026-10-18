@@ -326,10 +326,15 @@ def next_up(ctx: Context) -> dict[str, Any]:
     return {"next": rows, "skipped": skipped, "unreadable": [dataclasses.asdict(b) for b in broken]}
 
 
+def last_merge(log: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The line of a task's log that records its last merge, with the commit it made; None before it merged."""
+    return next((e for e in reversed(log) if e["event"] == "merged" and e.get("commit")), None)
+
+
 def merge_commit(queue: Queue, task_id: str) -> str:
     """The commit the task's last merge made, from its log; "" before it merged."""
-    merges = [e for e in queue.read_log(task_id) if e["event"] == "merged" and e.get("commit")]
-    return merges[-1]["commit"] if merges else ""
+    found = last_merge(queue.read_log(task_id))
+    return str(found["commit"]) if found else ""
 
 
 def advance_deployed(

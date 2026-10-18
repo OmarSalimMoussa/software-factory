@@ -1,4 +1,5 @@
-"""One agent's panel, what stopping it would stop, and a retired agent's read-only History record."""
+"""One agent's panel, with what a benched implementer's task waits on; what stopping it would stop; and a retired
+agent's read-only History record."""
 
 from __future__ import annotations
 
@@ -6,13 +7,19 @@ from typing import Any
 
 from runtime.dashboard.views import messaging
 from runtime.dashboard.views.agents import history_row, in_tree
-from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, epoch, version
+from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, ago, epoch, version
 from runtime.dashboard.views.shell import factory_state
 from runtime.dashboard.views.words import agentwords as words
+from runtime.dashboard.views.words import taskwords
+from runtime.queue.tasks import ON_HOLD, last_merge
+from runtime.queue.turn import MERGED
 from runtime.shared.models import DEPRIORITIZED, RETIRED
+from runtime.warden.health.probes import STAGING
+from runtime.warden.verbs import REGRESSION
 
 WANTS = ("settings", "sessions", "queue", "cost", "factory", "yolo")
-_DEPRI = "Deprioritized. It holds no slot, keeps its full context, and comes back first when a slot frees."
+_WAITS = ("logs", "deploys", "proposals")
+_DEPRI = "Deprioritized. It holds no slot and keeps its full context."
 _RETIRED = "Retired. It can never be resumed. It moves to History in a few minutes."
 
 
@@ -50,6 +57,7 @@ def panel(snap: Snap, row: dict[str, Any]) -> dict[str, Any]:
         "initials": words.initials(row),
         "role": words.role(row),
         "doing": words.doing(snap, row),
+        "waits": waits(snap, row),
         "life_note": life,
         "kv": [
             {"label": "Model", "value": words.model(row)},
@@ -76,6 +84,79 @@ def panel(snap: Snap, row: dict[str, Any]) -> dict[str, Any]:
         "actions": actions,
         "version": agent_version(row),
     }
+
+
+def waits(snap: Snap, row: dict[str, Any]) -> list[dict[str, Any]]:
+    """What a live implementer's task waits on, a line each: its merge's check, or each task its hold waits for."""
+    found = taskwords.tasks(snap)
+    own = found.get(row["task"]) if row["role"] == "implementer" and row["state"] != RETIRED else None
+    if own is not None and own["status"] == MERGED:
+        return [{"task": None, "title": None, **_check(snap, own)}]
+    if own is None or own["status"] != ON_HOLD:
+        return []
+    lines: list[dict[str, Any]] = []
+    for after in own["after"]:
+        waited = found.get(after)
+        if waited is None:
+            lines.append({"task": None, "title": after, "tone": "ring", "text": words.NOT_IN_QUEUE})
+            continue
+        if waited["status"] == MERGED:
+            line = _check(snap, waited)
+        else:
+            status = taskwords.status(snap, waited)
+            line = {"tone": status["tone"], "text": status["word"]}
+        lines.append({"task": after, "title": waited["title"], **line})
+    return lines
+
+
+def _check(snap: Snap, task: dict[str, Any]) -> dict[str, str]:
+    """The check of the task's merge: running on staging now, else the last one saved, else not started."""
+    try:
+        merge = last_merge(snap.get("logs").get(task["id"], []))
+    # telemetry: surfaced — `_said` puts why in the line the panel draws, and the rest of the panel still draws
+    except PartError as exc:
+        return _said("unread", why=str(exc))
+    if merge is None:
+        return _said("no-commit")
+    commit, now = str(merge["commit"]), snap.now
+    sha, since, staging = commit[:7], _walk_since(snap), _staging(snap)
+    if since is not None and staging is None:
+        return _said("unsure", sha=sha)
+    if since is not None and staging is not None and (commit.startswith(staging) or staging.startswith(commit)):
+        return _said("running", sha=sha, ago=ago(since, now))
+    saved = [c for c in snap.get("queue")["checks"] if c["commit"] == commit]
+    if not saved:
+        return _said("none", sha=sha, ago=ago(epoch(merge["at"]), now))
+    last = max(saved, key=lambda c: str(c["at"]))
+    failed = [r["scenario"] for r in last["rows"] if r["result"] == "fail"]
+    blocked = [r["scenario"] for r in last["rows"] if r["result"] != "pass"]
+    kind, names = ("fail", failed) if failed else ("blocked", blocked) if blocked else ("pass", [])
+    return _said(kind, sha=sha, ago=ago(epoch(last["at"]), now), scenarios=", ".join(names))
+
+
+def _said(kind: str, **values: str) -> dict[str, str]:
+    tone, text = words.CHECK[kind]
+    return {"tone": tone, "text": text.format(**values)}
+
+
+def _walk_since(snap: Snap) -> float | None:
+    """When the regression walk running now began: a tester still walking when a check is saved reports into the
+    next one, as the evidence takes its runs. None when no regression tester runs."""
+    last = max((epoch(c["at"]) for c in snap.get("queue")["checks"]), default=0.0)
+    testers = [s for s in snap.get("sessions").values() if s["role"] == REGRESSION]
+    walk = [s for s in testers if s["state"] != RETIRED or (s["ended"] and epoch(s["ended"]) >= last)]
+    if not any(s["state"] != RETIRED for s in walk):
+        return None
+    return min(epoch(s["started"]) for s in walk)
+
+
+def _staging(snap: Snap) -> str | None:
+    try:
+        current = snap.get("deploys")[STAGING]["current"]
+    # telemetry: surfaced — the build is `None`, unknown, and the check's line says whether it runs is not known
+    except PartError:
+        return None
+    return None if current is None else str(current["commit"])
 
 
 def stopping(snap: Snap, row: dict[str, Any]) -> list[dict[str, Any]]:
@@ -138,9 +219,10 @@ def record(snap: Snap, row: dict[str, Any]) -> dict[str, Any]:
 
 
 def wants(query: Query) -> dict[str, Any]:
-    # The thread is read from the agent's transcript, so only for the panel that is open.
+    # Only for the panel that is open: the thread, from the agent's transcript, and the merged tasks' logs, for waits.
     if query.get("view", "agent") == "agent":
-        return {"want": [*WANTS, "thread"], "days": 1, "session": query.get("id", "")}
+        want = [*WANTS, "thread", *_WAITS]
+        return {"want": want, "days": 1, "session": query.get("id", ""), "statuses": [MERGED]}
     return {"want": list(WANTS), "days": 1}
 
 

@@ -12,6 +12,7 @@ import dataclasses
 import hashlib
 import os
 from pathlib import Path
+from typing import Any
 
 from seed_agents import history_lines, seed_check_runs, seed_cost, seed_evidence, seed_sessions, seed_transcript
 from seed_kit import FIXTURES, PRICES, ROOT, fixture, fixture_time, iso, write
@@ -24,6 +25,7 @@ from runtime.shared import settings as settings_module
 from runtime.shared.paths import Places
 from runtime.warden import public
 from runtime.warden.delivery import deploys, done
+from runtime.warden.sessions import registry
 
 T0 = 1_791_546_000.0  # 2026-10-09 11:40:00 UTC
 TEST_TOKEN = "1"  # the device token the UI drives send as their owner cookie
@@ -301,13 +303,41 @@ def seed(root: Path, now: float = T0) -> Places:
     return places
 
 
-def blocked(repo: Path, places: Places, task_id: str, why: str, at: str) -> None:
-    """The orchestrator's block of ``task_id``: its status, its log's line and the card for the owner's Fixed."""
+def _move(repo: Path, task_id: str, entry: dict[str, str], **fields: Any) -> models.Task:
+    """``task_id`` moved to ``entry``'s status: its file, with ``fields`` changed, and its log's line."""
     path = repo / "queue" / "tasks" / f"{task_id}.md"
     task = formats.parse_task(path.read_text())
-    path.write_text(formats.dump_task(dataclasses.replace(task, status="blocked")))
-    entry = {"at": at, "actor": "orchestrator", "event": "blocked", "text": why, "from": task.status, "to": "blocked"}
+    path.write_text(formats.dump_task(dataclasses.replace(task, status=entry["to"], **fields)))
     with (repo / "queue" / "tasks" / f"{task_id}.log.jsonl").open("ab") as log:
-        log.write(records.dump_log(entry))
+        log.write(records.dump_log({**entry, "from": task.status}))
+    return task
+
+
+def _bench_for_own(places: Places, task_id: str) -> None:
+    """The task's implementer gives up its place and waits, benched for its own task."""
+    sessions = registry.read(places)
+    for s in sessions.values():
+        if s.task == task_id and s.role == "implementer" and s.state != models.RETIRED:
+            s.state, s.benched_for = models.DEPRIORITIZED, task_id
+    registry.write(places, sessions)
+
+
+def blocked(repo: Path, places: Places, task_id: str, why: str, at: str) -> None:
+    """The orchestrator's block of ``task_id``: its status, its log's line and the card for the owner's Fixed."""
+    task = _move(repo, task_id, {"at": at, "actor": "orchestrator", "event": "blocked", "text": why, "to": "blocked"})
     card = models.Card("n4", "blocked", task_id, task.title, why, at)
     store.write_json(places.cards, [*store.read_json(places.cards), models.dump(card)])
+
+
+def merged(repo: Path, places: Places, task_id: str, commit: str, at: str) -> None:
+    """The warden found ``task_id``'s merge, ``commit``: its implementer waits, benched, for the merge's check."""
+    entry = {"at": at, "actor": "warden", "event": "merged", "text": f"merged as {commit}", "to": "merged"}
+    _move(repo, task_id, {**entry, "commit": commit})
+    _bench_for_own(places, task_id)
+
+
+def held(repo: Path, places: Places, task_id: str, after: list[str], at: str) -> None:
+    """The orchestrator put ``task_id`` on hold until each of ``after`` passes its check; its implementer waits."""
+    entry = {"at": at, "actor": "orchestrator", "event": "on-hold", "text": "Its seed comes with another task"}
+    _move(repo, task_id, {**entry, "to": "on-hold"}, after=after)
+    _bench_for_own(places, task_id)
