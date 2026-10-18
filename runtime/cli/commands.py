@@ -172,7 +172,9 @@ def _slot(sub: Any) -> None:
     ops = slot.add_subparsers(dest="op", required=True)
     ops.add_parser("claim").add_argument("--note", default="")
     up = "build and start the stack, or the named services; a running service whose image is unchanged keeps running"
-    ops.add_parser("up", help=up).add_argument("services", nargs="*")
+    slot_up = ops.add_parser("up", help=up)
+    slot_up.add_argument("services", nargs="*")
+    slot_up.add_argument("--at", default="", help="slot 0 only: a commit of the default branch older than its tip")
     ops.add_parser("restart", help="restart the named services, running ones").add_argument("services", nargs="+")
     for name in ("down", "release", "list"):
         ops.add_parser(name)

@@ -3,6 +3,7 @@ tester holds alone, within the machine's cap and its CPU hold."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 import pytest
@@ -88,6 +89,54 @@ def test_slot_0_is_staging_and_comes_up_whole(world: World) -> None:
     slot(world.ctx(), {"op": "up"}, None)
 
     assert world.launcher.stacks == [(0, ["up"])]
+
+
+def _git(ancestor: int) -> Callable[[list[str]], tuple[int, str]]:
+    """git in the checkout: every sha names commit FULL, an ancestor of the default branch when ``ancestor`` is 0."""
+
+    def run(argv: list[str]) -> tuple[int, str]:
+        answers = {"rev-parse": (0, f"{FULL}\n"), "merge-base": (ancestor, ""), "remove": (128, "not a working tree")}
+        return answers.get(argv[3], answers.get(argv[4], (0, "")))
+
+    return run
+
+
+FULL = "a" * 40
+
+
+def test_slot_0_comes_up_at_an_older_commit_from_its_own_worktree_then_back_at_the_tip(world: World) -> None:
+    world.session("s-orch", "orchestrator", "orchestrator")
+    world.launcher.git = _git(0)
+    where = str(world.repo / ".claude" / "worktrees" / "staging-at")
+
+    assert slot(world.ctx(), {"op": "up", "at": "aaaaaaa"}, None)["at"] == FULL
+    assert [argv[3:] for argv in world.launcher.commands if argv[3] == "worktree"] == [
+        ["worktree", "remove", "--force", where], ["worktree", "prune"],
+        ["worktree", "add", "--force", "--detach", where, FULL],
+    ]  # fmt: skip
+    assert store.read_json(public.staging_at_path(world.places)) == {"commit": FULL}
+    assert slot(world.ctx(), {"op": "up"}, None)["at"] is None
+    assert not public.staging_at_path(world.places).exists()
+    assert world.launcher.stacks == [(0, ["up"]), (0, ["up"])]
+
+
+@pytest.mark.parametrize(
+    ("args", "ancestor", "said"),
+    [
+        ({"op": "up", "at": "bbbbbbb"}, 1, "bbbbbbb is not on master"),
+        ({"op": "up", "at": "HEAD~1"}, 0, "names a commit of the default branch by its sha"),
+        ({"op": "down", "at": "aaaaaaa"}, 0, "only slot 0's up takes --at"),
+    ],
+)
+def test_slot_0_comes_up_only_at_a_commit_of_the_default_branch(
+    world: World, args: dict[str, object], ancestor: int, said: str
+) -> None:
+    world.session("s-orch", "orchestrator", "orchestrator")
+    world.launcher.git = _git(ancestor)
+
+    with pytest.raises(Refused, match=said):
+        slot(world.ctx(), args, None)
+    assert world.launcher.stacks == [] and not public.staging_at_path(world.places).exists()
 
 
 @pytest.mark.parametrize("args", [{"op": "up"}, {"op": "down"}, {"op": "restart", "services": ["web"]}])

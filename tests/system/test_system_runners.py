@@ -46,7 +46,7 @@ def _parse(raw: dict[str, Any]) -> object:
     if kind == lf.DEPLOY:
         return lf.deploy_argv(raw)
     slot, _, session = lf.stack_parts(raw, settings())
-    return lf.checkout_for(session, settings(), SESSIONS)
+    return lf.checkout_for(session, settings(), SESSIONS, False)
 
 
 def test_each_kind_runs_only_the_installed_programs() -> None:
@@ -65,8 +65,8 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
     assert command[0] == "/usr/bin/git" and cwd == REPO
     assert respawned == [str(layout.CLAUDE_BIN), "respawn", "0b8f6a52"]
     assert shape == (REPO, ["--only", "repo-shape"])
-    assert lf.checkout_for("s1", settings(), SESSIONS) == REPO / ".claude" / "worktrees" / "impl-cart"
-    assert lf.checkout_for("", settings(), SESSIONS) == REPO
+    assert lf.checkout_for("s1", settings(), SESSIONS, False) == REPO / ".claude" / "worktrees" / "impl-cart"
+    assert lf.checkout_for("", settings(), SESSIONS, False) == REPO
     assert "--worktree" in argv and lf.session_cwd(SESSION, settings()) == REPO
     copy = lf.session_argv(COPY, STATE)
     assert copy[3:7] == ["--bg", "--resume", COPY["resume"], "--name"] and "--worktree" not in copy
@@ -123,6 +123,28 @@ def test_each_kind_runs_only_the_installed_programs() -> None:
 def test_a_request_outside_its_bounds_is_refused_before_anything_runs(raw: dict[str, Any]) -> None:
     with pytest.raises(lf.BadRequest):
         _parse(raw)
+
+
+def test_slot_0_builds_its_own_worktree_while_a_check_walks_an_older_commit(tmp_path: Path) -> None:
+    repo = tmp_path / "shop"
+    where = repo / ".claude" / "worktrees" / "staging-at"
+    where.mkdir(parents=True)
+    given = settings(**{"repo.path": str(repo)})
+
+    assert lf.checkout_for("", given, SESSIONS, True) == where
+    assert lf.checkout_for("", given, SESSIONS, False) == repo
+
+
+@pytest.mark.parametrize("made", ["link", "nothing"])
+def test_slot_0_never_builds_a_link_or_nothing_in_place_of_its_own_worktree(tmp_path: Path, made: str) -> None:
+    repo = tmp_path / "shop"
+    where = repo / ".claude" / "worktrees" / "staging-at"
+    where.parent.mkdir(parents=True)
+    if made == "link":
+        where.symlink_to(tmp_path)
+
+    with pytest.raises(lf.BadRequest, match="where slot 0 builds an older commit, is not a folder"):
+        lf.checkout_for("", settings(**{"repo.path": str(repo)}), SESSIONS, True)
 
 
 @pytest.mark.parametrize(("text", "size"), [("0B", 0), ("512kB", 512_000), ("1.25GB", 1_250_000_000), ("2TB", 2e12)])

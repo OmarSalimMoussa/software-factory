@@ -27,6 +27,7 @@ from runtime.shared.settings import Settings
 from runtime.slots import leases
 from runtime.system.runners import launch_file as lf
 from runtime.system.runners import same_up
+from runtime.warden import public
 from standard import config as product_config
 from standard import envfile
 from standard.config_records import Config
@@ -360,6 +361,7 @@ def _own_verb(slot: int, verb: list[str], timeout: int) -> int | None:
 
 def main(argv: list[str]) -> int:
     state, request_id = Path(argv[0]), argv[1]
+    places = Places.for_runner(Path(__file__).resolve().parents[3], state)
     try:
         raw = lf.read(state, request_id, (lf.STACK,))
         settings, sessions = lf.published(state)
@@ -372,7 +374,8 @@ def main(argv: list[str]) -> int:
         own = _own_verb(slot, verb, timeout)
         if own is not None:
             return own
-        checkout = lf.checkout_for(session, settings, sessions)
+        staging_at = slot == 0 and public.staging_at_path(places).exists()
+        checkout = lf.checkout_for(session, settings, sessions, staging_at)
     # telemetry: surfaced — the refusal is `print`ed to the unit's log, and the exit says it was refused
     except lf.BadRequest as exc:
         print(f"stack-run: refused: {exc}", flush=True)
@@ -381,7 +384,6 @@ def main(argv: list[str]) -> int:
     except subprocess.TimeoutExpired:
         print("stack-run: docker did not answer in time", flush=True)
         return lf.TIMED_OUT
-    places = Places.for_runner(Path(__file__).resolve().parents[3], state)
     return product_verb(
         places, settings, slot, verb, checkout, run=provision.real_run, timeout=timeout, request=request_id
     )

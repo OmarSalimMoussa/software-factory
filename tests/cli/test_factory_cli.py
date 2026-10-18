@@ -85,6 +85,7 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["turn", "next"],
         ["slot", "claim"],
         ["slot", "up", "web"],
+        ["slot", "up", "--at", "abc1234"],
         ["slot", "restart", "web", "worker"],
         ["slot", "free", "2"],
         ["slot", "sign-in", "tester-1@example.com"],

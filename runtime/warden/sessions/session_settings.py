@@ -34,6 +34,12 @@ def worktrees(repo: Path) -> Path:
     return repo / ".claude" / "worktrees"
 
 
+def staging_at(repo: Path) -> Path:
+    """The worktree slot 0 builds from while a check of the default branch walks a commit older than its tip; no
+    session's worktree takes its name."""
+    return worktrees(repo) / "staging-at"
+
+
 def render(places: Places, role: str) -> dict[str, Any]:
     body: dict[str, Any] = {
         "sandbox": {"enabled": False},

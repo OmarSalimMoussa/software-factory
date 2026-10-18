@@ -40,6 +40,12 @@ def desktops_path(places: Places) -> Path:
     return folder(places) / "desktops.json"
 
 
+def staging_at_path(places: Places) -> Path:
+    """The commit slot 0 builds from its own worktree (session_settings.staging_at), for the stack runner, while a
+    check walks an older commit than the tip; none while it builds the main checkout."""
+    return folder(places) / "staging-at.json"
+
+
 def read_switches(places: Places) -> set[str]:
     raw = store.read_json_or(places.switches, {"off": []})
     off = raw.get("off") if isinstance(raw, dict) else None

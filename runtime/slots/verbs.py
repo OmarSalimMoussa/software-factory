@@ -12,7 +12,8 @@ down; another tester's `desktop up` waits, so no one's new password cuts off a t
 CPU use is past budget.walk_hold_percent, a session's own `desktop up` waits too (runtime/guard/walk_hold.py), but
 never a tester's, whose walk the hold let start; the wait counts per slot, in the warden's memory, so a restart begins
 it again. Slot 0 is staging, so it comes up whole: one build of the
-stack, never a service at a time. No stack changes under a tester still walking it.
+stack, never a service at a time, at the tip or, for a check, an older commit of the default branch (staging.py). No
+stack changes under a tester still walking it.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from runtime.guard.facts import read_desktops, read_vitals
 from runtime.shared import store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.protocol import Refused, ok
-from runtime.slots import leases
+from runtime.slots import leases, staging
 from runtime.warden import public
 from runtime.warden.context import Context, StackResult
 from runtime.warden.sessions import registry
@@ -107,10 +108,19 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     if op == "release":
         failed = leases.empty(ctx, n, session.id)
         return ok(slot=n, released=not failed, **({"failed": failed} if failed else {}))
+    return _run(ctx, session, n, str(op), args)
+
+
+def _run(ctx: Context, session: Session, n: int, op: str, args: dict[str, Any]) -> dict[str, Any]:
+    """A scripts/dev verb on the caller's slot; slot 0's up first moves it to the commit --at names, or to the tip."""
     verb = _verb(op, args)
     if op in _CHANGES_STACK:
         _may_change(ctx, session, n, verb)
-    extra = _desktop_lease(ctx, n, verb) if op == "desktop" else {}
+    if args.get("at") and (op != "up" or n != 0):
+        raise Refused("slot", "only slot 0's up takes --at, for a check of the default branch at an older commit")
+    extra: dict[str, Any] = _desktop_lease(ctx, n, verb) if op == "desktop" else {}
+    if op == "up" and n == 0:
+        extra = {"at": staging.place(ctx, args.get("at")) or None}
     result = ctx.launcher.run_stack(n, verb, session.id)
     return {**_answer(ctx, n, result), **extra}
 

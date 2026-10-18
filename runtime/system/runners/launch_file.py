@@ -200,9 +200,15 @@ def deploy_argv(raw: dict[str, Any]) -> list[str]:
     return [sha, BACK] if back else [sha]
 
 
-def checkout_for(session: str, settings: Settings, sessions: dict[str, Any]) -> Path:
-    """The checkout a verb builds: the session's own worktree, or the main checkout for slot 0 and the warden."""
+def checkout_for(session: str, settings: Settings, sessions: dict[str, Any], staging_at: bool) -> Path:
+    """The checkout a verb builds: the session's own worktree; for slot 0 and the warden, the main checkout, or, while
+    ``staging_at`` (a check walks an older commit there: runtime/slots/staging.py), slot 0's own worktree."""
     repo = Path(settings.get_str("repo.path"))
+    if staging_at:
+        path = session_settings.staging_at(repo)
+        if path.is_symlink() or not path.is_dir():
+            raise BadRequest(f"{path}, where slot 0 builds an older commit, is not a folder")
+        return path
     row = sessions.get(session)
     worktree = row.get("worktree") if isinstance(row, dict) else ""
     path = Path(os.path.normpath(worktree)) if isinstance(worktree, str) and worktree else repo
