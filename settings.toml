@@ -134,8 +134,8 @@ cpu_target_percent = 55.0  # the machine's average CPU use the factory keeps to,
                            # (60% on a VPS that meters CPU on credits), less what the host counts and the machine misses
 cpu_floor_percent = 15.0   # the least of all CPUs the factory's slice keeps, however busy the rest of the machine is
 cpu_window_seconds = 300   # how far back the CPU averages reach; a reading older than this is unknown
-walk_hold_percent = 65.0   # past this average CPU use, or with it unknown, a new browser tester or remote desktop
-                           # waits: what a walk starts runs outside the factory's slice and its CPU limit
+walk_hold_percent = 65.0   # past this average CPU use, or with it unknown, a new browser tester, or a session's own
+                           # desktop, waits: what a walk starts runs outside the factory's slice and its CPU limit
 walk_hold_minutes = 15     # a walk held this long starts anyway, so a busy machine never stalls a merge for good
 test_memory_ceiling_mib = 6656
 test_reserve_mib = 4096 # kept for every other session: as many checks run tests at once

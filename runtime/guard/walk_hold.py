@@ -1,7 +1,8 @@
 """The CPU hold on new walks (`cpu-hold`). A host that meters CPU on credits holds the whole machine down once they run
 out, and a walk's browsers and remote desktop run in containers outside the factory's slice, beyond the CPU limit the
 warden sets on it: one walk costs about two CPUs. So while the machine's average CPU use is past
-budget.walk_hold_percent, a new browser tester and a new remote desktop wait. An unknown reading holds them too, as
+budget.walk_hold_percent, a new browser tester waits, and so does a session's own remote desktop; a tester's
+desktop is part of the walk the hold let start, and is never held. An unknown reading holds them too, as
 unknown is never fine: none published, one the warden could not take, or one older than budget.cpu_window_seconds,
 the stretch its average covers.
 

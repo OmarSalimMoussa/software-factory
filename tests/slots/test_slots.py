@@ -244,46 +244,51 @@ def _cpu(world: World, cpu: float | None, age: int = 0) -> None:
 
 
 @pytest.mark.parametrize(
-    ("cpu", "age", "off", "holds", "said"),
+    ("cpu", "age", "off", "said"),
     [
-        (50.0, 0, False, False, None),
-        (80.0, 0, False, False, "averages 80%, past the 65%"),
-        (None, 0, False, False, "unknown"),
-        (50.0, 301, False, False, "unknown"),
-        (80.0, 0, True, False, None),
-        (80.0, 0, False, True, None),
+        (50.0, 0, False, None),
+        (80.0, 0, False, "averages 80%, past the 65%"),
+        (None, 0, False, "unknown"),
+        (50.0, 301, False, "unknown"),
+        (80.0, 0, True, None),
     ],
-    ids=["under", "past-the-hold", "unread", "stale", "switched-off", "its-own-desktop-again"],
+    ids=["under", "past-the-hold", "unread", "stale", "switched-off"],
 )
-def test_a_desktop_waits_while_the_machines_cpu_use_is_past_the_hold_or_unknown(
-    world: World, cpu: float | None, age: int, off: bool, holds: bool, said: str | None
+def test_a_sessions_own_desktop_waits_while_the_machines_cpu_use_is_past_the_hold_or_unknown(
+    world: World, cpu: float | None, age: int, off: bool, said: str | None
 ) -> None:
     up = _desktop_slot(world)
     _cpu(world, cpu, age)
     public.write_switches(world.places, ["cpu-hold"] if off else [])
-    store.write_json(public.desktops_path(world.places), {"1": "agent-qa-1"} if holds else {})
-    tester = world.ctx("implementer", "s-1", "agent-qa-1")
+    implementer = world.ctx("implementer", "s-1")
     if said is None:
-        slot(tester, up, None)
+        slot(implementer, up, None)
         assert world.launcher.stacks == [(1, ["desktop", "up", "tester-1@example.com"])]
         return
-    with pytest.raises(Refused, match=f"{said}.*test what needs no desktop first, then try again") as refused:
-        slot(tester, up, None)
+    with pytest.raises(Refused, match=f"{said}.*wait or do other work, then try again") as refused:
+        slot(implementer, up, None)
     assert refused.value.rule == "cpu-hold" and world.launcher.stacks == []
+
+
+def test_a_testers_desktop_is_part_of_the_walk_the_hold_let_start_so_it_never_waits(world: World) -> None:
+    up = _desktop_slot(world)
+    _cpu(world, None)
+    slot(world.ctx("implementer", "s-1", "agent-qa-1"), up, None)
+    assert world.launcher.stacks == [(1, ["desktop", "up", "tester-1@example.com"])]
 
 
 def test_a_held_desktop_goes_up_once_its_slot_has_waited_the_longest_hold(world: World) -> None:
     up = _desktop_slot(world)
     _cpu(world, 80.0)
     with pytest.raises(Refused, match="or anyway in 15 min"):
-        slot(world.ctx("implementer", "s-1", "agent-qa-1"), up, None)
+        slot(world.ctx("implementer", "s-1"), up, None)
     world.clock.at += 14 * 60
     _cpu(world, 80.0)
     with pytest.raises(Refused, match="or anyway in 1 min; wait or do other work"):
-        slot(world.ctx("implementer", "s-1"), up, None)  # its implementer's own counts on the slot's wait
+        slot(world.ctx("implementer", "s-1"), up, None)
     world.clock.at += 60
     _cpu(world, 80.0)
-    slot(world.ctx("implementer", "s-1", "agent-qa-1"), up, None)
+    slot(world.ctx("implementer", "s-1"), up, None)
     with pytest.raises(Refused, match="or anyway in 15 min"):
         slot(world.ctx("implementer", "s-1"), up, None)  # the wait starts again once the desktop went up
     assert world.launcher.stacks == [(1, ["desktop", "up", "tester-1@example.com"])]

@@ -51,8 +51,8 @@ sign-in link only there. Empty, staging stays on the box's loopback, and the ins
 one from the owner's PATH, so the agents and the stack run the same tools as the owner.
 
 `budget.walk_hold_percent` holds back new walks. While the machine's average CPU use is past it, or unknown, a new
-browser tester or remote desktop waits: what a walk starts runs outside the factory's slice, so the slice's CPU limit
-cannot slow it. A walk held `budget.walk_hold_minutes` starts anyway, so a busy machine never stalls a merge for good.
+browser tester waits, and so does a session's own remote desktop: what a walk starts runs outside the factory's slice,
+so the slice's CPU limit cannot slow it. A tester's desktop is part of the walk the hold let start, and never waits. A walk held `budget.walk_hold_minutes` starts anyway, so a busy machine never stalls a merge for good.
 The guard's rule `cpu-hold` switches the hold off.
 
 `checks.writable_caches` names the folders in the agent's home a check may write, besides the checkout it checks:

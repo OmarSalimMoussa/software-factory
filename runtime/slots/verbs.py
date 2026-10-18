@@ -9,8 +9,9 @@ parent's. The slot's own session, an implementer or the orchestrator, may run on
 service, such as a scenario's set-up; so may its backend and security testers, to look from inside the slot's
 network. One tester holds a slot's desktop at a time, until its parent or, once it hands back, the warden takes it
 down; another tester's `desktop up` waits, so no one's new password cuts off a tester mid-step. While the machine's
-CPU use is past budget.walk_hold_percent, a `desktop up` waits too (runtime/guard/walk_hold.py); the wait counts per
-slot, in the warden's memory, so a restart begins it again. Slot 0 is staging, so it comes up whole: one build of the
+CPU use is past budget.walk_hold_percent, a session's own `desktop up` waits too (runtime/guard/walk_hold.py), but
+never a tester's, whose walk the hold let start; the wait counts per slot, in the warden's memory, so a restart begins
+it again. Slot 0 is staging, so it comes up whole: one build of the
 stack, never a service at a time. No stack changes under a tester still walking it.
 """
 
@@ -135,9 +136,9 @@ def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> None:
         held = read_desktops(ctx.places)
         if agent:
             _may_take(ctx, n, agent, held)
-        # A tester that holds the desktop already walks it: taking it up again starts no new walk.
-        if verb[1] == "up" and held.get(str(n)) != agent:
-            _cpu_hold(ctx, n, bool(agent))
+        # A tester's desktop is part of the walk the hold let start: holding it mid-walk spends the tester's time.
+        if verb[1] == "up" and not agent:
+            _cpu_hold(ctx, n)
         if agent:
             held[str(n)] = agent
         else:
@@ -161,7 +162,7 @@ def _may_take(ctx: Context, n: int, agent: str, held: dict[str, str]) -> None:
                                  "needs no desktop first, then try again")  # fmt: skip
 
 
-def _cpu_hold(ctx: Context, n: int, tester: bool) -> None:
+def _cpu_hold(ctx: Context, n: int) -> None:
     key = (str(ctx.places.state), n)
     now = datetime.fromtimestamp(ctx.clock.now(), UTC)
     off = walk_hold.HOLD in public.read_switches(ctx.places)
@@ -170,8 +171,7 @@ def _cpu_hold(ctx: Context, n: int, tester: bool) -> None:
         _HELD.pop(key, None)
         return
     _HELD.setdefault(key, now)
-    then = "test what needs no desktop first, then try again" if tester else "wait or do other work, then try again"
-    raise Refused(walk_hold.HOLD, f"{why}; {then}")
+    raise Refused(walk_hold.HOLD, f"{why}; wait or do other work, then try again")
 
 
 def _verb(op: object, args: dict[str, Any]) -> list[str]:
