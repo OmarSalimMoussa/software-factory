@@ -264,12 +264,15 @@ def test_a_subagents_edit_tool_writes_only_in_its_sessions_scratch(tmp_path: Pat
     [
         ("", "git commit -m fix", "orchestrator-writes"),
         ("MERGE_HEAD", "git commit --no-edit", None),
-        ("REVERT_HEAD", "git commit -m 'Revert the merge'", None),
+        ("REVERT_HEAD", "git commit -m 'Revert abc: x' -m 'This reverts commit abc.'", None),
+        ("REVERT_HEAD", "git commit --no-edit", None),
+        ("REVERT_HEAD", "git commit -m 'Revert the merge'", "orchestrator-writes"),
         ("", "echo x > app.py", "orchestrator-writes"),
         ("", "echo x > .factory/body.md", None),
     ],
-    ids=["plain-commit", "finishing-a-merge", "finishing-a-revert", "product-file", "scratch"],
-)
+    ids=["plain-commit", "finishing-a-merge", "finishing-a-revert", "a-revert-with-git-s-message",
+         "a-revert-naming-nothing", "product-file", "scratch"],
+)  # fmt: skip
 def test_the_orchestrator_writes_no_product_code_and_commits_only_to_finish_a_merge_or_a_revert(
     tmp_path: Path, finishing: str, command: str, rule: str | None
 ) -> None:

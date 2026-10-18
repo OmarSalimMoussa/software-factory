@@ -4,7 +4,8 @@ A subagent reads and reports (`subagent-writes`): in any checkout of the product
 scratch folder, `.factory/` in the worktree, and it runs only git commands that read, so no tester or critic can
 reset, stash or edit the implementer's uncommitted work. The orchestrator steers and never writes product code
 (`orchestrator-writes`): in its checkout it writes only to `.factory/`, and on the default branch it commits only to
-finish a merge or a revert, while git holds MERGE_HEAD or REVERT_HEAD.
+finish a merge or a revert, while git holds MERGE_HEAD or REVERT_HEAD; a revert's commit keeps git's line naming the
+commit it takes back.
 """
 
 from __future__ import annotations
@@ -65,8 +66,24 @@ def check_shell(call: Call, inv: shell.Invocation, cwd: Path) -> Decision:
     if not call.in_subagent and sub == "commit" and not any((call.worktree / ".git" / h).exists() for h in _FINISHING):
         default = call.settings.get_str("repo.default_branch")
         return Refusal("orchestrator-writes", f"you commit on {default} only to finish a merge or a revert")
+    unnamed = _unnamed_revert(call, args) if not call.in_subagent and sub == "commit" and args is not None else None
+    if unnamed is not None:
+        return unnamed
     for word, _ in writes.written(inv):
         found = _refused_at(call, resolve(word, cwd, call.home))
         if found is not None:
             return found
     return None
+
+
+def _unnamed_revert(call: Call, args: list[str]) -> Refusal | None:
+    """A revert's commit keeps git's own line naming the merge it takes back: the prod push gate and the Done page
+    find what a revert took back by that line alone."""
+    head = call.worktree / ".git" / "REVERT_HEAD"
+    if not head.exists():
+        return None
+    line = f"This reverts commit {head.read_text(encoding='utf-8').strip()}"
+    if "--no-edit" in args or any(line in arg for arg in args):
+        return None
+    told = f"a revert's commit keeps git's line naming what it takes back: add -m '{line}.' after your own -m"
+    return Refusal("orchestrator-writes", told)

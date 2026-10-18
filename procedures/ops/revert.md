@@ -6,8 +6,10 @@ How the orchestrator takes a merge back off the default branch after a failed ch
 2. **Keep what must stay:** a fix the merge carried for what every task shares (a build or ignore file, a shared
    script), and a migration it added with the models that migration creates. `git checkout HEAD -- <those paths>`
    puts them back. A migration that drops or rewrites data is fixed forward instead, never reverted.
-3. `git commit -m "Revert <merge sha>: <why>; keeps <what step 2 kept>"`: one commit. The guard lets the
-   orchestrator commit on the default branch only while git holds the revert, so nothing is applied after it.
+3. `git commit -m "Revert <merge sha>: <why>; keeps <what step 2 kept>" -m "This reverts commit <its full sha>."`:
+   one commit. The guard lets the orchestrator commit on the default branch only while git holds the revert, so
+   nothing is applied after it, and only with git's own second line, by which the prod push and the Done page know
+   what the revert took back.
 4. `factory check` on the default branch. A revert back to a state that already passed (the last merge taken off)
    is known at once and runs nothing; any other revert is checked from the newest commit that passed.
 5. Check the revert like a merge, once step 7 sent the task back: walk what `factory queue bundle` names now, with the
