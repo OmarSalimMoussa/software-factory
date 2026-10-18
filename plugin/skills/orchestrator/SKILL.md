@@ -138,8 +138,8 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    `qa-regression` testers at once, the scenarios split between them, each signed in as its own test address. Start
    each in its own lane, `qa-regression`, then `qa-regression-2` and on, as its `subagent_type`: two in one lane share
    one browser, and a lane named only in the brief changes nothing. A brief names scenarios, never an earlier
-   report's results or causes. A check of slot 0's health is read in the tester's
-   browser: no tester's shell reaches a slot. Save each tester's report to a file and run
+   report's results or causes, nor a desktop's password: a tester brings the desktop up itself. A check of slot 0's
+   health is read in the tester's browser: no tester's shell reaches a slot. Save each tester's report to a file and run
    `factory queue check <merge sha> --body <that file>`.
 4. **A failure** reverts the merge only when that merge is the one change to the scenario's code since its last
    pass: revert it as `${CLAUDE_PLUGIN_ROOT}/../procedures/ops/revert.md` says, then `factory queue task status

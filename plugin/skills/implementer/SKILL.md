@@ -64,10 +64,10 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
    name testers mark it with: a scenario by its file name without `.md`, a check by a short name of words joined
    by dashes; a hold you ask for, such as one for your own measurement, is an item of its own, as a tester's time is
    its items' time); the time each item gets (`qa.seconds_per_item`, from `factory settings show`); your slot's
-   address; the widths to test
-   (`qa.widths`); what changed and why, with file paths; the spec's checks; the scenarios to walk (round 1 walks
-   each scenario your branch adds or changes, cold); the test address each tester signs in as; and every finding
-   earlier rounds raised, with what you did about it.
+   address; the widths to test (`qa.widths`); what changed and why, with file paths; the spec's checks; the
+   scenarios to walk (round 1 walks each scenario your branch adds or changes, cold); the test address each tester
+   signs in as; and every finding earlier rounds raised, with what you did about it. Never a desktop's address or
+   password, nor a word against `desktop up`: a tester takes neither from a brief, and brings the desktop up itself.
 5. **Findings** are claims to check (the `taking-review` skill): fix it, dispute it with evidence (the orchestrator
    may waive it: `factory qa waive <task> <finding> --why "…"`), or file it when it is outside your task: `factory request new --from <tester> --severity normal --where "<where>" --body <file>`.
    Each bug a tester caught gets a test, or a scenario step, that would catch it again. A tester the environment
