@@ -191,7 +191,7 @@ def ready_check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
     why = health.off_head(ctx, int(latest["slot"]), session.id, head)
     if why is not None:
         raise Refused("ready-check", f"not ready: {why}")
-    folder = {"folder": scratch_of(ctx.caller.agent_id)} if ctx.caller.agent_id else {}
+    folder = {"folder": str(Path(session.worktree) / scratch_of(ctx.caller.agent_id))} if ctx.caller.agent_id else {}
     return ok(head=head, slot=latest["slot"], testers=latest.get("testers", []), **folder)
 
 

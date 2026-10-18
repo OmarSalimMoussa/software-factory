@@ -153,7 +153,7 @@ def _built_and_tested(r: Rehearsal, impl: str, worktree: Path) -> list[str]:
     for n, tester in enumerate(testers):
         agent = f"a{n}7f3c9e1d2b4a6"
         r.hook(impl, "subagent.start", {"agent_id": agent, "kind": tester})
-        assert r.session(impl, ["ready-check"], agent_id=agent)["folder"] == scratch_of(agent)
+        assert r.session(impl, ["ready-check"], agent_id=agent)["folder"] == str(worktree / scratch_of(agent))
         note = r.body(worktree, f"{agent}/finding-{n}.md", b"The empty list says nothing about how to add a note.\n")
         finding = ["qa", "finding", "--head", head, "--severity", "minor", "--where", "/notes", "--body", note]
         r.session(impl, finding, agent_id=agent)

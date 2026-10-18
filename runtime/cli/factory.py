@@ -350,6 +350,14 @@ def main(argv: list[str], places: Places | None = None) -> int:
     except (OSError, ValueError) as exc:
         print(f"factory: the warden cannot be reached ({type(exc).__name__}); is it running?", file=sys.stderr)
         return UNREACHABLE
+    folder = answer.get("folder") if call.verb == "ready-check" and answer.get("ok") else None
+    if folder:
+        # A tester's own folder is there before its first file: `curl -c` into a missing folder saves nothing.
+        try:
+            Path(str(folder)).mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            print(f"factory: your folder {folder} cannot be made ({exc.strerror})", file=sys.stderr)
+            return 2
     return show(answer, sys.stdout, sys.stderr)
 
 

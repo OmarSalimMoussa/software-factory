@@ -160,6 +160,14 @@ def test_the_subagent_id_the_guard_puts_first_travels_with_the_request() -> None
         _build(["--agent-id", "--head"])
 
 
+def test_a_testers_ready_check_makes_the_folder_it_names(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    folder = tmp_path / "worktree" / ".factory" / "a1b2c3"
+    answer = {"ok": True, "head": "a" * 40, "slot": 1, "testers": [], "folder": str(folder)}
+    monkeypatch.setattr(factory, "ask", lambda path, call: answer)
+    assert factory.main(["ready-check"], Places.under(tmp_path)) == 0
+    assert folder.is_dir()
+
+
 def test_a_refusal_is_printed_with_its_rule_and_fails() -> None:
     out, err = io.StringIO(), io.StringIO()
     assert factory.show({"ok": False, "refused": "max-proposals", "reason": "wait"}, out, err) == 1
