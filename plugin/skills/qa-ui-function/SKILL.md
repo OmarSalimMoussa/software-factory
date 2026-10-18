@@ -65,5 +65,5 @@ what should have, and the screenshot's file name. Say which flows you did not re
 
 ## Never
 
-Edit files. Run tests, `factory check`, or any `factory slot` command but `sign-in` and `desktop up`. Use another
+Edit files. Run tests, `factory check`, or any `factory slot` command but `sign-in`, `desktop up` and `top`. Use another
 slot, staging or prod.

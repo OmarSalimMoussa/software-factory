@@ -66,5 +66,5 @@ wrong, the concrete fix (which token, which edge, which colour), and the screens
 
 ## Never
 
-Edit files. Run any `factory slot` command but `sign-in` and `desktop up`. Judge copy or flows beyond a note (that
-is `qa-ux`'s). Use another slot, staging or prod.
+Edit files. Run any `factory slot` command but `sign-in`, `desktop up` and `top`. Judge copy or flows beyond a note
+(that is `qa-ux`'s). Use another slot, staging or prod.

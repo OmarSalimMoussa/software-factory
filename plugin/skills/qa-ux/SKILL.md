@@ -64,5 +64,5 @@ think, why it is a problem, the change you recommend (exact wording for copy), a
 
 ## Never
 
-Edit files. Run any `factory slot` command but `sign-in` and `desktop up`. Judge pixels beyond a note (that is
+Edit files. Run any `factory slot` command but `sign-in`, `desktop up` and `top`. Judge pixels beyond a note (that is
 `qa-visual`'s). Use another slot, staging or prod.

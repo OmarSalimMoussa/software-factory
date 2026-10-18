@@ -71,5 +71,5 @@ request that shows it. A failure you suspect is a broken scenario still fails; s
 
 ## Never
 
-Edit files. Run tests, `factory check`, or any `factory slot` command but `sign-in` and `desktop up`. Retry a
+Edit files. Run tests, `factory check`, or any `factory slot` command but `sign-in`, `desktop up` and `top`. Retry a
 failing step until it passes and call it a pass.
