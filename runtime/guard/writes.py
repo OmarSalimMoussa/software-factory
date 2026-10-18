@@ -31,6 +31,8 @@ _MUTATORS = frozenset(
 _REMOVERS = frozenset({"rm", "rmdir", "shred", "mv"})
 # Programs that write only to their destination: what they copy from is read, not changed.
 _COPIERS = frozenset({"cp", "install", "ln", "rsync"})
+# chmod's mode, octal or symbolic (`700`, `u+x,go-w`): the one word of its own that names no file.
+_MODE = re.compile(r"^(?:[0-7]{1,4}|[ugoa]*(?:[-+=][rwxXst]*)+(?:,[ugoa]*(?:[-+=][rwxXst]*)+)*)$")
 # A flag cluster that edits in place: sed's and perl's `-i`, alone or among others (`-pi`, `-ni`).
 _IN_PLACE = re.compile(r"^-[a-zA-Z]*i")
 _RECURSIVE = re.compile(r"^(-[a-zA-Z]*[rRa][a-zA-Z]*|--recursive|--archive)$")
@@ -188,7 +190,11 @@ def written(inv: shell.Invocation) -> list[tuple[str, bool]]:
         return found
     # mv's last word is where things go; what it moves away is removed from where it was.
     gone = args[:-1] if inv.program == "mv" else args
-    return found + [(word, inv.program in _REMOVERS and word in gone) for word in args if not word.startswith("-")]
+    words = [word for word in args if not word.startswith("-")]
+    mode = next((n for n, word in enumerate(words) if _MODE.match(word)), None) if inv.program == "chmod" else None
+    if mode is not None:
+        del words[mode]
+    return found + [(word, inv.program in _REMOVERS and word in gone) for word in words]
 
 
 def _shell_writes(call: Call, inv: shell.Invocation, cwd: Path) -> Refusal | None:

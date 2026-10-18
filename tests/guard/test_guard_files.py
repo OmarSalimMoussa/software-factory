@@ -237,6 +237,9 @@ READER = {"agent_id": "a1234567890abc", "agent_type": "Explore"}  # a reader: no
         ("sed -i s/a/b/ app.py", "subagent-writes"),
         ("echo x > app.py", "subagent-writes"),
         ("echo x > .factory/notes.md", None),
+        ("chmod 700 .factory/notes.md", None),
+        ("chmod u+x,go-w app.py", "subagent-writes"),
+        ("chmod 700 700", "subagent-writes"),
         ("git log --oneline", None),
         ("git diff main", None),
         ("echo x > /tmp/scratch.txt", None),
@@ -273,6 +276,15 @@ def test_a_tester_writes_only_in_its_own_folder_as_testers_of_one_worktree_run_a
     kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
     asked = {"file_path": str(kit.worktree / path), "content": "Save fails."}
     assert kit.rule("Write", asked, agent_id=TESTER_ID, agent_type="qa-visual") == rule
+
+
+@pytest.mark.parametrize("command", ["D=.factory/x; chmod 700 $D", 'echo x > "$OUT"', "touch `pwd`/f"])
+def test_a_write_through_a_shell_variable_is_refused_naming_why(tmp_path: Path, command: str) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    decision = kit.decide("Bash", {"command": command}, **READER)
+    assert isinstance(decision, Refusal) and decision.rule == "subagent-writes"
+    assert "cannot tell where a shell variable points" in decision.reason
 
 
 @pytest.mark.parametrize(

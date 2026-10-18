@@ -76,10 +76,18 @@ def check_shell(call: Call, inv: shell.Invocation, cwd: Path) -> Decision:
     if unnamed is not None:
         return unnamed
     for word, _ in writes.written(inv):
-        found = _refused_at(call, resolve(word, cwd, call.home))
+        found = _through_variable(call, word) or _refused_at(call, resolve(word, cwd, call.home))
         if found is not None:
             return found
     return None
+
+
+def _through_variable(call: Call, word: str) -> Refusal | None:
+    if "$" not in word and "`" not in word:
+        return None
+    where = call.worktree / _folder(call)
+    why = f"the guard cannot tell where a shell variable points; write only in {where}"
+    return Refusal(_rule(call), f"name the path you write in full, not as {word}: {why}")
 
 
 def _unnamed_revert(call: Call, args: list[str]) -> Refusal | None:
