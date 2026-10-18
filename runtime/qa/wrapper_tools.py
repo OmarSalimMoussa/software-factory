@@ -10,6 +10,8 @@
   server, whose own code tool is hidden from testers.
 - ``browser_type_keys`` types a text as key presses into whatever has the keyboard, in one call, ``qa.key_delay_ms``
   apart: the remote desktop's view takes keys, not a field's filled value, and drops keys sent faster.
+- ``browser_hold_request`` holds the next request to an address for up to ``qa.hold_max_seconds``, then hands it on
+  through the browser's other routes, so a blocked address stays blocked: one request can overtake another.
 """
 
 from __future__ import annotations
@@ -24,7 +26,7 @@ from typing import Any
 from runtime.qa.wrapper import SERVER_CODE, ServerError
 
 SIGN_IN, WAIT_UNTIL, OPEN_DESKTOP = "browser_sign_in", "browser_wait_until", "browser_open_desktop"
-COLOUR, TYPE_KEYS = "browser_color_scheme", "browser_type_keys"
+COLOUR, TYPE_KEYS, HOLD = "browser_color_scheme", "browser_type_keys", "browser_hold_request"
 SCHEMES = ("light", "dark")
 # Playwright's answers name the page after an action on a line of their own.
 PAGE_URL = re.compile(r"Page URL: (\S+)")
@@ -90,6 +92,19 @@ TOOLS: list[dict[str, Any]] = [
             "required": ["text"],
         },
     },
+    {
+        "name": HOLD,
+        "description": "Hold the next request to an address for some seconds, then send it on as usual, so another "
+        "request can overtake it. It holds one request, then lifts itself.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pattern": {"type": "string", "description": "the address, * and ** as wildcards: **/api/runs/*"},
+                "seconds": {"type": "number", "description": "how long to hold it"},
+            },
+            "required": ["pattern", "seconds"],
+        },
+    },
 ]
 
 
@@ -106,6 +121,7 @@ class Tools:
     max_minutes: int
     desktop: tuple[int, int]
     key_delay_ms: int
+    hold_max_seconds: int
     now: Callable[[], float]  # a monotonic clock, in seconds
 
     def answer(self, name: str, arguments: dict[str, Any], cancelled: threading.Event) -> tuple[str, bool]:
@@ -116,6 +132,7 @@ class Tools:
             OPEN_DESKTOP: self._open_desktop,
             COLOUR: self._color_scheme,
             TYPE_KEYS: self._type_keys,
+            HOLD: self._hold_request,
         }
         try:
             return tools[name](arguments, cancelled), False
@@ -187,6 +204,20 @@ class Tools:
         typed = f"await page.keyboard.type({json.dumps(text)}, {{ delay: {self.key_delay_ms} }});"
         self.call(SERVER_CODE, {"code": f"async (page) => {{ {typed} }}"})
         return f"Typed {len(text)} keys. A screenshot shows where they landed."
+
+    def _hold_request(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
+        pattern, seconds = arguments.get("pattern"), arguments.get("seconds")
+        if not isinstance(pattern, str) or not pattern.strip():
+            raise ToolError("give the address of the request to hold")
+        most = self.hold_max_seconds
+        if isinstance(seconds, bool) or not isinstance(seconds, int | float) or not 0 < seconds <= most:
+            raise ToolError(f"hold it for more than 0 and at most {most} seconds")
+        # The code runs where no timer is defined, so the page waits. fallback, never continue: the held request still
+        # meets the routes that keep the dashboard out of reach.
+        held = f"await page.waitForTimeout({round(seconds * 1000)}); await route.fallback();"
+        route = f"page.context().route({json.dumps(pattern)}, async (route) => {{ {held} }}, {{ times: 1 }})"
+        self.call(SERVER_CODE, {"code": f"async (page) => {{ await {route}; }}"})
+        return f"The next request to {pattern} waits {seconds:g} s, then goes on. Do the step now."
 
 
 def first_link(text: str) -> str:

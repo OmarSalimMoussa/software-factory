@@ -32,7 +32,8 @@ in every state, and you prove each finding with a screenshot.
 - To wait for the page to show something, call `browser_wait_until` with the words and a ceiling inside the item's
   time. One call does the whole wait; never poll.
 - To see how the page meets a failed request, answer it with `browser_route` (its URL pattern and a status, such as
-  502), then lift it with `browser_unroute` before the next step.
+  502), then lift it with `browser_unroute` before the next step. To let one request overtake another, hold the
+  first with `browser_hold_request`.
 - Read the page with the snapshot tool and act on the refs it gives. Measure with the page-script tool: sizes, the
   focused element, `scrollWidth` against `innerWidth`.
 - Take a screenshot at the end of each item and for each finding, never naming a file, and give its file name in

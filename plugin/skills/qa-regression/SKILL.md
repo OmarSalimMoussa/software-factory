@@ -34,7 +34,8 @@ them.
    `--whole` for that event's JSON; its Logs view is `factory logs --where slot 0 --find <text> --since <time>`.
    Never sign in to it.
 4. Do each step exactly. A step that has a request fail answers it with `browser_route` (its URL pattern and the
-   status the step names, such as 502) and lifts it with `browser_unroute` once the step ends. At each expected
+   status the step names, such as 502) and lifts it with `browser_unroute` once the step ends; a step where one
+   request overtakes another holds the first with `browser_hold_request`. At each expected
    result, check it in the page (a snapshot or a page script), take a screenshot (never naming a file, never
    opening one afterwards), and decide pass or fail. Read the console and the requests after each scenario, and at
    the end `factory errors --where slot 0` for new issues your walk raised.

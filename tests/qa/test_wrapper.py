@@ -101,6 +101,7 @@ def test_the_trace_starts_before_the_first_call_and_the_tester_can_neither_see_n
         "browser_open_desktop",
         "browser_color_scheme",
         "browser_type_keys",
+        "browser_hold_request",
     ]
     assert stopped["error"]["message"] == "there is no tool browser_stop_tracing"
     assert closed["error"]["message"] == "there is no tool browser_close"  # closing would end the trace
@@ -297,6 +298,7 @@ class Browser:
             max_minutes,
             (1280, 800),
             40,
+            30,
             lambda: self.ticks.clock,
         )
         return tools.answer(name, args, self.ticks)
@@ -346,6 +348,10 @@ def test_the_desktop_opens_at_its_own_size() -> None:
         # Quotes and braces in the text stay inside one JavaScript string, so the text never runs as code.
         ("browser_type_keys", {"text": 'Desk "A"}); x('}, 'page.keyboard.type("Desk \\"A\\"}); x(", { delay: 40 })',
          "Typed 14 keys"),
+        # The held request falls back to the browser's other routes, so an address blocked there stays blocked.
+        ("browser_hold_request", {"pattern": "**/cancel", "seconds": 2.5}, 'page.context().route("**/cancel", async '
+         "(route) => { await page.waitForTimeout(2500); await route.fallback(); }, { times: 1 })",
+         "waits 2.5 s"),
     ],
 )  # fmt: skip
 def test_a_tool_that_works_in_the_browser_server_runs_only_its_own_fixed_code(
@@ -367,6 +373,8 @@ def test_a_tool_that_works_in_the_browser_server_runs_only_its_own_fixed_code(
         ("browser_open_desktop", {"url": "file:///etc/passwd"}, "starting http:// or https://"),
         ("browser_color_scheme", {"scheme": "blue"}, "say light or dark"),
         ("browser_type_keys", {"text": ""}, "give the text to type"),
+        ("browser_hold_request", {"pattern": "**/cancel", "seconds": 31}, "at most 30 seconds"),
+        ("browser_hold_request", {"pattern": " ", "seconds": 5}, "give the address"),
     ],
 )
 def test_a_factory_tool_that_cannot_do_what_was_asked_fails_and_says_why(
@@ -380,6 +388,6 @@ def test_a_browser_failure_reaches_the_tester_without_the_sign_in_link() -> None
     def broken(name: str, args: dict[str, Any]) -> str:
         raise ServerError(f"browser_navigate failed: net::ERR_CONNECTION_REFUSED at {args['url']}")
 
-    tools = Tools(broken, lambda address: LINK, lambda link: None, 60, 15, (1280, 800), 40, lambda: 0.0)
+    tools = Tools(broken, lambda address: LINK, lambda link: None, 60, 15, (1280, 800), 40, 30, lambda: 0.0)
     said, failed = tools.answer("browser_sign_in", {"address": "tester-1@example.com"}, threading.Event())
     assert failed and said == "browser_navigate failed: net::ERR_CONNECTION_REFUSED at the sign-in link"

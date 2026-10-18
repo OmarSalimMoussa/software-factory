@@ -71,6 +71,7 @@ SCHEMA: dict[str, Spec] = {
     "qa.desktop_viewport": Spec("list", 2, 2, item="int"),  # contract: a desktop tester's browser, width then height
     "qa.wait_reload_seconds": Spec("int", 5, 600),
     "qa.key_delay_ms": Spec("int", 0, 1000),
+    "qa.hold_max_seconds": Spec("int", 1, 300),
     "qa.wait_max_minutes": Spec("int", 1, 60),
     "qa.browser_answer_seconds": Spec("int", 10, 900),
     "replay.long_wait_seconds": Spec("float", 1, 60),
