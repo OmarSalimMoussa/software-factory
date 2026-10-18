@@ -13,9 +13,12 @@ from typing import Any
 
 from runtime.guard import decide
 from runtime.guard.facts import Decision, Refusal
+from runtime.queue import formats
+from runtime.queue.book import task_rel
 from runtime.shared import lanes, store
 from runtime.shared import settings as settings_module
-from runtime.shared.paths import Places
+from runtime.shared.models import Task
+from runtime.shared.paths import Places, queue_dir
 from runtime.shared.settings_schema import SCHEMA
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -55,6 +58,7 @@ class Kit:
         self.settings()
         self.transcript([])
         self.vitals()
+        self.task("building")
 
     @property
     def public(self) -> Path:
@@ -64,6 +68,17 @@ class Kit:
         """The vitals the warden published ``age`` seconds ago, with the machine's average CPU use."""
         at = (NOW - timedelta(seconds=age)).isoformat()
         store.write_json(self.public / "vitals.json", {"level": level, "why": why, "cpu": cpu, "at": at})
+
+    def task(self, status: str) -> None:
+        """The queue's file of task t-0001, every session's task here, at ``status``."""
+        task = Task(
+            id="t-0001", title="Sign-in loops", requests=["r-2026-10-17-0001"], goal_item="G1", severity="major",
+            surfaces=["ui"], status=status, created=NOW.strftime("%Y-%m-%dT%H:%M:%SZ"), body="Fix the loop.",
+            slices=1, run=1,
+        )  # fmt: skip
+        path = queue_dir(self.repo) / task_rel(task.id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(formats.dump_task(task))
 
     def settings(self, **changes: Any) -> None:
         defaults = tomllib.loads((REPO_ROOT / "settings.toml").read_text())

@@ -31,8 +31,8 @@ from runtime.guard.facts import (
 )
 from runtime.guard.wire import HANDBACK
 from runtime.shared import store
-from runtime.shared.models import BENCH_PENDING, RETIRED, WAITING, WORKING
-from runtime.shared.paths import Places
+from runtime.shared.models import BENCH_PENDING, QA_CLEAN, RETIRED, WAITING, WORKING
+from runtime.shared.paths import Places, queue_dir
 
 UNPERMITTED_CARD = (
     "This session holds no permit from the factory's warden, so it may read and report, nothing more. "
@@ -197,11 +197,27 @@ def _read(path: Path, what: str) -> str:
         return f"{what} ({path}) cannot be read ({type(exc).__name__}): tell the owner the factory's install is broken."
 
 
+def _turn_comes(call: Call) -> bool:
+    """Whether the session's task waits, QA clean, for its merge turn: `factory turn next` tells its implementer."""
+    if call.session is None or not call.session.task:
+        return False
+    # The queue's parser loads only here, at a stop, so no other call pays for its import.
+    from runtime.queue import book, formats
+
+    rel = book.task_rel(call.session.task)
+    path = queue_dir(Path(call.settings.get_str("repo.path"))) / rel
+    try:
+        return formats.parse_task(path.read_text(encoding="utf-8"), rel).status == QA_CLEAN
+    except (OSError, formats.FormatError) as exc:
+        raise store.StoreError(f"{path}: the task cannot be read: {exc}") from exc
+
+
 def check_stop(call: Call) -> Decision:
     """No session goes idle with nothing to wake it. The orchestrator keeps its wait for the warden's events in the
     background; a stop the hook already turned back once is let through, so the refusal names the whole remedy. An
-    implementer or designer at work keeps a subagent running, or has told the orchestrator since its last prompt,
-    since no one else answers its chat: turned back every time, as it can always send that message."""
+    implementer or designer at work keeps a subagent running, has told the orchestrator since its last prompt, or
+    waits QA clean for the merge turn the warden tells it of, since no one else answers its chat: turned back every
+    time, as it can always send that message."""
     if call.in_subagent:
         return None
     if call.role in (IMPLEMENTER, DESIGNER):
@@ -232,7 +248,7 @@ def _waker(call: Call) -> Decision:
     reports = isinstance(tasks, list) and any(
         isinstance(t, dict) and t.get("type") == "subagent" and t.get("status", "running") == "running" for t in tasks
     )
-    if reports or transcript.messaged_since_prompt(call.transcript, ORCHESTRATOR):
+    if reports or transcript.messaged_since_prompt(call.transcript, ORCHESTRATOR) or _turn_comes(call):
         return None
     return Refusal(
         "no-waker",

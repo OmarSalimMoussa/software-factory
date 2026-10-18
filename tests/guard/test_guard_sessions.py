@@ -247,6 +247,22 @@ def test_an_implementer_or_designer_goes_idle_only_with_something_to_wake_it(
     assert (isinstance(decision, Refusal) and decision.rule == "no-waker") is refused
 
 
+@pytest.mark.parametrize(("status", "refused"), [("qa-clean", False), ("turn", True), ("building", True)])
+def test_an_implementer_whose_task_waits_qa_clean_for_its_merge_turn_may_stop_as_the_turn_wakes_it(
+    tmp_path: Path, status: str, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.task(status)
+    kit.transcript([_PROMPT, _TO_ORCH, _SENT, _ORCH_SAYS])
+    payload = {"hook_event_name": "Stop", "session_id": SID, "stop_hook_active": False, "cwd": str(kit.worktree),
+               "transcript_path": str(kit.session_transcript)}  # fmt: skip
+    call = decide.resolve(payload, kit.places, NOW, kit.home)
+    assert call is not None
+    decision = decide.check_stop(call)
+    assert (isinstance(decision, Refusal) and decision.rule == "no-waker") is refused
+
+
 def test_a_session_the_warden_has_not_bound_yet_is_known_by_the_name_it_was_started_under(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer", sid=PENDING + "0f0f")
