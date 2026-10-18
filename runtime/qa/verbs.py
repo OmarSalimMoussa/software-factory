@@ -81,8 +81,8 @@ def qa_plan(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str,
 
 def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """Every slice is built and the slot runs the head: testers may start on it. The task records the worktree's
-    branch here: its merge turn names it, and the warden finds its merge by it. A reproduction comes before the
-    branch's first commit: its testers show a bug before its fix, in no QA round, and no result of theirs counts."""
+    branch here: its merge turn names it, and the warden finds its merge by it. A reproduction (`_unbuilt`) shows a
+    bug before its fix, in no QA round, and no result of its testers counts."""
     session = _implementer(ctx)
     asked, slices, reproduce = args.get("head"), args.get("slices"), args.get("reproduce") is True
     if not isinstance(asked, str) or not SHA.match(asked):
@@ -122,11 +122,12 @@ def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
 
 
 def _unbuilt(ctx: Context, session: Session, asked: str, slices: Any) -> list[str]:
-    """A reproduction's slices: none, on a branch with no commit of its own yet."""
+    """A reproduction's slices: none, on a branch whose commits change no file but Markdown, such as its spec."""
     default = ctx.settings().get_str("repo.default_branch")
-    if slices is not None or _git(ctx, session.worktree, "rev-list", "--count", f"{default}..{asked}") != "0":
-        raise Refused("qa-ready", "a reproduction comes before your first commit and names no slice; once the fix "
-                                  "is built, run qa-ready on its head")  # fmt: skip
+    changed = _git(ctx, session.worktree, "log", "--format=", "--name-only", f"{default}..{asked}").splitlines()
+    if slices is not None or not all(path.endswith(".md") for path in changed if path):
+        raise Refused("qa-ready", "a reproduction comes before your first commit beyond Markdown, such as your spec, "
+                                  "and names no slice; once the fix is built, run qa-ready on its head")  # fmt: skip
     return []
 
 

@@ -136,13 +136,15 @@ def test_qa_clean_waits_for_a_second_tester_of_a_kind_still_testing(ready_world:
 
 
 @pytest.mark.parametrize(
-    ("own", "slices", "refused"), [("0", None, False), ("2", None, True), ("0", [HEAD[:7]], True)],
-    ids=["before-the-first-commit", "after-a-commit", "naming-a-slice"],
+    ("changed", "slices", "refused"),
+    [("", None, False), ("docs/specs/t-0001.md\n", None, False), ("docs/specs/t-0001.md\n\nweb/page.ts\n", None, True),
+     ("", [HEAD[:7]], True)],
+    ids=["before-the-first-commit", "after-its-spec-alone", "after-a-commit-beyond-markdown", "naming-a-slice"],
 )  # fmt: skip
-def test_a_reproduction_comes_before_the_first_commit_and_none_of_its_results_is_qa(
-    ready_world: World, monkeypatch: pytest.MonkeyPatch, own: str, slices: list[str] | None, refused: bool
+def test_a_reproduction_comes_before_the_first_commit_beyond_markdown_and_none_of_its_results_is_qa(
+    ready_world: World, monkeypatch: pytest.MonkeyPatch, changed: str, slices: list[str] | None, refused: bool
 ) -> None:
-    answers = {"rev-parse": HEAD, "show": PREFIXES, "diff": "web/page.ts\n", "merge-base": "", "rev-list": own}
+    answers = {"rev-parse": HEAD, "show": PREFIXES, "diff": "web/page.ts\n", "merge-base": "", "log": changed}
     ready_world.launcher.git = lambda argv: (0, answers[argv[3]])
     impl = ready_world.ctx("implementer", IMPL_ID)
     args = {"head": HEAD[:12], "reproduce": True, **({"slices": slices} if slices else {})}
