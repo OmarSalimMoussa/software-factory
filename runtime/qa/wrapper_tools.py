@@ -8,8 +8,9 @@
   live view: a screenshot is not shrunk before the tester sees it, so a point in it is the point on the desktop.
 - ``browser_color_scheme`` shows the page in its light or dark colours: fixed code the wrapper runs in the browser
   server, whose own code tool is hidden from testers.
-- ``browser_mouse_press_xy`` clicks at a point holding the button ``qa.click_hold_ms``: a remote desktop under load
-  misses a click as short as Playwright's.
+- ``browser_mouse_press_xy`` clicks at a point, resting there ``qa.press_settle_ms`` first, holding the button
+  ``qa.click_hold_ms``: a remote desktop under load misses a press that comes with its move, or one as short as
+  Playwright's.
 - ``browser_type_keys`` types a text as key presses into whatever has the keyboard, in one call, ``qa.key_delay_ms``
   apart: the remote desktop's view takes keys, not a field's filled value, drops keys sent faster, and reads a capital
   or a shifted symbol only with Shift held.
@@ -178,6 +179,7 @@ class Tools:
     key_delay_ms: int
     hold_max_seconds: int
     click_hold_ms: int
+    press_settle_ms: int
     now: Callable[[], float]  # a monotonic clock, in seconds
 
     def answer(self, name: str, arguments: dict[str, Any], cancelled: threading.Event) -> tuple[str, bool]:
@@ -278,8 +280,9 @@ class Tools:
             raise ToolError("give the point as x and y, in the page's pixels")
         if not (0 <= x < width and 0 <= y < height):
             raise ToolError(f"the point is off the page: x from 0 to {width - 1}, y from 0 to {height - 1}")
+        rest = f"await page.mouse.move({x}, {y}); await page.waitForTimeout({self.press_settle_ms});"
         held = f"await page.mouse.down(); await page.waitForTimeout({self.click_hold_ms}); await page.mouse.up();"
-        self.call(SERVER_CODE, {"code": f"async (page) => {{ await page.mouse.move({x}, {y}); {held} }}"})
+        self.call(SERVER_CODE, {"code": f"async (page) => {{ {rest} {held} }}"})
         return f"Pressed at {x:g}, {y:g}. A screenshot shows what it did."
 
     def _hold_request(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:

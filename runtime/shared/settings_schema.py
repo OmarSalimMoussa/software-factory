@@ -75,6 +75,7 @@ SCHEMA: dict[str, Spec] = {
     "qa.key_delay_ms": Spec("int", 0, 1000),
     "qa.hold_max_seconds": Spec("int", 1, 300),
     "qa.click_hold_ms": Spec("int", 0, 2000),
+    "qa.press_settle_ms": Spec("int", 0, 2000),
     "qa.place_turn_seconds": Spec("int", 10, 3600),
     "qa.wait_max_minutes": Spec("int", 1, 60),
     "qa.browser_answer_seconds": Spec("int", 10, 900),

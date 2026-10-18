@@ -313,6 +313,7 @@ class Browser:
             40,
             30,
             150,
+            250,
             lambda: self.ticks.clock,
         )
         return tools.answer(name, args, self.ticks)
@@ -406,11 +407,12 @@ def test_typed_keys_hold_shift_for_capitals_and_symbols_and_the_text_never_runs_
     assert not failed and said.startswith("Typed 5 keys. A desktop may draw them seconds late")
 
 
-def test_a_desktop_click_holds_the_button_as_the_desktop_takes_a_click() -> None:
+def test_a_desktop_click_rests_at_its_point_then_holds_the_button_as_the_desktop_takes_a_click() -> None:
     browser = Browser([])
     said, failed = browser.answer("browser_mouse_press_xy", {"x": 100, "y": 200.5})
+    rest = "await page.mouse.move(100, 200.5); await page.waitForTimeout(250);"
     held = "await page.mouse.down(); await page.waitForTimeout(150); await page.mouse.up();"
-    code = f"async (page) => {{ await page.mouse.move(100, 200.5); {held} }}"
+    code = f"async (page) => {{ {rest} {held} }}"
     assert browser.calls == [("browser_run_code_unsafe", {"code": code})]
     assert (said, failed) == ("Pressed at 100, 200.5. A screenshot shows what it did.", False)
 
@@ -445,6 +447,6 @@ def test_a_browser_failure_reaches_the_tester_without_the_sign_in_link() -> None
     def broken(name: str, args: dict[str, Any]) -> str:
         raise ServerError(f"browser_navigate failed: net::ERR_CONNECTION_REFUSED at {args['url']}")
 
-    tools = Tools(broken, lambda address: LINK, lambda link: None, 60, 15, (1280, 800), 40, 30, 150, lambda: 0.0)
+    tools = Tools(broken, lambda address: LINK, lambda link: None, 60, 15, (1280, 800), 40, 30, 150, 250, lambda: 0.0)
     said, failed = tools.answer("browser_sign_in", {"address": "tester-1@example.com"}, threading.Event())
     assert failed and said == "browser_navigate failed: net::ERR_CONNECTION_REFUSED at the sign-in link"
