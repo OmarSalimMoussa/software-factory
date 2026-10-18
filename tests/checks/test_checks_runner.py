@@ -11,7 +11,7 @@ from conftest import MakeRepo, commit_all
 
 from checks.runner import cli
 from checks.runner.repo import Repo
-from checks.standard import count_claims
+from checks.standard import comment_budgets, count_claims
 from checks.standard import tests as tests_check
 from runtime.shared.settings import Settings, build
 
@@ -142,6 +142,29 @@ def _branch_from(root: Path, files: dict[str, str]) -> Repo:
         (root / rel).write_text(text)
     commit_all(root, "work")
     return Repo.open(root, tuple(files), base.strip())
+
+
+CODE = "".join(f"value_{n} = {n}\n" for n in range(8))
+
+
+@pytest.mark.parametrize(
+    ("files", "fails"),
+    [
+        ({"app/notes_test.py": "value = 1\n"}, False),
+        ({"app/notes.py": "# Saved notes keep their order.\n# Each note keeps its id.\n# One more.\n" + CODE}, True),
+    ],
+    ids=["tests-deleted", "comment-added"],
+)
+def test_a_trees_comment_share_may_rise_only_by_deleting_code(
+    make_repo: MakeRepo, files: dict[str, str], fails: bool
+) -> None:
+    notes = "# Saved notes keep their order.\n# Each note keeps its id.\n" + CODE
+    baseline = '{"module-docblock": {"pins": {}}}'
+    root = make_repo({"app/notes.py": notes, "app/notes_test.py": CODE, "check-values/baseline.json": baseline})
+
+    problems = comment_budgets.run(_branch_from(root, files), {"trees": ["app"]})
+
+    assert any(p.startswith("tree-density: app") for p in problems) is fails
 
 
 @pytest.mark.parametrize(("now", "fails"), [("all three of them, the last two", True), ("every one", False)])

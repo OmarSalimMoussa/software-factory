@@ -2,10 +2,11 @@
 
 Three budgets: a module docblock holds at most 20 lines (a ceiling, pinned with grounds); a function or class
 docstring over 20 lines is a per-file ratchet; each named tree's share of discretionary comment lines is a ratchet in
-permille, and a new tree starts where the branch puts it, since it cannot start at zero. Both ratchets compare what
-a branch changed with the default branch. The docblock leaves both
-sides of the density ratio, and an error-telemetry marker leaves its numerator. A measured file outside every named
-tree fails, so nothing drops out of the totals. A ``testdata/`` corpus is not measured.
+permille, held where the branch adds comment lines to the tree (deleting code alone never fails it), and a new tree
+starts where the branch puts it, since it cannot start at zero. Both ratchets compare what a branch changed with the
+default branch. The docblock leaves both sides of the density ratio, and an error-telemetry marker leaves its
+numerator. A measured file outside every named tree fails, so nothing drops out of the totals. A ``testdata/`` corpus
+is not measured.
 """
 
 from __future__ import annotations
@@ -79,7 +80,8 @@ def measure(repo: Repo, trees: list[str]) -> tuple[dict[str, dict[str, int]], li
         tree_comment[tree] += discretionary
         tree_total[tree] += nonblank
     density = {tree: tree_comment[tree] * 1000 // total if total else 0 for tree, total in tree_total.items()}
-    return {"module-docblock": docblock, "docstring-length": docstrings, "tree-density": density}, outside
+    found = {"module-docblock": docblock, "docstring-length": docstrings, "tree-density": density}
+    return found | {"tree-comments": dict(tree_comment)}, outside
 
 
 def measure_before(
@@ -87,7 +89,7 @@ def measure_before(
 ) -> dict[str, dict[str, int]]:
     """The two ratchets as they stood on the default branch: ``docstrings``, each file's long docstrings, and
     ``density``, each tree's comment density over every file it held there."""
-    found: dict[str, dict[str, int]] = {"docstring-length": {}, "tree-density": {}}
+    found: dict[str, dict[str, int]] = {"docstring-length": {}, "tree-density": {}, "tree-comments": {}}
     for rel in docstrings:
         old = repo.before(rel)
         try:
@@ -110,6 +112,7 @@ def measure_before(
         comment[tree] += discretionary
         total[tree] += nonblank
     found["tree-density"] = {tree: comment[tree] * 1000 // n if n else 0 for tree, n in total.items()}
+    found["tree-comments"] = dict(comment)
     return found
 
 
@@ -131,6 +134,7 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
     out += budgets.check_ratchet(
         "docstring-length", {rel: gates["docstring-length"][rel] for rel in files}, before["docstring-length"]
     )
-    density = {tree: gates["tree-density"][tree] for tree in trees if tree in gates["tree-density"]}
+    added = [tree for tree in trees if gates["tree-comments"].get(tree, 0) > before["tree-comments"].get(tree, -1)]
+    density = {tree: gates["tree-density"][tree] for tree in added if tree in gates["tree-density"]}
     out += budgets.check_ratchet("tree-density", density, before["tree-density"], new_units=True)
     return out + outside

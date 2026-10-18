@@ -61,7 +61,9 @@ deploy, from the hooks to the images, the deploy files and the ports
 A ratchet (`complexity-ratchet`, `count-claims`, `history-narrative`, and the docstring and density budgets of
 `comment-budgets`) compares each file or tree a branch changed with how it stands on the default branch, measured
 the same way: only getting worse fails, and no number is kept by hand, so an improvement tightens the baseline as
-soon as it merges and parallel branches never conflict over one. Checking everything (`--all`) runs no ratchet.
+soon as it merges and parallel branches never conflict over one. A tree's comment density counts as worse only
+when the branch also adds comment lines to it, so deleting code, such as a test cut, never fails it. Checking
+everything (`--all`) runs no ratchet.
 Growing past a ceiling needs a pin in `baseline.json` with its grounds in one line; a pin without grounds fails.
 
 ## When a check fails
