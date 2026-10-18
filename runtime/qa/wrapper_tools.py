@@ -115,7 +115,8 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": PRESS,
         "description": "Click at a point on the remote desktop's view, holding the button a moment, as the desktop "
-        "takes a click. A point is in the view's own pixels, as a screenshot shows them.",
+        "takes a click. A point is in the page's pixels from its top-left corner, as a screenshot shows them: a "
+        "view inside a frame counts from the page's corner, not the frame's.",
         "inputSchema": {
             "type": "object",
             "properties": {"x": {"type": "number"}, "y": {"type": "number"}},
@@ -274,9 +275,9 @@ class Tools:
             or not isinstance(x, int | float)
             or not isinstance(y, int | float)
         ):
-            raise ToolError("give the point as x and y, in the view's pixels")
+            raise ToolError("give the point as x and y, in the page's pixels")
         if not (0 <= x < width and 0 <= y < height):
-            raise ToolError(f"the point is off the view: x from 0 to {width - 1}, y from 0 to {height - 1}")
+            raise ToolError(f"the point is off the page: x from 0 to {width - 1}, y from 0 to {height - 1}")
         held = f"await page.mouse.down(); await page.waitForTimeout({self.click_hold_ms}); await page.mouse.up();"
         self.call(SERVER_CODE, {"code": f"async (page) => {{ await page.mouse.move({x}, {y}); {held} }}"})
         return f"Pressed at {x:g}, {y:g}. A screenshot shows what it did."

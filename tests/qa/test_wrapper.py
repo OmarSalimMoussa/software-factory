@@ -428,7 +428,7 @@ def test_a_desktop_click_holds_the_button_as_the_desktop_takes_a_click() -> None
         ("browser_hold_request", {"pattern": "**/cancel", "seconds": 31}, "at most 30 seconds"),
         ("browser_hold_request", {"pattern": " ", "seconds": 5}, "give the address"),
         ("browser_release_request", {"pattern": " "}, "give the address you held"),
-        ("browser_mouse_press_xy", {"x": 1280, "y": 10}, "the point is off the view: x from 0 to 1279"),
+        ("browser_mouse_press_xy", {"x": 1280, "y": 10}, "the point is off the page: x from 0 to 1279"),
         ("browser_mouse_press_xy", {"x": "1); x(", "y": 10}, "give the point as x and y"),
         ("browser_mouse_press_xy", {"x": True, "y": 10}, "give the point as x and y"),
         ("browser_release_request", {"pattern": "**/x"}, "the browser answered with no result"),
