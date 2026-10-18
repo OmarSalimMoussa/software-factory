@@ -129,8 +129,7 @@ def restarts(timeout: int) -> int:
 
 
 def top(slot: int, timeout: int) -> int:
-    """Each container running for the slot, its own and those still on its networks, with its CPU and memory, then
-    each of its processes' CPU, run time and name: names alone, since a command line can carry a secret."""
+    """Each container running for the slot, its own and those on its networks, then each process in it."""
     listed = _docker(["container", "ls", "-q", "--filter", f"label={SLOT_LABEL}={slot}"], timeout)
     networks = _docker(["network", "ls", "-q", "--filter", f"label={SLOT_LABEL}={slot}"], timeout)
     if listed.returncode != 0 or networks.returncode != 0:
@@ -151,8 +150,9 @@ def top(slot: int, timeout: int) -> int:
     for line in sorted(stats.stdout.splitlines()):
         cid, _, said = line.partition(" ")
         print(said, flush=True)
-        for row in _docker(["container", "top", cid, "-eo", "pcpu,etime,comm"], timeout).stdout.splitlines()[1:]:
-            print(f"  {row.strip()}", flush=True)
+        # Names alone, as a command line can carry a secret; docker top refuses columns without the pid.
+        for row in _docker(["container", "top", cid, "-eo", "pid,pcpu,etime,comm"], timeout).stdout.splitlines()[1:]:
+            print(f"  {' '.join(row.split())}", flush=True)
     return 0
 
 

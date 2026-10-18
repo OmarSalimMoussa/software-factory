@@ -296,7 +296,7 @@ def test_top_prints_each_container_running_for_the_slot_with_its_processes_cpu_a
         "network inspect": "fedcba9876543210fedcba98 \n",  # a visit the product started, with no slot label
         "container stats": "0123456789ab notes-slot2-web 2.10% CPU, 90MiB / 1GiB\n"
         "fedcba987654 notes-signin-1 150.00% CPU, 600MiB / 2GiB\n",
-        "container top": "%CPU ELAPSED COMMAND\n140 01:02 neko\n 9.5 01:02 chromium\n",
+        "container top": "PID       %CPU      ELAPSED   COMMAND\n7         140       01:02     neko\n",
     }
 
     def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
@@ -309,10 +309,10 @@ def test_top_prints_each_container_running_for_the_slot_with_its_processes_cpu_a
 
     printed = capsys.readouterr().out
     assert "notes-slot2-web 2.10% CPU" in printed and "notes-signin-1 150.00% CPU" in printed
-    assert "  140 01:02 neko" in printed
+    assert "  7 140 01:02 neko" in printed
     stats = next(a for a in asked if a[:2] == ["container", "stats"])
     assert stats[-2:] == ["0123456789ab", "fedcba987654"]
-    assert all(a[-1] == "pcpu,etime,comm" for a in asked if a[:2] == ["container", "top"])
+    assert all(a[-1] == "pid,pcpu,etime,comm" for a in asked if a[:2] == ["container", "top"])
 
 
 def test_top_fails_when_docker_cannot_list_the_slots_containers(
