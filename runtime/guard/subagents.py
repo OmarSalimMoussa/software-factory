@@ -303,25 +303,27 @@ def check_send(call: Call) -> Decision:
 
 def check_tester_time(call: Call) -> Decision:
     """A tester's own calls: refused once its time is spent, or its desktop time once it drives the remote desktop;
-    shell and browser waits cut to the time left, but for `desktop up`. Its report always goes: a file in its scratch
-    folder, its steps' results, findings and verdict, a reflection, and its hand-back."""
+    shell and browser waits cut to the time left, but for `desktop up`. Its report always goes, uncut: a file in its
+    scratch folder, its steps' results, findings and verdict, a reflection, and its hand-back."""
     tester = call.in_subagent and call.agent_type.startswith(TESTER)
     if not tester or call.tool == HANDBACK or call.off("tester-time"):
         return None
-    left = _time_left(call)
-    if isinstance(left, Refusal):
-        return None if reports(call) else left
+    left, report = _time_left(call), reports(call)
+    if isinstance(left, Refusal) and not report:
+        return left
     timed = _TIMED_TOOLS.get(call.tool)
     if timed is None:
-        return browser.cap_wait(call, left)
+        return None if isinstance(left, Refusal) else browser.cap_wait(call, left)
     name, default = timed
     command = str(call.tool_input.get("command", "")) if call.tool == "Bash" else ""
     if factory_calls.plain_words(command) is not None:
         default = _LONGEST_BASH
     asked = call.tool_input.get(name)
     current = asked if isinstance(asked, int) and not isinstance(asked, bool) and asked > 0 else default
-    # `desktop up` runs on the factory's time, which `_time_left` leaves out: cut to the tester's, it stops halfway.
-    most = _LONGEST_BASH if _starts_desktop(command) else min(current, int(left * 1000))
+    # `desktop up` runs on the factory's time (`_time_left` leaves it out) and a report always goes: neither is cut.
+    desktop = _starts_desktop(command)
+    uncut = _LONGEST_BASH if desktop else current
+    most = uncut if report or desktop or isinstance(left, Refusal) else min(current, int(left * 1000))
     updated = {**call.tool_input, name: max(1_000, most)}
     if call.tool == "Bash":
         updated["run_in_background"] = False

@@ -302,6 +302,17 @@ def test_a_testers_desktop_up_waits_its_own_length_however_little_time_the_teste
     assert isinstance(up, Rewrite) and up.updated_input["timeout"] == 600_000
 
 
+@pytest.mark.parametrize("spent", [140, 200], ids=["seconds-left", "time-spent"])
+def test_a_testers_report_waits_its_own_length_in_sight_whatever_time_it_has_left(tmp_path: Path, spent: int) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.settings(qa__setup_seconds=30, qa__seconds_per_item=120)
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=spent), "user", "Scenarios and checks: 1")])
+    verdict = kit.decide("Bash", {"command": "factory qa result --head abc1234", "run_in_background": True}, **TESTER)
+    assert isinstance(verdict, Rewrite)
+    assert verdict.updated_input["timeout"] == 600_000 and verdict.updated_input["run_in_background"] is False
+
+
 def test_a_testers_slot_api_session_carries_its_id_and_the_implementers_keeps_its_name(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer")
