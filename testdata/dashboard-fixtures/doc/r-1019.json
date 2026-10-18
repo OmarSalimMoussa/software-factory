@@ -50,6 +50,7 @@
    }
   ],
   "html": "<h1>Usage page should show totals per day</h1><p>A person says: Usage page should show totals per day.</p><p>Became part of <span class=\"doclink\" data-open-doc=\"t-0012\" tabindex=\"0\">t-0012</span>.</p>",
-  "brief_url": null
+  "brief_url": null,
+  "proof": null
  }
 }

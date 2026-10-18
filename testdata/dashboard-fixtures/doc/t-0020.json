@@ -80,6 +80,7 @@
    }
   ],
   "html": "<h1>Long project names wrap badly</h1><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li>none yet</li></ul>",
-  "brief_url": null
+  "brief_url": null,
+  "proof": null
  }
 }

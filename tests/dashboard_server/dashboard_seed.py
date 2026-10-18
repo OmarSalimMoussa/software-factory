@@ -13,7 +13,7 @@ import hashlib
 import os
 from pathlib import Path
 
-from seed_agents import history_lines, seed_cost, seed_evidence, seed_sessions, seed_transcript
+from seed_agents import history_lines, seed_check_runs, seed_cost, seed_evidence, seed_sessions, seed_transcript
 from seed_kit import FIXTURES, PRICES, ROOT, fixture, fixture_time, iso, write
 from seed_queue import seed_checks, seed_requests, seed_tasks
 from settings_text import set_line
@@ -285,6 +285,7 @@ def seed(root: Path, now: float = T0) -> Places:
         },
     )
     seed_evidence(places, now)
+    seed_check_runs(places, now)
     seed_transcript(places, now)
     # The queue is the warden's own and writable by no one else, or it refuses to read it.
     for folder in [repo, *(d for d in repo.rglob("*") if d.is_dir())]:

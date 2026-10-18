@@ -21,7 +21,7 @@ from runtime.qa import evidence as qa_evidence
 from runtime.qa.replay import reader as replay_reader
 from runtime.queue import approvals, cards, files, goal, intake, pictures, proposals, records, triage
 from runtime.queue.book import Queue
-from runtime.queue.formats import TASK_ID
+from runtime.queue.formats import CHECK_ID, TASK_ID
 from runtime.shared import models, protocol, store
 from runtime.shared.models import RETIRED
 from runtime.shared.protocol import Refused
@@ -157,6 +157,17 @@ def _qa(ctx: Context, args: dict[str, Any]) -> Any:
     return found
 
 
+def _check_runs(ctx: Context, args: dict[str, Any]) -> Any:
+    wanted = args.get("checks", [])
+    if not isinstance(wanted, list) or len(wanted) > _MAX_IDS or not all(CHECK_ID.match(str(c)) for c in wanted):
+        raise Refused("snapshot", f"checks is a list of at most {_MAX_IDS} check ids")
+    found: dict[str, list[dict[str, Any]]] = {str(c): [] for c in wanted}
+    for entry in qa_evidence.entries(ctx.places):
+        if entry.get("check") in found:
+            found[entry["check"]].append(entry)
+    return found
+
+
 def _probes(ctx: Context, args: dict[str, Any]) -> Any:
     strip = ctx.settings().get_int("dashboard.probe_strip")
     streaks = kept(Streaks, ctx.places.probes)
@@ -284,6 +295,7 @@ READERS: dict[str, Reader] = {
     "logs": _logs,
     "specs": _spec_text,
     "qa": _qa,
+    "check_runs": _check_runs,
     "replay": replay_reader.read,
     "goal": _goal,
     "triage": lambda ctx, args: dataclasses.asdict(triage.batch(ctx)),

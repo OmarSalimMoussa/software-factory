@@ -85,6 +85,7 @@
    }
   ],
   "html": "<h1>Clearer empty states on Projects and Invoices</h1><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li><span class=\"doclink\" data-open-doc=\"r-1034\" tabindex=\"0\">r-1034</span></li><li><span class=\"doclink\" data-open-doc=\"r-1010\" tabindex=\"0\">r-1010</span></li></ul>",
-  "brief_url": null
+  "brief_url": null,
+  "proof": null
  }
 }

@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 from dashboard_rig import Rig
 from dashboard_seed import STAGING, T0
-from seed_agents import REPLAY_URL
+from seed_agents import CHECKED, REPLAY_URL
 from seed_kit import FIXTURES, iso
 
 from runtime.dashboard.views import agents, ops, spend
@@ -107,7 +107,7 @@ PAGES = [
     ("/api/doc/t-0017", ["doc/t-0017.json"]),
     ("/api/doc/s-0012", ["doc/s-0012.json"]),
     ("/api/doc/GOAL.md", ["doc/GOAL.md.json"]),
-    ("/api/doc/c-1009-1405", ["doc/c-1009-1405.json"]),
+    ("/api/doc/c-20261009T140500Z-a1b2c3d", ["doc/c-20261009T140500Z-a1b2c3d.json"]),
     ("/api/doc/sr1", ["doc/sr1.json"]),
     ("/api/settings", ["settings.json"]),
     ("/api/reflect", ["reflect.json"]),
@@ -432,6 +432,17 @@ def test_a_replay_not_built_says_why_in_its_place(rig: Rig, replay: dict[str, An
     data = rig.parts(REPLAY_URL)["replay"]["data"]
     assert (data["title"], data["says"]) == ("Sign-in sends people back to the sign-in page", says)
     assert "rows" not in data
+
+
+def test_a_checks_page_shows_each_runs_screenshots_and_a_replay_only_where_its_tester_is_known(rig: Rig) -> None:
+    proof = rig.parts(f"/api/doc/{CHECKED}")["doc"]["data"]["proof"]
+    assert [(r["name"], len(r["shots"]), [b["label"] for b in r["replays"]], r["note"]) for r in proof["rows"]] == [
+        ("qa-regression 1", 2, ["Replay"], None),
+        ("qa-regression 2", 1, [], "No replay: its tester is not known."),
+    ]
+    replay = rig.parts(proof["rows"][0]["replays"][0]["url"])["replay"]["data"]
+    says = "The tester marked no steps in this run, so it plays as one recording."
+    assert (replay["title"], replay["empty"], len(replay["frames"])) == ("Merge t-0015", says, 3)
 
 
 @pytest.mark.parametrize(

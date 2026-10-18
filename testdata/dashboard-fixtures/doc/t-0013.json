@@ -80,6 +80,7 @@
    }
   ],
   "html": "<h1>Invoice page: the Approve button jumps</h1><p>Cause: <code>invoice page: the Approve label changed width on hover</code>.</p><p>What to change, and how to know it is fixed, in the factory's own words.</p><h2>Requests</h2><ul><li><span class=\"doclink\" data-open-doc=\"r-1022\" tabindex=\"0\">r-1022</span></li></ul>",
-  "brief_url": null
+  "brief_url": null,
+  "proof": null
  }
 }

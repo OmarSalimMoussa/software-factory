@@ -60,6 +60,7 @@
    }
   ],
   "html": "<p>Restarted the orchestrator after 41 minutes of silence while idle.</p>",
-  "brief_url": null
+  "brief_url": null,
+  "proof": null
  }
 }

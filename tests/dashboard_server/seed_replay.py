@@ -111,9 +111,10 @@ REPLAY: dict[str, Any] = {
 }
 
 
-def seed_replay(run: Path) -> None:
+def seed_replay(run: Path, marked: bool = True) -> None:
+    """The replay, with the items its tester marked; a regression tester marks none."""
     (run / "replay" / "frames").mkdir(parents=True)
     for n in (1, 2, 3):
         picture = FIXTURES / "pictures" / f"replay-{n}.jpg"
         (run / "replay" / "frames" / f"{n:06d}.jpg").write_bytes(picture.read_bytes())
-    (run / "replay" / "replay.json").write_text(json.dumps(REPLAY))
+    (run / "replay" / "replay.json").write_text(json.dumps(REPLAY if marked else {**REPLAY, "items": []}))

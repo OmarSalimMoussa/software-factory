@@ -1,7 +1,8 @@
 'use strict';
 /* A tester run's replay: opened from the task panel; a row opens on its failed step; picking a step moves nothing;
    Watch plays the title card, the thought and the actions over the frames; the stage pauses and resumes; the list
-   follows the player; the recording plays and hides a secret's stretch; a step that did not run says so. */
+   follows the player; the recording plays and hides a secret's stretch; a step that did not run says so. A check
+   shows each run's screenshots, and a run with no steps marked plays as its recording. */
 const {drive, ready, settle} = require('./lib.cjs');
 
 const wait = (p, fn, arg, ms = 20000) => p.waitForFunction(fn, arg, {timeout: ms}).then(() => true, () => false);
@@ -81,5 +82,18 @@ drive('replay', async t => {
     await t.shot(p, `replay-${w}.png`);
     await p.click('.backlink'); await settle(p);
     t.check(await p.evaluate(() => location.hash) === '#work', tag('the back link did not return to Work'));
+
+    await p.click('[data-worktab="checks"]'); await ready(p);
+    await p.click('.check-row[data-open-doc="c-20261009T140500Z-a1b2c3d"]'); await settle(p);
+    t.check(await p.$$eval('#sheet-body .doc-proof .tester', els => els.length) === 2, tag('the check shows no testers'));
+    t.check(await p.$$eval('#sheet-body .doc-proof .shots a img', els => els.length) === 3, tag('the check shows no screenshots'));
+    t.check((await p.textContent('#sheet-body .doc-proof')).includes('No replay: its tester is not known.'), tag('an unknown tester is not said'));
+    await t.wide(p, tag('check'));
+    await t.shot(p, `check-${w}.png`);
+    await p.click('#sheet-body .doc-proof [data-replay]'); await ready(p);
+    t.check((await p.textContent('#page .rp-says')).includes('plays as one recording'), tag('no recording offered'));
+    await p.click('#page .rp-says [data-rp="raw"]'); await settle(p);
+    t.check(await p.isVisible('.rp-raw'), tag('the recording of a run with no steps did not open'));
+    await p.keyboard.press('Escape'); await settle(p);
   }
 });

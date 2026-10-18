@@ -211,7 +211,7 @@ def seed_checks(repo: Path, now: float) -> None:
         ]
         record = records.CheckRecord(
             row["id"],
-            row["sha"],
+            row["sha"].ljust(40, "0"),
             iso(now - (back + 1) * 3600),
             row["merge"],
             rows,

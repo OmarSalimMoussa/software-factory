@@ -49,9 +49,11 @@ function readerHTML(id) {
   const p = env.parts.doc || Object.values(env.parts)[0];
   return p.ok ? docHTML(p.data) : failedPart(p.error, '');
 }
+const proofCard = x => `<div class="tester"><b>${esc(x.name)}</b>${x.note ? `<div class="faint" style="font-size:12px">${esc(x.note)}</div>` : ''}${shotsHTML(x.shots, x.name + ' screenshot')}${replaysHTML(x.replays)}</div>`;
+const proofHTML = p => p ? `<div class="section doc-proof"><div class="label">Testers</div>${p.rows.length ? `<div class="testers">${p.rows.map(proofCard).join('')}</div>` : `<div class="empty card" style="min-height:64px">${esc(p.empty)}</div>`}</div>` : '';
 function docHTML(d) {
   const fmVal = v => { const t = v.doc ? `<span class="doclink" data-open-doc="${esc(v.doc)}" tabindex="0">${esc(v.text)}</span>` : esc(v.text); return v.tone == null ? t : `<span class="chip ${esc(v.tone)}">${t}</span>`; };
-  return `<div class="doc-head">${ktile(d.kind_icon, d.kind_tone)}<div><div class="dh-kind">${esc(d.kind_label)} <span class="faint mono" style="font-weight:500">${esc(d.id)}</span></div><div class="dh-when">${esc(d.when)}</div></div></div>${d.fm.length ? `<dl class="fm-grid">${d.fm.map(f => `<div><dt>${esc(f.label)}</dt><dd>${f.values.map(fmVal).join(' ')}</dd></div>`).join('')}</dl>` : ''}${safeHtml(d.html)}${d.brief_url ? `<div class="spec-full"><span class="ico">${icon('document-text')}</span><div style="flex:1;min-width:0"><b>The brief</b><div class="muted" style="font-size:12px">Design, diagram, mock-ups and your comments, in its brief</div></div><button class="btn sm primary" data-brief="${esc(d.brief_url)}">${icon('document-text', 'sm')}Open brief</button></div>` : ''}`;
+  return `<div class="doc-head">${ktile(d.kind_icon, d.kind_tone)}<div><div class="dh-kind">${esc(d.kind_label)} <span class="faint mono" style="font-weight:500">${esc(d.id)}</span></div><div class="dh-when">${esc(d.when)}</div></div></div>${d.fm.length ? `<dl class="fm-grid">${d.fm.map(f => `<div><dt>${esc(f.label)}</dt><dd>${f.values.map(fmVal).join(' ')}</dd></div>`).join('')}</dl>` : ''}${safeHtml(d.html)}${proofHTML(d.proof)}${d.brief_url ? `<div class="spec-full"><span class="ico">${icon('document-text')}</span><div style="flex:1;min-width:0"><b>The brief</b><div class="muted" style="font-size:12px">Design, diagram, mock-ups and your comments, in its brief</div></div><button class="btn sm primary" data-brief="${esc(d.brief_url)}">${icon('document-text', 'sm')}Open brief</button></div>` : ''}`;
 }
 async function loadDoc(id) {
   let env;

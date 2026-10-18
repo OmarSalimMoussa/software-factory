@@ -60,6 +60,7 @@
    }
   ],
   "html": "<p>A visual tester passed a menu that overflowed at 390 px: the phone-width check was not in its brief.</p>",
-  "brief_url": null
+  "brief_url": null,
+  "proof": null
  }
 }

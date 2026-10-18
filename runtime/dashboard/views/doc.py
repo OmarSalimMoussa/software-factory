@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from runtime.dashboard import markdown
-from runtime.dashboard.views import docs
+from runtime.dashboard.views import docs, replay
 from runtime.dashboard.views.kit import (
     INBOX_TONES,
     KIND_LOOK,
@@ -22,9 +22,9 @@ from runtime.dashboard.views.kit import (
     plural,
     when,
 )
-from runtime.queue.formats import outcome
+from runtime.queue.formats import CHECK_ID, outcome
 
-WANTS = (*docs.WANTS, "specs")
+WANTS = (*docs.WANTS, "specs", "check_runs")
 
 
 def _value(text: str, tone: str | None = None, doc: str | None = None) -> dict[str, Any]:
@@ -48,13 +48,29 @@ def _check_text(raw: dict[str, Any]) -> str:
     return f"# {raw['title']}\n\n{raw['notes']}\n\n## Scenarios\n\n{table}"
 
 
+def _proof(check: str, runs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Each run the check's testers walked: its screenshots, and its replay when its tester is known."""
+    rows = []
+    for n, run in enumerate(sorted(runs, key=lambda e: str(e["run"])), 1):
+        names = (check, str(run["head"]), str(run["tester"]), str(run["run"]))
+        rows.append(
+            {
+                "name": names[2] if len(runs) == 1 else f"{names[2]} {n}",
+                "note": None if run["agent"] else "No replay: its tester is not known.",
+                "shots": replay.shots(check, run),
+                "replays": [{"label": "Replay", "url": replay.url(*names)}] if run["agent"] else [],
+            }
+        )
+    return {"rows": rows, "empty": "No screenshots were kept for this check."}
+
+
 def reader(snap: Snap, ref: str) -> dict[str, Any]:
     every = docs.index(snap)
     doc = next((d for d in every if d.id == ref), None)
     if doc is None:
         raise PartError("This file is gone. It may have been removed.")
     known = {d.id for d in every}
-    raw, brief = doc.raw, None
+    raw, brief, proof = doc.raw, None, None
     if doc.kind == "task":
         fm = [
             _fm("Id", _value(raw["id"])),
@@ -97,7 +113,7 @@ def reader(snap: Snap, ref: str) -> dict[str, Any]:
             _fm("Commit", _value(raw["commit"][:7])),
             _fm("When", _value(when(doc.at, utc=True))),
         ]
-        text = _check_text(raw)
+        text, proof = _check_text(raw), _proof(raw["id"], snap.get("check_runs").get(raw["id"], []))
     elif doc.kind == "reflection":
         fm = [
             _fm("Kind", _value(raw["kind"], REFLECT_TONES[raw["kind"]])),
@@ -120,13 +136,14 @@ def reader(snap: Snap, ref: str) -> dict[str, Any]:
         "fm": fm,
         "html": markdown.render(text, known, doc.id),
         "brief_url": brief,
+        "proof": proof,
     }
 
 
 def wants(query: Query) -> dict[str, Any]:
     ref = query.get("id", "")
     spec = [ref.replace("s-", "t-", 1)] if ref.startswith("s-") and ref[2:].isdigit() else []
-    return {"want": list(WANTS), "specs": spec}
+    return {"want": list(WANTS), "specs": spec, "checks": [ref] if CHECK_ID.match(ref) else []}
 
 
 def parts(snap: Snap, query: Query) -> Parts:

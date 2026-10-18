@@ -28,6 +28,9 @@ const ava = (family, initials, size) => `<span class="ava ${family}"${size ? ` s
 const ktile = (ic, tone) => { const c = toneColor(tone); return `<span class="ktile" style="color:${c};background:color-mix(in srgb,${c} 15%,transparent)">${sicon(ic)}</span>`; };
 /* A picture is an image the server serves under its own strict policy; a picture that fails to load says so in place. */
 const picture = (url, alt) => url ? `<img src="${esc(url)}" alt="${esc(alt || '')}" loading="lazy">` : `<span class="pic-gone">No picture</span>`;
+/* A tester's screenshots, each opening whole in a tab of its own, and its replays. */
+const shotsHTML = (urls, alt) => urls.length ? `<div class="shots">${urls.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${picture(u, alt)}</a>`).join('')}</div>` : '';
+const replaysHTML = rs => rs.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px">${rs.map(r => `<button class="btn sm" data-replay="${esc(r.url)}">${icon('play-circle', 'sm')}${esc(r.label)}</button>`).join('')}</div>` : '';
 document.addEventListener('error', e => { const t = e.target; if (t.tagName === 'IMG' && !t.dataset.gone) { t.dataset.gone = '1'; t.outerHTML = '<span class="pic-gone">The picture could not be shown.</span>'; } }, true);
 
 /* Server HTML (documents, the outage line, search marks) is narrowed to the tags a reader needs. */

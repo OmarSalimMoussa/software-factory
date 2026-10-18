@@ -17,7 +17,13 @@ from runtime.shared.paths import Places
 from runtime.warden.owner import messages
 
 COSTS: dict[str, float] = {}  # each agent's cost as the fixtures show it, filled as the agents are written
-REPLAYED = ("t-0017", "qa-ui-function")  # the one run whose replay is built
+REPLAYED = ("t-0017", "qa-ui-function")  # the one task run whose replay is built
+# The newest check's two regression runs: one by a tester it knows, whose replay is built, and one by none it knows.
+CHECKED = "c-20261009T140500Z-a1b2c3d"
+CHECK_RUNS = (
+    ("20261009T134000Z-0a1b2c", "ag-reg-1", ("page-1", "page-2")),
+    ("20261009T134005Z-0d0e0f", None, ("page-1",)),
+)
 REPLAY_URL = "/api/replay?of=t-0017&head=eeeeeeeeeeee&tester=qa-ui-function&run=20261009T120000Z-abc123"
 
 
@@ -239,6 +245,20 @@ def seed_evidence(places: Places, now: float) -> None:
                     "files": [f"{shot}.svg"],
                 },
             )
+
+
+def seed_check_runs(places: Places, now: float) -> None:
+    head, picture = "a1b2c3d".ljust(40, "0"), (FIXTURES / "pictures" / "evidence-t-0017-page.svg").read_bytes()
+    for run, agent, shots in CHECK_RUNS:
+        folder = places.evidence / CHECKED / head[:12] / "qa-regression" / run
+        folder.mkdir(parents=True)
+        for shot in shots:
+            (folder / f"{shot}.svg").write_bytes(picture)
+        if agent is not None:
+            seed_replay(folder, marked=False)
+        names = {"check": CHECKED, "head": head, "tester": "qa-regression", "run": run, "session": "orchestrator"}
+        line = {**names, "agent": agent, "at": iso(now), "files": [f"{shot}.svg" for shot in shots]}
+        store.append_jsonl(places.evidence / "index.jsonl", line)
 
 
 def seed_transcript(places: Places, now: float) -> None:

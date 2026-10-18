@@ -109,7 +109,7 @@ def page(snap: Snap, asked: dict[str, str]) -> dict[str, Any]:
         "seconds": data["seconds"],
         "pace": {name: settings.get_int(f"replay.{name}_ms") for name in PACE},
         "rows": rows,
-        "empty": None if rows else "The tester marked no steps in this run, so there is nothing to replay.",
+        "empty": None if rows else "The tester marked no steps in this run, so it plays as one recording.",
     }
 
 

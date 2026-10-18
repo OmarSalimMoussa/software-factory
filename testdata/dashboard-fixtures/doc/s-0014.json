@@ -60,6 +60,7 @@
    }
   ],
   "html": "<h1>Clearer empty states</h1><p>An empty Projects or Invoices page says what it is for and offers the one next step, with a picture of what will appear.</p>",
-  "brief_url": "/api/brief/t-0014"
+  "brief_url": "/api/brief/t-0014",
+  "proof": null
  }
 }

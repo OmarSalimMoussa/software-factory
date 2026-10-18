@@ -208,7 +208,7 @@
    ]
   },
   {
-   "id": "c-1009-1405",
+   "id": "c-20261009T140500Z-a1b2c3d",
    "kind": "check",
    "title": "Merge t-0015: a scenario failed",
    "status": "fail",
@@ -219,7 +219,7 @@
    "text": "phone-lists failed at step 4. Scenarios Scenario Result Steps run auth-admission pass 6 of 6 auth-remove pass 6 of 6 billing-credit pass 6 of 6 billing-own-key pass 6 of 6 invoice-access pass 6 of 6 account-menu pass 6 of 6 bar-widths pass 6 of 6 invoice-create pass 6 of 6 home-and-lists pass 6 of 6 phone-pages pass 6 of 6 phone-lists fail 3 of 6 shell pass 6 of 6 signed-out pass 6 of 6 stack pass 6 of 6 trash pass 6 of 6 import-run pass 6 of 6 partner-connect pass 6 of 6 first-invoice blocked 0 of 6 api-connect pass 6 of 6 sign-ins-saved pass 6 of 6 Evidence (videos and screenshots) is kept for 14 days, for the owner only.",
    "chips": [
     {
-     "text": "c-1009-1405",
+     "text": "c-20261009T140500Z-a1b2c3d",
      "tone": "good",
      "mono": true
     },
@@ -296,7 +296,7 @@
    ]
   },
   {
-   "id": "c-1009-1110",
+   "id": "c-20261009T111000Z-77ab12e",
    "kind": "check",
    "title": "Merge t-0016: every scenario passed",
    "status": "pass",
@@ -307,7 +307,7 @@
    "text": "All protected scenarios passed. Scenarios Scenario Result Steps run auth-admission pass 6 of 6 auth-remove pass 6 of 6 billing-credit pass 6 of 6 billing-own-key pass 6 of 6 invoice-access pass 6 of 6 account-menu pass 6 of 6 bar-widths pass 6 of 6 invoice-create pass 6 of 6 home-and-lists pass 6 of 6 phone-pages pass 6 of 6 phone-lists pass 6 of 6 shell pass 6 of 6 signed-out pass 6 of 6 stack pass 6 of 6 trash pass 6 of 6 import-run pass 6 of 6 partner-connect pass 6 of 6 first-invoice blocked 0 of 6 api-connect pass 6 of 6 sign-ins-saved pass 6 of 6 Evidence (videos and screenshots) is kept for 14 days, for the owner only.",
    "chips": [
     {
-     "text": "c-1009-1110",
+     "text": "c-20261009T111000Z-77ab12e",
      "tone": "good",
      "mono": true
     },
@@ -488,7 +488,7 @@
    ]
   },
   {
-   "id": "c-1008-1725",
+   "id": "c-20261008T172500Z-3e9f0aa",
    "kind": "check",
    "title": "Merge t-0013: every scenario passed",
    "status": "pass",
@@ -499,7 +499,7 @@
    "text": "All protected scenarios passed. Scenarios Scenario Result Steps run auth-admission pass 6 of 6 auth-remove pass 6 of 6 billing-credit pass 6 of 6 billing-own-key pass 6 of 6 invoice-access pass 6 of 6 account-menu pass 6 of 6 bar-widths pass 6 of 6 invoice-create pass 6 of 6 home-and-lists pass 6 of 6 phone-pages pass 6 of 6 phone-lists pass 6 of 6 shell pass 6 of 6 signed-out pass 6 of 6 stack pass 6 of 6 trash pass 6 of 6 import-run pass 6 of 6 partner-connect pass 6 of 6 first-invoice pass 6 of 6 api-connect pass 6 of 6 sign-ins-saved pass 6 of 6 Evidence (videos and screenshots) is kept for 14 days, for the owner only.",
    "chips": [
     {
-     "text": "c-1008-1725",
+     "text": "c-20261008T172500Z-3e9f0aa",
      "tone": "good",
      "mono": true
     },
@@ -554,7 +554,7 @@
    ]
   },
   {
-   "id": "c-1008-1505",
+   "id": "c-20261008T150500Z-c12d4f8",
    "kind": "check",
    "title": "Merge t-0012: a scenario failed",
    "status": "fail",
@@ -565,7 +565,7 @@
    "text": "Reverted, then fixed forward. Scenarios Scenario Result Steps run auth-admission pass 6 of 6 auth-remove pass 6 of 6 billing-credit pass 6 of 6 billing-own-key pass 6 of 6 invoice-access pass 6 of 6 account-menu pass 6 of 6 bar-widths pass 6 of 6 invoice-create fail 3 of 6 home-and-lists pass 6 of 6 phone-pages pass 6 of 6 phone-lists pass 6 of 6 shell pass 6 of 6 signed-out pass 6 of 6 stack pass 6 of 6 trash pass 6 of 6 import-run pass 6 of 6 partner-connect pass 6 of 6 first-invoice blocked 0 of 6 api-connect blocked 0 of 6 sign-ins-saved pass 6 of 6 Evidence (videos and screenshots) is kept for 14 days, for the owner only.",
    "chips": [
     {
-     "text": "c-1008-1505",
+     "text": "c-20261008T150500Z-c12d4f8",
      "tone": "good",
      "mono": true
     },

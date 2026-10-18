@@ -27,9 +27,10 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    orchestrator merges with `--no-ff`; the merge hook lets only the turn's branch land, with the pass for its tree.
    The warden finds the merge itself.
 9. **Check the default branch.** Slot 0 comes up at the merge, whole, and regression testers walk the scenarios
-   it could break, in parallel. A failure reverts the merge only when that merge is the one change to the
-   scenario's code since its last pass; any other failure becomes a request. A check with no failure marks the task
-   checked. A scenario that could not run reverts the merge too. When only the owner can give what it lacks (a key,
+   it could break, in parallel. Their runs go into the evidence with the saved check, so its page in Work shows each
+   tester's screenshots and the replay of its walk. A failure reverts the merge only when that merge is the one change
+   to the scenario's code since its last pass; any other failure becomes a request. A check with no failure marks the
+   task checked. A scenario that could not run reverts the merge too. When only the owner can give what it lacks (a key,
    an account, leave to use an outside site), the task is blocked: it waits on Home for the owner's **Fixed, carry
    on**, its implementer benched and written to SELF_REFLECT, while other work goes on. When another open task makes
    it, the task is on hold, and the warden sends it back once that task is checked, or closed or parked; the

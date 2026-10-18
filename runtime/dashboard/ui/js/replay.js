@@ -23,7 +23,7 @@ function drawReplay(d) {
   const S = rpState();
   const head = `<div class="page-h"><div><h1>${esc(d.title)}</h1><div class="sub">${d.summary ? rpTone(d.summary.text, d.summary.tone) + ' · ' : ''}${esc(d.sub)}</div></div></div>`;
   if (d.says) return head + `<div class="card empty rp-says">${esc(d.says)}</div>`;
-  if (d.empty) return head + `<div class="card empty rp-says">${esc(d.empty)}</div>`;
+  if (d.empty) return head + `<div class="card empty rp-says">${esc(d.empty)}<button class="btn sm" data-rp="raw" aria-haspopup="dialog">${icon('video-camera', 'sm')}Recording</button></div>` + rawHTML(d);
   const open = d.rows.find(r => r.key === S.open);
   return head + `<div class="rp-rows">${d.rows.map((r, i) => rowHTML(d, r, i)).join('')}</div>` + (open ? logHTML(open) : '') + rawHTML(d);
 }

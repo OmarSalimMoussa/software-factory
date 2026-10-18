@@ -9,6 +9,7 @@ import urllib.request
 import pytest
 from dashboard_rig import HOST, OWNER, Rig
 from dashboard_seed import T0
+from seed_agents import CHECKED
 
 from runtime.dashboard import auth, brief_frame, pictures
 from runtime.dashboard.server import serve
@@ -83,11 +84,13 @@ def test_pages_and_pictures_carry_their_policies(rig: Rig) -> None:
     base = f"http://127.0.0.1:{server.server_address[1]}"
     head = rig.parts("/api/task/t-0017")["task"]["data"]["testers"]["rows"]
     evidence = next(shot for row in head for shot in row["shots"])
+    checked = rig.parts(f"/api/doc/{CHECKED}")["doc"]["data"]["proof"]["rows"][0]["shots"][0]
     try:
         for path, policy, media in (
             ("/", auth.PAGE_POLICY, "text/html; charset=utf-8"),
             ("/api/picture/task/t-0027", pictures.POLICY, "image/svg+xml"),
             (evidence, pictures.POLICY, "image/svg+xml"),
+            (checked, pictures.POLICY, "image/svg+xml"),
             ("/api/brief-page/t-0023/1", brief_frame.POLICY, "text/html; charset=utf-8"),
         ):
             with urllib.request.urlopen(urllib.request.Request(base + path, headers={"Cookie": "owner=1"})) as answer:
