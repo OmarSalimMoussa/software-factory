@@ -130,7 +130,7 @@ def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> None:
     """A tester's `desktop up` takes the slot's desktop while no other tester holds it, within caps.desktops_at_once."""
     agent = ctx.caller.agent_id
     if agent and verb[1] != "up":
-        raise Refused("slot", "a tester opens the desktop; its implementer takes it down")
+        raise Refused("slot", "the factory takes your desktop down once you hand back: nothing to run")
     with ctx.lock:
         held = read_desktops(ctx.places)
         if agent:
