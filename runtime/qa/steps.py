@@ -4,7 +4,8 @@ tester got from its result.
 
 `factory qa step --step <item>:<n>` marks a step's start; `factory qa step-result --step <item>:<n> --result
 pass|fail|blocked --got '…'` its end. A result for a step the tester never started is refused, so every result has a
-start. An implementer's session keeps its testers' marks in the warden's state.
+start, and so is a start while a step it started has no result, so steps never overlap in the replay. An implementer's
+session keeps its testers' marks in the warden's state.
 """
 
 from __future__ import annotations
@@ -38,11 +39,29 @@ def _mark(ctx: Context, args: dict[str, Any], verb: str) -> tuple[str, int]:
 
 
 def start(ctx: Context, session_id: str, head: str, tester: str, agent: str, args: dict[str, Any]) -> dict[str, Any]:
-    """Mark the start of one step of ``agent``'s item on ``head``."""
+    """Mark the start of one step of ``agent``'s item on ``head``, once each step it started before has its end."""
     item, step = _mark(ctx, args, "qa-step")
     record = {"item": item, "step": step, "head": head, "tester": tester, "agent": agent, "at": ctx.clock.iso()}
-    store.append_jsonl(path(ctx, session_id), record)
+    with ctx.lock:
+        unended = _unended(of_agent(ctx, session_id, agent))
+        if unended:
+            was_item, was_step = unended[0]
+            raise Refused(
+                "qa-step",
+                f"mark how step {was_step} of {was_item} ended first: factory qa step-result --head <sha> --step "
+                f"{was_item}:{was_step} --result pass|fail|blocked --got '…'",
+            )
+        store.append_jsonl(path(ctx, session_id), record)
     return record
+
+
+def _unended(marks: list[dict[str, Any]]) -> list[tuple[Any, Any]]:
+    """The steps among ``marks`` started and not yet ended, in the order they started."""
+    started: list[tuple[Any, Any]] = []
+    for mark in marks:
+        step = (mark.get("item"), mark.get("step"))
+        started = [s for s in started if s != step] if "result" in mark else [*started, step]
+    return started
 
 
 def end(ctx: Context, session_id: str, head: str, tester: str, agent: str, args: dict[str, Any]) -> dict[str, Any]:

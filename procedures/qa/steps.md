@@ -7,7 +7,8 @@ its report's tables are its record.
 - **Name the item as your brief does:** a scenario by its file name without `.md`, a check by its short name. A check
   with no numbered steps is one step, step 1.
 - **Setup is not a step.** Sign in, load seeds and reach the starting page first. A step's start is marked as its own
-  walk begins, and its result only once that walk is done.
+  walk begins, and its result only once that walk is done: one step at a time, so the factory refuses a start while
+  a step you started has no result.
 - **Before a step,** say in one sentence what you will do, then mark its start:
   `factory qa step --head <sha> --step <item>:<n>`. The replay opens the step with your sentence.
 - **After it,** mark how it ended, with what you saw in one sentence:
