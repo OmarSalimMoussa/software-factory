@@ -143,12 +143,13 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    scenarios split between them, each signed in as its own test address; a scenario that restarts or stops services
    walks alone. Start each in its own lane, `qa-regression`, then `qa-regression-2` and on, as its `subagent_type`: two
    in one lane share one browser, and a lane named only in the brief changes nothing. When the machine's browser places
-   are full, the factory messages you once one frees. A brief names scenarios, never an earlier report's results or
-   causes, nor a desktop's password: a tester brings the desktop up itself. A check of slot 0's health is read in the
-   tester's browser. Put every tester's rows, as they wrote them, in one report, and run `factory queue check <that
-   commit> --body <file>` before slot 0 moves. It clears every merge waiting up to that commit at once, within the cap,
-   when every row passed and each scenario they protect has a row; anything less clears none. A row you doubt is walked
-   again by a tester, never changed by you. Then `factory slot up` for the tip.
+   are full, the factory messages you once one frees. A brief names scenarios and what a set-up made that a step needs,
+   such as a record's id; never an earlier report's results or causes, nor a desktop's password: a tester brings the
+   desktop up itself. A check of slot 0's health is read in the tester's browser. Put every tester's rows, as they wrote
+   them, in one report, and run `factory queue check <that commit> --body <file>` before slot 0 moves. It clears every
+   merge waiting up to that commit at once, within the cap, when every row passed and each scenario they protect has a
+   row; anything less clears none. A row you doubt is walked again by a tester, never changed by you. Then `factory slot
+   up` for the tip.
 4. **A row that did not pass** comes back with `next`, and `factory queue bundle` says it again:
    - `again`: walk it again once what blocked it is fixed (a tester's time, the desktop, a set-up): never a revert.
    - `walk`: walk that scenario alone at the commit `at` names and save that check; then read the bundle again.
