@@ -284,17 +284,20 @@ def test_a_testers_steps_are_kept_in_order_and_a_result_needs_its_start(ready_wo
     assert [f["step"] for f in findings.of_agent(ready_world.ctx(), "t-0001", "ag-fn")] == ["cart:2"]
 
 
-def test_a_tester_starts_a_step_only_once_each_step_it_started_has_ended(ready_world: World) -> None:
+def test_a_tester_starts_an_items_step_only_once_its_earlier_step_ended_while_another_items_may_run_inside(
+    ready_world: World,
+) -> None:
     qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
     ctx, other = (ready_world.ctx("implementer", IMPL_ID, agent) for agent in ("ag-fn", "ag-ux"))
     qa.qa_step(ctx, {"head": HEAD[:9], "item": "cart", "step": 1}, None)
     qa.qa_step(other, {"head": HEAD[:9], "item": "cart", "step": 1}, None)
+    qa.qa_step(ctx, {"head": HEAD[:9], "item": "slow-total", "step": 1}, None)  # a hold, inside cart's step 1
     with pytest.raises(Refused, match="mark how step 1 of cart ended first"):
         qa.qa_step(ctx, {"head": HEAD[:9], "item": "cart", "step": 2}, None)
     qa.qa_step_result(ctx, {"head": HEAD[:9], "item": "cart", "step": 1, "result": "pass", "got": "it showed"}, None)
     qa.qa_step(ctx, {"head": HEAD[:9], "item": "cart", "step": 2}, None)
 
-    assert [m["step"] for m in steps.of_agent(ready_world.ctx(), IMPL_ID, "ag-fn")] == [1, 1, 2]
+    assert [m["step"] for m in steps.of_agent(ready_world.ctx(), IMPL_ID, "ag-fn")] == [1, 1, 1, 2]
 
 
 @pytest.mark.parametrize(
