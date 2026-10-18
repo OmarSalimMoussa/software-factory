@@ -67,6 +67,7 @@ class Proxy:
         self._server_in, self._client_out, self._wait = server_in, client_out, wait_seconds
         self._tools: list[dict[str, Any]] = []
         self._answer_tool: Answer = lambda name, args, cancelled: ("", True)
+        self._notes: dict[str, str] = {}
         self._server_lock, self._client_lock = threading.Lock(), threading.Lock()
         self._mine: dict[str, _Waiting] = {}
         self._lists: set[Any] = set()
@@ -79,9 +80,14 @@ class Proxy:
         self.untraced: Callable[[str], None] = lambda why: None
         self._trace_asked, self._trace_ok, self._trace_answered = False, False, threading.Event()
 
-    def add_tools(self, tools: list[dict[str, Any]], answer: Answer) -> None:
-        """The factory's own tools, listed beside the server's and answered by ``answer``."""
-        self._tools, self._answer_tool = tools, answer
+    def add_tools(self, tools: list[dict[str, Any]], answer: Answer, notes: dict[str, str]) -> None:
+        """The factory's own tools, listed beside the server's and answered by ``answer``; ``notes`` adds a line to
+        one of the server's tools, by its name."""
+        self._tools, self._answer_tool, self._notes = tools, answer, notes
+
+    def _noted(self, tool: dict[str, Any]) -> dict[str, Any]:
+        note = self._notes.get(str(tool.get("name")))
+        return tool if note is None else {**tool, "description": f"{tool.get('description', '')} {note}".strip()}
 
     def hide(self, secret: str) -> None:
         """From now on ``secret`` never reaches the session: a page left on a sign-in link names it in every answer."""
@@ -102,7 +108,7 @@ class Proxy:
             return
         if key in self._lists and isinstance(message.get("result"), dict):
             self._lists.discard(key)
-            listed = [t for t in message["result"].get("tools", []) if t.get("name") not in HIDDEN]
+            listed = [self._noted(t) for t in message["result"].get("tools", []) if t.get("name") not in HIDDEN]
             message["result"]["tools"] = listed + self._tools
             line = json.dumps(message)
         self._to_client(line)

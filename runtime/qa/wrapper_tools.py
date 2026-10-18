@@ -52,6 +52,12 @@ SHIFTED = {
     ),
 }
 
+# A line added to one of Playwright's own tools, where a tester reads it as it loads that tool.
+NOTES = {
+    "browser_type": f"On a remote desktop's live view, type with {TYPE_KEYS} instead: there this tool loses capitals, "
+    "symbols and keys sent fast."
+}
+
 TOOLS: list[dict[str, Any]] = [
     {
         "name": SIGN_IN,

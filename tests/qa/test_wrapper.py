@@ -18,7 +18,7 @@ from queue_kit import World
 
 from runtime.qa import qa_browser, wrapper
 from runtime.qa.wrapper import ServerError
-from runtime.qa.wrapper_tools import Tools
+from runtime.qa.wrapper_tools import NOTES, Tools
 from runtime.shared.settings import Settings
 
 FAKE = Path(__file__).with_name("fake_mcp.py")
@@ -87,7 +87,8 @@ def test_the_trace_starts_before_the_first_call_and_the_tester_can_neither_see_n
     opened: tuple[Session, Path, list[str]],
 ) -> None:
     session, log, _ = opened
-    listed = [t["name"] for t in session.send("tools/list")["result"]["tools"]]
+    tools = session.send("tools/list")["result"]["tools"]
+    listed = [t["name"] for t in tools]
     stopped = session.send("tools/call", {"name": "browser_stop_tracing", "arguments": {}})
     closed = session.send("tools/call", {"name": "browser_close", "arguments": {}})
     session.send("tools/call", {"name": "browser_navigate", "arguments": {"url": "https://app.test/"}})
@@ -96,6 +97,7 @@ def test_the_trace_starts_before_the_first_call_and_the_tester_can_neither_see_n
         "browser_navigate",
         "browser_snapshot",
         "browser_resize",
+        "browser_type",
         "browser_sign_in",
         "browser_wait_until",
         "browser_open_desktop",
@@ -104,6 +106,9 @@ def test_the_trace_starts_before_the_first_call_and_the_tester_can_neither_see_n
         "browser_hold_request",
         "browser_release_request",
     ]
+    # A tester that loads Playwright's typing tool reads where the factory's own types better.
+    [typing] = [t["description"] for t in tools if t["name"] == "browser_type"]
+    assert typing == "Playwright's own. " + NOTES["browser_type"] and "browser_type_keys" in typing
     assert stopped["error"]["message"] == "there is no tool browser_stop_tracing"
     assert closed["error"]["message"] == "there is no tool browser_close"  # closing would end the trace
     assert log.read_text().splitlines() == [
@@ -213,7 +218,7 @@ def test_a_cancelled_factory_call_stops_and_gets_no_answer() -> None:
         stopped.set() if cancelled.wait(10) else None
         return "Waited", False
 
-    proxy.add_tools([{"name": "browser_wait_until"}, {"name": "browser_open_desktop"}], answer)
+    proxy.add_tools([{"name": "browser_wait_until"}, {"name": "browser_open_desktop"}], answer, {})
     proxy.from_client(
         json.dumps(
             {

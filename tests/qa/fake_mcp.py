@@ -17,6 +17,7 @@ TOOLS = [
     "browser_navigate",
     "browser_snapshot",
     "browser_resize",
+    "browser_type",
     "browser_close",
     "browser_start_tracing",
     "browser_stop_tracing",
@@ -29,7 +30,11 @@ def answer(message: dict[str, object]) -> dict[str, object] | None:
     if method == "initialize":
         return {"protocolVersion": "2025-06-18", "capabilities": {"tools": {}}, "serverInfo": {"name": "fake"}}
     if method == "tools/list":
-        return {"tools": [{"name": name, "inputSchema": {"type": "object"}} for name in TOOLS]}
+        return {
+            "tools": [
+                {"name": name, "description": "Playwright's own.", "inputSchema": {"type": "object"}} for name in TOOLS
+            ]
+        }
     if method != "tools/call":
         return None
     name, args = params.get("name"), params.get("arguments") or {}

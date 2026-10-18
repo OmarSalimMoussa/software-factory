@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.qa import wrapper
-from runtime.qa.wrapper_tools import TOOLS, ToolError, Tools, first_link
+from runtime.qa.wrapper_tools import NOTES, TOOLS, ToolError, Tools, first_link
 from runtime.shared import environment, lanes, store
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import AGENT_USER, Places
@@ -180,6 +180,6 @@ def equipper(
             settings.get_int("qa.hold_max_seconds"),
             time.monotonic,
         )
-        proxy.add_tools(TOOLS, tools.answer)
+        proxy.add_tools(TOOLS, tools.answer, NOTES)
 
     return equip
