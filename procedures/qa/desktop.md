@@ -32,6 +32,8 @@ needs none first, then try again.
 - **One key,** such as Escape, right after a type.
 - **A window taller than the desktop** hides its lower part: maximise it first, by double-clicking its title bar.
 - **To replace an address or a field's text,** click it, select all with Ctrl+A, then type.
+- **To scroll a page,** click a blank part of it, then press PageDown, PageUp or the arrow keys: a mouse wheel on the
+  live view may not reach the desktop.
 
 ## 3. Finish
 
