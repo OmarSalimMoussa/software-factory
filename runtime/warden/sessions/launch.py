@@ -206,8 +206,11 @@ class Units:
         store.write_text(log, output, mode=0o600)
         settings = self.settings()
         lines = settings.get_int("slots.log_tail_lines")
-        kept = output if verb[0] == leases.RUN else "\n".join(output.splitlines()[-lines:]) if lines else ""
+        kept = output if verb[0] in _WHOLE else "\n".join(output.splitlines()[-lines:]) if lines else ""
         return StackResult(exit=code, tail=_last(kept, settings.get_int("slots.tail_max_kib") * 1024), log=str(log))
+
+
+_WHOLE = frozenset({leases.RUN, leases.TOP})
 
 
 def _last(text: str, most: int) -> str:

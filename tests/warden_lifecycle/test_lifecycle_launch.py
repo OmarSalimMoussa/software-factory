@@ -103,10 +103,11 @@ def test_a_stack_runs_input_waits_where_only_the_warden_reads_and_goes_after(wor
     [
         (["up"], "start\nline 1\n" + "é" * 1500 + "!", "[1991 bytes above are cut]\n" + "é" * 511 + "!"),
         (["run", "web", "--", "ls"], "\n".join(f"line {n}" for n in range(9)), None),
+        (["factory-top"], "\n".join(f"container {n}" for n in range(9)), None),
     ],
-    ids=["one-long-line-cut-at-a-character", "run-whole"],
+    ids=["one-long-line-cut-at-a-character", "run-whole", "top-whole"],
 )
-def test_a_stack_answer_holds_at_most_tail_max_kib_and_a_run_all_of_its_output(
+def test_a_stack_answer_holds_at_most_tail_max_kib_and_a_run_or_top_all_of_its_output(
     world: World, verb: list[str], out: str, tail: str | None
 ) -> None:
     world.settings = world.settings.with_changes({"slots.log_tail_lines": 3, "slots.tail_max_kib": 1})
