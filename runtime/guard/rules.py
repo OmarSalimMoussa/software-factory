@@ -48,5 +48,6 @@ RULES: dict[str, str] = {
     "agent-id": "an agent-written --agent-id: only the guard names a subagent on its factory calls",
     "inbox-wait": "the orchestrator going idle without `factory inbox --wait` in the background",
     "no-waker": "an implementer or designer ending its turn with nothing to wake it: no subagent of its own running, "
-    "no message to the orchestrator since its last prompt, and no QA-clean task waiting for its merge turn",
+    "no message to the orchestrator since its last prompt, no QA-clean task waiting for its merge turn, and no wait "
+    "for a browser place",
 }

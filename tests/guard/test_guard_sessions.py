@@ -13,6 +13,7 @@ from guard_kit import NOW, SID, TESTER_ID, Kit
 
 from runtime.guard import decide, transcript
 from runtime.guard.facts import Refusal
+from runtime.shared import lanes
 from runtime.shared.models import PENDING
 
 
@@ -241,6 +242,25 @@ def test_an_implementer_or_designer_goes_idle_only_with_something_to_wake_it(
     kit.transcript(lines)
     payload = {"hook_event_name": "Stop", "session_id": SID, "stop_hook_active": False, "cwd": str(kit.worktree),
                "transcript_path": str(kit.session_transcript), **extra}  # fmt: skip
+    call = decide.resolve(payload, kit.places, NOW, kit.home)
+    assert call is not None
+    decision = decide.check_stop(call)
+    assert (isinstance(decision, Refusal) and decision.rule == "no-waker") is refused
+
+
+@pytest.mark.parametrize(
+    ("waiting", "told", "refused"), [([SID], {}, False), ([], {SID: 1.0}, True), (["other"], {}, True)],
+    ids=["waits-for-a-browser-place", "was-told-of-one-already", "another-waits"],
+)  # fmt: skip
+def test_an_implementer_waiting_for_a_browser_place_may_stop_as_the_warden_tells_it(
+    tmp_path: Path, waiting: list[str], told: dict[str, float], refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.transcript([_PROMPT])
+    lanes.write_line(kit.places, waiting, told)
+    payload = {"hook_event_name": "Stop", "session_id": SID, "stop_hook_active": False, "cwd": str(kit.worktree),
+               "transcript_path": str(kit.session_transcript)}  # fmt: skip
     call = decide.resolve(payload, kit.places, NOW, kit.home)
     assert call is not None
     decision = decide.check_stop(call)

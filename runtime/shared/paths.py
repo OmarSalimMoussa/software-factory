@@ -115,6 +115,11 @@ class Places:
         return self.state / "history.jsonl"
 
     @property
+    def browser_line(self) -> Path:
+        """The sessions waiting for a browser place, in public/ where the guard reads them."""
+        return self.state / "public" / "browser-line.json"
+
+    @property
     def mirror(self) -> Path:
         """The warden's bare mirror of the product: what it pushes from, and what prod's deploy builds from."""
         return self.state / "mirror.git"

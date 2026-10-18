@@ -16,7 +16,9 @@ from collections.abc import Iterable
 from datetime import datetime
 from typing import Protocol, TypeVar
 
+from runtime.shared import store
 from runtime.shared.models import WAITING, WORKING
+from runtime.shared.paths import Places
 from runtime.shared.settings import Settings
 
 BROWSER = "qa-browser"  # the server a browser tester's launcher starts: `factory qa-browser <kind or lane>`
@@ -63,6 +65,24 @@ def holders(rows: Iterable[R], settings: Settings, now: datetime) -> list[R]:
     longest = tester_seconds(settings, settings.get_int("qa.max_items")) + waits
     return [s for s in rows if s.parent in alive and s.state == WORKING and s.role in personas
             and (now - datetime.fromisoformat(s.started.replace("Z", "+00:00"))).total_seconds() < longest]  # fmt: skip
+
+
+def line(places: Places) -> tuple[list[str], dict[str, float]]:
+    """The sessions waiting for a browser place, in order, and those told of one, with when."""
+    path = places.browser_line
+    raw = store.read_json_or(path, {"waiting": [], "told": {}})
+    bad = store.StoreError(f"{path}: want waiting, a list of session ids, and told, times by session id")
+    fields = raw if isinstance(raw, dict) else {}
+    waiting, told = fields.get("waiting"), fields.get("told")
+    if not isinstance(waiting, list) or not isinstance(told, dict):
+        raise bad
+    if not all(isinstance(sid, str) for sid in waiting) or not all(isinstance(at, int | float) for at in told.values()):
+        raise bad
+    return waiting, told
+
+
+def write_line(places: Places, waiting: list[str], told: dict[str, float]) -> None:
+    store.write_json(places.browser_line, {"waiting": waiting, "told": told})
 
 
 def names(settings: Settings, kind: str) -> list[str]:

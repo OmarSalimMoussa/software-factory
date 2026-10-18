@@ -30,7 +30,7 @@ from runtime.guard.facts import (
     read_switches,
 )
 from runtime.guard.wire import HANDBACK
-from runtime.shared import store
+from runtime.shared import lanes, store
 from runtime.shared.models import BENCH_PENDING, QA_CLEAN, RETIRED, WAITING, WORKING
 from runtime.shared.paths import Places, queue_dir
 
@@ -250,9 +250,12 @@ def _waker(call: Call) -> Decision:
     )
     if reports or transcript.messaged_since_prompt(call.transcript, ORCHESTRATOR) or _turn_comes(call):
         return None
+    # The warden tells a session waiting for a browser place once one frees (runtime/warden/sessions/browser_waits.py).
+    if call.session.id in lanes.line(call.places)[0]:
+        return None
     return Refusal(
         "no-waker",
-        "nothing would wake you: no tester or critic of yours runs, a background command does not count, and no one "
-        "answers this chat, the owner included. Carry on, or send what you need to the orchestrator (SendMessage to "
-        "orchestrator), then end your turn",
+        "nothing would wake you: no tester or critic of yours runs, you wait for no browser place, a background "
+        "command does not count, and no one answers this chat, the owner included. Carry on, or send what you need to "
+        "the orchestrator (SendMessage to orchestrator), then end your turn",
     )
