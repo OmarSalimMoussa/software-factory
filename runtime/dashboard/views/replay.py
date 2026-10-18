@@ -13,7 +13,7 @@ from runtime.dashboard.views.words import taskwords
 from runtime.shared.models import SEVERITIES
 
 WANTS = ("settings", "queue", "replay")
-FIELDS = ("task", "head", "tester", "run")
+FIELDS = ("of", "head", "tester", "run")
 PACE = (
     "freeze",
     "card",
@@ -55,17 +55,24 @@ SEVERITY_TONES = dict(zip(SEVERITIES, ("bad", "warn", "muted"), strict=True))  #
 HIDDEN_SAYS = "A sign-in link was on screen here, so this part is hidden."
 _FRAME = re.compile(r"^replay/frames/\d{6}\.jpg$")
 _SHOT = re.compile(r"^[A-Za-z0-9][\w.-]{0,127}\.(?:png|jpe?g)$")
+_IMAGE = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")
 
 
-def url(task: str, head: str, tester: str, run: str) -> str:
+def url(of: str, head: str, tester: str, run: str) -> str:
     """The replay page's address in the API, for a link to it."""
-    return "/api/replay?" + urlencode({"task": task, "head": head[:12], "tester": tester, "run": run})
+    return "/api/replay?" + urlencode({"of": of, "head": head[:12], "tester": tester, "run": run})
+
+
+def evidence_base(of: str, head: str, tester: str, run: str) -> str:
+    return "/api/evidence/" + "/".join((of, head[:12], tester, run)) + "/"
 
 
 def _asked(query: Query) -> dict[str, str]:
     missing = [k for k in FIELDS if not query.get(k)]
     if missing:
-        raise PartError(f"A replay is named by its task, head, tester and run; this one has no {', '.join(missing)}.")
+        raise PartError(
+            f"A replay is named by its task or check, head, tester and run; this one has no {', '.join(missing)}."
+        )
     return {k: str(query[k]) for k in FIELDS}
 
 
@@ -81,16 +88,12 @@ def parts(snap: Snap, query: Query) -> Parts:
 def page(snap: Snap, asked: dict[str, str]) -> dict[str, Any]:
     found = snap.get("replay")
     entry, data = found["entry"], found["replay"]
-    task = taskwords.tasks(snap).get(asked["task"])
-    head = {
-        "title": str(task["title"]) if task else asked["task"],
-        "sub": f"{asked['tester']} · {when(epoch(str(entry['at'])))}",
-    }
+    head = {"title": _title(snap, asked["of"]), "sub": f"{asked['tester']} · {when(epoch(str(entry['at'])))}"}
     if data is None:
         return head | {"state": "making", "says": "The replay is being made. It shows here once it is ready."}
     if "error" in data:
         return head | {"state": "failed", "says": f"This run has no replay: {data['error']}."}
-    base = "/api/evidence/" + "/".join((asked["task"], asked["head"], asked["tester"], asked["run"])) + "/"
+    base = evidence_base(asked["of"], asked["head"], asked["tester"], asked["run"])
     shown = [f for f in data["frames"] if _FRAME.match(f["file"])]
     frames = [{"t": f["t"], "url": base + f["file"], "w": f["w"], "h": f["h"]} for f in shown]
     if not frames:
@@ -108,6 +111,12 @@ def page(snap: Snap, asked: dict[str, str]) -> dict[str, Any]:
         "rows": rows,
         "empty": None if rows else "The tester marked no steps in this run, so there is nothing to replay.",
     }
+
+
+def _title(snap: Snap, of: str) -> str:
+    task = taskwords.tasks(snap).get(of)
+    check = next((c for c in snap.get("queue")["checks"] if c["id"] == of), None)
+    return str(task["title"]) if task else str(check["title"]) if check else of
 
 
 def _summary(items: list[dict[str, Any]]) -> dict[str, str]:
@@ -217,3 +226,9 @@ def tester_runs(task_id: str, head: str, evidence: list[dict[str, Any]]) -> dict
         if e["head"] == head:
             runs.setdefault(str(e["tester"]), []).append(url(task_id, head, str(e["tester"]), str(e["run"])))
     return runs
+
+
+def shots(of: str, entry: dict[str, Any]) -> list[str]:
+    """The addresses of a run's screenshots: the pictures at the top of its folder, never its replay's frames."""
+    base = evidence_base(of, str(entry["head"]), str(entry["tester"]), str(entry["run"]))
+    return [base + f for f in entry["files"] if "/" not in f and f.lower().endswith(_IMAGE)]

@@ -1,9 +1,9 @@
 """The warden's replays pass: every run taken into the evidence gets its replay built once, off the tick.
 
-A run's inputs are the warden's own: its entry in the evidence index names the task, the head, the tester's kind
-and agent, and the implementer's session, whose transcript holds the tester's under ``subagents/``. The scenarios
-are read as the tested head holds them, from the product's repo. A run that cannot be replayed says why in its
-replay's place and is not tried again.
+A run's inputs are the warden's own: its entry in the evidence index names the task or the check, the head, the
+tester's kind and agent, and the session the tester ran in, whose transcript holds the tester's under ``subagents/``.
+That session may run on as a copy under a new id since. The scenarios are read as the tested head holds them, from
+the product's repo. A run that cannot be replayed says why in its replay's place and is not tried again.
 """
 
 from __future__ import annotations
@@ -28,18 +28,14 @@ from runtime.warden.spend import cost
 log = logging.getLogger("factory.warden")
 
 
-def run_folder(ctx: Context, entry: dict[str, Any]) -> Path:
-    return ctx.places.evidence / str(entry["task"]) / str(entry["head"])[:12] / str(entry["tester"]) / str(entry["run"])
-
-
 def build_pending(ctx: Context, roots: Sequence[Path]) -> int:
     """Build the replay of every run that has none yet; how many were built or failed."""
     done = 0
     for entry in evidence.entries(ctx.places):
-        run = run_folder(ctx, entry)
+        run = evidence.folder(ctx.places, entry)
         if not run.is_dir() or (run / FOLDER / DATA).exists():
             continue
-        which = (entry.get("tester"), entry.get("run"), entry.get("task"))
+        which = (entry.get("tester"), entry.get("run"), evidence.of(entry))
         try:
             build(inputs(ctx, roots, entry, run))
         except ReplayError as exc:
@@ -66,11 +62,12 @@ def _give_up(run: Path, reason: str, which: tuple[Any, ...]) -> None:
 def inputs(ctx: Context, roots: Sequence[Path], entry: dict[str, Any], run: Path) -> Inputs:
     agent = entry.get("agent")
     if not agent:
-        raise ReplayError("this run was taken before runs kept their tester's transcript, so it has no replay")
-    session = registry.read(ctx.places).get(str(entry["session"]))
+        raise ReplayError("which tester walked it is not known, so its transcript cannot be found")
+    ran_in = str(entry["session"])
+    session = next((s for s in registry.read(ctx.places).values() if ran_in in (s.id, s.copied_from)), None)
     if session is None:
         raise ReplayError("the session that ran this tester is no longer known, so its transcript cannot be found")
-    parent = cost.transcript(roots, session)
+    parent = cost.transcript_of(roots, session.worktree, ran_in)
     if parent is None:
         raise ReplayError("the tester's transcript is gone, so its replay cannot be built")
     transcript = subagent_transcript(parent, str(agent))
@@ -90,7 +87,7 @@ def inputs(ctx: Context, roots: Sequence[Path], entry: dict[str, Any], run: Path
         run=run,
         transcript=transcript,
         records=steps.of_agent(ctx, session.id, str(agent)),
-        findings=findings.of_agent(ctx, str(entry["task"]), str(agent)),
+        findings=findings.of_agent(ctx, str(entry["task"]), str(agent)) if "task" in entry else [],
         scenario=scenario,
         timings=Timings(
             settings.get_float("replay.long_wait_seconds"),

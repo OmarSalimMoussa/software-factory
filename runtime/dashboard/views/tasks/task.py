@@ -26,7 +26,6 @@ from runtime.queue.formats import TASK_ID
 from runtime.shared.models import OPEN_SEVERITIES, RETIRED
 
 WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "cards", "logs", "qa", "specs", "done")
-_IMAGE = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")
 UI_TESTERS = ("qa-ui-function", "qa-ux", "qa-visual")
 
 
@@ -46,12 +45,7 @@ def _latest_round(snap: Snap, task_id: str) -> tuple[str, list[str], dict[str, l
     for r in qa["results"]:
         if r["head"] == head:
             results.setdefault(str(r["tester"]), []).append(r)
-    files = []
-    for entry in qa["evidence"]:
-        if entry["head"] == head:
-            base = f"/api/evidence/{task_id}/{head[:12]}/{entry['tester']}/{entry['run']}"
-            shots = [f for f in entry["files"] if "/" not in f and f.lower().endswith(_IMAGE)]
-            files += [(entry["tester"], f"{base}/{f}") for f in shots]
+    files = [(e["tester"], url) for e in qa["evidence"] if e["head"] == head for url in replay.shots(task_id, e)]
     return head, list(last["testers"]), results, [f"{t}\t{u}" for t, u in files]
 
 

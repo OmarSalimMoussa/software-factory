@@ -18,6 +18,7 @@ from runtime.qa.replay import build, pending, reader
 from runtime.qa.replay.trace import ReplayError
 from runtime.shared import store
 from runtime.shared.protocol import Refused
+from runtime.warden.sessions import registry
 
 SESSION = "0b6f1c3e-1d2a-4c5b-9e8f-7a6b5c4d3e2f"
 ENTRY = {
@@ -130,7 +131,7 @@ def test_a_trace_that_names_a_picture_by_a_path_is_not_replayed(tmp_path: Path) 
 
 def _taken(world: World, entry: dict[str, object]) -> Path:
     store.append_jsonl(evidence.index_path(world.places), entry)
-    return pending.run_folder(world.ctx(), entry)
+    return evidence.folder(world.places, entry)
 
 
 def test_the_replays_pass_builds_each_run_once_from_the_wardens_own_records(world: World, tmp_path: Path) -> None:
@@ -148,6 +149,25 @@ def test_the_replays_pass_builds_each_run_once_from_the_wardens_own_records(worl
     assert pending.build_pending(world.ctx(), [tmp_path / "projects"]) == 0
 
 
+def test_a_checks_run_is_replayed_from_the_session_it_ran_in_after_that_ran_on_as_a_copy(
+    world: World, tmp_path: Path
+) -> None:
+    before, now = SESSION, "1d4e7a90-3b2c-4f5e-8a6b-0c9d8e7f6a5b"
+    world.session(now, "orchestrator", "orchestrator", worktree=str(world.repo))
+    sessions = registry.read(world.places)
+    sessions[now] = dataclasses.replace(sessions[now], copied_from=before)
+    registry.write(world.places, sessions)
+    parent = tmp_path / "projects" / "-repo" / f"{before}.jsonl"
+    parent.parent.mkdir(parents=True)
+    parent.write_text("")
+    entry = {**{k: v for k, v in ENTRY.items() if k != "task"}, "check": "c-20261009T140500Z-ccccccc"}
+    given = replay_run.make(_taken(world, entry), parent.with_suffix("") / "subagents" / "agent-a1.jsonl")
+
+    assert pending.build_pending(world.ctx(), [tmp_path / "projects"]) == 1
+    replay = json.loads((given.run / "replay" / "replay.json").read_text())
+    assert replay["frames"] and replay["items"] == []  # a regression tester marks no steps
+
+
 def test_a_run_the_pass_cannot_replay_says_why_logs_it_and_is_not_tried_again(
     world: World, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -156,13 +176,13 @@ def test_a_run_the_pass_cannot_replay_says_why_logs_it_and_is_not_tried_again(
     with caplog.at_level(logging.WARNING, logger="factory.warden"):
         assert pending.build_pending(world.ctx(), []) == 1
     said = json.loads((run / "replay" / "replay.json").read_text())["error"]
-    assert said == "this run was taken before runs kept their tester's transcript, so it has no replay"
+    assert said == "which tester walked it is not known, so its transcript cannot be found"
     assert "the replay of qa-ux run 20261009T120500Z-0a1b2c for t-0001 could not be built (ReplayError)" in caplog.text
     assert pending.build_pending(world.ctx(), []) == 0
 
 
 def test_the_dashboard_reads_a_replay_by_its_run_and_never_through_a_link(world: World, tmp_path: Path) -> None:
-    asked = {"replay": {"task": "t-0001", "head": "c" * 12, "tester": "qa-ux", "run": ENTRY["run"]}}
+    asked = {"replay": {"of": "t-0001", "head": "c" * 12, "tester": "qa-ux", "run": ENTRY["run"]}}
     with pytest.raises(Refused, match="has no run"):
         reader.read(world.ctx(), asked)
     run = _taken(world, ENTRY)

@@ -354,20 +354,20 @@ def picture(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str,
 
 
 def evidence(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """{"task", "path"} → one evidence image under the task's folder, opened without following any link."""
-    task, rel = args.get("task"), args.get("path")
-    if not isinstance(task, str) or not TASK_ID.match(task) or not isinstance(rel, str):
-        raise Refused("evidence", "name a task and a file under its evidence")
+    """{"of", "path"} → one evidence image under the task's or the check's folder, opened without following a link."""
+    of, rel = args.get("of"), args.get("path")
+    if not isinstance(of, str) or not qa_evidence.named(of) or not isinstance(rel, str):
+        raise Refused("evidence", "name a task or a check and a file under its evidence")
     parts = rel.split("/")
     media = _IMAGES.get(parts[-1].rpartition(".")[2].lower())
     if not all(_SEGMENT.match(p) for p in parts) or media is None:
-        raise Refused("evidence", "evidence is shown only as an image named inside the task's folder")
+        raise Refused("evidence", f"evidence is shown only as an image named inside the folder of {of}")
     try:
-        raw = qa_evidence.read_file(ctx.places, [task, *parts], _MAX_IMAGE)
+        raw = qa_evidence.read_file(ctx.places, [of, *parts], _MAX_IMAGE)
     except FileNotFoundError as exc:
-        raise Refused("evidence", f"{task} has no evidence {rel}; it may have aged out") from exc
+        raise Refused("evidence", f"{of} has no evidence {rel}; it may have aged out") from exc
     except qa_evidence.TooLarge as exc:
         raise Refused("evidence", f"{rel} is too large to show here") from exc
     except OSError as exc:
-        raise Refused("evidence", f"{rel} is not a plain file in {task}'s evidence") from exc
+        raise Refused("evidence", f"{rel} is not a plain file in {of}'s evidence") from exc
     return {"type": media, "bytes_b64": base64.b64encode(raw).decode()}

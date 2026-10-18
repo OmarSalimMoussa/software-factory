@@ -1,12 +1,13 @@
 """`factory qa-browser <role>`: a tester's own browser, which Claude Code starts from the tester's agent definition
 when the tester starts, and stops when it finishes.
 
-It makes the run's folder, deletes runs older than ``qa.evidence_days``, writes Playwright's settings into the
-folder, then runs Playwright's MCP server behind the wrapper (wrapper.py), which talks to Claude Code over standard
-input and output, so nothing here prints to standard output. The wrapper traces the whole run: every frame the
-screen showed and every action, on the browser's own clock, from which the warden builds the run's replay. A page
-recorder (recorder.js) runs in every page and notes where each click landed and what each read touched. When the
-tester reports its result, the warden copies the folder into its evidence, where only the owner looks.
+It makes the run's folder, writes Playwright's settings into it, then runs Playwright's MCP server behind the
+wrapper (wrapper.py), which talks to Claude Code over standard input and output, so nothing here prints to standard
+output. The wrapper traces the whole run: every frame the screen showed and every action, on the browser's own clock,
+from which the warden builds the run's replay. A page recorder (recorder.js) runs in every page and notes where each
+click landed and what each read touched. When the tester reports its result, or the orchestrator saves the check a
+regression tester walked for, the warden copies the folder into its evidence, where only the owner looks; its nightly
+prune removes a run nothing took.
 """
 
 from __future__ import annotations
@@ -16,11 +17,10 @@ import os
 import pwd
 import re
 import secrets
-import shutil
 import sys
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -89,31 +89,10 @@ def playwright_settings(folder: Path, role: str, settings: Settings) -> dict[str
     }
 
 
-def prune(root: Path, days: int, now: datetime) -> None:
-    """Delete every run older than ``days``, and every session folder left empty."""
-    cutoff = now - timedelta(days=days)
-    for session in root.iterdir() if root.is_dir() else []:
-        old = [
-            run
-            for run in (session.iterdir() if session.is_dir() else [])
-            if (found := RUN.match(run.name)) and datetime.strptime(found[1], STAMP).replace(tzinfo=UTC) < cutoff
-        ]
-        # Two testers starting at once may clean up together: what the other removed is gone either way.
-        for run in old:
-            shutil.rmtree(run, ignore_errors=True)
-        try:
-            if not any(session.iterdir()):
-                session.rmdir()
-        # telemetry: expected — the other tester removed the folder, or a new run filled it
-        except OSError:
-            continue
-
-
 def prepare(role: str, session_id: str, root: Path, settings: Settings, now: datetime) -> Path:
     """The run's folder, with who ran it and Playwright's settings written in it; returns the settings file."""
     if lanes.kind_of(role) not in settings.get_list("subagents.browser_personas"):
         raise BrowserError(f"{role!r} is not a tester with a browser")
-    prune(root, settings.get_int("qa.evidence_days"), now)
     folder = run_folder(root, session_id, now)
     meta = {"role": role, "session_id": session_id, "started": now.strftime("%Y-%m-%dT%H:%M:%SZ")}
     (folder / "run.json").write_text(json.dumps(meta), encoding="utf-8")

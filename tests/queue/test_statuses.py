@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from queue_kit import World
 
+from runtime.qa import qa_browser
 from runtime.queue import cards, documents, owner, proposals, records, statuses, tasks, turn, verbs
 from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
 from runtime.shared import store
@@ -336,6 +337,7 @@ def test_a_check_named_by_a_short_sha_checks_the_merge_it_ran_on(
     world.queue().write_task(dataclasses.replace(task, status="merged", run=1))
     merge = "abc1234" + "0" * 33
     store.write_json(turn.merges_path(world.places), {merge: task.id})
+    monkeypatch.setattr(qa_browser, "runs_root", lambda: world.repo.parent / "runs")
     report = (f"# Check\n\n## Scenarios\n\n{records.CHECK_TABLE}\n| --- | --- | --- | --- |\n"
               "| sign-in | pass | 3 | shot.png |\n").encode()  # fmt: skip
 

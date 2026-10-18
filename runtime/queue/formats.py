@@ -27,6 +27,8 @@ class FormatError(ValueError):
 
 REQUEST_ID = re.compile(r"^r-\d{4}-\d{2}-\d{2}-\d{4}$")
 TASK_ID = re.compile(r"^t-\d{4,}$")
+# A saved check of the default branch: when it was saved, then its commit's first 7 characters (documents.py).
+CHECK_ID = re.compile(r"^c-\d{8}T\d{6}Z-[0-9a-f]{7}$")
 GOAL_ITEM = re.compile(rf"^{goal.NAME}$")
 ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 ROLE = re.compile(r"^[a-z][a-z0-9-]{0,40}$")

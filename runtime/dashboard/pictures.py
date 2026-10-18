@@ -9,12 +9,14 @@ import re
 from dataclasses import dataclass
 
 from runtime.dashboard.client import Warden
+from runtime.queue.formats import CHECK_ID, TASK_ID
 
 POLICY = "default-src 'none'; style-src 'unsafe-inline'"
 TYPES = frozenset({"image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"})
 PICTURE = re.compile(r"^/api/picture/(task|card)/([A-Za-z0-9][A-Za-z0-9._-]{0,127})$")
+_OF = "|".join(p.pattern.removeprefix("^").removesuffix("$") for p in (TASK_ID, CHECK_ID))
 EVIDENCE = re.compile(
-    r"^/api/evidence/(t-\d{4,})/((?:[A-Za-z0-9][A-Za-z0-9._-]{0,127}/){0,6}[A-Za-z0-9][\w.-]{0,127})$"
+    rf"^/api/evidence/({_OF})/((?:[A-Za-z0-9][A-Za-z0-9._-]{{0,127}}/){{0,6}}[A-Za-z0-9][\w.-]{{0,127}})$"
 )
 
 
@@ -34,7 +36,7 @@ def fetch(warden: Warden, path: str) -> Image | None:
     if found := PICTURE.match(path):
         answer = warden.call("picture", {"kind": found.group(1), "id": found.group(2)})
     elif found := EVIDENCE.match(path):
-        answer = warden.call("evidence", {"task": found.group(1), "path": found.group(2)})
+        answer = warden.call("evidence", {"of": found.group(1), "path": found.group(2)})
     else:
         return None
     if not answer.get("ok"):

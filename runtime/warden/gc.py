@@ -1,9 +1,11 @@
-"""The nightly prune, at ``gc.prune_hour``: QA evidence past ``qa.evidence_days``, then Docker's build cache and old
-unused slot images, keeping this machine's Docker data under ``gc.docker_budget_gib``.
+"""The nightly prune, at ``gc.prune_hour``: QA evidence past ``qa.evidence_days`` and the testers' runs that old
+that nothing took into it, then Docker's build cache and old unused slot images, keeping this machine's Docker data
+under ``gc.docker_budget_gib``.
 
-The stack user's runs reach Docker, so both Docker verbs run through the stack unit. Prod shares that Docker, so only
-images a slot labelled are pruned. Volumes are never pruned: the shared services keep theirs, and a reap removes a
-slot's own. The disk reading is kept for the Guard page.
+The testers' runs are the agent user's, so they are removed through the agent's unit. The stack user's runs reach
+Docker, so both Docker verbs run through the stack unit. Prod shares that Docker, so only images a slot labelled are
+pruned. Volumes are never pruned: the shared services keep theirs, and a reap removes a slot's own. The disk reading
+is kept for the Guard page.
 """
 
 from __future__ import annotations
@@ -11,9 +13,11 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
+from runtime.qa import qa_browser
+from runtime.qa.qa_browser import RUN, STAMP
 from runtime.shared import store
 from runtime.shared.paths import Places
 from runtime.slots import leases
@@ -50,6 +54,34 @@ def prune_evidence(places: Places, now: float, days: int) -> int:
     return removed
 
 
+def prune_runs(ctx: Context, root: Path, days: int) -> int:
+    """Remove the runs in the agent's ``root`` that nothing took, past ``days``, and emptied folders; how many went."""
+    cutoff = ctx.clock.now() - days * 86400
+    gone = 0
+    for session in sorted(root.iterdir()) if root.is_dir() else []:
+        if session.is_symlink() or not session.is_dir():
+            continue
+        names = [p.name for p in session.iterdir()]
+        old = [n for n in names if (m := RUN.match(n)) and _started(m[1]) < cutoff]
+        if old and _agent(ctx, root, ["rm", "-rf", "--", *(str(session / n) for n in old)]):
+            gone += len(old)
+        if len(old) == len(names):
+            # A tester may start a run there meanwhile: rmdir leaves a folder that is not empty, and says nothing.
+            _agent(ctx, root, ["rmdir", "--ignore-fail-on-non-empty", "--", str(session)])
+    return gone
+
+
+def _agent(ctx: Context, root: Path, argv: list[str]) -> bool:
+    code, _ = ctx.launcher.agent_command(argv, str(root))
+    if code != 0:
+        log.warning("warden: %s of old QA runs failed (exit %d)", argv[0], code)
+    return code == 0
+
+
+def _started(stamp: str) -> float:
+    return datetime.strptime(stamp, STAMP).replace(tzinfo=UTC).timestamp()
+
+
 def _disk(ctx: Context) -> int | None:
     done = ctx.launcher.run_stack(_NO_SLOT, [leases.DISK], _SESSION)
     last = (done.tail.strip().splitlines() or [""])[-1].strip()
@@ -63,6 +95,7 @@ def prune(ctx: Context) -> int | None:
     """One prune; returns the Docker data's size after it, or None when it could not be read."""
     settings = ctx.settings()
     prune_evidence(ctx.places, ctx.clock.now(), settings.get_int("qa.evidence_days"))
+    prune_runs(ctx, qa_browser.runs_root(), settings.get_int("qa.evidence_days"))
     budget = settings.get_int("gc.docker_budget_gib") * 1024**3
     used: int | None = None
     # Old images first; over the budget after that, every unused image.

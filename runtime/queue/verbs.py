@@ -4,17 +4,22 @@ queue function and returns its answer; the queue functions refuse what breaks a 
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
+from runtime.qa import evidence, qa_browser
 from runtime.queue import cards, documents, formats, intake, owner, records, tasks, triage, turn
 from runtime.queue import propose as proposing
 from runtime.queue import route as ladders
 from runtime.queue.book import Queue
+from runtime.shared import store
 from runtime.shared.models import REQUEST_SEVERITIES
 from runtime.shared.protocol import Refused, ok
 from runtime.warden import inbox
 from runtime.warden.context import Context
 from runtime.warden.sessions import registry
+
+log = logging.getLogger("factory.warden")
 
 Args = dict[str, Any]
 CAUSE_TRY = "cause-try"
@@ -157,11 +162,17 @@ def needs_owner(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
 
 
 def check_save(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
-    """A check of the default branch; the task its merge landed is checked when nothing failed."""
+    """A check of the default branch, its testers' runs in the evidence; its merge's task is checked if none failed."""
     record = documents.save_check(ctx, turn.full_commit(ctx, _text(args, "commit")), data)
     failed = [r.scenario for r in record.rows if r.result != "pass"]
     checked = turn.check_saved(ctx, record.commit, not failed)
-    return ok(check=record.id, scenarios=len(record.rows), not_passed=failed, checked=checked or None)
+    try:
+        taken: list[str] | None = evidence.intake_check(ctx, qa_browser.runs_root(), record)
+    except (OSError, store.StoreError) as exc:
+        log.warning("warden: the runs of check %s could not be taken into the evidence (%s)", record.id,
+                    type(exc).__name__)  # fmt: skip
+        taken = None
+    return ok(check=record.id, scenarios=len(record.rows), not_passed=failed, checked=checked or None, runs=taken)
 
 
 # The owner's decisions, from the dashboard over owner.sock.
