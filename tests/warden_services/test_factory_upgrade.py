@@ -111,6 +111,28 @@ def test_an_agent_check_or_push_that_never_settles_stops_the_upgrade_before_it_s
     assert launcher.upgrades == []
 
 
+def test_an_upgrade_asked_while_a_session_comes_back_waits_for_it_then_pauses(
+    ctx: Context, launcher: FakeLauncher, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _installed(ctx.places)
+    pause, waited = factory_upgrade.revive.owner_pause, []
+
+    def back_in_a_tick(ctx: Context, args: dict[str, object], data: bytes | None) -> dict[str, object]:
+        if not waited:
+            raise Refused("reviving", "a session is coming back right now; pause again in a moment")
+        return pause(ctx, args, data)
+
+    monkeypatch.setattr(factory_upgrade.revive, "owner_pause", back_in_a_tick)
+    monkeypatch.setattr(factory_upgrade.time, "sleep", waited.append)
+
+    op_id = factory_upgrade.start(ctx, {"commit": NEW}, None)["op"]
+    ops.join(op_id, 10)
+
+    op = ops.get(ctx, {"id": op_id}, None)["op"]
+    assert op["state"] == ops.DONE and op["steps"][0]["detail"] == "paused, every agent keeping its work"
+    assert len(waited) == 1 and launcher.upgrades == [NEW]
+
+
 @pytest.mark.parametrize("started", [True, False], ids=["went-quiet-mid-way", "never-said-a-word"])
 def test_an_upgrade_quiet_for_longer_than_one_may_run_reads_as_stopped(ctx: Context, started: bool) -> None:
     _installed(ctx.places)

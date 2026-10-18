@@ -92,10 +92,19 @@ def _op(ctx: Context, op_id: str) -> dict[str, Any] | None:
 
 
 def _pause(ctx: Context) -> str:
-    if lifecycle.paused_path(ctx).exists():
-        return "it was paused already"
-    revive.owner_pause(ctx, {}, None)
-    return "paused, every agent keeping its work"
+    """Pause the factory once no session is coming back: an upgrade asked right after a resume waits for it."""
+    settings = ctx.settings()
+    deadline = ctx.clock.now() + settings.get_int("install.upgrade_wait_minutes") * 60
+    while not lifecycle.paused_path(ctx).exists():
+        try:
+            revive.owner_pause(ctx, {}, None)
+            return "paused, every agent keeping its work"
+        # A session coming back refuses the pause until it is back; past the wait, the step fails.
+        except Refused as exc:
+            if exc.rule != "reviving" or ctx.clock.now() >= deadline:
+                raise
+        time.sleep(settings.get_int("watch.tick_seconds"))
+    return "it was paused already"
 
 
 def _settled(ctx: Context) -> str:
