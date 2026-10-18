@@ -486,10 +486,13 @@ def test_an_up_that_would_change_nothing_runs_nothing(
     (checkout / ".gitignore").write_text("ran.json\n")
     for args in (["init", "-q"], ["add", "-A"], ["commit", "-qm", "base"]):
         _git(checkout, *args)
-    started = {"c-web": "2026-10-18T04:00:00Z healthy", "c-db": "2026-10-18T04:00:01Z"}
+    # Docker gives a container without a healthcheck no Health key at all.
+    started = {"c-web": {"StartedAt": "2026-10-18T04:00:00Z", "Health": {"Status": "healthy"}},
+               "c-db": {"StartedAt": "2026-10-18T04:00:01Z"}}  # fmt: skip
 
     def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-        listed = "".join(f"{c} {at}\n" for c, at in started.items()) if args[:2] == ["container", "inspect"] else ""
+        inspect = args[:2] == ["container", "inspect"]
+        listed = "".join(f"{c} {json.dumps(state)}\n" for c, state in started.items()) if inspect else ""
         return subprocess.CompletedProcess(args, 0, listed or "".join(f"{c}\n" for c in started), "")
 
     monkeypatch.setattr(stack_run, "_docker", docker)
@@ -508,7 +511,8 @@ def test_an_up_that_would_change_nothing_runs_nothing(
         _git(checkout, "add", "-A")
         _git(checkout, "commit", "-qm", "next")
     if change in ("restarted", "unhealthy"):
-        started["c-web"] = "2026-10-18T04:09:00Z healthy" if change == "restarted" else "2026-10-18T04:00:00Z unhealthy"
+        at, health = ("04:09", "healthy") if change == "restarted" else ("04:00", "unhealthy")
+        started["c-web"] = {"StartedAt": f"2026-10-18T{at}:00Z", "Health": {"Status": health}}
     if change == "stale":
         monkeypatch.setattr(same_up, "time", SimpleNamespace(time=lambda: time.time() + 240 * 60))
     capsys.readouterr()

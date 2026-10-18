@@ -20,8 +20,8 @@ from pathlib import Path
 from runtime.shared import environment, store
 
 RECORD = "same-up.json"
-# Each running container as "<id> <started at> [health]".
-_STARTED = "{{.Id}} {{.State.StartedAt}} {{if .State.Health}}{{.State.Health.Status}}{{end}}"
+# A container without a healthcheck has no Health key, which no template tests for on every Docker: read JSON.
+_STATES = "{{.Id}} {{json .State}}"
 Docker = Callable[[list[str], int], subprocess.CompletedProcess[str]]
 
 
@@ -107,9 +107,20 @@ def _started(docker: Docker, label: str, timeout: int) -> list[str]:
     try:
         found = docker(["container", "ls", "-q", "--filter", label], timeout)
         ids = found.stdout.split()
-        told = docker(["container", "inspect", "--format", _STARTED, *ids], timeout) if ids else found
+        told = docker(["container", "inspect", "--format", _STATES, *ids], timeout) if ids else found
     except subprocess.TimeoutExpired as exc:
         raise SameUpError("docker did not answer in time") from exc
     if found.returncode != 0 or told.returncode != 0:
         raise SameUpError(f"docker could not list the slot's containers: {(found.stderr + told.stderr).strip()[-200:]}")
-    return [line for line in told.stdout.splitlines() if line.strip()] if ids else []
+    return [_started_as(line) for line in told.stdout.splitlines() if line.strip()] if ids else []
+
+
+def _started_as(line: str) -> str:
+    """One container as "<id> <started at> [health]"."""
+    cid, _, raw = line.partition(" ")
+    try:
+        state = json.loads(raw)
+        health = [state["Health"]["Status"]] if "Health" in state else []
+        return " ".join([cid, state["StartedAt"], *health])
+    except (ValueError, TypeError, KeyError) as exc:
+        raise SameUpError(f"docker told no start time for container {cid[:12]}") from exc
