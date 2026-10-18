@@ -30,6 +30,7 @@ from runtime.warden.health import probes
 
 PASS, BLOCKED = "pass", "blocked"
 _MERGE = re.compile(r"^merge ([0-9a-f]{40})$")  # the line `git log --format='merge %H'` opens each merge with
+_NO_BUILD = "if slot 0 cannot come up there, save that check with each scenario blocked and why"
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,7 +153,7 @@ def settle(ctx: Context, found: Line, record: CheckRecord) -> dict[str, Any]:
     if first:
         cap = ctx.settings().get_int("rounds.bundle_merges")
         why = f"{len(members)} merges wait up to {record.commit[:12]}, past the cap of {cap}: check the oldest {cap} "
-        return {"cleared": [], "why": why + f"at {first[:12]} first (factory queue bundle)"}
+        return {"cleared": [], "why": why + f"at {first[:12]} first (factory queue bundle); {_NO_BUILD}"}
     missing = sorted(frozenset[str]().union(*(m.scenarios for m in members)) - {row.scenario for row in record.rows})
     if missing:
         return {
@@ -283,7 +284,7 @@ def show(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
             raise Refused(
                 "bundle",
                 f"{len(members)} merges is past the cap of {cap}: a bundle grows past it only "
-                f"once the check of the first {cap}, at {first[:12]}, failed",
+                f"once the check of the first {cap}, at {first[:12]}, failed; {_NO_BUILD}",
             )
     names = sorted(frozenset[str]().union(*(m.scenarios for m in members)))
     answer: dict[str, Any] = {

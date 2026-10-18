@@ -135,7 +135,9 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
 3. **Check, in bundles,** as soon as a merge lands. `factory queue bundle` names the oldest merges waiting for their
    check, at most `rounds.bundle_merges`, the commit to walk them at, and each scenario whose `protects` names a
    path one of them changed; with none, the one that waited longest. Add the merged specs' own checks. Bring slot 0
-   up there, whole, as its answer says (`factory slot up --at <commit>` for one older than the tip). Load the seeds
+   up there, whole, as its answer says (`factory slot up --at <commit>` for one older than the tip). When it cannot
+   come up there, as when the env that commit needs is gone, save that check with each scenario blocked and why; then
+   `factory queue bundle --through <a later commit>` takes the bundle on to one that builds. Load the seeds
    (`factory slot seed load <name>`), and do a set-up that writes inside a service with `factory slot run <service>
    -- <command>`. Start the `qa-regression` testers at once, the scenarios split between them, each signed in as its
    own test address; a scenario that restarts or stops services walks alone. Start each in its own lane,

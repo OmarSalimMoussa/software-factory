@@ -200,8 +200,9 @@ def test_no_merge_turn_goes_while_the_cap_of_merges_waits_until_their_bundle_s_c
     assert bundle.next_turn(world.ctx(), {}, None)["task"] == ready.id
 
 
-def test_a_bundle_takes_in_a_fix_past_the_cap_only_once_the_check_of_the_cap_failed(
-    world: World, product: Product
+@pytest.mark.parametrize("result", ["fail", "blocked"], ids=["a-fix-joins", "slot-0-cannot-build-the-cap-s-commit"])
+def test_a_bundle_grows_past_the_cap_only_once_the_check_of_the_cap_did_not_pass(
+    world: World, product: Product, result: str
 ) -> None:
     world.with_settings(rounds__bundle_merges=2)
     _, web = product.merge("web/page.js")
@@ -212,7 +213,7 @@ def test_a_bundle_takes_in_a_fix_past_the_cap_only_once_the_check_of_the_cap_fai
         bundle.show(world.ctx(), {"through": fix}, None)
     product.slot0(fix)
     assert "past the cap of 2" in product.check(fix, web="pass", api="pass")["why"]  # walked past it all the same
-    product.check(capped, web="fail", api="pass")
+    product.check(capped, web=result, api="pass" if result == "fail" else result)
     answer = bundle.show(world.ctx(), {"through": fix[:9]}, None)
     assert [m["task"] for m in answer["merges"]] == [web, api, fixed] and answer["walk_at"] == fix
 
