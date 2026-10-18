@@ -9,7 +9,8 @@
 - ``browser_color_scheme`` shows the page in its light or dark colours: fixed code the wrapper runs in the browser
   server, whose own code tool is hidden from testers.
 - ``browser_type_keys`` types a text as key presses into whatever has the keyboard, in one call, ``qa.key_delay_ms``
-  apart: the remote desktop's view takes keys, not a field's filled value, and drops keys sent faster.
+  apart: the remote desktop's view takes keys, not a field's filled value, drops keys sent faster, and reads a capital
+  or a shifted symbol only with Shift held.
 - ``browser_hold_request`` holds the next request to an address for up to ``qa.hold_max_seconds``, then hands it on
   through the browser's other routes, so a blocked address stays blocked: one request can overtake another.
 """
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import json
 import re
+import string
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -34,6 +36,18 @@ PAGE_URL = re.compile(r"Page URL: (\S+)")
 # characters \n, so a backslash ends the link too.
 LINK = re.compile(r"https?://[^\s'\"<>)\\]+")
 WEB = re.compile(r"^https?://\S+$")
+# The key under each character typed with Shift, on the US layout the browser server types with.
+SHIFTED = {
+    **{c: f"Key{c}" for c in string.ascii_uppercase},
+    **dict(
+        zip(
+            '~!@#$%^&*()_+{}|:"<>?',
+            "Backquote Digit1 Digit2 Digit3 Digit4 Digit5 Digit6 Digit7 Digit8 Digit9 "
+            "Digit0 Minus Equal BracketLeft BracketRight Backslash Semicolon Quote Comma Period Slash".split(),
+            strict=True,
+        )
+    ),
+}
 
 TOOLS: list[dict[str, Any]] = [
     {
@@ -200,9 +214,10 @@ class Tools:
         text = arguments.get("text")
         if not isinstance(text, str) or not text:
             raise ToolError("give the text to type")
-        # json.dumps makes the text one JavaScript string, so it cannot end the code it sits in.
-        typed = f"await page.keyboard.type({json.dumps(text)}, {{ delay: {self.key_delay_ms} }});"
-        self.call(SERVER_CODE, {"code": f"async (page) => {{ {typed} }}"})
+        # The keys go as JSON data to one fixed loop, so the text cannot end the code it sits in.
+        keys = json.dumps([["press", f"Shift+{SHIFTED[c]}"] if c in SHIFTED else ["type", c] for c in text])
+        each = f"await page.keyboard[how](key); await page.waitForTimeout({self.key_delay_ms});"
+        self.call(SERVER_CODE, {"code": f"async (page) => {{ for (const [how, key] of {keys}) {{ {each} }} }}"})
         return f"Typed {len(text)} keys. A screenshot shows where they landed."
 
     def _hold_request(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:

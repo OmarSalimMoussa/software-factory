@@ -19,16 +19,18 @@ counted. When the factory refuses a desktop, test what needs none first, then tr
 
 ## 2. Work it
 
-- **Click:** take a screenshot, click at the point, then take a screenshot again to check what happened.
+- **Click:** take a screenshot, click at the point, then take a screenshot again to check what happened. Take each
+  point from a screenshot taken after the last change: a panel that opens or closes moves what is under it.
 - **Check by screenshot.** The desktop's words are pixels in a video, not page text: a text wait or a snapshot never
   sees them.
 - **Type:** click where the text goes on the video first, then `browser_type_keys` with the text: one call types
-  it all, key by key, as the desktop takes it.
+  it all, key by key, capitals and symbols with Shift held, as the desktop takes it.
 - **One key,** such as Escape, right after a type.
 - **A window taller than the desktop** hides its lower part: maximise it first, by double-clicking its title bar.
 - **To replace an address or a field's text,** click it, select all with Ctrl+A, then type.
 
 ## 3. Finish
 
-Put your browser back to the first width your brief lists. Each `desktop up` gives new credentials; a change to what
-runs on the desktop needs it run again.
+Put your browser back to the first width your brief lists. The desktop stays up until you hand back, and the factory
+takes it down then, whatever the product's notes say: never run `desktop down`. Each `desktop up` gives new
+credentials; a change to what runs on the desktop needs it run again.

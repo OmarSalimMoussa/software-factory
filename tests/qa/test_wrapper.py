@@ -345,9 +345,6 @@ def test_the_desktop_opens_at_its_own_size() -> None:
     ("name", "args", "code", "says"),
     [
         ("browser_color_scheme", {"scheme": "dark"}, "page.emulateMedia({ colorScheme: 'dark' })", "dark colours"),
-        # Quotes and braces in the text stay inside one JavaScript string, so the text never runs as code.
-        ("browser_type_keys", {"text": 'Desk "A"}); x('}, 'page.keyboard.type("Desk \\"A\\"}); x(", { delay: 40 })',
-         "Typed 14 keys"),
         # The held request falls back to the browser's other routes, so an address blocked there stays blocked.
         ("browser_hold_request", {"pattern": "**/cancel", "seconds": 2.5}, 'page.context().route("**/cancel", async '
          "(route) => { await page.waitForTimeout(2500); await route.fallback(); }, { times: 1 })",
@@ -361,6 +358,16 @@ def test_a_tool_that_works_in_the_browser_server_runs_only_its_own_fixed_code(
     said, failed = browser.answer(name, args)
     assert browser.calls == [("browser_run_code_unsafe", {"code": f"async (page) => {{ await {code}; }}"})]
     assert not failed and says in said
+
+
+def test_typed_keys_hold_shift_for_capitals_and_symbols_and_the_text_never_runs_as_code() -> None:
+    browser = Browser([])
+    said, failed = browser.answer("browser_type_keys", {"text": 'Hi "x'})
+    keys = '[["press", "Shift+KeyH"], ["type", "i"], ["type", " "], ["press", "Shift+Quote"], ["type", "x"]]'
+    each = "await page.keyboard[how](key); await page.waitForTimeout(40);"
+    code = f"async (page) => {{ for (const [how, key] of {keys}) {{ {each} }} }}"
+    assert browser.calls == [("browser_run_code_unsafe", {"code": code})]
+    assert (said, failed) == ("Typed 5 keys. A screenshot shows where they landed.", False)
 
 
 @pytest.mark.parametrize(
