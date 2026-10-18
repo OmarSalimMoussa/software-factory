@@ -19,12 +19,14 @@ counted. When the factory refuses a desktop, test what needs none first, then tr
 
 ## 2. Work it
 
-- **Click:** take a screenshot, click at the point, then take a screenshot again to check what happened. Take each
-  point from a screenshot taken after the last change: a panel that opens or closes moves what is under it.
+- **Click:** take a screenshot, click at the point with `browser_mouse_press_xy`, which holds the button as the desktop
+  needs, then take a screenshot again to check what happened. Take each point from a screenshot taken after the last
+  change: a panel that opens or closes moves what is under it.
 - **Check by screenshot.** The desktop's words are pixels in a video, not page text: a text wait or a snapshot never
   sees them.
 - **Type:** click where the text goes on the video first, then `browser_type_keys` with the text: one call types
-  it all, key by key, capitals and symbols with Shift held, as the desktop takes it.
+  it all, key by key, capitals and symbols with Shift held, as the desktop takes it. The desktop may draw the keys
+  seconds later: find them in a screenshot before you type again, or they come twice.
 - **One key,** such as Escape, right after a type.
 - **A window taller than the desktop** hides its lower part: maximise it first, by double-clicking its title bar.
 - **To replace an address or a field's text,** click it, select all with Ctrl+A, then type.

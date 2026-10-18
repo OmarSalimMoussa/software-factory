@@ -18,6 +18,7 @@ TOOLS = [
     "browser_snapshot",
     "browser_resize",
     "browser_type",
+    "browser_mouse_click_xy",
     "browser_close",
     "browser_start_tracing",
     "browser_stop_tracing",

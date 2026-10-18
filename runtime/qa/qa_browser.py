@@ -178,6 +178,7 @@ def equipper(
             (width, height),
             settings.get_int("qa.key_delay_ms"),
             settings.get_int("qa.hold_max_seconds"),
+            settings.get_int("qa.click_hold_ms"),
             time.monotonic,
         )
         proxy.add_tools(TOOLS, tools.answer, NOTES)

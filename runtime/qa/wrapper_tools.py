@@ -8,6 +8,8 @@
   live view: a screenshot is not shrunk before the tester sees it, so a point in it is the point on the desktop.
 - ``browser_color_scheme`` shows the page in its light or dark colours: fixed code the wrapper runs in the browser
   server, whose own code tool is hidden from testers.
+- ``browser_mouse_press_xy`` clicks at a point holding the button ``qa.click_hold_ms``: a remote desktop under load
+  misses a click as short as Playwright's.
 - ``browser_type_keys`` types a text as key presses into whatever has the keyboard, in one call, ``qa.key_delay_ms``
   apart: the remote desktop's view takes keys, not a field's filled value, drops keys sent faster, and reads a capital
   or a shifted symbol only with Shift held.
@@ -30,7 +32,7 @@ from runtime.qa.wrapper import SERVER_CODE, ServerError
 
 SIGN_IN, WAIT_UNTIL, OPEN_DESKTOP = "browser_sign_in", "browser_wait_until", "browser_open_desktop"
 COLOUR, TYPE_KEYS, HOLD = "browser_color_scheme", "browser_type_keys", "browser_hold_request"
-RELEASE = "browser_release_request"
+RELEASE, PRESS = "browser_release_request", "browser_mouse_press_xy"
 SCHEMES = ("light", "dark")
 # Playwright's answers name the page after an action on a line of their own, and its code tool's value after a heading.
 PAGE_URL = re.compile(r"Page URL: (\S+)")
@@ -55,7 +57,9 @@ SHIFTED = {
 # A line added to one of Playwright's own tools, where a tester reads it as it loads that tool.
 NOTES = {
     "browser_type": f"On a remote desktop's live view, type with {TYPE_KEYS} instead: there this tool loses capitals, "
-    "symbols and keys sent fast."
+    "symbols and keys sent fast.",
+    "browser_mouse_click_xy": f"On a remote desktop's live view, click with {PRESS} instead: a click this short may "
+    "not take there.",
 }
 
 TOOLS: list[dict[str, Any]] = [
@@ -103,6 +107,16 @@ TOOLS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {"scheme": {"type": "string", "enum": list(SCHEMES)}},
             "required": ["scheme"],
+        },
+    },
+    {
+        "name": PRESS,
+        "description": "Click at a point on the remote desktop's view, holding the button a moment, as the desktop "
+        "takes a click. A point is in the view's own pixels, as a screenshot shows them.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"x": {"type": "number"}, "y": {"type": "number"}},
+            "required": ["x", "y"],
         },
     },
     {
@@ -155,6 +169,7 @@ class Tools:
     desktop: tuple[int, int]
     key_delay_ms: int
     hold_max_seconds: int
+    click_hold_ms: int
     now: Callable[[], float]  # a monotonic clock, in seconds
 
     def answer(self, name: str, arguments: dict[str, Any], cancelled: threading.Event) -> tuple[str, bool]:
@@ -165,6 +180,7 @@ class Tools:
             OPEN_DESKTOP: self._open_desktop,
             COLOUR: self._color_scheme,
             TYPE_KEYS: self._type_keys,
+            PRESS: self._press,
             HOLD: self._hold_request,
             RELEASE: self._release_request,
         }
@@ -238,7 +254,25 @@ class Tools:
         keys = json.dumps([["press", f"Shift+{SHIFTED[c]}"] if c in SHIFTED else ["type", c] for c in text])
         each = f"await page.keyboard[how](key); await page.waitForTimeout({self.key_delay_ms});"
         self.call(SERVER_CODE, {"code": f"async (page) => {{ for (const [how, key] of {keys}) {{ {each} }} }}"})
-        return f"Typed {len(text)} keys. A screenshot shows where they landed."
+        return (
+            f"Typed {len(text)} keys. A desktop may draw them seconds late: see them in a screenshot, then type more."
+        )
+
+    def _press(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
+        x, y = arguments.get("x"), arguments.get("y")
+        width, height = self.desktop
+        if (
+            isinstance(x, bool)
+            or isinstance(y, bool)
+            or not isinstance(x, int | float)
+            or not isinstance(y, int | float)
+        ):
+            raise ToolError("give the point as x and y, in the view's pixels")
+        if not (0 <= x < width and 0 <= y < height):
+            raise ToolError(f"the point is off the view: x from 0 to {width - 1}, y from 0 to {height - 1}")
+        held = f"await page.mouse.down(); await page.waitForTimeout({self.click_hold_ms}); await page.mouse.up();"
+        self.call(SERVER_CODE, {"code": f"async (page) => {{ await page.mouse.move({x}, {y}); {held} }}"})
+        return f"Pressed at {x:g}, {y:g}. A screenshot shows what it did."
 
     def _hold_request(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
         pattern, seconds = arguments.get("pattern"), arguments.get("seconds")

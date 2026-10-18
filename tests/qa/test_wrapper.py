@@ -98,17 +98,20 @@ def test_the_trace_starts_before_the_first_call_and_the_tester_can_neither_see_n
         "browser_snapshot",
         "browser_resize",
         "browser_type",
+        "browser_mouse_click_xy",
         "browser_sign_in",
         "browser_wait_until",
         "browser_open_desktop",
         "browser_color_scheme",
+        "browser_mouse_press_xy",
         "browser_type_keys",
         "browser_hold_request",
         "browser_release_request",
     ]
-    # A tester that loads Playwright's typing tool reads where the factory's own types better.
-    [typing] = [t["description"] for t in tools if t["name"] == "browser_type"]
-    assert typing == "Playwright's own. " + NOTES["browser_type"] and "browser_type_keys" in typing
+    # A tester that loads Playwright's typing or clicking tool reads which of the factory's works on a remote desktop.
+    noted = {t["name"]: t["description"] for t in tools if t["name"] in NOTES}
+    assert noted == {name: "Playwright's own. " + note for name, note in NOTES.items()}
+    assert "browser_type_keys" in noted["browser_type"] and "browser_mouse_press_xy" in noted["browser_mouse_click_xy"]
     assert stopped["error"]["message"] == "there is no tool browser_stop_tracing"
     assert closed["error"]["message"] == "there is no tool browser_close"  # closing would end the trace
     assert log.read_text().splitlines() == [
@@ -308,6 +311,7 @@ class Browser:
             (1280, 800),
             40,
             30,
+            150,
             lambda: self.ticks.clock,
         )
         return tools.answer(name, args, self.ticks)
@@ -398,7 +402,16 @@ def test_typed_keys_hold_shift_for_capitals_and_symbols_and_the_text_never_runs_
     each = "await page.keyboard[how](key); await page.waitForTimeout(40);"
     code = f"async (page) => {{ for (const [how, key] of {keys}) {{ {each} }} }}"
     assert browser.calls == [("browser_run_code_unsafe", {"code": code})]
-    assert (said, failed) == ("Typed 5 keys. A screenshot shows where they landed.", False)
+    assert not failed and said.startswith("Typed 5 keys. A desktop may draw them seconds late")
+
+
+def test_a_desktop_click_holds_the_button_as_the_desktop_takes_a_click() -> None:
+    browser = Browser([])
+    said, failed = browser.answer("browser_mouse_press_xy", {"x": 100, "y": 200.5})
+    held = "await page.mouse.down(); await page.waitForTimeout(150); await page.mouse.up();"
+    code = f"async (page) => {{ await page.mouse.move(100, 200.5); {held} }}"
+    assert browser.calls == [("browser_run_code_unsafe", {"code": code})]
+    assert (said, failed) == ("Pressed at 100, 200.5. A screenshot shows what it did.", False)
 
 
 @pytest.mark.parametrize(
@@ -414,6 +427,9 @@ def test_typed_keys_hold_shift_for_capitals_and_symbols_and_the_text_never_runs_
         ("browser_hold_request", {"pattern": "**/cancel", "seconds": 31}, "at most 30 seconds"),
         ("browser_hold_request", {"pattern": " ", "seconds": 5}, "give the address"),
         ("browser_release_request", {"pattern": " "}, "give the address you held"),
+        ("browser_mouse_press_xy", {"x": 1280, "y": 10}, "the point is off the view: x from 0 to 1279"),
+        ("browser_mouse_press_xy", {"x": "1); x(", "y": 10}, "give the point as x and y"),
+        ("browser_mouse_press_xy", {"x": True, "y": 10}, "give the point as x and y"),
         ("browser_release_request", {"pattern": "**/x"}, "the browser answered with no result"),
     ],
 )
@@ -428,6 +444,6 @@ def test_a_browser_failure_reaches_the_tester_without_the_sign_in_link() -> None
     def broken(name: str, args: dict[str, Any]) -> str:
         raise ServerError(f"browser_navigate failed: net::ERR_CONNECTION_REFUSED at {args['url']}")
 
-    tools = Tools(broken, lambda address: LINK, lambda link: None, 60, 15, (1280, 800), 40, 30, lambda: 0.0)
+    tools = Tools(broken, lambda address: LINK, lambda link: None, 60, 15, (1280, 800), 40, 30, 150, lambda: 0.0)
     said, failed = tools.answer("browser_sign_in", {"address": "tester-1@example.com"}, threading.Event())
     assert failed and said == "browser_navigate failed: net::ERR_CONNECTION_REFUSED at the sign-in link"
