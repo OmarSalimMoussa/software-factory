@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 from runtime.guard.browser import BROWSER
 from runtime.qa.replay.trace import Trace
 from runtime.qa.wrapper import ROUTE, WAIT_FOR
-from runtime.qa.wrapper_tools import LINK, OPEN_DESKTOP, SIGN_IN, WAIT_UNTIL
+from runtime.qa.wrapper_tools import HOLD, LINK, OPEN_DESKTOP, RELEASE, SIGN_IN, WAIT_UNTIL
 
 # Calls with nothing to show: the browser's own housekeeping.
 QUIET = frozenset({"browser_close", "browser_tabs", "browser_install"})
@@ -262,6 +262,8 @@ _WORDS: dict[str, Callable[[dict[str, Any]], tuple[str, str]]] = {
     "browser_network_requests": lambda a: ("read", "Read the requests"),
     "browser_press_key": lambda a: ("key", f"Pressed {a.get('key', '')}"),
     ROUTE: lambda a: ("read", f"Answered {str(a.get('pattern', ''))[:40]} with {a.get('status', 200)}"),
+    HOLD: lambda a: ("wait", f"Held the next request to {str(a.get('pattern', ''))[:40]}"),
+    RELEASE: lambda a: ("wait", f"Let the held request to {str(a.get('pattern', ''))[:40]} go on"),
 }
 
 

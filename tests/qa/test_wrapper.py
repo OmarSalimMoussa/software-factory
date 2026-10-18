@@ -102,6 +102,7 @@ def test_the_trace_starts_before_the_first_call_and_the_tester_can_neither_see_n
         "browser_color_scheme",
         "browser_type_keys",
         "browser_hold_request",
+        "browser_release_request",
     ]
     assert stopped["error"]["message"] == "there is no tool browser_stop_tracing"
     assert closed["error"]["message"] == "there is no tool browser_close"  # closing would end the trace
@@ -279,13 +280,16 @@ class Ticks(threading.Event):
 class Browser:
     """Playwright's tools as the factory's tools call them: each call kept, each snapshot the next page given."""
 
-    def __init__(self, pages: list[str]) -> None:
-        self.pages, self.ticks = iter(pages), Ticks()
+    def __init__(self, pages: list[str], results: tuple[Any, ...] = ()) -> None:
+        self.pages, self.results, self.ticks = iter(pages), iter(results), Ticks()
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
     def call(self, name: str, args: dict[str, Any]) -> str:
         self.calls.append((name, args))
-        return next(self.pages) if name == "browser_snapshot" else f"{name} done"
+        if name == "browser_snapshot":
+            return next(self.pages)
+        # The code tool's value as Playwright prints it.
+        return next((f"### Result\n{json.dumps(r)}\n### Ran Playwright code" for r in self.results), f"{name} done")
 
     def answer(
         self, name: str, args: dict[str, Any], reload_seconds: int = 60, max_minutes: int = 15
@@ -345,10 +349,6 @@ def test_the_desktop_opens_at_its_own_size() -> None:
     ("name", "args", "code", "says"),
     [
         ("browser_color_scheme", {"scheme": "dark"}, "page.emulateMedia({ colorScheme: 'dark' })", "dark colours"),
-        # The held request falls back to the browser's other routes, so an address blocked there stays blocked.
-        ("browser_hold_request", {"pattern": "**/cancel", "seconds": 2.5}, 'page.context().route("**/cancel", async '
-         "(route) => { await page.waitForTimeout(2500); await route.fallback(); }, { times: 1 })",
-         "waits 2.5 s"),
     ],
 )  # fmt: skip
 def test_a_tool_that_works_in_the_browser_server_runs_only_its_own_fixed_code(
@@ -358,6 +358,32 @@ def test_a_tool_that_works_in_the_browser_server_runs_only_its_own_fixed_code(
     said, failed = browser.answer(name, args)
     assert browser.calls == [("browser_run_code_unsafe", {"code": f"async (page) => {{ await {code}; }}"})]
     assert not failed and says in said
+
+
+def test_a_request_waits_for_its_release_or_its_seconds_and_still_meets_the_browsers_blocks() -> None:
+    browser = Browser([], ("held",))
+    said, failed = browser.answer("browser_hold_request", {"pattern": '**/x"); y("', "seconds": 2.5})
+    [(name, args)] = browser.calls
+    assert (
+        name == "browser_run_code_unsafe" and 'const p = "**/x\\"); y(\\"";' in args["code"]
+    )  # the address stays data
+    # fallback, never continue: the held request meets the routes that keep the dashboard out of reach.
+    assert "Promise.race([go, page.waitForTimeout(2500)])" in args["code"] and "await route.fallback();" in args["code"]
+    assert not failed and "until you release it, or 2.5 s at most" in said
+
+
+@pytest.mark.parametrize(
+    ("name", "result", "says", "failed"),
+    [
+        ("browser_release_request", "waiting", "The held request to **/x goes on now.", False),
+        ("browser_release_request", "armed", "No request to **/x had come yet: the hold is lifted.", False),
+        ("browser_release_request", None, "no request to **/x is held: its hold ended, or none was set", True),
+        ("browser_hold_request", "busy", "a request to **/x is held already: release it first", True),
+    ],
+    ids=["a-request-waits", "none-came-yet", "nothing-held", "held-twice"],
+)
+def test_a_release_says_what_it_let_go(name: str, result: str | None, says: str, failed: bool) -> None:
+    assert Browser([], (result,)).answer(name, {"pattern": "**/x", "seconds": 5}) == (says, failed)
 
 
 def test_typed_keys_hold_shift_for_capitals_and_symbols_and_the_text_never_runs_as_code() -> None:
@@ -382,6 +408,8 @@ def test_typed_keys_hold_shift_for_capitals_and_symbols_and_the_text_never_runs_
         ("browser_type_keys", {"text": ""}, "give the text to type"),
         ("browser_hold_request", {"pattern": "**/cancel", "seconds": 31}, "at most 30 seconds"),
         ("browser_hold_request", {"pattern": " ", "seconds": 5}, "give the address"),
+        ("browser_release_request", {"pattern": " "}, "give the address you held"),
+        ("browser_release_request", {"pattern": "**/x"}, "the browser answered with no result"),
     ],
 )
 def test_a_factory_tool_that_cannot_do_what_was_asked_fails_and_says_why(

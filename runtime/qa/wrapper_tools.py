@@ -11,8 +11,9 @@
 - ``browser_type_keys`` types a text as key presses into whatever has the keyboard, in one call, ``qa.key_delay_ms``
   apart: the remote desktop's view takes keys, not a field's filled value, drops keys sent faster, and reads a capital
   or a shifted symbol only with Shift held.
-- ``browser_hold_request`` holds the next request to an address for up to ``qa.hold_max_seconds``, then hands it on
-  through the browser's other routes, so a blocked address stays blocked: one request can overtake another.
+- ``browser_hold_request`` holds the next request to an address until ``browser_release_request`` lets it go, or its
+  seconds (at most ``qa.hold_max_seconds``) end, then hands it on through the browser's other routes, so a blocked
+  address stays blocked: one request can overtake another, at the moment the step needs, whatever a call takes.
 """
 
 from __future__ import annotations
@@ -29,9 +30,11 @@ from runtime.qa.wrapper import SERVER_CODE, ServerError
 
 SIGN_IN, WAIT_UNTIL, OPEN_DESKTOP = "browser_sign_in", "browser_wait_until", "browser_open_desktop"
 COLOUR, TYPE_KEYS, HOLD = "browser_color_scheme", "browser_type_keys", "browser_hold_request"
+RELEASE = "browser_release_request"
 SCHEMES = ("light", "dark")
-# Playwright's answers name the page after an action on a line of their own.
+# Playwright's answers name the page after an action on a line of their own, and its code tool's value after a heading.
 PAGE_URL = re.compile(r"Page URL: (\S+)")
+RESULT = re.compile(r"### Result\n(.*)\n")
 # A link as the sign-in prints it, and as a transcript keeps that output: inside JSON, where a line break is the two
 # characters \n, so a backslash ends the link too.
 LINK = re.compile(r"https?://[^\s'\"<>)\\]+")
@@ -108,15 +111,25 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": HOLD,
-        "description": "Hold the next request to an address for some seconds, then send it on as usual, so another "
-        "request can overtake it. It holds one request, then lifts itself.",
+        "description": "Hold the next request to an address until you release it, or for at most some seconds, then "
+        "send it on as usual, so another request can overtake it. It holds one request, then lifts itself.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "pattern": {"type": "string", "description": "the address, * and ** as wildcards: **/api/runs/*"},
-                "seconds": {"type": "number", "description": "how long to hold it"},
+                "seconds": {"type": "number", "description": "the most it waits for your release"},
             },
             "required": ["pattern", "seconds"],
+        },
+    },
+    {
+        "name": RELEASE,
+        "description": "Let the request you held to an address go on now, such as right after the request that "
+        "overtakes it.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"pattern": {"type": "string", "description": "the address you held, as you gave it"}},
+            "required": ["pattern"],
         },
     },
 ]
@@ -147,6 +160,7 @@ class Tools:
             COLOUR: self._color_scheme,
             TYPE_KEYS: self._type_keys,
             HOLD: self._hold_request,
+            RELEASE: self._release_request,
         }
         try:
             return tools[name](arguments, cancelled), False
@@ -227,12 +241,43 @@ class Tools:
         most = self.hold_max_seconds
         if isinstance(seconds, bool) or not isinstance(seconds, int | float) or not 0 < seconds <= most:
             raise ToolError(f"hold it for more than 0 and at most {most} seconds")
-        # The code runs where no timer is defined, so the page waits. fallback, never continue: the held request still
-        # meets the routes that keep the dashboard out of reach.
-        held = f"await page.waitForTimeout({round(seconds * 1000)}); await route.fallback();"
-        route = f"page.context().route({json.dumps(pattern)}, async (route) => {{ {held} }}, {{ times: 1 }})"
-        self.call(SERVER_CODE, {"code": f"async (page) => {{ await {route}; }}"})
-        return f"The next request to {pattern} waits {seconds:g} s, then goes on. Do the step now."
+        # The code runs where no timer is defined, so the page waits; a release, a later call, finds the hold kept on
+        # the browser's context. fallback, never continue: the held request still meets the routes that keep the
+        # dashboard out of reach.
+        wait = f"await Promise.race([go, page.waitForTimeout({round(seconds * 1000)})]);"
+        caught = f"if (hold.state === 'armed') hold.state = 'waiting'; {wait} delete held[p]; await route.fallback();"
+        code = (
+            "if (held[p]) return 'busy'; const hold = held[p] = { state: 'armed' }; "
+            "const go = new Promise((done) => { hold.go = done; }); "
+            f"hold.handler = async (route) => {{ {caught} }}; "
+            "await page.context().route(p, hold.handler, { times: 1 }); return 'held';"
+        )
+        if self._held(pattern, code) == "busy":
+            raise ToolError(f"a request to {pattern} is held already: release it first")
+        return f"The next request to {pattern} waits until you release it, or {seconds:g} s at most. Do the step now."
+
+    def _release_request(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
+        pattern = arguments.get("pattern")
+        if not isinstance(pattern, str) or not pattern.strip():
+            raise ToolError("give the address you held, as you gave it")
+        was = self._held(pattern, (
+            "const hold = held[p]; if (!hold) return null; const was = hold.state; hold.state = 'released'; hold.go(); "
+            "if (was === 'armed') { delete held[p]; await page.context().unroute(p, hold.handler); } return was;"
+        ))  # fmt: skip
+        if was == "waiting":
+            return f"The held request to {pattern} goes on now."
+        if was == "armed":
+            return f"No request to {pattern} had come yet: the hold is lifted."
+        raise ToolError(f"no request to {pattern} is held: its hold ended, or none was set")
+
+    def _held(self, pattern: str, body: str) -> Any:
+        """``body`` run in the browser server with ``held``, the holds kept on its context, and ``p``, the address."""
+        start = f"const held = page.context().__held ??= {{}}; const p = {json.dumps(pattern)}; "
+        answer = self.call(SERVER_CODE, {"code": f"async (page) => {{ {start}{body} }}"})
+        found = RESULT.search(answer)
+        if found is None:
+            raise ToolError("the browser answered with no result; report the step blocked with that")
+        return json.loads(found.group(1))
 
 
 def first_link(text: str) -> str:
