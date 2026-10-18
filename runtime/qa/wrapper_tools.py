@@ -8,10 +8,13 @@
   live view: a screenshot is not shrunk before the tester sees it, so a point in it is the point on the desktop.
 - ``browser_color_scheme`` shows the page in its light or dark colours: fixed code the wrapper runs in the browser
   server, whose own code tool is hidden from testers.
+- ``browser_type_keys`` types a text as key presses into whatever has the keyboard, in one call, ``qa.key_delay_ms``
+  apart: the remote desktop's view takes keys, not a field's filled value, and drops keys sent faster.
 """
 
 from __future__ import annotations
 
+import json
 import re
 import threading
 from collections.abc import Callable
@@ -21,7 +24,7 @@ from typing import Any
 from runtime.qa.wrapper import SERVER_CODE, ServerError
 
 SIGN_IN, WAIT_UNTIL, OPEN_DESKTOP = "browser_sign_in", "browser_wait_until", "browser_open_desktop"
-COLOUR = "browser_color_scheme"
+COLOUR, TYPE_KEYS = "browser_color_scheme", "browser_type_keys"
 SCHEMES = ("light", "dark")
 # Playwright's answers name the page after an action on a line of their own.
 PAGE_URL = re.compile(r"Page URL: (\S+)")
@@ -76,6 +79,16 @@ TOOLS: list[dict[str, Any]] = [
             "required": ["scheme"],
         },
     },
+    {
+        "name": TYPE_KEYS,
+        "description": "Type a text as key presses into whatever has the keyboard, such as the remote desktop's view "
+        "after you click where the text goes. One call types it all.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"text": {"type": "string", "description": "the text to type"}},
+            "required": ["text"],
+        },
+    },
 ]
 
 
@@ -91,6 +104,7 @@ class Tools:
     reload_seconds: int
     max_minutes: int
     desktop: tuple[int, int]
+    key_delay_ms: int
     now: Callable[[], float]  # a monotonic clock, in seconds
 
     def answer(self, name: str, arguments: dict[str, Any], cancelled: threading.Event) -> tuple[str, bool]:
@@ -100,6 +114,7 @@ class Tools:
             WAIT_UNTIL: self._wait_until,
             OPEN_DESKTOP: self._open_desktop,
             COLOUR: self._color_scheme,
+            TYPE_KEYS: self._type_keys,
         }
         try:
             return tools[name](arguments, cancelled), False
@@ -158,6 +173,15 @@ class Tools:
             SERVER_CODE, {"code": f"async (page) => {{ await page.emulateMedia({{ colorScheme: '{scheme}' }}); }}"}
         )
         return f"The page now shows its {scheme} colours, and keeps them across reloads. Your browser started light."
+
+    def _type_keys(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
+        text = arguments.get("text")
+        if not isinstance(text, str) or not text:
+            raise ToolError("give the text to type")
+        # json.dumps makes the text one JavaScript string, so it cannot end the code it sits in.
+        typed = f"await page.keyboard.type({json.dumps(text)}, {{ delay: {self.key_delay_ms} }});"
+        self.call(SERVER_CODE, {"code": f"async (page) => {{ {typed} }}"})
+        return f"Typed {len(text)} keys. A screenshot shows where they landed."
 
 
 def first_link(text: str) -> str:

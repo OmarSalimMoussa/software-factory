@@ -20,7 +20,8 @@ first, then try again.
 ## 2. Work it
 
 - **Click:** take a screenshot, click at the point, then take a screenshot again to check what happened.
-- **Type:** click the field on the video first, then type into the layer the view takes keys from.
+- **Type:** click where the text goes on the video first, then `browser_type_keys` with the text: one call types
+  it all, key by key, as the desktop takes it.
 - **One key,** such as Escape, right after a type.
 - **A window taller than the desktop** hides its lower part: maximise it first, by double-clicking its title bar.
 - **To replace an address or a field's text,** click it, select all with Ctrl+A, then type.

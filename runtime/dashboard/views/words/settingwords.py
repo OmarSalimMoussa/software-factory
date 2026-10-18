@@ -72,6 +72,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("qa.prod_every_hours", "Hours between read-only walks of prod"),
             ("qa.desktop_viewport", "Desktop tester's screen, width and height"),
             ("qa.wait_reload_seconds", "Seconds between a wait's reloads"),
+            ("qa.key_delay_ms", "Milliseconds between the keys a tester types on the desktop"),
             ("qa.wait_max_minutes", "Longest wait, minutes"),
             ("qa.browser_answer_seconds", "Seconds the browser has to answer"),
         ],

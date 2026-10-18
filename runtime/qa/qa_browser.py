@@ -196,6 +196,7 @@ def equipper(
             settings.get_int("qa.wait_reload_seconds"),
             settings.get_int("qa.wait_max_minutes"),
             (width, height),
+            settings.get_int("qa.key_delay_ms"),
             time.monotonic,
         )
         proxy.add_tools(TOOLS, tools.answer)

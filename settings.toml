@@ -62,6 +62,7 @@ max_steps = 6           # numbered steps a standing scenario may have; one scena
 prod_every_hours = 24   # the warden asks for a read-only walk of prod this long after the last one
 desktop_viewport = [1280, 800]  # a desktop tester's browser, at the desktop's own size: its screenshots are not shrunk
 wait_reload_seconds = 60  # a tester's wait reloads the page this often
+key_delay_ms = 50       # the pause between the keys browser_type_keys sends: the remote desktop drops faster ones
 wait_max_minutes = 15   # the longest one wait may last
 browser_answer_seconds = 120  # the longest the browser has to answer one call, a browser_wait_for's own time aside
 
