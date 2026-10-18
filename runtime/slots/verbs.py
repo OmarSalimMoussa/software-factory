@@ -175,11 +175,13 @@ def _may_take(ctx: Context, n: int, agent: str, held: dict[str, str]) -> None:
                                      "try again in a minute")  # fmt: skip
         raise Refused("desktop", f"slot {n}'s desktop is {holder.name}'s until it hands back; test what "
                                  "needs no desktop first, then try again")  # fmt: skip
-    up = [s for slot, s in held.items() if slot != str(n) and s in sessions and sessions[s].state != RETIRED]
+    live = {s.id for s in sessions.values() if s.state != RETIRED}
+    up = [(slot, sessions[s].name) for slot, s in sorted(held.items()) if slot != str(n) and s in live]
     cap = ctx.settings().get_int("caps.desktops_at_once")
     if len(up) >= cap:
-        raise Refused("desktop", f"{len(up)} desktops are up on this machine, its cap of {cap}; test what "
-                                 "needs no desktop first, then try again")  # fmt: skip
+        holders = ", ".join(f"{name}'s on slot {slot}" for slot, name in up)
+        raise Refused("desktop", f"{len(up)} desktops are up on this machine, its cap of {cap}: {holders}; test "
+                                 "what needs no desktop first, then try again")  # fmt: skip
 
 
 def _cpu_hold(ctx: Context, n: int) -> None:

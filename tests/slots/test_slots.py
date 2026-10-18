@@ -271,7 +271,8 @@ def test_the_machine_runs_at_most_its_cap_of_desktops_and_a_finished_testers_cou
     up = {"op": "desktop", "desktop": ["up", "tester-1@example.com"]}
     slot(world.ctx("implementer", "s-1", "agent-qa-1"), up, None)
     slot(world.ctx("implementer", "s-2", "agent-qa-2"), up, None)
-    with pytest.raises(Refused, match="2 desktops are up on this machine, its cap of 2"):
+    holders = "impl-t-0001.qa's on slot 1, impl-t-0002.qa's on slot 2"
+    with pytest.raises(Refused, match=f"2 desktops are up on this machine, its cap of 2: {holders};"):
         slot(world.ctx("implementer", "s-3", "agent-qa-3"), up, None)
 
     sessions = registry.read(world.places)
