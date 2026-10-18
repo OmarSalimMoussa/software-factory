@@ -62,8 +62,9 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
    One tester at a time uses the slot's remote desktop, and the factory takes it down when that tester hands back.
 4. **The brief:** one line `Scenarios and checks: N` (N from 1 to `qa.max_items`, the items you list, each by the
    name testers mark it with: a scenario by its file name without `.md`, a check by a short name of words joined
-   by dashes); the time each
-   item gets (`qa.seconds_per_item`, from `factory settings show`); your slot's address; the widths to test
+   by dashes; a hold you ask for, such as one for your own measurement, is an item of its own, as a tester's time is
+   its items' time); the time each item gets (`qa.seconds_per_item`, from `factory settings show`); your slot's
+   address; the widths to test
    (`qa.widths`); what changed and why, with file paths; the spec's checks; the scenarios to walk (round 1 walks
    each scenario your branch adds or changes, cold); the test address each tester signs in as; and every finding
    earlier rounds raised, with what you did about it.
