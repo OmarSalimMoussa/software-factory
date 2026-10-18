@@ -24,6 +24,7 @@ from typing import IO, Any
 
 SERVER_CODE = "browser_run_code_unsafe"
 WAIT_FOR = "browser_wait_for"
+ROUTE = "browser_route"
 # The devtools capability holds the trace's tools; the wrapper needs the capability on, the tester keeps its usual
 # tools, so every tool the capability adds is hidden. Closing the browser would end the trace, and the next call
 # would open an untraced browser, so that is hidden too: the browser closes with the session.

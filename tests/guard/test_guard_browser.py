@@ -111,6 +111,21 @@ def test_no_code_runs_in_the_browser_server(kit: Kit) -> None:
     assert kit.rule("mcp__qa-browser__browser_run_code_unsafe", {"code": "x"}, **UI_TESTER) == "qa-browser"
 
 
+@pytest.mark.parametrize(
+    ("asked", "refused"),
+    [
+        ({"pattern": "**/api/runs", "status": 502}, False),
+        ({"pattern": "**/api/runs", "body": "{}"}, False),
+        # Headers alone send the request on, past the route that keeps the dashboard out of the browser's reach.
+        ({"pattern": "**", "removeHeaders": "origin"}, True),
+        ({"pattern": "**/api/runs"}, True),
+    ],
+)
+def test_a_route_answers_what_it_catches_and_never_sends_it_on(kit: Kit, asked: dict[str, Any], refused: bool) -> None:
+    rule = kit.rule("mcp__qa-browser__browser_route", asked, **UI_TESTER)
+    assert (rule == "qa-browser") is refused
+
+
 def test_a_browser_call_that_names_a_file_is_refused_so_the_tester_reports_the_name_it_got(kit: Kit) -> None:
     asked = {"filename": "GOAL.md", "type": "png"}
     decision = kit.decide("mcp__qa-browser__browser_take_screenshot", asked, **UI_TESTER)

@@ -81,8 +81,9 @@ def playwright_settings(folder: Path, role: str, settings: Settings) -> dict[str
             "contextOptions": {"viewport": viewport},
         },
         # Vision clicks at a point, which a remote desktop needs: it is a video of a screen. Devtools holds the
-        # trace's tools, which only the wrapper sees.
-        "capabilities": ["core", "vision", "devtools"],
+        # trace's tools, which only the wrapper sees. Network lets a step answer a request with the status it asks
+        # for, such as a 502; the guard keeps each route answering what it catches, never sending it on.
+        "capabilities": ["core", "vision", "devtools", "network"],
         "outputDir": str(folder),
         "imageResponses": "omit" if unseen else "allow",
         "network": {"blockedOrigins": blocked(settings)},

@@ -2,7 +2,8 @@
 
 `product-drivers`: only the UI testers drive the product, in their own browser or on the remote desktop; no session
 drives the owner's Chrome. `subagents-at-once`: a lane's browser is its first tester's while it runs.
-`qa-browser`: no code runs in the browser server itself, and a browser call names no file.
+`qa-browser`: no code runs in the browser server itself, a browser call names no file, and a route answers what
+it catches itself.
 `qa-evidence`: no agent opens the factory's state (the testers' recordings, screenshots and saved sign-ins) or the
 dashboard. The evidence rule reads paths and addresses, never prose: a report may name a screenshot.
 """
@@ -15,7 +16,7 @@ from pathlib import Path, PurePosixPath
 
 from runtime.guard import shell, transcript
 from runtime.guard.facts import Call, Decision, Refusal, Rewrite, SessionView, inside, public, resolve
-from runtime.qa.wrapper import SERVER_CODE, WAIT_FOR
+from runtime.qa.wrapper import ROUTE, SERVER_CODE, WAIT_FOR
 from runtime.qa.wrapper_tools import WAIT_UNTIL
 from runtime.shared import lanes
 from runtime.shared.models import WORKING
@@ -104,6 +105,9 @@ def _server(call: Call) -> Decision:
     # A named file lands wherever the name says; without one it lands in the run's own evidence folder.
     if "filename" in call.tool_input:
         return Refusal("qa-browser", "name no file: the browser names it, and its answer says the name to report")
+    # A route with neither sends the request on, past the routes that keep the owner's dashboard out of reach.
+    if call.tool == BROWSER + ROUTE and call.tool_input.get("status") is None and call.tool_input.get("body") is None:
+        return Refusal("qa-browser", "a route answers what it catches itself: give it the status the step asks for")
     return None
 
 

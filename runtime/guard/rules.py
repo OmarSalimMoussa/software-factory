@@ -36,7 +36,8 @@ RULES: dict[str, str] = {
     "orchestrator-writes": "the orchestrator's write in its checkout outside .factory/, or a commit on the default "
     "branch that finishes no merge or revert",
     "product-drivers": "a browser or computer-use tool outside a UI tester; the owner's Chrome, always",
-    "qa-browser": "code run inside the browser server; a browser call that names a file",
+    "qa-browser": "code run inside the browser server; a browser call that names a file; a route that sends a "
+    "request on",
     "qa-evidence": "a path or address into the factory's state, the testers' evidence or sign-ins, or the dashboard",
     "banned-tools": "workflows, remote triggers, and tools that keep work in the Claude account",
     "worktree-tools": "entering or leaving a worktree with Claude Code's own tools, or starting an isolated subagent",
