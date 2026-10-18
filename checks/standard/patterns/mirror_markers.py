@@ -35,7 +35,7 @@ PHRASES = (
     "in lockstep",
 )  # fmt: skip
 SUFFIXES = (".py", ".ts", ".sh", ".mjs", ".css", ".html", ".tsx", ".template", ".js", ".rs", ".yml", ".yaml", ".md",
-            "Dockerfile")  # fmt: skip
+            "Dockerfile", "Caddyfile")  # fmt: skip
 _PHRASE_RE = re.compile("|".join(re.escape(p) for p in PHRASES), re.I)
 _NEVER = (*scope.DATED_RECORDS, "check-values/")
 

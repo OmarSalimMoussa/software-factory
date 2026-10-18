@@ -106,17 +106,24 @@ def test_js_import_rules_let_types_and_named_guards_past(make_repo: MakeRepo, st
     assert bool(problems) == broken, problems
 
 
-def test_an_unclaimed_mirror_declaration_fails_and_a_claim_with_no_declaration_is_stale(make_repo: MakeRepo) -> None:
+@pytest.mark.parametrize(
+    ("path", "line"),
+    [("app/limits.py", "LIMIT = 5  # must mirror web/limits.js"), ("Caddyfile", "# limit: must mirror web/limits.js")],
+    ids=["by-suffix", "by-name"],
+)
+def test_an_unclaimed_mirror_declaration_fails_and_a_claim_with_no_declaration_is_stale(
+    make_repo: MakeRepo, path: str, line: str
+) -> None:
     claim = '{path = "app/old.py", phrase = "keep in sync", fragment = "gone", covered_by = "debt:a reason"}'
     problems = run(mirror_markers, make_repo, {
         "check-values/mirror-markers.toml": MIRRORS.replace("{CLAIMS}", claim),
         "check-values/mirrored-constants.toml": "groups = []\n",
         "app/old.py": "X = 1\n",
-        "app/limits.py": "LIMIT = 5  # must mirror web/limits.js\n",
+        path: line + "\n",
         "web/limits.js": "export const LIMIT = 5;\n",
     })  # fmt: skip
     assert len(problems) == 2
-    assert problems[0].startswith("app/limits.py:1: declared mirror is not claimed")
+    assert problems[0].startswith(f"{path}:1: declared mirror is not claimed")
     assert problems[1].startswith("mirror-markers: stale claim: app/old.py")
 
 
