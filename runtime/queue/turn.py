@@ -41,6 +41,7 @@ REVERTED = "Your work was taken back off {default}: {note}\n\n" + _BRING_BACK
 BLOCKED = "Your task was blocked: {note}\n\nThe owner fixed what blocked it: carry on."
 BLOCKED_OFF = BLOCKED + " It was taken back off {default}. " + _BRING_BACK
 HELD = "Your task was put on hold: {note}\n\n{after}, which it waited for, passed its check: carry on."
+RELEASED = "Your task was put on hold, and the orchestrator let it go on without what it waited for: {note}"
 HELD_GONE = (
     "Your task was put on hold: {note}\n\n{after}, which it waited for, was {how} before its check passed: find "
     "another way, or report what still stops it."
@@ -194,6 +195,21 @@ def check_saved(ctx: Context, commit: str, passed: bool) -> str:
     return task_id
 
 
+def take_off_course(ctx: Context, task_id: str, to: str, event: str, note: str, after: str) -> Task:
+    """The orchestrator's moves off a task's course: a revert, a block, a hold, and the release of its own hold."""
+    if event in (tasks.BLOCKED, tasks.ON_HOLD) and to != event:
+        raise Refused("task-status", f"--event {event} moves {task_id} to {event}, nowhere else")
+    if event == tasks.BLOCKED:
+        return block(ctx, task_id, note)
+    if event == tasks.ON_HOLD:
+        return hold(ctx, task_id, note, after)
+    if event == tasks.RELEASED:
+        return release(ctx, task_id, note)
+    if to != "building":
+        raise Refused("task-status", f"a revert sends {task_id} back to building; the warden finds who builds it")
+    return send_back(ctx, task_id, note)
+
+
 def send_back(ctx: Context, task_id: str, note: str) -> Task:
     """A reverted task goes back to building, its implementer told why; a benched or reviving one is told when it
     is back, and a word that did not arrive is held for the run's next start or revive.
@@ -273,7 +289,15 @@ def release_held(ctx: Context) -> None:
         how = " or ".join(sorted({w.status for w in gone}))
         told = (HELD_GONE if gone else HELD).format(note=note, after=waited, how=how)
         told += _OFF.format(default=ctx.settings().get_str("repo.default_branch")) if off else ""
-        _back(ctx, task.id, "released", statuses.WARDEN, f"{waited} {how or 'passed its check'}", told)
+        _back(ctx, task.id, tasks.RELEASED, statuses.WARDEN, f"{waited} {how or 'passed its check'}", told)
+
+
+def release(ctx: Context, task_id: str, note: str) -> Task:
+    """A hold the orchestrator lets go: the task goes back as a revert does, and waits for, and merges after, none."""
+    if not note.strip():
+        raise Refused("note", "a release says why the task need not wait, in --note")
+    told = RELEASED.format(note=note.strip())
+    return _back(ctx, task_id, tasks.RELEASED, statuses.ORCH, note.strip(), told, after=[])
 
 
 def unblock(ctx: Context, task_id: str) -> Task:
@@ -286,7 +310,7 @@ def unblock(ctx: Context, task_id: str) -> Task:
     return _back(ctx, task_id, "unblocked", statuses.OWNER, "the owner fixed what blocked it", told)
 
 
-def _back(ctx: Context, task_id: str, event: str, by: str, note: str, told: str) -> Task:
+def _back(ctx: Context, task_id: str, event: str, by: str, note: str, told: str, **fields: Any) -> Task:
     """Back to its implementer, or to a new one once that has ended, told ``told`` first."""
     queue = Queue.of(ctx)
     with ctx.lock, queue.lock():
@@ -294,7 +318,7 @@ def _back(ctx: Context, task_id: str, event: str, by: str, note: str, told: str)
         impl = _implementer(ctx, task_id)
         designed = task.run is not None and task.run >= 3
         to = "building" if impl is not None or designed else "approved"
-        moved = tasks.transition(ctx, queue, task, to, event, by, note)
+        moved = tasks.transition(ctx, queue, task, to, event, by, note, **fields)
         if impl is None and designed and task_id not in proposals.designed_builds(ctx.places):
             proposals.set_designed_builds(ctx.places, [*proposals.designed_builds(ctx.places), task_id])
         # The latest revert's word alone is held: an earlier one's revert is part of this one's history.

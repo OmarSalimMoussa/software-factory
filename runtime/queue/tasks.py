@@ -29,6 +29,7 @@ SCORED = frozenset({"queued", "parked", "proposed"})
 REVERTED = "reverted"  # the event that takes a landed task back to its builder
 BLOCKED = "blocked"
 ON_HOLD = "on-hold"
+RELEASED = "released"
 _FACTS: dict[str, type] = {
     "title": str,
     "goal_item": str,
@@ -128,8 +129,7 @@ def _hold_turn(ctx: Context, task_id: str, held: bool) -> None:
 
 
 def set_status(ctx: Context, task_id: str, to: str, event: str, note: str, after: str = "") -> Task:
-    """The orchestrator's move of a task (a merge turn, a spec it approved, a close); refused off the table. A revert
-    goes where the warden finds its implementer, and a block or a hold benches it (runtime/queue/turn.py)."""
+    """The orchestrator's move of a task (a merge turn, a spec it approved, a close); refused off the table."""
     from runtime.queue import turn  # the turn moves tasks through this module
 
     queue = Queue.of(ctx)
@@ -143,20 +143,12 @@ def set_status(ctx: Context, task_id: str, to: str, event: str, note: str, after
             event = found[0]
         if after and event != ON_HOLD:
             raise Refused("task-status", "--after names the task a hold waits for, and goes only with on-hold")
-        if event not in (REVERTED, BLOCKED, ON_HOLD):
+        if event not in (REVERTED, BLOCKED, ON_HOLD, RELEASED):
             moved = transition(ctx, queue, task, to, event, actor(ctx), note or f"{event}: now {to}")
             if event == "spec-approved":
                 documents.approve_spec(ctx, queue, task_id)
             return moved
-    if event in (BLOCKED, ON_HOLD) and to != event:
-        raise Refused("task-status", f"--event {event} moves {task_id} to {event}, nowhere else")
-    if event == BLOCKED:
-        return turn.block(ctx, task_id, note)
-    if event == ON_HOLD:
-        return turn.hold(ctx, task_id, note, after)
-    if to != "building":
-        raise Refused("task-status", f"a revert sends {task_id} back to building; the warden finds who builds it")
-    return turn.send_back(ctx, task_id, note)
+    return turn.take_off_course(ctx, task_id, to, event, note, after)
 
 
 def goal_ranks(ctx: Context) -> dict[str, int]:

@@ -32,7 +32,8 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    checked. A scenario that could not run reverts the merge too. When only the owner can give what it lacks (a key,
    an account, leave to use an outside site), the task is blocked: it waits on Home for the owner's **Fixed, carry
    on**, its implementer benched and written to SELF_REFLECT, while other work goes on. When another open task makes
-   it, the task is on hold, and the warden sends it back once that task is checked, or closed or parked. Anything
+   it, the task is on hold, and the warden sends it back once that task is checked, or closed or parked; the
+   orchestrator may release a hold whose task cannot pass soon, and it then no longer waits for it. Anything
    else the factory can make (a seed, a scenario out of date) goes back to the implementer as a failure does. A
    fix the merge carried for what every task shares, such as a build or ignore file, is applied again right after
    the revert, in one commit of its own; one that no longer applies cleanly becomes a request.

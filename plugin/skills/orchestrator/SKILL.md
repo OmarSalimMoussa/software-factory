@@ -153,7 +153,9 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
      The warden benches its implementer, writes it to SELF_REFLECT and puts it on Home for the owner's Fixed.
    - Another open task makes it: `factory queue task status <task> on-hold --after <that task> --note "<what
      stopped it>; reverted as <sha>"`. The warden benches its implementer and sends it back once that task's check
-     passes, or, told why, once that task is closed or parked.
+     passes, or, told why, once that task is closed or parked. When that task cannot pass soon and this one does
+     not truly need it, release the hold: `factory queue task status <task> building --note "<why it need not
+     wait>"`. It goes back to work and no longer waits to merge after the other.
    - Anything else the factory can make (a seed, a scenario out of date, a page a slot can serve): send it back to
      building, as a failure, with what to make in the note.
    A revert keeps a fix the merge carried for what every task shares (a build or ignore file, a shared script):

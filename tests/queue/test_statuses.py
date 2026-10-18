@@ -270,6 +270,24 @@ def test_a_task_on_hold_goes_back_told_why_once_the_task_it_waits_for_is_closed_
     assert world.queue().task(task.id).status == "approved"  # no implementer is left: a new one starts
 
 
+def test_the_orchestrator_releases_its_own_hold_and_the_task_no_longer_waits_to_merge_after_the_other(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    task, maker = world.task(), dataclasses.replace(world.task(), run=1)
+    world.queue().write_task(dataclasses.replace(task, status="qa", run=1))
+    monkeypatch.setattr(backstop, "processes", lambda: {})
+    verbs.task_status(world.ctx(), {"task": task.id, "to": "on-hold", "note": HOLD, "after": maker.id}, None)
+    with pytest.raises(Refused, match="says why"):
+        verbs.task_status(world.ctx(), {"task": task.id, "to": "building"}, None)
+
+    verbs.task_status(world.ctx(), {"task": task.id, "to": "building", "note": "its walk never fits the desktop"}, None)
+
+    released = world.queue().task(task.id)
+    assert (released.status, released.after) == ("approved", [])  # no implementer is left: a new one starts
+    assert world.queue().read_log(task.id)[-1]["event"] == "released"
+    assert "let it go on without what it waited for" in lifecycle.held_path(world.ctx(), task.id).read_text()
+
+
 def test_a_hold_on_a_task_that_makes_nothing_or_waits_back_on_it_is_refused(world: World) -> None:
     task, other, third = world.task(), *(dataclasses.replace(world.task(), run=1) for _ in range(2))
     world.queue().write_task(dataclasses.replace(task, status="qa", run=1))

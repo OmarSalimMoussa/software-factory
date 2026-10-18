@@ -69,7 +69,7 @@ MOVES: tuple[Move, ...] = (
     _m({"blocked"}, {"building", "approved"}, "unblocked", OWNER),
     # What another task makes (a seed, a scenario): off the default branch until that task's check passes.
     _m({"building", "qa", "qa-clean", "turn", "merged"}, {"on-hold"}, "on-hold", ORCH),
-    _m({"on-hold"}, {"building", "approved"}, "released", WARDEN),
+    _m({"on-hold"}, {"building", "approved"}, "released", WARDEN, ORCH),
     _m({"decide"}, {"proposed"}, "to-designer", OWNER),
     _m(OPEN, {"proposed"}, "rung-up", ORCH),
     _m(OPEN, {"proposed"}, "void", WARDEN),
