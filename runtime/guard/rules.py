@@ -22,7 +22,8 @@ RULES: dict[str, str] = {
     "model": "an Agent call asking for any model but that kind's configured one",
     "tester-brief": "a tester brief without one `Scenarios and checks: N` line, or asking for a slot command its "
     "tester cannot run",
-    "tester-time": "a tester's calls after its time, but for its report; command timeouts are cut to the time left",
+    "tester-time": "a tester's calls after its time, but for its report; command timeouts are cut to the time left, "
+    "but for `desktop up`",
     "intake-time": "intake's calls after intake.fast_lane_minutes, but for `factory` and its hand-back",
     "qa-ready": "a tester start with no ready record for the head",
     "qa-rounds": "a QA round past its setting",

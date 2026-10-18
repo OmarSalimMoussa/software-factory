@@ -303,8 +303,8 @@ def check_send(call: Call) -> Decision:
 
 def check_tester_time(call: Call) -> Decision:
     """A tester's own calls: refused once its time is spent, or its desktop time once it drives the remote desktop;
-    shell and browser waits cut to the time left. Its report always goes: a file in its scratch folder, its steps'
-    results, findings and verdict, a reflection, and its hand-back."""
+    shell and browser waits cut to the time left, but for `desktop up`. Its report always goes: a file in its scratch
+    folder, its steps' results, findings and verdict, a reflection, and its hand-back."""
     tester = call.in_subagent and call.agent_type.startswith(TESTER)
     if not tester or call.tool == HANDBACK or call.off("tester-time"):
         return None
@@ -315,11 +315,14 @@ def check_tester_time(call: Call) -> Decision:
     if timed is None:
         return browser.cap_wait(call, left)
     name, default = timed
-    if call.tool == "Bash" and factory_calls.plain_words(str(call.tool_input.get("command", ""))) is not None:
+    command = str(call.tool_input.get("command", "")) if call.tool == "Bash" else ""
+    if factory_calls.plain_words(command) is not None:
         default = _LONGEST_BASH
     asked = call.tool_input.get(name)
     current = asked if isinstance(asked, int) and not isinstance(asked, bool) and asked > 0 else default
-    updated = {**call.tool_input, name: max(1_000, min(current, int(left * 1000)))}
+    # `desktop up` runs on the factory's time, which `_time_left` leaves out: cut to the tester's, it stops halfway.
+    most = _LONGEST_BASH if _starts_desktop(command) else min(current, int(left * 1000))
+    updated = {**call.tool_input, name: max(1_000, most)}
     if call.tool == "Bash":
         updated["run_in_background"] = False
     return Rewrite(updated) if updated != call.tool_input else None

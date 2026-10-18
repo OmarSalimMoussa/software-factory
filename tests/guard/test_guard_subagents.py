@@ -293,6 +293,15 @@ def test_a_testers_factory_call_is_not_cut_at_claude_codes_default_wait(
     assert isinstance(decided, Rewrite) and decided.updated_input["timeout"] == waits
 
 
+def test_a_testers_desktop_up_waits_its_own_length_however_little_time_the_tester_has_left(tmp_path: Path) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.settings(qa__setup_seconds=30, qa__seconds_per_item=120)
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=140), "user", "Scenarios and checks: 1")])
+    up = kit.decide("Bash", {"command": "factory slot desktop up qa-admin@notes.test", "timeout": 60_000}, **TESTER)
+    assert isinstance(up, Rewrite) and up.updated_input["timeout"] == 600_000
+
+
 def test_a_testers_slot_api_session_carries_its_id_and_the_implementers_keeps_its_name(tmp_path: Path) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer")
