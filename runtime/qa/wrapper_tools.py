@@ -298,7 +298,10 @@ class Tools:
         )
         if self._held(pattern, code) == "busy":
             raise ToolError(f"a request to {pattern} is held already: release it first")
-        return f"The next request to {pattern} waits until you release it, or {seconds:g} s at most. Do the step now."
+        return (
+            f"The next request to {pattern} waits until you release it, or {seconds:g} s at most: a limit, not time "
+            "your step takes. Do the step now, then release it."
+        )
 
     def _release_request(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
         pattern = arguments.get("pattern")
