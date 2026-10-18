@@ -174,9 +174,11 @@ def test_only_an_upgrade_puts_the_stand_in_in_the_dashboards_place(
     steps_prepare.stop_factory(job)
 
     runs = [a for a in host.actions if a.startswith("run: systemctl")]
-    stopped = f"run: systemctl stop {' '.join(layout.SERVICES)}"
+    # The daemon stops once the warden is down: an agent request the warden starts until then would cancel its stop.
+    warden, daemon = f"{layout.WARDEN_UNIT} {layout.DASHBOARD_UNIT}", layout.DAEMON_UNIT
+    stopped = [f"run: systemctl stop {warden}", f"run: systemctl stop {daemon}"]
     started = ["run: systemctl daemon-reload", f"run: systemctl start {layout.UPGRADING_UNIT}"]
-    assert runs == ([*started, stopped] if unattended else [stopped])
+    assert runs == ([*started, *stopped] if unattended else stopped)
     # It runs from this commit's sealed copy: the factory installed now may have no stand-in of its own.
     unit = written.get(layout.UNITS_DIR / layout.UPGRADING_UNIT, "")
     assert (f"{REPO_ROOT}/runtime/system/runners/upgrading.py" in unit) is unattended

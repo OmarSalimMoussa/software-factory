@@ -214,8 +214,11 @@ def stop_factory(ctx: Install) -> None:
     running = [unit for unit in layout.SERVICES if ctx.host.exists(layout.UNITS_DIR / unit)]
     if running and ctx.unattended:
         steps_wire.stand_in(ctx)
-    if running:
-        ctx.host.run(["systemctl", "stop", *running])
-    else:
+    # The warden starts agent requests until it is down, and an agent request needs the daemon: one started while the
+    # daemon stops cancels that stop, so the daemon stops on its own, last.
+    for units in ([u for u in running if u != layout.DAEMON_UNIT], [u for u in running if u == layout.DAEMON_UNIT]):
+        if units:
+            ctx.host.run(["systemctl", "stop", *units])
+    if not running:
         ctx.host.say("nothing is installed yet")
     refuse_live_sessions(ctx)
