@@ -33,7 +33,6 @@ FAMILY = {ORCH: "orch", IMPL: "impl", DESIGN: "design"}
 CAP = {IMPL: "caps.implementers", DESIGN: "caps.designers"}
 # The factory never works on itself. This is code, not a setting, so no saved setting can turn it off.
 FACTORY_REPO = "software-factory"
-LEVELS = ("green", "amber", "red", "unknown")
 SEVERE = "severe"
 # Where a switch of Claude accounts stands: its daemon restarting, or back (runtime/warden/owner/accounts.py).
 RESTARTING, BACK = "restarting", "back"
@@ -74,26 +73,36 @@ def ranking(ctx: Context) -> order.Ranking:
 
 
 def vitals_level(ctx: Context) -> tuple[str, str]:
+    from runtime.warden.health import vitals  # vitals reaches this module through the clean-up and the cards
+
     try:
         raw = store.read_json(ctx.places.vitals)
     # telemetry: expected — no vitals yet: none has been read, so the level is unknown
     except FileNotFoundError:
-        return "unknown", "none read yet"
+        return vitals.UNKNOWN, "none read yet"
     except store.StoreError as exc:
         raise Refused("vitals", f"the vitals cannot be read ({exc}); see factory status") from exc
     level, why = (raw.get("level"), raw.get("why")) if isinstance(raw, dict) else (None, None)
-    if level not in LEVELS or not isinstance(why, str):
+    readings = raw.get("readings") if isinstance(raw, dict) else None
+    if level not in vitals.LEVELS or not isinstance(why, str) or not isinstance(readings, list):
         raise Refused("vitals", "the vitals record names no level and readings; see factory status")
-    return str(level), why
+    if level != vitals.RED:
+        return str(level), why
+    try:
+        return vitals.install_again(level, why, readings, ctx.places)
+    except (TypeError, KeyError) as exc:
+        raise Refused("vitals", "the vitals record's readings cannot be read; see factory status") from exc
 
 
 def check_vitals(ctx: Context, severe: bool) -> None:
     """Red blocks every start; amber, or vitals not read yet, block all but severe work. So does a day whose known
     spend, at API prices, reached cost.daily_budget_usd."""
+    from runtime.warden.health import vitals
+
     level, why = vitals_level(ctx)
-    if level == "red":
+    if level == vitals.RED:
         raise Refused("vitals", f"the machine's vitals are red ({why}), so nothing starts")
-    if level != "green" and not severe:
+    if level != vitals.GREEN and not severe:
         raise Refused("vitals", f"the machine's vitals are {level} ({why}), so only severe work starts")
     budget = ctx.settings().get_float("cost.daily_budget_usd")
     spent = cost.spent_days(ctx).get(ctx.clock.iso()[:10], [0.0, 0])[0]

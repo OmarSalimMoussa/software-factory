@@ -55,6 +55,14 @@ def why(readings: list[Reading]) -> str:
     return "" if level == GREEN else "; ".join(f"{r.name}: {r.value}" for r in readings if r.level == level)
 
 
+def install_again(level: str, said: str, readings: list[dict[str, Any]], places: Places) -> tuple[str, str]:
+    """A vitals record's level and why, a red install read again: an upgrade records it just after the warden reads."""
+    if not any(r["name"] == "install" and r["level"] == RED for r in readings):
+        return level, said
+    found = [install(places) if r["name"] == "install" else Reading(**r) for r in readings]
+    return worst(found), why(found)
+
+
 def memory(meminfo: str, settings: Settings) -> Reading:
     found = re.search(r"^MemAvailable:\s+(\d+) kB", meminfo, re.MULTILINE)
     if found is None:

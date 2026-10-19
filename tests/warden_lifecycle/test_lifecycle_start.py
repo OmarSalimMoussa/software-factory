@@ -11,6 +11,7 @@ from runtime.shared import store
 from runtime.shared.models import DEPRIORITIZED, RETIRED, WAITING, WORKING
 from runtime.shared.protocol import Refused
 from runtime.warden.delivery import outage
+from runtime.warden.health import vitals
 from runtime.warden.sessions import lifecycle, reap
 
 START: dict[str, Any] = {"role": "implementer", "task": "t-0001"}
@@ -77,6 +78,23 @@ def test_red_vitals_block_every_start_and_amber_all_but_severe(
 ) -> None:
     world.approve(severity=severity)
     world.vitals(level)
+    if starts:
+        lifecycle.start(world.ctx(), START, None)
+    else:
+        assert refusal(world) == "vitals"
+
+
+@pytest.mark.parametrize(("recorded", "starts"), [(True, True), (False, False)])
+def test_a_red_install_is_read_again_at_a_start_since_an_upgrade_records_it_after_the_new_warden_reads(
+    world: World, recorded: bool, starts: bool
+) -> None:
+    world.approve()
+    world.places.install.mkdir(parents=True, exist_ok=True)
+    (world.places.install / "COMMIT").write_text("abc\n")
+    world.places.install_hash.write_text(vitals.install_digest(world.places.install) if recorded else "before")
+    readings = [vitals.Reading("install", vitals.RED, "differs"), vitals.Reading("memory", vitals.GREEN, "4 GiB")]
+    store.write_json(world.places.vitals, {"level": vitals.RED, "why": "install: differs",
+                                           "readings": [dataclasses.asdict(r) for r in readings]})  # fmt: skip
     if starts:
         lifecycle.start(world.ctx(), START, None)
     else:
