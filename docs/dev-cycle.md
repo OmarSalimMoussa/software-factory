@@ -38,9 +38,10 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    every row passed, each of those scenarios has a row, slot 0 ran that commit, and they are within the cap;
    anything less clears none. No merge turn goes while the cap of merges waits, until their bundle's check failed.
    Each row that did not pass says what comes next: walk it again once what blocked it is fixed (a block is never a
-   revert); walk it alone at the bundle's base, or between its suspects (the merges since its last pass whose
-   changed paths it protects); revert the one suspect left, which sends its task back to its implementer; or, when
-   it fails at the base too, wait for its fix, which takes the next turn and joins the bundle past the cap. When
+   revert); walk it alone at the bundle's base (or, where slot 0 cannot come up there, at the next merge's place), or
+   between its suspects (the merges since its last pass whose changed paths it protects); revert the one suspect
+   left, which sends its task back to its implementer; or, when it fails at the oldest of those too, wait for its
+   fix, which takes the next turn and joins the bundle past the cap. When
    only the owner can give what a merge needs (a key, an account, leave to use an outside site), it is reverted and
    its task blocked: it waits on Home for the owner's **Fixed, carry on**, its implementer benched and written to
    SELF_REFLECT, while other work goes on. When another open task makes it, the task is on hold, and the warden

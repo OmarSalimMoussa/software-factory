@@ -3,8 +3,8 @@
 A merge waits from when the warden finds it until a check clears it, its task at merged; a task merged twice waits by
 its newest merge. A bundle is the oldest waiting merges, at most rounds.bundle_merges, walked at one commit: the one
 just before the next merge after the bundle's last, or the tip, so a revert after its last merge is in it. Its
-scenarios are the standing ones whose `protects` names a path one of its merges changed, read at the tip, where the
-testers read them.
+scenarios are the standing ones whose `protects` names a path one of its merges changed, read at the tip; a tester
+reads each as the build slot 0 runs has it (runtime/qa/walked.py).
 
 A saved check of a commit on the default branch's first-parent line clears every merge waiting up to it, at once, when
 every row passed, each scenario those merges protect has a row, slot 0's last probe named that commit, and they are
@@ -195,7 +195,7 @@ def _next(found: Line, checks: list[CheckRecord], record: CheckRecord, row: Scen
         return {**said, "do": "read", "why": "it is no standing scenario, so no merge's protects names it"}
     if not members:
         return {**said, "do": "request", "why": "no merge waits up to this commit: file what failed as a request"}
-    here, floor = found.at[record.commit], found.at[found.base]
+    here = found.at[record.commit]
     walks = [
         (found.at[c.commit], r.result)
         for c in checks
@@ -203,22 +203,38 @@ def _next(found: Line, checks: list[CheckRecord], record: CheckRecord, row: Scen
         for r in c.rows
         if r.scenario == row.scenario
     ]
+    floor = _floor(found, members, walks, here)
     passes = [at for at, result in walks if result == PASS]
     if passes and min(passes) <= floor:
         return {**said, **_since_pass(found, members, row.scenario, min(passes), here)}
-    if any(at == floor and result not in (PASS, BLOCKED) for at, result in walks):
+    oldest = (
+        "before every merge waiting" if floor == found.at[found.base] else "the oldest commit it was not blocked at"
+    )
+    if floor == here or any(at == floor and result not in (PASS, BLOCKED) for at, result in walks):
         return {
             **said,
             "do": "wait",
-            "why": f"it fails at {found.base[:12]} too, before every merge waiting: its fix "
-            "takes the next merge turn and joins the bundle",
+            "why": f"it fails at {found.commits[floor][:12]} too, {oldest}: its fix takes the next merge turn and "
+            "joins the bundle",
         }
     return {
         **said,
         "do": "walk",
-        "at": found.base,
-        "why": "it has not passed since before the merges waiting: walk it alone at their base first",
+        "at": found.commits[floor],
+        "why": "it has not passed since before the merges waiting: walk it alone there first",
     }
+
+
+def _floor(found: Line, members: list[Merge], walks: list[tuple[int, str]], here: int) -> int:
+    """The oldest place a walk can tell it apart: the base, or past each walk place where it only came back blocked,
+    as where slot 0 cannot come up any more; at last the check's own."""
+    for commit in [found.base, *(m.walk_at for m in members)]:
+        place = found.at[commit]
+        if place <= here:
+            break
+        if any(at == place and result != BLOCKED for at, result in walks) or all(at != place for at, _ in walks):
+            return place
+    return here
 
 
 def _since_pass(found: Line, members: list[Merge], scenario: str, passed: int, here: int) -> dict[str, Any]:

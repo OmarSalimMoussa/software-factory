@@ -160,8 +160,22 @@ def test_a_git_failure_naming_the_check_s_commit_is_refused_and_logged(
         ("fail", [("base", "fail")], "wait for its fix"),
         ("fail", [("base", "pass")], "walk it halfway"),
         ("fail", [("base", "pass"), ("first", "pass")], "revert the second"),
+        ("fail", [("base", "blocked")], "walk it at the first"),
+        ("fail", [("base", "blocked"), ("first", "fail")], "wait for its fix"),
+        ("fail", [("base", "blocked"), ("first", "pass")], "revert the second"),
+        ("fail", [("base", "blocked"), ("first", "blocked"), ("second", "blocked")], "wait for its fix"),
     ],
-    ids=["blocked", "never passed", "fails at the base", "two suspects", "one suspect left"],
+    ids=[
+        "blocked",
+        "never passed",
+        "fails at the base",
+        "two suspects",
+        "one suspect left",
+        "the base cannot come up",
+        "fails at the first it came up at",
+        "passes at the first it came up at",
+        "came up at none before",
+    ],
 )
 def test_a_row_that_did_not_pass_names_what_comes_next(
     product: Product, result: str, earlier: list[tuple[str, str]], then: str
@@ -170,13 +184,14 @@ def test_a_row_that_did_not_pass_names_what_comes_next(
     second, two = product.merge("web/list.js")
     tip, _ = product.merge("api/handlers.py")
     for at, said in earlier:
-        product.check({"base": product.base, "first": first}[at], web=said)
+        product.check({"base": product.base, "first": first, "second": second}[at], web=said)
 
     answer = product.check(tip, web=result, api="pass")
 
     expected: dict[str, Any] = {
         "walk it again": {"do": "again"},
         "walk it at the base": {"do": "walk", "at": product.base},
+        "walk it at the first": {"do": "walk", "at": first},
         "wait for its fix": {"do": "wait"},
         "walk it halfway": {"do": "walk", "at": first, "suspects": [one, two]},
         "revert the second": {"do": "revert", "merge": second, "task": two},
