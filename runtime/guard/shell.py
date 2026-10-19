@@ -91,8 +91,8 @@ def _body_substitutions(body: str) -> list[str]:
         if body[i] == "\\":
             i += 2
         elif body.startswith("$(", i):
-            end = _closing(body, i + 2)
-            inner.append(body[i + 2 : end])
+            end, ran = _substitution(body, i)
+            inner.extend(ran)
             i = end + 1
         elif body[i] == "`":
             end = body.find("`", i + 1)
@@ -136,8 +136,8 @@ def _substitutions(command: str) -> tuple[str, list[str]]:
         elif ch == '"':
             quote = "" if quote == '"' else '"'
         if command.startswith("$(", i):
-            end = _closing(command, i + 2)
-            inner.append(command[i + 2 : end])
+            end, ran = _substitution(command, i)
+            inner.extend(ran)
             out.append(EXPANDED)
             i = end + 1
             continue
@@ -152,6 +152,15 @@ def _substitutions(command: str) -> tuple[str, list[str]]:
         out.append(ch)
         i += 1
     return "".join(out), inner
+
+
+def _substitution(command: str, i: int) -> tuple[int, list[str]]:
+    """Where the ``$(`` at ``i`` ends, and what runs: of ``$(( … ))``, not ``$((a); (b))``, only its substitutions."""
+    end = _closing(command, i + 2)
+    body = command[i + 2 : end]
+    if body.startswith("(") and _closing(body, 1) == len(body) - 1:
+        return end, _substitutions(body[1:-1])[1]
+    return end, [body]
 
 
 def _closing(command: str, start: int) -> int:

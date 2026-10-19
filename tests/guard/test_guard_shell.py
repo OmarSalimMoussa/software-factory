@@ -42,6 +42,8 @@ def kit(tmp_path: Path) -> Kit:
         ("command -p sudo ls", "leave-slice"),
         ("coproc sudo ls", "leave-slice"),
         ("find . -name x -exec sudo ls {} \\;", "leave-slice"),
+        ("echo $(( $(sudo ls | wc -l) + 1 ))", "leave-slice"),
+        ("echo $((sudo ls); (true))", "leave-slice"),
         ("env -S'sudo ls'", "leave-slice"),
         ("env --split-string='sudo ls'", "leave-slice"),
         ("run0 ls", "leave-slice"),
@@ -214,6 +216,9 @@ def test_a_line_hidden_from_the_guard_or_named_only_once_expanded_is_refused(kit
         'cd "$(git rev-parse --show-toplevel)" && ls',
         'for f in a b; do echo "$f"; done',
         "echo ${HOME}/x $((1<<3))",
+        # Arithmetic runs no program of its own, though it starts with a value only the shell knows.
+        "start=$(date +%s); until [ $(( $(date +%s) - start )) -ge 30 ]; do sleep 1; done",
+        "echo $(( $n + 1 ))",
         "source scripts/lib/slots.sh && slot_number 1",
         'git log --oneline "$base"..HEAD',
         "git diff $(git merge-base main HEAD)",
