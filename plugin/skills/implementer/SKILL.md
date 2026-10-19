@@ -69,7 +69,8 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
    address; the widths to test (`qa.widths`); what changed and why, with file paths; the spec's checks; the
    scenarios to walk (round 1 walks each scenario your branch adds or changes, cold); the test address each tester
    signs in as; and every finding earlier rounds raised, with what you did about it. Never a desktop's address or
-   password, nor a word against `desktop up`: a tester takes neither from a brief, and brings the desktop up itself.
+   password, nor a word of `desktop up` or `desktop down`: a tester takes neither from a brief, brings the desktop up
+   itself, and leaves it for the warden to take down at its hand-back.
 5. **Findings** are claims to check (the `taking-review` skill): fix it, dispute it with evidence (the orchestrator
    may waive it: `factory qa waive <task> <finding> --why "…"`), or file it when it is outside your task: `factory request new --from <tester> --severity normal --where "<where>" --body <file>`.
    Each bug a tester caught gets a test, or a scenario step, that would catch it again. A tester the environment
