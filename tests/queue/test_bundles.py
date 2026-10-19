@@ -260,18 +260,22 @@ def test_a_bundle_grows_past_the_cap_only_once_the_check_of_the_cap_did_not_pass
 
 
 @pytest.mark.parametrize(
-    ("built", "name", "refused"),
+    ("built", "name", "said"),
     [
-        (True, "web", None),
+        (True, "web", "1. Open it."),
+        (True, "phone-width", "1. Narrow the window."),
         (False, "web", "slot 0 gives no build"),
-        (True, "gone", "has no scenario gone"),
+        (True, "gone", "has no scenario or qa procedure gone"),
     ],
-    ids=["as-slot-0-runs-it", "no-build-known", "one-its-build-lacks"],
+    ids=["as-slot-0-runs-it", "a-qa-procedure-one-points-at", "no-build-known", "one-its-build-lacks"],
 )
 def test_a_regression_tester_reads_each_scenario_as_the_build_slot_0_runs_has_it(
-    world: World, product: Product, monkeypatch: pytest.MonkeyPatch, built: bool, name: str, refused: str | None
+    world: World, product: Product, monkeypatch: pytest.MonkeyPatch, built: bool, name: str, said: str
 ) -> None:
-    older = product.base
+    (world.repo / "qa" / "phone-width.md").write_text("# Phone width\n\n1. Narrow the window.\n")
+    product.git("add", "-A")
+    product.git("commit", "-q", "-m", "a procedure")
+    older = product.git("rev-parse", "HEAD")
     (world.repo / FOLDER / "web.md").write_text(f"---\n{SCENARIOS['web']}\n---\n# web\n\n1. Rewritten since.\n")
     product.git("commit", "-q", "-am", "rewrite web")
     # The deploy log lags slot 0 by up to a probe: slot 0's own answer is the build its testers walk.
@@ -281,10 +285,10 @@ def test_a_regression_tester_reads_each_scenario_as_the_build_slot_0_runs_has_it
     monkeypatch.setattr(health, "http_get", lambda *_: json.dumps({"build_commit": older[:8]}).encode())
     tester = world.ctx(agent_id="a1", agent_kind="qa-regression")
 
-    if refused is not None:
-        with pytest.raises(Refused, match=refused):
+    if not built or name == "gone":
+        with pytest.raises(Refused, match=said):
             walked.show(tester, {"name": name}, None)
         return
     answer = walked.show(tester, {"name": name}, None)["message"]
-    assert answer.startswith(f"web, as slot 0 runs it at {older[:8]}") and "1. Open it." in answer
+    assert answer.startswith(f"{name}, as slot 0 runs it at {older[:8]}") and said in answer
     assert "Rewritten" not in answer

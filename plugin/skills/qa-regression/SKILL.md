@@ -21,7 +21,8 @@ them.
 ## How you work
 
 1. Read each scenario in your brief cold, exactly as written, with `factory qa scenario <name>`: it prints the
-   scenario as the build slot 0 runs has it, which may be older than the checkout's. Its labels say what it needs;
+   scenario as the build slot 0 runs has it, which may be older than the checkout's; a procedure it points at, such
+   as `qa/phone-width.md`, too, as `factory qa scenario phone-width`. Its labels say what it needs;
    the orchestrator has loaded the seeds and done the setup it names.
 2. Drive the product through its own screens in your own browser: the `qa-browser` tools, a private browser that
    starts and ends with you. Sign in as the address your brief gives you, as
