@@ -4,7 +4,12 @@ request carrying the page's own header and an idempotency key."""
 from __future__ import annotations
 
 import json
+import logging
+import socketserver
+import threading
 import urllib.request
+import uuid
+from pathlib import Path
 
 import pytest
 from dashboard_rig import HOST, OWNER, Rig
@@ -12,7 +17,8 @@ from dashboard_seed import T0
 from seed_agents import CHECKED
 
 from runtime.dashboard import auth, brief_frame, pictures
-from runtime.dashboard.server import serve
+from runtime.dashboard.client import Warden
+from runtime.dashboard.server import App, PublicSettings, serve
 from runtime.shared import store, totp
 
 WRITE = {**OWNER, "origin": "http://127.0.0.1:8300", "content-type": "application/json", "x-software": "1"}
@@ -118,3 +124,44 @@ def test_while_the_warden_is_away_the_last_parts_are_served_marked_old(rig: Rig)
     never = rig.get("/api/guard")
     assert never.status == 503 and json.loads(never.body)["warden"]["ok"] is False
     assert rig.post("/api/factory/resume", {"idempotency_key": "resume-0001"}).status == 503
+
+
+@pytest.mark.parametrize(
+    ("serving", "answer", "why"),
+    [
+        (False, b"", "ConnectionRefusedError"),
+        (True, b"", "TimeoutError"),  # it takes the question and never answers
+        (True, b"not json\n", "an answer that is not JSON"),
+        (True, b"{}\n", "an answer with no ok"),
+    ],
+    ids=["gone", "silent", "not-json", "no-ok"],
+)
+def test_the_warning_that_the_warden_does_not_answer_names_the_verb_and_why(
+    rig: Rig, caplog: pytest.LogCaptureFixture, serving: bool, answer: bytes, why: str
+) -> None:
+    address, given_up = Path(f"\0dashboard-stand-in-{uuid.uuid4().hex}"), threading.Event()
+
+    class StandIn(socketserver.StreamRequestHandler):
+        def handle(self) -> None:
+            self.rfile.readline()
+            if answer:
+                self.wfile.write(answer)
+            else:
+                given_up.wait(10)
+
+    stand_in = socketserver.ThreadingUnixStreamServer(str(address), StandIn) if serving else None
+    if stand_in is not None:
+        threading.Thread(target=stand_in.serve_forever, daemon=True).start()
+    app = App(PublicSettings(rig.places), Warden(address, lambda: 0.2), rig.clock.now)
+    try:
+        with caplog.at_level(logging.WARNING, logger="factory.dashboard"):
+            reply = app.get("/api/home", OWNER)
+    finally:
+        given_up.set()
+        if stand_in is not None:
+            stand_in.shutdown()
+            stand_in.server_close()
+    assert reply.status == 503 and json.loads(reply.body)["warden"]["ok"] is False
+    assert [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING] == [
+        f"dashboard: the warden does not answer device.verify on its owner socket (WardenDown: {why})"
+    ]

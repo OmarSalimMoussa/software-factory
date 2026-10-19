@@ -138,5 +138,5 @@ def test_a_tool_the_warden_does_not_answer_says_so_and_is_logged(
     assert status == 200 and answer["result"]["isError"]
     assert "did not answer" in answer["result"]["content"][0]["text"]
     assert [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING] == [
-        "dashboard: the warden does not answer on its owner socket (WardenDown)"
+        "dashboard: the warden does not answer factory.pause on its owner socket (WardenDown: ConnectionRefusedError)"
     ]

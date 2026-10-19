@@ -68,7 +68,7 @@ class _Invalid(Exception):
         super().__init__(message)
 
 
-def answer(warden: Warden, lost: Callable[[], None], raw: bytes) -> tuple[int, dict[str, Any] | None]:
+def answer(warden: Warden, lost: Callable[[WardenDown], None], raw: bytes) -> tuple[int, dict[str, Any] | None]:
     """The HTTP status and the JSON-RPC answer to one message, or None for a notification, which gets none.
     ``lost`` reports that the warden did not answer."""
     try:
@@ -93,7 +93,7 @@ def answer(warden: Warden, lost: Callable[[], None], raw: bytes) -> tuple[int, d
     return 200, {"jsonrpc": "2.0", "id": ident, "result": result}
 
 
-def _result(warden: Warden, lost: Callable[[], None], method: str, params: dict[str, Any]) -> dict[str, Any]:
+def _result(warden: Warden, lost: Callable[[WardenDown], None], method: str, params: dict[str, Any]) -> dict[str, Any]:
     if method == "initialize":
         asked = params.get("protocolVersion")
         if not isinstance(asked, str):
@@ -110,7 +110,7 @@ def _result(warden: Warden, lost: Callable[[], None], method: str, params: dict[
     raise _Invalid(_NO_METHOD, f"There is no method {method}.")
 
 
-def _tool(warden: Warden, lost: Callable[[], None], params: dict[str, Any]) -> dict[str, Any]:
+def _tool(warden: Warden, lost: Callable[[WardenDown], None], params: dict[str, Any]) -> dict[str, Any]:
     name, arguments = params.get("name"), params.get("arguments")
     if name not in _TOOLS:
         raise _Invalid(_INVALID_PARAMS, f"There is no tool {name}.")
@@ -123,8 +123,8 @@ def _tool(warden: Warden, lost: Callable[[], None], params: dict[str, Any]) -> d
     try:
         reply = warden.call(verb, args, None if data is None else data.encode())
     # telemetry: surfaced — `lost` reports the warden's absence once; the tool's answer says what is unknown
-    except WardenDown:
-        lost()
+    except WardenDown as down:
+        lost(down)
         return _text(_NO_ANSWER, error=True)
     return _text(json.dumps(reply), error=not reply["ok"])
 

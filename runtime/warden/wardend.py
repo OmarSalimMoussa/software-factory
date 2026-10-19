@@ -25,7 +25,7 @@ from runtime.shared import environment, error_reports, store
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, Places
 from runtime.shared.settings import Settings
-from runtime.warden import gc, imports, inbox, loop, public, schedule, server, upgrade
+from runtime.warden import gc, imports, inbox, lock_watch, loop, public, schedule, server, upgrade
 from runtime.warden.context import Caller, CheckPlaces, Clock, Context
 from runtime.warden.delivery import done, github
 from runtime.warden.dispatch import Dispatcher, Doors, resolve
@@ -167,6 +167,11 @@ def main() -> int:
         proc=Path("/proc"),
     )
     server.serve(places, peers, dispatcher, current.get_int("factory.warden_threads"))
+
+    def dashboard_wait() -> float:
+        return float(settings().get_int("dashboard.warden_seconds"))
+
+    imports.in_thread("lock watch")(partial(lock_watch.watch, doors.lock, dashboard_wait, threading.Event()))
     ctx = doors.context(WARDEN)
     refusals = reflections.RefusalWatch()
 

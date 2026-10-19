@@ -12,7 +12,11 @@ from runtime.shared import protocol
 
 
 class WardenDown(Exception):
-    """The warden did not answer: its socket is gone, it refused the connection, or it answered too late."""
+    """The warden gave ``verb`` no answer; ``why`` names the error's class, or what was wrong with what came back."""
+
+    def __init__(self, verb: str, why: str) -> None:
+        super().__init__(f"{verb}: {why}")
+        self.verb, self.why = verb, why
 
 
 class Warden:
@@ -29,11 +33,11 @@ class Warden:
                 with conn.makefile("rb") as reader:
                     line = reader.readline(protocol.MAX_LINE + 1)
         except (OSError, TimeoutError) as exc:
-            raise WardenDown(type(exc).__name__) from exc
+            raise WardenDown(verb, type(exc).__name__) from exc
         try:
             answer = json.loads(line)
         except ValueError as exc:
-            raise WardenDown("an answer that is not JSON") from exc
+            raise WardenDown(verb, "an answer that is not JSON") from exc
         if not isinstance(answer, dict) or not isinstance(answer.get("ok"), bool):
-            raise WardenDown("an answer with no ok")
+            raise WardenDown(verb, "an answer with no ok")
         return answer

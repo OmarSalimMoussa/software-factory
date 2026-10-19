@@ -102,8 +102,8 @@ class App:
         # telemetry: surfaced — the browser is answered with `_json` saying why access was refused
         except auth.Denied as exc:
             return _json(exc.status, {"ok": False, "refused": "access", "reason": str(exc)})
-        except WardenDown:
-            return self._away(target)
+        except WardenDown as lost:
+            return self._away(target, lost)
 
     def _api(self, target: str, path: str, query: dict[str, str], headers: Mapping[str, str]) -> Reply:
         if (refused := self._device(auth.token_of(headers))) is not None:
@@ -131,12 +131,12 @@ class App:
         try:
             if self.devices.admitted(token):
                 return None
-        except WardenDown:
-            return self._unreachable("Can't reach the warden, so nothing changed.")
+        except WardenDown as lost:
+            return self._unreachable("Can't reach the warden, so nothing changed.", lost)
         return _json(401, {"ok": False, "error": "This device is not signed in."})
 
-    def _unreachable(self, reason: str) -> Reply:
-        self._warden_lost()
+    def _unreachable(self, reason: str, lost: WardenDown) -> Reply:
+        self._warden_lost(lost)
         warden = {"ok": False, "since": clock(self.parts.down_since or self.now())}
         return _json(503, {"ok": False, "warden": warden, "error": "Can't reach the warden.", "reason": reason})
 
@@ -148,16 +148,18 @@ class App:
         )
         return {**envelope, "timeout_ms": wait * 1000}
 
-    def _away(self, key: str) -> Reply:
-        self._warden_lost()
+    def _away(self, key: str, lost: WardenDown) -> Reply:
+        self._warden_lost(lost)
         envelope = self.parts.stale(key, None)
         if envelope is not None:
             return _json(200, self._timed(envelope))
-        return self._unreachable("Can't reach the warden.")
+        return self._unreachable("Can't reach the warden.", lost)
 
-    def _warden_lost(self) -> None:
+    def _warden_lost(self, lost: WardenDown) -> None:
         if self.parts.down_since is None:
-            log.warning("dashboard: the warden does not answer on its owner socket (WardenDown)")
+            log.warning(
+                "dashboard: the warden does not answer %s on its owner socket (WardenDown: %s)", lost.verb, lost.why
+            )
         self.parts.down()
 
     def _snapshot(self, wants: dict[str, Any]) -> Snap:
@@ -215,8 +217,8 @@ class App:
         # telemetry: surfaced — the caller is answered with `_json` saying why access was refused
         except auth.Denied as exc:
             return _json(exc.status, {"ok": False, "refused": "access", "reason": str(exc)})
-        except WardenDown:
-            return self._unreachable("Can't reach the warden, so nothing changed.")
+        except WardenDown as lost:
+            return self._unreachable("Can't reach the warden, so nothing changed.", lost)
 
     def _change(self, path: str, headers: Mapping[str, str], raw: bytes) -> Reply:
         host = auth.check_host(headers, self.settings().get_list("dashboard.hosts"), write=True)
