@@ -12,7 +12,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import checks, schedule
 from runtime.warden.owner import ops
-from runtime.warden.sessions import crashwatch, lifecycle, older_skills, revive
+from runtime.warden.sessions import crashwatch, lifecycle, older_skills, permits, revive
 
 
 def rule(call: Any, *args: Any) -> str:
@@ -246,6 +246,24 @@ def test_a_revived_implementer_is_told_how_far_the_default_branch_moved(
     [(_, said)] = world.launcher.messages
     assert ("The default branch has 3 commits your branch lacks: `git rebase " in said) == told
     assert any("was not compared with" in r.getMessage() for r in caplog.records) == logged
+
+
+@pytest.mark.parametrize(("status", "slot", "told"), [
+    ("deprioritized", 1, "Slot 1 is yours again: rebuild it"),
+    ("qa-clean", None, permits.AWAITS_TURN),
+])  # fmt: skip
+def test_a_revived_implementer_rebuilds_its_slot_unless_its_task_waits_qa_clean_for_its_merge_turn(
+    world: World, status: str, slot: int | None, told: str
+) -> None:
+    world.queue.add("t-0001", status=status)
+    world.seat("5e550001", task="t-0001", state=DEPRIORITIZED)
+    world.launcher.behind = 3
+
+    revive.revive_session(world.ctx(), "5e550001", "warden")
+
+    [(_, said)] = world.launcher.messages
+    lease = leases.held_by(world.places, world.settings, world.session("5e550001").name)
+    assert (told in said, "git rebase" in said, lease and lease.slot) == (True, slot is not None, slot)
 
 
 def test_a_stopped_run_that_never_was_a_proposal_goes_back_to_the_queue(world: World) -> None:

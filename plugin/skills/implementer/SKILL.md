@@ -110,7 +110,8 @@ message, or your first one, says so) comes back first: `git merge --ff-only <def
   `git add -A`, then `git commit -m "Paused: <slice, and what is left>"`, and end your turn. Only `git commit` and
   `factory` work until you stop.
 - **Revived:** your context is whole. Claim a slot and rebuild it (`factory slot claim`, `factory slot up`). Testers
-  that were running ended with you: start the interrupted round again; it does not count.
+  that were running ended with you: start the interrupted round again; it does not count. A task QA clean needs no
+  slot: end your turn, and the merge turn's word wakes you.
 
 ## Never
 

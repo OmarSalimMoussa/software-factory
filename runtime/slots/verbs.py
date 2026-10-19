@@ -31,7 +31,7 @@ from runtime.shared.protocol import Refused, ok
 from runtime.slots import health, leases, staging
 from runtime.warden import public
 from runtime.warden.context import Context, StackResult
-from runtime.warden.sessions import registry
+from runtime.warden.sessions import permits, registry
 from runtime.warden.verbs import IMPL, ORCH, slot_ops
 
 WORD = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@+-]{0,127}$")
@@ -91,6 +91,8 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     if op == "claim":
         if session.role != IMPL:
             raise Refused("slot", "only an implementer claims a slot; slot 0 is the orchestrator's")
+        if permits.awaits_turn(ctx, session):
+            raise Refused("slot", permits.AWAITS_TURN)
         n = leases.claim(ctx, session.name, str(args.get("note", "")))
         return ok(slot=n, port=leases.port(settings, n))
     if op == "list":

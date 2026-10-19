@@ -31,7 +31,7 @@ from runtime.warden.sessions.permits import CAP, DESIGN, IMPL, SEVERE
 
 log = logging.getLogger(__name__)
 PAUSED = {"message": "The factory is paused; every session keeps its context.", "refresh": "all"}
-REVIVED = "The warden brought you back: carry on with your task from your branch."
+BROUGHT, CARRY_ON = "The warden brought you back", "carry on with your task from your branch."
 
 
 def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
@@ -42,16 +42,19 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
     s = read(ctx)[sid]
     slot = None
     try:
-        if s.role == IMPL:
+        waits = permits.awaits_turn(ctx, s)
+        builds = s.role == IMPL and not waits
+        if builds:
             slot = permits.claim_slot(ctx, s)
         rebuild = f" Slot {slot} is yours again: rebuild it with factory slot up." if slot is not None else ""
         older = older_skills.holds(ctx.places, s.id)
         held = held_word(ctx, s.task)
         unheard = checks.unheard(ctx.places, s.name)
-        behind = _behind(ctx, s) if s.role == IMPL else ""
+        behind = _behind(ctx, s) if builds else ""
         parts = (older_skills.RELOAD if older else "", unheard, behind, note, held)
         said = "\n\n".join(part for part in parts if part)
-        back = respawn.resume(ctx, s, REVIVED + rebuild + (f"\n\n{said}" if said else ""))
+        opening = f"{BROUGHT}. {permits.AWAITS_TURN}" if waits else f"{BROUGHT}: {CARRY_ON}{rebuild}"
+        back = respawn.resume(ctx, s, opening + (f"\n\n{said}" if said else ""))
     # telemetry: surfaced — the session stays deprioritized; `move` records why, and the caller is told
     except (LaunchError, Refused) as exc:
         if slot is not None:

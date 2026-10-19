@@ -18,7 +18,7 @@ from runtime.queue import approvals, statuses, tasks
 from runtime.queue import route as ladders
 from runtime.queue.formats import FormatError
 from runtime.shared import order, store
-from runtime.shared.models import DEPRIORITIZED, RETIRED, WAITING, WORKING, Session, Task
+from runtime.shared.models import DEPRIORITIZED, QA_CLEAN, RETIRED, WAITING, WORKING, Session, Task
 from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.slots import leases
@@ -34,6 +34,11 @@ CAP = {IMPL: "caps.implementers", DESIGN: "caps.designers"}
 # The factory never works on itself. This is code, not a setting, so no saved setting can turn it off.
 FACTORY_REPO = "software-factory"
 SEVERE = "severe"
+# The merge turn's check runs in the implementer's worktree, so a task QA clean has nothing to build until it.
+AWAITS_TURN = (
+    "Your task is QA clean and waits for its merge turn, which needs no slot: end your turn, and the turn's word "
+    "wakes you."
+)
 # Where a switch of Claude accounts stands: its daemon restarting, or back (runtime/warden/owner/accounts.py).
 RESTARTING, BACK = "restarting", "back"
 # owner/name at the end of any git remote or GitHub name: git@host:owner/name.git, https://host/owner/name, owner/name.
@@ -292,6 +297,10 @@ def in_order(ctx: Context, sessions: list[Session]) -> list[Session]:
 def has_work(ctx: Context, s: Session) -> bool:
     """Whether a benched session's task has work for it: one benched at its merge waits for the task's return."""
     return bool(s.task) and read_task(ctx, s.task).status not in statuses.WAITS
+
+
+def awaits_turn(ctx: Context, s: Session) -> bool:
+    return s.role == IMPL and bool(s.task) and read_task(ctx, s.task).status == QA_CLEAN
 
 
 def read_task(ctx: Context, task_id: str) -> Task:

@@ -3,6 +3,7 @@ tester holds alone, within the machine's cap and its CPU hold."""
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Callable
 from datetime import UTC, datetime
 
@@ -20,8 +21,11 @@ from runtime.warden.context import StackResult
 from runtime.warden.sessions import reap, registry
 
 
-def _implementer(world: World, n: int) -> None:
-    world.session(f"s-{n}", "implementer", f"impl-t-000{n}", f"t-000{n}", f"/wt/impl-t-000{n}")
+def _implementer(world: World, n: int, status: str = "") -> None:
+    task = world.task()
+    if status:
+        world.queue().write_task(dataclasses.replace(task, status=status, run=1))
+    world.session(f"s-{n}", "implementer", f"impl-{task.id}", task.id, f"/wt/impl-{task.id}")
 
 
 def test_claim_takes_the_first_free_slot_and_keeps_it(world: World) -> None:
@@ -36,6 +40,13 @@ def test_claim_takes_the_first_free_slot_and_keeps_it(world: World) -> None:
     with pytest.raises(Refused) as refused:
         slot(world.ctx("implementer", "s-3"), {"op": "claim"}, None)
     assert refused.value.rule == "slots-full"
+
+
+def test_an_implementer_whose_task_is_qa_clean_claims_no_slot_before_its_merge_turn(world: World) -> None:
+    _implementer(world, 1, "qa-clean")
+    with pytest.raises(Refused, match="waits for its merge turn, which needs no slot"):
+        slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)
+    assert leases.read(world.places, 1) is None
 
 
 def test_a_stack_command_before_a_claim_is_refused(world: World) -> None:
