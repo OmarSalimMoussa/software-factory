@@ -12,10 +12,10 @@ holds. When the factory still refuses one, test what needs none first, then try 
 
 ## 1. Open it
 
-1. `factory slot desktop up <address>` prints the view's address and a one-time password. It may take minutes, on
-   the factory's time, not yours: never skip it for lack of time. A product without a desktop answers "not
-   supported": report the step blocked.
-2. `browser_open_desktop` with the view's address. It sets your browser to the desktop's own size first, so a
+1. `factory slot desktop up <test address>`, the email address your scenario signs in as, prints the view's web
+   address and a one-time password. It may take minutes, on the factory's time, not yours: never skip it for lack of
+   time. A product without a desktop answers "not supported": report the step blocked.
+2. `browser_open_desktop` with the view's web address. It sets your browser to the desktop's own size first, so a
    screenshot is not shrunk before you see it and a point in it is the point on the desktop.
 3. Enter the password and take control as the view asks. Never put the password in your report.
 
