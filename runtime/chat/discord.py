@@ -19,7 +19,7 @@ from typing import Any
 
 from runtime.shared import network, store
 from runtime.shared.claude_accounts import SHOWN
-from runtime.shared.models import CHAT_ID
+from runtime.shared.models import CHAT_ID, CHAT_PAGES
 from runtime.shared.network import Answer
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
@@ -29,7 +29,6 @@ from runtime.warden.context import Context
 API = "https://discord.com/api/v10"
 TOKEN_FILE = "discord.token"
 AGENT = "DiscordBot (software-factory, 1)"  # Discord turns away urllib's own agent; a bot names itself this way
-POSITIONS = ("before", "after", "around")
 _TOKEN = re.compile(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
 _SECONDS = re.compile(r"[0-9]+(?:\.[0-9]+)?")
 
@@ -149,7 +148,7 @@ def _message(raw: Any) -> Message:
 
 def messages(secret: str, channel: str, position: str, ref: str, limit: int, timeout: float) -> list[Message]:
     """At most ``limit`` messages of the channel ``position`` the message ``ref``, oldest first."""
-    if position not in POSITIONS or not (CHAT_ID.fullmatch(channel) and CHAT_ID.fullmatch(ref)):
+    if position not in CHAT_PAGES or not (CHAT_ID.fullmatch(channel) and CHAT_ID.fullmatch(ref)):
         raise ValueError("a page of the chat is read before, after or around a message, by the ids of both")
     query = urllib.parse.urlencode({position: ref, "limit": limit})
     page = _call(secret, "GET", f"/channels/{channel}/messages?{query}", timeout)

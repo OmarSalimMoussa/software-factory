@@ -67,6 +67,8 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["errors", "--where", "slot", "3", "--issue", "12"],
         ["errors", "--where", "slot", "3", "--issue", "12", "--whole"],
         ["logs", "--where", "slot", "0", "--find", "sentinel", "--since", "2026-10-17T09:17:00Z"],
+        ["chat", "r-2026-10-09-0001"],
+        ["chat", "r-2026-10-09-0001", "--before", "700000000000000003"],
         ["request", "new", "--from", "owner", "--severity", "normal", "--where", "the sign-in page", "--body", FILE],
         ["triage", "apply", "--body", FILE],
         ["queue", "next"],
@@ -148,6 +150,13 @@ def test_telemetry_is_read_from_prod_or_a_slot_and_staging_is_slot_0() -> None:
         _build(["errors", "--where", "staging"])
 
 
+def test_a_read_of_the_chat_names_its_request_and_at_most_one_message_to_read_at() -> None:
+    assert _build(["chat", "r-2026-10-09-0001"]).args == {"request": "r-2026-10-09-0001"}
+    assert _build(["chat", "r-2026-10-09-0001", "--after", "7"]).args == {"request": "r-2026-10-09-0001", "after": "7"}
+    with pytest.raises(SystemExit):
+        _build(["chat", "r-2026-10-09-0001", "--after", "7", "--before", "9"])
+
+
 def test_propose_none_names_no_task() -> None:
     with pytest.raises(CliError):
         _build(["propose", "t-0001", "--none"])
@@ -224,6 +233,7 @@ def test_the_owners_account_commands_send_the_token_as_bytes_and_follow_a_switch
         "triage apply", "inbox", "inbox --wait", "tick", "status", "reflect --kind miss 'it missed'",
         "slot claim", "slot up", "propose t-0001 --picture p.svg --why now", "spec save t-0001 s.md --slices 2",
         "needs-owner t-0001 --picture p.svg --question why", "errors", "logs", "doing 'reading'",
+        "chat r-2026-10-09-0001 --around 700000000000000003",
     ],
 )  # fmt: skip
 def test_every_command_asks_for_the_verb_the_guard_reads_it_as(line: str) -> None:

@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 from typing import Any
 
+from runtime.shared.models import CHAT_PAGES
+
 
 def parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="factory", description="Ask the factory's warden.")
@@ -167,6 +169,11 @@ def _telemetry(sub: Any) -> None:
     logs.add_argument("--where", nargs="+", default=["prod"], metavar="prod|slot N")
     logs.add_argument("--find", nargs="+", help="only lines whose text holds these words, in this order")
     logs.add_argument("--since", help="only lines from this time on, such as 2026-10-17T09:17:00Z")
+    chat = sub.add_parser("chat", help="the talk around a request from the chat, a page at a time; read-only")
+    chat.add_argument("request")
+    place = chat.add_mutually_exclusive_group()
+    for position in CHAT_PAGES:
+        place.add_argument(f"--{position}", metavar="<message id>", help=f"the page {position} that message")
 
 
 def _slot(sub: Any) -> None:

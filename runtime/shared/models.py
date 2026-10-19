@@ -37,6 +37,7 @@ RETIRE_KINDS = (FINISHED, STOPPED, WITH_PARENT, CRASHED)
 FAMILIES = ("orch", "intake", "design", "impl", "qa")
 CHAT = "chat"
 CHAT_ID = re.compile(r"[0-9]{1,20}")  # a channel's, a message's or a writer's id in the chat: digits, sent as text
+CHAT_PAGES = ("before", "after", "around")  # where a page of the chat lies, from the message it is read at
 INBOXES = ("agents", "owner", "users", CHAT)
 TASK_SEVERITIES = ("severe", "major", "minor")
 REQUEST_SEVERITIES = ("severe", "normal")

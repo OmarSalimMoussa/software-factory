@@ -22,7 +22,7 @@ from typing import IO, Any
 
 from runtime.cli import commands
 from runtime.shared import lanes, protocol
-from runtime.shared.models import SEVERITIES
+from runtime.shared.models import CHAT_PAGES, SEVERITIES
 from runtime.shared.paths import Places
 
 LOCAL = (lanes.BROWSER, "slot-api")
@@ -253,6 +253,9 @@ _CALLS: dict[str, Callable[[argparse.Namespace, Callable[[str], bytes]], Call]] 
     "settings": lambda ns, _: Call("settings.show", {}),
     "errors": lambda ns, _: _telemetry_call(ns),
     "logs": lambda ns, _: _telemetry_call(ns),
+    "chat": lambda ns, _: Call(
+        "chat", {"request": ns.request, **{p: getattr(ns, p) for p in CHAT_PAGES if getattr(ns, p)}}
+    ),
     "request": _request_call,
     "triage": _triage_call,
     "queue": _queue_call,
