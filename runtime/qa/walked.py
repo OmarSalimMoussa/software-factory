@@ -1,4 +1,5 @@
-"""A scenario, or a qa procedure one points at (qa/<name>.md), as slot 0 runs it: `factory qa scenario <name>`.
+"""A scenario, the scenarios' README, or a qa procedure one points at (qa/<name>.md), as slot 0 runs it:
+`factory qa scenario <name>`.
 
 A regression tester walks slot 0 at the build its health answer names, which can be older than the default branch's
 tip: a bundle walks the commit its merges reached. The checkout holds the tip's text, which a merge since may have
@@ -16,7 +17,7 @@ from runtime.shared.protocol import Refused, ok
 from runtime.slots import health
 from runtime.warden.context import Context
 
-_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_NAME = re.compile(r"^(?:[a-z0-9][a-z0-9-]*|README)$")
 
 
 def show(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:

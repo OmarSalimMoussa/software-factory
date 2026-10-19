@@ -264,10 +264,17 @@ def test_a_bundle_grows_past_the_cap_only_once_the_check_of_the_cap_did_not_pass
     [
         (True, "web", "1. Open it."),
         (True, "phone-width", "1. Narrow the window."),
+        (True, "README", "# Scenarios"),
         (False, "web", "slot 0 gives no build"),
         (True, "gone", "has no scenario or qa procedure gone"),
     ],
-    ids=["as-slot-0-runs-it", "a-qa-procedure-one-points-at", "no-build-known", "one-its-build-lacks"],
+    ids=[
+        "as-slot-0-runs-it",
+        "a-qa-procedure-one-points-at",
+        "the-scenarios-readme",
+        "no-build-known",
+        "one-its-build-lacks",
+    ],
 )
 def test_a_regression_tester_reads_each_scenario_as_the_build_slot_0_runs_has_it(
     world: World, product: Product, monkeypatch: pytest.MonkeyPatch, built: bool, name: str, said: str
