@@ -33,24 +33,24 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    the oldest waiting merges, at most `rounds.bundle_merges`, walked together at one commit: the one just before the
    next merge, or the tip. Slot 0 comes up there, whole, from a worktree of its own when that commit is older than
    the tip, and regression testers walk, in parallel, every scenario whose `protects` names a path one of them
-   changed. Their runs go into the evidence with the saved check, so its page in Work shows each tester's
-   screenshots and the replay of its walk. The clean-up keeps the QA of the newest `qa.keep_bundles` checks that
-   cleared a merge; past them, the screenshots and replays of a check, or of a task it cleared, go, and their pages
-   say when. Transcripts are never removed. A check clears every merge waiting up to its commit, at once, only when
-   every row passed, each of those scenarios has a row, slot 0 ran that commit, and they are within the cap;
-   anything less clears none. No merge turn goes while the cap of merges waits, until their bundle's check failed.
-   Each row that did not pass says what comes next: walk it again once what blocked it is fixed (a block is never a
-   revert); walk it alone at the bundle's base (or, where slot 0 cannot come up there, at the next merge's place), or
-   between its suspects (the merges since its last pass whose changed paths it protects); revert the one suspect
-   left, which sends its task back to its implementer; or, when it fails at the oldest of those too, wait for its
-   fix, which takes the next turn and joins the bundle past the cap. When
-   only the owner can give what a merge needs (a key, an account, leave to use an outside site), it is reverted and
-   its task blocked: it waits on Home for the owner's **Fixed, carry on**, its implementer benched and written to
-   SELF_REFLECT, while other work goes on. When another open task makes it, the task is on hold, and the warden
-   sends it back once that task is checked, or closed or parked; the orchestrator may release a hold whose task
-   cannot pass soon, and it then no longer waits for it. A fix the merge carried for what every task shares, such
-   as a build or ignore file, is applied again right after the revert, in one commit of its own; one that no longer
-   applies cleanly becomes a request.
+   changed. Their runs go into the evidence with the saved check, so its page in Work shows each tester's screenshots
+   and the replay of its walk. The clean-up keeps the QA of the newest `qa.keep_bundles` checks that cleared a merge;
+   past them, the screenshots and replays of a check, or of a task it cleared, go, and their pages say when.
+   Transcripts are never removed. A check clears every merge waiting up to its commit, at once, only when every row
+   passed, each of those scenarios has a row, slot 0 ran that commit, and they are within the cap; anything less
+   clears none. No merge turn goes while the cap of merges waits, until their bundle's check failed. Each row that
+   did not pass says what comes next: walk it again once what blocked it is fixed (a block is never a revert); walk
+   it alone at the bundle's base (or, where slot 0 cannot come up there, at the next merge's place), or between its
+   suspects (the merges since its last pass whose changed paths it protects); revert the one suspect left once
+   `rounds.revert_fails` walks with it in failed (one fail of a scenario that sometimes fails is no proof), which
+   sends its task back to its implementer; or, when it fails at the oldest of those too, wait for its fix, which
+   takes the next turn and joins the bundle past the cap. When only the owner can give what a merge needs (a key, an
+   account, leave to use an outside site), it is reverted and its task blocked: it waits on Home for the owner's
+   **Fixed, carry on**, its implementer benched and written to SELF_REFLECT, while other work goes on. When another
+   open task makes it, the task is on hold, and the warden sends it back once that task is checked, or closed or
+   parked; the orchestrator may release a hold whose task cannot pass soon, and it then no longer waits for it. A fix
+   the merge carried for what every task shares, such as a build or ignore file, is applied again right after the
+   revert, in one commit of its own; one that no longer applies cleanly becomes a request.
 10. **Staging** is slot 0: after each check it comes back up at the default branch's tip, so it runs the newest
     merge. The warden mirrors the default branch to GitHub; no agent pushes, asks for a push or waits on one.
 11. **Prod.** Only the owner pushes to prod, from the dashboard, at exactly the commit staging runs, once every merge

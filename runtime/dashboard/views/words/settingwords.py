@@ -52,6 +52,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("rounds.check_runs", "Check runs on a merge turn"),
             ("rounds.extend_by", "One extension adds"),
             ("rounds.bundle_merges", "Merges one check of the default branch clears together"),
+            ("rounds.revert_fails", "Failed walks that name a merge for a revert"),
         ],
     ),
     (

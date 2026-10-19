@@ -159,10 +159,11 @@ def test_a_git_failure_naming_the_check_s_commit_is_refused_and_logged(
         ("fail", [], "walk it at the base"),
         ("fail", [("base", "fail")], "wait for its fix"),
         ("fail", [("base", "pass")], "walk it halfway"),
-        ("fail", [("base", "pass"), ("first", "pass")], "revert the second"),
+        ("fail", [("base", "pass"), ("first", "pass")], "walk it at the second again"),
+        ("fail", [("base", "pass"), ("first", "pass"), ("second", "fail")], "revert the second"),
         ("fail", [("base", "blocked")], "walk it at the first"),
         ("fail", [("base", "blocked"), ("first", "fail")], "wait for its fix"),
-        ("fail", [("base", "blocked"), ("first", "pass")], "revert the second"),
+        ("fail", [("base", "blocked"), ("first", "pass"), ("second", "fail")], "revert the second"),
         ("fail", [("base", "blocked"), ("first", "blocked"), ("second", "blocked")], "wait for its fix"),
     ],
     ids=[
@@ -170,7 +171,8 @@ def test_a_git_failure_naming_the_check_s_commit_is_refused_and_logged(
         "never passed",
         "fails at the base",
         "two suspects",
-        "one suspect left",
+        "one suspect failed once",
+        "one suspect failed twice",
         "the base cannot come up",
         "fails at the first it came up at",
         "passes at the first it came up at",
@@ -194,6 +196,7 @@ def test_a_row_that_did_not_pass_names_what_comes_next(
         "walk it at the first": {"do": "walk", "at": first},
         "wait for its fix": {"do": "wait"},
         "walk it halfway": {"do": "walk", "at": first, "suspects": [one, two]},
+        "walk it at the second again": {"do": "walk", "at": second, "suspects": [two]},
         "revert the second": {"do": "revert", "merge": second, "task": two},
     }[then]
     told = [{k: v for k, v in step.items() if k != "why"} for step in answer["next"]]

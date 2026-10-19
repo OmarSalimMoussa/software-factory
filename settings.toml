@@ -47,6 +47,7 @@ critic = 4
 check_runs = 3
 extend_by = 2
 bundle_merges = 5       # merges one check of the default branch clears together; no merge turn goes past it
+revert_fails = 2        # a bundle names a merge for a revert once this many walks with it in failed a scenario
 
 [qa]
 seconds_per_item = 120

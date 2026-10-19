@@ -148,7 +148,8 @@ def settle(ctx: Context, found: Line, record: CheckRecord) -> dict[str, Any]:
     failing = [row for row in record.rows if row.result != PASS]
     checks, _ = Queue.of(ctx).checks()
     if failing:
-        return {"cleared": [], "next": [_next(found, checks, record, row) for row in failing]}
+        need = ctx.settings().get_int("rounds.revert_fails")
+        return {"cleared": [], "next": [_next(found, checks, record, row, need) for row in failing]}
     first = _past_cap(ctx, found, checks, members)
     if first:
         cap = ctx.settings().get_int("rounds.bundle_merges")
@@ -185,8 +186,9 @@ def _slot0_ran(ctx: Context, commit: str) -> bool:
     return bool(last) and last[0].ok and bool(last[0].commit) and commit.startswith(last[0].commit)
 
 
-def _next(found: Line, checks: list[CheckRecord], record: CheckRecord, row: ScenarioRow) -> dict[str, Any]:
-    """What a row that did not pass asks for: walk it again or alone, revert one merge, or wait for a fix."""
+def _next(found: Line, checks: list[CheckRecord], record: CheckRecord, row: ScenarioRow, need: int) -> dict[str, Any]:
+    """What a row that did not pass asks for: walk it again or alone, revert one merge once ``need`` walks with it in
+    failed, or wait for a fix."""
     said = {"scenario": row.scenario, "result": row.result}
     members = found.upto(record.commit)
     if row.result == BLOCKED:
@@ -206,7 +208,8 @@ def _next(found: Line, checks: list[CheckRecord], record: CheckRecord, row: Scen
     floor = _floor(found, members, walks, here)
     passes = [at for at, result in walks if result == PASS]
     if passes and min(passes) <= floor:
-        return {**said, **_since_pass(found, members, row.scenario, min(passes), here)}
+        fails = [here, *(at for at, result in walks if result not in (PASS, BLOCKED))]
+        return {**said, **_since_pass(found, members, row.scenario, (min(passes), here), fails, need)}
     oldest = (
         "before every merge waiting" if floor == found.at[found.base] else "the oldest commit it was not blocked at"
     )
@@ -237,25 +240,44 @@ def _floor(found: Line, members: list[Merge], walks: list[tuple[int, str]], here
     return here
 
 
-def _since_pass(found: Line, members: list[Merge], scenario: str, passed: int, here: int) -> dict[str, Any]:
-    """Its suspects: the merges since its pass at the place ``passed``, those that protect it if any do."""
+def _since_pass(
+    found: Line, members: list[Merge], scenario: str, places: tuple[int, int], fails: list[int], need: int
+) -> dict[str, Any]:
+    """Its suspects: the merges since its pass, those that protect it if any do. ``places`` are its pass's and the
+    check's; ``fails``, where it failed since."""
+    passed, here = places
     since = [m for m in members if found.at[m.commit] < passed]
     if passed == here or not since:
         return {"do": "again", "why": "it passed with every merge up to here in it: walk it again"}
     suspects = [m for m in since if scenario in m.scenarios] or since
     if len(suspects) == 1:
-        return {
-            "do": "revert",
-            "merge": suspects[0].commit,
-            "task": suspects[0].task,
-            "why": f"the one merge since its pass at {found.commits[passed][:12]} that could break it",
-        }
+        return _one_suspect(found, suspects[0], found.commits[passed], fails, need)
     middle = suspects[(len(suspects) + 1) // 2 - 1]
     return {
         "do": "walk",
         "at": middle.walk_at,
         "suspects": [m.task for m in suspects],
         "why": "walk it alone there: a pass leaves the later suspects, a fail the earlier",
+    }
+
+
+def _one_suspect(found: Line, suspect: Merge, passed: str, fails: list[int], need: int) -> dict[str, Any]:
+    """A revert once ``need`` walks with the suspect in failed: one fail of a scenario that sometimes fails is no
+    proof."""
+    seen = sum(1 for at in fails if at <= found.at[suspect.commit])
+    if seen < need:
+        return {
+            "do": "walk",
+            "at": suspect.walk_at,
+            "suspects": [suspect.task],
+            "why": f"{seen} of the {need} failed walks a revert needs have the one merge that could break it in: "
+            "walk it alone there again",
+        }
+    return {
+        "do": "revert",
+        "merge": suspect.commit,
+        "task": suspect.task,
+        "why": f"the one merge since its pass at {passed[:12]} that could break it, failed {seen} times",
     }
 
 
@@ -315,7 +337,8 @@ def show(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     newest = _newest(checks, walk_at)
     if newest is not None:
         answer["check"] = newest.id
-        answer["next"] = [_next(found, checks, newest, row) for row in newest.rows if row.result != PASS]
+        need = ctx.settings().get_int("rounds.revert_fails")
+        answer["next"] = [_next(found, checks, newest, row, need) for row in newest.rows if row.result != PASS]
     up = "factory slot up" if walk_at == found.commits[0] else f"factory slot up --at {walk_at[:12]}"
     told = f"{len(members)} of {len(found.waiting)} waiting merges: {up}, walk "
     told += f"{len(names)} scenarios" if names else f"{answer['walk_instead']}, as no scenario protects them"
