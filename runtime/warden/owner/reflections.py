@@ -21,8 +21,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from runtime.guard import walk_hold
 from runtime.guard.wire import REFUSAL_FIELDS
-from runtime.shared import store
+from runtime.shared import lanes, store
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.warden.context import Context
@@ -159,6 +160,8 @@ def incident(ctx: Context, text: str, where: str = "") -> None:
 
 # The guard's refusals for a spent round limit, by the rounds.* name the limit extends.
 SPENT = {"qa-rounds": "qa", "critic-rounds": "critic"}
+# The refusals that ask a session only to wait its turn, which ends on its own: no misbehaviour, however often.
+WAITS = frozenset({lanes.PLACES, walk_hold.HOLD, walk_hold.UPGRADE})
 
 
 def _spent(ctx: Context, sid: str, limit: str) -> None:
@@ -175,7 +178,8 @@ def _spent(ctx: Context, sid: str, limit: str) -> None:
 
 
 class RefusalWatch:
-    """Records each guard refusal, and files an incident when one rule refuses one session or subagent repeatedly."""
+    """Records each guard refusal, and files an incident when one rule refuses one session or subagent repeatedly, but
+    for a wait."""
 
     def __init__(self) -> None:
         self._recent: dict[tuple[str, str, str], deque[float]] = {}
@@ -189,6 +193,8 @@ class RefusalWatch:
         store.append_jsonl(ctx.places.refusals, {"at": ctx.clock.iso(), **fields})
         if fields["rule"] in SPENT:
             _spent(ctx, fields["session"], SPENT[fields["rule"]])
+        if fields["rule"] in WAITS:
+            return
         window = settings.get_int("watch.refusal_window_minutes") * 60
         limit = settings.get_int("watch.refusals_to_notify")
         key = (fields["session"], fields["agent_id"], fields["rule"])

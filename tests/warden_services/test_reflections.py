@@ -97,6 +97,18 @@ def test_one_messages_calls_refused_at_once_are_one_attempt(ctx: Context) -> Non
     assert reflections.entries(ctx.places) == [] and len(store.read_jsonl(ctx.places.refusals)) == limit * 2
 
 
+@pytest.mark.parametrize("rule", ["browsers-at-once", "cpu-hold", "upgrade-hold"])
+def test_a_refusal_that_asks_only_to_wait_a_turn_files_no_incident_however_often(ctx: Context, rule: str) -> None:
+    watch = reflections.RefusalWatch()
+    limit = ctx.settings().get_int("watch.refusals_to_notify")
+
+    for _ in range(limit * 2):
+        watch.record(ctx, {"session": "s1", "rule": rule, "tool": "Agent", "detail": "wait"})
+        _later(ctx)
+
+    assert reflections.entries(ctx.places) == [] and len(store.read_jsonl(ctx.places.refusals)) == limit * 2
+
+
 def _later(ctx: Context) -> None:
     """Past the seconds within which refusals count as one attempt."""
     cast(FakeClock, ctx.clock).t += ctx.settings().get_int("watch.refusal_burst_seconds")
