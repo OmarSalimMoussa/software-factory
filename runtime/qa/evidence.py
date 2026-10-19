@@ -36,6 +36,14 @@ from runtime.warden.verbs import REGRESSION
 log = logging.getLogger("factory.warden")
 
 TESTER = re.compile(r"^qa-[a-z0-9-]+$")
+IMAGES = {
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "webp": "image/webp",
+    "gif": "image/gif",
+    "svg": "image/svg+xml",
+}
 
 
 def index_path(places: Places) -> Path:
@@ -50,6 +58,13 @@ def entries(places: Places) -> list[dict[str, Any]]:
 def of(entry: dict[str, Any]) -> str:
     """The task or the check a run was taken for, as its entry names it: the first folder of its path here."""
     return str(entry["check"] if "check" in entry else entry["task"])
+
+
+def drawn(entry: dict[str, Any], cleaned: str | None) -> dict[str, Any]:
+    """An entry as a page draws it: the pictures atop its run as ``shots``, in place of ``files``, whose trace's
+    thousands of names would overflow an answer about many tasks."""
+    shots = [f for f in entry["files"] if "/" not in f and f.rpartition(".")[2].lower() in IMAGES]
+    return {**{k: v for k, v in entry.items() if k != "files"}, "shots": shots, "cleaned": cleaned}
 
 
 def named(of_id: str) -> bool:

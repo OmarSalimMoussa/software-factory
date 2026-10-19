@@ -138,7 +138,13 @@ class _Request(socketserver.StreamRequestHandler):
         try:
             line = self.rfile.readline(protocol.MAX_LINE + 1)
             pid, uid = peer(self.connection)
-            self.wfile.write(protocol.answer(self.server.answer(pid, uid, line)))
+            reply = protocol.answer(self.server.answer(pid, uid, line))
+            if len(reply) > protocol.MAX_LINE:
+                # A caller reads at most MAX_LINE bytes of a line: a longer answer would reach it cut short.
+                where = Path(str(self.server.server_address)).name
+                log.warning("warden: an answer of %d bytes on %s is too large to send", len(reply), where)
+                reply = protocol.answer(protocol.refused("protocol", "the answer is too large to send"))
+            self.wfile.write(reply)
         # telemetry: expected — the caller went away or sent nothing in time; it has no one to answer
         except (TimeoutError, BrokenPipeError, ConnectionResetError):
             return

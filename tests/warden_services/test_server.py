@@ -99,20 +99,35 @@ def test_a_process_whose_record_names_a_reused_pid_is_no_session(places: Places,
     assert server.identify(places, peers, AGENT_SOCKET, CLI, AGENT, binding(places)).role == ""
 
 
-def test_the_socket_answers_one_json_line_per_request(places: Places, doors: Doors, tmp_path: Path) -> None:
-    def status(ctx: Any, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-        return {"who": ctx.caller.kind}
-
-    dispatcher = Dispatcher(doors, {"status": status}, {"status": Verb("x:y", ANY)})
+def _ask(places: Places, doors: Doors, tmp_path: Path, run: Any) -> dict[str, Any]:
+    """One request on the agent socket to a warden whose only verb is ``run``, asked as the owner."""
+    dispatcher = Dispatcher(doors, {"status": run}, {"status": Verb("x:y", ANY)})
     me = server.Peers(agent_uid=-2, owner_uid=os.getuid(), dashboard_uid=-3, sessions_folder=tmp_path, proc=tmp_path)
     servers = server.serve(places, me, dispatcher, threads=2)
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
             conn.connect(str(places.socket))
             conn.sendall(protocol.request("status", {"as": "orchestrator"}))
-            reply = json.loads(conn.makefile("rb").readline())
+            reply: dict[str, Any] = json.loads(conn.makefile("rb").readline())
+            return reply
     finally:
         for running in servers:
             running.shutdown()
             running.server_close()
+
+
+def test_the_socket_answers_one_json_line_per_request(places: Places, doors: Doors, tmp_path: Path) -> None:
+    reply = _ask(places, doors, tmp_path, lambda ctx, args, data: {"who": ctx.caller.kind})
+
     assert reply == {"who": "owner", "ok": True}
+
+
+def test_an_answer_past_the_line_limit_is_refused_and_logged_never_sent_cut_short(
+    places: Places, doors: Doors, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(protocol, "MAX_LINE", 1000)
+
+    reply = _ask(places, doors, tmp_path, lambda ctx, args, data: {"blob": "x" * 2000})
+
+    assert (reply["ok"], reply["refused"]) == (False, "protocol")
+    assert "too large to send" in caplog.text

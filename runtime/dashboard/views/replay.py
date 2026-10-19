@@ -55,7 +55,6 @@ SEVERITY_TONES = dict(zip(SEVERITIES, ("bad", "warn", "muted"), strict=True))  #
 HIDDEN_SAYS = "A sign-in link was on screen here, so this part is hidden."
 _FRAME = re.compile(r"^replay/frames/\d{6}\.jpg$")
 _SHOT = re.compile(r"^[A-Za-z0-9][\w.-]{0,127}\.(?:png|jpe?g)$")
-_IMAGE = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")
 
 
 def url(of: str, head: str, tester: str, run: str) -> str:
@@ -234,7 +233,6 @@ def tester_runs(task_id: str, head: str, evidence: list[dict[str, Any]]) -> dict
 
 
 def shots(of: str, entry: dict[str, Any]) -> list[str]:
-    """The addresses of a run's screenshots, never its replay's frames; none once the clean-up removed them."""
+    """The addresses of a run's screenshots; none once the clean-up removed them."""
     base = evidence_base(of, str(entry["head"]), str(entry["tester"]), str(entry["run"]))
-    pictures = [] if entry["cleaned"] else entry["files"]
-    return [base + f for f in pictures if "/" not in f and f.lower().endswith(_IMAGE)]
+    return [] if entry["cleaned"] else [base + f for f in entry["shots"]]

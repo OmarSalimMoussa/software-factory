@@ -15,6 +15,7 @@ from queue_kit import World
 from runtime.qa import evidence, qa_browser
 from runtime.queue import records, verbs
 from runtime.shared.models import RETIRED
+from runtime.warden import snapshot
 from runtime.warden.sessions import registry
 
 SESSION = "0b6f1c3e-1d2a-4c5b-9e8f-7a6b5c4d3e2f"
@@ -48,6 +49,20 @@ def test_a_testers_runs_are_copied_without_following_links_or_a_replay_and_taken
     assert not (target / "secret").exists() and not (target / "replay").exists()
     assert world.launcher.commands == [["rm", "-rf", "--", str(run)]]
     assert evidence.intake(world.ctx(), runs, SESSION, "t-0001", HEAD, "qa-ux", "ag-ux", "2026-10-09T12:00:00Z") == []
+
+
+def test_a_page_is_sent_a_runs_screenshots_never_the_files_of_its_trace(world: World, tmp_path: Path) -> None:
+    run = tmp_path / "runs" / SESSION / "20261009T120500Z-0a1b2c"
+    (run / "traces" / "resources").mkdir(parents=True)
+    (run / "run.json").write_text(json.dumps({"role": "qa-ux", "started": "2026-10-09T12:05:00Z"}))
+    for name in ("page-1.png", "page-1.yml", "traces/resources/page@1.jpeg"):
+        (run / name).write_bytes(b"x")
+    evidence.intake(world.ctx(), run.parent.parent, SESSION, "t-0001", HEAD, "qa-ux", "ag", "2026-10-09T12:00:00Z")
+
+    answer = snapshot.snapshot(world.ctx(), {"want": ["qa"], "tasks": ["t-0001"]}, None)
+
+    [entry] = answer["state"]["qa"]["t-0001"]["evidence"]
+    assert (entry["shots"], "files" in entry) == (["page-1.png"], False)
 
 
 def test_two_testers_of_one_kind_at_once_each_take_only_their_own_lanes_run(world: World, tmp_path: Path) -> None:

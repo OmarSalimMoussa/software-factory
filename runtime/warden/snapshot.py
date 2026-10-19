@@ -40,14 +40,6 @@ log = logging.getLogger("factory.warden")
 
 Reader = Callable[[Context, dict[str, Any]], Any]
 _SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
-_IMAGES = {
-    "png": "image/png",
-    "jpg": "image/jpeg",
-    "jpeg": "image/jpeg",
-    "webp": "image/webp",
-    "gif": "image/gif",
-    "svg": "image/svg+xml",
-}
 # An answer is one JSON line of at most protocol.MAX_LINE bytes, and base64 grows bytes by a third.
 _MAX_IMAGE = protocol.MAX_LINE * 3 // 4 - 4096
 _MAX_IDS = 200  # task ids one snapshot reads logs, specs or QA records for
@@ -155,7 +147,7 @@ def _qa(ctx: Context, args: dict[str, Any]) -> Any:
     went = retention.cleaned(ctx.places)
     for entry in store.read_jsonl(ctx.places.evidence / "index.jsonl"):
         if entry.get("task") in wanted:
-            found[entry["task"]]["evidence"].append({**entry, "cleaned": went.get(entry["task"])})
+            found[entry["task"]]["evidence"].append(qa_evidence.drawn(entry, went.get(entry["task"])))
     return found
 
 
@@ -167,7 +159,7 @@ def _check_runs(ctx: Context, args: dict[str, Any]) -> Any:
     went = retention.cleaned(ctx.places)
     for entry in qa_evidence.entries(ctx.places):
         if entry.get("check") in found:
-            found[entry["check"]].append({**entry, "cleaned": went.get(entry["check"])})
+            found[entry["check"]].append(qa_evidence.drawn(entry, went.get(entry["check"])))
     return found
 
 
@@ -381,7 +373,7 @@ def evidence(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     if not isinstance(of, str) or not qa_evidence.named(of) or not isinstance(rel, str):
         raise Refused("evidence", "name a task or a check and a file under its evidence")
     parts = rel.split("/")
-    media = _IMAGES.get(parts[-1].rpartition(".")[2].lower())
+    media = qa_evidence.IMAGES.get(parts[-1].rpartition(".")[2].lower())
     if not all(_SEGMENT.match(p) for p in parts) or media is None:
         raise Refused("evidence", f"evidence is shown only as an image named inside the folder of {of}")
     try:
