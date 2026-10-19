@@ -48,7 +48,7 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
 - **New behaviour gets a standing scenario** in `qa/scenarios/`, or an update to the one that covers it: three labels
   (`protects`, `needs`, `runs`) and at most `qa.max_steps` steps, each opening with a short bold name and holding an
   `Expect:` line: the owner's replay shows both. A scenario that signs in as a test address names its role in
-  `needs` (`person <role>`), so its tester is handed that person.
+  `needs` (`person <role>`), and your brief gives its tester an address for each person it names.
 
 ## 3. QA rounds
 
