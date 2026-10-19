@@ -127,17 +127,19 @@ def test_a_route_answers_what_it_catches_and_never_sends_it_on(kit: Kit, asked: 
 
 
 @pytest.mark.parametrize(
-    ("asked", "refused"),
+    ("asked", "sent"),
     [
-        ({"textGone": "Restarting", "time": 60}, True),
-        ({"text": "Saved", "time": 5}, True),
-        ({"textGone": "Restarting"}, False),
-        ({"time": 5}, False),
+        ({"textGone": "Restarting", "time": 60}, {"textGone": "Restarting"}),
+        ({"text": "Saved", "time": 5}, {"text": "Saved"}),
+        ({"textGone": "Restarting"}, None),
+        ({"time": 5}, None),
     ],
 )
-def test_a_text_wait_gives_no_time_since_time_sleeps_before_it(kit: Kit, asked: dict[str, Any], refused: bool) -> None:
-    rule = kit.rule("mcp__qa-browser__browser_wait_for", asked, **UI_TESTER)
-    assert (rule == "qa-browser") is refused
+def test_a_text_waits_time_is_dropped_since_it_sleeps_before_the_wait_and_is_no_time_out(
+    kit: Kit, asked: dict[str, Any], sent: dict[str, Any] | None
+) -> None:
+    decision = kit.decide("mcp__qa-browser__browser_wait_for", asked, **UI_TESTER)
+    assert (decision.updated_input if isinstance(decision, Rewrite) else None) == sent
 
 
 def test_a_browser_call_that_names_a_file_is_refused_so_the_tester_reports_the_name_it_got(kit: Kit) -> None:

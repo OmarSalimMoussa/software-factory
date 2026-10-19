@@ -111,12 +111,10 @@ def _server(call: Call) -> Decision:
     # A route with neither sends the request on, past the routes that keep the owner's dashboard out of reach.
     if call.tool == BROWSER + ROUTE and call.tool_input.get("status") is None and call.tool_input.get("body") is None:
         return Refusal("qa-browser", "a route answers what it catches itself: give it the status the step asks for")
+    # A text wait's time sleeps its whole length before the wait starts, and is no time-out: it goes, and the text
+    # wait gives up after a few seconds on its own.
     if call.tool == BROWSER + WAIT_FOR and "time" in call.tool_input and {"text", "textGone"} & call.tool_input.keys():
-        return Refusal(
-            "qa-browser",
-            "time sleeps its whole length before a text wait starts, and is no time-out: wait on the text alone, "
-            "which gives up after a few seconds, and wait again while it has not shown or gone",
-        )
+        return Rewrite({k: v for k, v in call.tool_input.items() if k != "time"})
     return None
 
 
