@@ -14,7 +14,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from runtime.guard import browser, commands, factory_calls, git_rules, scratch, shell, subagents, transcript, writes
+from runtime.guard import (
+    browser,
+    commands,
+    factory_calls,
+    git_rules,
+    scratch,
+    shell,
+    subagents,
+    transcript,
+    walk_hold,
+    writes,
+)
 from runtime.guard.facts import (
     DESIGNER,
     IMPLEMENTER,
@@ -94,10 +105,10 @@ def _bench_pending(call: Call) -> Decision:
         return None
     if commands.is_way_out(call) or (call.tool in commands.SHELL_TOOLS and _commits_only(call)):
         return None
-    if call.in_subagent and subagents.reports(call):
+    if call.in_subagent and walk_hold.reports(call):
         return None
     if call.in_subagent:
-        return Refusal("bench-pending", f"{SUBAGENT_BENCH}: {subagents.report_now(call)}")
+        return Refusal("bench-pending", f"{SUBAGENT_BENCH}: {walk_hold.report_now(call)}")
     return Refusal("bench-pending", BENCH_NOTE)
 
 
@@ -155,7 +166,7 @@ def decide_tool(call: Call) -> Decision:
         if refusal is not None:
             return refusal
     current = call
-    for rule in (subagents.check_tester_time, browser.check, _tool, _by_tool, subagents.check_intake_time):
+    for rule in (walk_hold.check_tester_time, browser.check, _tool, _by_tool, subagents.check_intake_time):
         decision = rule(current)
         if isinstance(decision, Refusal):
             return decision
