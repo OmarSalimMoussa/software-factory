@@ -158,7 +158,7 @@ def test_no_stack_changes_under_a_tester_still_walking_the_slot(world: World, ar
     registry.write(world.places, sessions)
     slot(world.ctx("implementer", "s-1"), args, None)
 
-    assert len(world.launcher.stacks) == 1
+    assert len([verb for _, verb in world.launcher.stacks if verb != ["health"]]) == 1
 
 
 @pytest.mark.parametrize("op", ["restart", "stop"])
@@ -168,7 +168,7 @@ def test_the_holder_restarts_or_stops_the_services_it_names(world: World, op: st
 
     slot(world.ctx("implementer", "s-1"), {"op": op, "services": ["web", "worker"]}, None)
 
-    assert world.launcher.stacks == [(1, [op, "web", "worker"])]
+    assert world.launcher.stacks[-1] == (1, [op, "web", "worker"])
 
 
 def test_a_slots_own_session_and_its_backend_and_security_testers_run_any_command_in_it_and_no_other_tester_does(

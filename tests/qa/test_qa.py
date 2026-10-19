@@ -16,6 +16,7 @@ from runtime.qa import verbs as qa
 from runtime.qa.scenarios import Step, parse
 from runtime.shared.protocol import Refused
 from runtime.slots import health, leases
+from runtime.slots.verbs import slot
 from runtime.warden.context import StackResult
 
 HEAD = "a" * 40
@@ -190,6 +191,24 @@ def test_qa_ready_needs_the_slot_running_the_head(
     with pytest.raises(Refused, match=re.escape(refusal)):
         qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
     assert not (ready_world.places.state / "public" / "ready" / f"{IMPL_ID}.json").exists()
+
+
+def test_a_slot_its_session_stopped_for_a_set_up_stays_ready_on_the_commit_it_ran_until_its_stack_changes(
+    ready_world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    impl, tester = (
+        ready_world.ctx("implementer", IMPL_ID),
+        ready_world.ctx("implementer", IMPL_ID, "ag-be", "qa-backend"),
+    )
+    qa.qa_ready(impl, {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
+    slot(impl, {"op": "stop", "services": ["relay"]}, None)
+    monkeypatch.setattr(health, "http_get", _no_answer)
+    slot(impl, {"op": "stop", "services": ["control-plane"]}, None)
+
+    assert qa.ready_check(tester, {}, None)["stopped"].startswith("control-plane, relay, by your implementer")
+    slot(impl, {"op": "up", "services": ["relay"]}, None)
+    with pytest.raises(Refused, match="gave no commit"):
+        qa.ready_check(tester, {}, None)
 
 
 def test_only_a_registered_tester_reports_a_result(ready_world: World) -> None:

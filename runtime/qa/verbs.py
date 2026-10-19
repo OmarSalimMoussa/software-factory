@@ -181,7 +181,8 @@ def _touched(ctx: Context, session: Session, task: Task, tested: str, head: str)
 
 
 def ready_check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """A tester's first step: the last ready record still holds, the slot runs its head; and the tester's folder."""
+    """A tester's first step: the last ready record still holds, the slot runs its head; the tester's folder, and the
+    services a set-up stopped."""
     session = _implementer(ctx)
     records = ready_records(ctx, session)
     if not records:
@@ -192,7 +193,9 @@ def ready_check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
     if why is not None:
         raise Refused("ready-check", f"not ready: {why}")
     folder = {"folder": str(Path(session.worktree) / scratch_of(ctx.caller.agent_id))} if ctx.caller.agent_id else {}
-    return ok(head=head, slot=latest["slot"], testers=latest.get("testers", []), **folder)
+    noted = health.stopped(ctx.places, int(latest["slot"]))
+    stopped = {"stopped": f"{', '.join(noted.services)}, by your implementer for a set-up: no fault"} if noted else {}
+    return ok(head=head, slot=latest["slot"], testers=latest.get("testers", []), **folder, **stopped)
 
 
 def _tester_on_head(ctx: Context, args: dict[str, Any], verb: str) -> tuple[Session, Session, str]:

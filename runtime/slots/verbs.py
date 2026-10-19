@@ -28,7 +28,7 @@ from runtime.guard.facts import read_desktops, read_vitals
 from runtime.shared import store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.protocol import Refused, ok
-from runtime.slots import leases, staging
+from runtime.slots import health, leases, staging
 from runtime.warden import public
 from runtime.warden.context import Context, StackResult
 from runtime.warden.sessions import registry
@@ -121,7 +121,10 @@ def _run(ctx: Context, session: Session, n: int, op: str, args: dict[str, Any]) 
     extra: dict[str, Any] = _desktop_lease(ctx, n, verb) if op == "desktop" else {}
     if op == "up" and n == 0:
         extra = {"at": staging.place(ctx, args.get("at")) or None}
+    before = health.before_stop(ctx, n, session.id) if op == leases.STOP else None
     result = ctx.launcher.run_stack(n, verb, session.id)
+    if op in _CHANGES_STACK:
+        health.note_stop(ctx.places, n, verb[1:], before if result.exit == 0 else None)
     return {**_answer(ctx, n, result), **extra}
 
 
