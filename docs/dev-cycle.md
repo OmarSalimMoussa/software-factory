@@ -32,7 +32,8 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
 8. **Merge turn.** One branch at a time: the warden gives the turn to the next ready task and tells its
    implementer, which rebases and has the warden run `factory check`, at most `rounds.check_runs` times. The
    orchestrator merges with `--no-ff`; the merge hook lets only the turn's branch land, with the pass for its tree.
-   The warden finds the merge itself.
+   The warden finds the merge itself. A turn whose implementer was benched or ended goes back, so the next task
+   merges first; the owner's pause keeps every turn.
 9. **Check the default branch, in bundles.** A merge waits for its check from when the warden finds it. A bundle is
    the oldest waiting merges, at most `rounds.bundle_merges`, walked together at one commit: the one just before the
    next merge, or the tip. Slot 0 comes up there, whole, from a worktree of its own when that commit is older than

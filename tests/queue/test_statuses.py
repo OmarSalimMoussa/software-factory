@@ -10,7 +10,7 @@ from queue_kit import World
 
 from runtime.queue import cards, documents, owner, proposals, statuses, tasks, turn, verbs
 from runtime.queue.statuses import IMPL, ORCH, OWNER, WARDEN
-from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, REVIVING, Task
+from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, PAUSED, RETIRED, REVIVING, WAITING, Task
 from runtime.shared.protocol import Refused
 from runtime.warden import wardend
 from runtime.warden.owner import reflections
@@ -77,11 +77,15 @@ def test_task_statuses_follow_the_builds_forward_and_back(world: World) -> None:
     assert world.queue().task(task.id).status == "checked"
 
 
-def test_one_task_holds_the_merge_turn_and_turn_next_picks_by_after_then_the_order(world: World) -> None:
+def test_one_task_holds_the_merge_turn_and_turn_next_picks_by_after_then_the_order(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
     first, second, blocked = world.task(branch="impl-a"), world.task(branch="impl-b"), world.task(branch="impl-c")
     unlanded = world.task()
     for task, after in ((first, []), (second, []), (blocked, [unlanded.id])):
         world.queue().write_task(dataclasses.replace(task, status="qa-clean", run=1, after=after))
+        world.session(f"s-{task.id}", "implementer", task.branch, task.id)
+    monkeypatch.setattr(backstop, "processes", lambda: {})
     world.launcher.git = lambda argv: (0, "c0ffee" * 6 + "abcd\n")
 
     assert turn.next_turn(world.ctx(), {}, None)["task"] == first.id
@@ -94,6 +98,47 @@ def test_one_task_holds_the_merge_turn_and_turn_next_picks_by_after_then_the_ord
     tasks.move(world.ctx(), first.id, "merged", "merged", "warden", "merged")
     assert turn.holder(world.places) is None
     assert turn.next_turn(world.ctx(), {}, None)["task"] == second.id  # the blocked one waits for its after task
+
+
+@pytest.mark.parametrize("state", [BENCH_PENDING, DEPRIORITIZED])
+def test_the_merge_turn_skips_a_task_whose_implementer_is_benched_as_none_would_merge_it(
+    world: World, monkeypatch: pytest.MonkeyPatch, state: str
+) -> None:
+    benched, awake = world.task(branch="impl-a"), world.task(branch="impl-b")
+    for task in (benched, awake):
+        world.queue().write_task(dataclasses.replace(task, status="qa-clean", run=1))
+        world.session(f"s-{task.id}", "implementer", task.branch, task.id)
+    sessions = registry.read(world.places)
+    sessions[f"s-{benched.id}"].state = state
+    registry.write(world.places, sessions)
+    monkeypatch.setattr(backstop, "processes", lambda: {})
+    world.launcher.git = lambda argv: (0, "c0ffee" * 6 + "abcd\n")
+
+    assert turn.next_turn(world.ctx(), {}, None)["task"] == awake.id
+
+
+@pytest.mark.parametrize(
+    ("state", "benched_for", "gives_back"),
+    [(DEPRIORITIZED, "t-0009", True), (RETIRED, "", True), (DEPRIORITIZED, PAUSED, False), (WAITING, "", False)],
+    ids=["benched-for-another-task", "ended", "paused-with-the-factory", "awake"],
+)  # fmt: skip
+def test_a_turn_whose_implementer_was_benched_or_ended_goes_back_so_the_next_task_merges(
+    world: World, monkeypatch: pytest.MonkeyPatch, state: str, benched_for: str, gives_back: bool
+) -> None:
+    holding = world.task(branch="impl-a")
+    world.queue().write_task(dataclasses.replace(holding, status="qa-clean", run=1))
+    world.session("s-impl", "implementer", "impl-a", holding.id)
+    monkeypatch.setattr(backstop, "processes", lambda: {})
+    world.launcher.git = lambda argv: (0, "c0ffee" * 6 + "abcd\n")  # no merge on the default branch yet
+    turn.next_turn(world.ctx(), {}, None)
+    sessions = registry.read(world.places)
+    sessions["s-impl"].state, sessions["s-impl"].benched_for = state, benched_for
+    registry.write(world.places, sessions)
+
+    turn.find_merge(world.ctx())
+
+    assert world.queue().task(holding.id).status == ("qa-clean" if gives_back else "turn")
+    assert (turn.holder(world.places) is None) == gives_back
 
 
 def test_an_approved_spec_gives_its_task_the_slice_count_it_lists(world: World) -> None:

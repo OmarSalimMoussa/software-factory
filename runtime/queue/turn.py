@@ -1,13 +1,14 @@
 """The merge turn: one branch at a time onto the default branch, kept by the warden, never by a model's memory.
 
-`factory turn next` gives the turn to the next qa-clean task whose `after` tasks have landed, in the one order, and
-tells its implementer; while a task holds it no other task may. The holder and its branch are published for the
-merge hook, which refuses any other branch. The warden finds the merge itself, each tick: the first-parent merge on
-the default branch, since the turn was given, whose second parent is on the holder's branch; a check clears it with
-the merges bundled with it (bundle.py). The warden benches the merged task's implementer, which holds no place while
-the check runs. The orchestrator keeps the merge itself and the call to revert or block; the warden sends
-a reverted task, or a blocked one at the owner's Fixed, back to its implementer, or, once that has ended, to a new
-one.
+`factory turn next` gives the turn to the next qa-clean task whose `after` tasks have landed and whose implementer
+is awake, in the one order, and tells its implementer; while a task holds it no other task may. The holder and its
+branch are published for the merge hook, which refuses any other branch. The warden finds the merge itself, each
+tick: the first-parent merge on the default branch, since the turn was given, whose second parent is on the holder's
+branch; a check clears it with the merges bundled with it (bundle.py). Until then, a holder whose implementer was
+benched, outside the owner's pause, or ended goes back to qa-clean, so the next task merges first. The warden
+benches the merged task's implementer, which holds no place while the check runs. The orchestrator keeps the merge
+itself and the call to revert or block; the warden sends a reverted task, or a blocked one at the owner's Fixed, back
+to its implementer, or, once that has ended, to a new one.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from typing import Any
 from runtime.queue import cards, formats, proposals, statuses, tasks
 from runtime.queue.book import Queue
 from runtime.shared import order, store
-from runtime.shared.models import RETIRED, WAITING, WORKING, Session, Task
+from runtime.shared.models import DEPRIORITIZED, PAUSED, QA_CLEAN, RETIRED, WAITING, WORKING, Session, Task
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.warden.context import Context
@@ -29,7 +30,8 @@ from runtime.warden.sessions import lifecycle, permits, registry, revive
 from runtime.warden.sessions.launch import LaunchError
 
 log = logging.getLogger(__name__)
-TURN, MERGED, CHECKED = "turn", "merged", "checked"
+TURN, MERGED, CHECKED, TURN_BACK = "turn", "merged", "checked", "turn-back"
+GAVE_BACK = "its implementer was benched or ended before its merge: the next task merges first"
 GIVEN = (
     "You have the merge turn. Rebase on {default}, rerun the tests you picked, then factory check; once it passes, "
     "ask the orchestrator to merge, with the tree it names."
@@ -133,8 +135,8 @@ def give(ctx: Context, fits: Callable[[Task], bool], none: str) -> dict[str, Any
     queue = Queue.of(ctx)
     found, _ = queue.tasks()
     by_id = {t.id: t for t in found}
-    ready = [t for t in found if t.status == "qa-clean"
-             and all(a in by_id and by_id[a].status in tasks.LANDED for a in t.after) and fits(t)]  # fmt: skip
+    ready = [t for t in found if t.status == QA_CLEAN and fits(t) and _awake(ctx, t.id)
+             and all(a in by_id and by_id[a].status in tasks.LANDED for a in t.after)]  # fmt: skip
     if not ready:
         return ok(task=None, message=none)
     task = order.ordered(ready, permits.ranking(ctx))[0]
@@ -149,6 +151,11 @@ def _implementer(ctx: Context, task_id: str) -> Session | None:
     return next((s for s in mine if s.state != RETIRED), None)
 
 
+def _awake(ctx: Context, task_id: str) -> bool:
+    impl = _implementer(ctx, task_id)
+    return impl is not None and impl.state in (WORKING, WAITING)
+
+
 def _tell(ctx: Context, task: Task, message: str) -> None:
     impl = _implementer(ctx, task.id)
     if impl is None:
@@ -160,7 +167,8 @@ def _tell(ctx: Context, task: Task, message: str) -> None:
 
 
 def find_merge(ctx: Context) -> None:
-    """The tick's step: the holder's merge on the default branch, recorded as soon as it is there."""
+    """The tick's step: the holder's merge on the default branch, recorded as soon as it is there; with none, a holder
+    whose implementer was benched or ended gives the turn back."""
     found = holder(ctx.places)
     if found is None:
         return
@@ -177,6 +185,9 @@ def find_merge(ctx: Context) -> None:
             _bench(ctx, found["task"], f"merged as {commit[:12]}: benched until its check")
             log.info("warden: %s merged as %s", found["task"], commit)
             return
+    impl = _implementer(ctx, found["task"])
+    if impl is None or (impl.state == DEPRIORITIZED and impl.benched_for != PAUSED):
+        tasks.move(ctx, found["task"], QA_CLEAN, TURN_BACK, statuses.WARDEN, GAVE_BACK)
 
 
 def _bench(ctx: Context, task_id: str, why: str) -> None:

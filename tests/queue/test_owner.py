@@ -160,6 +160,7 @@ def test_the_owners_extend_of_a_task_stopped_in_its_merge_turn_sends_it_back_for
     card = next(c for c in cards.read(world.places) if c.kind == "decide")
     other = world.task(branch="impl-b")  # takes the turn while the owner decides
     world.write_raw(task_rel(other.id), formats.dump_task(dataclasses.replace(other, status="qa-clean", run=1)))
+    world.session("s-other", "implementer", "impl-b", other.id)
     world.launcher.git = lambda argv: (0, "c0ffee" * 6 + "abcd\n")
     assert turn.next_turn(world.ctx(), {}, None)["task"] == other.id
 

@@ -21,6 +21,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import health, leases
 from runtime.warden.context import StackResult
 from runtime.warden.delivery import deploys
+from runtime.warden.sessions import backstop
 
 SCENARIOS = {
     "web": "protects: web/\nneeds: nothing\nruns: in-turn",
@@ -215,13 +216,15 @@ def test_a_row_that_did_not_pass_names_what_comes_next(
     ids=["a-fix-of-what-failed", "a-task-that-fixes-nothing-failed", "slot-0-could-not-come-up"],
 )
 def test_while_the_cap_of_merges_waits_a_merge_turn_goes_only_to_a_fix_of_a_scenario_their_check_failed(
-    world: World, product: Product, web: str, changes: str, gets_it: bool | None
+    world: World, product: Product, monkeypatch: pytest.MonkeyPatch, web: str, changes: str, gets_it: bool | None
 ) -> None:
     world.with_settings(rounds__bundle_merges=2)
     product.merge("web/page.js")
     tip, _ = product.merge("api/handlers.py")
     ready = world.task(branch=product.branch(changes))
     world.queue().write_task(dataclasses.replace(ready, status="qa-clean", run=1))
+    world.session("s-impl", "implementer", ready.branch, ready.id)
+    monkeypatch.setattr(backstop, "processes", lambda: {})
 
     with pytest.raises(Refused, match="2 merges wait for their check, the cap of 2") as refused:
         bundle.next_turn(world.ctx(), {}, None)

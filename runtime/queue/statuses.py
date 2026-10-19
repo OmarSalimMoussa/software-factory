@@ -53,6 +53,7 @@ MOVES: tuple[Move, ...] = (
     _m({"building"}, {"qa"}, "qa-ready", IMPL),
     _m({"qa"}, {"qa-clean"}, "qa-clean", IMPL),
     _m({"qa-clean"}, {"turn"}, "turn", ORCH),
+    _m({"turn"}, {"qa-clean"}, "turn-back", WARDEN),
     # The warden's alone: it finds the merge on the default branch, and a saved check of it that passed.
     _m({"turn"}, {"merged"}, "merged", WARDEN),
     _m({"merged"}, {"checked"}, "checked", WARDEN),
