@@ -20,7 +20,7 @@ from runtime.guard.rules import RULES
 from runtime.qa import evidence as qa_evidence
 from runtime.qa import retention
 from runtime.qa.replay import reader as replay_reader
-from runtime.queue import approvals, bundle, cards, files, goal, intake, pictures, proposals, records, triage
+from runtime.queue import approvals, bundle, cards, files, goal, intake, owner, pictures, proposals, records, triage
 from runtime.queue.book import Queue
 from runtime.queue.formats import CHECK_ID, TASK_ID
 from runtime.shared import models, protocol, store
@@ -263,6 +263,11 @@ def _factory(ctx: Context, args: dict[str, Any]) -> Any:
     return {"paused": paused, "locked_until": until, "triage": triage}
 
 
+def _goal_change(ctx: Context, args: dict[str, Any]) -> dict[str, Any] | None:
+    found = store.read_jsonl(owner.goal_changes_path(ctx.places))
+    return found[-1] if found else None
+
+
 def _proposals(ctx: Context, args: dict[str, Any]) -> dict[str, Any]:
     found = proposals.read(ctx.places)
     # An empty place is the orchestrator choosing only while it is at work.
@@ -303,6 +308,7 @@ READERS: dict[str, Reader] = {
     "replay": replay_reader.read,
     "goal": _goal,
     "triage": lambda ctx, args: dataclasses.asdict(triage.batch(ctx)),
+    "goal_change": _goal_change,
     "gc": lambda ctx, args: gc.view(ctx),
     "reflections": lambda ctx, args: reflections.entries(ctx.places),
     "history": _history,

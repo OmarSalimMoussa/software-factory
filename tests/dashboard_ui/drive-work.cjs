@@ -1,6 +1,6 @@
 'use strict';
 /* Work: back links and browser history restore tab, filter and scroll; stacked panels; the task panel; boost, approved
-   order, requests with a broken row and Show more, parked, done with Open, checks and the last triage line. */
+   order, requests with a broken row and Show more, parked, done with Open, checks, the last triage and goal lines. */
 const {drive, ready, settle, until, texts} = require('./lib.cjs');
 
 drive('work', async t => {
@@ -59,6 +59,8 @@ drive('work', async t => {
   t.check(await p.$eval('.group-h', e => getComputedStyle(e).backgroundColor) !== 'rgb(255, 255, 255)', 'group header is white');
   t.check(await p.$$eval('.task-row .status .dot', els => Math.max(...els.map(e => e.getBoundingClientRect().width))) <= 10, 'a status dot is oversized');
   t.check((await p.textContent('.triage-line')).includes('Last triage, 2 h ago'), 'no last-triage line');
+  t.check((await p.textContent('.goals-line')) === 'Goals changed, 3 h ago: 4 parked items came back for triage', 'no goals-changed line');
+  t.check(await p.getAttribute('.goals-line', 'title') === 'G2 reworded, G5 added', 'the goals-changed line does not say why');
   // Boost: the row moves to the top of the queue, washed; Unboost puts it back
   const queue = () => p.$$eval('[data-group="queue"] .task-row', els => els.map(e => e.dataset.task));
   const q0 = await queue();

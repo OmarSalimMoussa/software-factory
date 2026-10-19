@@ -20,7 +20,7 @@ from seed_kit import FIXTURES, PRICES, ROOT, fixture, fixture_time, iso, write
 from seed_queue import seed_checks, seed_requests, seed_tasks
 from settings_text import set_line
 
-from runtime.queue import formats, records, turn
+from runtime.queue import formats, owner, records, turn
 from runtime.shared import claude_accounts, models, store, totp
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import Places
@@ -193,6 +193,8 @@ def _seed_health(places: Places, now: float) -> None:
             "parked": 13,
         },
     )
+    change = {"at": iso(now - 3 * 3600), "changed": ["G2 reworded", "G5 added"], "tasks": ["t-0009"]}
+    store.append_jsonl(owner.goal_changes_path(places), {**change, "requests": ["r-0041", "r-0042", "r-0043"]})
 
 
 def _seed_done(places: Places, now: float) -> None:

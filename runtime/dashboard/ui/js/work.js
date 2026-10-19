@@ -17,7 +17,7 @@ function pWork(env) {
 </div>
     ${tabs && tabs.ok ? `<div class="tabs" role="tablist">${tabs.data.map(([id, n, c]) => `<button role="tab" data-worktab="${esc(id)}" aria-selected="${UI.workTab === id}">${esc(n)}<span class="c">${c}</span></button>`).join('')}</div>` : failedPart(tabs ? tabs.error : 'The answer had no tabs.')}
     ${part(env, UI.workTab, WORK_TAB[UI.workTab])}
-    ${h && h.triage_line ? `<div class="triage-line">${icon('clock', 'sm')}<span>${esc(h.triage_line)}</span></div>` : ''}`;
+    ${h && (h.triage_line || h.goals_line) ? `<div class="work-notes">${h.triage_line ? `<div class="triage-line">${icon('clock', 'sm')}<span>${esc(h.triage_line)}</span></div>` : ''}${h.goals_line ? `<div class="triage-line goals-line" title="${esc(h.goals_why)}">${icon('arrow-path', 'sm')}<span>${esc(h.goals_line)}</span></div>` : ''}</div>` : ''}`;
 }
 const WORK_TAB = {
   tasks: d => `<div class="groups" id="taskrows">${d.groups.map(groupHTML).join('')}</div>`,

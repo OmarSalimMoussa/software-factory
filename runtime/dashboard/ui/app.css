@@ -630,6 +630,7 @@ body.has-savebar .toasts{bottom:84px}
 .btn.writes-off{opacity:.45;cursor:not-allowed}
 .showmore{display:flex;justify-content:center;padding:8px;border-top:1px solid var(--line)}
 .entries .showmore,.groups .showmore{border-top:0}
+.work-notes{display:flex;flex-direction:column;gap:6px}
 .triage-line{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12.5px}
 .steps li.failed{color:var(--bad)}
 .steps .detail{display:block;font-size:12px;color:var(--muted);margin-top:2px}

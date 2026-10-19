@@ -21,7 +21,7 @@ from runtime.dashboard.views.tasks.task import qa_line
 from runtime.dashboard.views.words import agentwords, taskwords
 from runtime.dashboard.views.words.settingwords import LABELS
 from runtime.qa import retention
-from runtime.queue import formats
+from runtime.queue import formats, owner
 from runtime.shared import models, store
 from runtime.shared import operations as kinds
 from runtime.shared import settings as settings_module
@@ -527,3 +527,19 @@ def test_the_disk_shows_its_free_space_and_what_fills_it_and_how_the_clean_up_go
 
     assert (disk["value"], disk["pct"], disk["tone"], disk["hint"]) == ("112 GiB", 58, "good", hint)
     assert [r["value"] for r in laptop["rows"] if r["label"] == "Disk"] == ["42%"]
+
+
+@pytest.mark.parametrize(
+    ("requests", "says"),
+    [(["r-0041", "r-0042"], "2 parked items came back for triage"), ([], "nothing was parked")],
+    ids=["some-back", "none-parked"],
+)
+def test_the_work_page_says_what_came_back_when_the_goal_items_changed_and_why_on_request(
+    rig: Rig, requests: list[str], says: str
+) -> None:
+    change = {"at": iso(T0 - 3 * 3600), "changed": ["G2 reworded"], "requests": requests, "tasks": []}
+    store.append_jsonl(owner.goal_changes_path(rig.places), change)
+
+    header = rig.parts("/api/work?tab=parked")["header"]["data"]
+
+    assert (header["goals_line"], header["goals_why"]) == (f"Goals changed, 3 h ago: {says}", "G2 reworded")

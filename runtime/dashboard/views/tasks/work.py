@@ -28,7 +28,19 @@ from runtime.shared.models import ON_STAGING
 # A row keeps its key as it moves between these groups and Home's proposals, so it slides instead of jumping.
 _FLIP = {"approved": "appr", "proposed": "prop"}
 
-WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "factory", "probes", "goal", "done")
+WANTS = (
+    "settings",
+    "queue",
+    "proposals",
+    "sessions",
+    "cost",
+    "outage",
+    "factory",
+    "probes",
+    "goal",
+    "done",
+    "goal_change",
+)
 TABS = (("tasks", "Tasks"), ("requests", "Requests"), ("parked", "Parked"), ("done", "Done"), ("checks", "Checks"))
 INBOXES = (("all", "All inboxes"), ("agents", "Agents"), ("owner", "You"), ("users", "Users"))
 OUTCOMES = [["all", "Any outcome"], ["waiting", "Waiting"], ["task", "Task"], ["noise", "Noise"], ["parked", "Parked"]]
@@ -244,10 +256,19 @@ def header(snap: Snap) -> dict[str, Any]:
             f"{plural(len(last['new']), 'new task')}, {last['joined']} joined, {last['noise']} noise, "
             f"{last['parked']} parked"
         )
+    change = snap.get("goal_change")
     return {
         "sub": f"{plural(waiting, 'request')} wait for triage · {plural(queued, 'task')} queued",
         "triage_line": line,
+        "goals_line": None if change is None else _goals_line(snap, change),
+        "goals_why": None if change is None else ", ".join(change["changed"]),
     }
+
+
+def _goals_line(snap: Snap, change: dict[str, Any]) -> str:
+    back = len(change["requests"]) + len(change["tasks"])
+    came = f"{plural(back, 'parked item')} came back for triage" if back else "nothing was parked"
+    return f"Goals changed, {ago(epoch(change['at']), snap.now)}: {came}"
 
 
 def tabs(snap: Snap) -> list[list[Any]]:
