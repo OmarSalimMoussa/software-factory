@@ -36,7 +36,7 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 | `loop due` | One loop pass (below). |
 | `severe request` | Start intake on it at once (one subagent place is always kept for intake). Route its task next, and propose it: a severe task goes first, even when every slot is held. |
 | `prod red` | As "When something is red" says. |
-| `triage due` | Start one `triage` subagent on the batch the event names (its request ids). When it hands back, `factory triage apply`; give each new task a light intake pass. |
+| `triage due` | Start one `triage` subagent on the batch the event names (its request ids, and any task back from parked). When it hands back, `factory triage apply`; give each new task a light intake pass. |
 | `qa-prod due` | Start one `qa-prod` tester on the build the owner pushed, giving it the event's `since`, `prod` and `staging` addresses (staging is slot 0) and `health` path. |
 | `approved` | The warden starts it when a place frees. Fill the free proposal slot. |
 | `not-now`, `dropped`, `proposal-slot-free` | Fill the free proposal slots. |
@@ -54,7 +54,7 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 | `yolo on` | The owner is away and the factory runs on its own. Each proposal you make is approved as places free, so propose only what moves the goal most. A question you ask the owner is answered "Be proactive and solve it yourself." A session waiting on the owner's word is yours to answer. |
 | `yolo off` | The owner approves and decides again. |
 | `yours to decide` | With YOLO mode on, a card the owner would decide is yours: read its task, then `factory decide <card> <choice>` with one of the event's `choices` (`go` on a spec; `extend`, `designer` or `park` on a stuck task). |
-| `goal-changed` | Reread `GOAL.md` and fill the proposal slots again. |
+| `goal-changed` | Reread `GOAL.md` and fill the proposal slots again. When it names what `changed`, the goal items changed and every parked request and task came back: the next triage judges them, and until then such a task cannot be proposed. |
 
 ## A loop pass
 

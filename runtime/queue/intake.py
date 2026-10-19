@@ -1,4 +1,5 @@
-"""Requests arriving in the three inboxes, and the owner's boost of a waiting request (intake spec).
+"""Requests arriving in the three inboxes, the owner's boost of a waiting request (intake spec), and the tasks back
+from parked that triage judges again.
 
 A request is written once; only its outcome is added later. A severe one posts ``severe request`` at once; the warden's
 tick posts ``triage due`` when a batch is due (runtime/queue/triage.py names it).
@@ -49,13 +50,18 @@ def file_request(
     return req
 
 
-def boosts(ctx: Context) -> dict[str, str]:
-    """Requests the owner boosted, by id, with when; triage takes each into a batch of its own."""
-    raw = store.read_json_or(ctx.places.state / "request-boosts.json", {})
+# Each by id with when: the requests the owner boosted, which triage takes at once in a batch of their own; and the
+# tasks back from parked when the goal items changed, which triage judges before one can be proposed.
+BOOSTED, RETURNED = "request-boosts.json", "returned-tasks.json"
+
+
+def marked(ctx: Context, kind: str) -> dict[str, str]:
+    path = ctx.places.state / kind
+    raw = store.read_json_or(path, {})
     if not isinstance(raw, dict) or not all(isinstance(v, str) for v in raw.values()):
-        raise store.StoreError(f"{ctx.places.state / 'request-boosts.json'}: not an object of times")
+        raise store.StoreError(f"{path}: not an object of times")
     return raw
 
 
-def set_boosts(ctx: Context, found: dict[str, str]) -> None:
-    store.write_json(ctx.places.state / "request-boosts.json", found, mode=0o600)
+def mark(ctx: Context, kind: str, found: dict[str, str]) -> None:
+    store.write_json(ctx.places.state / kind, found, mode=0o600)

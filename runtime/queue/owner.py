@@ -1,4 +1,5 @@
-"""The owner's decisions from the dashboard: proposals, the approved order, boosts, parked work and cards.
+"""The owner's decisions from the dashboard: proposals, the approved order, boosts, parked work and cards; and the
+owner's rule for a change to the goal items in GOAL.md, which brings every parked request and task back for triage.
 
 None needs the code (an approval steers work and changes nothing in the factory). Each one posts an inbox event so
 the orchestrator acts at once (R4). The warden writes the approval where no agent can (R20).
@@ -6,13 +7,17 @@ the orchestrator acts at once (R4). The warden writes the approval where no agen
 
 from __future__ import annotations
 
+import dataclasses
+from pathlib import Path
 from typing import Any
 
-from runtime.queue import approvals, cards, documents, formats, intake, proposals, route, tasks, turn
+from runtime.queue import approvals, cards, documents, formats, goal, intake, proposals, route, statuses, tasks, turn
 from runtime.queue.book import Queue, request_rel, task_rel
 from runtime.queue.formats import dump_request, one_line
-from runtime.queue.statuses import OWNER
+from runtime.queue.statuses import OWNER, WARDEN
+from runtime.shared import store
 from runtime.shared.models import RETIRED, STOPPED, Task
+from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden import inbox
 from runtime.warden.context import Context
@@ -114,9 +119,9 @@ def boost_request(ctx: Context, request_id: str) -> dict[str, Any]:
         req = queue.request(request_id)
         if req.outcome:
             raise Refused("boost", f"{request_id} already has its outcome: {req.outcome}")
-        found = intake.boosts(ctx)
+        found = intake.marked(ctx, intake.BOOSTED)
         found[request_id] = ctx.clock.iso()
-        intake.set_boosts(ctx, found)
+        intake.mark(ctx, intake.BOOSTED, found)
     return {"request": request_id}
 
 
@@ -133,6 +138,45 @@ def unpark(ctx: Context, item: str) -> dict[str, Any]:
             req.outcome = ""
             queue.write({request_rel(req): dump_request(req)})
     return {"item": item}
+
+
+def goal_changes_path(places: Places) -> Path:
+    """Each change to the goal items, with what changed and the parked work it brought back."""
+    return places.state / "goal-changes.jsonl"
+
+
+def goals_changed(ctx: Context, text: str) -> dict[str, Any] | None:
+    """Once the goal items of GOAL.md (``text``) change, every parked request and task comes back in one write, and
+    the change is recorded with its cause; noise stays. What came back, or None when no goal item changed."""
+    judged = ctx.places.state / "goal-judged.json"
+    before = store.read_json_or(judged, None)
+    if before == text:
+        return None
+    if before is not None and not isinstance(before, str):
+        raise store.StoreError(f"{judged}: not the text of {goal.GOAL_FILE}")
+    said = [] if before is None else goal.changes(goal.parse(before), goal.parse(text))
+    queue = Queue.of(ctx)
+    with ctx.lock, queue.lock():
+        back = _unpark_all(ctx, queue, said) if said else None
+        store.write_json(judged, text, mode=0o600)
+    return back
+
+
+def _unpark_all(ctx: Context, queue: Queue, changed: list[str]) -> dict[str, Any]:
+    now, cause = ctx.clock.iso(), f"goals changed: {', '.join(changed)}"
+    requests = [r for r in queue.requests()[0] if formats.outcome(r.outcome).kind == "parked"]
+    parked = [t for t in queue.tasks()[0] if t.status == "parked"]
+    moved = [statuses.move(t, "queued", "goals-changed", WARDEN) for t in parked]
+    # Triage judges each task against the new goals before it can be proposed: it is marked before it is queued.
+    intake.mark(ctx, intake.RETURNED, intake.marked(ctx, intake.RETURNED) | {t.id: now for t in moved})
+    changes = {request_rel(r): dump_request(dataclasses.replace(r, outcome="")) for r in requests}
+    queue.write(changes | {task_rel(t.id): formats.dump_task(t) for t in moved})
+    for before, after in zip(parked, moved, strict=True):
+        queue.log(after.id, now, WARDEN, "goals-changed", cause, **{"from": "parked", "to": "queued"})
+        tasks.follow(ctx, before, after)
+    record = {"at": now, "changed": changed, "requests": [r.id for r in requests], "tasks": [t.id for t in moved]}
+    store.append_jsonl(goal_changes_path(ctx.places), record)
+    return record
 
 
 def go(ctx: Context, card_id: str, by: str = "you") -> dict[str, Any]:

@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Use when the orchestrator starts you on a batch of waiting requests - to cluster them, give every request exactly one outcome (a new task, joins a task, noise or parked), and save one plan that the factory checks and applies, without changing the queue yourself.
+description: Use when the orchestrator starts you on a batch of waiting requests and tasks back from parked - to cluster the requests, give every request exactly one outcome (a new task, joins a task, noise or parked), judge each task against the goal items (kept or parked again), and save one plan that the factory checks and applies, without changing the queue yourself.
 ---
 <!-- doc-refs: external -->
 
@@ -12,7 +12,8 @@ checks it and writes everything at once or nothing.
 
 ## What you read
 
-- Your brief names the batch: the request ids, in `queue/requests/<inbox>/`.
+- Your brief names the batch: the request ids, in `queue/requests/<inbox>/`, and any task ids, in `queue/tasks/`.
+  A task in the batch was parked, and came back when the owner changed the goal items.
 - `GOAL.md`: who the product is for, and the goal's ranked items.
 - The open tasks (`factory queue next`, and `queue/tasks/`) and the parked ones, so a request can join what exists.
 
@@ -30,6 +31,9 @@ Group the batch into clusters: requests about the same thing. Then give every re
 | **Noise** | A misunderstanding, a test, spam, nothing to act on; with a one-line reason |
 | **Parked** | Real, but it serves no goal item now, or is too small to matter; with a one-line reason |
 
+Judge each task in the batch against the goal items as they are now. It is **kept** for the open goal item it
+serves now, which may be another than the one it names, or **parked** again, with a one-line reason.
+
 Each new task has a short title in your words, the goal item it serves (its name in `GOAL.md`, such as `G-build-sop`; never one checked done), a severity (`severe`, `major` or
 `minor`), the surfaces you expect it to touch (`ui`, `api`, `access`, `desktop`, `none`), the requests it gathers,
 and a body: what is wrong or wanted, and how to know it is done. The cause, slices and owner class come later, from
@@ -41,8 +45,8 @@ goal rank, requests, users and age: do not rank the tasks yourself.
 Write the plan as one JSON object to a file under `.factory/` with the Write tool, then save it in a call of its
 own: `factory triage plan --body <that file>`. It checks the plan's shape and refuses one off it, with the reason:
 fix it and save again. Then hand back in your final message, in three lines: the count of requests, new
-tasks, joins, noise and parked; and each request from the owner's inbox that came out noise or parked, with its
-reason, so the orchestrator tells the owner.
+tasks, joins, noise and parked; the tasks kept and those parked again; and each request from the owner's inbox that
+came out noise or parked, with its reason, so the orchestrator tells the owner.
 
 ```json
 {"batch": ["r-2026-10-09-0042", "r-2026-10-09-0051", "r-2026-10-09-0052"],
@@ -53,10 +57,12 @@ reason, so the orchestrator tells the owner.
                 "requests": ["r-2026-10-09-0042"], "after": []}],
  "joins": {"r-2026-10-09-0051": "t-0017"},
  "noise": {},
- "parked": {"r-2026-10-09-0052": "serves no goal item yet"}}
+ "parked": {"r-2026-10-09-0052": "serves no goal item yet"},
+ "kept": {}}
 ```
 
-Every request in `batch` appears exactly once in a new task's `requests`, `joins`, `noise` or `parked`; every new
+Every request in `batch` appears exactly once in a new task's `requests`, `joins`, `noise` or `parked`, and every
+task in it exactly once in `kept` (with its goal item, such as `{"t-0031": "G-build-sop"}`) or `parked`. Every new
 task holds every key above and names a goal item. `factory triage apply` refuses anything else, with every problem
 listed, and writes nothing.
 

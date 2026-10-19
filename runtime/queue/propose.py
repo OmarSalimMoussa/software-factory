@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.queue import pictures, proposals, route, statuses, tasks
+from runtime.queue import intake, pictures, proposals, route, statuses, tasks
 from runtime.queue.book import Queue
 from runtime.queue.formats import one_line
 from runtime.shared import store
@@ -33,6 +33,8 @@ def propose(
         task = queue.task(task_id)
         if task.not_now:
             raise Refused("not-now", f"the owner said not now to {task_id}; it waits for a new request or a boost")
+        if task.status == "queued" and task_id in intake.marked(ctx, intake.RETURNED):
+            raise Refused("returned", f"{task_id} came back from parked when the goals changed: triage judges it first")
         planned = route.route(task, settings)
         if run is None:
             if planned == 0:

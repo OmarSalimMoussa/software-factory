@@ -83,7 +83,7 @@ Plain words and pictures, with four headings:
 - `## The goal`: the owner's goal, then its items, top ranked first. Each reads `- <name> <outcome>. Done when
   <check>.`, the name a stable one such as `G-build-sop`: tasks name their item by it, so moving a line reranks it
   and never points a task at another item. Mark an item done with `- [x] <name> …`: it keeps its name, and ranks no
-  more.
+  more. Adding, removing, rewording, moving or marking an item brings all parked work back for triage.
 - `## How it looks and feels`: the look, in words and in images from `goal/`.
 - `## How it speaks`: the product's voice, and the words it uses and avoids.
 

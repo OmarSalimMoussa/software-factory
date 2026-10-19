@@ -127,7 +127,7 @@ def _filed_and_proposed(r: Rehearsal, tmp_path: Path, orch: str) -> None:
             "cause": "web/app.js:4 draws the notes in the order the server sent them",
             "requests": [filed["request"]], "after": [],
         }],
-        "joins": {}, "noise": {}, "parked": {},
+        "joins": {}, "noise": {}, "parked": {}, "kept": {},
     }  # fmt: skip
     applied = r.session(orch, ["triage", "apply", "--body", r.body(r.repo, "plan.json", json.dumps(plan).encode())])
     assert applied["new"] == [TASK]

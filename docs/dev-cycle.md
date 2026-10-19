@@ -10,7 +10,10 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    orchestrator, word for word), and from users (the optional report pull).
 2. **Intake and triage.** A severe request goes to an intake agent at once and becomes a top task within minutes.
    The rest wait for a batch, which a triage agent turns into a few tasks: each request becomes a new task, joins
-   one, is noise, or is parked. `factory triage apply` checks the plan and writes all of it or none.
+   one, is noise, or is parked. `factory triage apply` checks the plan and writes all of it or none. When the owner
+   changes the goal items in `GOAL.md`, every parked request and task comes back. The next triage, due at once,
+   judges each task against the new items: it is kept for the item it serves now, or parked again. Until then it
+   cannot be proposed.
 3. **Proposals.** The orchestrator picks at most `routing.max_proposals` tasks that take the owner closest to the
    goal, plans each on the cheapest rung that can do it, and proposes it with a small picture and why now. A task
    the owner boosted, or a severe one, goes first, even when every place is held.

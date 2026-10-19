@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import dataclasses
+import hashlib
 import logging
 import os
 from pathlib import Path
@@ -196,3 +198,26 @@ def test_a_boosted_request_is_posted_for_triage_at_once_and_once(ticking: World,
         ticking.clock.t += ticking.ctx.settings().get_int("watch.tick_seconds")
 
     assert posted == [inbox.TRIAGE_DUE]
+
+
+def test_a_change_to_the_goal_items_brings_parked_requests_back_and_tells_the_orchestrator(
+    ticking: World, tmp_path: Path
+) -> None:
+    file_requests(ticking, 1, 0)
+    filed = ticking.checkout / "queue" / "requests" / "agents" / "r-2026-10-01-0001.md"
+    filed.write_text(
+        formats.dump_request(dataclasses.replace(formats.parse_request(filed.read_text()), outcome="parked x"))
+    )
+    goal_md = ticking.checkout / "GOAL.md"
+    # An earlier factory scored the tasks from this GOAL.md, and judged no parked work against it.
+    digest = hashlib.sha256(goal_md.read_bytes()).hexdigest()
+    memo = {"probed": {}, "deployed": {}, "loop_due": None, "triage_due": None, "goal": digest}
+    store.write_json(loop.memo_path(ticking.ctx.places), memo)
+    run(ticking, tmp_path)
+    goal_md.write_text(goal_md.read_text().replace("- G3 ", "- [x] G3 "))
+
+    run(ticking, tmp_path)
+
+    told = [e["data"] for e in inbox.unacknowledged(ticking.ctx.places) if e["kind"] == inbox.GOAL_CHANGED]
+    assert [(d["changed"], d["back"]) for d in told] == [(["G3 marked done"], 1)]
+    assert Queue.of(ticking.ctx).request("r-2026-10-01-0001").outcome == ""

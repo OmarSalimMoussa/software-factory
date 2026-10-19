@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from runtime.queue import files
@@ -66,6 +67,20 @@ def parse(text: str) -> list[GoalItem]:
     if problems:
         raise GoalError(problems)
     return items
+
+
+def changes(before: list[GoalItem], after: list[GoalItem]) -> list[str]:
+    """What changed among the goal items, such as "G3 reworded"; an item added above an open one re-ranks nothing."""
+    old, new = {i.id: i for i in before}, {i.id: i for i in after}
+    said = [f"{n} added" for n in new if n not in old] + [f"{n} removed" for n in old if n not in new]
+    for n in (n for n in new if n in old):
+        said += [f"{n} reworded"] if new[n].text != old[n].text else []
+        said += [f"{n} marked {'done' if new[n].done else 'open'}"] if new[n].done != old[n].done else []
+    both = {i.id for i in before if not i.done} & {i.id for i in after if not i.done}
+    was, now = [i.id for i in before if i.id in both], [i.id for i in after if i.id in both]
+    blocks = SequenceMatcher(None, was, now, autojunk=False).get_matching_blocks()
+    stayed = {n for b in blocks for n in was[b.a : b.a + b.size]}
+    return said + [f"{n} re-ranked" for n in now if n not in stayed]
 
 
 def ranks(items: list[GoalItem]) -> dict[str, int]:

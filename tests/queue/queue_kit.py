@@ -23,10 +23,19 @@ from runtime.warden.context import Caller, CheckPlaces, Clock, Context, StackRes
 from runtime.warden.sessions import registry
 
 ROOT = Path(__file__).resolve().parents[2]
-GOAL = (
-    "# Goal\n\n## Who it is for\n\nPeople.\n\n## The goal\n\n- G1 Sign in works. Done when it does.\n"
-    "- G2 Pages load. Done when they do.\n- G3 Reports export. Done when they do.\n\n## How it looks and feels\n"
+ITEMS = (
+    "G1 Sign in works. Done when it does.",
+    "G2 Pages load. Done when they do.",
+    "G3 Reports export. Done when they do.",
 )
+
+
+def goal_text(*items: str, who: str = "People.") -> str:
+    listed = "".join(f"- {item}\n" for item in items)
+    return f"# Goal\n\n## Who it is for\n\n{who}\n\n## The goal\n\n{listed}\n## How it looks and feels\n"
+
+
+GOAL = goal_text(*ITEMS)
 PICTURE = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="4" height="4"/></svg>'
 
 
@@ -182,4 +191,5 @@ def set_outcome(world: World, req: Request, outcome: str) -> None:
 
 
 def plan(**parts: Any) -> bytes:
-    return json.dumps({"batch": [], "new_tasks": [], "joins": {}, "noise": {}, "parked": {}, **parts}).encode()
+    empty = {"batch": [], "new_tasks": [], "joins": {}, "noise": {}, "parked": {}, "kept": {}}
+    return json.dumps({**empty, **parts}).encode()

@@ -129,7 +129,7 @@ def _queue(ctx: Context, args: dict[str, Any]) -> Any:
         "checks": [models.dump(c) for c in checks],
         "specs": specs,
         "go": [t.id for t in tasks if approvals.has_go(ctx.places, t.id)],
-        "boosts": intake.boosts(ctx),
+        "boosts": intake.marked(ctx, intake.BOOSTED),
         "broken": broken,
     }
 

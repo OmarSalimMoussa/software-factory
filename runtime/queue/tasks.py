@@ -232,7 +232,7 @@ def new_task(ctx: Context, args: Mapping[str, Any], body: str) -> Task:
             body=body.strip(),
         )
         draft = dataclasses.replace(draft, **facts)
-        boosted = intake.boosts(ctx)
+        boosted = intake.marked(ctx, intake.BOOSTED)
         if any(r.id in boosted for r in reqs):
             draft.boosted_at = now
         task = scored(ctx, queue, statuses.move(draft, "queued", "fast-lane", actor(ctx)), goals)
@@ -242,7 +242,7 @@ def new_task(ctx: Context, args: Mapping[str, Any], body: str) -> Task:
             changes[f"requests/{req.inbox}/{req.id}.md"] = formats.dump_request(req)
         queue.write(changes)
         queue.log(task.id, now, actor(ctx), "fast-lane", f"made from {', '.join(request_ids)}", to="queued")
-        intake.set_boosts(ctx, {k: v for k, v in boosted.items() if k not in request_ids})
+        intake.mark(ctx, intake.BOOSTED, {k: v for k, v in boosted.items() if k not in request_ids})
     return task
 
 
@@ -302,12 +302,13 @@ def next_up(ctx: Context) -> dict[str, Any]:
     by_id = {t.id: t for t in tasks}
     ready: list[Task] = []
     skipped: list[dict[str, str]] = []
+    back = intake.marked(ctx, intake.RETURNED)
     for task in (t for t in tasks if t.status == "queued"):
         waits = [a for a in task.after if a not in by_id or by_id[a].status not in LANDED]
         if task.not_now:
             skipped.append({"task": task.id, "why": "the owner said not now"})
-        elif waits:
-            skipped.append({"task": task.id, "why": f"waits for {', '.join(waits)}"})
+        elif waits or task.id in back:
+            skipped.append({"task": task.id, "why": f"waits for {', '.join(waits) or 'triage'}"})
         else:
             ready.append(task)
     ranking = Ranking(proposals.read(ctx.places).approved, goal_ranks(ctx))

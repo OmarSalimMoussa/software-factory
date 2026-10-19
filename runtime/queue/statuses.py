@@ -87,6 +87,7 @@ MOVES: tuple[Move, ...] = (
     _m({"merged", "checked", "on-staging"}, {"building", "approved"}, "reverted", ORCH, WARDEN),
     _m({"queued"}, {"parked"}, "park", ORCH),
     _m({"parked"}, {"queued"}, "unpark", OWNER),
+    _m({"parked"}, {"queued"}, "goals-changed", WARDEN),
 )
 EVENTS = frozenset(m.event for m in MOVES)
 

@@ -18,7 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import files, format_check, formats, goal, intake, tasks, triage, turn
+from runtime.queue import files, format_check, formats, goal, intake, owner, tasks, triage, turn
 from runtime.queue.book import Queue
 from runtime.shared import store
 from runtime.shared.models import Probe
@@ -167,18 +167,21 @@ def _deployed(ctx: Context, memo: dict[str, Any], probe: Probe) -> None:
 
 
 def _goal(ctx: Context, memo: dict[str, Any]) -> None:
-    """A change to GOAL.md scores every waiting task again and tells the orchestrator; the first reading is none."""
+    """A change to GOAL.md scores every waiting task again and tells the orchestrator; the first reading is none. A
+    change to its goal items brings every parked request and task back for triage first."""
     settings = ctx.settings()
     raw = files.read_repo_file(Path(settings.get_str("repo.path")), goal.GOAL_FILE,
                                settings.get_int("queue.max_upload_kib") * 1024)  # fmt: skip
     digest = hashlib.sha256(raw).hexdigest()
-    if memo["goal"] == digest:
+    back = owner.goals_changed(ctx, raw.decode())
+    if memo["goal"] == digest and back is None:
         return
     changed = tasks.rescore(ctx)
     first, memo["goal"] = memo["goal"] is None, digest
     store.write_json(memo_path(ctx.places), memo)
-    if not first:
-        ctx.post_event(inbox.GOAL_CHANGED, {"rescored": changed})
+    if not first or back is not None:
+        said = {} if back is None else {"changed": back["changed"], "back": len(back["requests"]) + len(back["tasks"])}
+        ctx.post_event(inbox.GOAL_CHANGED, {"rescored": changed, **said})
     log.info("warden: GOAL.md changed; %d task scores changed", changed)
 
 
