@@ -34,7 +34,9 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    next merge, or the tip. Slot 0 comes up there, whole, from a worktree of its own when that commit is older than
    the tip, and regression testers walk, in parallel, every scenario whose `protects` names a path one of them
    changed. Their runs go into the evidence with the saved check, so its page in Work shows each tester's
-   screenshots and the replay of its walk. A check clears every merge waiting up to its commit, at once, only when
+   screenshots and the replay of its walk. The clean-up keeps the QA of the newest `qa.keep_bundles` checks that
+   cleared a merge; past them, the screenshots and replays of a check, or of a task it cleared, go, and their pages
+   say when. Transcripts are never removed. A check clears every merge waiting up to its commit, at once, only when
    every row passed, each of those scenarios has a row, slot 0 ran that commit, and they are within the cap;
    anything less clears none. No merge turn goes while the cap of merges waits, until their bundle's check failed.
    Each row that did not pass says what comes next: walk it again once what blocked it is fixed (a block is never a

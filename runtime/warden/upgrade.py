@@ -52,15 +52,15 @@ def migrate(ctx: Context) -> list[str]:
 
 
 def _gc_record(ctx: Context) -> str:
-    """The nightly prune's day and its Docker reading go: the clean-up, which starts at once, writes its own record."""
+    """A clean-up record that does not say what failed goes, and the Docker reading: the clean-up writes its own."""
     docker, raw = ctx.places.state / "docker-disk.json", gc.record(ctx.places)
-    old = raw is not None and "measured" not in raw
+    old = raw is not None and "failed" not in raw
     if not old and not docker.exists():
         return ""
     docker.unlink(missing_ok=True)
     if old:
         gc.record_path(ctx.places).unlink()
-    return "the nightly prune's records"
+    return "the clean-up's records"
 
 
 def _reflection_states(ctx: Context) -> str:

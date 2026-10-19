@@ -18,6 +18,7 @@ from typing import Any
 
 from runtime.guard.rules import RULES
 from runtime.qa import evidence as qa_evidence
+from runtime.qa import retention
 from runtime.qa.replay import reader as replay_reader
 from runtime.queue import approvals, bundle, cards, files, goal, intake, pictures, proposals, records, triage
 from runtime.queue.book import Queue
@@ -151,9 +152,10 @@ def _qa(ctx: Context, args: dict[str, Any]) -> Any:
         ready = store.read_json_or(ctx.places.ready(s.id), {"records": []})
         found[s.task]["ready"] += ready.get("records", []) if isinstance(ready, dict) else []
         found[s.task]["results"] += store.read_jsonl(ctx.places.results_of(s.id))
+    went = retention.cleaned(ctx.places)
     for entry in store.read_jsonl(ctx.places.evidence / "index.jsonl"):
         if entry.get("task") in wanted:
-            found[entry["task"]]["evidence"].append(entry)
+            found[entry["task"]]["evidence"].append({**entry, "cleaned": went.get(entry["task"])})
     return found
 
 
@@ -162,9 +164,10 @@ def _check_runs(ctx: Context, args: dict[str, Any]) -> Any:
     if not isinstance(wanted, list) or len(wanted) > _MAX_IDS or not all(CHECK_ID.match(str(c)) for c in wanted):
         raise Refused("snapshot", f"checks is a list of at most {_MAX_IDS} check ids")
     found: dict[str, list[dict[str, Any]]] = {str(c): [] for c in wanted}
+    went = retention.cleaned(ctx.places)
     for entry in qa_evidence.entries(ctx.places):
         if entry.get("check") in found:
-            found[entry["check"]].append(entry)
+            found[entry["check"]].append({**entry, "cleaned": went.get(entry["check"])})
     return found
 
 
@@ -300,7 +303,7 @@ READERS: dict[str, Reader] = {
     "replay": replay_reader.read,
     "goal": _goal,
     "triage": lambda ctx, args: dataclasses.asdict(triage.batch(ctx)),
-    "gc": lambda ctx, args: gc.record(ctx.places),
+    "gc": lambda ctx, args: gc.view(ctx),
     "reflections": lambda ctx, args: reflections.entries(ctx.places),
     "history": _history,
     "brief": _brief,
@@ -378,7 +381,7 @@ def evidence(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     try:
         raw = qa_evidence.read_file(ctx.places, [of, *parts], _MAX_IMAGE)
     except FileNotFoundError as exc:
-        raise Refused("evidence", f"{of} has no evidence {rel}; it may have aged out") from exc
+        raise Refused("evidence", retention.why_gone(ctx, of) or f"{of} has no evidence {rel}") from exc
     except qa_evidence.TooLarge as exc:
         raise Refused("evidence", f"{rel} is too large to show here") from exc
     except OSError as exc:

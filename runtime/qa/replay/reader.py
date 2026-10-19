@@ -7,7 +7,7 @@ import json
 import re
 from typing import Any
 
-from runtime.qa import evidence
+from runtime.qa import evidence, retention
 from runtime.qa.evidence import TESTER
 from runtime.qa.qa_browser import RUN
 from runtime.qa.replay.build import DATA, FOLDER
@@ -38,10 +38,11 @@ def read(ctx: Context, args: dict[str, Any]) -> dict[str, Any]:
     named = (of, head, tester, run)
     entry = next((e for e in evidence.entries(ctx.places) if _names(e) == named), None)
     if entry is None:
-        raise Refused("replay", f"{of} has no run {run} by {tester}; it may have aged out")
+        raise Refused("replay", f"{of} has no run {run} by {tester}")
     # The clean-up deletes a run's files and leaves its line in the index.
     if not (ctx.places.evidence / of / head / tester / run).is_dir():
-        raise Refused("replay", f"{tester}'s run {run} on {of} has aged out of the evidence")
+        gone = retention.why_gone(ctx, of)
+        raise Refused("replay", gone or f"{tester}'s run {run} on {of} is gone from the evidence")
     try:
         raw = evidence.read_file(ctx.places, [of, head, tester, run, FOLDER, DATA], _LIMIT)
     # telemetry: expected — the warden's replays pass has not reached this run yet; the page says so

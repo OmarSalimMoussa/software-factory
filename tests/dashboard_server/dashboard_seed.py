@@ -180,8 +180,8 @@ def _seed_health(places: Places, now: float) -> None:
     rows = [{"name": n, "level": lv, "value": v, "figure": f, "whole": w} for n, lv, v, f, w in readings]
     store.write_json(places.vitals, {"at": iso(now), "level": "green", "why": "", "readings": rows})
     use = {"worktrees": 23 * 1024**3, "docker": 38 * 1024**3, "qa": 2 * 1024**3, "transcripts": 1024**3}
-    store.write_json(places.state / "gc.json", {"started": iso(now - 7200), "ended": iso(now - 7100), "use": use,
-                                                "measured": iso(now - 7100)})  # fmt: skip
+    store.write_json(places.state / "gc.json", {"started": iso(now - 7200), "ended": iso(now - 7100), "failed": [],
+                                                "use": use, "measured": iso(now - 7100)})  # fmt: skip
     store.write_json(
         places.state / "triage-last.json",
         {

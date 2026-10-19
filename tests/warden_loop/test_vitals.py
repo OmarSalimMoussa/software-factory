@@ -66,20 +66,30 @@ def test_the_machines_level_names_the_readings_that_set_it() -> None:
     assert vitals.why([power, vitals.Reading("install", vitals.RED, "differs")]) == "install: differs"
 
 
+FAILED = "the last clean-up failed: the Docker prune failed (exit 1)"
+
+
 @pytest.mark.parametrize(
-    ("free_gib", "level", "said"),
+    ("free_gib", "cleanup", "level", "said"),
     [
-        ((120, 31), vitals.GREEN, "31 GiB free of 193 GiB"),
-        ((120, 30), vitals.GREEN, "30 GiB free of 193 GiB"),
-        ((120, 29.5), vitals.AMBER, "30 GiB free of 193 GiB"),  # the fullest disk sets it
-        ((10, 120), vitals.AMBER, "10 GiB free of 193 GiB"),
-        ((9.5, 120), vitals.RED, "10 GiB free of 193 GiB"),
-        (None, vitals.UNKNOWN, "cannot read the free disk space: PermissionError"),
+        ((120, 31), None, vitals.GREEN, "31 GiB free of 193 GiB"),
+        ((120, 30), None, vitals.GREEN, "30 GiB free of 193 GiB"),
+        ((120, 29.5), None, vitals.AMBER, "30 GiB free of 193 GiB"),  # the fullest disk sets it
+        ((10, 120), None, vitals.AMBER, "10 GiB free of 193 GiB"),
+        ((9.5, 120), None, vitals.RED, "10 GiB free of 193 GiB"),
+        ((120, 31), FAILED, vitals.AMBER, f"31 GiB free of 193 GiB; {FAILED}"),
+        ((9.5, 120), FAILED, vitals.RED, f"10 GiB free of 193 GiB; {FAILED}"),
+        (None, None, vitals.UNKNOWN, "cannot read the free disk space: PermissionError"),
     ],
-    ids=["plenty", "at-amber", "under-amber", "at-red", "under-red", "unreadable"],
+    ids=["plenty", "at-amber", "under-amber", "at-red", "under-red", "failed", "failed-full", "unreadable"],
 )
-def test_the_disk_vital_turns_amber_then_red_as_the_fullest_disk_the_factory_writes_to_fills(
-    world: World, monkeypatch: pytest.MonkeyPatch, free_gib: tuple[float, float] | None, level: str, said: str
+def test_the_disk_vital_turns_amber_then_red_as_the_fullest_disk_fills_and_amber_when_a_clean_up_failed(
+    world: World,
+    monkeypatch: pytest.MonkeyPatch,
+    free_gib: tuple[float, float] | None,
+    cleanup: str | None,
+    level: str,
+    said: str,
 ) -> None:
     state, work = Path("/state"), Path("/work")
 
@@ -90,7 +100,7 @@ def test_the_disk_vital_turns_amber_then_red_as_the_fullest_disk_the_factory_wri
         return os.statvfs_result((4096, 4096, 193 * 1024**3 // 4096, 0, int(free) // 4096, 0, 0, 0, 0, 255))
 
     monkeypatch.setattr(vitals.os, "statvfs", statvfs)
-    reading = vitals.disk([state, work], world.ctx.settings())
+    reading = vitals.disk([state, work], world.ctx.settings(), cleanup)
     assert (reading.level, reading.value) == (level, said)
     assert reading.whole == (None if free_gib is None else 193)
 

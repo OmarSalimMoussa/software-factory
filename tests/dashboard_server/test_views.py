@@ -20,6 +20,7 @@ from runtime.dashboard.views.kit import PartError, Snap
 from runtime.dashboard.views.tasks.task import qa_line
 from runtime.dashboard.views.words import agentwords, taskwords
 from runtime.dashboard.views.words.settingwords import LABELS
+from runtime.qa import retention
 from runtime.queue import formats
 from runtime.shared import models, store
 from runtime.shared import operations as kinds
@@ -445,6 +446,32 @@ def test_a_checks_page_shows_each_runs_screenshots_and_a_replay_only_where_its_t
     assert (replay["title"], replay["empty"], len(replay["frames"])) == ("Merge t-0015", says, 3)
 
 
+CLEANED = "Cleaned up Oct 9: QA is kept for the newest 5 merge bundles."
+
+
+def _runs(rows: list[dict[str, Any]]) -> list[tuple[str | None, list[Any], list[Any]]]:
+    return [(r["note"], r["shots"], r["replays"]) for r in rows]
+
+
+@pytest.mark.parametrize(
+    ("of", "url", "shown", "said"),
+    [
+        (CHECKED, f"/api/doc/{CHECKED}", lambda p: _runs(p["doc"]["data"]["proof"]["rows"]), [(CLEANED, [], [])] * 2),
+        ("t-0013", "/api/task/t-0013", lambda p: _runs(p["task"]["data"]["testers"]["rows"]),
+         [("recordings cleaned up Oct 9", [], [])] * 3),
+        ("t-0013", "/api/task/t-0013", lambda p: p["task"]["data"]["built_from"]["qa"],
+         {"tone": None, "note": CLEANED, "shots": []}),
+    ],
+    ids=["check", "testers", "fix"],
+)  # fmt: skip
+def test_qa_the_clean_up_removed_says_when_in_place_of_its_screenshots_and_replays(
+    rig: Rig, of: str, url: str, shown: Any, said: Any
+) -> None:
+    store.write_json(retention.cleaned_path(rig.places), {of: "2026-10-09T13:00:00Z"})
+
+    assert shown(rig.parts(url)) == said
+
+
 @pytest.mark.parametrize(
     ("level", "figure", "home", "guard"),
     [
@@ -472,23 +499,28 @@ def test_power_reads_mains_only_when_the_reading_has_no_charge(
 
 
 SIZES = "Agents' worktrees 23.0 GiB, Docker {docker}, QA recordings 2.0 GiB, transcripts 1.0 GiB, measured 2 h ago."
+MEASURED, NEXT = SIZES.format(docker="38.0 GiB"), " The next clean-up is in 4 h 0 min."
+NOT_YET = "What fills the disk is not measured yet: the clean-up measures it every 6 h."
+FAILED = "the Docker prune failed (exit 1)"
 
 
 @pytest.mark.parametrize(
-    ("measured", "docker", "hint"),
+    ("docker", "change", "hint"),
     [
-        (True, 38 * 1024**3, SIZES.format(docker="38.0 GiB")),
-        (True, None, SIZES.format(docker="unknown")),
-        (False, None, "What fills the disk is not measured yet: the clean-up measures it every 6 h."),
+        (38 * 1024**3, {}, MEASURED + NEXT),
+        (None, {}, SIZES.format(docker="unknown") + NEXT),
+        (None, {"measured": None}, NOT_YET + NEXT),
+        (38 * 1024**3, {"ended": None}, MEASURED + " A clean-up is running."),
+        (38 * 1024**3, {"failed": [FAILED]}, f"The last clean-up failed: {FAILED}. {MEASURED}{NEXT}"),
     ],
-    ids=["measured", "docker-unread", "not-yet"],
+    ids=["measured", "docker-unread", "not-yet", "running", "failed"],
 )
-def test_the_disk_shows_its_free_space_and_what_fills_it_one_click_behind(
-    rig: Rig, measured: bool, docker: int | None, hint: str
+def test_the_disk_shows_its_free_space_and_what_fills_it_and_how_the_clean_up_goes_one_click_behind(
+    rig: Rig, docker: int | None, change: dict[str, object], hint: str
 ) -> None:
     record = store.read_json(rig.places.state / "gc.json")
     record["use"]["docker"] = docker
-    store.write_json(rig.places.state / "gc.json", record if measured else {**record, "measured": None})
+    store.write_json(rig.places.state / "gc.json", {**record, **change})
 
     [disk] = [g for g in rig.parts("/api/guard")["vitals"]["data"] if g["label"] == "Disk free"]
     laptop = rig.parts("/api/home")["envs"]["data"]["laptop"]

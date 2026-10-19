@@ -13,7 +13,7 @@ import pytest
 import replay_run
 from queue_kit import World
 
-from runtime.qa import evidence
+from runtime.qa import evidence, retention
 from runtime.qa.replay import build, pending, reader
 from runtime.qa.replay.trace import ReplayError
 from runtime.shared import store
@@ -193,7 +193,10 @@ def test_the_dashboard_reads_a_replay_by_its_run_and_never_through_a_link(world:
     with pytest.raises(Refused, match="has no run"):
         reader.read(world.ctx(), asked)
     run = _taken(world, ENTRY)
-    with pytest.raises(Refused, match="has aged out of the evidence"):
+    with pytest.raises(Refused, match="is gone from the evidence"):
+        reader.read(world.ctx(), asked)
+    store.write_json(retention.cleaned_path(world.places), {"t-0001": "2026-10-09T12:00:00Z"})
+    with pytest.raises(Refused, match="the QA of t-0001 was cleaned up on 2026-10-09"):
         reader.read(world.ctx(), asked)
     (run / "replay").mkdir(parents=True)
     assert reader.read(world.ctx(), asked)["replay"] is None  # not built yet

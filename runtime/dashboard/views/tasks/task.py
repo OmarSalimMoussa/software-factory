@@ -13,6 +13,7 @@ from runtime.dashboard.views.kit import (
     Snap,
     ago,
     brief_url,
+    day_label,
     epoch,
     first_line,
     model_label,
@@ -49,6 +50,11 @@ def _latest_round(snap: Snap, task_id: str) -> tuple[str, list[str], dict[str, l
     return head, list(last["testers"]), results, [f"{t}\t{u}" for t, u in files]
 
 
+def _gone(snap: Snap, task_id: str, head: str) -> str | None:
+    found = snap.get("qa")[task_id]["evidence"] if head else []
+    return next((e["cleaned"] for e in found if e["head"] == head and e["cleaned"]), None)
+
+
 def _shots(files: list[str], tester: str) -> list[str]:
     return [line.split("\t", 1)[1] for line in files if line.split("\t", 1)[0] == tester]
 
@@ -63,6 +69,7 @@ def testers(snap: Snap, task: dict[str, Any]) -> dict[str, Any]:
     # The testers a round needs are the warden's, from the task and its diff, recorded when QA was readied.
     head, names, results, files = _latest_round(snap, task["id"])
     runs = replay.tester_runs(task["id"], head, snap.get("qa")[task["id"]]["evidence"]) if head else {}
+    gone = _gone(snap, task["id"], head)
     worker = taskwords.worker(snap, task["id"])
     reported = {r["agent"] for kind in results.values() for r in kind}
     testing = {
@@ -80,6 +87,8 @@ def testers(snap: Snap, task: dict[str, Any]) -> dict[str, Any]:
             note = ", ".join(plural(found[s], s) for s in OPEN_SEVERITIES)
         else:
             state, tone, note = "pass", "good", None
+        if gone and name in results:
+            note = "; ".join(filter(None, [note, f"recordings cleaned up {day_label(gone[:10])}"]))
         model = settings.model(name.replace("-", "_"))[0]
         rows.append(
             {
@@ -119,8 +128,10 @@ def built_from(snap: Snap, task: dict[str, Any]) -> dict[str, Any] | None:
             "approved_by": "you" if go else "the orchestrator (rung 3)",
         }
     n = taskwords.rung(task, snap.settings)
-    _, names, results, files = _latest_round(snap, task["id"])
-    qa = qa_line(names, results, files)
+    head, names, results, files = _latest_round(snap, task["id"])
+    qa, gone = qa_line(names, results, files), _gone(snap, task["id"], head)
+    if gone and qa["note"] is None:
+        qa = {"tone": None, "note": replay.cleaned(snap, gone), "shots": []}
     body = task["body"].split("\n", 1)[1] if task["body"].startswith("#") else task["body"]
     return {
         "kind": "fix",

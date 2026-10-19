@@ -206,7 +206,7 @@ class Units:
         store.write_text(self.places.state / "runs" / f"{request_id}.in", given, mode=0o600)
         self._request(request_id, {"kind": "stack", "slot": slot, "verb": verb, "session": session})
         code, output = self._wait(STACK_UNIT.format(request_id), request_id)
-        log = self.places.evidence / "stack" / f"{request_id}.log"
+        log = self.places.stack_logs / f"{request_id}.log"
         store.write_text(log, output, mode=0o600)
         settings = self.settings()
         lines = settings.get_int("slots.log_tail_lines")

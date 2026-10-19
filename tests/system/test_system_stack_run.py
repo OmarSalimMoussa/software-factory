@@ -323,8 +323,23 @@ def test_top_fails_when_docker_cannot_list_the_slots_containers(
     assert "top: listing slot 2's containers failed: Cannot connect" in capsys.readouterr().out
 
 
-def test_the_nightly_prune_removes_only_slot_images_since_prods_share_the_docker(
-    monkeypatch: pytest.MonkeyPatch,
+SLOT_IMAGES = ["image", "prune", "-a", "-f", "--filter", "label=software.slot"]
+
+
+@pytest.mark.parametrize(
+    ("ages", "status", "expected"),
+    [
+        (
+            ["168", "48"],
+            0,
+            [["builder", "prune", "--all", "-f", "--filter", "until=48h"], [*SLOT_IMAGES, "--filter", "until=168h"]],
+        ),
+        (["0", "0"], 0, [["builder", "prune", "--all", "-f"], SLOT_IMAGES]),
+        (["7d", "48"], lf.REFUSED, []),
+    ],
+)
+def test_the_prune_removes_build_cache_and_only_slot_images_past_their_ages_since_prods_share_the_docker(
+    monkeypatch: pytest.MonkeyPatch, ages: list[str], status: int, expected: list[list[str]]
 ) -> None:
     asked: list[list[str]] = []
 
@@ -334,11 +349,8 @@ def test_the_nightly_prune_removes_only_slot_images_since_prods_share_the_docker
 
     monkeypatch.setattr(stack_run, "_docker", docker)
 
-    assert stack_run.prune("168", 30) == 0
-
-    images = [args for args in asked if args[0] == "image"]
-    assert images == [["image", "prune", "-a", "-f", "--filter", "label=software.slot", "--filter", "until=168h"]]
-    assert [args[0] for args in asked] == ["builder", "image"]
+    assert stack_run.prune(*ages, 30) == status
+    assert asked == expected
 
 
 # scripts/dev listing the verbs in verbs.txt beside it; its run records its label, then sleeps the seconds it ends with.

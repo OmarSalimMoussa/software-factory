@@ -48,17 +48,18 @@ def _check_text(raw: dict[str, Any]) -> str:
     return f"# {raw['title']}\n\n{raw['notes']}\n\n## Scenarios\n\n{table}"
 
 
-def _proof(check: str, runs: list[dict[str, Any]]) -> dict[str, Any]:
+def _proof(snap: Snap, check: str, runs: list[dict[str, Any]]) -> dict[str, Any]:
     """Each run the check's testers walked: its screenshots, and its replay when its tester is known."""
     rows = []
     for n, run in enumerate(sorted(runs, key=lambda e: str(e["run"])), 1):
         names = (check, str(run["head"]), str(run["tester"]), str(run["run"]))
+        note = replay.cleaned(snap, run["cleaned"]) if run["cleaned"] else None
         rows.append(
             {
                 "name": names[2] if len(runs) == 1 else f"{names[2]} {n}",
-                "note": None if run["agent"] else "No replay: its tester is not known.",
+                "note": note or (None if run["agent"] else "No replay: its tester is not known."),
                 "shots": replay.shots(check, run),
-                "replays": [{"label": "Replay", "url": replay.url(*names)}] if run["agent"] else [],
+                "replays": [{"label": "Replay", "url": replay.url(*names)}] if run["agent"] and not note else [],
             }
         )
     return {"rows": rows, "empty": "No screenshots were kept for this check."}
@@ -113,7 +114,7 @@ def reader(snap: Snap, ref: str) -> dict[str, Any]:
             _fm("Commit", _value(raw["commit"][:7])),
             _fm("When", _value(when(doc.at, utc=True))),
         ]
-        text, proof = _check_text(raw), _proof(raw["id"], snap.get("check_runs").get(raw["id"], []))
+        text, proof = _check_text(raw), _proof(snap, raw["id"], snap.get("check_runs").get(raw["id"], []))
     elif doc.kind == "reflection":
         fm = [
             _fm("Kind", _value(raw["kind"], REFLECT_TONES[raw["kind"]])),

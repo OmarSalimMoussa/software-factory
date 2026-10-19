@@ -64,7 +64,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("qa.max_items", "Items per brief"),
             ("qa.desktop_seconds", "Desktop seconds per tester"),
             ("qa.desktop_wait_minutes", "Minutes a tester waits for a desktop to free"),
-            ("qa.evidence_days", "Days evidence is kept"),
+            ("qa.keep_bundles", "Merge bundles whose QA is kept"),
             ("qa.widths", "Screen widths testers use"),
             ("qa.viewport_height", "Tester screen height"),
             ("qa.quiet_seconds", "Seconds of quiet before a tester's place frees"),
@@ -333,6 +333,8 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         [
             ("gc.every_hours", "Clean up every, hours"),
             ("gc.images_keep_days", "Days unused images are kept"),
+            ("gc.build_cache_keep_hours", "Hours unused build cache is kept"),
+            ("gc.logs_keep_days", "Days stack logs are kept"),
             ("gc.docker_budget_gib", "Docker disk budget, GiB"),
         ],
     ),

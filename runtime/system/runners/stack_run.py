@@ -94,14 +94,18 @@ def sweep(slot: int, timeout: int) -> int:
     return 1 if failed else 0
 
 
-def prune(hours: str, timeout: int) -> int:
-    if not hours.isdigit() or int(hours) < 1:
-        print("prune: name the age in whole hours", flush=True)
+def prune(images: str, cache: str, timeout: int) -> int:
+    if not images.isdigit() or not cache.isdigit():
+        print("prune: name the images' and the build cache's ages in whole hours", flush=True)
         return lf.REFUSED
     status = 0
     # Prod's images share this Docker: only an image a slot labelled is ever pruned, so prod can always push back.
-    for args in (["builder", "prune", "-f"], ["image", "prune", "-a", "-f", "--filter", f"label={SLOT_LABEL}"]):
-        done = _docker([*args, "--filter", f"until={hours}h"], timeout)
+    # --all reaches the cache an image shares too, most of it; without it the age reaches a small part.
+    for args, hours in (
+        (["builder", "prune", "--all", "-f"], cache),
+        (["image", "prune", "-a", "-f", "--filter", f"label={SLOT_LABEL}"], images),
+    ):
+        done = _docker([*args, *(["--filter", f"until={hours}h"] if int(hours) else [])], timeout)
         print(done.stdout.strip() or done.stderr.strip(), flush=True)
         status |= done.returncode
     return 1 if status else 0
@@ -349,7 +353,8 @@ def _own_verb(slot: int, verb: list[str], timeout: int) -> int | None:
     if verb[0] == lf.SWEEP:
         return sweep(slot, timeout)
     if verb[0] == lf.PRUNE:
-        return prune(verb[1] if len(verb) == 2 else "", timeout)
+        images, cache = verb[1:] if len(verb) == 3 else ["", ""]
+        return prune(images, cache, timeout)
     if verb[0] == lf.DISK:
         return disk(timeout)
     if verb[0] == lf.RESTARTS:

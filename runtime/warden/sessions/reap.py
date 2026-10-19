@@ -5,7 +5,7 @@ session claimed is never touched): the product's ``scripts/dev empty``, then eve
 both through the stack unit, then the lease goes. A reap that failed is tried again after watch.reap_retry_minutes. Its
 worktree is removed as the agent user only when git calls it clean and no live session works in it; a dirty one is held,
 with git's reason, for the next session on the same task. Its branch goes once merged. A tester's desktop goes down once
-it has handed back. QA evidence ages out in the clean-up (gc.py).
+it has handed back. QA evidence goes in the clean-up, past the merge bundles kept (gc.py).
 """
 
 from __future__ import annotations
@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import Any
 
 from runtime.guard.facts import read_desktops
-from runtime.queue import formats
+from runtime.queue import formats, tasks
+from runtime.queue.book import Queue
 from runtime.shared import store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.paths import Places
@@ -98,9 +99,39 @@ def _remove_worktree(ctx: Context, session: Session, live: list[Session]) -> dic
         return {"worktree": f"held: {reason}", "branch": branch}
     if not branch or branch in ("HEAD", ctx.settings().get_str("repo.default_branch")):
         return {"worktree": "removed"}
+    kept = "deleted" if _drop_branch(ctx, branch) else "kept: not merged"
+    return {"worktree": "removed", "branch": f"{branch} {kept}"}
+
+
+def _drop_branch(ctx: Context, branch: str) -> bool:
     # -d (never -D) deletes only a branch already merged into the main checkout's branch.
-    code, _ = ctx.launcher.agent_command(["git", "branch", "-d", branch], repo)
-    return {"worktree": "removed", "branch": f"{branch} {'deleted' if code == 0 else 'kept: not merged'}"}
+    code, _ = ctx.launcher.agent_command(["git", "branch", "-d", branch], ctx.settings().get_str("repo.path"))
+    return code == 0
+
+
+def retry_held(ctx: Context) -> int:
+    """Remove each worktree held for a task that has since settled, once git calls it clean and unlocked: Claude Code
+    locks a session's worktree until its process ends, which may come after the reap. How many went."""
+    held = _read(_held_path(ctx.places))
+    settled = {t.id for t in Queue.of(ctx).tasks()[0] if t.status in tasks.SETTLED} if held else set()
+    live = {s.worktree for s in registry.read(ctx.places).values() if s.state != RETIRED}
+    repo, default = ctx.settings().get_str("repo.path"), ctx.settings().get_str("repo.default_branch")
+    gone = []
+    for task, found in sorted(held.items()):
+        if task not in settled or found["worktree"] in live:
+            continue
+        if Path(found["worktree"]).is_dir():
+            code, _ = ctx.launcher.agent_command(["git", "worktree", "remove", found["worktree"]], repo)
+            if code != 0:  # still dirty or locked: it stays held
+                continue
+        if found["branch"] not in ("", "HEAD", default):
+            _drop_branch(ctx, found["branch"])
+        gone.append(task)
+    if gone:
+        with ctx.lock:
+            left = _read(_held_path(ctx.places))
+            store.write_json(_held_path(ctx.places), {k: v for k, v in left.items() if k not in gone}, mode=0o600)
+    return len(gone)
 
 
 def reap(ctx: Context, session_id: str) -> dict[str, str]:

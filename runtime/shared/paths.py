@@ -255,6 +255,10 @@ class Places:
         return self.state / "evidence"
 
     @property
+    def stack_logs(self) -> Path:
+        return self.evidence / "stack"
+
+    @property
     def totp_secret(self) -> Path:
         return self.state / "totp.key"
 

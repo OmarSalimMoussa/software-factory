@@ -1,5 +1,5 @@
 """A finished tester's runs move into the warden's evidence by task, head and tester, and the regression testers'
-by the check they walked for; no link is followed. A run nothing took goes once the evidence would have aged out."""
+by the check they walked for; no link is followed."""
 
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ from queue_kit import World
 from runtime.qa import evidence, qa_browser
 from runtime.queue import records, verbs
 from runtime.shared.models import RETIRED
-from runtime.warden import gc
 from runtime.warden.sessions import registry
 
 SESSION = "0b6f1c3e-1d2a-4c5b-9e8f-7a6b5c4d3e2f"
@@ -168,35 +167,3 @@ def test_a_check_whose_runs_cannot_be_taken_is_saved_and_the_warden_says_so(
 
     assert answer["runs"] is None and [c.id for c in orchestrator.queue().checks()[0]] == [answer["check"]]
     assert f"the runs of check {answer['check']} could not be taken into the evidence (StoreError)" in caplog.text
-
-
-def test_runs_nothing_took_go_through_the_agents_unit_once_the_evidence_would_have_aged_out(
-    world: World, tmp_path: Path
-) -> None:
-    root = tmp_path / "runs"
-    for path in ("a/20261009T110000Z-0a0a0a", "a/20260920T110000Z-0b0b0b", "b/20260901T000000Z-0c0c0c", "c"):
-        (root / path).mkdir(parents=True)
-    (root / "d").mkdir()
-    (root / "d" / "notes.txt").write_text("not a run")
-
-    assert gc.prune_runs(world.ctx(), root, world.settings.get_int("qa.evidence_days")) == 2
-
-    assert world.launcher.commands == [
-        ["rm", "-rf", "--", str(root / "a" / "20260920T110000Z-0b0b0b")],
-        ["rm", "-rf", "--", str(root / "b" / "20260901T000000Z-0c0c0c")],
-        ["rmdir", "--ignore-fail-on-non-empty", "--", str(root / "b")],
-        ["rmdir", "--ignore-fail-on-non-empty", "--", str(root / "c")],
-    ]
-
-
-def test_old_runs_the_agents_unit_could_not_remove_are_reported(
-    world: World, tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    (tmp_path / "runs" / SESSION / "20260901T000000Z-0c0c0c").mkdir(parents=True)
-    (tmp_path / "runs" / SESSION / "20261009T110000Z-0a0a0a").mkdir()
-    world.launcher.git = lambda argv: (1, "rm: Permission denied")
-
-    with caplog.at_level(logging.WARNING, logger="factory.warden"):
-        assert gc.prune_runs(world.ctx(), tmp_path / "runs", 14) == 0
-
-    assert "warden: rm of old QA runs failed (exit 1)" in caplog.text

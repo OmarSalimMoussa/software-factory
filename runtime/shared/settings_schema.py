@@ -63,7 +63,7 @@ SCHEMA: dict[str, Spec] = {
     "qa.prod_every_hours": Spec("int", 1, 168),
     "qa.desktop_seconds": Spec("int", 60, 900),
     "qa.desktop_wait_minutes": Spec("int", 0, 6),
-    "qa.evidence_days": Spec("int", 1, 60),
+    "qa.keep_bundles": Spec("int", 1, 100),
     "qa.widths": Spec("list", 1, 6, item="int"),
     "qa.quiet_seconds": Spec("int", 30, 900),
     "qa.stale_seconds": Spec("int", 60, 3600),
@@ -226,6 +226,8 @@ SCHEMA: dict[str, Spec] = {
     "dashboard.thread_tail_kib": Spec("int", 64, 65536),  # contract: how much of a transcript the thread reads
     "gc.every_hours": Spec("int", 1, 168),
     "gc.images_keep_days": Spec("int", 1, 90),
+    "gc.build_cache_keep_hours": Spec("int", 1, 2160),
+    "gc.logs_keep_days": Spec("int", 1, 365),
     "gc.docker_budget_gib": Spec("int", 5, 2000),
     # The factory's own repo on GitHub (owner/name), which it never works on; the installer sets it.
     "factory.github": Spec("str", when="Next install"),

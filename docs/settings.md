@@ -22,7 +22,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `caps` | Implementers, designers and subagents at once, and the browsers and remote desktops testers run at once |
 | `subagents` | Which subagent kinds each role may start |
 | `rounds` | QA rounds, critic rounds, check runs, how far one extension goes, and how many merges one check of the default branch clears together |
-| `qa` | Time per item and to start, items per brief, desktop time, widths, evidence days, the desktop tester's screen and the pause between its typed keys and how long its click holds, how long a held request may wait, how long a free browser place waits for the session told of it, how a wait reloads and how long it may last |
+| `qa` | Time per item and to start, items per brief, desktop time, widths, how many merge bundles keep their QA, the desktop tester's screen and the pause between its typed keys and how long its click holds, how long a held request may wait, how long a free browser place waits for the session told of it, how a wait reloads and how long it may last |
 | `replay` | How a tester's run is replayed for the owner: the builder's timings, how long the picture stays hidden after a sign-in link is typed, and the player's pace |
 | `intake` | Batch size and wait, the fast lane's time, the score's weights |
 | `routing` | Slices per rung, open proposals at once, the estimate's window, tries to confirm a cause |
@@ -35,7 +35,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `telemetry` | What `factory errors` and `factory logs` give an agent: how many items, how large, how long a call |
 | `cost`, `prices` | The daily budget (past it, only severe work starts that day), the plan-limit levels, and dollars per million tokens per model |
 | `dashboard` | Port, refresh and stale times, the code lock, page size, the hosts it answers |
-| `gc` | How often the clean-up runs, how long images stay, the Docker disk budget |
+| `gc` | How often the clean-up runs, how long images, build cache and stack logs stay, the Docker disk budget |
 | `install` | The guard's timeout, the check-ins' grace, the product's toolchain |
 
 `models.allowed` and `prices` are set at install and are read-only on the dashboard. Prod's health address is not a

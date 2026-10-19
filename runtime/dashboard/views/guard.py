@@ -5,14 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 from runtime.dashboard.views.home import disk_free, memory_free, on_mains
-from runtime.dashboard.views.kit import Parts, Query, Snap, ago, epoch
+from runtime.dashboard.views.kit import Parts, Query, Snap, ago, epoch, span
 from runtime.dashboard.views.words import agentwords
 from runtime.shared.models import RETIRED
 
 WANTS = ("settings", "vitals", "slots", "sessions", "queue", "refusals", "rules", "gc")
 _TONES = {"green": "good", "amber": "warn", "red": "bad", "unknown": ""}
 _GIB = 1024**3
-_KINDS =(("worktrees", "Agents' worktrees"), ("docker", "Docker"), ("qa", "QA recordings"),
+_KINDS = (("worktrees", "Agents' worktrees"), ("docker", "Docker"), ("qa", "QA recordings"),
           ("transcripts", "transcripts"))  # fmt: skip
 
 
@@ -82,13 +82,19 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
 
 
 def disk_detail(snap: Snap) -> str:
-    found = snap.get("gc")
-    if found is None or found["measured"] is None:
-        every = snap.settings.get_int("gc.every_hours")
+    found, every = snap.get("gc"), snap.settings.get_int("gc.every_hours")
+    if found is None:
         return f"What fills the disk is not measured yet: the clean-up measures it every {every} h."
-    use = found["use"]
-    sizes = [f"{word} {'unknown' if use[kind] is None else f'{use[kind] / _GIB:.1f} GiB'}" for kind, word in _KINDS]
-    return f"{', '.join(sizes)}, measured {ago(epoch(found['measured']), snap.now)}."
+    said = [found["problem"][:1].upper() + found["problem"][1:] + "."] if found["problem"] else []
+    if found["measured"] is None:
+        said.append(f"What fills the disk is not measured yet: the clean-up measures it every {every} h.")
+    else:
+        use = found["use"]
+        sizes = [f"{word} {'unknown' if use[kind] is None else f'{use[kind] / _GIB:.1f} GiB'}" for kind, word in _KINDS]
+        said.append(f"{', '.join(sizes)}, measured {ago(epoch(found['measured']), snap.now)}.")
+    due = epoch(found["started"]) + every * 3600 - snap.now
+    said.append("A clean-up is running." if found["ended"] is None else f"The next clean-up is in {span(due)}.")
+    return " ".join(said)
 
 
 def slots(snap: Snap) -> list[dict[str, Any]]:

@@ -51,7 +51,7 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
     store.write_json(places.approvals / f"{merged.id}.json", {"task": merged.id, "rung": 2, "model": "m",
                                                              "by": "owner", "at": "x", "digest": "d"})  # fmt: skip
     store.write_json(places.approvals / f"{in_turn.id}.go.json", {"task": in_turn.id, "by": "owner", "at": "x"})
-    # The nightly prune's day, and its Docker reading.
+    # A clean-up record that does not say what failed, and a Docker reading file.
     store.write_json(gc.record_path(places), {"last_day": "2026-10-09"})
     store.write_json(places.state / "docker-disk.json", {"at": "x", "bytes": 1, "budget_bytes": 2})
 

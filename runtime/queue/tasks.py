@@ -25,6 +25,7 @@ from runtime.warden.context import Context
 from runtime.warden.sessions import registry
 
 LANDED = frozenset({"merged", "checked", "on-staging", "promoted", "closed"})
+SETTLED = LANDED - {"merged"}  # past the check of its merge's bundle, or closed
 SCORED = frozenset({"queued", "parked", "proposed"})
 REVERTED = "reverted"  # the event that takes a landed task back to its builder
 BLOCKED = "blocked"

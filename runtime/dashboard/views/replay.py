@@ -8,7 +8,7 @@ import re
 from typing import Any
 from urllib.parse import urlencode
 
-from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, epoch, when
+from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, day_label, epoch, when
 from runtime.dashboard.views.words import taskwords
 from runtime.shared.models import SEVERITIES
 
@@ -219,16 +219,22 @@ def _beat(beat: dict[str, Any], frames: list[dict[str, Any]], base: str) -> dict
     return out
 
 
+def cleaned(snap: Snap, at: str) -> str:
+    keep = snap.settings.get_int("qa.keep_bundles")
+    return f"Cleaned up {day_label(at[:10])}: QA is kept for the newest {keep} merge bundles."
+
+
 def tester_runs(task_id: str, head: str, evidence: list[dict[str, Any]]) -> dict[str, list[str]]:
     """Each tester kind's runs on ``head``, one per tester of the kind, as the addresses of their replay pages."""
     runs: dict[str, list[str]] = {}
     for e in evidence:
-        if e["head"] == head:
+        if e["head"] == head and not e["cleaned"]:
             runs.setdefault(str(e["tester"]), []).append(url(task_id, head, str(e["tester"]), str(e["run"])))
     return runs
 
 
 def shots(of: str, entry: dict[str, Any]) -> list[str]:
-    """The addresses of a run's screenshots: the pictures at the top of its folder, never its replay's frames."""
+    """The addresses of a run's screenshots, never its replay's frames; none once the clean-up removed them."""
     base = evidence_base(of, str(entry["head"]), str(entry["tester"]), str(entry["run"]))
-    return [base + f for f in entry["files"] if "/" not in f and f.lower().endswith(_IMAGE)]
+    pictures = [] if entry["cleaned"] else entry["files"]
+    return [base + f for f in pictures if "/" not in f and f.lower().endswith(_IMAGE)]

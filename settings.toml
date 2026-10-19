@@ -55,7 +55,7 @@ max_items = 10
 desktop_seconds = 300
 desktop_wait_minutes = 5  # a tester's desktop up waits this long for a desktop to free before it is refused, on
                           # the factory's time: it and desktop up's own minutes fit one shell call's longest wait
-evidence_days = 14
+keep_bundles = 5        # the QA evidence and runs of the newest this many merge bundles are kept, the rest cleaned up
 widths = [1440, 1024, 390]
 quiet_seconds = 120     # a tester with no result stops holding a place after this much quiet, its budget spent
 stale_seconds = 300     # or after this much quiet, whatever its budget
@@ -263,6 +263,8 @@ thread_tail_kib = 2048  # how much of the end of a transcript the thread reads
 [gc]                    # the clean-up; reaping a retired session is immediate
 every_hours = 6         # how often it runs; each run then measures what fills the disk, for the disk vital's detail
 images_keep_days = 7
+build_cache_keep_hours = 48  # build cache unused this long goes; prod's own builds still find the recent cache
+logs_keep_days = 14     # what each stack request printed is kept this long
 docker_budget_gib = 60
 
 [factory]

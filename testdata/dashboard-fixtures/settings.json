@@ -795,18 +795,18 @@
       "when": "At once"
      },
      {
-      "key": "qa.evidence_days",
-      "label": "Days evidence is kept",
+      "key": "qa.keep_bundles",
+      "label": "Merge bundles whose QA is kept",
       "control": "number",
-      "value": 14,
-      "saved": 14,
-      "default": 14,
-      "applied": 14,
+      "value": 5,
+      "saved": 5,
+      "default": 5,
+      "applied": 5,
       "pending": null,
       "low": 1,
-      "high": 60,
+      "high": 100,
       "step": 1,
-      "hint": "From 1 to 60.",
+      "hint": "From 1 to 100.",
       "options": null,
       "when": "At once"
      }

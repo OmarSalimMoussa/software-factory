@@ -54,8 +54,10 @@ OWED = " Events you have not acted on yet: {kinds}. `factory inbox` lists them."
 IDLE = "idle"
 _SETTLING: set[str] = set()
 # A session whose task has moved past its part is finished; a process that ends before that crashed.
-_LANDED = tasks.LANDED - {"merged"}
-DONE_AT = {IMPL: _LANDED, DESIGN: _LANDED | {"building", "qa", QA_CLEAN, "turn", "merged", "blocked", "on-hold"}}
+DONE_AT = {
+    IMPL: tasks.SETTLED,
+    DESIGN: tasks.SETTLED | {"building", "qa", QA_CLEAN, "turn", "merged", "blocked", "on-hold"},
+}
 
 
 class SessionsWatch:

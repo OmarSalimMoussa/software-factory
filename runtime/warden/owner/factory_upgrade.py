@@ -84,7 +84,7 @@ def _epoch(iso: str) -> float:
 
 
 def _op(ctx: Context, op_id: str) -> dict[str, Any] | None:
-    """The operation that started an upgrade; None once the nightly clean-up took its record."""
+    """The operation that started an upgrade; None once its record is gone."""
     try:
         found: dict[str, Any] = ops.get(ctx, {"id": op_id}, None)["op"]
     # telemetry: expected — an old operation's record is cleaned up; the upgrade it started is over

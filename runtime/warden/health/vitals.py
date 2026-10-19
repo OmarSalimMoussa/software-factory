@@ -20,7 +20,7 @@ from typing import Any
 from runtime.shared import store
 from runtime.shared.paths import AGENT_USER, SLICE, Places
 from runtime.shared.settings import Settings
-from runtime.warden import public
+from runtime.warden import gc, public
 from runtime.warden.context import Context
 from runtime.warden.health import cpu_budget
 from runtime.warden.sessions import backstop, launch
@@ -80,8 +80,8 @@ def cpu(use: float, settings: Settings) -> Reading:
     return Reading("cpu", GREEN, f"{percent:.0f}% of every CPU in use on average", percent)
 
 
-def disk(paths: list[Path], settings: Settings) -> Reading:
-    """The free space of the fullest filesystem ``paths`` sit on: the factory's state and the agents' work."""
+def disk(paths: list[Path], settings: Settings, cleanup: str | None) -> Reading:
+    """The free space on the fullest filesystem of ``paths``; a ``cleanup`` problem turns it amber at least."""
     try:
         found = [os.statvfs(path) for path in paths]
     # telemetry: surfaced — the disk vital's `Reading` is unknown, naming why
@@ -89,10 +89,11 @@ def disk(paths: list[Path], settings: Settings) -> Reading:
         return Reading("disk", UNKNOWN, f"cannot read the free disk space: {type(exc).__name__}")
     fullest = min(found, key=lambda s: s.f_bavail * s.f_frsize)
     free, size = fullest.f_bavail * fullest.f_frsize / _GIB, fullest.f_blocks * fullest.f_frsize / _GIB
-    said = f"{free:.0f} GiB free of {size:.0f} GiB"
+    said = f"{free:.0f} GiB free of {size:.0f} GiB" + (f"; {cleanup}" if cleanup else "")
     if free < settings.get_int("vitals.disk_red_gib"):
         return Reading("disk", RED, said, free, size)
-    return Reading("disk", AMBER if free < settings.get_int("vitals.disk_amber_gib") else GREEN, said, free, size)
+    amber = cleanup or free < settings.get_int("vitals.disk_amber_gib")
+    return Reading("disk", AMBER if amber else GREEN, said, free, size)
 
 
 def power(supplies: Path, settings: Settings) -> Reading:
@@ -283,10 +284,11 @@ def refresh(
     """Read every vital and write vitals.json for the permits, the dashboard and the status."""
     settings = ctx.settings()
     cpu_use = _cpu(ctx, proc, cgroups, settings)
+    cleanup = gc.problem(gc.record(ctx.places), ctx.clock.now(), settings)
     readings = [
         memory(_text(proc / "meminfo"), settings),
         cpu_use,
-        disk([ctx.places.state, Path(settings.get_str("repo.path"))], settings),
+        disk([ctx.places.state, Path(settings.get_str("repo.path"))], settings, cleanup),
         power(supplies, settings),
         install(ctx.places),
         hooks(ctx.places, Path(settings.get_str("repo.path")), settings.get_int("watch.tick_seconds")),
