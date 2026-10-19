@@ -31,7 +31,7 @@ from runtime.guard.facts import (
 )
 from runtime.guard.wire import HANDBACK
 from runtime.shared import lanes, store
-from runtime.shared.models import BENCH_PENDING, QA_CLEAN, RETIRED, WAITING, WORKING
+from runtime.shared.models import BENCH_PENDING, MERGED, QA_CLEAN, RETIRED, WAITING, WORKING
 from runtime.shared.paths import Places, queue_dir
 
 UNPERMITTED_CARD = (
@@ -198,7 +198,8 @@ def _read(path: Path, what: str) -> str:
 
 
 def _turn_comes(call: Call) -> bool:
-    """Whether the session's task waits, QA clean, for its merge turn: `factory turn next` tells its implementer."""
+    """Whether the session's task waits, QA clean, for its merge turn, which `factory turn next` tells its implementer
+    of, or merged, for its merge check, whose revert the warden hands its implementer."""
     if call.session is None or not call.session.task:
         return False
     # The queue's parser loads only here, at a stop, so no other call pays for its import.
@@ -207,7 +208,7 @@ def _turn_comes(call: Call) -> bool:
     rel = book.task_rel(call.session.task)
     path = queue_dir(Path(call.settings.get_str("repo.path"))) / rel
     try:
-        return formats.parse_task(path.read_text(encoding="utf-8"), rel).status == QA_CLEAN
+        return formats.parse_task(path.read_text(encoding="utf-8"), rel).status in (QA_CLEAN, MERGED)
     except (OSError, formats.FormatError) as exc:
         raise store.StoreError(f"{path}: the task cannot be read: {exc}") from exc
 
@@ -216,8 +217,8 @@ def check_stop(call: Call) -> Decision:
     """No session goes idle with nothing to wake it. The orchestrator keeps its wait for the warden's events in the
     background; a stop the hook already turned back once is let through, so the refusal names the whole remedy. An
     implementer or designer at work keeps a subagent running, has told the orchestrator since its last prompt, or
-    waits QA clean for the merge turn the warden tells it of, since no one else answers its chat: turned back every
-    time, as it can always send that message."""
+    waits for the merge turn or merge check the warden tells it of, since no one else answers its chat: turned back
+    every time, as it can always send that message."""
     if call.in_subagent:
         return None
     if call.role in (IMPLEMENTER, DESIGNER):

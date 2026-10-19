@@ -267,8 +267,10 @@ def test_an_implementer_waiting_for_a_browser_place_may_stop_as_the_warden_tells
     assert (isinstance(decision, Refusal) and decision.rule == "no-waker") is refused
 
 
-@pytest.mark.parametrize(("status", "refused"), [("qa-clean", False), ("turn", True), ("building", True)])
-def test_an_implementer_whose_task_waits_qa_clean_for_its_merge_turn_may_stop_as_the_turn_wakes_it(
+@pytest.mark.parametrize(
+    ("status", "refused"), [("qa-clean", False), ("merged", False), ("turn", True), ("building", True)]
+)
+def test_an_implementer_whose_task_waits_for_its_merge_turn_or_check_may_stop_as_the_warden_wakes_it(
     tmp_path: Path, status: str, refused: bool
 ) -> None:
     kit = Kit(tmp_path)
