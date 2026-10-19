@@ -122,6 +122,11 @@ class Places:
         return self.state / "history.jsonl"
 
     @property
+    def upgrade_hold(self) -> Path:
+        """Until when an upgrade getting ready holds new testers, in public/ where the guard reads it."""
+        return self.state / "public" / "upgrade-hold.json"
+
+    @property
     def browser_line(self) -> Path:
         """The sessions waiting for a browser place, in public/ where the guard reads them."""
         return self.state / "public" / "browser-line.json"

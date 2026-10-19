@@ -19,6 +19,7 @@ RULES: dict[str, str] = {
     "tells the session once one may start",
     "cpu-hold": "a new browser tester, or a session's own remote desktop, while the machine's CPU use is past "
     "budget.walk_hold_percent or unknown, until it has waited budget.walk_hold_minutes",
+    "upgrade-hold": "a new tester while an upgrade gets ready, until install.walk_wait_minutes pass",
     "model": "an Agent call asking for any model but that kind's configured one",
     "tester-brief": "a tester brief without one `Scenarios and checks: N` line, or asking for a slot command its "
     "tester cannot run",

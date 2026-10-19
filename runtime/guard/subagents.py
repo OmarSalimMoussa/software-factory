@@ -1,8 +1,8 @@
 """The guard's rules for subagents: which kinds a role may start (`subagent-kinds`), on which model (`model`), how
 many at once (`subagents-at-once`), browser testers on the machine (`browsers-at-once`), a tester's brief
-(`tester-brief`), QA only after every slice (`qa-ready`), QA and critic rounds (`qa-rounds`, `critic-rounds`), a browser
-tester held while the CPU is busy (`cpu-hold`, in walk_hold), each tester's time (`tester-time`), and no finished
-subagent resumed (`resume-subagent`).
+(`tester-brief`), QA only after every slice (`qa-ready`), QA and critic rounds (`qa-rounds`, `critic-rounds`), a tester
+held while the CPU is busy or an upgrade gets ready (`cpu-hold`, `upgrade-hold`, in walk_hold), each tester's time
+(`tester-time`), and no finished subagent resumed (`resume-subagent`).
 
 Every count comes from the session's own transcript; the current call is left out by its ``tool_use_id``, and a
 call the guard refused never ran.

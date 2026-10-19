@@ -234,6 +234,7 @@ SCHEMA: dict[str, Spec] = {
     "install.mcp_start_seconds": Spec("int", 10, 600, when="Next install"),
     "install.firewall_refresh_seconds": Spec("int", 10, 600, when="Next install"),
     "install.healthchecks_grace_minutes": Spec("int", 1, 120, when="Next install"),
+    "install.walk_wait_minutes": Spec("int", 0, 240),
     "install.upgrade_wait_minutes": Spec("int", 5, 240),
     "install.upgrade_minutes": Spec("int", 10, 600, when="Next install"),
     # contract: added by FB7. The programs the product's scripts need, copied from the owner's PATH for the agents and

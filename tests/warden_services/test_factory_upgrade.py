@@ -6,8 +6,9 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from warden_fakes import OWNER_CALLER, FakeLauncher
@@ -55,6 +56,7 @@ def test_the_owners_upgrade_to_any_commit_pauses_waits_for_every_agent_and_start
     op = ops.get(ctx, {"id": op_id}, None)["op"]
     assert op["state"] == ops.DONE, op["steps"]
     assert [s["text"] for s in op["steps"]] == [
+        "Waiting for the testers to hand back",
         "Pausing the factory",
         "Waiting for every agent to settle",
         "Starting the upgrade",
@@ -94,7 +96,8 @@ def test_an_agent_check_or_push_that_never_settles_stops_the_upgrade_before_it_s
     ctx: Context, launcher: FakeLauncher, monkeypatch: pytest.MonkeyPatch, busy: str, said: str
 ) -> None:
     _installed(ctx.places)
-    working = {"s1": type("S", (), {"name": "impl-t-0001", "state": "working"})()} if busy == "agent" else {}
+    agent = SimpleNamespace(id="s1", name="impl-t-0001", role="implementer", state="working", parent="", started="")
+    working = {"s1": agent} if busy == "agent" else {}
     monkeypatch.setattr(factory_upgrade.registry, "read", lambda places: working)  # a session the pause can't bench
     if busy == "check":
         assert ctx.check_places.take(1, "orchestrator", 0) is None  # stopping the factory would kill its run
@@ -107,8 +110,51 @@ def test_an_agent_check_or_push_that_never_settles_stops_the_upgrade_before_it_s
     ops.join(op_id, 10)
 
     op = ops.get(ctx, {"id": op_id}, None)["op"]
-    assert op["state"] == ops.FAILED and said in op["steps"][1]["detail"]
+    assert op["state"] == ops.FAILED and said in op["steps"][2]["detail"]
     assert launcher.upgrades == []
+
+
+@pytest.mark.parametrize(
+    ("hands_back", "said"),
+    [(True, "no tester is at work"), (False, "qa-ux still at work after 30 minutes: the pause stops them")],
+    ids=["once-it-hands-back", "past-the-wait"],
+)
+def test_an_upgrade_holds_new_testers_and_pauses_once_those_at_work_hand_back_or_the_wait_ends(
+    ctx: Context, launcher: FakeLauncher, monkeypatch: pytest.MonkeyPatch, hands_back: bool, said: str
+) -> None:
+    _installed(ctx.places)
+    started = datetime.fromtimestamp(ctx.clock.now(), UTC).isoformat()
+    rows = {
+        "s1": SimpleNamespace(
+            id="s1", name="impl-t-0001", role="implementer", state="working", parent="", started=started
+        ),
+        "a1": SimpleNamespace(id="a1", name="qa-ux", role="qa-ux", state="working", parent="s1", started=started),
+    }
+    holds: list[object] = []
+
+    def tick(seconds: float) -> None:
+        holds.append(json.loads(ctx.places.upgrade_hold.read_text())["until"])
+        if hands_back:
+            rows["a1"].state = "retired"
+        else:
+            ctx.clock.t += 30 * 60
+
+    def bench(ctx: Context) -> str:
+        for row in rows.values():
+            row.state = "deprioritized"
+        return "paused"
+
+    monkeypatch.setattr(factory_upgrade.registry, "read", lambda places: rows)
+    monkeypatch.setattr(factory_upgrade.time, "sleep", tick)
+    monkeypatch.setattr(factory_upgrade, "_paused", bench)
+    deadline = datetime.fromtimestamp(ctx.clock.now() + 30 * 60, UTC).isoformat()
+
+    op_id = factory_upgrade.start(ctx, {"commit": NEW}, None)["op"]
+    ops.join(op_id, 10)
+
+    op = ops.get(ctx, {"id": op_id}, None)["op"]
+    assert op["state"] == ops.DONE and op["steps"][0]["detail"] == said
+    assert holds == [deadline] and not ctx.places.upgrade_hold.exists() and launcher.upgrades == [NEW]
 
 
 def test_an_upgrade_asked_while_a_session_comes_back_waits_for_it_then_pauses(
@@ -129,7 +175,7 @@ def test_an_upgrade_asked_while_a_session_comes_back_waits_for_it_then_pauses(
     ops.join(op_id, 10)
 
     op = ops.get(ctx, {"id": op_id}, None)["op"]
-    assert op["state"] == ops.DONE and op["steps"][0]["detail"] == "paused, every agent keeping its work"
+    assert op["state"] == ops.DONE and op["steps"][1]["detail"] == "paused, every agent keeping its work"
     assert len(waited) == 1 and launcher.upgrades == [NEW]
 
 

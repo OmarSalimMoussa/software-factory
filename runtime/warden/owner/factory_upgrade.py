@@ -1,19 +1,20 @@
 """An upgrade of the factory to any commit of its repo on GitHub, started with the owner's factory.upgrade.
 
-The verb takes the commit's full sha. It pauses the factory, waits for every agent to settle and every check running
-tests and push to prod to end, and starts root's upgrade unit, which downloads that commit itself and installs it. No
-commit need be newer than the one installed, so installing the commit before is the way back. The warden stops while the
-install runs: what was asked for stays here for the page, and root's progress record says how it went.
+The verb takes the commit's full sha. It holds new testers and gives those at work install.walk_wait_minutes to hand
+back, since the pause would cut a walk half way. Then it pauses the factory, waits for every agent to settle and every
+check running tests and push to prod to end, and starts root's upgrade unit, which downloads that commit itself and
+installs it. No commit need be newer than the one installed, so installing the commit before is the way back. The warden
+stops while the install runs: what was asked for stays here for the page, and root's progress record says how it went.
 """
 
 from __future__ import annotations
 
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from runtime.shared import operations, store, upgrades
+from runtime.shared import lanes, operations, store, upgrades
 from runtime.shared.models import RESTING
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
@@ -51,6 +52,7 @@ def start(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
         if installed is None:
             raise Refused("upgrade", "Install the factory by hand first")
         steps = [
+            ("Waiting for the testers to hand back", lambda: _testers_done(ctx)),
             ("Pausing the factory", lambda: _pause(ctx)),
             ("Waiting for every agent to settle", lambda: _settled(ctx)),
             ("Starting the upgrade", lambda: _start(ctx, commit)),
@@ -91,7 +93,31 @@ def _op(ctx: Context, op_id: str) -> dict[str, Any] | None:
     return found
 
 
+def _testers_done(ctx: Context) -> str:
+    """No new tester starts until the pause, past which none can (`upgrade-hold`); past the wait, the pause stops those
+    still at work."""
+    settings = ctx.settings()
+    wait = settings.get_int("install.walk_wait_minutes")
+    deadline = ctx.clock.now() + wait * 60
+    store.write_json(ctx.places.upgrade_hold, {"until": datetime.fromtimestamp(deadline, UTC).isoformat()})
+    while True:
+        now = ctx.clock.now()
+        rows = registry.read(ctx.places).values()
+        at_work = sorted(s.name for s in lanes.testers(rows, settings, datetime.fromtimestamp(now, UTC)))
+        if not at_work:
+            return "no tester is at work"
+        if now >= deadline:
+            return f"{', '.join(at_work)} still at work after {wait} minutes: the pause stops them"
+        time.sleep(settings.get_int("watch.tick_seconds"))
+
+
 def _pause(ctx: Context) -> str:
+    said = _paused(ctx)
+    ctx.places.upgrade_hold.unlink(missing_ok=True)
+    return said
+
+
+def _paused(ctx: Context) -> str:
     """Pause the factory once no session is coming back: an upgrade asked right after a resume waits for it."""
     settings = ctx.settings()
     deadline = ctx.clock.now() + settings.get_int("install.upgrade_wait_minutes") * 60

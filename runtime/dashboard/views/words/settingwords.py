@@ -364,6 +364,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("install.mcp_start_seconds", "Seconds Claude Code waits for a tester's browser to start"),
             ("install.firewall_refresh_seconds", "Load the firewall again every, seconds"),
             ("install.healthchecks_grace_minutes", "Minutes a check-in may be late"),
+            ("install.walk_wait_minutes", "Minutes an upgrade waits for testers to hand back"),
             ("install.upgrade_wait_minutes", "Minutes an upgrade waits for the agents to settle"),
             ("install.upgrade_minutes", "Longest an upgrade may run, minutes"),
             ("install.toolchain", "Programs the product's scripts need"),

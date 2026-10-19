@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Protocol, TypeVar
 
 from runtime.shared import store
-from runtime.shared.models import WAITING, WORKING
+from runtime.shared.models import TESTER, WAITING, WORKING
 from runtime.shared.paths import Places
 from runtime.shared.settings import Settings
 
@@ -66,14 +66,19 @@ def time_note(settings: Settings, items: int) -> str:
 
 
 def holders(rows: Iterable[R], settings: Settings, now: datetime) -> list[R]:
-    """The browser testers holding a place: working under a live session, and younger than any tester may last, since
-    none outlasts its items' time, a desktop's start and a lost hand-back's quiet."""
-    rows = list(rows)
+    """The browser testers holding a place."""
     personas = settings.get_list("subagents.browser_personas")
+    return [s for s in testers(rows, settings, now) if s.role in personas]
+
+
+def testers(rows: Iterable[R], settings: Settings, now: datetime) -> list[R]:
+    """The testers at work: working under a live session, and younger than any tester may last, since none outlasts
+    its items' time, a desktop's start and a lost hand-back's quiet."""
+    rows = list(rows)
     alive = {s.id for s in rows if s.state in (WORKING, WAITING)}
     waits = settings.get_int("slots.verb_minutes") * 60 + settings.get_int("qa.stale_seconds")
     longest = tester_seconds(settings, settings.get_int("qa.max_items")) + waits
-    return [s for s in rows if s.parent in alive and s.state == WORKING and s.role in personas
+    return [s for s in rows if s.parent in alive and s.state == WORKING and s.role.startswith(TESTER)
             and (now - datetime.fromisoformat(s.started.replace("Z", "+00:00"))).total_seconds() < longest]  # fmt: skip
 
 

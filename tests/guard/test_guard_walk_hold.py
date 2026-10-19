@@ -1,5 +1,6 @@
-"""The CPU hold on new walks: a browser tester waits while the machine's average CPU use is past
-budget.walk_hold_percent or unknown, and starts anyway once its session has waited budget.walk_hold_minutes."""
+"""The holds on new walks: a tester waits while an upgrade gets ready, and a browser tester waits while the machine's
+average CPU use is past budget.walk_hold_percent or unknown, starting anyway once its session has waited
+budget.walk_hold_minutes."""
 
 from __future__ import annotations
 
@@ -94,13 +95,45 @@ def test_a_held_browser_tester_starts_once_its_session_has_waited_the_longest_ho
 
 
 @pytest.mark.parametrize(
-    "record",
-    [{"level": "green", "why": ""}, {"level": "green", "why": "", "cpu": 30.0, "at": "soon"}],
-    ids=["without-cpu-use", "bad-time"],
+    ("kind", "until", "off", "held"),
+    [
+        ("qa-backend", 5, False, True),
+        ("qa-ux", 5, False, True),
+        ("Explore", 5, False, False),
+        ("qa-ux", -1, False, False),
+        ("qa-ux", None, False, False),
+        ("qa-ux", 5, True, False),
+    ],
+    ids=["a-tester", "a-browser-tester", "not-a-tester", "past-its-time", "no-upgrade", "switched-off"],
 )
-def test_vitals_the_guard_cannot_read_refuse_a_browser_testers_start(tmp_path: Path, record: dict[str, object]) -> None:
+def test_a_new_tester_waits_while_an_upgrade_gets_ready_until_the_hold_ends(
+    tmp_path: Path, kind: str, until: int | None, off: bool, held: bool
+) -> None:
+    kit = _kit(tmp_path, *(["upgrade-hold"] if off else []))
+    kit.vitals(cpu=30.0)
+    if until is not None:
+        store.write_json(kit.places.upgrade_hold, {"until": (NOW + timedelta(minutes=until)).isoformat()})
+    decision = kit.decide("Agent", {**START, "subagent_type": kind})
+    assert (isinstance(decision, Refusal) and decision.rule == "upgrade-hold") is held
+    assert not held or (isinstance(decision, Refusal) and "start the " + kind in decision.reason)
+
+
+@pytest.mark.parametrize(
+    ("name", "record"),
+    [
+        ("vitals.json", {"level": "green", "why": ""}),
+        ("vitals.json", {"level": "green", "why": "", "cpu": 30.0, "at": "soon"}),
+        ("upgrade-hold.json", {"until": "soon"}),
+        ("upgrade-hold.json", {}),
+    ],
+    ids=["vitals-without-cpu-use", "vitals-bad-time", "hold-bad-time", "hold-without-time"],
+)
+def test_a_hold_record_the_guard_cannot_read_refuses_a_browser_testers_start(
+    tmp_path: Path, name: str, record: dict[str, object]
+) -> None:
     kit = _kit(tmp_path)
-    store.write_json(kit.public / "vitals.json", record)
+    kit.vitals(cpu=30.0)
+    store.write_json(kit.public / name, record)
     raw = json.dumps(kit.payload("Agent", START))
     code, _, err = hook.handle(raw, f"0::/{SLICE}/agent-run@{SID}.service\n", kit.places, kit.home, NOW)
     assert code == 2 and err.startswith("Refused by the factory guard (guard): the guard failed (StoreError")
