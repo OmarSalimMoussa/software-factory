@@ -25,6 +25,8 @@ from typing import IO, Any
 SERVER_CODE = "browser_run_code_unsafe"
 WAIT_FOR = "browser_wait_for"
 ROUTE = "browser_route"
+# The input that names a file a server tool writes: the guard refuses it, so no listed tool offers it.
+FILENAME = "filename"
 # The devtools capability holds the trace's tools; the wrapper needs the capability on, the tester keeps its usual
 # tools, so every tool the capability adds is hidden. Closing the browser would end the trace, and the next call
 # would open an untraced browser, so that is hidden too: the browser closes with the session.
@@ -86,6 +88,10 @@ class Proxy:
         self._tools, self._answer_tool, self._notes = tools, answer, notes
 
     def _noted(self, tool: dict[str, Any]) -> dict[str, Any]:
+        schema = tool.get("inputSchema")
+        if isinstance(schema, dict) and isinstance(schema.get("properties"), dict) and FILENAME in schema["properties"]:
+            kept = {name: field for name, field in schema["properties"].items() if name != FILENAME}
+            tool = {**tool, "inputSchema": {**schema, "properties": kept}}
         note = self._notes.get(str(tool.get("name")))
         return tool if note is None else {**tool, "description": f"{tool.get('description', '')} {note}".strip()}
 

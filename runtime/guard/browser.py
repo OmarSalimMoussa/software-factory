@@ -18,7 +18,7 @@ from pathlib import Path, PurePosixPath
 from runtime.guard import shell, transcript
 from runtime.guard.facts import Call, Decision, Refusal, Rewrite, SessionView, inside, public, resolve
 from runtime.qa.scenarios import FOLDER
-from runtime.qa.wrapper import ROUTE, SERVER_CODE, WAIT_FOR
+from runtime.qa.wrapper import FILENAME, ROUTE, SERVER_CODE, WAIT_FOR
 from runtime.qa.wrapper_tools import WAIT_UNTIL
 from runtime.shared import lanes
 from runtime.shared.models import WORKING
@@ -106,7 +106,7 @@ def _server(call: Call) -> Decision:
     if call.tool.removeprefix(BROWSER) == SERVER_CODE:
         return Refusal("qa-browser", "code in the browser server runs outside the page; run a page script instead")
     # A named file lands wherever the name says; without one it lands in the run's own evidence folder.
-    if "filename" in call.tool_input:
+    if FILENAME in call.tool_input:
         return Refusal("qa-browser", "name no file: the browser names it, and its answer says the name to report")
     # A route with neither sends the request on, past the routes that keep the owner's dashboard out of reach.
     if call.tool == BROWSER + ROUTE and call.tool_input.get("status") is None and call.tool_input.get("body") is None:

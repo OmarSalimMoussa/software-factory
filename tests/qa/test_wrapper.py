@@ -113,6 +113,9 @@ def test_the_trace_starts_before_the_first_call_and_the_tester_can_neither_see_n
     noted = {t["name"]: t["description"] for t in tools if t["name"] in NOTES}
     assert noted == {name: "Playwright's own. " + note for name, note in NOTES.items()}
     assert "browser_type_keys" in noted["browser_type"] and "browser_mouse_press_xy" in noted["browser_mouse_click_xy"]
+    # The guard refuses a named file, so no tool offers one.
+    playwrights = [t["inputSchema"]["properties"] for t in tools if t["description"].startswith("Playwright's own.")]
+    assert playwrights and all(fields == {"type": {"type": "string"}} for fields in playwrights)
     assert stopped["error"]["message"] == "there is no tool browser_stop_tracing"
     assert closed["error"]["message"] == "there is no tool browser_close"  # closing would end the trace
     assert log.read_text().splitlines() == [

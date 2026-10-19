@@ -25,6 +25,9 @@ TOOLS = [
     "browser_stop_tracing",
 ]
 
+# Playwright offers a file name to the tools that write one, such as a screenshot.
+FIELDS = {"type": {"type": "string"}, "filename": {"type": "string"}}
+
 
 def answer(message: dict[str, object]) -> dict[str, object] | None:
     method, params = message.get("method"), message.get("params") or {}
@@ -34,7 +37,12 @@ def answer(message: dict[str, object]) -> dict[str, object] | None:
     if method == "tools/list":
         return {
             "tools": [
-                {"name": name, "description": "Playwright's own.", "inputSchema": {"type": "object"}} for name in TOOLS
+                {
+                    "name": name,
+                    "description": "Playwright's own.",
+                    "inputSchema": {"type": "object", "properties": FIELDS},
+                }
+                for name in TOOLS
             ]
         }
     if method != "tools/call":
