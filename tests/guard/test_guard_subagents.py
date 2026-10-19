@@ -488,28 +488,34 @@ def test_browser_testers_are_capped_across_the_machine_and_start_unless_its_vita
 
 
 @pytest.mark.parametrize(
-    ("role", "line", "refused"),
+    ("role", "line", "cap", "refused"),
     [
-        ("implementer", "waiting", True),
-        ("implementer", "told", True),
-        ("implementer", "told-past-its-turn", False),
-        ("implementer", "empty", False),
-        ("orchestrator", "waiting", False),
+        ("implementer", "orchestrator-waits", 1, True),
+        ("orchestrator", "orchestrator-waits", 1, False),
+        ("implementer", "another-told", 1, True),
+        ("implementer", "itself-told", 1, False),
+        ("implementer", "itself-and-the-orchestrator-told", 2, False),
+        ("implementer", "another-told-past-its-turn", 1, False),
+        ("implementer", "empty", 1, False),
     ],
 )
-def test_while_the_orchestrator_waits_for_a_browser_place_another_sessions_tester_waits_behind_it(
-    tmp_path: Path, role: str, line: str, refused: bool
+def test_a_freed_browser_place_is_kept_for_the_session_told_of_it_and_the_orchestrator_waits_first(
+    tmp_path: Path, role: str, line: str, cap: int, refused: bool
 ) -> None:
     kit = Kit(tmp_path)
+    kit.settings(caps__browsers_at_once=cap)
     kit.session(role)
     orchestrator = SID if role == "orchestrator" else "orch-1"
     if role != "orchestrator":
         kit.session("orchestrator", sid=orchestrator)
+    kit.session("implementer", sid="other-1")
     now = NOW.timestamp()
     waiting, told = {
-        "waiting": ([orchestrator], {}),
-        "told": ([], {orchestrator: now - 30}),
-        "told-past-its-turn": ([], {orchestrator: now - 3600}),
+        "orchestrator-waits": ([orchestrator], {}),
+        "another-told": ([], {"other-1": now - 30}),
+        "itself-told": ([], {SID: now - 30}),
+        "itself-and-the-orchestrator-told": ([], {SID: now - 30, orchestrator: now - 30}),
+        "another-told-past-its-turn": ([], {"other-1": now - 3600}),
         "empty": ([], {}),
     }[line]
     lanes.write_line(kit.places, waiting, told)

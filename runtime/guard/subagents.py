@@ -115,32 +115,31 @@ def _model(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision
 
 def _browsers(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     """At most caps.browsers_at_once browser testers on the machine, none on red vitals: amber holds back new work.
-    This session's earlier starts count too: one sent in the same message has no session row yet."""
+    This session's earlier starts count too: one sent in the same message has no session row yet. A place the warden
+    told another session of is kept for it for qa.place_turn_seconds, and none goes to another while the orchestrator
+    waits for one: its merge check is what every merge waits on."""
     personas = call.settings.get_list("subagents.browser_personas")
     if kind not in personas or call.off(lanes.PLACES):
         return None
-    if call.role != ORCHESTRATOR and _check_waits(call):
+    waiting, told = lanes.line(call.places)
+    first = {s.id for s in call.sessions.values() if s.role == ORCHESTRATOR and not s.parent}
+    if call.role != ORCHESTRATOR and first & set(waiting):
         return Refusal(lanes.PLACES, f"the orchestrator waits for a browser place for the merge check, which every "
                                      f"merge waits on, so it goes first. {WOKEN}")  # fmt: skip
     rows = lanes.holders(call.sessions.values(), call.settings, call.now)
     known = {s.agent_id for s in call.sessions.values() if s.agent_id}
     starting = [c for c in calls if lanes.kind_of(c.subagent_type) in personas and c.agent_id not in known
                 and _running(call, c)]  # fmt: skip
+    turn, me = call.settings.get_int("qa.place_turn_seconds"), call.session.id if call.session else ""
+    kept = sum(1 for sid, at in told.items() if sid != me and call.now.timestamp() - at < turn)
     running, cap = len(rows) + len(starting), call.settings.get_int("caps.browsers_at_once")
-    if running >= cap:
-        return Refusal(lanes.PLACES, f"{running} browser testers run on this machine, its cap of {cap}. {WOKEN}")
+    if running + kept >= cap:
+        also = f", and {kept} kept for a session told one is free" if kept else ""
+        return Refusal(lanes.PLACES, f"{running} browser testers run on this machine{also}, its cap of {cap}. {WOKEN}")
     vitals = read_vitals(call.places)
     if vitals.level == "red":
         return Refusal(lanes.PLACES, f"the machine's vitals are red ({vitals.why}). {WOKEN}")
     return None
-
-
-def _check_waits(call: Call) -> bool:
-    """Whether the orchestrator waits in the browser line, or was told of a place within qa.place_turn_seconds."""
-    waiting, told = lanes.line(call.places)
-    first = {s.id for s in call.sessions.values() if s.role == ORCHESTRATOR and not s.parent}
-    turn, now = call.settings.get_int("qa.place_turn_seconds"), call.now.timestamp()
-    return bool(first & set(waiting)) or any(sid in first and now - at < turn for sid, at in told.items())
 
 
 def _at_once(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:

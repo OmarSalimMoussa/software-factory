@@ -3,8 +3,8 @@
 session in a line, in the order the guard refused them, and each pass tells as many as there are free places, the
 longest waiting first, while the vitals are not red. The orchestrator joins at the head: its merge check is what
 every merge waits on, and the guard holds back other testers while it waits. A place told of is kept for its session
-qa.place_turn_seconds; a told session refused again, because another took the place, goes back to the head of the
-line. A session leaves the line once it starts a browser tester or retires.
+qa.place_turn_seconds, which the guard counts as taken for every other session; a told session refused again goes
+back to the head of the line. A session leaves the line once it starts a browser tester or retires.
 """
 
 from __future__ import annotations
