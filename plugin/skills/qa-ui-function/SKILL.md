@@ -13,9 +13,9 @@ in every state, and you prove each finding with a screenshot.
 
 - **First, run `factory ready-check`.** It says whether your implementer recorded every slice and its slot runs
   that build, and names the head. If it answers "not ready", report that line as your whole result and stop.
-- **Your time.** Your brief's `Scenarios and checks: N` line sets it, and the brief ends with the factory's time. When
-  an item's time passes, mark it `timed out` with what you saw and go on; while you hold the remote desktop, its time
-  is yours instead, as the next point says. Never wait on a long operation: mark that step
+- **Your time.** Your brief's `Scenarios and checks: N` line sets it, and the brief ends with the factory's time. Once
+  the guard says your time is spent, mark each item left `timed out` with what you saw and go on; while you hold the
+  remote desktop, its time is yours instead, as the next point says. Never wait on a long operation: mark that step
   blocked and go on. The guard cuts your commands to the time left and, once it is spent, lets only your report through:
   your finding files, `factory qa step-result`, `factory qa finding`, `factory qa result`, `factory reflect` and your
   hand-back. A scenario's own timings never override this.

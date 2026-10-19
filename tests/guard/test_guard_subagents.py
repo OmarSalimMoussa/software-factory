@@ -538,6 +538,8 @@ def test_a_testers_brief_ends_with_the_time_the_guard_holds_it_to(
     assert isinstance(decision, Rewrite)
     last = decision.updated_input["prompt"].rstrip().splitlines()[-1]
     assert last.startswith("Your time, set by the factory: 1320 s from your start") is timed
+    # A model cannot tell how long it has worked: a tester that guessed it had run out gave up a third of the way in.
+    assert ("walk on until the factory says your time is spent" in last) is timed
     assert kit.decide("Agent", decision.updated_input) is None
 
 

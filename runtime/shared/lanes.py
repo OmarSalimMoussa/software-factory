@@ -60,8 +60,9 @@ def time_note(settings: Settings, items: int) -> str:
     setup, each = settings.get_int("qa.setup_seconds"), settings.get_int("qa.seconds_per_item")
     return (
         f"Your time, set by the factory: {tester_seconds(settings, items)} s from your start, {setup} s to set up "
-        f"and {each} s for each of your {items} items. After it the factory lets only your report through, whatever "
-        "else this brief says of time."
+        f"and {each} s for each of your {items} items. You cannot tell how long you have worked, so walk on until the "
+        "factory says your time is spent, and only then mark what is left. After it the factory lets only your report "
+        "through, whatever else this brief says of time."
     )
 
 
