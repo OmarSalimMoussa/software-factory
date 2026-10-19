@@ -307,9 +307,11 @@ class Browser:
     def __init__(self, pages: list[str], results: tuple[Any, ...] = ()) -> None:
         self.pages, self.results, self.ticks = iter(pages), iter(results), Ticks()
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.at: list[float] = []  # each call's time on the wait's clock
 
     def call(self, name: str, args: dict[str, Any]) -> str:
         self.calls.append((name, args))
+        self.at.append(self.ticks.clock)
         if name == "browser_snapshot":
             return next(self.pages)
         # The code tool's value as Playwright prints it.
@@ -361,6 +363,16 @@ def test_a_wait_never_lasts_past_the_factorys_ceiling() -> None:
         "“Ready” did not show in the page's text within 1 min (the most one wait may last is 1 min). "
         "Words drawn in a picture or a live view are no page text: a screenshot shows them."
     )
+
+
+def test_each_look_of_a_wait_comes_a_whole_interval_after_its_reload_once_the_page_has_loaded() -> None:
+    page = "- Page URL: https://app.test/jobs/7\n"
+    browser = Browser([page + "Loading", page + "Loading", page + "Ready"])
+    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 1.5})
+    assert not failed and said.startswith("“Ready” shows, after 1 min 30 s.")
+    look, reload = "browser_snapshot", "browser_navigate"
+    timed = [(look, 0), (reload, 0), (look, 60), (reload, 60), (look, 90)]
+    assert list(zip([n for n, _ in browser.calls], browser.at, strict=True)) == timed
 
 
 def test_a_cancelled_wait_stops_at_its_next_reload() -> None:

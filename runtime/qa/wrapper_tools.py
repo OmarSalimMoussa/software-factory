@@ -232,13 +232,15 @@ class Tools:
                     f"“{text}” did not show in the page's text within {duration(ceiling)}{capped}. Words drawn in "
                     f"a picture or a live view are no page text: a screenshot shows them. The page now:\n\n{page}"
                 )
-            # The last look comes at the ceiling, however much shorter than a reload's interval the wait is.
-            if cancelled.wait(min(self.reload_seconds, ceiling - waited)):
-                raise ToolError("the wait was cancelled")
             found = PAGE_URL.search(page)
             if found is None:
                 raise ToolError("the page names no address to reload, so the wait stopped")
+            if cancelled.is_set():
+                raise ToolError("the wait was cancelled")
+            # A reload, then the wait: each look comes once the page has loaded, and the last at the ceiling.
             self.call("browser_navigate", {"url": found.group(1)})
+            if cancelled.wait(min(self.reload_seconds, ceiling - waited)):
+                raise ToolError("the wait was cancelled")
 
     def _open_desktop(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
         url = arguments.get("url")
