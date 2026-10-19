@@ -19,6 +19,10 @@ holds. When the factory still refuses one, test what needs none first, then try 
    screenshot is not shrunk before you see it and a point in it is the point on the desktop.
 3. Enter the password and take control as the view asks. Never put the password in your report.
 
+Leaving the view's page ends its session. `browser_open_desktop` with the same address and password takes you back,
+so where the scenario lets you, run the steps that need the desktop together, and the web app's checks before or
+after them.
+
 ## 2. Work it
 
 - **Click:** take a screenshot, click at the point with `browser_mouse_press_xy`, which holds the button as the desktop
