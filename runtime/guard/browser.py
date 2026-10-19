@@ -123,13 +123,16 @@ def _walked(call: Call) -> Decision:
     if not (call.in_subagent and lanes.kind_of(call.agent_type) == REGRESSION) or call.off("walked-scenario"):
         return None
     folder = call.worktree / FOLDER
-    words = [word for word in _named(call) if "/" in word or word.startswith(("~", "."))]
-    if not any(inside(resolve(word, call.cwd, call.home), folder) for word in words):
+    # An address names a page, not a file, unless it is a file:// one; a tester's folder may be the scenarios' own.
+    local = [w.removeprefix("file://") for w in _named(call) if "://" not in w.removeprefix("file://")]
+    words = [word for word in local if "/" in word or word.startswith(("~", "."))]
+    found = next((p for p in (resolve(w, call.cwd, call.home) for w in words) if inside(p, folder)), None)
+    if found is None:
         return None
     return Refusal(
         "walked-scenario",
-        "this checkout holds the scenarios of the default branch's tip, and the build you walk may be older: read "
-        "each with `factory qa scenario <name>`, as that build has it",
+        f"{found} is in this checkout's scenarios, which hold the default branch's tip, and the build you walk may be "
+        "older: read each with `factory qa scenario <name>`, as that build has it",
     )
 
 

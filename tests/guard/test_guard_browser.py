@@ -169,14 +169,20 @@ def test_a_browser_wait_is_cut_to_the_testers_time_left(
         ("Bash", {"command": "factory qa scenario web"}, "qa-regression", False),
         ("Read", {"file_path": "{repo}/GOAL.md"}, "qa-regression", False),
         ("Read", {"file_path": "{repo}/qa/scenarios/web.md"}, "qa-prod", False),
+        ("Bash", {"command": "curl -s http://slot.test:8101/api/people"}, "qa-regression", False),
+        ("mcp__qa-browser__browser_navigate", {"url": "http://slot.test:8101/people"}, "qa-regression", False),
+        ("mcp__qa-browser__browser_navigate", {"url": "file://{repo}/qa/scenarios/web.md"}, "qa-regression", True),
     ],
 )
+@pytest.mark.parametrize("within", ["", "/qa/scenarios"], ids=["from-the-checkout", "from-the-scenarios-folder"])
 def test_a_regression_tester_reads_no_scenario_in_the_checkout_which_holds_the_tips_text(
-    tmp_path: Path, tool: str, tool_input: dict[str, str], kind: str, refused: bool
+    tmp_path: Path, tool: str, tool_input: dict[str, str], kind: str, refused: bool, within: str
 ) -> None:
     kit = Kit(tmp_path)
     kit.session("orchestrator", worktree=kit.repo)
     kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=10), "user", "Scenarios and checks: 2")])
     given = {key: value.replace("{repo}", str(kit.repo)) for key, value in tool_input.items()}
-    rule = kit.rule(tool, given, agent_id=TESTER_ID, agent_type=kind, cwd=str(kit.repo))
-    assert (rule == "walked-scenario") is refused
+    decision = kit.decide(tool, given, agent_id=TESTER_ID, agent_type=kind, cwd=f"{kit.repo}{within}")
+    walked = isinstance(decision, Refusal) and decision.rule == "walked-scenario"
+    assert walked is refused
+    assert not walked or f"{kit.repo}/qa/scenarios/" in decision.reason  # it names what it matched
