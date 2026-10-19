@@ -208,6 +208,23 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         ],
     ),
     (
+        "chat",
+        "Chat",
+        "Applies as soon as you save. No channels: the factory reads no chat.",
+        [
+            ("chat.channels", "Channels the factory reads, by id"),
+            ("chat.senders", "People and bots whose tags count, by id; none: anyone"),
+            ("chat.tag", "The tag that files a message"),
+            ("chat.poll_minutes", "Read the chat every, minutes"),
+            ("chat.poll_pages", "Pages one read takes from a channel"),
+            ("chat.page_messages", "Messages a page holds"),
+            ("chat.read_pages", "Pages the agents may read for one request"),
+            ("chat.reply_chars", "Longest title or reason a reply carries, characters"),
+            ("chat.max_kib", "Largest page an agent gets, KiB"),
+            ("chat.timeout_seconds", "Seconds a call to the chat may take"),
+        ],
+    ),
+    (
         "dashboard",
         "Dashboard",
         "Applies as soon as you save; threads at the next start. The port and addresses are set at install.",

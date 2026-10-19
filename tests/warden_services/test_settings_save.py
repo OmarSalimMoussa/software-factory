@@ -52,6 +52,8 @@ def save(ctx: Context, **args: Any) -> dict[str, Any]:
         ({"qa.widths": []}, None, "settings"),  # a tester browser needs a width
         ({"qa.widths": [1440, "wide"]}, None, "settings"),
         ({"install.toolchain": ["uv", " "]}, None, "settings"),
+        ({"chat.channels": [700000000000000001]}, None, "settings"),  # an id goes as text: it outgrows a JS number
+        ({"chat.senders": ["#general"]}, None, "settings"),
     ],
 )
 @pytest.mark.usefixtures("install")

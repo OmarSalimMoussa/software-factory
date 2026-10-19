@@ -15,7 +15,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from runtime.shared.models import CRITIC
+from runtime.shared.models import CHAT_ID, CRITIC
 from runtime.shared.settings_schema import SCHEMA, Spec
 
 
@@ -90,6 +90,9 @@ def _list_problems(key: str, spec: Spec, value: Any) -> list[str]:
     if spec.item == "int":
         good = all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in value)
         return [] if good else [f"{key} must hold whole numbers above zero"]
+    if spec.item == "id":
+        good = all(isinstance(v, str) and CHAT_ID.fullmatch(v) for v in value)
+        return [] if good else [f"{key} must hold ids, each a text of up to 20 digits"]
     good = all(isinstance(v, str) and v.strip() for v in value)
     return [] if good else [f"{key} must hold text, none of it blank"]
 

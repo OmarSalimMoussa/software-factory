@@ -8,6 +8,7 @@ from pathlib import Path
 from dashboard_rig import Rig
 from dashboard_seed import blocked
 
+from runtime.shared import settings as settings_module
 from runtime.shared import store
 from runtime.warden.owner import ops
 
@@ -111,3 +112,11 @@ def test_an_entry_marked_fixed_leaves_the_open_list_for_the_fixed_one(rig: Rig) 
     assert [(e["id"], e["state"], e["actions"]) for e in fixed] == [
         (entry["id"], "Fixed", [{"state": "open", "label": "Reopen"}])
     ]
+
+
+def test_ids_typed_into_a_list_of_ids_are_saved_as_the_text_they_are(rig: Rig) -> None:
+    body = {"changes": {"chat.channels": ["700000000000000001"]}, "idempotency_key": "settings-ids-01"}
+    ops.join(json.loads(rig.post("/api/settings", body).body)["op"])
+
+    saved = settings_module.load(rig.places.defaults, rig.places.overrides)
+    assert saved["chat.channels"] == ["700000000000000001"]

@@ -51,7 +51,10 @@ _TOOLS: dict[str, dict[str, Any]] = {
             "properties": {
                 "verb": {"type": "string", "enum": sorted(name for name, verb in VERBS.items() if verb.owner_socket)},
                 "args": {"type": "object"},
-                "data": {"type": "string", "description": "Text for a verb that takes bytes: account.add's token."},
+                "data": {
+                    "type": "string",
+                    "description": "Text for a verb that takes bytes: the token account.add or chat.token keeps.",
+                },
             },
             "required": ["verb", "args"],
         },

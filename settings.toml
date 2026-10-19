@@ -233,6 +233,18 @@ max_items = 20          # issues or log lines one answer lists
 max_kib = 64            # the largest answer an agent gets; longer lists and texts are cut to fit
 timeout_seconds = 20    # one call to GlitchTip
 
+[chat]                  # messages tagged in a chat become requests in the chat inbox, and the factory answers there
+channels = []           # ids of the channels the warden reads, as text; none: it reads no chat
+senders = []            # ids of the people and bots whose tags count, as text; none: anyone's in those channels
+tag = "#factory"        # the word that files a message, in any case
+poll_minutes = 1        # how often the warden reads the channels and answers on the requests filed from them
+poll_pages = 5          # pages one read takes from a channel; the rest wait for the next read
+page_messages = 50      # messages one call to the chat asks for
+read_pages = 10         # pages of the chat the agents may read for one request
+reply_chars = 200       # the most of a task's title, or of triage's reason, a reply in the chat carries
+max_kib = 64            # the largest page of the chat an agent gets; longer texts are cut to fit
+timeout_seconds = 20    # one call to the chat
+
 [reflect]
 fold_hours = 24         # the same kind and text within this window bumps a count instead of a new entry
 max_chars = 600         # the longest reflection an agent may write

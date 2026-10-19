@@ -189,7 +189,7 @@ def to_saved(settings: Settings, key: str, value: Any) -> Any:
             return int(value) if kind == "int" else float(value)
         except ValueError as exc:
             raise PartError(f"{LABELS[key]} must be a number.") from exc
-    if kind == "list" and isinstance(value, list) and all(isinstance(v, int) for v in _default(settings, key)):
+    if kind == "list" and isinstance(value, list) and SCHEMA[key].item == "int":
         if not all(isinstance(v, int) or isinstance(v, str) and v.isdigit() for v in value):
             raise PartError(f"{LABELS[key]} holds whole numbers only.")
         return [int(v) for v in value]

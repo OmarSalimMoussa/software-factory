@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from runtime.queue import goal
 from runtime.shared.models import (
     CHAT,
+    CHAT_ID,
     INBOXES,
     REQUEST_SEVERITIES,
     SURFACES,
@@ -44,7 +45,7 @@ ROLE = re.compile(r"^[a-z][a-z0-9-]{0,40}$")
 USER = re.compile(r"^user-[A-Za-z0-9-]{1,64}$")
 # A tagged message's writer in the chat, by its id there: a person, or another agent's bot.
 CHAT_FROM = "discord-"
-CHAT_SENDER = re.compile(rf"^{CHAT_FROM}[0-9]{{1,20}}$")
+CHAT_SENDER = re.compile(rf"^{CHAT_FROM}{CHAT_ID.pattern}$")
 # The inboxes whose requests quote words from outside, kept under the id their report names.
 QUOTED = ("users", CHAT)
 OUTCOME = re.compile(r"^(?:(task|joined) (t-\d{4,})|(noise|parked) (\S.*))$")

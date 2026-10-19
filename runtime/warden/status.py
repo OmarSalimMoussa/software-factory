@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from runtime.chat import pull
 from runtime.queue import proposals, reports
 from runtime.shared import models
 from runtime.slots import leases
@@ -43,6 +44,7 @@ def status(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
         "plan": plan.reading(ctx),
         "errors_import": errors_import.note(ctx.places),
         "reports_import": reports.note(ctx),
+        "chat_import": pull.note(ctx),
         "code_locked_until": None
         if until is None
         else datetime.fromtimestamp(until, UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),

@@ -1,5 +1,5 @@
 """The imports the warden runs on a timer: prod's and staging's (slot 0's) new errors in the tick, and the users' new
-reports in a pass of their own, off the tick (``Background``).
+reports and the chat's tagged messages in passes of their own, off the tick (``Background``).
 
 Each keeps, in its own state file, when it last ran, since when its runs have failed, and the note `factory status`
 shows. A run of failures is logged as a warning when it begins and, once it has lasted

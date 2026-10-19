@@ -7,6 +7,7 @@ filling a default, so a malformed state file fails loudly where it is read.
 from __future__ import annotations
 
 import dataclasses
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -35,6 +36,7 @@ RETIRE_KINDS = (FINISHED, STOPPED, WITH_PARENT, CRASHED)
 
 FAMILIES = ("orch", "intake", "design", "impl", "qa")
 CHAT = "chat"
+CHAT_ID = re.compile(r"[0-9]{1,20}")  # a channel's, a message's or a writer's id in the chat: digits, sent as text
 INBOXES = ("agents", "owner", "users", CHAT)
 TASK_SEVERITIES = ("severe", "major", "minor")
 REQUEST_SEVERITIES = ("severe", "normal")

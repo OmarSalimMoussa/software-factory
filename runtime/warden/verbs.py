@@ -158,4 +158,5 @@ VERBS: dict[str, Verb] = {
     "account.add": _o("runtime.warden.owner.accounts:add"),
     "account.remove": _o("runtime.warden.owner.accounts:remove"),
     "account.use": _o("runtime.warden.owner.accounts:use"),
+    "chat.token": _o("runtime.chat.discord:save_token"),
 }

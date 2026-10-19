@@ -33,6 +33,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `errors` | How often the warden reads prod's and staging's new GlitchTip issues into requests, and how many pages of a GlitchTip list one read covers |
 | `reports` | How often the warden reads prod's report export, how long it waits for it, and the largest it takes |
 | `telemetry` | What `factory errors` and `factory logs` give an agent: how many items, how large, how long a call |
+| `chat` | The chat channels the warden reads and the tag that files a message there, whose tags count, how often and how much it reads, and how long the factory's replies there may run |
 | `cost`, `prices` | The daily budget (past it, only severe work starts that day), the plan-limit levels, and dollars per million tokens per model |
 | `dashboard` | Port, refresh and stale times, the code lock, page size, the hosts it answers |
 | `gc` | How often the clean-up runs, how long images, build cache and stack logs stay, the Docker disk budget |
@@ -64,11 +65,17 @@ from the home folder down, without the `~/`. A check writes a cache only once th
 cannot lie in `.claude`, `.config`, `.local`, `.ssh` or `bin`, because a check that wrote there could act outside its
 walls.
 
+`chat.channels` names the Discord channels the warden reads, by id; empty, it reads no chat. To turn the chat on,
+give the factory the bot's token with `call chat.token` on Claude's MCP, the token as the call's `data`, then save the
+channel's id in `chat.channels`. Run `chat.token` again to replace the token. A message there that holds `chat.tag`
+becomes a request in the chat inbox, and the factory answers on it as the bot. `factory status` says what the last
+read found, or why it failed.
+
 ## When a change takes effect
 
 | Setting | Takes effect |
 | --- | --- |
-| Caps, rounds, QA, vitals, watch, errors, reports, telemetry, intake and routing values, the hold on new walks, but those below | At once: every guard call and warden pass reads them fresh |
+| Caps, rounds, QA, vitals, watch, errors, reports, telemetry, chat, intake and routing values, the hold on new walks, but those below | At once: every guard call and warden pass reads them fresh |
 | The replay's timings, and the QA browser's screen and waits | At the next replay built, and at the next tester's start; the player's pace at the next page load |
 | A session's or a subagent's model and effort | At its next start |
 | The slice budget | Within a minute |

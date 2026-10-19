@@ -16,7 +16,7 @@ class Spec:
     high: float | None = None  # for a list, the most
     required: bool = False
     when: str = "At once"
-    item: str = "str"  # for a list, each item's kind: str (never blank) or int (above zero)
+    item: str = "str"  # for a list, each item's kind: str (never blank), int (above zero) or id (a chat's id)
 
 
 AT_ONCE, NEXT_START, MINUTE, ORCH = "At once", "Next start", "Within a minute", "Next orchestrator start"
@@ -196,6 +196,16 @@ SCHEMA: dict[str, Spec] = {
     "telemetry.max_items": Spec("int", 1, 200),  # contract: added by FB6, `factory errors` and `factory logs`
     "telemetry.max_kib": Spec("int", 4, 1024),
     "telemetry.timeout_seconds": Spec("int", 1, 120),
+    "chat.channels": Spec("list", item="id"),
+    "chat.senders": Spec("list", item="id"),
+    "chat.tag": Spec("str", required=True),
+    "chat.poll_minutes": Spec("int", 1, 1440),
+    "chat.poll_pages": Spec("int", 1, 50),
+    "chat.page_messages": Spec("int", 1, 100),  # Discord answers at most 100 messages a call
+    "chat.read_pages": Spec("int", 1, 100),
+    "chat.reply_chars": Spec("int", 20, 1500),
+    "chat.max_kib": Spec("int", 4, 1024),
+    "chat.timeout_seconds": Spec("int", 1, 120),
     "reflect.fold_hours": Spec("int", 1, 168),
     "reflect.max_chars": Spec("int", 80, 4000),  # contract: added by 1B-3
     "reflect.chart_days": Spec("int", 7, 90),

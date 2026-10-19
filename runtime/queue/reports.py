@@ -53,6 +53,10 @@ def shown(text: str) -> str:
     return "".join(c if c in "\n\t" or c.isprintable() else f"<U+{ord(c):04X}>" for c in typed)
 
 
+def quoted(text: str) -> str:
+    return "\n".join(f"> {row}" if row else ">" for row in shown(text).split("\n"))
+
+
 def _read(line: str) -> dict[str, str]:
     """One output line: a report, or an erasure when it names ``erased``."""
     item = json.loads(line)
@@ -84,10 +88,9 @@ def _erase(queue: Queue, report_id: str) -> None:
 
 
 def _file(ctx: Context, queue: Queue, report: dict[str, str]) -> str:
-    quoted = "\n".join(f"> {row}" if row else ">" for row in shown(report["text"]).split("\n"))
     words = (
         f"---\nid: {report['id']}\nuser: {report['user']}\nat: {report['at']}\n"
-        f"where: {formats.one_line(report['where'])}\n---\n{NOTICE}\n\n{quoted}\n"
+        f"where: {formats.one_line(report['where'])}\n---\n{NOTICE}\n\n{quoted(report['text'])}\n"
     )
     queue.files.write(f"reports/{report['id']}.md", words.encode())
     where = formats.one_line(report["where"])

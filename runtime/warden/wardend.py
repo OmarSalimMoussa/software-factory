@@ -18,6 +18,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+from runtime.chat import pull
 from runtime.qa.replay import pending
 from runtime.queue import reports, turn
 from runtime.shared import environment, error_reports, store
@@ -86,6 +87,11 @@ def _pull_reports(ctx: Context) -> None:
     loop.run_once(ctx, "the reports pull", lambda: reports.poll(ctx))
 
 
+def _pull_chat(ctx: Context) -> None:
+    # In its own thread: it waits on the chat's service, and reports a failure there as the reports pull does.
+    loop.run_once(ctx, "the chat pass", lambda: pull.poll(ctx))
+
+
 def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> list[tuple[str, Pass]]:
     watch = plan.PlanWatch(plan.source(agent_home, places))
     reaper, cleanup = reap.Reaper(), gc.Cleanup()
@@ -94,6 +100,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
         ("sessions", crashwatch.SessionsWatch(imports.in_thread("benches")).run_pass),
         # It runs the product's scripts on a slot, for up to slots.verb_minutes: never inside the tick.
         ("reports", imports.Background(_pull_reports, imports.in_thread("reports")).run_pass),
+        ("chat", imports.Background(_pull_chat, imports.in_thread("chat")).run_pass),
         ("done", imports.Background(_refresh_done, imports.in_thread("done")).run_pass),
         (
             "replays",
