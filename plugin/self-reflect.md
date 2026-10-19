@@ -5,5 +5,6 @@ Write to SELF_REFLECT.md with `factory reflect --kind <kind> "<one or two senten
 - owner-feedback: the owner gave their view of how the factory works (orchestrator only; quote it). An
   instruction from the owner is done, not reflected.
 - misroute: a task had to change rung (orchestrator only).
-Do not reflect on the product: that is a request. Do not reflect to complain about a refusal
-that was right. Say what happened and what would have prevented it. Never edit the file.
+Do not reflect on the product, its scenarios and seeds included: that is a finding or a request. Do not
+reflect to complain about a refusal that was right. Say what happened and what would have prevented it. Never edit
+the file.
