@@ -344,6 +344,15 @@ def test_a_wait_reloads_until_its_words_show_in_one_call() -> None:
     assert browser.calls == [look, reload, look, reload, look]
 
 
+def test_a_wait_shorter_than_a_reload_looks_last_at_its_ceiling() -> None:
+    page = "- Page URL: https://app.test/jobs/7\n"
+    browser = Browser([page + "Building", page + "Ready"])
+    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 0.75})
+    assert not failed and said.startswith("“Ready” shows, after 45 s.")
+    assert browser.calls == [("browser_snapshot", {}), ("browser_navigate", {"url": "https://app.test/jobs/7"}),
+                             ("browser_snapshot", {})]  # fmt: skip
+
+
 def test_a_wait_never_lasts_past_the_factorys_ceiling() -> None:
     browser = Browser(["- Page URL: https://app.test/jobs/7\nBuilding"] * 3)
     said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 90}, 30, 1)
