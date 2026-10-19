@@ -6,8 +6,10 @@ from __future__ import annotations
 import dataclasses
 import json
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 from queue_kit import World
@@ -312,6 +314,29 @@ def test_a_testers_steps_are_kept_in_order_and_a_result_needs_its_start(ready_wo
     assert [(m["item"], m["step"], m.get("result"), m.get("got")) for m in marks] == [
         ("cart", 2, None, None), ("cart", 2, "fail", "the total stayed")]  # fmt: skip
     assert [f["step"] for f in findings.of_agent(ready_world.ctx(), "t-0001", "ag-fn")] == ["cart:2"]
+
+
+@pytest.mark.parametrize(
+    ("verb", "args"),
+    [
+        (qa.qa_step, {"item": "cart", "step": 3}),
+        (qa.qa_step_result, {"item": "cart", "step": 3, "result": "pass", "got": "it saved"}),
+        (qa.qa_finding, {"severity": "major", "where": "/cart"}),
+        (qa.qa_result, {}),
+    ],
+    ids=["a-step", "a-steps-result", "a-finding", "a-second-verdict"],
+)
+def test_a_testers_verdict_is_its_last_word_as_it_takes_its_runs_into_the_evidence(
+    ready_world: World, verb: Callable[..., dict[str, Any]], args: dict[str, Any]
+) -> None:
+    qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
+    _result(ready_world, "ag-fn")
+    with pytest.raises(Refused, match="your verdict is recorded"):
+        verb(ready_world.ctx("implementer", IMPL_ID, "ag-fn"), {"head": HEAD[:9], **args}, b"It breaks.")
+    other = ready_world.ctx("implementer", IMPL_ID, "ag-ux")
+    if verb is qa.qa_step_result:
+        qa.qa_step(other, {"head": HEAD[:9], "item": "cart", "step": 3}, None)
+    verb(other, {"head": HEAD[:9], **args}, b"It breaks.")
 
 
 def test_a_tester_starts_an_items_step_only_once_its_earlier_step_ended_while_another_items_may_run_inside(

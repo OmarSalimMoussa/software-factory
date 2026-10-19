@@ -208,6 +208,9 @@ def _tester_on_head(ctx: Context, args: dict[str, Any], verb: str) -> tuple[Sess
     records = ready_records(ctx, session)
     if not isinstance(head, str) or not records or not str(records[-1]["head"]).startswith(head) or len(head) < 7:
         raise Refused(verb, "report on the head of the last ready record: --head <sha>")
+    if any(r.get("agent") == ctx.caller.agent_id for r in store.read_jsonl(_results_path(ctx, session))):
+        raise Refused(verb, "your verdict is recorded and took your runs into the evidence, so nothing after it "
+                            "counts: hand back now with what you walked")  # fmt: skip
     return session, tester, str(records[-1]["head"])
 
 
