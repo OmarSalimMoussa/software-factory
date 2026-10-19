@@ -208,6 +208,10 @@ def _qa_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
         if len(ns.words) != 2 or not ns.why:
             raise CliError("factory qa waive <task> <finding> --why '…'")
         return Call("qa.waive", {"task": ns.words[0], "finding": ns.words[1], "why": ns.why})
+    if ns.what == "scenario":
+        if len(ns.words) != 1:
+            raise CliError("factory qa scenario <name>")
+        return Call("qa.scenario", {"name": ns.words[0]})
     if not ns.head:
         raise CliError(f"factory qa {ns.what} --head <sha> …")
     if ns.what == "result":

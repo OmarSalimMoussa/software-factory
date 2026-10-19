@@ -4,6 +4,7 @@
 drives the owner's Chrome. `subagents-at-once`: a lane's browser is its first tester's while it runs.
 `qa-browser`: no code runs in the browser server itself, a browser call names no file, a route answers what it
 catches itself, and a text wait gives no `time`, which sleeps before it and is no time-out.
+`walked-scenario`: a regression tester reads no scenario in the checkout, which holds the tip's text.
 `qa-evidence`: no agent opens the factory's state (the testers' recordings, screenshots and saved sign-ins) or the
 dashboard. The evidence rule reads paths and addresses, never prose: a report may name a screenshot.
 """
@@ -16,10 +17,12 @@ from pathlib import Path, PurePosixPath
 
 from runtime.guard import shell, transcript
 from runtime.guard.facts import Call, Decision, Refusal, Rewrite, SessionView, inside, public, resolve
+from runtime.qa.scenarios import FOLDER
 from runtime.qa.wrapper import ROUTE, SERVER_CODE, WAIT_FOR
 from runtime.qa.wrapper_tools import WAIT_UNTIL
 from runtime.shared import lanes
 from runtime.shared.models import WORKING
+from runtime.warden.verbs import REGRESSION
 
 BROWSER = f"mcp__{lanes.BROWSER}__"
 CHROME = "mcp__claude-in-chrome__"
@@ -46,7 +49,7 @@ _BROWSER_FIELDS = ("paths", "url")
 
 
 def check(call: Call) -> Decision:
-    for rule in (_drivers, _held, _evidence, _server):
+    for rule in (_drivers, _held, _evidence, _server, _walked):
         decision = rule(call)
         if decision is not None:
             return decision
@@ -115,6 +118,21 @@ def _server(call: Call) -> Decision:
             "which gives up after a few seconds, and wait again while it has not shown or gone",
         )
     return None
+
+
+def _walked(call: Call) -> Decision:
+    """A bundle walks slot 0 at the commit its merges reached, which a merge since may have changed a scenario after."""
+    if not (call.in_subagent and lanes.kind_of(call.agent_type) == REGRESSION) or call.off("walked-scenario"):
+        return None
+    folder = call.worktree / FOLDER
+    words = [word for word in _named(call) if "/" in word or word.startswith(("~", "."))]
+    if not any(inside(resolve(word, call.cwd, call.home), folder) for word in words):
+        return None
+    return Refusal(
+        "walked-scenario",
+        "this checkout holds the scenarios of the default branch's tip, and the build you walk may be older: read "
+        "each with `factory qa scenario <name>`, as that build has it",
+    )
 
 
 def cap_wait(call: Call, left: float) -> Decision:

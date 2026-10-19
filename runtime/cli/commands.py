@@ -95,7 +95,7 @@ def _qa(sub: Any) -> None:
             "pass|fail|blocked --got … | finding --head … --severity … --where … [--step <item>:<n>] --body <file> | "
             "result --head … | waive <task> <finding> --why …")  # fmt: skip
     qa = sub.add_parser("qa", help=said)
-    qa.add_argument("what", choices=["plan", "step", "step-result", "finding", "result", "waive"])
+    qa.add_argument("what", choices=["plan", "step", "step-result", "finding", "result", "waive", "scenario"])
     qa.add_argument("words", nargs="*")
     qa.add_argument("--head", default="")
     qa.add_argument("--severity", default="")

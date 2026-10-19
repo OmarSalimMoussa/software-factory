@@ -10,12 +10,14 @@ import pytest
 from product_git import ProductGit, run
 from queue_kit import World
 
-from runtime.qa import qa_browser
+from runtime.qa import qa_browser, walked
+from runtime.qa.scenarios import FOLDER
 from runtime.queue import bundle, records, turn, verbs
 from runtime.queue.book import Queue
 from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.protocol import Refused
+from runtime.warden.delivery import deploys
 
 SCENARIOS = {
     "web": "protects: web/\nneeds: nothing\nruns: in-turn",
@@ -219,3 +221,31 @@ def test_a_bundle_grows_past_the_cap_only_once_the_check_of_the_cap_did_not_pass
 
     product.slot0(fix)
     assert product.check(fix, web="pass", api="pass")["cleared"] == [web, api, fixed]
+
+
+@pytest.mark.parametrize(
+    ("built", "name", "refused"),
+    [
+        (True, "web", None),
+        (False, "web", "which build slot 0 runs is not known"),
+        (True, "gone", "has no scenario gone"),
+    ],
+    ids=["as-slot-0-runs-it", "no-build-known", "one-its-build-lacks"],
+)
+def test_a_regression_tester_reads_each_scenario_as_the_build_slot_0_runs_has_it(
+    world: World, product: Product, built: bool, name: str, refused: str | None
+) -> None:
+    older = product.base
+    (world.repo / FOLDER / "web.md").write_text(f"---\n{SCENARIOS['web']}\n---\n# web\n\n1. Rewritten since.\n")
+    product.git("commit", "-q", "-am", "rewrite web")
+    if built:
+        deploys.record(world.places, "staging", older[:8], world.clock.iso())
+    tester = world.ctx(agent_id="a1", agent_kind="qa-regression")
+
+    if refused is not None:
+        with pytest.raises(Refused, match=refused):
+            walked.show(tester, {"name": name}, None)
+        return
+    answer = walked.show(tester, {"name": name}, None)["message"]
+    assert answer.startswith(f"web, as slot 0 runs it at {older[:8]}") and "1. Open it." in answer
+    assert "Rewritten" not in answer

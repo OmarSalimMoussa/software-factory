@@ -106,6 +106,7 @@ VERBS: dict[str, Verb] = {
     "qa.step": _v("runtime.qa.verbs:qa_step", IMPL, kinds=VERDICTS),
     "qa.step-result": _v("runtime.qa.verbs:qa_step_result", IMPL, kinds=VERDICTS),
     "qa.waive": _v("runtime.qa.verbs:qa_waive", ORCH),
+    "qa.scenario": _v("runtime.qa.walked:show", ORCH, kinds=frozenset({REGRESSION})),
     "cause": _v("runtime.queue.verbs:cause_try", IMPL),
     # the owner, from the dashboard or their own terminal
     "snapshot": _o("runtime.warden.snapshot:snapshot"),

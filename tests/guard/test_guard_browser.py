@@ -156,3 +156,25 @@ def test_a_browser_wait_is_cut_to_the_testers_time_left(
     decision = kit.decide("mcp__qa-browser__" + tool, {**asked, field: long}, **UI_TESTER)
     assert isinstance(decision, Rewrite) and 5 * 120 - 10 < decision.updated_input[field] * unit <= 60 + 5 * 120 - 10
     assert kit.decide("mcp__qa-browser__" + tool, {**asked, field: short}, **UI_TESTER) is None
+
+
+@pytest.mark.parametrize(
+    ("tool", "tool_input", "kind", "refused"),
+    [
+        ("Read", {"file_path": "{repo}/qa/scenarios/web.md"}, "qa-regression", True),
+        ("Bash", {"command": "cat qa/scenarios/web.md"}, "qa-regression", True),
+        ("Glob", {"pattern": "qa/scenarios/*.md"}, "qa-regression-2", True),
+        ("Bash", {"command": "factory qa scenario web"}, "qa-regression", False),
+        ("Read", {"file_path": "{repo}/GOAL.md"}, "qa-regression", False),
+        ("Read", {"file_path": "{repo}/qa/scenarios/web.md"}, "qa-prod", False),
+    ],
+)
+def test_a_regression_tester_reads_no_scenario_in_the_checkout_which_holds_the_tips_text(
+    tmp_path: Path, tool: str, tool_input: dict[str, str], kind: str, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("orchestrator", worktree=kit.repo)
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=10), "user", "Scenarios and checks: 2")])
+    given = {key: value.replace("{repo}", str(kit.repo)) for key, value in tool_input.items()}
+    rule = kit.rule(tool, given, agent_id=TESTER_ID, agent_type=kind, cwd=str(kit.repo))
+    assert (rule == "walked-scenario") is refused

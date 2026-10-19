@@ -137,19 +137,20 @@ nothing merged for a while, a regression walk of the scenarios that waited longe
    one of them changed; with none, the one that waited longest. Add the merged specs' own checks. Bring slot 0 up there,
    whole, as its answer says (`factory slot up --at <commit>` for one older than the tip). When it cannot come up there,
    as when the env that commit needs is gone, save that check with each scenario blocked and why; then `factory queue
-   bundle --through <a later commit>` takes the bundle on to one that builds. Load the seeds (`factory slot seed load
-   <name>`), do a set-up that writes inside a service with `factory slot run <service> -- <command>`, and stop the
-   services a set-up needs down with `factory slot stop <service…>`. Start the `qa-regression` testers at once, the
-   scenarios split between them, each signed in as its own test address; a scenario that restarts or stops services
-   walks alone. Start each in its own lane, `qa-regression`, then `qa-regression-2` and on, as its `subagent_type`: two
-   in one lane share one browser, and a lane named only in the brief changes nothing. When the machine's browser places
-   are full, the factory messages you once one frees. A brief names scenarios and what a set-up made that a step needs,
-   such as a record's id; never an earlier report's results or causes, nor a desktop's password: a tester brings the
-   desktop up itself. A check of slot 0's health is read in the tester's browser. Put every tester's rows, as they wrote
-   them, in one report, and run `factory queue check <that commit> --body <file>` before slot 0 moves. It clears every
-   merge waiting up to that commit at once, within the cap, when every row passed and each scenario they protect has a
-   row; anything less clears none. A row you doubt is walked again by a tester, never changed by you. Then `factory slot
-   up` for the tip.
+   bundle --through <a later commit>` takes the bundle on to one that builds. Read each scenario as slot 0 runs it, with
+   `factory qa scenario <name>`: the checkout holds the tip's. Load the seeds (`factory slot seed load <name>`), do a
+   set-up that writes inside a service with `factory slot run <service> -- <command>`, and stop the services a set-up
+   needs down with `factory slot stop <service…>`. Start the `qa-regression` testers at once, the scenarios split
+   between them, each signed in as its own test address; a scenario that restarts or stops services walks alone. Start
+   each in its own lane, `qa-regression`, then `qa-regression-2` and on, as its `subagent_type`: two in one lane share
+   one browser, and a lane named only in the brief changes nothing. When the machine's browser places are full, the
+   factory messages you once one frees. A brief names scenarios and what a set-up made that a step needs, such as a
+   record's id; never an earlier report's results or causes, nor a desktop's password: a tester brings the desktop up
+   itself. A check of slot 0's health is read in the tester's browser. Put every tester's rows, as they wrote them, in
+   one report, and run `factory queue check <that commit> --body <file>` before slot 0 moves. It clears every merge
+   waiting up to that commit at once, within the cap, when every row passed and each scenario they protect has a row;
+   anything less clears none. A row you doubt is walked again by a tester, never changed by you. Then `factory slot up`
+   for the tip.
 4. **A row that did not pass** comes back with `next`, and `factory queue bundle` says it again:
    - `again`: walk it again once what blocked it is fixed (a tester's time, the desktop, a set-up): never a revert.
    - `walk`: walk that scenario alone at the commit `at` names and save that check; then read the bundle again.

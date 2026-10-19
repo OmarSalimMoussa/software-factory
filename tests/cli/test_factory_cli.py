@@ -218,7 +218,7 @@ def test_the_owners_account_commands_send_the_token_as_bytes_and_follow_a_switch
         "cause --tried 'the cache, and a cold start loops too'", "queue task show t-0001", "queue next",
         "queue task status t-0001 approved", "queue task facts t-0001 --slices 2", "turn next", "check",
         "qa finding --head abc --severity major --where /notes --step notes:2 --body f.md", "qa result --head abc",
-        "qa plan",
+        "qa plan", "qa scenario sign-ins-cancel",
         "qa step --head abc --step notes:2", "qa step-result --head abc --step notes:2 --result pass --got 'shown'",
         "qa waive t-0001 f-1 --why 'not a bug'", "qa-ready abc", "qa-clean", "ready-check", "triage plan --body p.json",
         "triage apply", "inbox", "inbox --wait", "tick", "status", "reflect --kind miss 'it missed'",
