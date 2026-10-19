@@ -4,6 +4,7 @@ subagent resumed, and every brief ending with the note on reflecting."""
 
 from __future__ import annotations
 
+import shlex
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -362,6 +363,26 @@ def test_a_tester_out_of_time_still_records_its_report(
     kit.subagent(TESTER_ID, [entry(NOW - timedelta(hours=1), "user", "Scenarios and checks: 1")])
     asked = {**tool_input, "file_path": str(kit.worktree / tool_input["file_path"])} if tool == "Write" else tool_input
     assert (kit.rule(tool, asked, **TESTER) != "tester-time") is goes
+
+
+@pytest.mark.parametrize(
+    ("minutes", "got", "refused"),
+    [
+        (1, "The side panel did not open before my time ran out.", True),
+        (1, "Not reached: I ran out of time.", True),
+        (1, "The export request timed out with a 504.", False),  # the product's time, a finding
+        (60, "The side panel did not open before my time ran out.", False),
+    ],
+    ids=["time-ran-out", "out-of-time", "the-products-timeout", "once-spent"],
+)
+def test_a_tester_cannot_report_its_time_out_before_the_guard_says_so(
+    tmp_path: Path, minutes: int, got: str, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(minutes=minutes), "user", "Scenarios and checks: 1")])
+    command = f"factory qa step-result --head abc1234 --step x:3 --result blocked --got {shlex.quote(got)}"
+    assert (kit.rule("Bash", {"command": command}, **TESTER) == "tester-time") is refused
 
 
 @pytest.mark.parametrize(

@@ -19,6 +19,7 @@ time (`tester-time`), counted from its brief, then its report alone goes.
 from __future__ import annotations
 
 import math
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -128,6 +129,10 @@ REPORT = (
     "`factory qa result`, then hand back"
 )
 _REPORTS = frozenset({"qa.step-result", "qa.finding", "qa.result", "reflect"})
+# A report that says the tester's own time ran out, which only the guard can tell: one gave up a third of the way.
+_OUT_OF_TIME = re.compile(
+    r"\bout of time\b|\btime (?:ran|runs|has run|had run|is|was) (?:out|up)\b|\bno time left\b", re.I
+)
 
 
 def check_tester_time(call: Call) -> Decision:
@@ -140,6 +145,9 @@ def check_tester_time(call: Call) -> Decision:
     left, report = _time_left(call), reports(call)
     if isinstance(left, Refusal) and not report:
         return left
+    if report and not isinstance(left, Refusal) and _OUT_OF_TIME.search(str(call.tool_input.get("command", ""))):
+        said = "A tester cannot tell how long it has worked, so walk on until the factory refuses a call for time"
+        return Refusal("tester-time", f"your time is not spent: {int(left)} s are left. {said}")
     timed = _TIMED_TOOLS.get(call.tool)
     if timed is None:
         return None if isinstance(left, Refusal) else browser.cap_wait(call, left)
