@@ -1,10 +1,9 @@
 """The settings page's words: every setting's label, in the groups the page draws, each group with its hint
-saying when a change takes effect.
+saying when a change takes effect, as (group, title, hint, [(key, label), ...]).
 """
 
 from __future__ import annotations
 
-# (group, title, hint, [(key, label), ...]); hints say when a change takes effect.
 GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
     (
         "models",
@@ -68,6 +67,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("qa.keep_bundles", "Merge bundles whose QA is kept"),
             ("qa.widths", "Screen widths testers use"),
             ("qa.viewport_height", "Tester screen height"),
+            ("qa.browser_permissions", "What testers' browsers let pages use"),
             ("qa.quiet_seconds", "Seconds of quiet before a tester's place frees"),
             ("qa.stale_seconds", "Seconds before a silent tester is let go"),
             ("qa.screenshots_for_owner_only", "Testers whose screenshots only you see"),

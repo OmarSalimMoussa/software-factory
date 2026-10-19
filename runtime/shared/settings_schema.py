@@ -71,6 +71,7 @@ SCHEMA: dict[str, Spec] = {
     "qa.screenshots_for_owner_only": Spec("list"),
     "qa.max_steps": Spec("int", 1, 20),  # contract: the most numbered steps a standing scenario has
     "qa.viewport_height": Spec("int", 400, 2000),  # contract: the tester browser's height; widths come from qa.widths
+    "qa.browser_permissions": Spec("list"),
     "qa.desktop_viewport": Spec("list", 2, 2, item="int"),  # contract: a desktop tester's browser, width then height
     "qa.wait_reload_seconds": Spec("int", 5, 600),
     "qa.key_delay_ms": Spec("int", 0, 1000),

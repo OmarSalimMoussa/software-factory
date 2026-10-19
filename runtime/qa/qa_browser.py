@@ -78,7 +78,7 @@ def playwright_settings(folder: Path, role: str, settings: Settings) -> dict[str
             "browserName": "chromium",
             "isolated": True,
             "launchOptions": {"channel": "chrome", "headless": True},
-            "contextOptions": {"viewport": viewport},
+            "contextOptions": {"viewport": viewport, "permissions": settings.get_list("qa.browser_permissions")},
         },
         # Vision clicks at a point, which a remote desktop needs: it is a video of a screen. Devtools holds the
         # trace's tools, which only the wrapper sees. Network lets a step answer a request with the status it asks

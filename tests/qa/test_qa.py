@@ -6,6 +6,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -39,6 +40,14 @@ def test_the_required_testers_are_the_union_of_the_task_and_its_diff(
 ) -> None:
     found = plan.required(surfaces, rung, plan.diff_surfaces(changed, plan.surface_prefixes(PREFIXES)))
     assert list(found) == testers
+
+
+def test_a_testers_browser_lets_every_page_use_what_the_setting_names(world: World, tmp_path: Path) -> None:
+    world.with_settings(qa__browser_permissions=["clipboard-read", "clipboard-write"])
+    at = datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
+    config = qa_browser.prepare("qa-regression", IMPL_ID, tmp_path / "runs", world.ctx().settings(), at)
+    context = json.loads(config.read_text())["browser"]["contextOptions"]
+    assert context["permissions"] == ["clipboard-read", "clipboard-write"]
 
 
 def test_surfaces_toml_names_only_surfaces() -> None:

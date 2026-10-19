@@ -22,7 +22,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `caps` | Implementers, designers and subagents at once, and the browsers and remote desktops testers run at once |
 | `subagents` | Which subagent kinds each role may start |
 | `rounds` | QA rounds, critic rounds, check runs, how far one extension goes, and how many merges one check of the default branch clears together |
-| `qa` | Time per item and to start, items per brief, desktop time, widths, how many merge bundles keep their QA, the desktop tester's screen and the pause between its typed keys and how long its click holds, how long a held request may wait, how long a free browser place waits for the session told of it, how a wait reloads and how long it may last, and the longest text one browser answer gives |
+| `qa` | Time per item and to start, items per brief, desktop time, widths, what a tester's browser lets pages use, how many merge bundles keep their QA, the desktop tester's screen and the pause between its typed keys and how long its click holds, how long a held request may wait, how long a free browser place waits for the session told of it, how a wait reloads and how long it may last, and the longest text one browser answer gives |
 | `replay` | How a tester's run is replayed for the owner: the builder's timings, how long the picture stays hidden after a sign-in link is typed, and the player's pace |
 | `intake` | Batch size and wait, the fast lane's time, the score's weights |
 | `routing` | Slices per rung, open proposals at once, the estimate's window, tries to confirm a cause |
