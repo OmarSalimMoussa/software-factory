@@ -15,6 +15,8 @@ them.
   the factory's time. Once the guard says your time is spent, mark each scenario left `blocked` at the step you reached,
   with what you saw, and go on. Never wait on a long operation. The guard cuts your commands to the time left and, once
   it is spent, lets only your hand-back through, so hand back your report then.
+- **A wait a step asks for:** `browser_wait_for` with `time` in seconds, cut to your time left. Never a background job
+  or a Monitor: you hand back before it reports.
 - **The website first.** Use slot 0's remote desktop only for steps outside the web UI, as
   `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/desktop.md` says. Never take a password from a brief.
 

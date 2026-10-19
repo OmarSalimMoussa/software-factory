@@ -122,7 +122,8 @@ def _held_since(call: Call, personas: list[str]) -> datetime | None:
 
 
 # Claude Code's waits, in milliseconds: its defaults, and its longest, for a `factory` call the warden bounds itself.
-_TIMED_TOOLS = {"Bash": ("timeout", 120_000), "Monitor": ("timeout_ms", 300_000)}
+_TIMED_TOOLS = {"Bash": ("timeout", 120_000)}
+MONITOR = "a Monitor reports after you hand back: for a wait a step asks for, call `browser_wait_for` with `time`"
 _LONGEST_BASH = 600_000
 REPORT = (
     "record each step's result with `factory qa step-result` and what you found with `factory qa finding`, run "
@@ -137,11 +138,13 @@ _OUT_OF_TIME = re.compile(
 
 def check_tester_time(call: Call) -> Decision:
     """A tester's own calls: refused once its time is spent, or its desktop time once it drives the remote desktop;
-    shell and browser waits cut to the time left, but for `desktop up`. Its report always goes, uncut: a file in its
-    scratch folder, its steps' results, findings and verdict, a reflection, and its hand-back."""
+    shell and browser waits cut to the time left, but for `desktop up`, and a Monitor never. Its report always goes,
+    uncut: a file in its scratch folder, its steps' results, findings and verdict, a reflection, and its hand-back."""
     tester = call.in_subagent and call.agent_type.startswith(TESTER)
     if not tester or call.tool == HANDBACK or call.off("tester-time"):
         return None
+    if call.tool == "Monitor":
+        return Refusal("tester-time", MONITOR)
     left, report = _time_left(call), reports(call)
     if isinstance(left, Refusal) and not report:
         return left

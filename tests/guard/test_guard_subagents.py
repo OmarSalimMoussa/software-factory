@@ -12,8 +12,10 @@ from typing import Any
 import pytest
 from guard_kit import NOW, SID, TESTER_ID, Kit, agent_use, bash_use, entry, result
 
+from runtime.guard.browser import BROWSER
 from runtime.guard.facts import Refusal, Rewrite
 from runtime.guard.subagents import SLOT_API
+from runtime.qa.wrapper import WAIT_FOR
 from runtime.shared import lanes, store
 
 TESTER = {"agent_id": TESTER_ID, "agent_type": "qa-backend"}
@@ -276,6 +278,16 @@ def test_a_testers_time_runs_out_and_its_shell_timeouts_are_cut_but_its_report_g
     assert kit.decide("SubagentHandback", {"message": "2 of 3"}, **TESTER) is None
     walker = kit.decide("Read", {"file_path": "/x"}, agent_id=TESTER_ID, agent_type="qa-regression")
     assert isinstance(walker, Refusal) and walker.reason.endswith("hand back your report now")
+
+
+def test_a_tester_waits_in_its_browser_never_in_a_monitor_that_reports_after_it_hands_back(tmp_path: Path) -> None:
+    kit = Kit(tmp_path)
+    kit.session("orchestrator")
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=60), "user", "Scenarios and checks: 1")])
+    walker = {"agent_id": TESTER_ID, "agent_type": "qa-regression"}
+    refused = kit.decide("Monitor", {"command": "sleep 30; curl -s http://x/", "description": "step 2"}, **walker)
+    assert isinstance(refused, Refusal) and "`browser_wait_for` with `time`" in refused.reason
+    assert kit.rule(BROWSER + WAIT_FOR, {"time": 30}, **walker) is None
 
 
 @pytest.mark.parametrize(

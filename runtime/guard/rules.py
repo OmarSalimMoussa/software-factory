@@ -25,7 +25,7 @@ RULES: dict[str, str] = {
     "tester-brief": "a tester brief without one `Scenarios and checks: N` line, or asking for a slot command its "
     "tester cannot run",
     "tester-time": "a tester's calls after its time, but for its report, and a report that says its time ran out "
-    "before it did; command timeouts are cut to the time left, but for `desktop up`",
+    "before it did; command timeouts are cut to the time left, but for `desktop up`; a tester's Monitor",
     "intake-time": "intake's calls after intake.fast_lane_minutes, but for `factory` and its hand-back",
     "qa-ready": "a tester start with no ready record for the head",
     "qa-rounds": "a QA round past its setting",
