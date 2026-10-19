@@ -42,9 +42,14 @@ WANTS = (
     "goal_change",
 )
 TABS = (("tasks", "Tasks"), ("requests", "Requests"), ("parked", "Parked"), ("done", "Done"), ("checks", "Checks"))
-INBOXES = (("all", "All inboxes"), ("agents", "Agents"), ("owner", "You"), ("users", "Users"))
+INBOXES = (("all", "All inboxes"), ("agents", "Agents"), ("owner", "You"), ("users", "Users"), ("chat", "Chat"))
 OUTCOMES = [["all", "Any outcome"], ["waiting", "Waiting"], ["task", "Task"], ["noise", "Noise"], ["parked", "Parked"]]
-_FROM = {"agents": ("A", "impl", "from agents"), "owner": ("Y", "orch", "from you"), "users": ("U", "qa", "from users")}
+_FROM = {
+    "agents": ("A", "impl", "from agents"),
+    "owner": ("Y", "orch", "from you"),
+    "users": ("U", "qa", "from users"),
+    "chat": ("C", "intake", "from the chat"),
+}
 _GROUPS = {
     "progress": ("In progress", None, "Nothing is being built."),
     "approved": (

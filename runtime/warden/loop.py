@@ -235,18 +235,18 @@ def _loop_due(ctx: Context, memo: dict[str, Any], now: float) -> None:
 
 
 def _triage_due(ctx: Context, memo: dict[str, Any], now: float) -> None:
-    """`triage due` names its batch. A boosted request goes at once; otherwise a pass takes a while and the batch
-    waits while it runs, so one reminder per loop period is enough."""
+    """`triage due` names its batch. A request triaged alone goes at once; otherwise a pass takes a while and the
+    batch waits while it runs, so one reminder per loop period is enough."""
     found = triage.batch(ctx)
     if not found.due or inbox.pending(ctx.places, inbox.TRIAGE_DUE):
         return
     period = ctx.settings().get_int("watch.loop_minutes") * 60
     recent = memo["triage_due"] is not None and now - memo["triage_due"] < period
-    if recent and not found.boosted:
+    if recent and not found.alone:
         return
     last = inbox.last(ctx.places, inbox.TRIAGE_DUE)
-    if found.boosted and recent and last is not None and last["data"]["batch"] == found.ids:
-        return  # the boosted request was posted at once, and its pass is under way
-    ctx.post_event(inbox.TRIAGE_DUE, {"batch": found.ids, "boosted": found.boosted, "waiting": found.waiting})
+    if found.alone and recent and last is not None and last["data"]["batch"] == found.ids:
+        return  # the request was posted at once, and its pass is under way
+    ctx.post_event(inbox.TRIAGE_DUE, {"batch": found.ids, "alone": found.alone, "waiting": found.waiting})
     memo["triage_due"] = now
     store.write_json(memo_path(ctx.places), memo)

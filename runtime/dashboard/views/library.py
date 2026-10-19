@@ -23,7 +23,7 @@ from runtime.dashboard.views.kit import (
 
 WANTS = docs.WANTS
 RANGES = [["all", "Any time"], ["today", "Today"], ["d7", "7 days"], ["d30", "30 days"], ["custom", "Between"]]
-INBOXES = [["all", "Any inbox"], ["agents", "Agents"], ["owner", "You"], ["users", "Users"]]
+INBOXES = [["all", "Any inbox"], ["agents", "Agents"], ["owner", "You"], ["users", "Users"], ["chat", "Chat"]]
 _SNIPPET = 160
 
 

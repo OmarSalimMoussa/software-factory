@@ -36,6 +36,10 @@ def test_a_task_and_a_request_round_trip_through_their_text() -> None:
         ({"where": ""}, "where is empty"),
         ({"inbox": "owner"}, "cannot file in the owner inbox"),
         ({"report": "7c1e"}, "names its report"),
+        ({"inbox": "chat", "from_role": "discord-6381", "report": "9", "severity": "severe"}, "never severe"),
+        ({"inbox": "chat", "from_role": "implementer", "report": "9"}, "cannot file in the chat inbox"),
+        ({"inbox": "chat", "from_role": "discord-6381"}, "names its report"),
+        ({"from_role": "discord-6381"}, "cannot file in the agents inbox"),
     ],
 )
 def test_a_request_breaking_a_rule_is_malformed(change: dict[str, str], problem: str) -> None:

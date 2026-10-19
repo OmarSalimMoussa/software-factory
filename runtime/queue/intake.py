@@ -1,5 +1,5 @@
-"""Requests arriving in the three inboxes, the owner's boost of a waiting request (intake spec), and the tasks back
-from parked that triage judges again.
+"""Requests arriving in the inboxes, the owner's boost of a waiting request (intake spec), and the tasks back from
+parked that triage judges again.
 
 A request is written once; only its outcome is added later. A severe one posts ``severe request`` at once; the warden's
 tick posts ``triage due`` when a batch is due (runtime/queue/triage.py names it).

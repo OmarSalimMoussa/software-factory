@@ -8,7 +8,7 @@ from collections.abc import Callable
 import pytest
 from queue_kit import World, plan
 
-from runtime.queue import owner, triage
+from runtime.queue import intake, owner, triage
 from runtime.shared.protocol import Refused
 
 
@@ -88,11 +88,28 @@ def test_the_next_batch_is_the_oldest_waiting_requests_without_the_severe_and_a_
     filed = [world.request() for _ in range(size + 1)]
     world.request(severity="severe")  # the fast lane's
     found = triage.batch(world.ctx())
-    assert (found.ids, found.due, found.boosted) == ([r.id for r in filed[:size]], True, False)
+    assert (found.ids, found.due, found.alone) == ([r.id for r in filed[:size]], True, False)
 
     owner.boost_request(world.owner(), filed[-1].id)
     found = triage.batch(world.ctx())
-    assert (found.ids, found.due, found.boosted) == ([filed[-1].id], True, True)
+    assert (found.ids, found.due, found.alone) == ([filed[-1].id], True, True)
+
+
+def test_a_request_from_the_chat_goes_alone_after_a_boosted_one_and_makes_no_boosted_task(world: World) -> None:
+    waiting = world.request()
+    queue = world.queue()
+    with queue.lock():
+        chat = intake.file_request(
+            world.ctx(), queue, "chat", "discord-638197490801180728", "normal", "chat channel 7", "Tagged.", "9"
+        )
+    owner.boost_request(world.owner(), waiting.id)
+    assert triage.batch(world.ctx()).ids == [waiting.id]
+    triage.apply(world.ctx(), plan(batch=[waiting.id], noise={waiting.id: "a test"}))
+
+    found = triage.batch(world.ctx())
+    assert (found.ids, found.due, found.alone) == ([chat.id], True, True)
+    summary = triage.apply(world.ctx(), plan(batch=[chat.id], new_tasks=[_new(chat.id)]))
+    assert world.queue().task(summary["new"][0]).boosted_at == ""
 
 
 def test_triage_saves_its_plan_and_the_orchestrator_applies_the_saved_one(world: World) -> None:

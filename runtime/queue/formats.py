@@ -14,7 +14,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from runtime.queue import goal
-from runtime.shared.models import INBOXES, REQUEST_SEVERITIES, SURFACES, TASK_SEVERITIES, TASK_STATUSES, Request, Task
+from runtime.shared.models import (
+    CHAT,
+    INBOXES,
+    REQUEST_SEVERITIES,
+    SURFACES,
+    TASK_SEVERITIES,
+    TASK_STATUSES,
+    Request,
+    Task,
+)
 
 
 class FormatError(ValueError):
@@ -33,6 +42,11 @@ GOAL_ITEM = re.compile(rf"^{goal.NAME}$")
 ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 ROLE = re.compile(r"^[a-z][a-z0-9-]{0,40}$")
 USER = re.compile(r"^user-[A-Za-z0-9-]{1,64}$")
+# A tagged message's writer in the chat, by its id there: a person, or another agent's bot.
+CHAT_FROM = "discord-"
+CHAT_SENDER = re.compile(rf"^{CHAT_FROM}[0-9]{{1,20}}$")
+# The inboxes whose requests quote words from outside, kept under the id their report names.
+QUOTED = ("users", CHAT)
 OUTCOME = re.compile(r"^(?:(task|joined) (t-\d{4,})|(noise|parked) (\S.*))$")
 PICTURE = re.compile(r"^pictures/[a-z0-9-]+\.(svg|png)$")
 SHA = re.compile(r"^[0-9a-f]{7,40}$")
@@ -188,12 +202,12 @@ def request_problems(req: Request) -> list[str]:
         problems.append(f"at {req.at!r} is not a UTC time")
     if req.severity not in REQUEST_SEVERITIES:
         problems.append(f"severity {req.severity!r} is not one of {', '.join(REQUEST_SEVERITIES)}")
-    elif req.inbox == "users" and req.severity == "severe":
-        problems.append("a user request is never severe on arrival")
+    elif req.inbox in QUOTED and req.severity == "severe":
+        problems.append(f"a request from the {req.inbox} inbox is never severe on arrival")
     if not req.where:
         problems.append("where is empty: name the screen, endpoint, file or host")
-    if (req.inbox == "users") != bool(req.report):
-        problems.append("a user request names its report, and only a user request does")
+    if (req.inbox in QUOTED) != bool(req.report):
+        problems.append(f"a request from the {' or '.join(QUOTED)} inbox names its report, and no other does")
     if req.outcome and not OUTCOME.match(req.outcome):
         problems.append(f"outcome {req.outcome!r} is not 'task t-N', 'joined t-N', 'noise <why>' or 'parked <why>'")
     if not req.body:
@@ -202,13 +216,15 @@ def request_problems(req: Request) -> list[str]:
 
 
 def _may_file(req: Request) -> bool:
-    """Whether the request's sender may file in its inbox: the owner in the owner's, a user in the users', an agent's
-    role in its own."""
+    """Whether the request's sender may file in its inbox: the owner in the owner's, a user in the users', whoever
+    wrote in the chat in the chat's, an agent's role in its own."""
     if req.inbox == "owner":
         return req.from_role == "owner"
     if req.inbox == "users":
         return bool(USER.match(req.from_role))
-    return bool(ROLE.match(req.from_role)) and not req.from_role.startswith(("owner", "user"))
+    if req.inbox == CHAT:
+        return bool(CHAT_SENDER.match(req.from_role))
+    return bool(ROLE.match(req.from_role)) and not req.from_role.startswith(("owner", "user", CHAT_FROM))
 
 
 def dump_request(req: Request) -> str:

@@ -2,11 +2,11 @@
 
 ``batch`` names the next batch, the one rule both the warden's `triage due` and the dashboard read: the tasks back
 from parked since the goal items changed, then the waiting requests (no outcome yet, and not severe: those take the
-fast lane), oldest first, at most intake.batch_size. A request the owner boosted goes at once, in a batch of its own.
-The triage subagent saves its plan with `factory triage plan`; `factory triage apply` applies the saved plan. Every
-request in the plan's batch gets exactly one outcome: a new task, joining an open task, noise or parked; every task
-is kept for the open goal item it serves now, or parked again. Every problem is found before anything is written,
-and then every file is written at once, or nothing is.
+fast lane), oldest first, at most intake.batch_size. A request the owner boosted goes at once, in a batch of its own,
+and so does one from the chat, while its talk is live. The triage subagent saves its plan with `factory triage
+plan`; `factory triage apply` applies the saved plan. Every request in the plan's batch gets exactly one outcome: a
+new task, joining an open task, noise or parked; every task is kept for the open goal item it serves now, or parked
+again. Every problem is found before anything is written, and then every file is written at once, or nothing is.
 
     {"batch": ["t-…", "r-…"],
      "new_tasks": [{"title", "body", "goal_item", "severity", "surfaces", "cause", "slices", "owner_class",
@@ -26,7 +26,7 @@ from runtime.queue.book import Queue, request_rel, task_rel
 from runtime.queue.formats import FormatError
 from runtime.queue.score import score
 from runtime.shared import store
-from runtime.shared.models import Request, Task
+from runtime.shared.models import CHAT, Request, Task
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
 
@@ -38,7 +38,7 @@ PLAN_FILE = "triage-plan.json"
 class Batch:
     ids: list[str]  # the tasks back from parked, then the requests, the next triage pass takes
     due: bool  # whether that pass is due now
-    boosted: bool  # a request the owner boosted, alone
+    alone: bool  # one request at once: one the owner boosted, else one from the chat
     waiting: int  # every request waiting for triage
     oldest_at: str | None  # when the oldest waiting request arrived; None when it cannot be read or none waits
     due_at: str | None  # when the pass is due: now when it is, else when the oldest has waited long enough
@@ -51,19 +51,20 @@ def returned(ctx: Context, queue: Queue) -> list[Task]:
 
 
 def batch(ctx: Context) -> Batch:
-    """The next triage batch, and whether it is due: a boosted request at once, else when a task is back from
-    parked, intake.batch_size requests wait or the oldest has waited intake.batch_max_wait_hours. A request that
-    cannot be read still waits, with no known age; the queue-format sweep reports it."""
+    """The next triage batch, and whether it is due: a boosted request at once, then one from the chat, else when a
+    task is back from parked, intake.batch_size requests wait or the oldest has waited intake.batch_max_wait_hours. A
+    request that cannot be read still waits, with no known age; the queue-format sweep reports it."""
     settings = ctx.settings()
     queue = Queue.of(ctx)
     good, broken = queue.requests()
     waiting = sorted((r for r in good if not r.outcome and r.severity != "severe"), key=lambda r: (r.at, r.id))
     ids = {r.id for r in waiting}
     boosted = sorted((at, rid) for rid, at in intake.marked(ctx, intake.BOOSTED).items() if rid in ids)
+    alone = [rid for _, rid in boosted] + [r.id for r in waiting if r.inbox == CHAT]
     count = len(waiting) + len(broken)
     now = ctx.clock.iso()
-    if boosted:
-        return Batch([boosted[0][1]], True, True, count, waiting[0].at if waiting else None, now)
+    if alone:
+        return Batch(alone[:1], True, True, count, waiting[0].at if waiting else None, now)
     size = settings.get_int("intake.batch_size")
     back = [t.id for t in returned(ctx, queue)]
     oldest = waiting[0].at if waiting else None

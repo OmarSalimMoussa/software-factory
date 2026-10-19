@@ -34,7 +34,8 @@ FINISHED, STOPPED, WITH_PARENT, CRASHED = "finished", "stopped", "with-parent", 
 RETIRE_KINDS = (FINISHED, STOPPED, WITH_PARENT, CRASHED)
 
 FAMILIES = ("orch", "intake", "design", "impl", "qa")
-INBOXES = ("agents", "owner", "users")
+CHAT = "chat"
+INBOXES = ("agents", "owner", "users", CHAT)
 TASK_SEVERITIES = ("severe", "major", "minor")
 REQUEST_SEVERITIES = ("severe", "normal")
 SURFACES = ("ui", "api", "access", "desktop", "none")
