@@ -32,7 +32,8 @@ implementers = 3
 designers = 2
 subagents_at_once = 4
 browsers_at_once = 4    # browser testers on the whole machine at once: each one is a browser in the slice's memory
-desktops_at_once = 2    # desktop testers on the whole machine at once: a desktop's live view needs spare CPU
+desktops_at_once = 2    # desktop testers on the whole machine at once: a desktop's live view needs spare CPU, so a
+                        # desktop walk runs alone and a second comes only from a tester already walking
 
 [subagents]             # which subagent kinds each role may start
 browser_personas = ["qa-ui-function", "qa-ux", "qa-visual", "qa-regression", "qa-prod"]
@@ -54,8 +55,9 @@ seconds_per_item = 120
 setup_seconds = 180     # added once to each tester's time, for its start-up and sign-in
 max_items = 10
 desktop_seconds = 300
-desktop_wait_minutes = 5  # a tester's desktop up waits this long for a desktop to free before it is refused, on
-                          # the factory's time: it and desktop up's own minutes fit one shell call's longest wait
+desktop_wait_minutes = 5  # a tester's desktop up waits this long in all, on the factory's time, for a desktop to
+                          # free, or it is refused, then for the other browser walks to hand back, or it goes ahead:
+                          # it and desktop up's own minutes fit one shell call's longest wait
 keep_bundles = 5        # the QA evidence and runs of the newest this many merge bundles are kept, the rest cleaned up
 widths = [1440, 1024, 390]
 quiet_seconds = 120     # a tester with no result stops holding a place after this much quiet, its budget spent

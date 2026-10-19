@@ -14,7 +14,7 @@ from guard_kit import NOW, SID, TESTER_ID, Kit, agent_use, bash_use, entry, resu
 
 from runtime.guard.browser import BROWSER
 from runtime.guard.facts import Refusal, Rewrite
-from runtime.guard.subagents import SLOT_API
+from runtime.guard.subagents import SLOT_API, WOKEN
 from runtime.qa.wrapper import WAIT_FOR
 from runtime.shared import lanes, store
 
@@ -546,6 +546,25 @@ def test_browser_testers_started_in_one_message_count_against_the_machines_cap(
     kit.transcript(_running("qa-visual", "qa-ux", "qa-ui-function", ago=0))
     decision = kit.decide("Agent", _agent("qa-ui-function"), tool_use_id=current)
     assert (isinstance(decision, Refusal) and decision.rule == "browsers-at-once") is refused
+
+
+@pytest.mark.parametrize(("state", "refused"), [("working", True), ("retired", False)], ids=["held", "holder-retired"])
+def test_no_browser_tester_starts_while_another_tester_holds_a_desktop(
+    tmp_path: Path, state: str, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.session("implementer", sid="other-1")
+    kit.session("qa-ui-function", sid="a0", parent="other-1", agent_id="a0", state=state)
+    store.write_json(kit.public / "desktops.json", {"2": "a0"})
+    kit.switch_off("qa-ready")
+    decision = kit.decide("Agent", _agent("qa-ux"))
+    if not refused:
+        assert not isinstance(decision, Refusal)
+        return
+    assert isinstance(decision, Refusal) and decision.rule == "browsers-at-once"
+    assert decision.reason.startswith("a tester holds slot 2's desktop, and a desktop walk runs alone")
+    assert decision.reason.endswith(WOKEN)
 
 
 @pytest.mark.parametrize("kind", ["intake", "Explore", "qa-backend"])

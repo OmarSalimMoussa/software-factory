@@ -1,5 +1,5 @@
 """Stack slots: a lease per implementer, worked out from the caller and never from an argument; a desktop each slot's
-tester holds alone, within the machine's cap and its CPU hold."""
+tester holds alone, within the machine's cap and its CPU hold, brought up once the other browser walks hand back."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 import pytest
 from queue_kit import World
 
+from runtime.guard.facts import read_desktops
 from runtime.shared import store
 from runtime.shared.models import RETIRED
 from runtime.shared.protocol import Refused
@@ -330,6 +331,34 @@ def test_a_testers_desktop_up_waits_for_a_desktop_to_free_then_takes_it_or_is_re
         with pytest.raises(Refused, match="1 desktops are up on this machine, its cap of 1"):
             slot(world.ctx("implementer", "s-2", "agent-qa-2"), up, None)
         assert [n for n, _ in world.launcher.stacks] == [1]
+
+
+@pytest.mark.parametrize("hands_back", [True, False], ids=["the-other-hands-back", "at-the-deadline"])
+def test_a_testers_desktop_up_records_its_desktop_then_waits_for_the_other_browser_walks(
+    world: World, monkeypatch: pytest.MonkeyPatch, hands_back: bool
+) -> None:
+    world.with_settings(slots__count=2, qa__desktop_wait_minutes=5)
+    for n, kind in ((1, "qa-ux"), (2, "qa-ui-function")):
+        _implementer(world, n)
+        world.session(f"agent-qa-{n}", kind, f"impl-t-000{n}.qa", f"t-000{n}", f"/wt/impl-t-000{n}",
+                      agent_id=f"agent-qa-{n}", parent=f"s-{n}")  # fmt: skip
+        slot(world.ctx("implementer", f"s-{n}"), {"op": "claim"}, None)
+
+    ticks: list[float] = []
+
+    def tick(seconds: float) -> None:
+        assert read_desktops(world.places) == {"2": "agent-qa-2"} and world.launcher.stacks == []
+        ticks.append(seconds)
+        world.clock.at += 60
+        if hands_back and len(ticks) == 2:
+            sessions = registry.read(world.places)
+            sessions["agent-qa-1"].state = RETIRED
+            registry.write(world.places, sessions)
+
+    monkeypatch.setattr(slots_verbs.time, "sleep", tick)
+    slot(world.ctx("implementer", "s-2", "agent-qa-2"), {"op": "desktop", "desktop": ["up", "t@example.com"]}, None)
+    assert len(ticks) == (2 if hands_back else 5)
+    assert world.launcher.stacks == [(2, ["desktop", "up", "t@example.com"])]
 
 
 def _desktop_slot(world: World) -> dict[str, object]:

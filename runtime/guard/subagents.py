@@ -1,8 +1,9 @@
 """The guard's rules for subagents: which kinds a role may start (`subagent-kinds`), on which model (`model`), how
-many at once (`subagents-at-once`), browser testers on the machine, the orchestrator's first (`browsers-at-once`), a
-tester's brief (`tester-brief`), QA only after every slice (`qa-ready`), QA and critic rounds (`qa-rounds`,
-`critic-rounds`), a tester held while the CPU is busy or an upgrade gets ready and each tester's time (`cpu-hold`,
-`upgrade-hold`, `tester-time`, in walk_hold), and no finished subagent resumed (`resume-subagent`).
+many at once (`subagents-at-once`), browser testers on the machine, none while a tester holds a desktop, the
+orchestrator's first (`browsers-at-once`), a tester's brief (`tester-brief`), QA only after every slice
+(`qa-ready`), QA and critic rounds (`qa-rounds`, `critic-rounds`), a tester held while the CPU is busy or an upgrade
+gets ready and each tester's time (`cpu-hold`, `upgrade-hold`, `tester-time`, in walk_hold), and no finished subagent
+resumed (`resume-subagent`).
 
 Every count comes from the session's own transcript; the current call is left out by its ``tool_use_id``, and a
 call the guard refused never ran.
@@ -23,6 +24,7 @@ from runtime.guard.facts import (
     Decision,
     Refusal,
     Rewrite,
+    read_desktops,
     read_ready,
     read_vitals,
 )
@@ -114,10 +116,10 @@ def _model(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision
 
 
 def _browsers(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
-    """At most caps.browsers_at_once browser testers on the machine, none on red vitals: amber holds back new work.
-    This session's earlier starts count too: one sent in the same message has no session row yet. A place the warden
-    told another session of is kept for it for qa.place_turn_seconds, and none goes to another while the orchestrator
-    waits for one: its merge check is what every merge waits on."""
+    """At most caps.browsers_at_once browser testers on the machine, none on red vitals or while a tester holds a
+    desktop: amber holds back new work. This session's earlier starts count too: one sent in the same message has no
+    session row yet. A place the warden told another session of is kept for it for qa.place_turn_seconds, and none
+    goes to another while the orchestrator waits for one: its merge check is what every merge waits on."""
     personas = call.settings.get_list("subagents.browser_personas")
     if kind not in personas or call.off(lanes.PLACES):
         return None
@@ -126,6 +128,11 @@ def _browsers(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decis
     if call.role != ORCHESTRATOR and first & set(waiting):
         return Refusal(lanes.PLACES, f"the orchestrator waits for a browser place for the merge check, which every "
                                      f"merge waits on, so it goes first. {WOKEN}")  # fmt: skip
+    desktops = lanes.desktop_walks(call.sessions.values(), read_desktops(call.places), call.settings, call.now)
+    if desktops:
+        return Refusal(lanes.PLACES, f"a tester holds slot {min(desktops)}'s desktop, and a desktop walk runs alone: "
+                                     "its live view needs the machine's spare CPU, so new browser walks wait until it "
+                                     f"hands back. {WOKEN}")  # fmt: skip
     rows = lanes.holders(call.sessions.values(), call.settings, call.now)
     known = {s.agent_id for s in call.sessions.values() if s.agent_id}
     starting = [c for c in calls if lanes.kind_of(c.subagent_type) in personas and c.agent_id not in known

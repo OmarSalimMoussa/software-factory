@@ -8,12 +8,13 @@ A tester only reads its slot and what runs on it, signs in and opens its desktop
 parent's. The slot's own session, an implementer or the orchestrator, may run one command in a new container of a
 service, such as a scenario's set-up; so may its backend and security testers, to look from inside the slot's
 network. One tester holds a slot's desktop at a time, until its parent or, once it hands back, the warden takes it
-down; another tester's `desktop up` waits, so no one's new password cuts off a tester mid-step. While the machine's
-CPU use is past budget.walk_hold_percent, a session's own `desktop up` waits too (runtime/guard/walk_hold.py), but
-never a tester's, whose walk the hold let start; the wait counts per slot, in the warden's memory, so a restart begins
-it again. Slot 0 is staging, so it comes up whole: one build of the
-stack, never a service at a time, at the tip or, for a check, an older commit of the default branch (staging.py). No
-stack changes under a tester still walking it.
+down; another tester's `desktop up` waits, so no one's new password cuts off a tester mid-step. A desktop walk runs
+alone: a tester's `desktop up` records its desktop first, which holds back new browser walks, then waits for the
+other browser testers to hand back, within the same minutes. While the machine's CPU use is past
+budget.walk_hold_percent, a session's own `desktop up` waits too (runtime/guard/walk_hold.py), but never a tester's,
+whose walk the hold let start; the wait counts per slot, in the warden's memory, so a restart begins it again. Slot 0
+is staging, so it comes up whole: one build of the stack, never a service at a time, at the tip or, for a check, an
+older commit of the default branch (staging.py). No stack changes under a tester still walking it.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from typing import Any
 
 from runtime.guard import walk_hold
 from runtime.guard.facts import read_desktops, read_vitals
-from runtime.shared import store
+from runtime.shared import lanes, store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import health, leases, staging
@@ -141,18 +142,28 @@ def _may_change(ctx: Context, session: Session, n: int, verb: list[str]) -> None
 
 def _desktop_lease(ctx: Context, n: int, verb: list[str]) -> dict[str, int]:
     """A tester's `desktop up` takes a desktop no other tester holds, within caps.desktops_at_once; its time too. One
-    taken waits for it to free, up to qa.desktop_wait_minutes: a tester's clock stops while its `desktop up` runs."""
+    taken waits for it to free, then the other browser testers' hand-backs, up to qa.desktop_wait_minutes in all: a
+    tester's clock stops while its `desktop up` runs."""
     agent = ctx.caller.agent_id
     if agent and verb[1] != "up":
         raise Refused("slot", "the factory takes your desktop down once you hand back: nothing to run")
     deadline = ctx.clock.now() + ctx.settings().get_int("qa.desktop_wait_minutes") * 60
     while True:
         try:
-            return _take_desktop(ctx, n, verb, agent)
+            taken = _take_desktop(ctx, n, verb, agent)
+            break
         except Refused as exc:
             if not agent or exc.rule != "desktop" or ctx.clock.now() >= deadline:
                 raise
         time.sleep(ctx.settings().get_int("watch.tick_seconds"))
+    while agent and _others_walk(ctx, agent) and ctx.clock.now() < deadline:
+        time.sleep(ctx.settings().get_int("watch.tick_seconds"))
+    return taken
+
+
+def _others_walk(ctx: Context, agent: str) -> bool:
+    now = datetime.fromtimestamp(ctx.clock.now(), UTC)
+    return any(s.id != agent for s in lanes.holders(registry.read(ctx.places).values(), ctx.settings(), now))
 
 
 def _take_desktop(ctx: Context, n: int, verb: list[str], agent: str) -> dict[str, int]:

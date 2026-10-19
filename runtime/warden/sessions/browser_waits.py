@@ -1,8 +1,9 @@
-"""The line for a browser place. The guard refuses a browser tester past the machine's browser places, or on red vitals
-(`browsers-at-once`), and a session cannot see another session's testers hand back. So the warden keeps each refused
-session in a line, in the order the guard refused them, and each pass tells as many as there are free places, the
-longest waiting first, while the vitals are not red. The orchestrator joins at the head: its merge check is what
-every merge waits on, and the guard holds back other testers while it waits. A place told of is kept for its session
+"""The line for a browser place. The guard refuses a browser tester past the machine's browser places, on red vitals,
+or while a tester holds a desktop (`browsers-at-once`), and a session cannot see another session's testers hand back.
+So the warden keeps each refused session in a line, in the order the guard refused them, and each pass tells as many
+as there are free places, the longest waiting first, while the vitals are not red and no tester at work holds a
+desktop, as a desktop walk runs alone. The orchestrator joins at the head: its merge check is what every merge waits
+on, and the guard holds back other testers while it waits. A place told of is kept for its session
 qa.place_turn_seconds, which the guard counts as taken for every other session; a told session refused again goes
 back to the head of the line. A session leaves the line once it starts a browser tester or retires.
 """
@@ -13,6 +14,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from runtime.guard.facts import read_desktops
 from runtime.shared import lanes
 from runtime.shared.models import RETIRED
 from runtime.shared.protocol import Refused
@@ -61,9 +63,11 @@ def run_pass(ctx: Context) -> None:
         turn = settings.get_int("qa.place_turn_seconds")
         told = {sid: at for sid, at in told.items() if sid in live and now - at < turn}
         waiting = [sid for sid in waiting if sid in live]
-        held = lanes.holders(sessions.values(), settings, datetime.fromtimestamp(now, UTC))
+        when = datetime.fromtimestamp(now, UTC)
+        held = lanes.holders(sessions.values(), settings, when)
+        alone = lanes.desktop_walks(sessions.values(), read_desktops(ctx.places), settings, when)
         red = permits.vitals_level(ctx)[0] == "red"
-        free = 0 if red else max(settings.get_int("caps.browsers_at_once") - len(held) - len(told), 0)
+        free = 0 if red or alone else max(settings.get_int("caps.browsers_at_once") - len(held) - len(told), 0)
         tell, waiting = waiting[:free], waiting[free:]
         lanes.write_line(ctx.places, waiting, {**told, **dict.fromkeys(tell, now)})
     for sid in tell:

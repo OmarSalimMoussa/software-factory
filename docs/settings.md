@@ -53,8 +53,13 @@ one from the owner's PATH, so the agents and the stack run the same tools as the
 
 `budget.walk_hold_percent` holds back new walks. While the machine's average CPU use is past it, or unknown, a new
 browser tester waits, and so does a session's own remote desktop: what a walk starts runs outside the factory's slice,
-so the slice's CPU limit cannot slow it. A tester's desktop is part of the walk the hold let start, and never waits. A walk held `budget.walk_hold_minutes` starts anyway, so a busy machine never stalls a merge for good.
-The guard's rule `cpu-hold` switches the hold off.
+so the slice's CPU limit cannot slow it. A tester's desktop is part of the walk the hold let start, and never waits
+for the hold. A walk held `budget.walk_hold_minutes` starts anyway, so a busy machine never stalls a merge for good. The
+guard's rule `cpu-hold` switches the hold off.
+
+A desktop walk runs alone, as a desktop's live view needs the machine's spare CPU. While a tester holds a desktop, no
+new browser tester starts, and the tester's `desktop up` waits for the other browser testers to hand back. It goes
+ahead after `qa.desktop_wait_minutes` all the same, so a busy machine never stalls it for good.
 
 `vitals.merge_wait_amber_hours` and `rounds.bundle_merges` turn the merges waiting for their check amber: once that
 many wait, or the oldest has waited longer. That reading sits beside the vitals but never holds back a start, since

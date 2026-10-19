@@ -5,7 +5,9 @@ import logging
 import pytest
 from lifecycle_fakes import World
 
+from runtime.shared import store
 from runtime.shared.models import RETIRED
+from runtime.warden import public
 from runtime.warden.sessions import browser_waits, subagents
 from runtime.warden.sessions.launch import LaunchError
 
@@ -79,6 +81,24 @@ def test_a_session_leaves_the_line_once_it_starts_a_browser_tester_or_retires(wo
     browser_waits.run_pass(world.ctx())
 
     assert world.launcher.messages == [("1mp10003", browser_waits.FREE)]
+
+
+@pytest.mark.parametrize("ends", ["taken-down", "holder-retires"])
+def test_no_session_is_told_of_a_place_while_a_tester_holds_a_desktop(world: World, ends: str) -> None:
+    _line(world, 2, 1)
+    store.write_json(public.desktops_path(world.places), {"1": "a0"})
+    _refuse(world, "1mp10001")
+    browser_waits.run_pass(world.ctx())
+    assert world.launcher.messages == []
+
+    if ends == "taken-down":
+        store.write_json(public.desktops_path(world.places), {})
+    else:
+        world.seat("a0", role="qa-ux", parent="1mp10004", agent_id="a0", started=RECENT, state=RETIRED,
+                   retired="finished")  # fmt: skip
+    browser_waits.run_pass(world.ctx())
+
+    assert world.launcher.messages == [("1mp10001", browser_waits.FREE)]
 
 
 def test_a_place_the_warden_could_not_tell_of_is_logged(

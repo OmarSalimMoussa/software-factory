@@ -4,11 +4,13 @@ Some steps happen outside the web UI, such as a browser extension. A product tha
 per slot: a real desktop whose view is a live video in a web page. A tester works it by sight, from its own browser:
 a screenshot, then a click or a key at a point on the video.
 
-Use it only for the steps that need it. One tester holds a slot's desktop at a time, and the machine runs only a few
-desktops at once. Each tester holds one for the seconds its `desktop up` answers with (`desktop_seconds`), whatever a
-brief or the product's own notes say, counted from its first `desktop up`. While you hold it, that is your time,
-however long an item gets. The time `desktop up` takes is not counted, nor its wait for a desktop another tester
-holds. When the factory still refuses one, test what needs none first, then try again.
+Use it only for the steps that need it. A desktop walk runs alone: its live view needs the machine's spare CPU. So no
+new browser walk starts while a tester holds a desktop, and your `desktop up` waits for the other walks to hand back,
+on the factory's time. One tester holds a slot's desktop at a time, and the machine runs only a few desktops at once.
+Each tester holds one for the seconds its `desktop up` answers with (`desktop_seconds`), whatever a brief or the
+product's own notes say, counted from its first `desktop up`. While you hold it, that is your time, however long an
+item gets. The time `desktop up` takes is not counted, nor its waits for the other walks or for a desktop another
+tester holds. When the factory still refuses one, test what needs none first, then try again.
 
 ## 1. Open it
 

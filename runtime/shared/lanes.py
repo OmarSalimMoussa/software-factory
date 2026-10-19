@@ -6,7 +6,9 @@ it for the rest. So lane n of a kind, from 2 up to caps.browsers_at_once, is a k
 whose browser starts under that name; lane 1 is the kind itself. Everywhere else a lane is the kind it copies.
 
 The machine has caps.browsers_at_once browser places. The guard refuses a browser tester past them
-(`browsers-at-once`), and the warden tells a refused session once one frees: both count the places held here.
+(`browsers-at-once`), and the warden tells a refused session once one frees: both count the places held here. A
+desktop walk runs alone, as a desktop's live view needs the machine's spare CPU: while a tester at work holds a slot's
+desktop, no place is free.
 """
 
 from __future__ import annotations
@@ -81,6 +83,11 @@ def testers(rows: Iterable[R], settings: Settings, now: datetime) -> list[R]:
     longest = tester_seconds(settings, settings.get_int("qa.max_items")) + waits
     return [s for s in rows if s.parent in alive and s.state == WORKING and s.role.startswith(TESTER)
             and (now - datetime.fromisoformat(s.started.replace("Z", "+00:00"))).total_seconds() < longest]  # fmt: skip
+
+
+def desktop_walks(rows: Iterable[R], desktops: dict[str, str], settings: Settings, now: datetime) -> dict[str, R]:
+    at_work = {s.id: s for s in testers(rows, settings, now)}
+    return {slot: at_work[agent] for slot, agent in sorted(desktops.items()) if agent in at_work}
 
 
 def line(places: Places) -> tuple[list[str], dict[str, float]]:
