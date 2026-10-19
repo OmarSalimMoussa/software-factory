@@ -10,11 +10,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from guard_kit import NOW, TESTER_ID, Kit, agent_use, bash_use, entry, result
+from guard_kit import NOW, SID, TESTER_ID, Kit, agent_use, bash_use, entry, result
 
 from runtime.guard.facts import Refusal, Rewrite
 from runtime.guard.subagents import SLOT_API
-from runtime.shared import store
+from runtime.shared import lanes, store
 
 TESTER = {"agent_id": TESTER_ID, "agent_type": "qa-backend"}
 
@@ -485,6 +485,37 @@ def test_browser_testers_are_capped_across_the_machine_and_start_unless_its_vita
     held = decision if isinstance(decision, Refusal) and decision.rule == "browsers-at-once" else None
     assert (held is not None) is refused
     assert held is None or why in held.reason  # it names the reading that holds the tester back
+
+
+@pytest.mark.parametrize(
+    ("role", "line", "refused"),
+    [
+        ("implementer", "waiting", True),
+        ("implementer", "told", True),
+        ("implementer", "told-past-its-turn", False),
+        ("implementer", "empty", False),
+        ("orchestrator", "waiting", False),
+    ],
+)
+def test_while_the_orchestrator_waits_for_a_browser_place_another_sessions_tester_waits_behind_it(
+    tmp_path: Path, role: str, line: str, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session(role)
+    orchestrator = SID if role == "orchestrator" else "orch-1"
+    if role != "orchestrator":
+        kit.session("orchestrator", sid=orchestrator)
+    now = NOW.timestamp()
+    waiting, told = {
+        "waiting": ([orchestrator], {}),
+        "told": ([], {orchestrator: now - 30}),
+        "told-past-its-turn": ([], {orchestrator: now - 3600}),
+        "empty": ([], {}),
+    }[line]
+    lanes.write_line(kit.places, waiting, told)
+    kind = "qa-regression" if role == "orchestrator" else "qa-ux"
+    decision = kit.decide("Agent", {"subagent_type": kind, "prompt": "Scenarios and checks: 1\nWalk the sign-in."})
+    assert (isinstance(decision, Refusal) and decision.rule == "browsers-at-once") is refused
 
 
 @pytest.mark.parametrize(("current", "refused"), [("t1", False), ("t2", True)])

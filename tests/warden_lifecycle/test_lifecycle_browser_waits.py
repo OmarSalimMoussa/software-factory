@@ -46,6 +46,17 @@ def test_a_session_refused_a_browser_place_is_told_once_one_frees_the_longest_wa
     assert world.launcher.messages == [(sid, browser_waits.FREE) for sid in told]
 
 
+def test_the_orchestrator_refused_a_browser_place_goes_to_the_head_of_the_line(world: World) -> None:
+    _line(world, 2, 1)
+    world.seat("0rch0001", role="orchestrator")
+    world.run("0rch0001")
+    _refuse(world, "1mp10001", "1mp10002", "0rch0001")
+
+    browser_waits.run_pass(world.ctx())
+
+    assert [sid for sid, _ in world.launcher.messages] == ["0rch0001"]
+
+
 def test_a_told_session_refused_again_goes_first_and_a_place_kept_past_its_turn_goes_to_the_next(world: World) -> None:
     _line(world, 2, 1)
     _refuse(world, "1mp10001", "1mp10002")
