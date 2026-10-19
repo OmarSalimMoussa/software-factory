@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 import logging
 from typing import Any
 
@@ -17,6 +18,8 @@ from runtime.queue.book import Queue
 from runtime.shared import models, store
 from runtime.shared.models import Probe
 from runtime.shared.protocol import Refused
+from runtime.slots import health, leases
+from runtime.warden.context import StackResult
 from runtime.warden.delivery import deploys
 
 SCENARIOS = {
@@ -245,19 +248,22 @@ def test_a_bundle_grows_past_the_cap_only_once_the_check_of_the_cap_did_not_pass
     ("built", "name", "refused"),
     [
         (True, "web", None),
-        (False, "web", "which build slot 0 runs is not known"),
+        (False, "web", "slot 0 gives no build"),
         (True, "gone", "has no scenario gone"),
     ],
     ids=["as-slot-0-runs-it", "no-build-known", "one-its-build-lacks"],
 )
 def test_a_regression_tester_reads_each_scenario_as_the_build_slot_0_runs_has_it(
-    world: World, product: Product, built: bool, name: str, refused: str | None
+    world: World, product: Product, monkeypatch: pytest.MonkeyPatch, built: bool, name: str, refused: str | None
 ) -> None:
     older = product.base
     (world.repo / FOLDER / "web.md").write_text(f"---\n{SCENARIOS['web']}\n---\n# web\n\n1. Rewritten since.\n")
     product.git("commit", "-q", "-am", "rewrite web")
-    if built:
-        deploys.record(world.places, "staging", older[:8], world.clock.iso())
+    # The deploy log lags slot 0 by up to a probe: slot 0's own answer is the build its testers walk.
+    deploys.record(world.places, "staging", product.git("rev-parse", "HEAD")[:8], world.clock.iso())
+    port = leases.port(world.settings, 0)
+    world.launcher.stack = lambda n, verb: StackResult(0 if built else 1, f"http://127.0.0.1:{port}/health\n", "/l")
+    monkeypatch.setattr(health, "http_get", lambda *_: json.dumps({"build_commit": older[:8]}).encode())
     tester = world.ctx(agent_id="a1", agent_kind="qa-regression")
 
     if refused is not None:

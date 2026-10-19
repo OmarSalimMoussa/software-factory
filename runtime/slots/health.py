@@ -103,16 +103,24 @@ def note_stop(places: Places, slot: int, services: list[str], commit: str | None
     store.write_json(path, {"commit": commit, "services": sorted({*services, *(noted.services if noted else [])})})
 
 
+def build(ctx: Context, slot: int, session: str) -> str:
+    """The commit the slot runs: its health answer's, else the one a stop noted; SlotUnread when neither is known."""
+    try:
+        return running(ctx, slot, session)
+    except SlotUnread:
+        noted = stopped(ctx.places, slot)
+        if noted is None:
+            raise
+        return noted.commit
+
+
 def off_head(ctx: Context, slot: int, session: str, head: str) -> str | None:
     """Why the slot's stack is not known to run ``head``, in words the agent can act on; None when it runs it."""
     try:
-        commit = running(ctx, slot, session)
-    # telemetry: surfaced — what the slot lacks goes back as the reason, `str(exc)`, unless a stop noted the commit
+        commit = build(ctx, slot, session)
+    # telemetry: surfaced — what the slot lacks goes back as the reason, `str(exc)`, which the caller refuses with
     except SlotUnread as exc:
-        noted = stopped(ctx.places, slot)
-        if noted is None:
-            return str(exc)
-        commit = noted.commit
+        return str(exc)
     if commit == leases.stand_in(slot):
         return (f"the slot answers {commit}, the stand-in its env file holds: the stack must take its build commit "
                 "from the image it built, not from the env file")  # fmt: skip
