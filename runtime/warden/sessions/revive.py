@@ -168,8 +168,9 @@ def pause_progress(ctx: Context, sid: str, detail: str) -> None:
 
 
 def owner_resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Bring back every session the pause benched, in the order it benched them: the orchestrator first. Each takes
-    longer than the dashboard waits for an answer, so they come back in an operation the page follows."""
+    """Bring back every session the pause benched whose task has work, in the order it benched them: the orchestrator
+    first. Each takes longer than the dashboard waits for an answer, so they come back in an operation the page
+    follows."""
     with ctx.lock:
         try:
             record = store.read_json(paused_path(ctx))
@@ -182,7 +183,11 @@ def owner_resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
             raise Refused("settling", f"the pause is still settling ({', '.join(settling)}); resume in a minute")
         permits.check_vitals(ctx, severe=True)
         permits.check_daemon(ctx)
-        back = [s for s in paused if s.state == models.DEPRIORITIZED]
+        benched = [s for s in paused if s.state == models.DEPRIORITIZED]
+        # One whose task waits, merged, blocked or on hold, stays benched: the scheduling pass brings it back once its
+        # task returns, as it does one benched at its merge.
+        back = [s for s in benched if not s.task or permits.has_work(ctx, s)]
+        waiting = [s.name for s in benched if s.id not in {b.id for b in back}]
         for s in back:
             move(ctx, s, models.REVIVING, OWNER, "resuming with the factory")
         registry.write(ctx.places, sessions)
@@ -198,4 +203,5 @@ def owner_resume(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict
     return ok(
         op=ops.launch(ctx, operations.RESUME, [("Bring back every benched agent", bring_all)]),
         resuming=[s.name for s in back],
+        **({"waiting": waiting} if waiting else {}),
     )

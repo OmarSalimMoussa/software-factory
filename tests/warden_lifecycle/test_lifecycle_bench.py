@@ -157,6 +157,28 @@ def test_pause_benches_every_session_and_resume_brings_them_back_in_order_each_w
     assert [kind for kind, _ in world.events] == ["paused", "benched", "benched", "benched", "resumed"]
 
 
+def test_resume_leaves_benched_a_session_whose_task_waits_for_its_merge_check(
+    world: World,
+) -> None:
+    world.queue.add("t-0001", goal_item="G1", status="merged")
+    world.seat("0c0c0c0c", role="orchestrator", family="orch")
+    world.seat("1a1a1a1a", task="t-0001", state=WAITING)
+    for sid in ("0c0c0c0c", "1a1a1a1a"):
+        world.run(sid)
+    revive.owner_pause(world.owner(), {}, None)
+    world.later(world.settings.get_int("watch.bench_grace_seconds"))
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
+
+    answer = revive.owner_resume(world.owner(), {}, None)
+    ops.join(answer["op"])
+
+    assert (answer["resuming"], answer["waiting"]) == (
+        [world.session("0c0c0c0c").name],
+        [world.session("1a1a1a1a").name],
+    )
+    assert (world.launcher.resumed, world.session("1a1a1a1a").state) == (["0c0c0c0c"], DEPRIORITIZED)
+
+
 def test_a_paused_session_whose_task_moves_past_its_part_on_its_way_to_the_bench_ends_and_the_pause_completes(
     world: World,
 ) -> None:
