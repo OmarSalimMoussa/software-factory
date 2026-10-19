@@ -290,12 +290,15 @@ def test_a_regression_tester_reads_each_scenario_as_the_build_slot_0_runs_has_it
     port = leases.port(world.settings, 0)
     world.launcher.stack = lambda n, verb: StackResult(0 if built else 1, f"http://127.0.0.1:{port}/health\n", "/l")
     monkeypatch.setattr(health, "http_get", lambda *_: json.dumps({"build_commit": older[:8]}).encode())
+    world.session("s-orch", "orchestrator", "orchestrator", worktree=str(world.repo))
     tester = world.ctx(agent_id="a1", agent_kind="qa-regression")
 
     if not built or name == "gone":
         with pytest.raises(Refused, match=said):
             walked.show(tester, {"name": name}, None)
         return
-    answer = walked.show(tester, {"name": name}, None)["message"]
+    shown = walked.show(tester, {"name": name}, None)
+    answer = shown["message"]
     assert answer.startswith(f"{name}, as slot 0 runs it at {older[:8]}") and said in answer
     assert "Rewritten" not in answer
+    assert shown["folder"] == str(world.repo / ".factory" / "a1")  # the one folder the guard lets it write in

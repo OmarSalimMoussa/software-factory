@@ -7,6 +7,7 @@ import io
 import json
 import shlex
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -170,11 +171,17 @@ def test_the_subagent_id_the_guard_puts_first_travels_with_the_request() -> None
         _build(["--agent-id", "--head"])
 
 
-def test_a_testers_ready_check_makes_the_folder_it_names(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    ("argv", "answer"),
+    [(["ready-check"], {"head": "a" * 40, "slot": 1, "testers": []}), (["qa", "scenario", "web"], {"message": "web"})],
+    ids=["an-implementers-tester", "a-regression-tester"],
+)
+def test_a_testers_first_call_makes_the_folder_it_names(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str], answer: dict[str, Any]
+) -> None:
     folder = tmp_path / "worktree" / ".factory" / "a1b2c3"
-    answer = {"ok": True, "head": "a" * 40, "slot": 1, "testers": [], "folder": str(folder)}
-    monkeypatch.setattr(factory, "ask", lambda path, call: answer)
-    assert factory.main(["ready-check"], Places.under(tmp_path)) == 0
+    monkeypatch.setattr(factory, "ask", lambda path, call: {"ok": True, **answer, "folder": str(folder)})
+    assert factory.main(argv, Places.under(tmp_path)) == 0
     assert folder.is_dir()
 
 

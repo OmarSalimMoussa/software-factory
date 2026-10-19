@@ -147,11 +147,12 @@ is live and nothing merged for a while, a regression walk of the scenarios that 
    places are full, the factory messages you once one frees. A brief names scenarios and what a set-up made that a
    step needs, such as a record's id; never an earlier report's results or causes, nor a desktop's password: a tester
    brings the desktop up itself. Ask for the steps that make a token or a sign-in link, never the token itself: a
-   report holds none. A check of slot 0's health is read in the tester's browser. Put every tester's rows, as they
-   wrote them, in one report, and run `factory queue check <that commit> --body <file>` before slot 0 moves. It
-   clears every merge waiting up to that commit at once, within the cap, when every row passed and each scenario they
-   protect has a row; anything less clears none. A row you doubt is walked again by a tester, never changed by you.
-   Then `factory slot up` for the tip.
+   report holds none. Name no folder to write in: each tester writes only in its own, which its first answer names. A
+   check of slot 0's health is read in the tester's browser. Put every tester's rows, as they wrote them, in one
+   report, and run `factory queue check <that commit> --body <file>` before slot 0 moves. It clears every merge
+   waiting up to that commit at once, within the cap, when every row passed and each scenario they protect has a row;
+   anything less clears none. A row you doubt is walked again by a tester, never changed by you. Then `factory slot
+   up` for the tip.
 4. **A row that did not pass** comes back with `next`, and `factory queue bundle` says it again:
    - `again`: walk it again once what blocked it is fixed (a tester's time, the desktop, a set-up): never a revert.
    - `walk`: walk that scenario alone at the commit `at` names and save that check; then read the bundle again.

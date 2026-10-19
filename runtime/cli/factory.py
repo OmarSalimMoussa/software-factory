@@ -359,7 +359,7 @@ def main(argv: list[str], places: Places | None = None) -> int:
     except (OSError, ValueError) as exc:
         print(f"factory: the warden cannot be reached ({type(exc).__name__}); is it running?", file=sys.stderr)
         return UNREACHABLE
-    folder = answer.get("folder") if call.verb == "ready-check" and answer.get("ok") else None
+    folder = answer.get("folder") if call.verb in ("ready-check", "qa.scenario") and answer.get("ok") else None
     if folder:
         # A tester's own folder is there before its first file: `curl -c` into a missing folder saves nothing.
         try:
