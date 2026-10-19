@@ -42,9 +42,11 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    past them, the screenshots and replays of a check, or of a task it cleared, go, and their pages say when.
    Transcripts are never removed. A check clears every merge waiting up to its commit, at once, only when every row
    passed, each of those scenarios has a row, slot 0 ran that commit, and they are within the cap; anything less
-   clears none. No merge turn goes while the cap of merges waits, until their bundle's check failed. Each row that
-   did not pass says what comes next: walk it again once what blocked it is fixed (a block is never a revert); walk
-   it alone at the bundle's base (or, where slot 0 cannot come up there, at the next merge's place), or between its
+   clears none. Once the check of the cap did not pass, the bundle runs through the tip. While the cap of merges
+   waits, a merge turn goes only to a fix: a task that changes a path a scenario protects whose newest row failed. Each
+   row that did not pass says what comes next: walk it again once what blocked it is fixed (a block is never a
+   revert); walk it alone at the bundle's base (or, where slot 0 cannot come up there, at the oldest place newer than
+   every one it could not come up at), or between its
    suspects (the merges since its last pass whose changed paths it protects); revert the one suspect left once
    `rounds.revert_fails` walks with it in failed (one fail of a scenario that sometimes fails is no proof), which
    sends its task back to its implementer; or, when it fails at the oldest of those too, wait for its fix, which

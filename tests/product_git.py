@@ -46,11 +46,16 @@ class ProductGit:
         self._change(rel)
         return self.git("rev-parse", "HEAD")
 
-    def merge(self, rel: str) -> tuple[str, str]:
-        """A branch changing ``rel``, merged into master with --no-ff: the merge commit and the branch."""
+    def branch(self, rel: str) -> str:
+        """A branch off master changing ``rel``, not merged."""
         branch = f"impl-{self.n + 1}"
         self.git("checkout", "-q", "-b", branch)
         self._change(rel)
         self.git("checkout", "-q", "master")
+        return branch
+
+    def merge(self, rel: str) -> tuple[str, str]:
+        """A branch changing ``rel``, merged into master with --no-ff: the merge commit and the branch."""
+        branch = self.branch(rel)
         self.git("merge", "-q", "--no-ff", branch, "-m", f"Merge {branch}")
         return self.git("rev-parse", "HEAD"), branch

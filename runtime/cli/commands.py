@@ -140,7 +140,7 @@ def _queue(sub: Any) -> None:
     check.add_argument("commit")
     check.add_argument("--body", required=True)
     bundle = words.add_parser("bundle", help="the merges a check clears together, where to walk them, and what")
-    bundle.add_argument("--through", default="", help="a commit past the cap, once the check of the cap failed")
+    bundle.add_argument("--through", default="", help="a commit before the tip, past the cap once its check failed")
     task = words.add_parser("task").add_subparsers(dest="task_cmd", required=True)
     new = task.add_parser("new", help="the task's text in --body <file>")
     new.add_argument("--body", required=True)

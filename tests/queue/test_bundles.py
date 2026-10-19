@@ -168,6 +168,7 @@ def test_a_git_failure_naming_the_check_s_commit_is_refused_and_logged(
         ("fail", [("base", "blocked"), ("first", "fail")], "wait for its fix"),
         ("fail", [("base", "blocked"), ("first", "pass"), ("second", "fail")], "revert the second"),
         ("fail", [("base", "blocked"), ("first", "blocked"), ("second", "blocked")], "wait for its fix"),
+        ("fail", [("first", "blocked")], "walk it at the second"),
     ],
     ids=[
         "blocked",
@@ -180,6 +181,7 @@ def test_a_git_failure_naming_the_check_s_commit_is_refused_and_logged(
         "fails at the first it came up at",
         "passes at the first it came up at",
         "came up at none before",
+        "no older commit comes up either",
     ],
 )
 def test_a_row_that_did_not_pass_names_what_comes_next(
@@ -197,6 +199,7 @@ def test_a_row_that_did_not_pass_names_what_comes_next(
         "walk it again": {"do": "again"},
         "walk it at the base": {"do": "walk", "at": product.base},
         "walk it at the first": {"do": "walk", "at": first},
+        "walk it at the second": {"do": "walk", "at": second},
         "wait for its fix": {"do": "wait"},
         "walk it halfway": {"do": "walk", "at": first, "suspects": [one, two]},
         "walk it at the second again": {"do": "walk", "at": second, "suspects": [two]},
@@ -206,21 +209,32 @@ def test_a_row_that_did_not_pass_names_what_comes_next(
     assert told == [{"scenario": "web", "result": result, **expected}]
 
 
-def test_no_merge_turn_goes_while_the_cap_of_merges_waits_until_their_bundle_s_check_failed(
-    world: World, product: Product
+@pytest.mark.parametrize(
+    ("web", "changes", "gets_it"),
+    [("fail", "web/fix.js", True), ("fail", "api/other.py", False), ("blocked", "web/fix.js", None)],
+    ids=["a-fix-of-what-failed", "a-task-that-fixes-nothing-failed", "slot-0-could-not-come-up"],
+)
+def test_while_the_cap_of_merges_waits_a_merge_turn_goes_only_to_a_fix_of_a_scenario_their_check_failed(
+    world: World, product: Product, web: str, changes: str, gets_it: bool | None
 ) -> None:
     world.with_settings(rounds__bundle_merges=2)
     product.merge("web/page.js")
     tip, _ = product.merge("api/handlers.py")
-    ready = world.task(branch="impl-ready")
+    ready = world.task(branch=product.branch(changes))
     world.queue().write_task(dataclasses.replace(ready, status="qa-clean", run=1))
 
     with pytest.raises(Refused, match="2 merges wait for their check, the cap of 2") as refused:
         bundle.next_turn(world.ctx(), {}, None)
     assert refused.value.rule == "bundle-full"
 
-    product.check(tip, web="fail", api="pass")
-    assert bundle.next_turn(world.ctx(), {}, None)["task"] == ready.id
+    product.check(tip, web=web, api="pass" if web == "fail" else web)
+    if gets_it is None:
+        with pytest.raises(Refused, match="check their bundle first"):
+            bundle.next_turn(world.ctx(), {}, None)
+        return
+    answer = bundle.next_turn(world.ctx(), {}, None)
+    assert answer["task"] == (ready.id if gets_it else None)
+    assert gets_it or "only a fix of what their check failed (web)" in answer["message"]
 
 
 @pytest.mark.parametrize("result", ["fail", "blocked"], ids=["a-fix-joins", "slot-0-cannot-build-the-cap-s-commit"])
@@ -237,8 +251,9 @@ def test_a_bundle_grows_past_the_cap_only_once_the_check_of_the_cap_did_not_pass
     product.slot0(fix)
     assert "past the cap of 2" in product.check(fix, web="pass", api="pass")["why"]  # walked past it all the same
     product.check(capped, web=result, api="pass" if result == "fail" else result)
-    answer = bundle.show(world.ctx(), {"through": fix[:9]}, None)
-    assert [m["task"] for m in answer["merges"]] == [web, api, fixed] and answer["walk_at"] == fix
+    for args in ({"through": fix[:9]}, {}):  # unasked, it runs through the tip
+        answer = bundle.show(world.ctx(), args, None)
+        assert [m["task"] for m in answer["merges"]] == [web, api, fixed] and answer["walk_at"] == fix
 
     product.slot0(fix)
     assert product.check(fix, web="pass", api="pass")["cleared"] == [web, api, fixed]

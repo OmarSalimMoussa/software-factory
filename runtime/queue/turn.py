@@ -13,6 +13,7 @@ one.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -121,6 +122,11 @@ def released(ctx: Context, task_id: str) -> None:
 
 def next_turn(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """`factory turn next`: the turn goes to the first qa-clean task, in the one order, whose after tasks landed."""
+    return give(ctx, lambda task: True, "no qa-clean task is ready for its merge turn")
+
+
+def give(ctx: Context, fits: Callable[[Task], bool], none: str) -> dict[str, Any]:
+    """The turn to the first ready task that ``fits``; ``none`` says why none got it."""
     held = holder(ctx.places)
     if held is not None:
         raise Refused("one-turn", f"{held['task']} holds the merge turn; wait for its merge")
@@ -128,9 +134,9 @@ def next_turn(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
     found, _ = queue.tasks()
     by_id = {t.id: t for t in found}
     ready = [t for t in found if t.status == "qa-clean"
-             and all(a in by_id and by_id[a].status in tasks.LANDED for a in t.after)]  # fmt: skip
+             and all(a in by_id and by_id[a].status in tasks.LANDED for a in t.after) and fits(t)]  # fmt: skip
     if not ready:
-        return ok(task=None, message="no qa-clean task is ready for its merge turn")
+        return ok(task=None, message=none)
     task = order.ordered(ready, permits.ranking(ctx))[0]
     moved = tasks.move(ctx, task.id, TURN, "turn", statuses.ORCH, "the next merge turn")
     _tell(ctx, moved, GIVEN.format(default=ctx.settings().get_str("repo.default_branch")))

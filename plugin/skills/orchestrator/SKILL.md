@@ -126,18 +126,18 @@ is live and nothing merged for a while, a regression walk of the scenarios that 
 
 1. **Turn.** One branch at a time. When a task is `qa-clean` and no task holds the turn, `factory turn next` gives
    it to the next one by `after`, then the one order, and the warden tells its implementer. Hold the default branch
-   still until it merges. No turn goes while `rounds.bundle_merges` merges wait for their check, until the check of
-   their bundle failed: check them first.
+   still until it merges. While `rounds.bundle_merges` merges wait for their check, a turn goes only to a fix of a
+   scenario their check failed: check them first.
 2. **Merge.** When it asks, with its tree's pass: `git merge-base --is-ancestor <default branch> <branch>` must
    hold. Then two separate commands: `git merge --no-ff --no-commit <branch>`, and after it
    `git commit -m "Merge <branch>: <the outcome in one line>"`. The commit's hook lets only the branch holding the
    turn land, with the pass for its tree. The warden finds the merge and records it.
-3. **Check, in bundles,** as soon as a merge lands. `factory queue bundle` names the oldest merges waiting for their
+3. **Check, in bundles,** as soon as a merge lands, while implementers work too. `factory queue bundle` names the oldest merges waiting for their
    check, at most `rounds.bundle_merges`, the commit to walk them at, and each scenario whose `protects` names a path
    one of them changed; with none, the one that waited longest. Add the merged specs' own checks. Bring slot 0 up there,
    whole, as its answer says (`factory slot up --at <commit>` for one older than the tip). When it cannot come up there,
    as when the env that commit needs is gone, save that check with each scenario blocked and why; then `factory queue
-   bundle --through <a later commit>` takes the bundle on to one that builds. Read each scenario as slot 0 runs it, with
+   bundle` takes the bundle on to the tip. Read each scenario as slot 0 runs it, with
    `factory qa scenario <name>`: the checkout holds the tip's. Load the seeds (`factory slot seed load <name>`), do a
    set-up that writes inside a service with `factory slot run <service> -- <command>`, and stop the services a set-up
    needs down with `factory slot stop <service…>`. Start the `qa-regression` testers at once, the scenarios split
@@ -158,7 +158,7 @@ is live and nothing merged for a while, a regression walk of the scenarios that 
      `factory queue task status <task> building --note "<the row>; reverted as <the revert's sha>"`. The warden tells
      its implementer, or starts a new one once it has ended. Check the bundle again.
    - `wait`: it fails before every merge waiting. File it as a request if nothing tracks it; its fix takes the next
-     turn, and once it merges, `factory queue bundle --through <its merge>` takes it in past the cap.
+     turn, and once it merges, `factory queue bundle` takes it in past the cap.
    - `request`: no merge waits up to that commit: file it. `read`: a check of the brief's own: read its evidence.
    **Blocked** by what the merge needs and the factory cannot make, seen in this check (never copied from an earlier
    report): revert that merge the same way, then one of two:
