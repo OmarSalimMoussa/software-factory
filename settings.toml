@@ -66,7 +66,8 @@ screenshots_for_owner_only = ["qa-prod"]
 viewport_height = 900   # a tester browser's height; its width is the first of widths
 browser_permissions = ["clipboard-read", "clipboard-write"]  # what a tester browser lets every page use: a
                         # paste is walked as a person makes it
-max_steps = 6           # numbered steps a standing scenario may have; one scenario fits seconds_per_item
+max_steps = 6           # numbered steps a standing scenario may have for each item it takes (its items: label, or
+                        # one), so its walk fits its items' seconds_per_item
 prod_every_hours = 24   # the warden asks for a read-only walk of prod this long after the last one
 desktop_viewport = [1280, 800]  # a desktop tester's browser, at the desktop's own size: its screenshots are not shrunk
 wait_reload_seconds = 60  # a tester's wait reloads the page this often

@@ -50,7 +50,7 @@ class Line:
     commits: list[str]
     at: dict[str, int]  # each commit's place on the line: 0 is the tip, a larger one is older
     waiting: list[Merge]
-    standing: dict[str, tuple[str, ...]]  # the standing scenarios a tester may walk now, by what each protects
+    standing: dict[str, scenarios.Scenario]  # the standing scenarios a tester may walk now, by name
 
     def upto(self, commit: str) -> list[Merge]:
         return [m for m in self.waiting if self.at[m.commit] >= self.at[commit]]
@@ -75,13 +75,13 @@ def line(ctx: Context) -> Line:
         if task in merged and commit in at and (task not in newest or at[commit] < at[newest[task]]):
             newest[task] = commit
     order = sorted(newest, key=lambda task: -at[newest[task]])
-    standing = _standing(ctx, commits[0], settings.get_int("qa.max_steps"))
+    standing = _standing(ctx, commits[0], settings.get_int("qa.max_steps"), settings.get_int("qa.max_items"))
     changed = _changed(ctx, [newest[task] for task in order])
     waiting = []
     for task in order:
         commit = newest[task]
         later = [n for n in merge_places if n < at[commit]]
-        guards = {name for name, protects in standing.items() for path in changed[commit] if _covers(protects, path)}
+        guards = {name for name, s in standing.items() for path in changed[commit] if _covers(s.protects, path)}
         waiting.append(Merge(commit, task, commits[max(later) + 1] if later else commits[0], frozenset(guards)))
     return Line(commits, at, waiting, standing)
 
@@ -90,8 +90,8 @@ def _covers(protects: tuple[str, ...], path: str) -> bool:
     return any(path == entry.rstrip("/") or path.startswith(entry.rstrip("/") + "/") for entry in protects)
 
 
-def _standing(ctx: Context, tip: str, max_steps: int) -> dict[str, tuple[str, ...]]:
-    """Each scenario at ``tip`` a tester may walk now (none waits for what it needs), by name: what it protects."""
+def _standing(ctx: Context, tip: str, max_steps: int, max_items: int) -> dict[str, scenarios.Scenario]:
+    """Each scenario at ``tip`` a tester may walk now (none waits for what it needs), by name."""
     repo = ctx.settings().get_str("repo.path")
     argv = ["git", "-C", repo, "grep", "-n", "--full-name", "-I", "-e", "", tip, "--", f"{scenarios.FOLDER}/*.md"]
     code, out = ctx.launcher.agent_command(argv, repo)
@@ -108,10 +108,10 @@ def _standing(ctx: Context, tip: str, max_steps: int) -> dict[str, tuple[str, ..
         name = rel.removeprefix(f"{scenarios.FOLDER}/").removesuffix(".md")
         if "/" in name or name == "README":
             continue
-        scenario, said = scenarios.parse(name, "\n".join(lines) + "\n", max_steps)
+        scenario, said = scenarios.parse(name, "\n".join(lines) + "\n", max_steps, max_items)
         problems += said
         if scenario is not None and scenario.runs != "waiting":
-            found[name] = scenario.protects
+            found[name] = scenario
     if problems:
         raise Refused("scenarios", "; ".join(problems))
     return found
@@ -320,17 +320,15 @@ def show(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
             raise Refused("bundle", f"no merge waits up to {walk_at[:12]}; the oldest waiting is {oldest}")
         first = _past_cap(ctx, found, checks, members)
         if first:
-            raise Refused(
-                "bundle",
-                f"{len(members)} merges is past the cap of {cap}: a bundle grows past it only "
-                f"once the check of the first {cap}, at {first[:12]}, failed; {_NO_BUILD}",
-            )
+            grows = f"a bundle grows past it only once the check of the first {cap}, at {first[:12]}, failed"
+            raise Refused("bundle", f"{len(members)} merges is past the cap of {cap}: {grows}; {_NO_BUILD}")
     names = sorted(frozenset[str]().union(*(m.scenarios for m in members)))
+    tasks_of = {s: [m.task for m in members if s in m.scenarios] for s in names}
     answer: dict[str, Any] = {
         "merges": [{"commit": m.commit, "task": m.task} for m in members],
         "walk_at": walk_at,
         "base": found.base,
-        "scenarios": [{"name": s, "merges": [m.task for m in members if s in m.scenarios]} for s in names],
+        "scenarios": [{"name": s, "items": found.standing[s].items, "merges": tasks_of[s]} for s in names],
         "waiting": len(found.waiting),
     }
     if not names:
@@ -341,9 +339,11 @@ def show(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
         need = ctx.settings().get_int("rounds.revert_fails")
         answer["next"] = [_next(found, checks, newest, row, need) for row in newest.rows if row.result != PASS]
     up = "factory slot up" if walk_at == found.commits[0] else f"factory slot up --at {walk_at[:12]}"
+    items = sum(found.standing[s].items for s in names or [answer["walk_instead"]] if s in found.standing)
     told = f"{len(members)} of {len(found.waiting)} waiting merges: {up}, walk "
     told += f"{len(names)} scenarios" if names else f"{answer['walk_instead']}, as no scenario protects them"
-    return ok(**answer, message=told + f", then factory queue check {walk_at[:12]}")
+    told += f", then factory queue check {walk_at[:12]}; one brief for them all says Scenarios and checks: {items}"
+    return ok(**answer, message=told + ", plus one for each check it adds")
 
 
 def view(ctx: Context, args: dict[str, Any]) -> dict[str, Any]:
@@ -395,5 +395,5 @@ def _failing(found: Line, checks: list[CheckRecord], cap: int) -> dict[str, tupl
     for check in sorted(checks, key=lambda c: c.at):
         if check.commit in found.at and found.at[check.commit] <= since:
             newest |= {row.scenario: row.result for row in check.rows}
-    return {name: found.standing[name] for name, result in newest.items()
+    return {name: found.standing[name].protects for name, result in newest.items()
             if result not in (PASS, BLOCKED) and name in found.standing}  # fmt: skip

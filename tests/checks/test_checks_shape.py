@@ -83,6 +83,29 @@ def test_a_scenario_that_signs_in_as_a_named_address_needs_that_person(
     assert not [p for p in qa_scenarios.run(Repo.open(fixture_product, ["app/notes.py"]), {}) if "sign-in.md" in p]
 
 
+@pytest.mark.parametrize(
+    ("label", "steps", "said"),
+    [
+        ("", 6, []),
+        ("items: 3\n", 18, []),
+        ("items: 3\n", 19, ["19 steps; 6 at most for each of 3 item(s): split it, or raise items"]),
+        ("items: 0\n", 0, ["items '0' is not a whole number from 1 to 10", "no numbered steps"]),
+        ("items: 11\n", 0, ["items '11' is not a whole number from 1 to 10", "no numbered steps"]),
+        ("items: two\n", 0, ["items 'two' is not a whole number from 1 to 10", "no numbered steps"]),
+    ],
+    ids=["one-without-the-label", "three-hold-three-times-the-steps", "a-step-past-them", "zero", "past-qa-max-items",
+         "not-a-number"],
+)  # fmt: skip
+def test_a_scenario_takes_the_items_its_label_names_or_one_with_qa_max_steps_steps_for_each(
+    fixture_product: Path, commit: Callable[[Path, str], None], label: str, steps: int, said: list[str]
+) -> None:
+    front = f"---\nprotects: app/notes.py\nneeds: nothing\nruns: in-turn\n{label}---\n# Long\n\n"
+    _add("qa/scenarios/long.md", front + "".join(f"{n}. Go on.\n" for n in range(1, steps + 1)))(fixture_product)
+    commit(fixture_product, "a long scenario")
+    found = qa_scenarios.run(Repo.open(fixture_product), {})
+    assert [p.removeprefix("qa/scenarios/long.md: ") for p in found if "long.md" in p] == said
+
+
 def _remove(rel: str) -> Break:
     return lambda root: (root / rel).unlink()
 

@@ -135,7 +135,8 @@ erased before the factory pulled it is never filed.
 
 ## qa/scenarios
 
-One Markdown file per scenario, with three labels in front matter and at most six steps:
+One Markdown file per scenario, with three labels in front matter, an optional fourth, and at most `qa.max_steps`
+numbered steps for each item it takes:
 
 ```markdown
 ---
@@ -151,6 +152,8 @@ runs: in-turn
   starting session runs). A scenario that signs in as a named address lists a `person`.
 - `runs`: `in-turn` on the default branch, `desktop` on the slot's remote desktop, or `waiting` (never run until
   what it needs exists).
+- `items` (optional): how many of a tester's items it takes, from 1 to `qa.max_items`; without it, one. A tester's
+  time grows with its items, so a scenario with a long wait, such as a recording or a rebuild, names more.
 
 ## check-values/
 

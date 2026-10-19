@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from runtime.qa import scenarios
 from runtime.queue import formats
 from runtime.shared import store
 from runtime.shared.protocol import Refused
@@ -33,7 +34,8 @@ def _mark(ctx: Context, args: dict[str, Any], verb: str) -> tuple[str, int]:
     item, step = args.get("item"), args.get("step")
     if not isinstance(item, str) or not ITEM.match(item):
         raise Refused(verb, "name the item as your brief does: a scenario's file name or a check's short name")
-    most = ctx.settings().get_int("qa.max_steps")
+    settings = ctx.settings()
+    most = scenarios.most_steps(settings.get_int("qa.max_items"), settings.get_int("qa.max_steps"))
     if not isinstance(step, int) or isinstance(step, bool) or not 1 <= step <= most:
         raise Refused(verb, f"the step is its number in the item, from 1 to {most}")
     return item, step

@@ -20,7 +20,7 @@ HANDED = "https://app.test/auth/link/handed-in-the-transcript"
 PASSWORD = "Xk92mQp7"
 SECRET_SECONDS = 15
 STEPS = (Step("Open", "The cart opens"), Step("Pay", "The order is placed"), Step("Receipt", ""))
-SCENARIO = Scenario("cart", ("web/",), ("nothing",), "in-turn", STEPS)
+SCENARIO = Scenario("cart", ("web/",), ("nothing",), "in-turn", 1, STEPS)
 
 
 def iso(seconds: float) -> str:

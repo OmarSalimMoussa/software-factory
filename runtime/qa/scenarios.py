@@ -5,9 +5,10 @@ A scenario opens with three labels as front matter. ``protects`` names the files
 it, each of which exists. ``needs`` lists what must be set up first: ``nothing``, ``seed <name>``, ``person <role>``
 (someone the tester signs in as) or ``session setup`` (a step the starting session runs). ``runs`` says where:
 ``in-turn`` (on the default branch, in turn), ``desktop`` (on the slot's remote desktop) or ``waiting`` (never run
-until what it needs exists). Then at most ``qa.max_steps`` numbered steps, so one scenario fits one tester's time
-for an item; a waiting scenario may hold more. A step may open with a short bold name (``1. **Search.** …``) and
-holds what it expects on a line of its own (``Expect: …`` or ``Expected: …``); the replay shows both.
+until what it needs exists). An ``items`` label may say how many of a tester's items it takes, up to ``qa.max_items``;
+without it, one. Then at most ``qa.max_steps`` numbered steps for each item it takes, so its walk fits its items'
+time; a waiting scenario may hold more. A step may open with a short bold name (``1. **Search.** …``) and holds what
+it expects on a line of its own (``Expect: …`` or ``Expected: …``); the replay shows both.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from dataclasses import dataclass
 
 FOLDER = "qa/scenarios"
 LABELS = ("protects", "needs", "runs")
+ITEMS = "items"
 RUNS = ("in-turn", "desktop", "waiting")
 NEEDS = re.compile(r"^(nothing|session setup|seed [a-z0-9-]+|person [a-z0-9-]+( [a-z0-9-]+)*)$")
 _FRONT = re.compile(r"\A---\n(.*?)\n---\n", re.S)
@@ -37,6 +39,7 @@ class Scenario:
     protects: tuple[str, ...]
     needs: tuple[str, ...]
     runs: str
+    items: int
     steps: tuple[Step, ...]
 
 
@@ -65,13 +68,25 @@ def front(text: str) -> dict[str, str] | None:
     }
 
 
-def problems(rel: str, text: str, exists: set[str] | None, max_steps: int) -> list[str]:
+def items_of(meta: dict[str, str], max_items: int) -> int | None:
+    """How many of a tester's items a scenario takes: one without the label, None when the label is out of bounds."""
+    said = meta.get(ITEMS)
+    if said is None:
+        return 1
+    return int(said) if said.isdecimal() and 1 <= int(said) <= max_items else None
+
+
+def most_steps(taken: int, max_steps: int) -> int:
+    return taken * max_steps
+
+
+def problems(rel: str, text: str, exists: set[str] | None, max_steps: int, max_items: int) -> list[str]:
     """Every way the file breaks the format; ``exists`` answers whether a protected path is there (None: unknown)."""
     meta = front(text)
     if meta is None:
         return [f"{rel}: no front matter (protects, needs, runs) above the title"]
-    if set(meta) != set(LABELS):
-        return [f"{rel}: front matter has {sorted(meta)}, not protects, needs and runs"]
+    if not set(LABELS) <= set(meta) <= {*LABELS, ITEMS}:
+        return [f"{rel}: front matter has {sorted(meta)}, not protects, needs and runs, with items if it takes more"]
     out = [] if meta["protects"].split() else [f"{rel}: protects names no path"]
     if exists is not None:
         out += [
@@ -89,20 +104,25 @@ def problems(rel: str, text: str, exists: set[str] | None, max_steps: int) -> li
         out.append(f"{rel}: needs lists nothing beside other needs")
     if meta["runs"] not in RUNS:
         out.append(f"{rel}: runs {meta['runs']!r} is not one of {', '.join(RUNS)}")
-    count = len(steps_of(text))
+    return out + _size(rel, text, meta, max_steps, max_items)
+
+
+def _size(rel: str, text: str, meta: dict[str, str], max_steps: int, max_items: int) -> list[str]:
+    taken, count = items_of(meta, max_items), len(steps_of(text))
+    out = [] if taken else [f"{rel}: items {meta[ITEMS]!r} is not a whole number from 1 to {max_items}"]
     if not count:
         out.append(f"{rel}: no numbered steps")
-    elif count > max_steps and meta["runs"] != "waiting":
-        out.append(f"{rel}: {count} steps; split it, {max_steps} at most")
+    elif taken and count > most_steps(taken, max_steps) and meta["runs"] != "waiting":
+        out.append(f"{rel}: {count} steps; {max_steps} at most for each of {taken} item(s): split it, or raise items")
     return out
 
 
-def parse(name: str, text: str, max_steps: int) -> tuple[Scenario | None, list[str]]:
+def parse(name: str, text: str, max_steps: int, max_items: int) -> tuple[Scenario | None, list[str]]:
     """One scenario from its file's text, or None with every problem; whether its protected paths exist is the
     check's to say, from the checkout."""
-    found = problems(f"{FOLDER}/{name}.md", text, None, max_steps)
+    found = problems(f"{FOLDER}/{name}.md", text, None, max_steps, max_items)
     meta = front(text)
-    if found or meta is None:
+    if found or meta is None or (taken := items_of(meta, max_items)) is None:
         return None, found
     needs = tuple(need.strip() for need in meta["needs"].split(","))
-    return Scenario(name, tuple(meta["protects"].split()), needs, meta["runs"], steps_of(text)), []
+    return Scenario(name, tuple(meta["protects"].split()), needs, meta["runs"], taken, steps_of(text)), []

@@ -89,7 +89,29 @@ def test_a_bundle_is_the_oldest_waiting_merges_up_to_the_cap_walked_before_the_n
     assert [m["task"] for m in answer["merges"]] == [web, api, docs][:count]
     assert answer["walk_at"] == [revert, third][count - 2]  # a revert after the bundle's last merge is in its walk
     assert answer["base"] == older and answer["waiting"] == 3
-    assert answer["scenarios"] == [{"name": "api", "merges": [api]}, {"name": "web", "merges": [web]}]
+    assert answer["scenarios"] == [
+        {"name": "api", "items": 1, "merges": [api]},
+        {"name": "web", "items": 1, "merges": [web]},
+    ]
+
+
+@pytest.mark.parametrize(
+    ("changed", "named", "count"),
+    [(["web/page.js", "api/handlers.py"], [("api", 3), ("web", 1)], 4), (["docs/notes.md"], [], 3)],
+    ids=["the-scenarios-its-merges-touch", "the-one-walked-instead"],
+)
+def test_a_bundle_names_the_items_each_scenario_takes_and_their_sum_as_the_count_of_a_brief_of_them_all(
+    world: World, product: Product, changed: list[str], named: list[tuple[str, int]], count: int
+) -> None:
+    (world.repo / FOLDER / "api.md").write_text(f"---\n{SCENARIOS['api']}\nitems: 3\n---\n# api\n\n1. Open it.\n")
+    product.git("commit", "-q", "-am", "api takes three items")
+    for rel in changed:
+        product.merge(rel)
+
+    answer = bundle.show(world.ctx(), {}, None)
+
+    assert [(s["name"], s["items"]) for s in answer["scenarios"]] == named
+    assert f"one brief for them all says Scenarios and checks: {count}, plus one for each check" in answer["message"]
 
 
 def test_a_full_pass_of_every_scenario_a_bundle_protects_clears_every_merge_up_to_its_commit_at_once(

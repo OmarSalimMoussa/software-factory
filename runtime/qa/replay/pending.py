@@ -81,7 +81,9 @@ def inputs(ctx: Context, roots: Sequence[Path], entry: dict[str, Any], run: Path
             ["git", "-C", settings.get_str("repo.path"), "show", f"{head}:{SCENARIOS}/{name}.md"],
             settings.get_str("repo.path"),
         )
-        return parse(name, text, settings.get_int("qa.max_steps"))[0] if code == 0 else None
+        if code != 0:
+            return None
+        return parse(name, text, settings.get_int("qa.max_steps"), settings.get_int("qa.max_items"))[0]
 
     return Inputs(
         run=run,

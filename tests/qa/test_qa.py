@@ -68,7 +68,7 @@ def test_surfaces_toml_names_only_surfaces() -> None:
     ],
 )  # fmt: skip
 def test_a_scenario_keeps_the_standard_format(text: str, problem: str) -> None:
-    scenario, problems = parse("a", text, 6)
+    scenario, problems = parse("a", text, 6, 10)
     assert scenario is None and any(problem in p for p in problems)
 
 
@@ -76,7 +76,7 @@ def test_a_scenarios_steps_carry_their_names_and_the_first_thing_each_expects() 
     text = ("---\nprotects: web/a\nneeds: nothing\nruns: in-turn\n---\n# A\n1. **Open the cart.** Go to /cart.\n"
             "   Expect: the cart shows\n2. Pay.\n   - Expected: a receipt\n   Expect: not this one\n"
             "3. **Leave** it.\n")  # fmt: skip
-    scenario, problems = parse("a", text, 6)
+    scenario, problems = parse("a", text, 6, 10)
     assert problems == [] and scenario is not None
     assert scenario.steps == (Step("Open the cart", "the cart shows"), Step("", "a receipt"), Step("Leave", ""))
 
@@ -355,11 +355,23 @@ def test_a_tester_starts_an_items_step_only_once_its_earlier_step_ended_while_an
     assert [m["step"] for m in steps.of_agent(ready_world.ctx(), IMPL_ID, "ag-fn")] == [1, 1, 1, 2]
 
 
+@pytest.mark.parametrize("step", [7, 60], ids=["past-qa-max-steps", "the-steps-of-qa-max-items"])
+def test_a_step_is_marked_up_to_the_steps_a_scenario_that_takes_the_most_items_holds(
+    ready_world: World, step: int
+) -> None:
+    qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
+    ctx = ready_world.ctx("implementer", IMPL_ID, "ag-fn")
+    qa.qa_step(ctx, {"head": HEAD[:9], "item": "cart", "step": step}, None)
+    qa.qa_step_result(ctx, {"head": HEAD[:9], "item": "cart", "step": step, "result": "pass", "got": "it saved"}, None)
+
+    assert [m["step"] for m in steps.of_agent(ready_world.ctx(), IMPL_ID, "ag-fn")] == [step, step]
+
+
 @pytest.mark.parametrize(
     ("verb", "args", "says"),
     [
         ("step", {"item": "Cart page", "step": 1}, "name the item as your brief does"),
-        ("step", {"item": "cart", "step": 7}, "from 1 to 6"),
+        ("step", {"item": "cart", "step": 61}, "from 1 to 60"),
         ("step-result", {"item": "cart", "step": 1, "result": "ok", "got": "it showed"}, "pass, fail, blocked"),
         ("step-result", {"item": "cart", "step": 1, "result": "pass", "got": " "}, "--got"),
         ("finding", {"severity": "minor", "where": "/cart", "step": "cart"}, "<item>:<n>"),
