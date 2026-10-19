@@ -2,8 +2,8 @@
 
 `product-drivers`: only the UI testers drive the product, in their own browser or on the remote desktop; no session
 drives the owner's Chrome. `subagents-at-once`: a lane's browser is its first tester's while it runs.
-`qa-browser`: no code runs in the browser server itself, a browser call names no file, and a route answers what
-it catches itself.
+`qa-browser`: no code runs in the browser server itself, a browser call names no file, a route answers what it
+catches itself, and a text wait gives no `time`, which sleeps before it and is no time-out.
 `qa-evidence`: no agent opens the factory's state (the testers' recordings, screenshots and saved sign-ins) or the
 dashboard. The evidence rule reads paths and addresses, never prose: a report may name a screenshot.
 """
@@ -108,6 +108,12 @@ def _server(call: Call) -> Decision:
     # A route with neither sends the request on, past the routes that keep the owner's dashboard out of reach.
     if call.tool == BROWSER + ROUTE and call.tool_input.get("status") is None and call.tool_input.get("body") is None:
         return Refusal("qa-browser", "a route answers what it catches itself: give it the status the step asks for")
+    if call.tool == BROWSER + WAIT_FOR and "time" in call.tool_input and {"text", "textGone"} & call.tool_input.keys():
+        return Refusal(
+            "qa-browser",
+            "time sleeps its whole length before a text wait starts, and is no time-out: wait on the text alone, "
+            "which gives up after a few seconds, and wait again while it has not shown or gone",
+        )
     return None
 
 

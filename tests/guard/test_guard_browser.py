@@ -126,6 +126,20 @@ def test_a_route_answers_what_it_catches_and_never_sends_it_on(kit: Kit, asked: 
     assert (rule == "qa-browser") is refused
 
 
+@pytest.mark.parametrize(
+    ("asked", "refused"),
+    [
+        ({"textGone": "Restarting", "time": 60}, True),
+        ({"text": "Saved", "time": 5}, True),
+        ({"textGone": "Restarting"}, False),
+        ({"time": 5}, False),
+    ],
+)
+def test_a_text_wait_gives_no_time_since_time_sleeps_before_it(kit: Kit, asked: dict[str, Any], refused: bool) -> None:
+    rule = kit.rule("mcp__qa-browser__browser_wait_for", asked, **UI_TESTER)
+    assert (rule == "qa-browser") is refused
+
+
 def test_a_browser_call_that_names_a_file_is_refused_so_the_tester_reports_the_name_it_got(kit: Kit) -> None:
     asked = {"filename": "GOAL.md", "type": "png"}
     decision = kit.decide("mcp__qa-browser__browser_take_screenshot", asked, **UI_TESTER)
@@ -133,12 +147,12 @@ def test_a_browser_call_that_names_a_file_is_refused_so_the_tester_reports_the_n
 
 
 @pytest.mark.parametrize(
-    ("tool", "field", "long", "short", "unit"),
-    [("browser_wait_for", "time", 3600, 3, 1), ("browser_wait_until", "minutes", 60, 0.05, 60)],
+    ("tool", "asked", "field", "long", "short", "unit"),
+    [("browser_wait_for", {}, "time", 3600, 3, 1), ("browser_wait_until", {"text": "Ready"}, "minutes", 60, 0.05, 60)],
 )
 def test_a_browser_wait_is_cut_to_the_testers_time_left(
-    kit: Kit, tool: str, field: str, long: float, short: float, unit: int
+    kit: Kit, tool: str, asked: dict[str, Any], field: str, long: float, short: float, unit: int
 ) -> None:
-    decision = kit.decide("mcp__qa-browser__" + tool, {"text": "Ready", field: long}, **UI_TESTER)
+    decision = kit.decide("mcp__qa-browser__" + tool, {**asked, field: long}, **UI_TESTER)
     assert isinstance(decision, Rewrite) and 5 * 120 - 10 < decision.updated_input[field] * unit <= 60 + 5 * 120 - 10
-    assert kit.decide("mcp__qa-browser__" + tool, {"text": "Ready", field: short}, **UI_TESTER) is None
+    assert kit.decide("mcp__qa-browser__" + tool, {**asked, field: short}, **UI_TESTER) is None
