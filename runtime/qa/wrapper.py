@@ -66,6 +66,12 @@ class _Waiting:
     answer: dict[str, Any] = field(default_factory=dict)
 
 
+def _seconds(params: dict[str, Any]) -> bool:
+    """A wait for a time alone, which the factory's tools answer (wrapper_tools.py)."""
+    args = params.get("arguments")
+    return params.get("name") == WAIT_FOR and isinstance(args, dict) and set(args) == {"time"}
+
+
 class Proxy:
     """One session's MCP traffic: the client is the tester's session, the server is Playwright's."""
 
@@ -133,7 +139,7 @@ class Proxy:
         if method == "tools/call" and params.get("name") in HIDDEN:
             self._error(message.get("id"), f"there is no tool {params['name']}")
             return
-        if method == "tools/call" and any(t["name"] == params.get("name") for t in self._tools):
+        if method == "tools/call" and (any(t["name"] == params.get("name") for t in self._tools) or _seconds(params)):
             cancelled = self._running[str(message.get("id"))] = threading.Event()
             # A wait may last minutes: it runs on its own, so the session's other calls still pass.
             threading.Thread(target=self._factory_tool, args=(message, cancelled), daemon=True).start()

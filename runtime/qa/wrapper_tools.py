@@ -4,13 +4,13 @@
   for. The link never reaches the tester's transcript; it is kept beside the run, so the replay can scrub it.
 - ``browser_wait_until`` reloads and reads the page every ``qa.wait_reload_seconds`` until a text shows, up to a
   ceiling, in one call: a tester never polls.
+- ``browser_wait_for`` with a time alone waits here, not in the browser, whose wait needs an open page.
 - ``browser_open_desktop`` sets the browser to the desktop's size (``qa.desktop_viewport``), then opens the desktop's
   live view: a screenshot is not shrunk before the tester sees it, so a point in it is the point on the desktop.
 - ``browser_color_scheme`` shows the page in its light or dark colours: fixed code the wrapper runs in the browser
   server, whose own code tool is hidden from testers.
-- ``browser_mouse_press_xy`` clicks at a point, resting there ``qa.press_settle_ms`` first, holding the button
-  ``qa.click_hold_ms``: a remote desktop under load misses a press that comes with its move, or one as short as
-  Playwright's.
+- ``browser_mouse_press_xy`` clicks at a point, resting there ``qa.press_settle_ms`` first and holding the button
+  ``qa.click_hold_ms``: a remote desktop under load misses a press that comes with its move, or a shorter one.
 - ``browser_type_keys`` types a text as key presses into whatever has the keyboard, in one call, ``qa.key_delay_ms``
   apart: the remote desktop's view takes keys, not a field's filled value, drops keys sent faster, and reads a capital
   or a shifted symbol only with Shift held.
@@ -193,6 +193,7 @@ class Tools:
             PRESS: self._press,
             HOLD: self._hold_request,
             RELEASE: self._release_request,
+            WAIT_FOR: self._wait_seconds,
         }
         try:
             return tools[name](arguments, cancelled), False
@@ -241,6 +242,14 @@ class Tools:
             self.call("browser_navigate", {"url": found.group(1)})
             if cancelled.wait(min(self.reload_seconds, ceiling - waited)):
                 raise ToolError("the wait was cancelled")
+
+    def _wait_seconds(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
+        seconds = arguments.get("time")
+        if isinstance(seconds, bool) or not isinstance(seconds, int | float) or seconds < 0:
+            raise ToolError("give the wait's time in seconds")
+        if cancelled.wait(seconds):
+            raise ToolError("the wait was cancelled")
+        return f"Waited {seconds:g} s."
 
     def _open_desktop(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
         url = arguments.get("url")

@@ -281,12 +281,33 @@ def test_a_call_the_browser_does_not_answer_in_time_fails_and_its_late_answer_re
 
 def test_a_wait_has_its_own_time_to_answer_beside_the_browsers() -> None:
     proxy, _, to_session = _proxy()
-    proxy.from_client(_call(8, "browser_wait_for", time=30))
+    proxy.from_client(_call(8, "browser_wait_for", text="Saved", time=30))
     threading.Event().wait(0.2)
     assert to_session.getvalue() == ""
     proxy.from_server(json.dumps({"jsonrpc": "2.0", "id": 8, "result": {"content": []}}))
     assert _said(to_session) == [{"jsonrpc": "2.0", "id": 8, "result": {"content": []}}]
     proxy.close()
+
+
+def test_a_wait_for_seconds_alone_is_the_factorys_as_the_browsers_needs_an_open_page() -> None:
+    proxy, to_server, to_session = _proxy()
+    asked: list[tuple[str, dict[str, Any]]] = []
+
+    def answer(name: str, args: dict[str, Any], cancelled: threading.Event) -> tuple[str, bool]:
+        asked.append((name, args))
+        return "Waited 30 s.", False
+
+    proxy.add_tools([], answer, {})
+    proxy.from_client(_call(8, "browser_wait_for", time=30))
+    for _ in range(500):
+        if to_session.getvalue():
+            break
+        threading.Event().wait(0.01)
+    assert (asked, to_server.getvalue()) == ([("browser_wait_for", {"time": 30})], "")
+    assert _said(to_session)[0]["result"]["content"][0]["text"] == "Waited 30 s."
+    browser = Browser([])
+    assert (browser.answer("browser_wait_for", {"time": 30}), browser.calls, browser.ticks.clock) == (
+        ("Waited 30 s.", False), [], 30)  # fmt: skip
 
 
 class Ticks(threading.Event):
