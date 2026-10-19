@@ -242,10 +242,22 @@ def test_every_command_asks_for_the_verb_the_guard_reads_it_as(line: str) -> Non
     assert verb_of(["factory", *argv]) == call.verb and call.verb in VERBS
 
 
-def test_a_body_given_as_text_instead_of_a_file_says_to_write_the_file_first(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    ("body", "shown"),
+    [
+        (
+            "The save button does nothing and says nothing, " * 6,
+            "'The save button does nothing and says nothing, The save ",
+        ),
+        # The end of a worktree's path is what tells it apart, so a missing file is named whole.
+        ("/home/agent/product/.claude/worktrees/impl-t-0115/.factory/qa-ux-ab12cd/f-1.md", "/qa-ux-ab12cd/f-1.md'"),
+    ],
+    ids=["text", "a-missing-file"],
+)
+def test_a_body_that_is_no_readable_file_says_to_write_the_file_first(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], body: str, shown: str
 ) -> None:
-    text = "The save button does nothing and says nothing, " * 6
-    argv = ["qa", "finding", "--head", "abc1234", "--severity", "minor", "--where", "/notes", "--body", text]
+    argv = ["qa", "finding", "--head", "abc1234", "--severity", "minor", "--where", "/notes", "--body", body]
     assert factory.main(argv, Places.under(tmp_path)) == 2
-    assert "write the text to a file first, then name the file" in capsys.readouterr().err
+    said = capsys.readouterr().err
+    assert "write the text to a file first, then name the file" in said and shown in said

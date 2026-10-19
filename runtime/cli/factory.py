@@ -332,7 +332,9 @@ def _read(path: str) -> bytes:
     try:
         return Path(path).read_bytes()
     except OSError as exc:
-        raise CliError(f"{path[:60]!r} is not a file this can read ({exc.strerror}): write the text to a file "
+        # A file's name is shown whole, since its end tells it apart; text given in its place is cut short.
+        shown = path if not any(c.isspace() for c in path) else path[:60]
+        raise CliError(f"{shown!r} is not a file this can read ({exc.strerror}): write the text to a file "
                        "first, then name the file") from exc  # fmt: skip
 
 
