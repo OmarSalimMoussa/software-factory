@@ -143,10 +143,6 @@ def _browsers(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decis
     return None
 
 
-def _when(iso: str) -> datetime:
-    return datetime.fromisoformat(iso.replace("Z", "+00:00"))
-
-
 def _at_once(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     if call.off("subagents-at-once"):
         return None
@@ -221,7 +217,7 @@ def _qa(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     heads: dict[str, bool] = {head: False}
     for agent in calls:
         if agent.subagent_type.startswith(TESTER):
-            active = [r for r in records if _when(r["at"]) <= agent.started]
+            active = [r for r in records if datetime.fromisoformat(r["at"].replace("Z", "+00:00")) <= agent.started]
             if active and not active[-1].get(REPRODUCE):
                 started_on = str(active[-1]["head"])
                 heads[started_on] = heads.get(started_on, False) or agent.agent_id in interrupted
@@ -278,12 +274,16 @@ def _saves_spec(command: str) -> bool:
 
 
 def _with_notes(call: Call, kind: str) -> Decision:
-    """A brief gains the note on calling factory if its kind may, and ends with the note on reflecting if it may."""
+    """A brief gains the note on calling factory if its kind may, the note on reflecting if it may, and a tester's
+    brief ends with the time the guard holds it to."""
     names = [name for name, may in (("factory-calls.md", any(kind in v.kinds for v in VERBS.values())),
                                     ("self-reflect.md", kind in VERBS["reflect"].kinds)) if may]  # fmt: skip
     prompt = str(call.tool_input.get("prompt", ""))
-    notes = [n for n in ((call.places.plugin / name).read_text(encoding="utf-8").strip() for name in names)
-             if n not in prompt]  # fmt: skip
+    texts = [(call.places.plugin / name).read_text(encoding="utf-8").strip() for name in names]
+    if kind.startswith(TESTER) and not call.off("tester-brief"):
+        items = transcript.declared_items(prompt, call.settings.get_int("qa.max_items"))
+        texts.append(lanes.time_note(call.settings, items))
+    notes = [n for n in texts if n not in prompt]
     if not notes:
         return None
     return Rewrite({**call.tool_input, "prompt": "\n\n".join([prompt.rstrip(), *notes]) + "\n"})

@@ -509,9 +509,7 @@ def test_a_brief_carries_the_notes_on_calling_factory_and_reflecting_exactly_whe
     kit.session(role, worktree=where)
     kit.switch_off("qa-ready")
     decision = kit.decide("Agent", _agent(kind))
-    noted = isinstance(decision, Rewrite) and decision.updated_input["prompt"].endswith(
-        "Write to SELF_REFLECT.md when a miss got past you.\n"
-    )
+    noted = isinstance(decision, Rewrite) and "Write to SELF_REFLECT.md" in decision.updated_input["prompt"]
     assert noted is may
     told = isinstance(decision, Rewrite) and "Run factory on its own." in decision.updated_input["prompt"]
     assert told is may
@@ -521,6 +519,26 @@ def test_a_brief_carries_the_notes_on_calling_factory_and_reflecting_exactly_whe
     kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
     reflect = kit.bash('factory reflect --kind friction "x"', cwd=str(where), agent_id=TESTER_ID, agent_type=kind)
     assert (reflect is None) is may
+
+
+@pytest.mark.parametrize(
+    ("role", "kind", "timed"), [("implementer", "qa-backend", True), ("designer", "critic-ux", False)]
+)
+def test_a_testers_brief_ends_with_the_time_the_guard_holds_it_to(
+    tmp_path: Path, role: str, kind: str, timed: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session(role, worktree=kit.worktree)
+    kit.switch_off("qa-ready")
+    kit.settings(qa__setup_seconds=60, qa__seconds_per_item=420)
+    brief = "Scenarios and checks: 3\nYou may spend up to about 25 minutes."
+
+    decision = kit.decide("Agent", _agent(kind, brief))
+
+    assert isinstance(decision, Rewrite)
+    last = decision.updated_input["prompt"].rstrip().splitlines()[-1]
+    assert last.startswith("Your time, set by the factory: 1320 s from your start") is timed
+    assert kit.decide("Agent", decision.updated_input) is None
 
 
 def test_intakes_time_runs_out_and_then_only_factory_and_its_hand_back_go(tmp_path: Path) -> None:

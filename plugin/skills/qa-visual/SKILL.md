@@ -14,7 +14,7 @@ what looks wrong, where, and how it should look instead. `GOAL.md` ("How it look
 
 - **First, run `factory ready-check`.** It says whether your implementer recorded every slice and its slot runs
   that build, and names the head. If it answers "not ready", report that line as your whole result and stop.
-- **Your time.** Your brief's `Scenarios and checks: N` line sets it, and the brief says how long each item gets. When
+- **Your time.** Your brief's `Scenarios and checks: N` line sets it, and the brief ends with the factory's time. When
   an item's time passes, mark it `timed out` with what you saw and go on. The guard cuts your commands to the time left
   and, once it is spent, lets only your report through: your finding files, `factory qa step-result`, `factory qa
   finding`, `factory qa result`, `factory reflect` and your hand-back.

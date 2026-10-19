@@ -55,6 +55,16 @@ def tester_seconds(settings: Settings, items: int) -> int:
     return settings.get_int("qa.setup_seconds") + items * settings.get_int("qa.seconds_per_item")
 
 
+def time_note(settings: Settings, items: int) -> str:
+    """The line the guard ends a tester's brief with, so a time its writer named does not stand for the one held."""
+    setup, each = settings.get_int("qa.setup_seconds"), settings.get_int("qa.seconds_per_item")
+    return (
+        f"Your time, set by the factory: {tester_seconds(settings, items)} s from your start, {setup} s to set up "
+        f"and {each} s for each of your {items} items. After it the factory lets only your report through, whatever "
+        "else this brief says of time."
+    )
+
+
 def holders(rows: Iterable[R], settings: Settings, now: datetime) -> list[R]:
     """The browser testers holding a place: working under a live session, and younger than any tester may last, since
     none outlasts its items' time, a desktop's start and a lost hand-back's quiet."""
