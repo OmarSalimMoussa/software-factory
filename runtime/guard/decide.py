@@ -228,8 +228,8 @@ def check_stop(call: Call) -> Decision:
     """No session goes idle with nothing to wake it. The orchestrator keeps its wait for the warden's events in the
     background; a stop the hook already turned back once is let through, so the refusal names the whole remedy. An
     implementer or designer at work keeps a subagent running, has told the orchestrator since its last prompt, or
-    waits for the merge turn or merge check the warden tells it of, since no one else answers its chat: turned back
-    every time, as it can always send that message."""
+    waits for the merge turn or merge check the warden tells it of, or for an upgrade's resume, since no one else
+    answers its chat: turned back every time, as it can always send that message."""
     if call.in_subagent:
         return None
     if call.role in (IMPLEMENTER, DESIGNER):
@@ -263,7 +263,7 @@ def _waker(call: Call) -> Decision:
     if reports or transcript.messaged_since_prompt(call.transcript, ORCHESTRATOR) or _turn_comes(call):
         return None
     # The warden tells a session waiting for a browser place once one frees (runtime/warden/sessions/browser_waits.py).
-    if call.session.id in lanes.line(call.places)[0]:
+    if call.session.id in lanes.line(call.places)[0] or walk_hold.upgrading(call):
         return None
     return Refusal(
         "no-waker",

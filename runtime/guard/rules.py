@@ -54,5 +54,5 @@ RULES: dict[str, str] = {
     "inbox-wait": "the orchestrator going idle without `factory inbox --wait` in the background",
     "no-waker": "an implementer or designer ending its turn with nothing to wake it: no subagent of its own running, "
     "no message to the orchestrator since its last prompt, no task waiting QA clean for its merge turn or merged for "
-    "its merge check, and no wait for a browser place",
+    "its merge check, no wait for a browser place, and no upgrade holding testers",
 }

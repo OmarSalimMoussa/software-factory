@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +14,7 @@ from guard_kit import NOW, SID, TESTER_ID, Kit
 
 from runtime.guard import decide, transcript
 from runtime.guard.facts import Refusal
-from runtime.shared import lanes
+from runtime.shared import lanes, store
 from runtime.shared.models import PENDING
 
 
@@ -259,6 +260,26 @@ def test_an_implementer_waiting_for_a_browser_place_may_stop_as_the_warden_tells
     kit.session("implementer")
     kit.transcript([_PROMPT])
     lanes.write_line(kit.places, waiting, told)
+    payload = {"hook_event_name": "Stop", "session_id": SID, "stop_hook_active": False, "cwd": str(kit.worktree),
+               "transcript_path": str(kit.session_transcript)}  # fmt: skip
+    call = decide.resolve(payload, kit.places, NOW, kit.home)
+    assert call is not None
+    decision = decide.check_stop(call)
+    assert (isinstance(decision, Refusal) and decision.rule == "no-waker") is refused
+
+
+@pytest.mark.parametrize(
+    ("minutes", "refused"), [(10, False), (-1, True), (None, True)],
+    ids=["an-upgrade-holds-testers", "the-hold-ran-out", "no-upgrade"],
+)  # fmt: skip
+def test_an_implementer_an_upgrade_keeps_from_its_tester_may_stop_as_the_resume_wakes_it(
+    tmp_path: Path, minutes: int | None, refused: bool
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.transcript([_PROMPT])
+    if minutes is not None:
+        store.write_json(kit.places.upgrade_hold, {"until": (NOW + timedelta(minutes=minutes)).isoformat()})
     payload = {"hook_event_name": "Stop", "session_id": SID, "stop_hook_active": False, "cwd": str(kit.worktree),
                "transcript_path": str(kit.session_transcript)}  # fmt: skip
     call = decide.resolve(payload, kit.places, NOW, kit.home)

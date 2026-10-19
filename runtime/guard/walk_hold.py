@@ -72,14 +72,19 @@ def check(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
 
 
 def _upgrade(call: Call, kind: str) -> Decision:
-    until = _held_until(call.places)
-    if not kind.startswith(TESTER) or call.off(UPGRADE) or until is None or until <= call.now:
+    if not kind.startswith(TESTER) or call.off(UPGRADE) or not upgrading(call):
         return None
     return Refusal(
         "upgrade-hold",
         f"the factory is about to upgrade, so new testers wait: do other work or end your turn, and start the {kind} "
         "once the factory is back",
     )
+
+
+def upgrading(call: Call) -> bool:
+    """Whether an upgrade holds new testers: its pause benches every session, and the resume wakes each."""
+    until = _held_until(call.places)
+    return until is not None and until > call.now
 
 
 def _held_until(places: Places) -> datetime | None:
