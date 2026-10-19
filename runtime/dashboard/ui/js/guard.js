@@ -5,6 +5,7 @@ PAGE.guard = {
   url: () => '/api/guard',
   render: env => `<div class="page-h"><div><h1>Guard</h1></div></div>
     ${part(env, 'vitals', v => `<div class="gauges ${env.parts.docker ? 'six' : ''}">${v.map(gauge).join('')}${dockerCard(env.parts.docker)}</div>`)}
+    <section class="section"><div class="sec-h"><div class="label">Merge checks</div></div>${part(env, 'merges', m => `<div class="gauges ${env.parts.docker ? 'six' : ''}">${gauge(m)}</div>`)}</section>
     <section class="section"><div class="sec-h"><div class="label">Slots</div></div>${part(env, 'slots', s => s.length ? `<div class="slots-row">${s.map(slotCard).join('')}</div>` : '<div class="card empty">No slot is set up.</div>')}</section>
     <section class="section"><div class="sec-h"><div class="label">Most refusals today</div></div>${part(env, 'refusals', refusalBars)}</section>
     <section class="section"><div class="sec-h"><div class="label">Rules</div></div>${part(env, 'rules', rs => `<div class="rules">${rs.map(ruleCard).join('')}</div>`)}</section>`

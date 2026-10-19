@@ -5,6 +5,10 @@ unknown is treated as amber, never as fine. A machine with no battery listed, a 
 The permits read vitals.json: red blocks every start; amber blocks all but severe work. The published copy carries
 the CPU use too, which holds back new walks (runtime/guard/walk_hold.py). Readers take the kernel's folders as
 arguments, so tests feed samples.
+
+Beside the machine's readings, and never part of its level, the record lists the merges waiting for their check
+(runtime/queue/bundle.py): amber once rounds.bundle_merges wait or the oldest passed vitals.merge_wait_amber_hours.
+Counted in, an amber there would hold back the very fixes and implementers that clear those merges.
 """
 
 from __future__ import annotations
@@ -17,8 +21,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from runtime.queue import formats, tasks, turn
+from runtime.queue.book import Queue
 from runtime.shared import store
 from runtime.shared.paths import AGENT_USER, SLICE, Places
+from runtime.shared.protocol import Refused
 from runtime.shared.settings import Settings
 from runtime.warden import gc, public
 from runtime.warden.context import Context
@@ -45,8 +52,16 @@ class Reading:
     whole: float | None = None  # what the figure is a part of: the disk's size in GiB
 
 
+@dataclass(frozen=True, slots=True)
+class Merges:
+    level: str  # green, amber or unknown; never red
+    value: str  # in words, for factory status
+    waiting: int | None  # None while the queue cannot be read
+    oldest_hours: float | None  # None with none waiting, or while the queue cannot be read
+
+
 def worst(readings: list[Reading]) -> str:
-    """The machine's level: the worst reading's."""
+    """The machine's level: the worst reading's. Only the machine's readings go in, never the merges'."""
     return max((r.level for r in readings), key=LEVELS.index, default=GREEN)
 
 
@@ -270,6 +285,46 @@ def blind(places: Places) -> bool:
     return any(r.get("level") == RED for r in found)
 
 
+# By checkout, its tasks' stamps and when each merged task last merged: the tasks are read again only when one moved.
+_MERGED: dict[str, tuple[dict[str, tuple[int, int, int]], list[float]]] = {}
+
+
+def _merge_times(queue: Queue) -> list[float]:
+    stamps = queue.files.stamps("tasks")
+    seen = _MERGED.get(str(queue.files.repo))
+    if seen is not None and seen[0] == stamps:
+        return seen[1]
+    found, broken = queue.tasks()
+    problems = [f"{b.file} cannot be read" for b in broken]
+    times = []
+    for task in (t for t in found if t.status == turn.MERGED):
+        last = tasks.last_merge(queue.read_log(task.id))
+        if last is None:
+            problems.append(f"{task.id} is merged, but its log names no merge")
+        else:
+            times.append(formats.epoch(last["at"]))
+    formats.raise_all(problems, "")
+    _MERGED[str(queue.files.repo)] = (stamps, times)
+    return times
+
+
+def merges(ctx: Context, settings: Settings) -> Merges:
+    """How many merges wait for their check, and how long the oldest has, from each one's newest merge line."""
+    try:
+        times = _merge_times(Queue.of(ctx))
+    # telemetry: surfaced — the `Merges` reading is unknown, naming why
+    except (OSError, ValueError, Refused) as exc:
+        return Merges(UNKNOWN, f"cannot read the queue: {exc}", None, None)
+    if not times:
+        return Merges(GREEN, "none waits for its check", 0, None)
+    cap, limit = settings.get_int("rounds.bundle_merges"), settings.get_int("vitals.merge_wait_amber_hours")
+    hours = (ctx.clock.now() - min(times)) / 3600
+    over = ([f"{cap} or more wait"] if len(times) >= cap else []) + ([f"past {limit} h"] if hours > limit else [])
+    said = f"{len(times)} waiting for {'its' if len(times) == 1 else 'their'} check, the oldest for {hours:.1f} h"
+    level = AMBER if over else GREEN
+    return Merges(level, f"{said}: {' and '.join(over)}" if over else said, len(times), round(hours, 1))
+
+
 def _text(path: Path) -> str:
     try:
         return path.read_text()
@@ -289,7 +344,8 @@ def _cpu(ctx: Context, proc: Path, cgroups: Path, settings: Settings) -> Reading
 def refresh(
     ctx: Context, proc: Path = PROC, supplies: Path = POWER, cgroups: Path = cpu_budget.CGROUPS
 ) -> dict[str, Any]:
-    """Read every vital and write vitals.json for the permits, the dashboard and the status."""
+    """Read every vital and write vitals.json for the permits, the dashboard and the status. The level and why are
+    the machine's readings' alone: the merges waiting are listed beside them, and left out."""
     settings = ctx.settings()
     cpu_use = _cpu(ctx, proc, cgroups, settings)
     cleanup = gc.problem(gc.record(ctx.places), ctx.clock.now(), settings)
@@ -305,7 +361,13 @@ def refresh(
         firewall(ctx.places.firewall_stamp, ctx.clock.now(), settings),
     ]
     level, said, at = worst(readings), why(readings), ctx.clock.iso()
-    snapshot = {"at": at, "level": level, "why": said, "readings": [asdict(r) for r in readings]}
+    snapshot = {
+        "at": at,
+        "level": level,
+        "why": said,
+        "readings": [asdict(r) for r in readings],
+        "merges": asdict(merges(ctx, settings)),
+    }
     store.write_json(ctx.places.vitals, snapshot)
     public.write_vitals(ctx.places, level, said, cpu_use.figure, at)
     return snapshot

@@ -319,6 +319,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("vitals.firewall_stale_seconds", "Firewall last loaded longer ago than this turns red, seconds"),
             ("vitals.disk_amber_gib", "Free disk that turns amber, GiB"),
             ("vitals.disk_red_gib", "Free disk that turns red, GiB"),
+            ("vitals.merge_wait_amber_hours", "A merge waiting longer for its check turns amber, hours"),
         ],
     ),
     (

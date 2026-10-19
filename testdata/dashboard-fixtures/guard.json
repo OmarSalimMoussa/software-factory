@@ -36,6 +36,13 @@
    "hint": null
   }
  ],
+ "merges": {
+  "label": "Waiting",
+  "value": "2",
+  "pct": 40,
+  "tone": "good",
+  "hint": "2 waiting for their check, the oldest for 1.5 h."
+ },
  "slots": [
   {
    "n": 0,

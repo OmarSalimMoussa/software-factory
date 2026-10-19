@@ -498,6 +498,37 @@ def test_power_reads_mains_only_when_the_reading_has_no_charge(
     assert [r["value"] for r in rows if r["label"] == "Power"] == [guard]
 
 
+UNREAD = "cannot read the queue: tasks/t-0099.md cannot be read"
+
+
+@pytest.mark.parametrize(
+    ("merges", "shown"),
+    [
+        ({"level": "amber", "value": "34 waiting for their check, the oldest for 52.0 h: 5 or more wait and past 6 h",
+          "waiting": 34, "oldest_hours": 52.0},
+         ("34", 100, "warn", "34 waiting for their check, the oldest for 52.0 h: 5 or more wait and past 6 h.")),
+        ({"level": "unknown", "value": UNREAD, "waiting": None, "oldest_hours": None},
+         ("unknown", None, "", f"Unknown: {UNREAD}.")),
+        (None, ("unknown", None, "", "Unknown: the vitals are not read yet.")),
+    ],
+    ids=["amber", "queue-unread", "vitals-unread"],
+)  # fmt: skip
+def test_the_merges_waiting_show_beside_the_vitals_in_a_tone_of_their_own(
+    rig: Rig, merges: dict[str, object] | None, shown: tuple[object, ...]
+) -> None:
+    vitals = store.read_json(rig.places.vitals)
+    if merges is None:
+        rig.places.vitals.unlink()
+    else:
+        store.write_json(rig.places.vitals, {**vitals, "merges": merges})
+
+    laptop = rig.parts("/api/home")["envs"]["data"]["laptop"]
+    gauge = rig.parts("/api/guard")["merges"]["data"]
+
+    assert [(m["value"], m["pct"], m["tone"], m["hint"]) for m in (laptop["merges"], gauge)] == [shown, shown]
+    assert laptop["label"] == ("unknown" if merges is None else "healthy")  # the laptop's own level, as it was
+
+
 SIZES = "Agents' worktrees 23.0 GiB, Docker {docker}, QA recordings 2.0 GiB, transcripts 1.0 GiB, measured 2 h ago."
 MEASURED, NEXT = SIZES.format(docker="38.0 GiB"), " The next clean-up is in 4 h 0 min."
 NOT_YET = "What fills the disk is not measured yet: the clean-up measures it every 6 h."

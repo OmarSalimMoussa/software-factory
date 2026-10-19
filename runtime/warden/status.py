@@ -7,7 +7,7 @@ from typing import Any
 
 from runtime.chat import pull
 from runtime.queue import proposals, reports
-from runtime.shared import models
+from runtime.shared import models, store
 from runtime.slots import leases
 from runtime.warden import schedule
 from runtime.warden.context import Context
@@ -32,6 +32,8 @@ def status(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
         slots.append({"slot": n, "holder": lease.holder if lease else None, "since": lease.since if lease else None})
     found = proposals.read(ctx.places)
     return {
+        # The last vitals read, None before the first: the machine's level, and the merges waiting listed beside it.
+        "vitals": store.read_json_or(ctx.places.vitals, None),
         "sessions": rows,
         "slots": slots,
         # The proposal places on Home (None: being chosen; "none": nothing else worth proposing), and the approved

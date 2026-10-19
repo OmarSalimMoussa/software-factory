@@ -57,6 +57,8 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    parked; the orchestrator may release a hold whose task cannot pass soon, and it then no longer waits for it. A fix
    the merge carried for what every task shares, such as a build or ignore file, is applied again right after the
    revert, in one commit of its own; one that no longer applies cleanly becomes a request.
+   The merges waiting show beside the vitals: amber once `rounds.bundle_merges` wait or the oldest has waited past
+   `vitals.merge_wait_amber_hours`. Unlike the vitals, they never hold back a start.
 10. **Staging** is slot 0: after each check it comes back up at the default branch's tip, so it runs the newest
     merge. The warden mirrors the default branch to GitHub; no agent pushes, asks for a push or waits on one.
 11. **Prod.** Only the owner pushes to prod, from the dashboard, at exactly the commit staging runs, once every merge

@@ -152,6 +152,7 @@ SCHEMA: dict[str, Spec] = {
     "vitals.firewall_stale_seconds": Spec("int", 30, 3600),
     "vitals.disk_amber_gib": Spec("int", 1, 100000),
     "vitals.disk_red_gib": Spec("int", 1, 100000),
+    "vitals.merge_wait_amber_hours": Spec("int", 1, 168),
     "watch.tick_seconds": Spec("int", 5, 120),
     "watch.probe_seconds": Spec("int", 15, 600, when=AT_INSTALL),
     "watch.outage_after": Spec("int", 2, 5),

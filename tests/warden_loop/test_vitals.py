@@ -1,4 +1,5 @@
-"""The machine's vitals as the permits read them: a wall that stopped loading blocks every start."""
+"""The machine's vitals as the permits read them: a wall that stopped loading blocks every start. The merges waiting for
+their check are listed beside them, and never block one."""
 
 from __future__ import annotations
 
@@ -7,10 +8,15 @@ import os
 from pathlib import Path
 
 import pytest
-from loop_fakes import World
+from loop_fakes import World, kernel
 
+from runtime.guard.facts import read_vitals
+from runtime.queue import formats
+from runtime.queue.book import Queue
+from runtime.shared.models import Task
+from runtime.warden import snapshot, status
 from runtime.warden.health import vitals
-from runtime.warden.sessions import backstop
+from runtime.warden.sessions import backstop, permits
 
 
 @pytest.mark.parametrize(
@@ -138,3 +144,73 @@ def test_a_claude_session_with_no_record_the_warden_reads_is_red(tmp_path: Path)
     _process(proc, 105, ["/usr/local/libexec/software-factory/claude", "--bg"], old)
 
     assert backstop.unseen(folder, proc, os.getuid(), 60) == [105]
+
+
+def _merged(world: World, merges: list[tuple[float, ...]], status_now: str = "merged") -> None:
+    """A task at ``status_now`` for each entry of ``merges``: the hours ago it merged, oldest first."""
+    folder = world.checkout / "queue" / "tasks"
+    folder.mkdir(mode=0o755, exist_ok=True)
+    folder.chmod(0o755)
+    queue, now = Queue.of(world.ctx), world.clock.now()
+    for ages in merges:
+        task_id = f"t-{len(list(folder.glob('*.md'))) + 1:04d}"
+        task = Task(id=task_id, title="A change", requests=["r-2026-10-09-0001"], goal_item="G1", severity="major",
+                    surfaces=["api"], status=status_now, created="2026-10-09T00:00:00Z", body="Change it.", run=1,
+                    slices=1)  # fmt: skip
+        (folder / f"{task_id}.md").write_text(formats.dump_task(task))
+        for age in ages:
+            moved = {"from": "turn", "to": "merged", "commit": "a" * 40}
+            queue.log(task_id, formats.iso(now - age * 3600), "warden", "merged", "merged", **moved)
+
+
+@pytest.mark.parametrize(
+    ("merges", "breaks", "level", "waiting", "oldest"),
+    [
+        ([], None, vitals.GREEN, 0, None),
+        ([(2,), (1,)], None, vitals.GREEN, 2, 2.0),
+        ([(30, 1)], None, vitals.GREEN, 1, 1.0),  # merged again after a revert: it waits by its newest merge
+        ([(1,)] * 5, None, vitals.AMBER, 5, 1.0),
+        ([(7,)], None, vitals.AMBER, 1, 7.0),
+        ([(7,)], "queue", vitals.UNKNOWN, None, None),
+        ([(1,)], "task", vitals.UNKNOWN, None, None),
+    ],
+    ids=["none", "under-both", "merged-again", "at-the-cap", "past-the-hours", "unsafe-queue", "unreadable-task"],
+)
+def test_the_merges_waiting_turn_amber_at_the_cap_or_past_the_hours_and_unknown_on_a_queue_it_cannot_read(
+    world: World,
+    tmp_path: Path,
+    merges: list[tuple[float, ...]],
+    breaks: str | None,
+    level: str,
+    waiting: int | None,
+    oldest: float | None,
+) -> None:
+    _merged(world, [(50,)], status_now="checked")  # its check passed: it waits no more
+    _merged(world, merges)
+    if breaks == "queue":
+        (world.checkout / "queue").chmod(0o777)
+    if breaks == "task":
+        (world.checkout / "queue" / "tasks" / "t-0099.md").write_text("not a task\n")
+
+    found = vitals.refresh(world.ctx, *kernel(tmp_path))["merges"]
+
+    assert (found["level"], found["waiting"], found["oldest_hours"]) == (level, waiting, oldest), found["value"]
+    assert found["value"].startswith("cannot read the queue: ") == (level == vitals.UNKNOWN)
+    assert status.status(world.ctx, {}, None)["vitals"]["merges"] == found
+    assert snapshot.snapshot(world.ctx, {"want": ["vitals"]}, None)["state"]["vitals"]["reading"]["merges"] == found
+
+
+def test_amber_merges_leave_the_machines_level_green_and_starts_still_go(
+    world: World, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("disk", "install", "hooks", "daemon", "records", "firewall"):
+        monkeypatch.setattr(vitals, name, lambda *args, n=name: vitals.Reading(n, vitals.GREEN, "fine"))
+    _merged(world, [(52,)] * 34)
+
+    found = vitals.refresh(world.ctx, *kernel(tmp_path))
+
+    assert found["merges"]["level"] == vitals.AMBER
+    assert (found["level"], found["why"]) == (vitals.GREEN, "")
+    assert read_vitals(world.ctx.places).level == vitals.GREEN
+    assert permits.vitals_level(world.ctx) == (vitals.GREEN, "")
+    permits.check_vitals(world.ctx, severe=False)  # no refusal: the work that clears the merges may start

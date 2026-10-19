@@ -41,7 +41,7 @@ or from `/opt/software-factory`.
 
 ## Start
 
-1. Plug the laptop in and run `factory status`: the vitals, the sessions and both environments.
+1. Plug the laptop in and run `factory status`: the vitals, the merges waiting, the sessions and both environments.
 2. Start the orchestrator from the dashboard's Agents page, or with `factory start orchestrator`.
 
 ## Every day
@@ -151,12 +151,11 @@ back to the account before and says why. Then it brings back every other agent t
 left off. You see each step as it runs. Until the daemon is back, no agent starts; while a merge is in its last turn,
 or another switch runs, a switch waits. The active account is the one whose token the agents' Claude holds.
 
-Add an account with Add and switch on the same page, which switches to it at once, or with
-`factory account add <name>`, which asks for the token
-that `claude setup-token` prints without showing it. `factory account list` shows every account and marks the active
-one. `factory account remove <name>` forgets an account the agents do not use. The factory never shows a token again,
-only its last four characters. Only you can do any of this: these commands reach the warden on the dashboard's own
-socket, which answers your user alone.
+Add an account with Add and switch on the same page, which switches to it at once, or with `factory account add <name>`,
+which asks for the token that `claude setup-token` prints without showing it. `factory account list` shows every account
+and marks the active one. `factory account remove <name>` forgets an account the agents do not use. The factory never
+shows a token again, only its last four characters. Only you can do any of this: these commands reach the warden on the
+dashboard's own socket, which answers your user alone.
 
 The install asks for the first account's token and a name for it (`main` if you press Enter). An install from before
 accounts keeps its one token as the account `main`.
@@ -197,4 +196,5 @@ The factory never changes itself: Claude or the owner changes it. Read Self-refl
 - **The warden unreachable:** the dashboard keeps its last known state, marked old, and refuses every change until
   the warden answers. Check its service on the laptop.
 - **Vitals red:** nothing starts until memory, CPU, disk or power recover, or the install hash matches an upgrade.
+- **Merges amber:** too many merges wait for their check, or too long. Unlike the vitals, it stops no start.
 - **The server stops answering under load:** its host has held it down. Restart it from the host's panel, then pause.

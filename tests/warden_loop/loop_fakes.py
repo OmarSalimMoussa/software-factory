@@ -10,6 +10,7 @@ from typing import Any
 
 from runtime.shared import store
 from runtime.warden.context import Clock, Context, StackResult
+from runtime.warden.health import cpu_budget
 from runtime.warden.health.probes import Answer
 
 
@@ -63,6 +64,20 @@ class World:
     events: list[tuple[str, dict[str, Any]]]
     checkout: Path
     launcher: FakeStack
+
+
+def kernel(tmp_path: Path) -> tuple[Path, Path, Path]:
+    proc, power, cgroups = tmp_path / "proc", tmp_path / "power" / "AC", tmp_path / "cgroup"
+    proc.mkdir(parents=True, exist_ok=True)
+    (proc / "meminfo").write_text("MemAvailable:   16000000 kB\n")
+    (proc / "stat").write_text("cpu  300 0 100 9600 0 0 0 0 0 0\ncpu0 300 0 100 9600 0 0 0 0 0 0\n")
+    cgroup = cpu_budget.slice_dir(cgroups)
+    cgroup.mkdir(parents=True, exist_ok=True)
+    (cgroup / "cpu.stat").write_text("usage_usec 1000000\n")
+    power.mkdir(parents=True, exist_ok=True)
+    (power / "type").write_text("Mains\n")
+    (power / "online").write_text("1\n")
+    return proc, power.parent, cgroups
 
 
 def answers(*replies: Answer | Exception) -> Callable[[str, float], Answer]:

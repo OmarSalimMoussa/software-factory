@@ -90,7 +90,14 @@
      "pct": 42,
      "value": "42%"
     }
-   ]
+   ],
+   "merges": {
+    "label": "Merges",
+    "value": "2",
+    "pct": 40,
+    "tone": "good",
+    "hint": "2 waiting for their check, the oldest for 1.5 h."
+   }
   }
  }
 }

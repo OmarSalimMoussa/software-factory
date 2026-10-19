@@ -6,7 +6,19 @@ import html
 from typing import Any
 
 from runtime.dashboard.views import messaging
-from runtime.dashboard.views.kit import Parts, Query, Snap, clock, epoch, iso, model_word, plural, span, when
+from runtime.dashboard.views.kit import (
+    LEVEL_TONES,
+    Parts,
+    Query,
+    Snap,
+    clock,
+    epoch,
+    iso,
+    model_word,
+    plural,
+    span,
+    when,
+)
 from runtime.dashboard.views.shell import STATE_COLOR, github_url, health, prod_runs_staging
 from runtime.dashboard.views.tasks import proposals
 from runtime.dashboard.views.words import agentwords, taskwords
@@ -74,10 +86,10 @@ def env_card(snap: Snap, env: str) -> dict[str, Any]:
 
 
 def laptop(snap: Snap) -> dict[str, Any]:
-    vitals = snap.get("vitals")["reading"]
+    vitals, merges = snap.get("vitals")["reading"], {"label": "Merges", **merges_waiting(snap)}
     if vitals is None:
         rows = [{"label": label, "pct": None, "value": "unknown"} for label in ("Memory", "CPU", "Power", "Disk")]
-        return {"state": "amber", "tone": "warn", "label": "unknown", "rows": rows}
+        return {"state": "amber", "tone": "warn", "label": "unknown", "rows": rows, "merges": merges}
     readings = {r["name"]: r for r in vitals["readings"]}
     state, label, tone = _LAPTOP[vitals["level"]]
     cpu, power = readings["cpu"], readings["power"]
@@ -101,6 +113,24 @@ def laptop(snap: Snap) -> dict[str, Any]:
             },
             {"label": "Disk", "pct": disk_used, "value": "unknown" if disk_used is None else f"{disk_used}%"},
         ],
+        "merges": merges,
+    }
+
+
+def merges_waiting(snap: Snap) -> dict[str, Any]:
+    """The merges waiting for their check, listed beside the machine's vitals: its tone is its own, never the
+    machine's level."""
+    vitals = snap.get("vitals")["reading"]
+    found = None if vitals is None else vitals["merges"]
+    if found is None or found["waiting"] is None:
+        why = "the vitals are not read yet" if found is None else found["value"]
+        return {"value": "unknown", "pct": None, "tone": "", "hint": f"Unknown: {why}."}
+    cap = snap.settings.get_int("rounds.bundle_merges")
+    return {
+        "value": str(found["waiting"]),
+        "pct": min(100, round(found["waiting"] / cap * 100)),
+        "tone": LEVEL_TONES[found["level"]],
+        "hint": found["value"][:1].upper() + found["value"][1:] + ".",
     }
 
 

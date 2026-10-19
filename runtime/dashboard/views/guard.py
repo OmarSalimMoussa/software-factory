@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from runtime.dashboard.views.home import disk_free, memory_free, on_mains
-from runtime.dashboard.views.kit import Parts, Query, Snap, ago, epoch, span
+from runtime.dashboard.views.home import disk_free, memory_free, merges_waiting, on_mains
+from runtime.dashboard.views.kit import LEVEL_TONES, Parts, Query, Snap, ago, epoch, span
 from runtime.dashboard.views.words import agentwords
 from runtime.shared.models import RETIRED
 
 WANTS = ("settings", "vitals", "slots", "sessions", "queue", "refusals", "rules", "gc")
-_TONES = {"green": "good", "amber": "warn", "red": "bad", "unknown": ""}
 _GIB = 1024**3
 _KINDS = (("worktrees", "Agents' worktrees"), ("docker", "Docker"), ("qa", "QA recordings"),
           ("transcripts", "transcripts"))  # fmt: skip
@@ -27,7 +26,7 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
             "label": "Memory free",
             "value": "unknown" if memory is None else f"{memory[0]:.1f} GiB",
             "pct": None if memory is None else memory[1],
-            "tone": _TONES[level],
+            "tone": LEVEL_TONES[level],
             "hint": None,
         }
     )
@@ -37,7 +36,7 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
             "label": "Disk free",
             "value": "unknown" if disk is None else f"{disk[0]:.0f} GiB",
             "pct": None if disk is None else disk[1],
-            "tone": _TONES[found.get("disk", {}).get("level", "unknown")],
+            "tone": LEVEL_TONES[found.get("disk", {}).get("level", "unknown")],
             "hint": disk_detail(snap),
         }
     )
@@ -48,7 +47,7 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
             "label": "CPU use",
             "value": f"{pct:.0f}%" if pct is not None else "unknown",
             "pct": round(pct) if pct is not None else None,
-            "tone": _TONES[cpu["level"] if cpu else "unknown"],
+            "tone": LEVEL_TONES[cpu["level"] if cpu else "unknown"],
             "hint": None,
         }
     )
@@ -63,7 +62,7 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
                 "label": "Power",
                 "value": "On mains" if mains else f"Battery {battery:.0f}%" if battery is not None else "On battery",
                 "pct": 100 if mains else round(battery) if battery is not None else None,
-                "tone": _TONES[power["level"]],
+                "tone": LEVEL_TONES[power["level"]],
                 "hint": None,
             }
         )
@@ -74,7 +73,7 @@ def vitals(snap: Snap) -> list[dict[str, Any]]:
             "label": "Install",
             "value": words.get(install["level"], "unknown"),
             "pct": None if install["level"] == "unknown" else 100,
-            "tone": _TONES[install["level"]],
+            "tone": LEVEL_TONES[install["level"]],
             "hint": None,
         }
     )
@@ -156,6 +155,7 @@ def wants(query: Query) -> dict[str, Any]:
 def parts(snap: Snap, query: Query) -> Parts:
     return {
         "vitals": lambda: vitals(snap),
+        "merges": lambda: {"label": "Waiting", **merges_waiting(snap)},
         "slots": lambda: slots(snap),
         "refusals": lambda: refusals(snap),
         "rules": lambda: rules(snap),

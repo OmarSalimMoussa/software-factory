@@ -56,6 +56,10 @@ browser tester waits, and so does a session's own remote desktop: what a walk st
 so the slice's CPU limit cannot slow it. A tester's desktop is part of the walk the hold let start, and never waits. A walk held `budget.walk_hold_minutes` starts anyway, so a busy machine never stalls a merge for good.
 The guard's rule `cpu-hold` switches the hold off.
 
+`vitals.merge_wait_amber_hours` and `rounds.bundle_merges` turn the merges waiting for their check amber: once that
+many wait, or the oldest has waited longer. That reading sits beside the vitals but never holds back a start, since
+the work that clears those merges has to start.
+
 `install.walk_wait_minutes` is how long an upgrade waits for the testers at work to hand back before it pauses the
 factory, which would cut their walks half way. Meanwhile no new tester starts: the guard's rule `upgrade-hold`.
 

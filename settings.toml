@@ -162,6 +162,8 @@ firewall_stale_seconds = 180  # the firewall loaded longer ago than this is red:
 disk_amber_gib = 30     # free disk, on the fullest one the factory writes to, under which only severe work starts:
                         # about a day of the agents' busiest growth
 disk_red_gib = 10       # under this nothing starts: prod shares the disk, and its database stops on a full one
+merge_wait_amber_hours = 6  # a merge that waited longer for its check is amber: twice the three hours or so a
+                            # check takes with a failed walk, its fix and a second walk
 
 [watch]
 tick_seconds = 15

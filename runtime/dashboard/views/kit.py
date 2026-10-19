@@ -60,6 +60,7 @@ FAMILIES = {
 INITIALS = {"orch": "OR", "intake": "IN", "design": "DS", "impl": "IM", "qa": "QA"}
 SURFACES = {"ui": "UI", "api": "API", "access": "Access", "desktop": "Desktop", "none": "No runtime change"}
 SEVERITY_TONES = {"severe": "bad", "major": "warn", "minor": ""}
+LEVEL_TONES = {"green": "good", "amber": "warn", "red": "bad", "unknown": ""}
 INBOX_TONES = {"users": "pink", "owner": "violet", "agents": "info", "chat": "amber"}
 
 
