@@ -29,7 +29,8 @@ address from your brief and sign in as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/s
 
 Mark each step you walk, and name it on each finding, as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/steps.md` says: the
 owner watches your run as a replay of those steps. To wait for the page to show something, call `browser_wait_until`
-with the words and a ceiling inside the item's time. One call does the whole wait; never poll.
+with the words, a ceiling inside the item's time and `reload`: false unless the page shows the change only once
+loaded again, as a reload is a step of its own. One call does the whole wait; never poll.
 
 Screenshot every changed screen in every state, in the light and the dark theme, at each width your brief lists
 (never naming a file). Switch the theme with `browser_color_scheme`. Resize with the resize tool, then read

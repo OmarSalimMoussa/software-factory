@@ -325,8 +325,8 @@ class Ticks(threading.Event):
 class Browser:
     """Playwright's tools as the factory's tools call them: each call kept, each snapshot the next page given."""
 
-    def __init__(self, pages: list[str], results: tuple[Any, ...] = ()) -> None:
-        self.pages, self.results, self.ticks = iter(pages), iter(results), Ticks()
+    def __init__(self, pages: list[str], results: tuple[Any, ...] = (), misses: int = 0) -> None:
+        self.pages, self.results, self.ticks, self.misses = iter(pages), iter(results), Ticks(), misses
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.at: list[float] = []  # each call's time on the wait's clock
 
@@ -335,6 +335,12 @@ class Browser:
         self.at.append(self.ticks.clock)
         if name == "browser_snapshot":
             return next(self.pages)
+        if name == "browser_wait_for" and "text" in args:
+            if self.misses:
+                self.misses -= 1
+                self.ticks.clock += 5  # Playwright's own wait for a text ends at its action timeout
+                raise ServerError("browser_wait_for failed: TimeoutError: locator.waitFor: Timeout 5000ms exceeded")
+            return f"Waited for {args['text']}"
         # The code tool's value as Playwright prints it.
         return next((f"### Result\n{json.dumps(r)}\n### Ran Playwright code" for r in self.results), f"{name} done")
 
@@ -360,7 +366,7 @@ class Browser:
 def test_a_wait_reloads_until_its_words_show_in_one_call() -> None:
     page = "- Page URL: https://app.test/jobs/7\n"
     browser = Browser([page + "Building", page + "Building", page + "Ready"])
-    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 5})
+    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 5, "reload": True})
     assert not failed and said.startswith("“Ready” shows, after 2 min.")
     reload = ("browser_navigate", {"url": "https://app.test/jobs/7"})
     look = ("browser_snapshot", {})
@@ -370,7 +376,7 @@ def test_a_wait_reloads_until_its_words_show_in_one_call() -> None:
 def test_a_wait_shorter_than_a_reload_looks_last_at_its_ceiling() -> None:
     page = "- Page URL: https://app.test/jobs/7\n"
     browser = Browser([page + "Building", page + "Ready"])
-    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 0.75})
+    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 0.75, "reload": True})
     assert not failed and said.startswith("“Ready” shows, after 45 s.")
     assert browser.calls == [("browser_snapshot", {}), ("browser_navigate", {"url": "https://app.test/jobs/7"}),
                              ("browser_snapshot", {})]  # fmt: skip
@@ -378,7 +384,7 @@ def test_a_wait_shorter_than_a_reload_looks_last_at_its_ceiling() -> None:
 
 def test_a_wait_never_lasts_past_the_factorys_ceiling() -> None:
     browser = Browser(["- Page URL: https://app.test/jobs/7\nBuilding"] * 3)
-    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 90}, 30, 1)
+    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 90, "reload": True}, 30, 1)
     assert not failed
     assert said.startswith(
         "“Ready” did not show in the page's text within 1 min (the most one wait may last is 1 min). "
@@ -389,17 +395,32 @@ def test_a_wait_never_lasts_past_the_factorys_ceiling() -> None:
 def test_each_look_of_a_wait_comes_a_whole_interval_after_its_reload_once_the_page_has_loaded() -> None:
     page = "- Page URL: https://app.test/jobs/7\n"
     browser = Browser([page + "Loading", page + "Loading", page + "Ready"])
-    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 1.5})
+    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 1.5, "reload": True})
     assert not failed and said.startswith("“Ready” shows, after 1 min 30 s.")
     look, reload = "browser_snapshot", "browser_navigate"
     timed = [(look, 0), (reload, 0), (look, 60), (reload, 60), (look, 90)]
     assert list(zip([n for n, _ in browser.calls], browser.at, strict=True)) == timed
 
 
+@pytest.mark.parametrize(
+    ("misses", "says", "looks"),
+    [(1, "“Sign in” shows, after 5 s.", 2), (9, "“Sign in” did not show in the page's text within 15 s.", 3)],
+    ids=["its-words-show", "its-ceiling-passes"],
+)
+def test_a_wait_without_reload_leaves_the_page_alone_and_waits_on_the_browsers_own_text_waits(
+    misses: int, says: str, looks: int
+) -> None:
+    browser = Browser(["- Page URL: https://app.test/visit\nOpening"] * 3, misses=misses)
+    said, failed = browser.answer("browser_wait_until", {"text": "Sign in", "minutes": 0.25, "reload": False})
+    assert not failed and said.startswith(says)
+    assert {name for name, _ in browser.calls} <= {"browser_wait_for", "browser_snapshot"}
+    assert [args for name, args in browser.calls if name == "browser_wait_for"] == [{"text": "Sign in"}] * looks
+
+
 def test_a_cancelled_wait_stops_at_its_next_reload() -> None:
     browser = Browser(["- Page URL: https://app.test/jobs/7\nBuilding"] * 3)
     browser.ticks.set()
-    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 5})
+    said, failed = browser.answer("browser_wait_until", {"text": "Ready", "minutes": 5, "reload": True})
     assert (said, failed) == ("the wait was cancelled", True)
     assert browser.calls == [("browser_snapshot", {})]
 
@@ -480,7 +501,8 @@ def test_a_desktop_click_rests_at_its_point_then_holds_the_button_as_the_desktop
         ("browser_sign_in", {"address": "me"}, "name the test address your brief gives"),
         ("browser_wait_until", {"text": " ", "minutes": 1}, "name the words to wait for"),
         ("browser_wait_until", {"text": "Ready", "minutes": 0}, "above zero"),
-        ("browser_wait_until", {"text": "Ready", "minutes": 1}, "the page names no address to reload"),
+        ("browser_wait_until", {"text": "Ready", "minutes": 1}, "say whether to reload the page between looks"),
+        ("browser_wait_until", {"text": "Ready", "minutes": 1, "reload": True}, "the page names no address to reload"),
         ("browser_open_desktop", {"url": "file:///etc/passwd"}, "starting http:// or https://"),
         ("browser_color_scheme", {"scheme": "blue"}, "say light or dark"),
         ("browser_type_keys", {"text": ""}, "give the text to type"),

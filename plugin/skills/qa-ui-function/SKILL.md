@@ -31,8 +31,9 @@ in every state, and you prove each finding with a screenshot.
   `qa-browser` tools, report "no browser" as your whole result.
 - Mark each step you walk, and name it on each finding, as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/steps.md` says:
   the owner watches your run as a replay of those steps.
-- To wait for the page to show something, call `browser_wait_until` with the words and a ceiling inside the item's
-  time. One call does the whole wait; never poll.
+- To wait for the page to show something, call `browser_wait_until` with the words, a ceiling inside the item's
+  time and `reload`: false unless the page shows the change only once loaded again, as a reload is a step of its
+  own. One call does the whole wait; never poll.
 - To see how the page meets a failed request, answer it with `browser_route` (its URL pattern and a status, such as
   502), then lift it with `browser_unroute` before the next step. To let one request overtake another, hold the
   first with `browser_hold_request`, do what sends the second, then let the first go with `browser_release_request`:

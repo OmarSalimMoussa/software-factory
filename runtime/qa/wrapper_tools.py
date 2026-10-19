@@ -2,8 +2,8 @@
 
 - ``browser_sign_in`` signs the browser in as a test address with a fresh one-time link the warden asks the slot
   for. The link never reaches the tester's transcript; it is kept beside the run, so the replay can scrub it.
-- ``browser_wait_until`` reloads and reads the page every ``qa.wait_reload_seconds`` until a text shows, up to a
-  ceiling, in one call: a tester never polls.
+- ``browser_wait_until`` reads the page until a text shows, up to a ceiling, in one call, so a tester never polls:
+  with ``reload``, a reload every ``qa.wait_reload_seconds`` before each look; without, the page is left alone.
 - ``browser_wait_for`` with a time alone waits here, not in the browser, whose wait needs an open page.
 - ``browser_open_desktop`` sets the browser to the desktop's size (``qa.desktop_viewport``), then opens the desktop's
   live view: a screenshot is not shrunk before the tester sees it, so a point in it is the point on the desktop.
@@ -62,8 +62,8 @@ NOTES = {
     "browser_mouse_click_xy": f"On a remote desktop's live view, click with {PRESS} instead: a click this short may "
     "not take there.",
     WAIT_FOR: "A text or textGone wait gives up after a few seconds, and time sleeps before either, so a message that "
-    f"shows briefly can pass unseen: wait on its text alone, right after the step. {WAIT_UNTIL} waits longer, but "
-    "reloads the page.",
+    f"shows briefly can pass unseen: wait on its text alone, right after the step. {WAIT_UNTIL} waits longer, and "
+    "reloads the page only when asked.",
 }
 
 TOOLS: list[dict[str, Any]] = [
@@ -79,16 +79,22 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": WAIT_UNTIL,
-        "description": "Wait until a text shows on the page, reloading the page every so often, up to a ceiling. One "
-        "call does the whole wait. It reads the page's own text, never words drawn in a picture or a live remote "
-        "view: check those with a screenshot.",
+        "description": "Wait until a text shows on the page, up to a ceiling. One call does the whole wait. A reload "
+        "is a step of its own, which can change what a step tests: reload only a page that shows news once loaded "
+        "again. It reads the page's own text, never words drawn in a picture or a live remote view: check those "
+        "with a screenshot.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "the words to wait for, as the page shows them"},
                 "minutes": {"type": "number", "description": "the ceiling, in minutes"},
+                "reload": {
+                    "type": "boolean",
+                    "description": "true reloads the page every so often; false leaves "
+                    "it as it is, for a page that updates itself",
+                },
             },
-            "required": ["text", "minutes"],
+            "required": ["text", "minutes", "reload"],
         },
     },
     {
@@ -168,6 +174,17 @@ class ToolError(Exception):
     """A factory tool cannot do what was asked; the message, which the tester reads, says why."""
 
 
+def _wait_asked(arguments: dict[str, Any]) -> tuple[str, float, bool]:
+    text, minutes, reload = arguments.get("text"), arguments.get("minutes"), arguments.get("reload")
+    if not isinstance(text, str) or not text.strip():
+        raise ToolError("name the words to wait for")
+    if not isinstance(minutes, int | float) or minutes <= 0:
+        raise ToolError("give the ceiling in minutes, above zero")
+    if not isinstance(reload, bool):
+        raise ToolError("say whether to reload the page between looks: true or false")
+    return text, float(minutes), reload
+
+
 @dataclass
 class Tools:
     call: Callable[[str, dict[str, Any]], str]  # one of the server's tools: its text
@@ -214,16 +231,12 @@ class Tools:
         return f"Signed in as {address}.\n\n" + page.replace(link, "the sign-in link")
 
     def _wait_until(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
-        text, minutes = arguments.get("text"), arguments.get("minutes")
-        if not isinstance(text, str) or not text.strip():
-            raise ToolError("name the words to wait for")
-        if not isinstance(minutes, int | float) or minutes <= 0:
-            raise ToolError("give the ceiling in minutes, above zero")
+        text, minutes, reload = _wait_asked(arguments)
         ceiling = min(float(minutes), float(self.max_minutes)) * 60
         capped = f" (the most one wait may last is {self.max_minutes} min)" if minutes > self.max_minutes else ""
         start = self.now()
         while True:
-            page = self.call("browser_snapshot", {})
+            page = self.call("browser_snapshot", {}) if reload else self._live_look(text)
             waited = self.now() - start
             if text in page:
                 return f"“{text}” shows, after {duration(waited)}.\n\n{page}"
@@ -233,15 +246,25 @@ class Tools:
                     f"“{text}” did not show in the page's text within {duration(ceiling)}{capped}. Words drawn in "
                     f"a picture or a live view are no page text: a screenshot shows them. The page now:\n\n{page}"
                 )
+            if cancelled.is_set():
+                raise ToolError("the wait was cancelled")
+            if not reload:
+                continue
             found = PAGE_URL.search(page)
             if found is None:
                 raise ToolError("the page names no address to reload, so the wait stopped")
-            if cancelled.is_set():
-                raise ToolError("the wait was cancelled")
             # A reload, then the wait: each look comes once the page has loaded, and the last at the ceiling.
             self.call("browser_navigate", {"url": found.group(1)})
             if cancelled.wait(min(self.reload_seconds, ceiling - waited)):
                 raise ToolError("the wait was cancelled")
+
+    def _live_look(self, text: str) -> str:
+        """The page once ``text`` shows, or as it is once Playwright's own short wait for it ends."""
+        try:
+            return self.call(WAIT_FOR, {"text": text})
+        # telemetry: expected — the words have not shown yet; a browser that failed fails the snapshot loudly
+        except ServerError:
+            return self.call("browser_snapshot", {})
 
     def _wait_seconds(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
         seconds = arguments.get("time")
