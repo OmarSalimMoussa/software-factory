@@ -154,7 +154,10 @@ def main(argv: list[str], places: Places, sign_in: Callable[[str], dict[str, Any
         return 2
     os.chdir(config.parent)
     equip = equipper(link_asker(sign_in), keeper(config.parent), settings)
-    return wrapper.serve(server_command(config), equip, settings.get_int("qa.browser_answer_seconds"))
+    return wrapper.serve(
+        server_command(config), equip, settings.get_int("qa.browser_answer_seconds"),
+        settings.get_int("qa.browser_answer_chars"),
+    )  # fmt: skip
 
 
 def equipper(

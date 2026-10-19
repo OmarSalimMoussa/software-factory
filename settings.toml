@@ -74,6 +74,7 @@ press_settle_ms = 250   # how long browser_mouse_press_xy rests on its point fir
 place_turn_seconds = 120  # a freed browser place waits this long for the session told of it, then the next is told
 wait_max_minutes = 15   # the longest one wait may last
 browser_answer_seconds = 120  # the longest the browser has to answer one call, a browser_wait_for's own time aside
+browser_answer_chars = 50000  # the longest text one browser answer gives, under Claude Code's cap on a tool's answer
 
 [replay]                # how a tester's run is replayed: the builder's timings, then the player's pace
 long_wait_seconds = 4.0     # a wait longer than this shows only its end

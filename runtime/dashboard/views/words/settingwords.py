@@ -82,6 +82,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("qa.place_turn_seconds", "Seconds a free browser place waits for the session told of it"),
             ("qa.wait_max_minutes", "Longest wait, minutes"),
             ("qa.browser_answer_seconds", "Seconds the browser has to answer"),
+            ("qa.browser_answer_chars", "Longest text one browser answer gives"),
         ],
     ),
     (

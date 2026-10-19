@@ -27,6 +27,10 @@ WAIT_FOR = "browser_wait_for"
 ROUTE = "browser_route"
 # The input that names a file a server tool writes: the guard refuses it, so no listed tool offers it.
 FILENAME = "filename"
+CUT = (
+    "\n\n[The factory cut this answer here: the page holds more than one answer can carry. Read what you need "
+    "with browser_evaluate, or look with browser_take_screenshot.]"
+)
 # The devtools capability holds the trace's tools; the wrapper needs the capability on, the tester keeps its usual
 # tools, so every tool the capability adds is hidden. Closing the browser would end the trace, and the next call
 # would open an untraced browser, so that is hidden too: the browser closes with the session.
@@ -65,8 +69,8 @@ class _Waiting:
 class Proxy:
     """One session's MCP traffic: the client is the tester's session, the server is Playwright's."""
 
-    def __init__(self, server_in: IO[str], client_out: IO[str], wait_seconds: float) -> None:
-        self._server_in, self._client_out, self._wait = server_in, client_out, wait_seconds
+    def __init__(self, server_in: IO[str], client_out: IO[str], wait_seconds: float, answer_chars: int) -> None:
+        self._server_in, self._client_out, self._wait, self._most = server_in, client_out, wait_seconds, answer_chars
         self._tools: list[dict[str, Any]] = []
         self._answer_tool: Answer = lambda name, args, cancelled: ("", True)
         self._notes: dict[str, str] = {}
@@ -116,6 +120,8 @@ class Proxy:
             self._lists.discard(key)
             listed = [self._noted(t) for t in message["result"].get("tools", []) if t.get("name") not in HIDDEN]
             message["result"]["tools"] = listed + self._tools
+            line = json.dumps(message)
+        elif isinstance(message.get("result"), dict) and _cut(message["result"].get("content"), self._most):
             line = json.dumps(message)
         self._to_client(line)
 
@@ -277,6 +283,16 @@ class Proxy:
             self._client_out.flush()
 
 
+def _cut(content: object, most: int) -> bool:
+    """Whether an answer held a text past ``most`` characters, now cut there: Claude Code refuses a tool's answer past
+    its own cap, which a snapshot of a page with a recorded page in its frame passes."""
+    long = [c for c in content if isinstance(c, dict) and c.get("type") == "text" and len(str(c.get("text")))
+            > most] if isinstance(content, list) else []  # fmt: skip
+    for part in long:
+        part["text"] = str(part["text"])[:most] + CUT
+    return bool(long)
+
+
 def text_of(result: dict[str, Any]) -> str:
     content = result.get("content")
     if not isinstance(content, list):
@@ -288,6 +304,7 @@ def serve(
     argv: list[str],
     equip: Callable[[Proxy], None],
     wait_seconds: float,
+    answer_chars: int,
     client_in: IO[str] = sys.stdin,
     client_out: IO[str] = sys.stdout,
 ) -> int:
@@ -295,7 +312,7 @@ def serve(
     session closes standard input or the server stops; the server's exit code, or 1 when the trace did not start."""
     server = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1)
     assert server.stdin is not None and server.stdout is not None  # both were asked for as pipes
-    proxy = Proxy(server.stdin, client_out, wait_seconds)
+    proxy = Proxy(server.stdin, client_out, wait_seconds, answer_chars)
     equip(proxy)
     ended, why = threading.Event(), []
 

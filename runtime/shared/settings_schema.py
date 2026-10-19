@@ -80,6 +80,7 @@ SCHEMA: dict[str, Spec] = {
     "qa.place_turn_seconds": Spec("int", 10, 3600),
     "qa.wait_max_minutes": Spec("int", 1, 60),
     "qa.browser_answer_seconds": Spec("int", 10, 900),
+    "qa.browser_answer_chars": Spec("int", 1000, 1_000_000),
     "replay.long_wait_seconds": Spec("float", 1, 60),
     "replay.wait_tail_seconds": Spec("float", 0.5, 30),
     "replay.navigation_tail_seconds": Spec("float", 0.2, 30),

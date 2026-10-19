@@ -38,7 +38,7 @@ class Session:
         argv = [sys.executable, str(FAKE), str(log)]
         self.exit: list[int] = []
         self.thread = threading.Thread(
-            target=lambda: self.exit.append(wrapper.serve(argv, equip, 10, client_in, client_out))
+            target=lambda: self.exit.append(wrapper.serve(argv, equip, 10, 10_000, client_in, client_out))
         )
         self.thread.start()
         self.sent = 0
@@ -204,9 +204,21 @@ def test_the_wrapper_stops_when_the_browser_does(
     assert "factory qa-browser: the browser stopped (exit 3)" in capsys.readouterr().err
 
 
-def _proxy() -> tuple[wrapper.Proxy, io.StringIO, io.StringIO]:
+def _proxy(wait: float = 0.01) -> tuple[wrapper.Proxy, io.StringIO, io.StringIO]:
     to_server, to_session = io.StringIO(), io.StringIO()
-    return wrapper.Proxy(to_server, to_session, 0.01), to_server, to_session
+    return wrapper.Proxy(to_server, to_session, wait, 40), to_server, to_session
+
+
+@pytest.mark.parametrize(("text", "cut"), [("a" * 40, False), ("b" * 41, True)], ids=["at-the-cap", "past-it"])
+def test_a_browser_answer_past_the_factorys_cap_reaches_the_tester_cut_with_a_note(text: str, cut: bool) -> None:
+    proxy, _, to_session = _proxy(wait=10)
+    proxy.from_client(_call(7, "browser_snapshot"))
+    shot = {"type": "image", "data": "c" * 100, "mimeType": "image/png"}
+    proxy.from_server(
+        json.dumps({"jsonrpc": "2.0", "id": 7, "result": {"content": [{"type": "text", "text": text}, shot]}})
+    )
+    [answer] = _said(to_session)
+    assert answer["result"]["content"] == [{"type": "text", "text": text[:40] + (wrapper.CUT if cut else "")}, shot]
 
 
 def test_an_answer_the_wrapper_stopped_waiting_for_reaches_no_one() -> None:
