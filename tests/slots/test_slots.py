@@ -340,6 +340,28 @@ def _desktop_slot(world: World) -> dict[str, object]:
     return {"op": "desktop", "desktop": ["up", "tester-1@example.com"]}
 
 
+@pytest.mark.parametrize(
+    ("kind", "holds_desktop", "refused"),
+    [("qa-ux", False, True), ("qa-ux", True, False), ("qa-backend", False, False), ("", False, False)],
+    ids=["a-browser-tester", "one-on-its-desktop", "a-tester-with-no-browser", "its-browser-asking-for-it"],
+)
+def test_a_browser_testers_sign_in_link_opens_unseen_and_prints_only_for_the_desktop_it_holds(
+    world: World, kind: str, holds_desktop: bool, refused: bool
+) -> None:
+    _desktop_slot(world)
+    if holds_desktop:
+        store.write_json(public.desktops_path(world.places), {"1": "agent-qa-1"})
+    world.launcher.stack = lambda n, verb: StackResult(0, "signed in\n", "/log")
+    ctx = world.ctx("implementer", "s-1", "agent-qa-1" if kind else "", kind)
+    args = {"op": "sign-in", "email": "tester-1@example.com"}
+    if refused:
+        with pytest.raises(Refused, match="sign in with browser_sign_in"):
+            slot(ctx, args, None)
+    else:
+        slot(ctx, args, None)
+    assert ((1, ["sign-in", "tester-1@example.com"]) in world.launcher.stacks) is not refused
+
+
 def _cpu(world: World, cpu: float | None, age: int = 0) -> None:
     at = datetime.fromtimestamp(world.clock.now() - age, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     public.write_vitals(world.places, "green", "", cpu, at)

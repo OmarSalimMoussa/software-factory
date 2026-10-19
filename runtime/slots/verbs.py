@@ -25,7 +25,7 @@ from typing import Any
 
 from runtime.guard import walk_hold
 from runtime.guard.facts import read_desktops, read_vitals
-from runtime.shared import store
+from runtime.shared import lanes, store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import health, leases, staging
@@ -38,6 +38,10 @@ WORD = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@+-]{0,127}$")
 EMAIL = re.compile(r"^[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
 _CHANGES_STACK = frozenset({"up", "down", leases.RESTART, leases.STOP})
 _FIXED = {"down": ["down"], "top": [leases.TOP]}
+_SIGN_IN = (
+    "sign in with browser_sign_in, which opens the one-time link unseen; `slot sign-in` prints one only for the remote "
+    "desktop you hold, after `factory slot desktop up`"
+)
 # By state folder and slot: when the CPU hold first refused that slot's desktop since it last went up.
 _HELD: dict[tuple[str, int], datetime] = {}
 
@@ -88,6 +92,9 @@ def slot(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
         raise Refused("slot", f"a {ctx.caller.agent_kind or 'tester'} may run {', '.join(sorted(allowed))} on its "
                               f"slot, not {op}")  # fmt: skip
     settings = ctx.settings()
+    browser = lanes.kind_of(ctx.caller.agent_kind or "") in settings.get_list("subagents.browser_personas")
+    if op == "sign-in" and browser and ctx.caller.agent_id not in read_desktops(ctx.places).values():
+        raise Refused("slot", _SIGN_IN)
     if op == "claim":
         if session.role != IMPL:
             raise Refused("slot", "only an implementer claims a slot; slot 0 is the orchestrator's")
