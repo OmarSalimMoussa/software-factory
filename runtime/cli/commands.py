@@ -166,6 +166,8 @@ def _telemetry(sub: Any) -> None:
     errors.add_argument("--where", nargs="+", default=["prod"], metavar="prod|slot N")
     errors.add_argument("--issue")
     errors.add_argument("--whole", action="store_true", help="with --issue: the newest event, all of it")
+    errors.add_argument("--find", nargs="+", help="only issues whose title or culprit holds this text, in any case")
+    errors.add_argument("--since", help="only issues seen from this time on, such as 2026-10-17T09:17:00Z")
     logs = sub.add_parser("logs", help="log lines of prod or a slot (slot 0 is staging), newest first; read-only")
     logs.add_argument("--where", nargs="+", default=["prod"], metavar="prod|slot N")
     logs.add_argument(

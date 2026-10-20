@@ -8,7 +8,6 @@ GlitchTip's own search, which reads a line's text and not its attributes, so eve
 from __future__ import annotations
 
 import urllib.parse
-from datetime import datetime
 from typing import Any
 
 from runtime.shared.protocol import Refused, ok
@@ -34,21 +33,8 @@ def logs(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
 
 
 def _query(args: dict[str, Any]) -> dict[str, str]:
-    query: dict[str, str] = {}
-    if "find" in args:
-        if not isinstance(args["find"], str) or not args["find"].strip():
-            raise Refused("args", "--find is the text to search for")
-        query["query"] = args["find"]
-    if "since" in args:
-        try:
-            since = datetime.fromisoformat(args["since"]) if isinstance(args["since"], str) else None
-        # telemetry: expected — the agent's own input, refused below with the form it takes
-        except ValueError:
-            since = None
-        if since is None or since.tzinfo is None:
-            raise Refused("args", "--since is a time with its zone, such as 2026-10-17T09:17:00Z")
-        query["start"] = since.isoformat()
-    return query
+    find, since = telemetry.find_of(args), telemetry.since_of(args)
+    return {**({"query": find} if find else {}), **({"start": since.isoformat()} if since else {})}
 
 
 def _org(service: GlitchTip) -> str:

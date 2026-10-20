@@ -67,6 +67,7 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["errors"],
         ["errors", "--where", "slot", "3", "--issue", "12"],
         ["errors", "--where", "slot", "3", "--issue", "12", "--whole"],
+        ["errors", "--where", "slot", "0", "--find", "NoPicture", "--since", "2026-10-20T06:00:00Z"],
         ["logs", "--where", "slot", "0", "--find", "sentinel", "--since", "2026-10-17T09:17:00Z"],
         ["records"],
         ["records", "job-store/j1/steps"],
@@ -151,6 +152,8 @@ def test_a_step_mark_names_its_step_as_a_finding_does() -> None:
 def test_telemetry_is_read_from_prod_or_a_slot_and_staging_is_slot_0() -> None:
     assert _build(["errors", "--where", "slot", "0"]).args == {"where": "slot", "slot": 0}
     assert _build(["logs", "--find", "sentinel"]).args == {"where": "prod", "find": "sentinel"}
+    found = _build(["errors", "--find", "no", "picture", "--since", "2026-10-20T06:00:00Z"]).args
+    assert found == {"where": "prod", "find": "no picture", "since": "2026-10-20T06:00:00Z"}
     # Agents leave a text of several words unquoted; it is still one text.
     found = _build(["logs", "--find", "connection", "refused", "--since", "2026-10-17T17:40:00Z"]).args
     assert found == {"where": "prod", "find": "connection refused", "since": "2026-10-17T17:40:00Z"}

@@ -55,8 +55,8 @@ Published practice (WCAG 2.2, Refactoring UI) and the look `GOAL.md` sets:
 - **AI-made looks.** No gradient heroes, no emoji, no browser-default dropdowns, no tutorial prose on the surface.
 - **Fit.** Media sized to its frame, never cropped; no large empty regions; nothing past the edge at phone width.
 - **Motion.** Changes move with the product's timing; reduced motion is honoured.
-- **Hidden failures.** `factory ready-check` names your slot: after your screens, `factory errors --where slot <n>`
-  shows no new issue they raised.
+- **Hidden failures.** `factory ready-check` names your slot: after your screens,
+  `factory errors --where slot <n> --since <when you started>` shows no new issue they raised.
 
 ## Report
 

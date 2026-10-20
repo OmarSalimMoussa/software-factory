@@ -8,10 +8,11 @@ description: Use when a test fails, a bug is reported, or the product behaves wr
 A fix without a cause is a guess. Find the cause first, then fix it once.
 
 1. **Confirm the bug where it was reported.** A report about staging or prod is checked against its error-tracker
-   issue first: `factory errors` for prod, `--where slot 0` for staging, then `--issue <id>` for its latest event,
-   and `factory logs --find <text>` for the log lines around it. What only prod holds, such as a model's answer
-   behind a failed step, is in prod's records: `factory records` names the folders you may read, and
-   `factory records <path>` lists a folder's newest entries or prints a file. Each read goes in your task's log.
+   issue first: `factory errors` for prod, `--where slot 0` for staging, `--find <text>` and `--since <time>` to
+   narrow them, then `--issue <id>` for its latest event, and `factory logs --find <text>` for the log lines around
+   it. What only prod holds, such as a model's answer behind a failed step, is in prod's records: `factory records`
+   names the folders you may read, and `factory records <path>` lists a folder's newest entries or prints a file.
+   Each read goes in your task's log.
    Do not inherit the claim from a doc, a task or another agent.
 2. **Reproduce it on your own slot.** A tester walks it through the product's screens or its API; an implementer
    never drives the product itself. Before your first commit, bring your slot up at your head, run

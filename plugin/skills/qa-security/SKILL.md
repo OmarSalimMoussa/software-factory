@@ -47,8 +47,8 @@ From the OWASP Top 10:2025, the OWASP API Security Top 10 and the OWASP Top 10 f
 - **Supply chain.** A new dependency: a permissive licence, a pinned version, a known maintainer.
 - **Integrity.** Webhook signatures checked; nothing deserialised from a user.
 - **Exceptional conditions.** An error fails closed: refused, never allowed by default. `factory ready-check` names
-  your slot: after your probes, `factory errors --where slot <n>` shows no new issue they raised, and none that
-  carries a secret or another account's data.
+  your slot: after your probes, `factory errors --where slot <n> --since <when you started>` shows no new issue
+  they raised, and none that carries a secret or another account's data.
 - **Agents.** Outside text a model reads used as instructions (prompt injection); an agent's tools or permissions
   beyond its task, or a costly action with no limit (excessive agency, unbounded consumption); a model's output
   leaking another account's data or its own instructions. Hostile instruction text in a page or document must be

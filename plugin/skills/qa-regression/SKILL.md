@@ -35,7 +35,8 @@ them.
 3. Set up each precondition through the UI. If you cannot reach it, the scenario is `blocked`, not passed: say what
    stopped you. A step that needs a `factory slot` command other than `sign-in` or `desktop up` is the
    orchestrator's: report the scenario blocked at that step. A step that reads the error tracker is
-   `factory errors --where slot 0`, with `--issue <id>` for an issue's newest event and its Request section and
+   `factory errors --where slot 0`, with `--find <text>` for the issues whose title or culprit holds it,
+   `--since <time>` for those seen since then, `--issue <id>` for an issue's newest event and its Request section and
    `--whole` for that event's JSON; its Logs view is `factory logs --where slot 0 --find <text> --since <time>`.
    Never sign in to it.
 4. Do each step exactly. A step that has a request fail answers it with `browser_route` (its URL pattern and the
@@ -44,7 +45,7 @@ them.
    `browser_release_request` right after the second. At each expected
    result, check it in the page (a snapshot or a page script), take a screenshot (never naming a file, never
    opening one afterwards), and decide pass or fail. Read the console and the requests after each scenario, and at
-   the end `factory errors --where slot 0` for new issues your walk raised.
+   the end `factory errors --where slot 0 --since <when your walk began>` for new issues your walk raised.
 5. Change nothing beyond what a scenario's steps change. A scenario that changed the width or the theme puts them
    back before the next one, even when it stopped early.
 

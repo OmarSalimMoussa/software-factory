@@ -29,7 +29,8 @@ You run beside the orchestrator in the main checkout, on the default branch. Rea
    merge that closed it when its log says.
 2. **Where it lives:** the screen or endpoint, and the files and lines that make it. Read `git log` on those files: a
    recent merge is a likely cause. Find it in the errors: `factory errors` (prod; `--where slot <n>` for a
-   slot, and slot 0 is staging), then `factory errors --issue <id>` for its latest event and trace, and
+   slot, and slot 0 is staging; `--find <text>` for those whose title or culprit holds it, `--since <time>` for
+   those seen since), then `factory errors --issue <id>` for its latest event and trace, and
    `factory logs --find <text>` for the log lines that name it.
 3. **The cause, when the code shows it.** Name it only when you can point at the line, as `path/file.py:41, what it
    does wrong`. Otherwise leave it out and say what the implementer should reproduce first.

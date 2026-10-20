@@ -5,16 +5,22 @@ slot (slot 0 is staging), lives on this machine's shared services, reached with 
 that the server set-up wrote. A workspace's GlitchTip projects are named for it (prod-…, slot0-…, slot3-…), so a read
 never strays into another workspace, or into the factory's own project. Every answer is cut to telemetry.max_kib. A
 key never appears in an answer, an error or a log line.
+
+GlitchTip's issue search matches whole words, and its time filter reads when an issue was first seen. So the warden
+narrows each page itself: `--find` keeps an issue whose title or culprit holds the text in any case, and `--since`
+one last seen from then on. The list is newest seen first, so the first issue seen before `--since` ends the read.
 """
 
 from __future__ import annotations
 
+import itertools
 import json
 import re
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -139,9 +145,11 @@ def _issue(raw: Any) -> Issue:
     return Issue(ident, slug, *(_text(raw, key) for key in fields))
 
 
-def unresolved(service: GlitchTip, prefix: str, timeout: float, max_pages: int, want: int | None = None) -> list[Issue]:
+def unresolved(service: GlitchTip, prefix: str, timeout: float, max_pages: int, want: int | None = None, *,
+               find: str = "", since: datetime | None = None) -> list[Issue]:  # fmt: skip
     """The unresolved issues of the projects whose slug starts with ``prefix``, newest first, from at most
-    ``max_pages`` pages, and at most ``want`` of them when given."""
+    ``max_pages`` pages, and at most ``want`` of them when given; only those whose title or culprit holds ``find``,
+    in any case, and those last seen from ``since`` on."""
     found: list[Issue] = []
     cursor = ""
     base = f"{service.url}/api/0/organizations/{urllib.parse.quote(service.org, safe='')}/issues/"
@@ -150,13 +158,49 @@ def unresolved(service: GlitchTip, prefix: str, timeout: float, max_pages: int, 
         page, headers = get_json("GlitchTip", f"{base}?{urllib.parse.urlencode(query)}", bearer(service), timeout)
         if not isinstance(page, list):
             raise TelemetryError("GlitchTip's issue list is not a list")
-        found += [issue for issue in map(_issue, page) if issue.project.startswith(prefix)]
+        issues = [_issue(raw) for raw in page]
+        recent = list(itertools.takewhile(lambda issue: since is None or _last_seen(issue) >= since, issues))
+        found += [issue for issue in recent if issue.project.startswith(prefix) and _holds(issue, find)]
         if want is not None and len(found) >= want:
             return found[:want]
         cursor = next_cursor(headers.get("link", ""))
-        if not cursor:
+        if not cursor or len(recent) < len(issues):
             break
     return found
+
+
+def _last_seen(issue: Issue) -> datetime:
+    try:
+        seen = datetime.fromisoformat(issue.last_seen or "")
+    except ValueError as exc:
+        raise TelemetryError(f"GlitchTip sent issue {issue.id} without a time it was last seen") from exc
+    if seen.tzinfo is None:
+        raise TelemetryError(f"GlitchTip sent issue {issue.id}'s last seen time without its zone")
+    return seen
+
+
+def _holds(issue: Issue, find: str) -> bool:
+    texts = (text.casefold() for text in (issue.title, issue.culprit) if text is not None)
+    return not find or any(find.casefold() in text for text in texts)
+
+
+def find_of(args: dict[str, Any]) -> str:
+    if "find" in args and (not isinstance(args["find"], str) or not args["find"].strip()):
+        raise Refused("args", "--find is the text to search for")
+    return str(args.get("find", ""))
+
+
+def since_of(args: dict[str, Any]) -> datetime | None:
+    if "since" not in args:
+        return None
+    try:
+        since = datetime.fromisoformat(args["since"]) if isinstance(args["since"], str) else None
+    # telemetry: expected — the agent's own input, refused below with the form it takes
+    except ValueError:
+        since = None
+    if since is None or since.tzinfo is None:
+        raise Refused("args", "--since is a time with its zone, such as 2026-10-17T09:17:00Z")
+    return since
 
 
 def _issue_row(issue: Issue) -> dict[str, Any]:
@@ -253,10 +297,13 @@ def _places(node: Any) -> list[tuple[Any, Any]]:
 
 
 def errors(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """`factory errors`: a workspace's unresolved GlitchTip issues, newest first, or one issue and its latest event,
-    whole when asked."""
+    """`factory errors`: a workspace's unresolved GlitchTip issues, newest first, those holding ``find`` and seen
+    since ``since`` when given, or one issue and its latest event, whole when asked."""
     settings = ctx.settings()
     workspace = workspace_of(ctx, args)
+    find, since = find_of(args), since_of(args)
+    if "issue" in args and (find or since):
+        raise Refused("args", "--find and --since narrow the list of issues; --issue reads one issue")
     timeout = float(settings.get_int("telemetry.timeout_seconds"))
     try:
         service = glitchtip(ctx.places)
@@ -266,7 +313,7 @@ def errors(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, 
             raise Refused("args", "--whole reads one issue's newest event: name the issue with --issue")
         else:
             found = unresolved(service, f"{workspace}-", timeout, settings.get_int("errors.max_pages"),
-                               settings.get_int("telemetry.max_items"))  # fmt: skip
+                               settings.get_int("telemetry.max_items"), find=find, since=since)  # fmt: skip
             answer = {"where": workspace, "issues": [_issue_row(issue) for issue in found]}
     except TelemetryError as exc:
         raise Refused("telemetry", str(exc)) from exc

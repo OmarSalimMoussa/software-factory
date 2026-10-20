@@ -94,7 +94,46 @@ def test_an_issue_answers_its_newest_event_with_its_request_section_or_whole(
 
 
 ORG = "/api/0/organizations/notes"
-LINE = {"timestamp": "2026-10-17T09:17:27Z", "level": "warn", "body": "store failure", "data": {"logger.name": "app"},
+ISSUES = f"{ORG}/issues/?query=is%3Aunresolved&sort=-last_seen"
+
+
+def seen(n: int, project: str, title: str, culprit: str, at: str) -> dict[str, Any]:
+    return {**issue(n, project, title), "culprit": culprit, "lastSeen": f"2026-10-09T{at}:00Z"}
+
+
+NEWEST = [seen(1, "prod-app", "NoPicture: a visit got no picture", "app.visits in watch", "12:00"),
+          seen(2, "prod-app", "KeyError", "app.notes in show", "11:00"),
+          seen(3, "slot0-app", "NoPicture on staging", "app.visits in watch", "10:00")]  # fmt: skip
+OLDER = [seen(4, "prod-web", "TimeoutError", "web.nopicture in load", "09:00")]
+
+
+@pytest.mark.parametrize(
+    ("args", "found", "pages"),
+    [
+        ({"find": "nopicture"}, ["1", "4"], 2),  # in the title or the culprit, in any case
+        ({"since": "2026-10-09T10:30:00Z"}, ["1", "2"], 1),  # newest first: the first one seen before ends the read
+        ({"find": "KEYERROR", "since": "2026-10-09T10:30:00Z"}, ["2"], 1),
+        ({"find": "no such words"}, [], 2),
+        ({"since": "10:30"}, "args", 0),
+        ({"find": " "}, "args", 0),
+        ({"find": "nopicture", "issue": "45"}, "args", 0),
+    ],
+)
+def test_errors_are_found_by_their_text_and_the_time_they_were_last_seen(
+    ctx: Context, monkeypatch: pytest.MonkeyPatch, args: dict[str, Any], found: list[str] | str, pages: int
+) -> None:
+    store.write_json(telemetry.server_json(ctx.places), SERVER)
+    asked = serving(monkeypatch, {ISSUES: (NEWEST, next_page("p2")), f"{ISSUES}&cursor=p2": (OLDER, "")})
+    if isinstance(found, str):
+        with pytest.raises(Refused) as refused:
+            telemetry.errors(ctx, {"where": "prod", **args}, None)
+        assert refused.value.rule == found and asked == []
+        return
+    answer = telemetry.errors(ctx, {"where": "prod", **args}, None)
+    assert [row["id"] for row in answer["issues"]] == found and len(asked) == pages
+
+
+LINE ={"timestamp": "2026-10-17T09:17:27Z", "level": "warn", "body": "store failure", "data": {"logger.name": "app"},
         "projectId": 37}  # fmt: skip
 
 

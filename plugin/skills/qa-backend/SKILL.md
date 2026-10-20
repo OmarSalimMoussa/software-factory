@@ -48,8 +48,9 @@ at `slots.run_seconds` and its container is removed after; no command opens a sh
 - **Telemetry.** A platform failure reports once, naming the ids and the failure class; a user's failure reaches the
   UI and never the error tracker; no user content, secret or token in a log line. Model calls record usage and cost
   in the product's own records, failed ones included, with unknown cost as unknown: read them back on your slot.
-  `factory ready-check` names your slot: after your items, `factory errors --where slot <n>` shows no new issue your
-  requests raised.
+  `factory ready-check` names your slot: after your items,
+  `factory errors --where slot <n> --since <when you started>` shows no new issue your requests raised;
+  `--find <text>` finds one by its title or culprit.
 - **Latency.** Time each touched endpoint at least 20 times and report the median, the 95th percentile and the
   slowest. On a shared laptop these are information, not findings. A finding is repeated identical queries for one
   request (an N+1), a timeout, or a time that grows with the data.

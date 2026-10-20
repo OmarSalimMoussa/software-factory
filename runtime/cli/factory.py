@@ -172,10 +172,9 @@ def _telemetry_call(ns: argparse.Namespace) -> Call:
         args = {"where": "slot", "slot": int(where[1])}
     else:
         raise CliError("--where is prod or slot <n>; staging is slot 0")
-    if ns.cmd == "logs":
-        given = {"find": None if ns.find is None else " ".join(ns.find), "since": ns.since}
-    else:
-        given = {"issue": ns.issue, "whole": ns.whole or None}
+    given = {"find": None if ns.find is None else " ".join(ns.find), "since": ns.since}
+    if ns.cmd == "errors":
+        given |= {"issue": ns.issue, "whole": ns.whole or None}
     args.update({key: value for key, value in given.items() if value is not None})
     return Call(ns.cmd, args)
 
