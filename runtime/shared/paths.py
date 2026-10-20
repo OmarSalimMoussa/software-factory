@@ -68,6 +68,7 @@ class Places:
     keys: Path = KEYS
     firewall: Path = FIREWALL
     upgrade: Path = UPGRADE
+    docker_volumes: Path = host_paths.DOCKER_VOLUMES
 
     @classmethod
     def system(cls) -> Places:
@@ -85,6 +86,7 @@ class Places:
             root / "keys",
             root / "firewall",
             root / "upgrade",
+            root / "docker-volumes",
         )
 
     @classmethod

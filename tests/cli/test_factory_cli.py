@@ -68,6 +68,8 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["errors", "--where", "slot", "3", "--issue", "12"],
         ["errors", "--where", "slot", "3", "--issue", "12", "--whole"],
         ["logs", "--where", "slot", "0", "--find", "sentinel", "--since", "2026-10-17T09:17:00Z"],
+        ["records"],
+        ["records", "job-store/j1/steps"],
         ["chat", "r-2026-10-09-0001"],
         ["chat", "r-2026-10-09-0001", "--before", "700000000000000003"],
         ["request", "new", "--from", "owner", "--severity", "normal", "--where", "the sign-in page", "--body", FILE],
@@ -154,6 +156,11 @@ def test_telemetry_is_read_from_prod_or_a_slot_and_staging_is_slot_0() -> None:
     assert found == {"where": "prod", "find": "connection refused", "since": "2026-10-17T17:40:00Z"}
     with pytest.raises(CliError, match="staging is slot 0"):
         _build(["errors", "--where", "staging"])
+
+
+def test_a_record_is_asked_for_by_its_path_in_prods_records() -> None:
+    assert _build(["records", "job-store/j1/steps"]).args == {"path": "job-store/j1/steps"}
+    assert _build(["records"]).args == {}
 
 
 def test_a_read_of_the_chat_names_its_request_and_at_most_one_message_to_read_at() -> None:
@@ -245,7 +252,7 @@ def test_the_owners_account_commands_send_the_token_as_bytes_and_follow_a_switch
         "qa waive t-0001 f-1 --why 'not a bug'", "qa-ready abc", "qa-clean", "ready-check", "triage plan --body p.json",
         "triage apply", "inbox", "inbox --wait", "tick", "status", "reflect --kind miss 'it missed'",
         "slot claim", "slot up", "propose t-0001 --picture p.svg --why now", "spec save t-0001 s.md --slices 2",
-        "needs-owner t-0001 --picture p.svg --question why", "errors", "logs", "doing 'reading'",
+        "needs-owner t-0001 --picture p.svg --question why", "errors", "logs", "records", "doing 'reading'",
         "chat r-2026-10-09-0001 --around 700000000000000003",
     ],
 )  # fmt: skip

@@ -32,7 +32,7 @@ Every value the factory uses is a setting: caps, models, rounds, times and thres
 | `vitals`, `watch` | Amber and red levels; probe, loop, grace and silence times; how refusals add up to an incident |
 | `errors` | How often the warden reads prod's and staging's new GlitchTip issues into requests, and how many pages of a GlitchTip list one read covers |
 | `reports` | How often the warden reads prod's report export, how long it waits for it, and the largest it takes |
-| `telemetry` | What `factory errors` and `factory logs` give an agent: how many items, how large, how long a call |
+| `telemetry` | What `factory errors`, `logs` and `records` give an agent: how many items, how large, how long a call |
 | `chat` | The chat channels the warden reads and the tag that files a message there, whose tags count, how often and how much it reads, and how long the factory's replies there may run |
 | `cost`, `prices` | The daily budget (past it, only severe work starts that day), the plan-limit levels, and dollars per million tokens per model |
 | `dashboard` | Port, refresh and stale times, the code lock, page size, the hosts it answers |

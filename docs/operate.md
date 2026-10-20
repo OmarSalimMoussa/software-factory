@@ -95,13 +95,15 @@ user in the factory's checkout of the product (the setting `repo.path`):
 The guard keeps every agent's session off these paths. The git hooks refuse a change to them only inside the
 agents' sessions, so your commit lands.
 
-## Errors and logs
+## Errors, logs and prod's records
 
-Every product gets a database and errors (GlitchTip) from one copy of the shared services on its server, for prod
-and every stack slot, staging among them ([server.md](server.md), [shared-services.md](shared-services.md)). Each
-new prod error arrives once as a request in the agents' inbox, for triage beside your feedback. Agents read errors
-and log lines with `factory errors` and `factory logs`. The factory's own failures report to a GlitchTip project of
-its own there, `factory`, which no agent reads.
+Every product gets a database and errors (GlitchTip) from one copy of the shared services on its server, for prod and
+every stack slot, staging among them ([server.md](server.md), [shared-services.md](shared-services.md)). Each new prod
+error arrives once as a request in the agents' inbox, for triage beside your feedback. Agents read errors and log lines
+with `factory errors` and `factory logs`. The factory's own failures report to a GlitchTip project of its own there,
+`factory`, which no agent reads. An implementer or a designer reads one of prod's records, such as a model's answer
+behind a failed step, with `factory records`: the warden reads it from the folders that factory.toml's `[records]` names
+([repo-shape.md](repo-shape.md)), and the task's log names who read which path.
 
 ## The product's tools
 
@@ -116,10 +118,9 @@ the tools' caches in the agent's home (`checks.writable_caches`).
 
 Each session runs with no sandbox, every tool allowed, no permission prompt and no auto-memory: the guard is its one
 wall. The factory reads parts of Claude Code that no version promises to keep: its session records, the line
-`claude --bg` prints, its transcripts. So the agents' copy is the one the install copied from you, and it never
-updates itself. After an install, check that one session starts and the vitals are green. Should sessions ever run
-with no record the warden reads, the vitals turn red and the crash watch resumes and retires nothing until they are
-seen.
+`claude --bg` prints, its transcripts. So the agents' copy is the one the install copied from you, and it never updates
+itself. After an install, check that one session starts and the vitals are green. Should sessions ever run with no
+record the warden reads, the vitals turn red and the crash watch resumes and retires nothing until they are seen.
 
 ## Pause, stop, resume
 
@@ -139,8 +140,7 @@ saying who made it.
 
 ## Switch the Claude account
 
-The agents sign in to Claude with one of your accounts at a time. To move them to another, when one nears its
-limits:
+The agents sign in to Claude with one of your accounts at a time. To move them to another, when one nears its limits:
 
 - **On the dashboard:** open Settings. Under Claude account, press Switch on the account you want.
 - **In a terminal:** run `factory account use <name>`.

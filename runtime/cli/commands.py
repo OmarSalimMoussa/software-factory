@@ -174,6 +174,9 @@ def _telemetry(sub: Any) -> None:
         help="only lines whose message holds these words, in this order; a line's attributes are not searched",
     )
     logs.add_argument("--since", help="only lines from this time on, such as 2026-10-17T09:17:00Z")
+    records = sub.add_parser("records", help="prod's records that factory.toml names: a folder's newest entries, or a "
+                                             "file's text; read-only, and logged in your task")  # fmt: skip
+    records.add_argument("path", nargs="?", default="", help="none: the folders you may read")
     chat = sub.add_parser("chat", help="the talk around a request from the chat, a page at a time; read-only")
     chat.add_argument("request")
     place = chat.add_mutually_exclusive_group()

@@ -47,6 +47,7 @@ _ARG = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _HEADER = re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]+$")
 _URL_PATH = re.compile(r"^/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$")
 _BLOCKED = re.compile(r"^/[A-Za-z0-9._~!$&'()+,;=:@%/-]*\*?$")
+_RECORDS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*(?:/(?:[A-Za-z0-9][A-Za-z0-9._-]*|\*))*$")
 
 
 class ConfigError(Exception):
@@ -93,7 +94,7 @@ class _Reader(Fields):
     """Walks the parsed file, collecting every problem rather than stopping at the first."""
 
     def config(self, data: dict[str, Any]) -> Config | None:
-        self.known(data, "factory.toml", (*REQUIRED, "reports"))
+        self.known(data, "factory.toml", (*REQUIRED, "reports", "records"))
         product = self.product(data)
         build = self.build(data)
         services = self.services(data)
@@ -103,9 +104,10 @@ class _Reader(Fields):
         deploy = self.deploy(data)
         edge = self.edge(data)
         reports = self.reports(data)
+        records = self.records(data)
         if self.problems:
             return None
-        return Config(product, build, services, env, server, workspaces, deploy, edge, reports, data)
+        return Config(product, build, services, env, server, workspaces, deploy, edge, reports, records, data)
 
     def product(self, data: dict[str, Any]) -> Product:
         t = self.table(data, "product", "", ("name", "registry"))
@@ -254,3 +256,18 @@ class _Reader(Fields):
             self.text(t, "header", "[reports]", _HEADER, "an HTTP header name"),
             self.text(t, "token_key", "[reports]", _ENV_KEY, "an UPPER_CASE environment key"),
         )
+
+    def records(self, data: dict[str, Any]) -> tuple[str, ...]:
+        if "records" not in data:
+            return ()
+        t = self.table(data, "records", "", ("folders",))
+
+        def folder(where: str, value: str) -> None:
+            if not _RECORDS.fullmatch(value):
+                self.fail(
+                    where,
+                    f"{value!r} must name one of prod's volumes, then folders in it, such as job-store/*/steps, "
+                    "where * stands for any one folder",
+                )
+
+        return self.texts(t, "folders", "[records]", folder, empty_ok=False)

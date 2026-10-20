@@ -237,9 +237,9 @@ poll_minutes = 10       # how often the warden asks for new ones
 fetch_seconds = 20      # how long prod's export may take to answer
 max_mib = 8             # the largest export the warden takes; a larger one fails the pull until the export pages
 
-[telemetry]             # `factory errors` and `logs`: agents read GlitchTip through the warden
-max_items = 20          # issues or log lines one answer lists
-max_kib = 64            # the largest answer an agent gets; longer lists and texts are cut to fit
+[telemetry]             # `factory errors`, `logs` and `records`: GlitchTip and prod's records, read by the warden
+max_items = 20          # issues, log lines or a folder's records one answer lists
+max_kib = 64            # the largest answer an agent gets, cut to fit; a larger record is not read
 timeout_seconds = 20    # one call to GlitchTip
 
 [chat]                  # messages tagged in a chat become requests in the chat inbox, and the factory answers there

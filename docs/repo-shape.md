@@ -39,6 +39,7 @@ schema.
 | `[deploy]` | The health address, how long a deploy waits, the files a deploy copies, how many builds to keep |
 | `[edge]` | Paths the edge answers 404, and hosts it redirects |
 | `[reports]` | Optional: the tailnet port and path where prod's report export answers, the header that carries its token, and `token_key`: the key in prod's env file that holds the token |
+| `[records]` | Optional: `folders`, the folders of prod's volumes whose files agents may read with `factory records`, each the compose volume's name and then folders in it, such as `job-store/*/steps`, where `*` stands for any one folder |
 
 The scripts factory.toml names are its **hooks**: prod's `after_deploy` scripts, which run on the server after a
 deploy. Each hook is committed and executable.

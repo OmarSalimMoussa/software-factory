@@ -57,12 +57,12 @@ def read_repo_file(repo: Path, name: str, limit: int) -> bytes:
         raise _unsafe(f"{name!r} is not a file name")
     top = os.open(repo, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
     try:
-        return _read_at(top, name, limit, f"{repo}/{name}")
+        return read_at(top, name, limit, f"{repo}/{name}")
     finally:
         os.close(top)
 
 
-def _read_at(dir_fd: int, name: str, limit: int | None, what: str) -> bytes:
+def read_at(dir_fd: int, name: str, limit: int | None, what: str) -> bytes:
     try:
         fd = os.open(name, _READ_FLAGS, dir_fd=dir_fd)
     except OSError as exc:
@@ -143,7 +143,7 @@ class QueueFiles:
         with self._root() as root:
             fd = self._walk(root, dirs, create=False)
             try:
-                return _read_at(fd, name, None, f"queue/{rel}")
+                return read_at(fd, name, None, f"queue/{rel}")
             finally:
                 os.close(fd)
 

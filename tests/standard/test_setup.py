@@ -352,6 +352,26 @@ def test_a_report_export_factory_toml_cannot_name_is_refused(line: str, problem:
 
 
 @pytest.mark.parametrize(
+    ("folders", "refused"),
+    [
+        ('["job-store/*/steps", "jobs"]', False),
+        ("[]", True),
+        ('["*/agent"]', True),  # a folder starts with one of prod's volumes
+        ('["job-store/../env"]', True),
+        ('["/srv/shop/prod/env"]', True),
+    ],
+)
+def test_records_name_folders_inside_prods_volumes(folders: str, refused: bool) -> None:
+    text = f"{FACTORY_TOML}\n[records]\nfolders = {folders}\n"
+    if not refused:
+        assert parse_text(text).records == ("job-store/*/steps", "jobs")
+        return
+    with pytest.raises(ConfigError) as error:
+        parse_text(text)
+    assert [p for p in error.value.problems if p.startswith("[records].folders")], error.value.problems
+
+
+@pytest.mark.parametrize(
     ("table", "where"),
     [
         ("[smoke]\ntimeout_seconds = 60\n", "factory.toml.smoke"),

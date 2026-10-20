@@ -253,6 +253,7 @@ _CALLS: dict[str, Callable[[argparse.Namespace, Callable[[str], bytes]], Call]] 
     "settings": lambda ns, _: Call("settings.show", {}),
     "errors": lambda ns, _: _telemetry_call(ns),
     "logs": lambda ns, _: _telemetry_call(ns),
+    "records": lambda ns, _: Call("records", {"path": ns.path} if ns.path else {}),
     "chat": lambda ns, _: Call(
         "chat", {"request": ns.request, **{p: getattr(ns, p) for p in CHAT_PAGES if getattr(ns, p)}}
     ),
