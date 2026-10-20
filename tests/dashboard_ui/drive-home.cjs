@@ -64,10 +64,12 @@ drive('home', async t => {
   await p.click('[data-need-act="extend"][data-id="n2"]'); await settle(p);
   t.check((await p.textContent('#needs')).includes('Two more rounds granted'), 'Extend not shown done');
   await t.wide(p, '1440 home');
-  // Push to prod: both builds, what prod gains with what each was built from, then the steps until prod answers
+  // Push to prod: prod's build and the one that ships, what prod gains with what each was built from, what is held
+  // back and why, then the steps until prod answers
   await p.click('#top-promote'); await settle(p);
   t.check((await p.textContent('#sheet-title')) === 'Push to prod' && await p.$('#sheet-body .diff'), 'no push panel');
   t.check((await p.$$('.origin-row')).length === 4, 'push panel should list 4 changes');
+  t.check((await p.textContent('#sheet-body')).includes('Held back') && (await p.textContent('#sheet-body')).includes('its check has not passed'), 'push panel should say what is held back and why');
   await p.click('[data-origin="t-0012"]'); await settle(p); t.check(await p.$('#origin-t-0012 .mock img'), 'spec built-from has no picture');
   await p.click('[data-origin="t-0013"]'); await settle(p); t.check((await p.$$('#origin-t-0013 .shot img')).length === 3, 'fix built-from has no QA shots');
   await t.shot(p, 'push-1440.png');
@@ -75,7 +77,7 @@ drive('home', async t => {
   await t.confirm(p);
   t.check(await until(p, () => document.querySelector('.steps li')), 'no steps shown for the push');
   await p.waitForFunction(() => document.querySelector('#pill-prod').textContent.includes('a1b2c3d'), null, {timeout: 8000}).catch(() => t.errors.push('prod pill did not move to a1b2c3d'));
-  const push = await lastCall('/api/push'); t.check(push && push.body.expected_staging_sha === 'a1b2c3d' && !('code' in push.body), 'push did not send the expected staging build');
+  const push = await lastCall('/api/push'); t.check(push && push.body.ships_sha.startsWith('a1b2c3d') && !('code' in push.body), 'push did not send the build that ships');
   await p.close();
 
   // a blocked task asks only for Fixed, and Fixed sends it back to its builder

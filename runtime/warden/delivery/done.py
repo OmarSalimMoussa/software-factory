@@ -104,7 +104,7 @@ def _taken_back(git: Git, local: str) -> set[str]:
 
 def _full(git: Git, name: str) -> str | None:
     """The full sha of a ref or commit the mirror holds; None when it holds none by that name."""
-    return git.run("rev-parse", "--verify", f"{name}^{{commit}}").strip() if git.knows(name) else None
+    return git.full(name) if git.knows(name) else None
 
 
 def _ancestors(git: Git, commit: str | None) -> set[str] | None:

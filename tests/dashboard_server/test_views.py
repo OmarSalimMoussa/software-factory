@@ -27,6 +27,7 @@ from runtime.shared import operations as kinds
 from runtime.shared import settings as settings_module
 from runtime.shared.models import OPEN_SEVERITIES
 from runtime.shared.settings_schema import SCHEMA
+from runtime.warden.delivery import push_plan
 
 BROKEN = {"broken", "id", "error"}
 
@@ -306,6 +307,26 @@ def test_the_push_sheet_says_prod_runs_staging_only_when_prod_answers_on_staging
         task.unlink()
 
     assert rig.parts("/api/push")["push"]["data"]["prod_runs_staging"] is runs
+
+
+def test_the_push_sheet_shows_the_build_that_ships_what_prod_gains_and_what_is_held_back_with_why(rig: Rig) -> None:
+    at = iso(rig.clock.now())
+    held = [
+        {"task": "t-0016", "merge": "c" * 40, "why": "its check has not passed"},
+        {"task": None, "merge": "d" * 40, "why": "comes after t-0016, which is held"},
+    ]
+    ships = {"commit": "b" * 8, "full": "b" * 40, "at": at}
+    plan = {"at": at, "staging": STAGING, "prod": None, "ships": ships, "gains": ["t-0013"], "held": held}
+    store.write_json(push_plan.path(rig.places), plan | {"refused": None})
+
+    push = rig.parts("/api/push")["push"]["data"]
+
+    assert (push["ships"]["sha"], push["ships"]["healthy_for"], push["ships_sha"]) == ("bbbbbbb", None, "b" * 40)
+    assert ([t["id"] for t in push["tasks"]], push["gains"], push["held_count"]) == (["t-0013"], 1, 2)
+    assert push["held"] == [
+        {"id": "t-0016", "title": "Billing page shows credit after a refund", "why": "its check has not passed"},
+        {"id": None, "title": "merge dddddddddddd", "why": "comes after t-0016, which is held"},
+    ]
 
 
 @pytest.mark.parametrize(("ok", "says"), [(True, None), (False, "staging is red (HTTP 502)")], ids=["green", "red"])

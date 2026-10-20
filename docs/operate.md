@@ -65,12 +65,12 @@ Staging is slot 0, on this machine. After each merge the orchestrator checks the
 (an older one while a check walks it). GitHub holds a mirror: every `watch.done_minutes` the warden fast-forwards
 GitHub's default branch to the checkout's. A branch that took commits on GitHub itself stays as it is, logged once.
 
-When staging looks right, press Push to prod in the top bar, then Push to prod in the panel. It shows both builds and
-what prod gains. The warden pushes staging's build only once it is cleared: staging answers on it, it is on the default
-branch, its tree passed `factory check`, and every merge since prod's build passed its check. The factory then builds
-that commit's images on this machine, deploys prod ([deploy.md](deploy.md)), waits until prod answers on it, and asks
-for a read-only walk of prod. If prod misbehaves, push back the same way, to the commit prod ran before. Going back
-needs only that the commit is on the default branch, so it works even while staging is down.
+When staging looks right, press Push to prod in the top bar, then Push to prod in the panel. It ships the newest green
+build: the newest commit of the default branch that staging answered on, whose tree passed `factory check`, and whose
+merges since prod's build passed their check or were reverted. The panel shows that build, what prod gains, and each
+merge held back, with why. The factory builds the commit's images here, deploys prod ([deploy.md](deploy.md)), waits
+until prod answers on it, and asks for a read-only walk of prod. If prod misbehaves, push back to the commit prod ran
+before. That needs only that the commit is on the default branch, so it works even while staging is down.
 
 Staging and prod each answer a health address with JSON naming the workspace, the running commit as `build_commit`,
 and the work still running as `busy`.
@@ -88,7 +88,7 @@ user in the factory's checkout of the product (the setting `repo.path`):
 2. Commit as the agent user: run each git command as `sudo -u software-agent git -C <repo.path> …`. To bring in a
    commit from your own checkout, write it out with `git format-patch -1 --no-renames <commit>`, then apply the file:
    `sudo -u software-agent git -C <repo.path> am < <file>`. It keeps your message and authorship. Make plain
-   commits, never a merge: Push to prod refuses a merge no task made.
+   commits, never a merge: Push to prod holds back a merge no task made, and all that comes after it.
 3. Resume. The warden asks the orchestrator to check the new tip. Once `factory check` passes, the orchestrator brings
    slot 0 up at it, and your change goes to prod with your next Push to prod.
 

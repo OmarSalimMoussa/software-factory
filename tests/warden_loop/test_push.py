@@ -13,7 +13,7 @@ from runtime.shared.models import Probe, Task
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import inbox
-from runtime.warden.delivery import deploys, github_push, prod_push
+from runtime.warden.delivery import deploys, github_push, prod_push, push_plan
 from runtime.warden.health import probes
 from runtime.warden.owner import ops
 from runtime.warden.sessions.launch import LaunchError
@@ -90,17 +90,114 @@ def _slot0(world: World, case: str) -> str:
         ("red", "staging-red", "staging is red (HTTP 502)"),
         ("prod-runs-it", "nothing-to-push", "prod already runs"),
         ("off-the-branch", "off-branch", "is not on master in the checkout"),
-        ("tree-never-checked", "unchecked", "has not passed factory check"),
-        ("merge-not-checked", "uncleared", "(t-0001, merged), whose check of the default branch has not passed"),
+        ("tree-never-checked", "unchecked", "t-0001 is held back (factory check has not passed on it yet)"),
+        ("merge-not-checked", "uncleared", "t-0001 is held back (its check has not passed)"),
     ],
 )
 def test_push_to_prod_refuses_saying_why(world: World, github_repo: Path, case: str, rule: str, said: str) -> None:
     build = _slot0(world, case)
 
     with pytest.raises(Refused) as refused:
-        prod_push.push_prod(world.ctx, {"expected_staging_sha": "f" * 8 if case == "stale" else build}, None)
+        prod_push.push_prod(world.ctx, {"ships_sha": "f" * 8 if case == "stale" else build}, None)
 
     assert (refused.value.rule, said in refused.value.reason) == (rule, True), refused.value.reason
+    assert world.launcher.deployed == []
+
+
+def _steps(world: World, steps: list[str]) -> dict[str, str]:
+    """Each step's commit on master, by name: `t-0001 checked` merges t-0001 at that status, `revert-t-0001` reverts
+    it. `checked` marks a tree that passed factory check, `served` a build staging ran, `green` both."""
+    made: dict[str, str] = {}
+    for n, step in enumerate(steps):
+        name, *marks = step.split()
+        if name.startswith("revert-"):
+            git(world.checkout, "revert", "-m", "1", "--no-edit", made[name.removeprefix("revert-")])
+            made[name] = git(world.checkout, "rev-parse", "HEAD")
+        else:
+            made[name] = _merge(world, f"impl-{name}-{n}")
+            _task(world, name, marks.pop(0), made[name])
+        if {"green", "checked"} & set(marks):
+            passed(world, git(world.checkout, "rev-parse", f"{made[name]}^{{tree}}"))
+        if {"green", "served"} & set(marks):
+            probe(world, probes.STAGING, True, made[name][:8])
+    return made
+
+
+def _history(world: World, steps: list[str]) -> dict[str, str]:
+    (world.checkout / ".git" / "info").mkdir(exist_ok=True)
+    (world.checkout / ".git" / "info" / "exclude").write_text("queue/\n")  # a revert leaves the task files be
+    probe(world, probes.PROD, True, git(world.checkout, "rev-parse", "HEAD")[:8])
+    world.launcher.deploy = lambda sha: (probe(world, probes.PROD, True, sha), (0, ""))[1]
+    return _steps(world, steps)
+
+
+HELD = "its check has not passed"
+
+
+@pytest.mark.parametrize(
+    ("steps", "ships", "gains", "held"),
+    [
+        (
+            ["t-0001 checked green", "t-0002 merged green", "t-0003 checked green"],
+            "t-0001",
+            ["t-0001"],
+            [("t-0002", HELD), ("t-0003", "comes after t-0002, which is held")],
+        ),
+        (
+            ["t-0001 checked green", "t-0002 merged", "revert-t-0002 green", "t-0002 merged", "t-0003 merged green"],
+            "revert-t-0002",
+            ["t-0001"],
+            [("t-0002", HELD), ("t-0003", HELD)],
+        ),
+        (
+            ["t-0001 checked green", "t-0002 checked checked", "t-0003 checked served"],
+            "t-0001",
+            ["t-0001"],
+            [("t-0002", "staging has not run it yet"), ("t-0003", "factory check has not passed on it yet")],
+        ),
+        (
+            ["t-0001 merged green", "t-0002 checked green"],
+            None,
+            [],
+            [("t-0001", HELD), ("t-0002", "comes after t-0001, which is held")],
+        ),
+    ],
+    ids=["newest-green", "a-revert-clears-its-merge", "a-build-staging-never-ran", "nothing-green"],
+)
+def test_the_push_ships_the_newest_green_build_and_holds_back_each_merge_after_it_saying_why(
+    world: World,
+    github_repo: Path,
+    steps: list[str],
+    ships: str | None,
+    gains: list[str],
+    held: list[tuple[str, str]],
+) -> None:
+    made = _history(world, steps)
+
+    if ships is None:
+        with pytest.raises(Refused) as refused:
+            prod_push.push_prod(world.ctx, {"ships_sha": "f" * 8}, None)
+        assert refused.value.reason.endswith(f"{held[0][0]} is held back ({held[0][1]})"), refused.value.reason
+    else:
+        ops.join(prod_push.push_prod(world.ctx, {"ships_sha": made[ships][:8]}, None)["op"], timeout=30)
+        assert world.launcher.deployed == [(made[ships], False)]
+    plan = push_plan.read(world.ctx.places)
+    assert plan is not None and plan["ships"] == (None if ships is None else {**plan["ships"], "full": made[ships]})
+    assert (plan["gains"], [(row["task"], row["why"]) for row in plan["held"]]) == (gains, held)
+
+
+def test_a_press_for_a_build_the_plan_no_longer_ships_is_refused_and_the_plan_then_names_the_new_one(
+    world: World, github_repo: Path
+) -> None:
+    shown = _history(world, ["t-0001 checked green"])["t-0001"]
+    push_plan.refresh(world.ctx)
+    moved = _steps(world, ["t-0002 checked green"])["t-0002"]
+
+    with pytest.raises(Refused) as refused:
+        prod_push.push_prod(world.ctx, {"ships_sha": shown}, None)
+
+    plan = push_plan.read(world.ctx.places)
+    assert refused.value.rule == "stale" and plan is not None and plan["ships"]["full"] == moved
     assert world.launcher.deployed == []
 
 
@@ -113,7 +210,7 @@ def test_push_to_prod_deploys_slot_0s_build_in_full_and_asks_for_a_qa_prod_pass(
     build = _slot0(world, "cleared")
     world.launcher.deploy = lambda sha: (probe(world, probes.PROD, True, build), (0, ""))[1]  # prod answers on it
 
-    started = prod_push.push_prod(world.ctx, {"expected_staging_sha": build}, None)
+    started = prod_push.push_prod(world.ctx, {"ships_sha": build}, None)
     ops.join(started["op"], timeout=30)
 
     op = ops.get(world.ctx, {"id": started["op"]}, None)["op"]
@@ -148,7 +245,7 @@ def test_a_failed_build_or_deploy_says_what_its_log_says_failed_and_is_logged(
     world.launcher.deploy = deploy
 
     with caplog.at_level(logging.WARNING):
-        started = prod_push.push_prod(world.ctx, {"expected_staging_sha": build}, None)
+        started = prod_push.push_prod(world.ctx, {"ships_sha": build}, None)
         ops.join(started["op"], timeout=30)
 
     steps = ops.get(world.ctx, {"id": started["op"]}, None)["op"]["steps"]
@@ -205,7 +302,7 @@ def test_push_back_goes_to_what_prod_ran_when_the_last_push_began_even_if_that_p
     prod = deploys.builds(world.ctx.places, probes.PROD)["current"]
     monkeypatch.setattr(prod_push, "_steps", lambda push: [])  # the push starts, and its build never answers
 
-    prod_push.push_prod(world.ctx, {"expected_staging_sha": build}, None)
+    prod_push.push_prod(world.ctx, {"ships_sha": build}, None)
 
     assert prod is not None and prod_push.push_back_target(world.ctx) == prod["commit"]  # not OLD, two builds back
 

@@ -1,9 +1,9 @@
 """A warden state folder and a product checkout that hold what the UI's fixtures show, in the real formats.
 
 The fixtures (testdata/dashboard-fixtures) are the UI's picture of one busy afternoon; this module writes the same
-afternoon as the warden keeps it: registry, queue files, cards, proposals, costs, probes, deploys, plan limits,
-vitals and reflections. The dashboard's views are then built from it, and must give back payloads of the fixtures'
-shapes.
+afternoon as the warden keeps it: registry, queue files, cards, proposals, costs, probes, deploys, what a push to
+prod ships, plan limits, vitals and reflections. The dashboard's views are then built from it, and must give back
+payloads of the fixtures' shapes.
 """
 
 from __future__ import annotations
@@ -25,12 +25,13 @@ from runtime.shared import claude_accounts, models, store, totp
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import Places
 from runtime.warden import public
-from runtime.warden.delivery import deploys, done
+from runtime.warden.delivery import deploys, done, push_plan
 from runtime.warden.sessions import registry
 
 T0 = 1_791_546_000.0  # 2026-10-09 11:40:00 UTC
 TEST_TOKEN = "1"  # the device token the UI drives send as their owner cookie
 STAGING, PROD, PREVIOUS = "a1b2c3d", "9f8e7d1", "5c4d3e2"  # a health answer may name a short commit
+STAGING_FULL = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4"
 GOAL = """# The goal
 
 ## Who it is for
@@ -159,6 +160,10 @@ def _seed_health(places: Places, now: float) -> None:
     for when, env, commit in (("Oct 5, 09:12", "prod", PREVIOUS), ("Oct 7, 10:05", "prod", PROD),
                               ("Oct 9, 11:18", "staging", STAGING)):  # fmt: skip
         deploys.record(places, env, commit, iso(fixture_time(when, now)))
+    ships = {"commit": STAGING, "full": STAGING_FULL, "at": iso(fixture_time("Oct 9, 11:18", now))}
+    held = [{"task": "t-0017", "merge": hashlib.sha1(b"t-0017").hexdigest(), "why": "its check has not passed"}]
+    plan = {"at": iso(now - 300), "staging": STAGING, "prod": PROD, "ships": ships, "held": held, "refused": None}
+    store.write_json(push_plan.path(places), plan | {"gains": ["t-0016", "t-0015", "t-0013", "t-0012"]})
     store.write_json(
         places.plan,
         {

@@ -267,7 +267,7 @@ WRITES: list[tuple[re.Pattern[str], Write]] = [
        lambda a, s: reflect.MARKED[a["state"]], ["reflect"]),
     _w(f"rules/{_P}", "rule.switch", lambda b, r, s: {"rule": r, "on": b.get("on")},
        lambda a, s: f"{a['rule']} is {'on' if a['on'] else 'off'}.", ["guard"]),
-    _w("push", "push.prod", lambda b, r, s: {"expected_staging_sha": _text(b, "expected_staging_sha")},
+    _w("push", "push.prod", lambda b, r, s: {"ships_sha": _text(b, "ships_sha")},
        lambda a, s: _said(a, "Pushing to prod."), ["home", "shell"]),
     _w("push/back", "push.back", _push_back_args, lambda a, s: _said(a, "Pushing prod back."), ["home", "shell"],
        wants=("deploys",)),

@@ -109,8 +109,11 @@ def commit(checkout: Path, change: Callable[[Path], None]) -> str:
 
 
 def passed(world: World, tree: str) -> None:
-    """The warden's record of a whole check that passed on ``tree``."""
-    store.write_json(world.ctx.places.check_passes, [{"tree": tree, "commit": "", "branch": "", "task": "", "at": ""}])
+    """The warden's record of a whole check that passed on ``tree``, beside those before it."""
+    found = store.read_json_or(world.ctx.places.check_passes, [])
+    store.write_json(
+        world.ctx.places.check_passes, [*found, {"tree": tree, "commit": "", "branch": "", "task": "", "at": ""}]
+    )
 
 
 def write(rel: str) -> Callable[[Path], None]:

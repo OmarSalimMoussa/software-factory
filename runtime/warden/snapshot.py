@@ -29,7 +29,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import gc, public
 from runtime.warden.context import Context
-from runtime.warden.delivery import deploys, done, outage, prod_push
+from runtime.warden.delivery import deploys, done, outage, prod_push, push_plan
 from runtime.warden.folds import Cost, History, Refusals, Streaks, kept
 from runtime.warden.health import probes
 from runtime.warden.owner import accounts, briefs, codes, factory_upgrade, messages, reflections, settings_save, yolo
@@ -282,6 +282,7 @@ READERS: dict[str, Reader] = {
         **{env: deploys.builds(ctx.places, env) for env in probes.ENVS},
         "push_back": prod_push.push_back_target(ctx),
         "push_refused": prod_push.push_refused(ctx),
+        "plan": push_plan.read(ctx.places),
     },
     "done": lambda ctx, args: done.read(ctx.places),
     "yolo": lambda ctx, args: yolo.state(ctx.places),

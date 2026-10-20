@@ -27,7 +27,7 @@ from runtime.shared.paths import AGENT_USER, DASHBOARD_USER, Places
 from runtime.shared.settings import Settings
 from runtime.warden import gc, imports, inbox, lock_watch, loop, public, schedule, server, upgrade
 from runtime.warden.context import Caller, CheckPlaces, Clock, Context
-from runtime.warden.delivery import done, github
+from runtime.warden.delivery import done, github, push_plan
 from runtime.warden.dispatch import Dispatcher, Doors, resolve
 from runtime.warden.owner import ops, reflections, settings_save, yolo
 from runtime.warden.sessions import browser_waits, crashwatch, launch, reap, registry
@@ -75,6 +75,7 @@ def run_passes(ctx: Context, passes: Sequence[tuple[str, Pass]]) -> None:
 def _refresh_done(ctx: Context) -> None:
     # In its own thread: it waits for a push to end, and mirrors GitHub.
     loop.run_once(ctx, "the done list", lambda: done.refresh(ctx))
+    loop.run_once(ctx, "the push plan", lambda: push_plan.refresh(ctx))
 
 
 def _build_replays(ctx: Context, transcripts: Sequence[Path]) -> None:

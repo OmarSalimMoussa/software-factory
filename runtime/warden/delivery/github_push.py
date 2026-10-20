@@ -3,8 +3,8 @@
 The warden's bare mirror fetches the agents' checkout, which needs no network, and GitHub's default branch over SSH
 with the deploy key, which no agent can read. The Done refresh brings GitHub's branch up to the checkout's tip: a
 fast-forward of whatever the tip holds, never a push over commits GitHub took on its own. It also asks the
-orchestrator to check a tip that waits on nothing else. The owner's push to prod, and back, is prod_push.py's; it
-shares the one lock, so one push or fetch of the checkout runs at a time.
+orchestrator to check a tip that waits on nothing else. The owner's push to prod, and back, is prod_push.py's, and
+what it ships push_plan.py's; they share the one lock, so one push or fetch of the checkout runs at a time.
 """
 
 from __future__ import annotations
@@ -85,12 +85,12 @@ def mirror(ctx: Context, git: Git, tip: str) -> None:
 def ask_for_check(ctx: Context, git: Git, tip: str) -> None:
     """Ask the orchestrator, once a tip, to check the default branch's ``tip`` when that is all it waits on: no turn
     held, and every merge since prod's build cleared to ship."""
-    from runtime.warden.delivery.prod_push import unchecked_merges  # prod_push imports this module
+    from runtime.warden.delivery.push_plan import unchecked_merges  # push_plan imports this module
 
     prod = deploys.builds(ctx.places, probes.PROD)["current"]
     if prod is None or not git.knows(prod["commit"]) or turn.holder(ctx.places) is not None:
         return
-    base = git.run("rev-parse", f"{prod['commit']}^{{commit}}").strip()
+    base = git.full(prod["commit"])
     if tip == base or unchecked_merges(ctx, git, base, tip):
         return
     if checks.passed(ctx.places, git.run("rev-parse", f"{tip}^{{tree}}").strip()):
@@ -158,6 +158,9 @@ class Git:
 
     def knows(self, commit: str) -> bool:
         return self._exec(["cat-file", "-e", f"{commit}^{{commit}}"], cwd=self.mirror).returncode == 0
+
+    def full(self, commit: str) -> str:
+        return self.run("rev-parse", "--verify", f"{commit}^{{commit}}").strip()
 
     def is_ancestor(self, older: str, newer: str) -> bool:
         done = self._exec(["merge-base", "--is-ancestor", older, newer], cwd=self.mirror)

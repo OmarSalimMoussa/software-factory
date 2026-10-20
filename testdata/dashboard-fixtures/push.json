@@ -5,11 +5,11 @@
    "deployed": "Oct 7, 10:05 UTC",
    "commit_url": "https://github.com/acme/acme-app/commit/9f8e7d1"
   },
-  "staging": {
+  "ships": {
    "sha": "a1b2c3d",
    "deployed": "Oct 9, 11:18 UTC",
-   "commit_url": "https://github.com/acme/acme-app/commit/a1b2c3d",
-   "healthy_for": "3 h 12 min"
+   "healthy_for": "3 h 12 min",
+   "commit_url": "https://github.com/acme/acme-app/commit/a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4"
   },
   "tasks": [
    {
@@ -106,9 +106,17 @@
    }
   ],
   "gains": 4,
+  "held": [
+   {
+    "id": "t-0017",
+    "title": "Sign-in sends people back to the sign-in page",
+    "why": "its check has not passed"
+   }
+  ],
+  "held_count": 1,
   "prod_runs_staging": false,
   "previous_prod": "5c4d3e2",
-  "expected_staging_sha": "a1b2c3d",
+  "ships_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4",
   "blocked": null
  }
 }

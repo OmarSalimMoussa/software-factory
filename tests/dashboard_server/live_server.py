@@ -4,8 +4,8 @@ Run: python3 tests/dashboard_server/live_server.py [--port 0]. It prints "listen
 the drives' test routes as the UI's own fixture server does: GET /__calls, POST /__reset and POST /__switch. Each
 switch makes its broken state for real where the warden can (down, scenarios, bump, saved, a failing push); a
 failure of the dashboard itself (fail_path, fail_part, api, refuse) is injected around the server. The clock starts
-at 14:02 UTC on the fixtures' day, an orchestrator stand-in refills free proposal places, a push to prod takes the
-build as named and deploys it at once, and a device signs in with the code 123456.
+at 14:02 UTC on the fixtures' day, an orchestrator stand-in refills free proposal places, a push to prod ships the
+build the seeded plan names and deploys it at once, and a device signs in with the code 123456.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ from runtime.shared import models, store
 from runtime.shared import settings as settings_module
 from runtime.warden import public
 from runtime.warden.context import Caller, Clock
-from runtime.warden.delivery import deploys, prod_push
+from runtime.warden.delivery import deploys, prod_push, push_plan
 from runtime.warden.owner import ops, settings_save
 from runtime.warden.sessions import crashwatch, registry
 
@@ -76,7 +76,8 @@ class Live:
         self.timers: list[threading.Timer] = []
         self._launch = ops.launch
         ops.launch = self.paced  # type: ignore[assignment]  # the drives set how long each step of an operation takes
-        prod_push._cleared = lambda ctx, kind, sha: sha  # type: ignore[assignment]  # the seeded checkout has no git
+        push_plan.fresh = lambda ctx: push_plan.read(ctx.places)  # type: ignore[assignment, return-value]  # no git
+        prod_push._on_branch = lambda ctx, sha: sha  # type: ignore[assignment]  # the seeded checkout has no git
         self.app = self.fresh()
 
     def paced(self, ctx: Any, kind: str, steps: Any, result: dict[str, Any] | None = None) -> str:

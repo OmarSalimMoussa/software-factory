@@ -62,9 +62,10 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    `vitals.merge_wait_amber_hours`. Unlike the vitals, they never hold back a start.
 10. **Staging** is slot 0: after each check it comes back up at the default branch's tip, so it runs the newest
     merge. The warden mirrors the default branch to GitHub; no agent pushes, asks for a push or waits on one.
-11. **Prod.** Only the owner pushes to prod, from the dashboard, at exactly the commit staging runs, once every merge
-    since prod's build passed its check. The factory builds that commit on the server and deploys it. Pushing back
-    redeploys the commit prod ran before.
+11. **Prod.** Only the owner pushes to prod, from the dashboard. A push ships the newest commit staging ran whose
+    tree passed `factory check` and whose merges since prod's build passed their check; the merges after it wait for
+    a later push. The factory builds that commit on the server and deploys it. Pushing back redeploys the commit prod
+    ran before.
 
 ## The rungs
 

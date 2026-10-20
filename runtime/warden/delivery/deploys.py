@@ -1,9 +1,10 @@
 """The deploy log: each build staging (slot 0) and prod answered with, in the order the warden first saw it answer; and
 the deploys in flight, while their restart may take the environment down for a moment.
 
-The log is what the warden saw of the builds. Push back reads prod's previous build here, and the dashboard reads each
-environment's current one. A deploy is in flight from the warden's push until the environment answers on the new
-build, within the minutes the push gives it: a failed probe then is the restart, never an outage.
+The log is what the warden saw of the builds, and is never pruned. Push back reads prod's previous build here, the push
+to prod every build staging answered with, and the dashboard each environment's current one. A deploy is in flight
+from the warden's push until the environment answers on the new build, within the minutes the push gives it: a failed
+probe then is the restart, never an outage.
 """
 
 from __future__ import annotations
@@ -24,10 +25,20 @@ def record(places: Places, env: str, commit: str, at: str) -> None:
         store.append_jsonl(places.deploys, {"at": at, "env": env, "commit": commit})
 
 
+def log(places: Places, env: str) -> list[dict[str, str]]:
+    """Every build ``env`` answered with, oldest first, each {at, env, commit}."""
+    return [row for row in (_row(places, raw) for raw in store.read_jsonl(places.deploys)) if row["env"] == env]
+
+
+def same_build(one: str, other: str) -> bool:
+    """A health answer may name a build by a prefix of its commit."""
+    return one.startswith(other) or other.startswith(one)
+
+
 def builds(places: Places, env: str) -> dict[str, dict[str, str] | None]:
     """``env``'s current build, the last one logged, and its previous one, the latest earlier build with another
     commit; each {at, env, commit}, or None when the log holds none."""
-    mine = [row for row in (_row(places, raw) for raw in store.read_jsonl(places.deploys)) if row["env"] == env]
+    mine = log(places, env)
     current = mine[-1] if mine else None
     previous = None if current is None else next((r for r in reversed(mine) if r["commit"] != current["commit"]), None)
     return {"current": current, "previous": previous}
@@ -62,8 +73,7 @@ def answered(places: Places, env: str, build: str) -> None:
     """``env`` answered on ``build``: a deploy of it has landed, and a failure from now on counts."""
     flights = _flights(places)
     flight = flights.get(env)
-    if flight is not None and not flight["landed"] and (flight["commit"].startswith(build) or
-                                                         build.startswith(flight["commit"])):  # fmt: skip
+    if flight is not None and not flight["landed"] and same_build(flight["commit"], build):
         flight["landed"] = True
         store.write_json(_flight_path(places), flights)
 
