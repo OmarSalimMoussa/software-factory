@@ -4,7 +4,9 @@ own slot's API and nothing else (factory spec, "Reaching a slot").
 Before each request it asks the warden which slot is the caller's, then sends it to
 ``http://127.0.0.1:<that slot's port><path>``: no other host, no redirects, a path only, and an answer cut at the
 warden's size. Nothing but MCP goes to stdout. A request that names a session sends the cookies the slot set in that
-session before, by RFC 6265's paths; an answer shows every header line, each Set-Cookie value hidden.
+session before, by RFC 6265's paths; an answer shows every header line, each Set-Cookie value hidden. The tool frames
+each request and closes its connection itself, so a header that would change either is refused, saying the way that
+works; the one Connection header it sends is a websocket upgrade's, whose 101 answer shows its head alone.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
+from http import HTTPStatus
 from typing import IO, Any
 from urllib.parse import urlsplit
 
@@ -27,7 +30,17 @@ PROTOCOL = "2025-06-18"
 METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD")
 PATH = re.compile(r"^/[\x21-\x7e]*$")
 HEADER_NAME = re.compile(r"^[A-Za-z0-9-]{1,64}$")
-BLOCKED_HEADERS = frozenset({"host", "connection", "transfer-encoding", "content-length", "proxy-authorization"})
+UPGRADE = (
+    "a websocket upgrade check: method GET and no body, `Connection: Upgrade` with `Upgrade: websocket`, "
+    "`Sec-WebSocket-Version: 13` and a `Sec-WebSocket-Key`"
+)
+SET_BY_TOOL = {
+    "host": "the tool sends each request to your slot's own address",
+    "transfer-encoding": "the tool frames the body itself: send it as `body`",
+    "content-length": "the tool frames the body itself: send it as `body`",
+    "proxy-authorization": "no proxy stands between the tool and your slot",
+    "connection": f"the tool closes each connection after its answer; the one Connection header it sends is {UPGRADE}",
+}
 SESSION = re.compile(r"^[A-Za-z0-9@._+-]{1,200}$")
 TOOL = {
     "name": "slot_api",
@@ -37,7 +50,12 @@ TOOL = {
         "properties": {
             "method": {"type": "string", "enum": list(METHODS)},
             "path": {"type": "string", "description": "the path and query, starting with /"},
-            "headers": {"type": "object", "additionalProperties": {"type": "string"}},
+            "headers": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "description": f"header names to values. For {UPGRADE}: a 101 answer shows its status and headers, "
+                "then the tool closes the connection",
+            },
             "body": {"type": "string"},
             "session": {
                 "type": "string",
@@ -77,17 +95,10 @@ def build(port: int, arguments: dict[str, Any]) -> urllib.request.Request:
         raise SlotApiError(f"method is one of {', '.join(METHODS)}")
     if not isinstance(path, str) or not PATH.match(path) or path.startswith("//"):
         raise SlotApiError("path starts with one / and holds no spaces or control characters")
-    headers = arguments.get("headers", {})
-    if not isinstance(headers, dict):
-        raise SlotApiError("headers map names to text")
-    for name, value in headers.items():
-        if not HEADER_NAME.match(str(name)) or name.lower() in BLOCKED_HEADERS:
-            raise SlotApiError(f"the header {name!r} cannot be sent")
-        if not isinstance(value, str) or any(c in value for c in "\r\n\0") or any(ord(c) > 255 for c in value):
-            raise SlotApiError(f"the header {name} holds one line of Latin-1 text")
     body = arguments.get("body")
     if body is not None and not isinstance(body, str):
         raise SlotApiError("body is text")
+    headers = _headers(arguments.get("headers", {}), upgrade=method == "GET" and body is None)
     try:
         data = body.encode() if body is not None else None
     except UnicodeEncodeError as exc:
@@ -95,9 +106,30 @@ def build(port: int, arguments: dict[str, Any]) -> urllib.request.Request:
     return urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data, headers=headers, method=method)
 
 
+def _headers(headers: object, *, upgrade: bool) -> dict[str, str]:
+    """The headers asked for, each one line of Latin-1 and none the tool sets itself, but for a websocket upgrade's
+    Connection when ``upgrade`` (a request that may switch protocols)."""
+    if not isinstance(headers, dict):
+        raise SlotApiError("headers map names to text")
+    for name, value in headers.items():
+        if not HEADER_NAME.match(str(name)):
+            raise SlotApiError(f"the header {name!r} cannot be sent")
+        if not isinstance(value, str) or any(c in value for c in "\r\n\0") or any(ord(c) > 255 for c in value):
+            raise SlotApiError(f"the header {name} holds one line of Latin-1 text")
+    asked = {name.lower(): value.lower() for name, value in headers.items()}
+    upgrade = upgrade and asked.get("connection") == "upgrade" and asked.get("upgrade") == "websocket"
+    for name in headers:
+        why = SET_BY_TOOL.get(name.lower())
+        if why is not None and not (upgrade and name.lower() == "connection"):
+            raise SlotApiError(f"the header {name!r} is not yours to send: {why}")
+    return headers
+
+
 def send(request: urllib.request.Request, timeout: int, limit: int, session: Session | None) -> str:
-    """The answer: its status, every header (each cookie kept in ``session``, its value hidden) and its body."""
-    answer = network.call(request, timeout, limit=limit + 1)
+    """The answer: its status, every header (each cookie kept in ``session``, its value hidden) and its body, or for a
+    switch of protocols, that the tool closed the connection."""
+    door = network.upgrade if request.has_header("Connection") else network.call
+    answer = door(request, timeout, limit=limit + 1)
     path = urlsplit(request.full_url).path
     head = [f"HTTP {answer.status}"]
     for name, value in answer.headers.items():
@@ -107,6 +139,8 @@ def send(request: urllib.request.Request, timeout: int, limit: int, session: Ses
         head.append(f"[session {session.name} holds: {names or 'no cookies'}]")
     raw = answer.body
     text = raw[:limit].decode(errors="replace") + ("\n[cut: the answer is longer]" if len(raw) > limit else "")
+    if answer.status == HTTPStatus.SWITCHING_PROTOCOLS:
+        text = "[the slot switched protocols; the tool read no further and closed the connection]"
     return "\n".join(head) + f"\n\n{text}"
 
 

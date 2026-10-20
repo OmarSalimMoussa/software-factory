@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Iterator
+import urllib.request
+from collections.abc import Callable, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -63,14 +64,33 @@ def test_checked_takes_only_success_and_a_passed_deadline_is_a_timeout(server: s
         network.call(server + "/slow", 0.3)
 
 
+def _upgrade(url: str) -> network.Answer:
+    asked = urllib.request.Request(url, headers={"Connection": "Upgrade", "Upgrade": "websocket"})
+    return network.upgrade(asked, 5)
+
+
+@pytest.mark.parametrize("door", [lambda url: network.call(url, 5), _upgrade], ids=["call", "upgrade"])
 @pytest.mark.parametrize(
     ("path", "kind"), [("/hangup", "RemoteDisconnected"), ("/cut", "IncompleteRead")], ids=["dropped", "cut-short"]
 )
-def test_a_broken_exchange_fails_naming_what_broke(server: str, path: str, kind: str) -> None:
+def test_a_broken_exchange_fails_naming_what_broke(
+    server: str, path: str, kind: str, door: Callable[[str], network.Answer]
+) -> None:
     with pytest.raises(OSError) as failed:
-        network.call(server + path, 5)
+        door(server + path)
 
     assert network.failure_class(failed.value) == kind
+
+
+def test_an_upgrade_the_host_refuses_is_an_answer(server: str) -> None:
+    answer = _upgrade(server + "/426")
+
+    assert (answer.status, answer.body) == (426, b"answered 426")
+
+
+def test_an_upgrade_goes_only_to_this_machine() -> None:
+    with pytest.raises(ValueError, match="not this machine"):
+        _upgrade("http://example.test/")
 
 
 def test_a_request_for_this_machine_never_goes_through_a_proxy(server: str, monkeypatch: pytest.MonkeyPatch) -> None:
