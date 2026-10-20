@@ -104,7 +104,8 @@ drive('work', async t => {
   // Checks: strips and a legend
   await p.click('[data-worktab="checks"]'); await ready(p);
   t.check((await p.$$('.scen i')).length === 80, 'check strips wrong');
-  t.check((await p.$$('.legend span')).length === 3, 'check legend wrong');
+  t.check((await p.$$('.legend span')).length === 4, 'check legend wrong');
+  t.check(((await p.getAttribute('.scen i.c', 'title')) || '').startsWith('stack, carried: it passed at'), 'a carried scenario is not drawn apart');
   // Done: each finished task with how far it reached; its commits; Open opens staging's sign-in link in a new tab,
   // on whatever address the warden answers with
   await p.click('[data-worktab="done"]'); await ready(p);

@@ -134,9 +134,11 @@ is live and nothing merged for a while, a regression walk of the scenarios that 
    turn land, with the pass for its tree. The warden finds the merge and records it.
 3. **Check, in bundles,** as soon as a merge lands, while implementers work too. `factory queue bundle` names the
    oldest merges waiting for their check, at most `rounds.bundle_merges`, the commit to walk them at, and each
-   scenario whose `protects` names a path one of them changed; with none, the one that waited longest. Add the merged
-   specs' own checks. Bring slot 0 up there, whole, as its answer says (`factory slot up --at <commit>` for one older
-   than the tip). When it cannot come up there, as when the env that commit needs is gone, save that check with each
+   scenario whose `protects` names a path one of them changed; with none, the one that waited longest. It lists under
+   `carried` each one whose earlier full pass still holds there: walk only the others. When every one carries and no
+   merged spec adds a check, run `factory queue check <that commit>` with no `--body`: no tester, no slot up. Add the
+   merged specs' own checks. Bring slot 0 up there, whole, as its answer says (`factory slot up --at <commit>` for
+   one older than the tip). When it cannot come up there, as when the env that commit needs is gone, save that check with each
    scenario blocked and why; then `factory queue bundle` takes the bundle on to the tip. Read each scenario as slot 0
    runs it, with `factory qa scenario <name>`: the checkout holds the tip's. Load the seeds (`factory slot seed load
    <name>`), do a set-up that writes inside a service with `factory slot run <service> -- <command>`, and stop the
@@ -152,8 +154,9 @@ is live and nothing merged for a while, a regression walk of the scenarios that 
    none. Name no folder to write in: each tester writes only in its own, which its first answer names. A check of slot
    0's health is read in the tester's browser. Put every tester's rows, as they wrote them, in one report, and run
    `factory queue check <that commit> --body <file>` before slot 0 moves. It clears every merge waiting up to that
-   commit at once, within the cap, when every row passed and each scenario they protect has a row; anything less clears
-   none. A row you doubt is walked again by a tester, never changed by you. Then `factory slot up` for the tip.
+   commit at once, within the cap, when every row passed and each scenario they protect has a row or carries; anything
+   less clears none. The warden adds the carried rows itself. A row you doubt is walked again by a tester, never
+   changed by you. Then `factory slot up` for the tip.
 4. **A row that did not pass** comes back with `next`, and `factory queue bundle` says it again:
    - `again`: walk it again once what blocked it is fixed (a tester's time, the desktop, a set-up): never a revert.
    - `walk`: walk that scenario alone at the commit `at` names and save that check; then read the bundle again.

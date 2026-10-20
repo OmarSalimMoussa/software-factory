@@ -12,10 +12,12 @@ from __future__ import annotations
 import importlib
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Any
 
 from checks.runner.repo import Repo
 from checks.runner.values import Schema
+from runtime.qa import scenarios
 
 IDS: tuple[str, ...] = (
     "repo-shape",
@@ -59,8 +61,8 @@ PATTERN_CHECKS = frozenset(
     }
 )
 NOTE = "note: "
-# Files in check-values/ that feed something other than a check: the QA surfaces table.
-OTHER_VALUES = ("surfaces.toml",)
+# Files in check-values/ that feed something other than a check: the QA surfaces table and the shared paths.
+OTHER_VALUES = ("surfaces.toml", PurePosixPath(scenarios.SHARED).name)
 
 
 @dataclass(frozen=True, slots=True)

@@ -270,7 +270,7 @@ svg.ring .fg{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoff
 .stages{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .scen{display:flex;flex-wrap:wrap;gap:3px}
 .scen i{width:10px;height:10px;border-radius:3px;background:var(--good)}
-.scen i.f{background:var(--bad)} .scen i.b{background:var(--idle)}
+.scen i.f{background:var(--bad)} .scen i.b{background:var(--idle)} .scen i.c{background:var(--f-impl)}
 .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .search{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);min-width:0;flex:1;max-width:420px}
 .search input{border:0;outline:0;background:none;width:100%;min-width:0}

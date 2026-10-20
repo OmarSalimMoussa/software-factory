@@ -1,5 +1,5 @@
 """A scenario, the scenarios' README, or a qa procedure one points at (qa/<name>.md), as slot 0 runs it:
-`factory qa scenario <name>`.
+`factory qa scenario <name>`; and each standing scenario at the default branch's tip, which a bundle reads.
 
 A regression tester walks slot 0 at the build its health answer names, which can be older than the default branch's
 tip: a bundle walks the commit its merges reached. The checkout holds the tip's text, which a merge since may have
@@ -12,7 +12,7 @@ import re
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from runtime.qa.scenarios import FOLDER
+from runtime.qa.scenarios import FOLDER, Scenario, named, parse
 from runtime.shared.paths import scratch_of
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import health
@@ -43,3 +43,30 @@ def show(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
         if code == 0:
             return ok(message=f"{name}, as slot 0 runs it at {commit[:9]}:\n\n{text.rstrip()}", **own)
     raise Refused("qa-scenario", f"slot 0 runs {commit[:9]}, which has no scenario or qa procedure {name}")
+
+
+def standing(ctx: Context, tip: str, max_steps: int, max_items: int) -> dict[str, Scenario]:
+    """Each scenario at ``tip`` a tester may walk now (none waits for what it needs), by name."""
+    repo = ctx.settings().get_str("repo.path")
+    argv = ["git", "-C", repo, "grep", "-n", "--full-name", "-I", "-e", "", tip, "--", f"{FOLDER}/*.md"]
+    code, out = ctx.launcher.agent_command(argv, repo)
+    if code == 1 and not out.strip():  # git grep found no line: the product has no scenario yet
+        return {}
+    if code != 0:
+        raise Refused("git", f"git grep failed: {out.strip()[-200:]}")
+    texts: dict[str, list[str]] = {}
+    for row in out.splitlines():
+        rel, _, numbered = row.removeprefix(f"{tip}:").partition(":")
+        texts.setdefault(rel, []).append(numbered.partition(":")[2])
+    found, problems = {}, []
+    for rel, lines in texts.items():
+        name = named(rel)
+        if name is None:
+            continue
+        scenario, said = parse(name, "\n".join(lines) + "\n", max_steps, max_items)
+        problems += said
+        if scenario is not None and scenario.runs != "waiting":
+            found[name] = scenario
+    if problems:
+        raise Refused("scenarios", "; ".join(problems))
+    return found

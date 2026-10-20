@@ -45,6 +45,10 @@
    {
     "label": "blocked",
     "tone": ""
+   },
+   {
+    "label": "carried",
+    "tone": "info"
    }
   ],
   "rows": [
@@ -57,105 +61,125 @@
      {
       "scenario": "auth-admission",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "auth-admission"
      },
      {
       "scenario": "auth-remove",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "auth-remove"
      },
      {
       "scenario": "billing-credit",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "billing-credit"
      },
      {
       "scenario": "billing-own-key",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "billing-own-key"
      },
      {
       "scenario": "invoice-access",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "invoice-access"
      },
      {
       "scenario": "account-menu",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "account-menu"
      },
      {
       "scenario": "bar-widths",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "bar-widths"
      },
      {
       "scenario": "invoice-create",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "invoice-create"
      },
      {
       "scenario": "home-and-lists",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "home-and-lists"
      },
      {
       "scenario": "phone-pages",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "phone-pages"
      },
      {
       "scenario": "phone-lists",
       "state": "fail",
-      "cls": "f"
+      "cls": "f",
+      "title": "phone-lists"
      },
      {
       "scenario": "shell",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "shell"
      },
      {
       "scenario": "signed-out",
       "state": "pass",
-      "cls": ""
-     },
-     {
-      "scenario": "stack",
-      "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "signed-out"
      },
      {
       "scenario": "trash",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "trash"
      },
      {
       "scenario": "import-run",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "import-run"
      },
      {
       "scenario": "partner-connect",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "partner-connect"
      },
      {
       "scenario": "first-invoice",
       "state": "blocked",
-      "cls": "b"
+      "cls": "b",
+      "title": "first-invoice"
      },
      {
       "scenario": "api-connect",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "api-connect"
      },
      {
       "scenario": "sign-ins-saved",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "sign-ins-saved"
+     },
+     {
+      "scenario": "stack",
+      "state": "carried",
+      "cls": "c",
+      "title": "stack, carried: it passed at 77ab12e, and nothing it depends on has changed since"
      }
     ],
-    "summary": "18 of 20 passed",
+    "summary": "17 of 19 passed, 1 carried",
     "tone": "bad"
    },
    {
@@ -167,102 +191,122 @@
      {
       "scenario": "auth-admission",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "auth-admission"
      },
      {
       "scenario": "auth-remove",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "auth-remove"
      },
      {
       "scenario": "billing-credit",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "billing-credit"
      },
      {
       "scenario": "billing-own-key",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "billing-own-key"
      },
      {
       "scenario": "invoice-access",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "invoice-access"
      },
      {
       "scenario": "account-menu",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "account-menu"
      },
      {
       "scenario": "bar-widths",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "bar-widths"
      },
      {
       "scenario": "invoice-create",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "invoice-create"
      },
      {
       "scenario": "home-and-lists",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "home-and-lists"
      },
      {
       "scenario": "phone-pages",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "phone-pages"
      },
      {
       "scenario": "phone-lists",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "phone-lists"
      },
      {
       "scenario": "shell",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "shell"
      },
      {
       "scenario": "signed-out",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "signed-out"
      },
      {
       "scenario": "stack",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "stack"
      },
      {
       "scenario": "trash",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "trash"
      },
      {
       "scenario": "import-run",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "import-run"
      },
      {
       "scenario": "partner-connect",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "partner-connect"
      },
      {
       "scenario": "first-invoice",
       "state": "blocked",
-      "cls": "b"
+      "cls": "b",
+      "title": "first-invoice"
      },
      {
       "scenario": "api-connect",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "api-connect"
      },
      {
       "scenario": "sign-ins-saved",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "sign-ins-saved"
      }
     ],
     "summary": "19 of 20 passed",
@@ -277,102 +321,122 @@
      {
       "scenario": "auth-admission",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "auth-admission"
      },
      {
       "scenario": "auth-remove",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "auth-remove"
      },
      {
       "scenario": "billing-credit",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "billing-credit"
      },
      {
       "scenario": "billing-own-key",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "billing-own-key"
      },
      {
       "scenario": "invoice-access",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "invoice-access"
      },
      {
       "scenario": "account-menu",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "account-menu"
      },
      {
       "scenario": "bar-widths",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "bar-widths"
      },
      {
       "scenario": "invoice-create",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "invoice-create"
      },
      {
       "scenario": "home-and-lists",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "home-and-lists"
      },
      {
       "scenario": "phone-pages",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "phone-pages"
      },
      {
       "scenario": "phone-lists",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "phone-lists"
      },
      {
       "scenario": "shell",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "shell"
      },
      {
       "scenario": "signed-out",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "signed-out"
      },
      {
       "scenario": "stack",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "stack"
      },
      {
       "scenario": "trash",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "trash"
      },
      {
       "scenario": "import-run",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "import-run"
      },
      {
       "scenario": "partner-connect",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "partner-connect"
      },
      {
       "scenario": "first-invoice",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "first-invoice"
      },
      {
       "scenario": "api-connect",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "api-connect"
      },
      {
       "scenario": "sign-ins-saved",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "sign-ins-saved"
      }
     ],
     "summary": "20 of 20 passed",
@@ -387,102 +451,122 @@
      {
       "scenario": "auth-admission",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "auth-admission"
      },
      {
       "scenario": "auth-remove",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "auth-remove"
      },
      {
       "scenario": "billing-credit",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "billing-credit"
      },
      {
       "scenario": "billing-own-key",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "billing-own-key"
      },
      {
       "scenario": "invoice-access",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "invoice-access"
      },
      {
       "scenario": "account-menu",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "account-menu"
      },
      {
       "scenario": "bar-widths",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "bar-widths"
      },
      {
       "scenario": "invoice-create",
       "state": "fail",
-      "cls": "f"
+      "cls": "f",
+      "title": "invoice-create"
      },
      {
       "scenario": "home-and-lists",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "home-and-lists"
      },
      {
       "scenario": "phone-pages",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "phone-pages"
      },
      {
       "scenario": "phone-lists",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "phone-lists"
      },
      {
       "scenario": "shell",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "shell"
      },
      {
       "scenario": "signed-out",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "signed-out"
      },
      {
       "scenario": "stack",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "stack"
      },
      {
       "scenario": "trash",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "trash"
      },
      {
       "scenario": "import-run",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "import-run"
      },
      {
       "scenario": "partner-connect",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "partner-connect"
      },
      {
       "scenario": "first-invoice",
       "state": "blocked",
-      "cls": "b"
+      "cls": "b",
+      "title": "first-invoice"
      },
      {
       "scenario": "api-connect",
       "state": "blocked",
-      "cls": "b"
+      "cls": "b",
+      "title": "api-connect"
      },
      {
       "scenario": "sign-ins-saved",
       "state": "pass",
-      "cls": ""
+      "cls": "",
+      "title": "sign-ins-saved"
      }
     ],
     "summary": "17 of 20 passed",

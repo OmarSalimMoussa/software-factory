@@ -8,67 +8,18 @@ import logging
 from typing import Any
 
 import pytest
-from product_git import ProductGit, run
+from bundle_kit import SCENARIOS, Product
 from queue_kit import World
 
-from runtime.qa import qa_browser, walked
+from runtime.qa import walked
 from runtime.qa.scenarios import FOLDER
-from runtime.queue import bundle, records, turn, verbs
+from runtime.queue import bundle
 from runtime.queue.book import Queue
-from runtime.shared import models, store
-from runtime.shared.models import Probe
 from runtime.shared.protocol import Refused
 from runtime.slots import health, leases
 from runtime.warden.context import StackResult
 from runtime.warden.delivery import deploys
 from runtime.warden.sessions import backstop
-
-SCENARIOS = {
-    "web": "protects: web/\nneeds: nothing\nruns: in-turn",
-    "api": "protects: api/handlers.py\nneeds: nothing\nruns: in-turn",
-    "later": "protects: web/\nneeds: seed none-yet\nruns: waiting",
-}
-
-
-class Product(ProductGit):
-    """The world's checkout as a git repo: merges recorded for tasks, and the checks the orchestrator saves of it."""
-
-    def __init__(self, world: World) -> None:
-        super().__init__(world.repo, SCENARIOS)
-        self.world = world
-        world.launcher.git = run
-
-    def merge(self, rel: str, status: str = "merged") -> tuple[str, str]:
-        """A merge recorded as its task's, at ``status``: the merge and the task."""
-        commit, branch = super().merge(rel)
-        task = self.world.task(branch=branch)
-        self.world.queue().write_task(dataclasses.replace(task, status=status, run=1))
-        return self.record(commit, task.id), task.id
-
-    def record(self, commit: str, task: str) -> str:
-        found = turn.merges(self.world.places)
-        store.write_json(turn.merges_path(self.world.places), {**found, commit: task})
-        return commit
-
-    def slot0(self, commit: str) -> None:
-        """Slot 0's probe, naming the build it runs as its health answer does: by the short commit."""
-        probe = Probe(self.world.clock.iso(), "staging", True, commit[:8], 40)
-        store.append_jsonl(self.world.places.probes, models.dump(probe))
-
-    def check(self, commit: str, **rows: str) -> dict[str, Any]:
-        table = "".join(f"| {name} | {result} | 1 | shot.png |\n" for name, result in rows.items())
-        report = f"# Check\n\n## Scenarios\n\n{records.CHECK_TABLE}\n| --- | --- | --- | --- |\n{table}"
-        self.world.clock.at += 60
-        return verbs.check_save(self.world.ctx(), {"commit": commit}, report.encode())
-
-    def status(self, task: str) -> str:
-        return self.world.queue().task(task).status
-
-
-@pytest.fixture
-def product(world: World, monkeypatch: pytest.MonkeyPatch) -> Product:
-    monkeypatch.setattr(qa_browser, "runs_root", lambda: world.repo.parent / "runs")
-    return Product(world)
 
 
 @pytest.mark.parametrize(("cap", "count"), [(2, 2), (3, 3)])

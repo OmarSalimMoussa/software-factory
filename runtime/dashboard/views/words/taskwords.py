@@ -1,5 +1,5 @@
 """The words for a task wherever it shows: its status as a dot and a word, its rung, its run, its testers, its cost
-and its estimate, all from the snapshot and the settings in effect.
+and its estimate, and how the checks that cleared it went, all from the snapshot and the settings in effect.
 """
 
 from __future__ import annotations
@@ -227,3 +227,14 @@ def money_or_estimate(snap: Snap, task: dict[str, Any]) -> tuple[str, str]:
     if task["status"] == "proposed":
         return "Estimate", estimate(snap, rung(task, snap.settings))
     return "Cost so far", cost(snap, task)
+
+
+def carried(row: dict[str, Any]) -> str:
+    """Why a check did not walk a scenario again: where the pass it carries came from."""
+    return f"it passed at {row['commit'][:7]}, and nothing it depends on has changed since"
+
+
+def check_summary(passed: int, walked: int, carried: int) -> str:
+    if not walked:
+        return f"{carried} carried, none walked"
+    return f"{passed} of {walked} passed" + (f", {carried} carried" if carried else "")

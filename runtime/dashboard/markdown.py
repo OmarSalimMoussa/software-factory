@@ -12,6 +12,8 @@ import html
 import re
 from collections.abc import Callable, Collection
 
+from runtime.queue.formats import CHECK_ID
+
 _CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 _HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 _RULE = re.compile(r"^\s{0,3}([-*_])(\s*\1){2,}\s*$")
@@ -23,8 +25,9 @@ _CODE = re.compile(r"(`+)(.+?)\1")
 _LINK = re.compile(r"\[([^\]\n]+)\]\((https?://[^\s)]+)\)")
 _BOLD = re.compile(r"\*\*(?=\S)(.+?)(?<=\S)\*\*|__(?=\S)(.+?)(?<=\S)__")
 _ITALIC = re.compile(r"(?<![\w*])\*(?=\S)(.+?)(?<=\S)\*(?![\w*])|(?<![\w_])_(?=\S)(.+?)(?<=\S)_(?![\w_])")
+_CHECK = CHECK_ID.pattern.strip("^$")
 DOC_ID = re.compile(
-    r"(?<![\w-])(t-\d{4,}|s-\d{4,}|r-\d{4}-\d{2}-\d{2}-\d{4}|c-[0-9a-z-]{3,40}|sr\d+|GOAL\.md)(?![\w-])"
+    r"(?<![\w-])(t-\d{4,}|s-\d{4,}|r-\d{4}-\d{2}-\d{2}-\d{4}|" + _CHECK + r"|c-[0-9a-z-]{3,40}|sr\d+|GOAL\.md)(?![\w-])"
 )
 
 

@@ -77,7 +77,7 @@ def index(snap: Snap) -> list[Doc]:
         )
     for c in queue["checks"]:
         status = "fail" if any(r["result"] == "fail" for r in c["rows"]) else "pass"
-        text = " ".join([c["title"], c["commit"], c["notes"], *(r["scenario"] for r in c["rows"])])
+        text = " ".join([c["title"], c["commit"], c["notes"], *(r["scenario"] for r in [*c["rows"], *c["carried"]])])
         docs.append(Doc(c["id"], "check", c["title"], status, None, epoch(c["at"]), text, c))
     for e in snap.get("reflections"):
         title = e["text"] if len(e["text"]) <= 72 else e["text"][:70].rstrip() + "…"

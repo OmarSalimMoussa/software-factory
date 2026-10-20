@@ -34,28 +34,28 @@ class ProductGit:
         return subprocess.run(["git", "-C", str(self.repo), *who, *args], capture_output=True, text=True,
                               check=True).stdout.strip()  # fmt: skip
 
-    def _change(self, rel: str) -> None:
+    def _change(self, rel: str, text: str | None) -> None:
         self.n += 1
         (self.repo / rel).parent.mkdir(parents=True, exist_ok=True)
-        (self.repo / rel).write_text(f"change {self.n}\n")
+        (self.repo / rel).write_text(f"change {self.n}\n" if text is None else text)
         self.git("add", "-A")
         self.git("commit", "-q", "-m", f"change {self.n}")
 
-    def commit(self, rel: str) -> str:
+    def commit(self, rel: str, *, text: str | None = None) -> str:
         """A commit on master itself, such as a revert."""
-        self._change(rel)
+        self._change(rel, text)
         return self.git("rev-parse", "HEAD")
 
-    def branch(self, rel: str) -> str:
+    def branch(self, rel: str, *, text: str | None = None) -> str:
         """A branch off master changing ``rel``, not merged."""
         branch = f"impl-{self.n + 1}"
         self.git("checkout", "-q", "-b", branch)
-        self._change(rel)
+        self._change(rel, text)
         self.git("checkout", "-q", "master")
         return branch
 
-    def merge(self, rel: str) -> tuple[str, str]:
+    def merge(self, rel: str, *, text: str | None = None) -> tuple[str, str]:
         """A branch changing ``rel``, merged into master with --no-ff: the merge commit and the branch."""
-        branch = self.branch(rel)
+        branch = self.branch(rel, text=text)
         self.git("merge", "-q", "--no-ff", branch, "-m", f"Merge {branch}")
         return self.git("rev-parse", "HEAD"), branch

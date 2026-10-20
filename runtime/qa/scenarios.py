@@ -9,14 +9,19 @@ until what it needs exists). An ``items`` label may say how many of a tester's i
 without it, one. Then at most ``qa.max_steps`` numbered steps for each item it takes, so its walk fits its items'
 time; a waiting scenario may hold more. A step may open with a short bold name (``1. **Search.** …``) and holds what
 it expects on a line of its own (``Expect: …`` or ``Expected: …``); the replay shows both.
+
+A path ``protects`` names covers itself and, as a folder, everything under it. ``SHARED`` lists, as ``paths``, the
+ones every scenario depends on though none names them, such as a lockfile: a change to one carries no pass past it.
 """
 
 from __future__ import annotations
 
 import re
+import tomllib
 from dataclasses import dataclass
 
 FOLDER = "qa/scenarios"
+SHARED = "check-values/qa-shared.toml"
 LABELS = ("protects", "needs", "runs")
 ITEMS = "items"
 RUNS = ("in-turn", "desktop", "waiting")
@@ -78,6 +83,30 @@ def items_of(meta: dict[str, str], max_items: int) -> int | None:
 
 def most_steps(taken: int, max_steps: int) -> int:
     return taken * max_steps
+
+
+def covers(protects: tuple[str, ...], path: str) -> bool:
+    return any(path == entry.rstrip("/") or path.startswith(entry.rstrip("/") + "/") for entry in protects)
+
+
+def named(rel: str) -> str | None:
+    """The scenario ``rel`` is the file of, or None."""
+    name = rel.removeprefix(f"{FOLDER}/").removesuffix(".md")
+    return name if rel == f"{FOLDER}/{name}.md" and "/" not in name and name != "README" else None
+
+
+def shared(text: str) -> tuple[tuple[str, ...], list[str]]:
+    """The paths ``SHARED`` lists, or every problem with it."""
+    try:
+        raw = tomllib.loads(text)
+    # telemetry: surfaced — a list that is not TOML is one of the `found` problems the bundle and the check report
+    except tomllib.TOMLDecodeError as exc:
+        return (), [f"not TOML ({exc})"]
+    paths = raw.get("paths")
+    found = [f"holds only paths, not {key}" for key in raw if key != "paths"]
+    if not isinstance(paths, list) or not all(isinstance(p, str) and p.strip("/") not in ("", ".") for p in paths):
+        return (), [*found, "paths is a list of the paths every scenario shares"]
+    return (tuple(paths), []) if not found else ((), found)
 
 
 def problems(rel: str, text: str, exists: set[str] | None, max_steps: int, max_items: int) -> list[str]:

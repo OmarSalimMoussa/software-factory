@@ -11,6 +11,8 @@ from typing import Any
 from runtime.queue import formats
 from runtime.queue.formats import (
     BRIEF,
+    CARRY_TABLE,
+    CHECK_ID,
     CHECK_KEYS,
     CHECK_RESULTS,
     CHECK_TABLE,
@@ -49,6 +51,15 @@ class ScenarioRow:
 
 
 @dataclass(slots=True)
+class Carried:
+    """A scenario a check did not walk again: the check and commit of the walk whose full pass carries to it."""
+
+    scenario: str
+    check: str
+    commit: str
+
+
+@dataclass(slots=True)
 class CheckRecord:
     """A saved check of the default branch: what each standing scenario did on one commit."""
 
@@ -58,6 +69,7 @@ class CheckRecord:
     title: str
     rows: list[ScenarioRow] = field(default_factory=list)
     notes: str = ""
+    carried: list[Carried] = field(default_factory=list)
 
 
 def parse_spec(text: str, rel: str = "") -> Spec:
@@ -114,44 +126,70 @@ def parse_check(text: str, rel: str = "") -> CheckRecord:
         problems.append(f"commit {record.commit!r} is not a commit sha")
     if not ISO.match(record.at):
         problems.append(f"at {record.at!r} is not a UTC time")
-    record.rows, record.notes = _scenario_table(body, problems)
+    walked, rest = _table(body, "## Scenarios", CHECK_TABLE, problems)
+    carried, record.notes = _table(rest, "## Carried", CARRY_TABLE, problems)
+    record.rows, record.carried = _scenario_rows(walked or [], problems), _carried_rows(carried or [], problems)
+    if walked is None:
+        problems.append("no ## Scenarios table")
+    elif not walked and not carried:
+        problems.append("the Scenarios table has no rows")
     formats.check_name(rel, record.id, problems)
     formats.raise_all(problems, rel)
     return record
 
 
-def _scenario_table(body: str, problems: list[str]) -> tuple[list[ScenarioRow], str]:
+def _table(body: str, heading: str, head: str, problems: list[str]) -> tuple[list[str] | None, str]:
+    """The rows of the table under ``heading``, and the body without it; None when the body has no such heading."""
     lines = body.split("\n")
-    if "## Scenarios" not in lines:
-        problems.append("no ## Scenarios table")
-        return [], body
-    heading = lines.index("## Scenarios")
-    start = heading + 1
+    if heading not in lines:
+        return None, body
+    at = lines.index(heading)
+    start = at + 1
     while start < len(lines) and not lines[start].strip():
         start += 1
-    head = lines[start] if start < len(lines) else ""
+    top = lines[start] if start < len(lines) else ""
     rule = lines[start + 1] if start + 1 < len(lines) else ""
-    if head != CHECK_TABLE or not rule.startswith("|") or set(rule) - set("|- "):
-        problems.append(f"the Scenarios table starts with {CHECK_TABLE} and its --- row")
+    if top != head or not rule.startswith("|") or set(rule) - set("|- "):
+        problems.append(f"the {heading.removeprefix('## ')} table starts with {head} and its --- row")
         return [], body
-    rows: list[ScenarioRow] = []
     end = start + 2
     while end < len(lines) and lines[end].startswith("|"):
-        cells = [c.strip() for c in lines[end].strip().strip("|").split("|")]
-        if len(cells) != 4 or not cells[0] or cells[1] not in CHECK_RESULTS or not cells[2].isdigit():
-            problems.append(f"scenario row {lines[end]!r} is not name | pass, fail or blocked | steps | evidence")
-        else:
-            rows.append(ScenarioRow(cells[0], cells[1], int(cells[2]), cells[3]))
         end += 1
-    if not rows:
-        problems.append("the Scenarios table has no rows")
-    return rows, "\n".join(lines[:heading] + lines[end:]).strip()
+    return lines[start + 2 : end], "\n".join(lines[:at] + lines[end:]).strip()
+
+
+def _cells(row: str) -> list[str]:
+    return [c.strip() for c in row.strip().strip("|").split("|")]
+
+
+def _scenario_rows(rows: list[str], problems: list[str]) -> list[ScenarioRow]:
+    found: list[ScenarioRow] = []
+    for row in rows:
+        cells = _cells(row)
+        if len(cells) != 4 or not cells[0] or cells[1] not in CHECK_RESULTS or not cells[2].isdigit():
+            problems.append(f"scenario row {row!r} is not name | pass, fail or blocked | steps | evidence")
+        else:
+            found.append(ScenarioRow(cells[0], cells[1], int(cells[2]), cells[3]))
+    return found
+
+
+def _carried_rows(rows: list[str], problems: list[str]) -> list[Carried]:
+    found: list[Carried] = []
+    for row in rows:
+        cells = _cells(row)
+        if len(cells) != 3 or not cells[0] or not CHECK_ID.match(cells[1]) or not SHA.match(cells[2]):
+            problems.append(f"carried row {row!r} is not name | the check it passed in | that check's commit")
+        else:
+            found.append(Carried(*cells))
+    return found
 
 
 def dump_check(record: CheckRecord) -> str:
     table = "\n".join(f"| {r.scenario} | {r.result} | {r.steps} | {r.evidence} |" for r in record.rows)
     sep = "| --- | --- | --- | --- |"
-    body = f"# {record.title}\n\n## Scenarios\n\n{CHECK_TABLE}\n{sep}\n{table}\n\n{record.notes}"
+    carried = "".join(f"\n| {c.scenario} | {c.check} | {c.commit} |" for c in record.carried)
+    carried = f"## Carried\n\n{CARRY_TABLE}\n| --- | --- | --- |{carried}\n\n" if carried else ""
+    body = f"# {record.title}\n\n## Scenarios\n\n{CHECK_TABLE}\n{sep}\n{table}\n\n{carried}{record.notes}"
     return formats.render(CHECK_KEYS, {"id": record.id, "commit": record.commit, "at": record.at}, body)
 
 

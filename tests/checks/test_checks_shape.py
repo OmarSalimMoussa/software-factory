@@ -7,8 +7,10 @@ import pytest
 
 from checks.runner.repo import Repo
 from checks.standard import deploy_shape, qa_scenarios, repo_shape
+from runtime.qa.scenarios import SHARED
 
 Break = Callable[[Path], None]
+EVERY = "the paths every scenario shares"
 
 
 def _edit(rel: str, old: str, new: str) -> Break:
@@ -104,6 +106,26 @@ def test_a_scenario_takes_the_items_its_label_names_or_one_with_qa_max_steps_ste
     commit(fixture_product, "a long scenario")
     found = qa_scenarios.run(Repo.open(fixture_product), {})
     assert [p.removeprefix("qa/scenarios/long.md: ") for p in found if "long.md" in p] == said
+
+
+@pytest.mark.parametrize(
+    ("text", "said"),
+    [
+        ('paths = ["pyproject.toml", "app/"]\n', []),
+        ('paths = ["app/gone.py"]\n', [f"{SHARED}: names app/gone.py, which does not exist"]),
+        ('paths = "app/"\n', [f"{SHARED}: paths is a list of {EVERY}"]),
+        ('path = ["app/"]\n', [f"{SHARED}: holds only paths, not path", f"{SHARED}: paths is a list of {EVERY}"]),
+        ("paths = [\n", [f"{SHARED}: not TOML"]),
+    ],
+    ids=["paths-that-exist", "one-gone", "not-a-list", "another-key", "not-toml"],
+)
+def test_the_paths_every_scenario_shares_are_a_list_of_paths_that_exist(
+    fixture_product: Path, commit: Callable[[Path, str], None], text: str, said: list[str]
+) -> None:
+    _add(SHARED, text)(fixture_product)
+    commit(fixture_product, "the shared paths")
+    found = [p for p in qa_scenarios.run(Repo.open(fixture_product), {}) if p.startswith(SHARED)]
+    assert [p.partition(" (")[0] for p in found] == said
 
 
 def _remove(rel: str) -> Break:

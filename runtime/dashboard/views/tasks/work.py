@@ -219,8 +219,8 @@ def parked(snap: Snap) -> dict[str, Any]:
     return {"rows": [row for _, row in sorted(rows, key=lambda x: x[0], reverse=True)]}
 
 
-# Each QA result's dot class on the checks tab: app.css colours no class as a pass, f as a failure, b as blocked.
-_RESULT_DOT = {"pass": "", "fail": "f", "blocked": "b"}
+# Each QA result's dot class on the checks tab, as app.css colours it; carried is a pass no tester walked again.
+_RESULT_DOT = {"pass": "", "fail": "f", "blocked": "b", "carried": "c"}
 
 
 def checks(snap: Snap) -> dict[str, Any]:
@@ -231,6 +231,10 @@ def checks(snap: Snap) -> dict[str, Any]:
     for c in sorted(queue["checks"], key=lambda c: c["at"], reverse=True):
         passed = sum(1 for r in c["rows"] if r["result"] == "pass")
         failed = any(r["result"] == "fail" for r in c["rows"])
+        walked = [(r["scenario"], r["result"], r["scenario"]) for r in c["rows"]]
+        carried = [
+            (k["scenario"], "carried", f"{k['scenario']}, carried: {taskwords.carried(k)}") for k in c["carried"]
+        ]
         rows.append(
             {
                 "id": c["id"],
@@ -238,15 +242,15 @@ def checks(snap: Snap) -> dict[str, Any]:
                 "sha": c["commit"][:7],
                 "age": ago(epoch(c["at"]), snap.now),
                 "results": [
-                    {"scenario": r["scenario"], "state": r["result"], "cls": _RESULT_DOT[r["result"]]}
-                    for r in c["rows"]
+                    {"scenario": name, "state": state, "cls": _RESULT_DOT[state], "title": title}
+                    for name, state, title in [*walked, *carried]
                 ],
-                "summary": f"{passed} of {len(c['rows'])} passed",
+                "summary": taskwords.check_summary(passed, len(walked), len(carried)),
                 "tone": "bad" if failed else "good",
             }
         )
     legend = [{"label": "pass", "tone": "good"}, {"label": "fail", "tone": "bad"}, {"label": "blocked", "tone": ""}]
-    return {"legend": legend, "rows": rows}
+    return {"legend": [*legend, {"label": "carried", "tone": "info"}], "rows": rows}
 
 
 def header(snap: Snap) -> dict[str, Any]:

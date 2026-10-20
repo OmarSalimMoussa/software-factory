@@ -1,0 +1,3 @@
+# The paths every QA scenario depends on, though no scenario's protects names them. A change to one walks every
+# scenario again: no earlier pass carries past it.
+paths = ["pyproject.toml", "app/config.py", "app/Dockerfile"]

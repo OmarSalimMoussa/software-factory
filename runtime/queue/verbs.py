@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from runtime.qa import evidence, qa_browser
+from runtime.qa import carry, evidence, qa_browser
 from runtime.queue import bundle, cards, documents, formats, intake, owner, records, tasks, triage, turn
 from runtime.queue import propose as proposing
 from runtime.queue import route as ladders
@@ -162,11 +162,14 @@ def needs_owner(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
 
 
 def check_save(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
-    """A check of the default branch, its testers' runs in the evidence: what it clears, as bundle.py says."""
+    """A check of the default branch, with each scenario whose earlier pass carries to it and its testers' runs in the
+    evidence: what it clears, as bundle.py says."""
     commit = turn.full_commit(ctx, _text(args, "commit"))
     found = bundle.line(ctx)
     bundle.on_line(ctx, found, commit)
-    record = documents.save_check(ctx, commit, data)
+    record = documents.check_record(ctx, commit, data)
+    record.carried = carry.onto(ctx, found, record, bundle.protected(found, commit))
+    documents.keep_check(ctx, record)
     failed = [r.scenario for r in record.rows if r.result != "pass"]
     settled = bundle.settle(ctx, found, record)
     try:
@@ -175,7 +178,8 @@ def check_save(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
         log.warning("warden: the runs of check %s could not be taken into the evidence (%s)", record.id,
                     type(exc).__name__)  # fmt: skip
         taken = None
-    return ok(check=record.id, scenarios=len(record.rows), not_passed=failed, **settled, runs=taken)
+    carried = [c.scenario for c in record.carried]
+    return ok(check=record.id, scenarios=len(record.rows), carried=carried, not_passed=failed, **settled, runs=taken)
 
 
 # The owner's decisions, from the dashboard over owner.sock.

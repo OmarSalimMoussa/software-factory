@@ -1,5 +1,6 @@
 """Documents sessions save into the queue through the warden: a designer's draft spec, and the orchestrator's
-saved check of the default branch. Each arrives as bytes the caller read itself, and must parse before it is kept.
+saved check of the default branch. Each arrives as bytes the caller read itself, and must parse before it is kept;
+a check no tester walked arrives with none, as every scenario it covers carries an earlier pass.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
 
 DESIGNED = ("designing", "review")
+CARRIED = "No tester walked it: each scenario its merges protect carries a full pass from an earlier walk."
 
 
 def _parsed(text: str, what: str) -> tuple[str, str]:
@@ -58,21 +60,28 @@ def save_spec(ctx: Context, task_id: str, data: bytes | None, slices: object) ->
     return spec
 
 
-def save_check(ctx: Context, commit: str, data: bytes | None) -> CheckRecord:
-    """A check of the default branch, on ``commit`` (a full sha): the report's # title, its ## Scenarios table and
-    any notes."""
-    text = intake.body_text(data, "check", ctx.settings().get_int("queue.max_upload_kib"))
+def check_record(ctx: Context, commit: str, data: bytes | None) -> CheckRecord:
+    """A check of the default branch on ``commit`` (a full sha), not kept yet: the report's # title, its ## Scenarios
+    table and any notes. With no report, no tester walked it: its rows are all carried, which the caller adds."""
     now = ctx.clock.iso()
     record_id = f"c-{now.replace('-', '').replace(':', '')}-{commit[:7]}"
+    if data is None:
+        return CheckRecord(record_id, commit, now, f"Check of {commit[:12]}, every scenario carried", [], CARRIED)
+    text = intake.body_text(data, "check", ctx.settings().get_int("queue.max_upload_kib"))
     full = f"---\nid: {record_id}\ncommit: {commit}\nat: {now}\n---\n{text.strip()}\n"
     try:
         record = records.parse_check(full, f"checks/{record_id}.md")
     except FormatError as exc:
         raise Refused("check", "; ".join(exc.problems)) from exc
+    if record.carried:
+        raise Refused("check", "the warden writes the Carried table: leave it out of the report")
+    return record
+
+
+def keep_check(ctx: Context, record: CheckRecord) -> None:
     queue = Queue.of(ctx)
     with ctx.lock, queue.lock():
-        queue.write({f"checks/{record_id}.md": records.dump_check(record)})
-    return record
+        queue.write({f"checks/{record.id}.md": records.dump_check(record)})
 
 
 def approve_spec(ctx: Context, queue: Queue, task_id: str) -> None:

@@ -87,6 +87,7 @@ CHECK_KEYS = ("id", "commit", "at")
 LOG_KEYS = frozenset({"at", "actor", "event", "text"})
 LOG_OPTIONAL = frozenset({"from", "to", "commit"})
 CHECK_TABLE = "| scenario | result | steps run | evidence |"
+CARRY_TABLE = "| scenario | passed in check | at commit |"
 _FRONT = re.compile(r"\A---\n(.*?)\n---\n(.*)\Z", re.S)
 
 

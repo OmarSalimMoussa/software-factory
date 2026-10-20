@@ -147,7 +147,7 @@ def _default_branch_call(ns: argparse.Namespace, read_file: Callable[[str], byte
     if ns.queue_cmd == "next":
         return Call("queue.next", {})
     if ns.queue_cmd == "check":
-        return Call("queue.check", {"commit": ns.commit}, read_file(ns.body))
+        return Call("queue.check", {"commit": ns.commit}, read_file(ns.body) if ns.body else None)
     return Call("queue.bundle", {"through": ns.through} if ns.through else {})
 
 

@@ -116,6 +116,11 @@ def test_every_command_asks_for_a_verb_the_warden_and_the_guard_know(argv: list[
     assert verb_of(["factory", *argv]) == call.verb
 
 
+def test_a_check_with_nothing_left_to_walk_sends_no_report() -> None:
+    call = _build(["queue", "check", "abc1234"])
+    assert (call.verb, call.args, call.data) == ("queue.check", {"commit": "abc1234"}, None)
+
+
 def test_a_slot_run_hands_on_every_word_after_the_double_dash() -> None:
     call = _build(["slot", "run", "web", "--", "python", "-c", "print(1)", "--verbose"])
     assert call.args == {"op": "run", "service": "web", "command": ["python", "-c", "print(1)", "--verbose"]}

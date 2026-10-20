@@ -22,6 +22,7 @@ from runtime.dashboard.views.kit import (
     plural,
     when,
 )
+from runtime.dashboard.views.words import taskwords
 from runtime.queue.formats import CHECK_ID, outcome
 
 WANTS = (*docs.WANTS, "specs", "check_runs")
@@ -44,8 +45,11 @@ def _check_text(raw: dict[str, Any]) -> str:
         f"| `{r['scenario']}` | {'**fail**' if r['result'] == 'fail' else r['result']} | {r['steps']} |"
         for r in raw["rows"]
     )
-    table = f"| Scenario | Result | Steps run |\n| :--- | :---: | ---: |\n{rows}"
-    return f"# {raw['title']}\n\n{raw['notes']}\n\n## Scenarios\n\n{table}"
+    table = f"\n\n## Scenarios\n\n| Scenario | Result | Steps run |\n| :--- | :---: | ---: |\n{rows}" if rows else ""
+    carried = "".join(
+        f"\n- `{k['scenario']}` carried from {k['check']}: {taskwords.carried(k)}." for k in raw["carried"]
+    )
+    return f"# {raw['title']}\n\n{raw['notes']}{table}" + (f"\n\n## Carried\n{carried}" if carried else "")
 
 
 def _proof(snap: Snap, check: str, runs: list[dict[str, Any]]) -> dict[str, Any]:

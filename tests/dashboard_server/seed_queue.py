@@ -204,10 +204,19 @@ def seed_requests(tasks: list[Task], now: float) -> list[Request]:
 
 
 def seed_checks(repo: Path, now: float) -> None:
-    for back, row in enumerate(fixture("work-checks.json")["checks"]["rows"]):
+    """Each check of the fixture's; one drawn carried carries the next older check's pass."""
+    found = fixture("work-checks.json")["checks"]["rows"]
+    for back, row in enumerate(found):
         rows = [
             records.ScenarioRow(r["scenario"], r["state"], 6 if r["state"] == "pass" else 3, "evidence/x")
             for r in row["results"]
+            if r["state"] != "carried"
+        ]
+        older = found[min(back + 1, len(found) - 1)]
+        carried = [
+            records.Carried(r["scenario"], older["id"], older["sha"].ljust(40, "0"))
+            for r in row["results"]
+            if r["state"] == "carried"
         ]
         record = records.CheckRecord(
             row["id"],
@@ -216,5 +225,6 @@ def seed_checks(repo: Path, now: float) -> None:
             row["merge"],
             rows,
             "Every scenario of the default branch, walked.",
+            carried,
         )
         write(repo / "queue" / "checks" / f"{row['id']}.md", records.dump_check(record))

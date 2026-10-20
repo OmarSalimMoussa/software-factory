@@ -52,7 +52,8 @@ check that reads no values needs no file.
 | `size-ceilings`, `comment-budgets` (their pins) | `baseline.json` |
 
 `repo-shape`, `deploy-shape`, `testing-imports`, `qa-scenarios` and `seeds-current` read no
-values. `deploy-shape` reads the product's `factory.toml` instead: it holds the product to the standard build and
+values; `qa-scenarios` also holds each path `qa-shared.toml` lists to one that exists. `deploy-shape` reads the
+product's `factory.toml` instead: it holds the product to the standard build and
 deploy, from the hooks to the images, the deploy files and the ports
 ([repo-shape.md](repo-shape.md)).
 

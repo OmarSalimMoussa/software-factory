@@ -41,12 +41,18 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    the oldest waiting merges, at most `rounds.bundle_merges`, walked together at one commit: the one just before the
    next merge, or the tip. Slot 0 comes up there, whole, from a worktree of its own when that commit is older than
    the tip, and regression testers walk, in parallel, every scenario whose `protects` names a path one of them
-   changed. Their runs go into the evidence with the saved check, so its page in Work shows each tester's screenshots
-   and the replay of its walk. The clean-up keeps the QA of the newest `qa.keep_bundles` checks that cleared a merge;
-   past them, the screenshots and replays of a check, or of a task it cleared, go, and their pages say when.
-   Transcripts are never removed. A check clears every merge waiting up to its commit, at once, only when every row
-   passed, each of those scenarios has a row, slot 0 ran that commit, and they are within the cap; anything less
-   clears none. Once the check of the cap did not pass, the bundle runs through the tip. While the cap of merges
+   changed. A scenario is not walked again, but carried, when its newest walk at that commit or before passed every
+   step and nothing it depends on changed since: a path its `protects` names, its own file, the rest of `qa/` but
+   other scenarios' files, and the paths the product lists in `check-values/qa-shared.toml` as ones every scenario
+   shares, or that list. Until the product lists them, nothing carries. The saved check names each carried scenario
+   with the walk its pass came from, and Work draws it apart; a check with nothing left to walk saves with no tester
+   and no build of slot 0's. Their runs go into the evidence with the saved check, so its page in Work shows each
+   tester's screenshots and the replay of its walk. The clean-up keeps the QA of the newest `qa.keep_bundles`
+   checks that cleared a merge; past them, the screenshots and replays of a check, or of a task it cleared, go, and
+   their pages say when. Transcripts are never removed. A check clears every merge waiting up to its commit, at once,
+   only when every row passed, each of those scenarios has a row or carries, slot 0 ran that commit if a tester
+   walked it, and they are within the cap; anything less clears none. Once the check of the cap did not pass, the
+   bundle runs through the tip. While the cap of merges
    waits, a merge turn goes only to a fix: a task that changes a path a scenario protects whose newest row failed. Each
    row that did not pass says what comes next: walk it again once what blocked it is fixed (a block is never a
    revert); walk it alone at the bundle's base (or, where slot 0 cannot come up there, at the oldest place newer than

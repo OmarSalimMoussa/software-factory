@@ -9,14 +9,14 @@ def test_everything_is_escaped_and_only_safe_links_are_made() -> None:
     source = (
         '<script>alert(1)</script> <img src=x onerror="alert(1)">\n\n'
         "[bad](javascript:alert(1)) [ok](https://example.org/a?b=1&c=2) `<b>code</b>`\n\n"
-        "t-0017 names itself; t-0018 is another task; t-0099 is unknown."
+        "t-0017 names itself; t-0018 is another task; t-0099 is unknown; c-20261009T111000Z-77ab12e is a check."
     )
-    html = render(source, known={"t-0017", "t-0018"}, own="t-0017")
+    html = render(source, known={"t-0017", "t-0018", "c-20261009T111000Z-77ab12e"}, own="t-0017")
     assert "<script" not in html and "<img" not in html and "&lt;script&gt;" in html
     assert 'href="javascript' not in html and "[bad](javascript:alert(1))" in html
     assert '<a href="https://example.org/a?b=1&amp;c=2">ok</a>' in html
     assert "<code>&lt;b&gt;code&lt;/b&gt;</code>" in html
-    assert 'data-open-doc="t-0018"' in html
+    assert 'data-open-doc="t-0018"' in html and 'data-open-doc="c-20261009T111000Z-77ab12e"' in html
     assert 'data-open-doc="t-0017"' not in html and 'data-open-doc="t-0099"' not in html
 
 

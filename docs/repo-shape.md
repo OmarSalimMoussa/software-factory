@@ -158,10 +158,16 @@ runs: in-turn
   time grows with its items, on the remote desktop too, so a scenario with a long wait, such as a recording or a
   rebuild, names more.
 
+A scenario's full pass carries to a later check while nothing it depends on changes
+([dev-cycle.md](dev-cycle.md)), so a path every scenario depends on that no `protects` names, such as a lockfile, the
+app's entry point or a shared stylesheet, belongs in `check-values/qa-shared.toml`: `paths = ["uv.lock", "web/app.py"]`.
+Each must exist. A change to one carries no pass past it; without the file, no pass carries.
+
 ## check-values/
 
 Only values, never code. Each file is named for the check it feeds (see [checks.md](checks.md)), plus
-`surfaces.toml`, the path prefixes that give a diff its QA surfaces.
+`surfaces.toml`, the path prefixes that give a diff its QA surfaces, and `qa-shared.toml`, the paths every scenario
+shares.
 
 ## What only a person changes
 

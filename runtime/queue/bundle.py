@@ -4,14 +4,16 @@ A merge waits from when the warden finds it until a check clears it, its task at
 its newest merge. A bundle is the oldest waiting merges, at most rounds.bundle_merges, walked at one commit: the one
 just before the next merge after the bundle's last, or the tip, so a revert after its last merge is in it. Its
 scenarios are the standing ones whose `protects` names a path one of its merges changed, read at the tip; a tester
-reads each as the build slot 0 runs has it (runtime/qa/walked.py).
+reads each as the build slot 0 runs has it (runtime/qa/walked.py), unless an earlier full pass carries to it
+(runtime/qa/carry.py).
 
 A saved check of a commit on the default branch's first-parent line clears every merge waiting up to it, at once, when
-every row passed, each scenario those merges protect has a row, slot 0's last probe named that commit, and they are
-at most rounds.bundle_merges, or the check of the first that many failed. Anything less clears none, and each row that
-did not pass says what comes next (`_next`). Once the check of the first that many did not pass, a fix joining it or
-slot 0 unable to come up there, the bundle runs through the tip. While the cap of merges waits, a merge turn goes only
-to a fix: a task that changes a path a scenario protects whose newest row, walked with them in, failed.
+every row passed, each scenario those merges protect has a row or carries, slot 0's last probe named that commit if a
+tester walked it, and they are at most rounds.bundle_merges, or the check of the first that many failed. Anything
+less clears none, and each row that did not pass says what comes next (`_next`). Once the check of the first that
+many did not pass, a fix joining it or slot 0 unable to come up there, the bundle runs through the tip. While the cap
+of merges waits, a merge turn goes only to a fix: a task that changes a path a scenario protects whose newest row,
+walked with them in, failed.
 """
 
 from __future__ import annotations
@@ -20,7 +22,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from runtime.qa import scenarios
+from runtime.qa import carry, scenarios, walked
+from runtime.qa.carry import PASS
 from runtime.queue import statuses, tasks, turn
 from runtime.queue.book import Queue
 from runtime.queue.records import CheckRecord, ScenarioRow
@@ -30,7 +33,7 @@ from runtime.warden.context import Context
 from runtime.warden.delivery import deploys
 from runtime.warden.health import probes
 
-PASS, BLOCKED = "pass", "blocked"
+BLOCKED = "blocked"
 _MERGE = re.compile(r"^merge ([0-9a-f]{40})$")  # the line `git log --format='merge %H'` opens each merge with
 _NO_BUILD = "if slot 0 cannot come up there, save that check with each scenario blocked and why"
 
@@ -75,46 +78,17 @@ def line(ctx: Context) -> Line:
         if task in merged and commit in at and (task not in newest or at[commit] < at[newest[task]]):
             newest[task] = commit
     order = sorted(newest, key=lambda task: -at[newest[task]])
-    standing = _standing(ctx, commits[0], settings.get_int("qa.max_steps"), settings.get_int("qa.max_items"))
+    standing = walked.standing(ctx, commits[0], settings.get_int("qa.max_steps"), settings.get_int("qa.max_items"))
     changed = _changed(ctx, [newest[task] for task in order])
     waiting = []
     for task in order:
         commit = newest[task]
         later = [n for n in merge_places if n < at[commit]]
-        guards = {name for name, s in standing.items() for path in changed[commit] if _covers(s.protects, path)}
+        guards = {
+            name for name, s in standing.items() for path in changed[commit] if scenarios.covers(s.protects, path)
+        }
         waiting.append(Merge(commit, task, commits[max(later) + 1] if later else commits[0], frozenset(guards)))
     return Line(commits, at, waiting, standing)
-
-
-def _covers(protects: tuple[str, ...], path: str) -> bool:
-    return any(path == entry.rstrip("/") or path.startswith(entry.rstrip("/") + "/") for entry in protects)
-
-
-def _standing(ctx: Context, tip: str, max_steps: int, max_items: int) -> dict[str, scenarios.Scenario]:
-    """Each scenario at ``tip`` a tester may walk now (none waits for what it needs), by name."""
-    repo = ctx.settings().get_str("repo.path")
-    argv = ["git", "-C", repo, "grep", "-n", "--full-name", "-I", "-e", "", tip, "--", f"{scenarios.FOLDER}/*.md"]
-    code, out = ctx.launcher.agent_command(argv, repo)
-    if code == 1 and not out.strip():  # git grep found no line: the product has no scenario yet
-        return {}
-    if code != 0:
-        raise Refused("git", f"git grep failed: {out.strip()[-200:]}")
-    texts: dict[str, list[str]] = {}
-    for row in out.splitlines():
-        rel, _, numbered = row.removeprefix(f"{tip}:").partition(":")
-        texts.setdefault(rel, []).append(numbered.partition(":")[2])
-    found, problems = {}, []
-    for rel, lines in texts.items():
-        name = rel.removeprefix(f"{scenarios.FOLDER}/").removesuffix(".md")
-        if "/" in name or name == "README":
-            continue
-        scenario, said = scenarios.parse(name, "\n".join(lines) + "\n", max_steps, max_items)
-        problems += said
-        if scenario is not None and scenario.runs != "waiting":
-            found[name] = scenario
-    if problems:
-        raise Refused("scenarios", "; ".join(problems))
-    return found
 
 
 def _changed(ctx: Context, commits: list[str]) -> dict[str, list[str]]:
@@ -132,6 +106,11 @@ def _changed(ctx: Context, commits: list[str]) -> dict[str, list[str]]:
         elif row and current:
             changed[current].append(row)
     return changed
+
+
+def protected(found: Line, commit: str) -> frozenset[str]:
+    """The standing scenarios the merges waiting up to ``commit`` protect."""
+    return frozenset[str]().union(*(m.scenarios for m in found.upto(commit)))
 
 
 def on_line(ctx: Context, found: Line, commit: str) -> None:
@@ -157,14 +136,15 @@ def settle(ctx: Context, found: Line, record: CheckRecord) -> dict[str, Any]:
         cap = ctx.settings().get_int("rounds.bundle_merges")
         why = f"{len(members)} merges wait up to {record.commit[:12]}, past the cap of {cap}: check the oldest {cap} "
         return {"cleared": [], "why": why + f"at {first[:12]} first (factory queue bundle); {_NO_BUILD}"}
-    missing = sorted(frozenset[str]().union(*(m.scenarios for m in members)) - {row.scenario for row in record.rows})
+    covered = {row.scenario for row in record.rows} | {row.scenario for row in record.carried}
+    missing = sorted(protected(found, record.commit) - covered)
     if missing:
         return {
             "cleared": [],
             "why": f"no row for {', '.join(missing)}, which the merges up to {record.commit[:12]} "
             "protect: walk them there and save the check again",
         }
-    if members and not _slot0_ran(ctx, record.commit):
+    if members and record.rows and not _slot0_ran(ctx, record.commit):
         return {
             "cleared": [],
             "why": f"slot 0's last probe does not name {record.commit[:12]}: a check clears merges "
@@ -323,13 +303,17 @@ def show(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
             grows = f"a bundle grows past it only once the check of the first {cap}, at {first[:12]}, failed"
             raise Refused("bundle", f"{len(members)} merges is past the cap of {cap}: {grows}; {_NO_BUILD}")
     names = sorted(frozenset[str]().union(*(m.scenarios for m in members)))
+    carried = carry.carried(ctx, found, checks, names, walk_at)
+    walk = [s for s in names if s not in carried.rows]
     tasks_of = {s: [m.task for m in members if s in m.scenarios] for s in names}
     answer: dict[str, Any] = {
         "merges": [{"commit": m.commit, "task": m.task} for m in members],
         "walk_at": walk_at,
         "base": found.base,
-        "scenarios": [{"name": s, "items": found.standing[s].items, "merges": tasks_of[s]} for s in names],
+        "scenarios": [{"name": s, "items": found.standing[s].items, "merges": tasks_of[s]} for s in walk],
+        "carried": [{"name": s, "check": c.check, "commit": c.commit} for s, c in sorted(carried.rows.items())],
         "waiting": len(found.waiting),
+        **({"carry_off": carried.off} if carried.off else {}),
     }
     if not names:
         answer["walk_instead"] = _longest(found, checks)
@@ -338,12 +322,17 @@ def show(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
         answer["check"] = newest.id
         need = ctx.settings().get_int("rounds.revert_fails")
         answer["next"] = [_next(found, checks, newest, row, need) for row in newest.rows if row.result != PASS]
+    told = f"{len(members)} of {len(found.waiting)} waiting merges: "
+    if names and not walk:
+        told += "every scenario they protect carries an earlier full pass, so no tester walks: "
+        return ok(**answer, message=told + f"factory queue check {walk_at[:12]} with no --body saves the check")
     up = "factory slot up" if walk_at == found.commits[0] else f"factory slot up --at {walk_at[:12]}"
-    items = sum(found.standing[s].items for s in names or [answer["walk_instead"]] if s in found.standing)
-    told = f"{len(members)} of {len(found.waiting)} waiting merges: {up}, walk "
-    told += f"{len(names)} scenarios" if names else f"{answer['walk_instead']}, as no scenario protects them"
-    told += f", then factory queue check {walk_at[:12]}; one brief for them all says Scenarios and checks: {items}"
-    return ok(**answer, message=told + ", plus one for each check it adds")
+    items = sum(found.standing[s].items for s in walk or [answer["walk_instead"]] if s in found.standing)
+    scope = f"{len(walk)} scenarios" if names else f"{answer['walk_instead']}, as no scenario protects them"
+    more = f" ({len(carried.rows)} more carry an earlier full pass)" if carried.rows else ""
+    told += f"{up}, walk {scope}{more}, then factory queue check {walk_at[:12]}; one brief for them all says "
+    off = f"; {carried.off}" if carried.off else ""
+    return ok(**answer, message=told + f"Scenarios and checks: {items}, plus one for each check it adds{off}")
 
 
 def view(ctx: Context, args: dict[str, Any]) -> dict[str, Any]:
@@ -381,7 +370,7 @@ def next_turn(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
 
     def fixes(task: Task) -> bool:
         changed = turn.git(ctx, "diff", "--name-only", f"refs/heads/{default}...refs/heads/{task.branch}").split()
-        return any(_covers(protects, path) for protects in failing.values() for path in changed)
+        return any(scenarios.covers(protects, path) for protects in failing.values() for path in changed)
 
     names = ", ".join(sorted(failing))
     return turn.give(ctx, fixes, f"{held}: only a fix of what their check failed ({names}) takes a turn, and no "

@@ -139,7 +139,7 @@ def _queue(sub: Any) -> None:
     words.add_parser("next")
     check = words.add_parser("check", help="queue check <the commit walked> --body <report file>")
     check.add_argument("commit")
-    check.add_argument("--body", required=True)
+    check.add_argument("--body", default="", help="the testers' rows; none when every scenario carries a pass")
     bundle = words.add_parser("bundle", help="the merges a check clears together, where to walk them, and what")
     bundle.add_argument("--through", default="", help="a commit before the tip, past the cap once its check failed")
     task = words.add_parser("task").add_subparsers(dest="task_cmd", required=True)

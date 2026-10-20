@@ -2,6 +2,7 @@
 it takes more than one item, and at most ``qa.max_steps`` steps for each item it takes; one a branch adds or changes
 that signs in as a named address lists a ``person <role>``: the orchestrator hands testers their people by ``needs``.
 Only changed ones, so a branch that left before older scenarios were fixed is not failed on files it never touched.
+The paths the product lists in check-values/qa-shared.toml, those every scenario depends on, each exist.
 
 The format is runtime/qa/scenarios.py's, the one reader the replay uses too; the most steps and items a scenario may
 have are the factory's own settings, read from its settings.toml, since a scenario takes items of a tester's brief.
@@ -21,7 +22,7 @@ from runtime.shared import settings as settings_mod
 ID = "qa-scenarios"
 RULE = (
     "Scenarios have their three labels, any items label from 1 to qa.max_items, at most qa.max_steps steps for each "
-    "item, and a person for an address they sign in as"
+    "item, a person for an address they sign in as, and the paths every scenario shares exist"
 )
 VALUES_FILE = None
 VALUES = None
@@ -50,7 +51,13 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
         found += scenarios.problems(rel, text, protected, max_steps, max_items)
         if repo.changed is None or rel in repo.changed:
             found += _unnamed(rel, meta, text)
-    return found
+    return found + (_shared(repo) if scenarios.SHARED in repo.tracked else [])
+
+
+def _shared(repo: Repo) -> list[str]:
+    paths, problems = scenarios.shared(repo.read(scenarios.SHARED))
+    problems += [f"names {path}, which does not exist" for path in paths if not (repo.root / path).exists()]
+    return [f"{scenarios.SHARED}: {problem}" for problem in problems]
 
 
 def _unnamed(rel: str, meta: dict[str, str], text: str) -> list[str]:
