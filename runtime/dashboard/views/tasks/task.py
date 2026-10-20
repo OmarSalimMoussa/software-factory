@@ -34,9 +34,12 @@ def spec_id(task_id: str) -> str:
     return "s-" + task_id.removeprefix("t-")
 
 
-def _latest_round(snap: Snap, task_id: str) -> tuple[str, list[str], dict[str, list[dict[str, Any]]], list[str]]:
+Shots = list[tuple[str, dict[str, Any]]]  # each screenshot of a round, after the tester kind that took it
+
+
+def _latest_round(snap: Snap, task_id: str) -> tuple[str, list[str], dict[str, list[dict[str, Any]]], Shots]:
     """The head of the last ready record, its testers, each tester kind's results on it, and its screenshots: the
-    pictures at the top of each run, never its replay's frames."""
+    pictures each run's browsers took, never its replay's frames."""
     qa = snap.get("qa").get(task_id, {"ready": [], "results": [], "evidence": []})
     if not qa["ready"]:
         return "", [], {}, []
@@ -46,8 +49,8 @@ def _latest_round(snap: Snap, task_id: str) -> tuple[str, list[str], dict[str, l
     for r in qa["results"]:
         if r["head"] == head:
             results.setdefault(str(r["tester"]), []).append(r)
-    files = [(e["tester"], url) for e in qa["evidence"] if e["head"] == head for url in replay.shots(task_id, e)]
-    return head, list(last["testers"]), results, [f"{t}\t{u}" for t, u in files]
+    files = [(str(e["tester"]), shot) for e in qa["evidence"] if e["head"] == head for shot in replay.shots(task_id, e)]
+    return head, list(last["testers"]), results, files
 
 
 def _gone(snap: Snap, task_id: str, head: str) -> str | None:
@@ -55,8 +58,8 @@ def _gone(snap: Snap, task_id: str, head: str) -> str | None:
     return next((e["cleaned"] for e in found if e["head"] == head and e["cleaned"]), None)
 
 
-def _shots(files: list[str], tester: str) -> list[str]:
-    return [line.split("\t", 1)[1] for line in files if line.split("\t", 1)[0] == tester]
+def _shots(files: Shots, tester: str) -> list[dict[str, Any]]:
+    return [shot for kind, shot in files if kind == tester]
 
 
 def _replays(urls: list[str]) -> list[dict[str, str]]:
@@ -142,19 +145,19 @@ def built_from(snap: Snap, task: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def qa_line(names: list[str], results: dict[str, list[dict[str, Any]]], files: list[str]) -> dict[str, Any]:
+def qa_line(names: list[str], results: dict[str, list[dict[str, Any]]], files: Shots) -> dict[str, Any]:
     """What a fix's testers found on its last round: each UI tester's screenshots with their verdicts, or one line."""
     if not names:
         return {"tone": None, "note": "No testers: a small backend fix is covered by its own tests.", "shots": []}
     if set(names) & set(UI_TESTERS):
-        shots = [_shot(t, u, _verdict(results.get(t, []))) for t in names for u in _shots(files, t)]
+        shots = [_shot(t, shot, _verdict(results.get(t, []))) for t in names for shot in _shots(files, t)]
         return {"tone": None, "note": None, "shots": shots}
     said = ", ".join(f"{t} {_verdict(results.get(t, []))}" for t in names)
     return {"tone": "good", "note": said, "shots": []}
 
 
-def _shot(tester: str, url: str, verdict: str) -> dict[str, Any]:
-    return {"tester": tester, "url": url, "verdict": verdict, "tone": "good" if verdict == "pass" else "bad"}
+def _shot(tester: str, shot: dict[str, Any], verdict: str) -> dict[str, Any]:
+    return {"tester": tester, **shot, "verdict": verdict, "tone": "good" if verdict == "pass" else "bad"}
 
 
 def _verdict(results: list[dict[str, Any]]) -> str:

@@ -23,6 +23,7 @@ from typing import Any
 
 from runtime.qa.qa_browser import RUN, SESSION
 from runtime.qa.replay.build import FOLDER as REPLAY
+from runtime.qa.wrapper import SECOND
 from runtime.queue.book import Queue
 from runtime.queue.formats import CHECK_ID, TASK_ID
 from runtime.queue.records import CheckRecord
@@ -61,9 +62,12 @@ def of(entry: dict[str, Any]) -> str:
 
 
 def drawn(entry: dict[str, Any], cleaned: str | None) -> dict[str, Any]:
-    """An entry as a page draws it: the pictures atop its run as ``shots``, in place of ``files``, whose trace's
-    thousands of names would overflow an answer about many tasks."""
-    shots = [f for f in entry["files"] if "/" not in f and f.rpartition(".")[2].lower() in IMAGES]
+    """An entry as a page draws it: the screenshots of both browsers as ``shots``, in the order they were taken, in
+    place of ``files``, whose trace's thousands of names would overflow an answer about many tasks."""
+    found = [f.rpartition("/") for f in entry["files"] if f.rpartition(".")[2].lower() in IMAGES]
+    shots = [
+        folder + slash + name for folder, slash, name in sorted(found, key=lambda f: f[2]) if folder in ("", SECOND)
+    ]
     return {**{k: v for k, v in entry.items() if k != "files"}, "shots": shots, "cleaned": cleaned}
 
 

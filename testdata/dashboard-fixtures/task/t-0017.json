@@ -84,7 +84,10 @@
      "tone": "accent",
      "note": null,
      "shots": [
-      "/api/evidence/t-0017/page.svg"
+      {
+       "url": "/api/evidence/t-0017/page.svg",
+       "note": null
+      }
      ],
      "replays": [
       {
@@ -109,7 +112,10 @@
      "tone": "bad",
      "note": "Menu overflows at 390 px",
      "shots": [
-      "/api/evidence/t-0017/phone.svg"
+      {
+       "url": "/api/evidence/t-0017/phone.svg",
+       "note": null
+      }
      ],
      "replays": []
     },

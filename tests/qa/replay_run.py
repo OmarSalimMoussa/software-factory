@@ -1,9 +1,11 @@
 """A small tester run as it reaches the replays pass: the trace's frames and the page recorder's lines, the tester's
 transcript, its step marks and its finding. Second 0 is the first frame; the tester walks two steps of the `cart`
-scenario, opens the desktop, types a sign-in link and opens another on the way, and never reaches step 3."""
+scenario, opens the desktop, types a sign-in link and opens another on the way, and never reaches step 3, unless
+``second`` adds it, walked in a second browser."""
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -128,3 +130,47 @@ def make(run: Path, transcript: Path) -> Inputs:
         Shares(0.3, 0.6),
         SECRET_SECONDS,
     )
+
+
+def _frame(run: Path, at: float, page: str) -> dict[str, Any]:
+    """A frame of the page ``page`` at second ``at``, its picture written into the trace's resources."""
+    name = f"{page}-{round((T0 + at) * 1000)}.jpeg"
+    (run / "traces" / "resources" / name).write_bytes(f"jpeg {at:g}".encode())
+    return {
+        "type": "screencast-frame",
+        "sha1": name,
+        "width": 1280,
+        "height": 800,
+        "frameSwapWallTime": (T0 + at) * 1000,
+    }
+
+
+def second(given: Inputs) -> Inputs:
+    """The run, then step 3 walked in a second browser once the secret is off screen: a page, a click and a screenshot
+    there, then the second closed and a page in the first. Its trace, named as Playwright names one, started after
+    the first's."""
+    run, there = given.run, {"browser": "second"}
+    events = [
+        *(_frame(run, at, "page@0c4b1f2e9d8a7b6c") for at in (22, 23, 25)),
+        _recorded(23.2, k="down", x=300, y=200, name="Start visit"),
+    ]
+    (run / "traces" / f"trace-{round((T0 + 21.8) * 1000)}.trace").write_text("\n".join(map(json.dumps, events)))
+    with (run / "traces" / "run.trace").open("a", encoding="utf-8") as first:
+        first.write("\n" + json.dumps(_frame(run, 27.6, "page@61b379a7fb0f2ca28dfab3f58d509a1c")) + "\n")
+    (run / "second").mkdir()
+    (run / "second" / "page-24.png").write_bytes(b"png 24")
+    go, act = "mcp__qa-browser__browser_navigate", "mcp__qa-browser__browser_"
+    lines = [
+        *_call(21.8, 22.4, "j", go, {"url": "https://app.test/visits", **there}, "ok"),
+        *_call(23.0, 23.5, "k", act + "click", {"element": "Start visit", "ref": "e9", **there}, "ok"),
+        *_call(24.0, 24.4, "l", act + "take_screenshot", there, "![shot](./page-24.png)"),
+        *_call(26.0, 26.3, "m", act + "close_second", {}, "Your second browser closed."),
+        *_call(27.0, 27.5, "n", go, {"url": "https://app.test/cart"}, "ok"),
+    ]
+    with given.transcript.open("a", encoding="utf-8") as transcript:
+        transcript.write("\n".join(map(json.dumps, lines)) + "\n")
+    marks = [
+        {"item": "cart", "step": 3, "at": iso(21.7)},
+        {"item": "cart", "step": 3, "result": "pass", "got": "Both showed", "at": iso(27.8)},
+    ]
+    return dataclasses.replace(given, records=[*given.records, *marks])

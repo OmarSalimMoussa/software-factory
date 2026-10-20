@@ -1,5 +1,6 @@
 """One tester run's replay, as the warden's replays pass leaves it in the run's folder: three frames of a plain
-sign-in form and the beats of two items, one failed on its second step and one with a step it did not run."""
+sign-in form, the last in the tester's second browser, and the beats of two items, one failed on its second step and
+one walked in the second browser, with a step it did not run."""
 
 from __future__ import annotations
 
@@ -41,7 +42,7 @@ REPLAY: dict[str, Any] = {
     "frames": [
         {"t": 0.0, "file": "replay/frames/000001.jpg", "w": 1280, "h": 800},
         {"t": 4.1, "file": "replay/frames/000002.jpg", "w": 1280, "h": 800},
-        {"t": 7.4, "file": "replay/frames/000003.jpg", "w": 1280, "h": 800},
+        {"t": 7.4, "file": "replay/frames/000003.jpg", "w": 1280, "h": 800, "in": "second"},
     ],
     "hidden": [[8.6, 9.2]],
     "seconds": 9.4,
@@ -101,7 +102,7 @@ REPLAY: dict[str, Any] = {
                     "The profile shows",
                     "pass",
                     "It showed",
-                    [_act([8.4, 9.4], "wait", "Waited for “Profile”")],
+                    [_act([8.4, 9.4], "wait", "Waited for “Profile”", **{"in": "second"})],
                     still="replay/frames/000003.jpg",
                 ),
                 _step(2, "Change the name", "The new name shows", "skip", "", []),

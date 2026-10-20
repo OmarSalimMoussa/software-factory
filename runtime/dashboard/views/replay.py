@@ -1,6 +1,8 @@
 """One tester run's replay page: its items as rows with their verdicts, each step's expected and got, and every beat
 the player shows, with its words, its icon and its place on the screen worked out here. The page only lays it out
-and keeps the time."""
+and keeps the time. What the tester's second browser showed and did says so: its frames and step pictures carry a
+flag the page labels, and its beats and steps say it in their words. A run replayed before the second browser holds
+no mark of it: all of it is the first's."""
 
 from __future__ import annotations
 
@@ -10,6 +12,7 @@ from urllib.parse import urlencode
 
 from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, day_label, epoch, when
 from runtime.dashboard.views.words import taskwords
+from runtime.qa.wrapper import FIRST, SECOND
 from runtime.shared.models import SEVERITIES
 
 WANTS = ("settings", "queue", "replay")
@@ -53,8 +56,11 @@ BEAT_ICONS = {
 }
 SEVERITY_TONES = dict(zip(SEVERITIES, ("bad", "warn", "muted"), strict=True))  # worst first
 HIDDEN_SAYS = "A sign-in link was on screen here, so this part is hidden."
+SECOND_SAYS = "Second browser"
+# Where a step's actions happened, after its name, by the browsers they used.
+_WHERE = {frozenset({SECOND}): " · second browser", frozenset({FIRST, SECOND}): " · both browsers"}
 _FRAME = re.compile(r"^replay/frames/\d{6}\.jpg$")
-_SHOT = re.compile(r"^[A-Za-z0-9][\w.-]{0,127}\.(?:png|jpe?g)$")
+_SHOT = re.compile(rf"^(?:{SECOND}/)?[A-Za-z0-9][\w.-]{{0,127}}\.(?:png|jpe?g)$")
 
 
 def url(of: str, head: str, tester: str, run: str) -> str:
@@ -94,17 +100,19 @@ def page(snap: Snap, asked: dict[str, str]) -> dict[str, Any]:
         return head | {"state": "failed", "says": f"This run has no replay: {data['error']}."}
     base = evidence_base(asked["of"], asked["head"], asked["tester"], asked["run"])
     shown = [f for f in data["frames"] if _FRAME.match(f["file"])]
-    frames = [{"t": f["t"], "url": base + f["file"], "w": f["w"], "h": f["h"]} for f in shown]
+    frames = [{"t": f["t"], "url": base + f["file"], "w": f["w"], "h": f["h"], "second": _second(f)} for f in shown]
     if not frames:
         return head | {"state": "failed", "says": "This run has no replay: it kept no pictures of the screen."}
     settings = snap.settings
-    rows = [_row(item, frames, base) for item in data["items"]]
+    seconds = {f["file"] for f in shown if _second(f)}
+    rows = [_row(item, frames, base, seconds) for item in data["items"]]
     return head | {
         "state": "ready",
         "summary": _summary(data["items"]),
         "frames": frames,
         "hidden": data["hidden"],
         "hidden_says": HIDDEN_SAYS,
+        "second_says": SECOND_SAYS,
         "seconds": data["seconds"],
         "pace": {name: settings.get_int(f"replay.{name}_ms") for name in PACE},
         "rows": rows,
@@ -129,13 +137,17 @@ def _summary(items: list[dict[str, Any]]) -> dict[str, str]:
     return {"text": "No verdict", "tone": "muted"}
 
 
-def _row(item: dict[str, Any], frames: list[dict[str, Any]], base: str) -> dict[str, Any]:
+def _second(shown: dict[str, Any]) -> bool:
+    return shown.get("in") == SECOND
+
+
+def _row(item: dict[str, Any], frames: list[dict[str, Any]], base: str, seconds: set[str]) -> dict[str, Any]:
     icon, tone, word = RESULTS[item["verdict"]]
     note = f"{word} at step {item['at']}" if item["at"] is not None else word
     if item["verdict"] == "none":
         note = "No verdict"
     severity = item["severity"]
-    steps = [_step(step, len(item["steps"]), frames, base) for step in item["steps"]]
+    steps = [_step(step, len(item["steps"]), frames, base, seconds) for step in item["steps"]]
     first = next((i for i, s in enumerate(item["steps"]) if s["n"] == item["at"]), 0)
     return {
         "key": item["item"],
@@ -149,23 +161,27 @@ def _row(item: dict[str, Any], frames: list[dict[str, Any]], base: str) -> dict[
     }
 
 
-def _step(step: dict[str, Any], count: int, frames: list[dict[str, Any]], base: str) -> dict[str, Any]:
+def _step(
+    step: dict[str, Any], count: int, frames: list[dict[str, Any]], base: str, seconds: set[str]
+) -> dict[str, Any]:
     icon, tone, word = RESULTS[step["result"]]
     label = step["name"] or f"Step {step['n']}"
     beats = [_beat(b, frames, base) for b in step["beats"]]
     finding = step["finding"]
-    still = step["still"]
+    still = step["still"] if step["still"] and (_FRAME.match(step["still"]) or _SHOT.match(step["still"])) else None
+    where = _WHERE.get(frozenset(SECOND if _second(b) else FIRST for b in step["beats"] if b["k"] != "think"), "")
     return {
         "n": step["n"],
         "label": label,
         "icon": icon,
         "tone": tone,
         "card": f"Step {step['n']} of {count} · {label}",
-        "head": f"Step {step['n']} · {label}" + ("" if beats else ": didn't run"),
+        "head": f"Step {step['n']} · {label}" + (where if beats else ": didn't run"),
         "expected": step["expected"] or "unknown: the scenario is not in the tested build",
         "got": step["got"] or word,
         "hint": f"{finding['severity'].title()} finding: {finding['text']}" if finding else None,
-        "still": base + still if still and (_FRAME.match(still) or _SHOT.match(still)) else None,
+        "still": base + still if still else None,
+        "still_second": still is not None and (still in seconds or still.startswith(f"{SECOND}/")),
         "rough": sum(1 for b in step["beats"] if b["k"] == "miss") > 1,
         "beats": beats,
     }
@@ -205,6 +221,8 @@ def _beat(beat: dict[str, Any], frames: list[dict[str, Any]], base: str) -> dict
         out |= {"log": "Took a screenshot", "say": "Took a screenshot"}
     else:
         out |= {"log": text, "say": text}
+    if _second(beat):
+        out["log"] += _WHERE[frozenset({SECOND})]
     out |= {"t": beat["t"], "seg": beat["seg"]}
     w, h = _size_at(frames, beat["seg"][0])
     if "x" in beat and "y" in beat:
@@ -232,7 +250,9 @@ def tester_runs(task_id: str, head: str, evidence: list[dict[str, Any]]) -> dict
     return runs
 
 
-def shots(of: str, entry: dict[str, Any]) -> list[str]:
-    """The addresses of a run's screenshots; none once the clean-up removed them."""
+def shots(of: str, entry: dict[str, Any]) -> list[dict[str, Any]]:
+    """A run's screenshots: each one's address, and a note on those the second browser took; none once the clean-up
+    removed them."""
     base = evidence_base(of, str(entry["head"]), str(entry["tester"]), str(entry["run"]))
-    return [] if entry["cleaned"] else [base + f for f in entry["shots"]]
+    found = [] if entry["cleaned"] else entry["shots"]
+    return [{"url": base + f, "note": SECOND_SAYS if f.startswith(f"{SECOND}/") else None} for f in found]

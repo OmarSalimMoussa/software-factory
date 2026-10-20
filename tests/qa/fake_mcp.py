@@ -1,7 +1,8 @@
 """A stand-in for Playwright's MCP server, for the wrapper's tests: it answers on standard input and output as the
 server does, and writes each request it gets to the file named first. With FAIL_TRACE set, the trace never starts;
 with ASK_ROOTS set, it asks the session for its roots before it starts the trace and waits for the answer, as
-Playwright does; a call to browser_crash ends it with exit 3.
+Playwright does; a call to browser_crash ends it with exit 3. Its code tool answers with the address its browser's
+process takes a second server on, as the wrapper's code asks.
 
 Run: python3 fake_mcp.py <log file>
 """
@@ -13,6 +14,7 @@ import os
 import sys
 
 LAST = ["about:blank"]  # the page the browser is on
+ENDPOINT = "/tmp/pw-fake/browser/browser-fake.sock"
 TOOLS = [
     "browser_navigate",
     "browser_snapshot",
@@ -51,6 +53,8 @@ def answer(message: dict[str, object]) -> dict[str, object] | None:
     assert isinstance(args, dict)
     if name == "browser_start_tracing" and os.environ.get("FAIL_TRACE"):
         return {"content": [{"type": "text", "text": "### Error\ntracing is off"}], "isError": True}
+    if name == "browser_run_code_unsafe":
+        return {"content": [{"type": "text", "text": f"### Result\n{json.dumps(ENDPOINT)}\n### Ran Playwright code"}]}
     if name == "browser_navigate":
         LAST[0] = str(args["url"])
     said = f"### Page\n- Page URL: {LAST[0]}\n" if name in ("browser_navigate", "browser_snapshot") else f"{name} done"

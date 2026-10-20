@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 
 from runtime.guard.browser import BROWSER
 from runtime.qa.replay.trace import Trace
-from runtime.qa.wrapper import ROUTE, WAIT_FOR
+from runtime.qa.wrapper import CHOICE, CLOSE, FIRST, ROUTE, SECOND, WAIT_FOR
 from runtime.qa.wrapper_tools import HOLD, LINK, OPEN_DESKTOP, RELEASE, SIGN_IN, WAIT_UNTIL
 
 # Calls with nothing to show: the browser's own housekeeping.
@@ -147,20 +147,27 @@ class Seen:
     shares: Shares
 
 
+def browser(use: Use) -> str:
+    return SECOND if use.input.get(CHOICE) == SECOND else FIRST
+
+
 def beat(use: Use, trace: Trace, t0: float, last: list[tuple[int, int]], shares: Shares) -> dict[str, Any] | None:
-    """One browser call as a beat, or None for a call with nothing to show."""
+    """One browser call as a beat, or None for a call with nothing to show; ``trace`` is its browser's."""
     name = use.name.removeprefix(BROWSER)
     if not use.name.startswith(BROWSER) or name in QUIET or use.done is None:
         return None
     start, end = round(use.at - t0, 2), round(use.done - t0, 2)
     seen = Seen(use, trace, t0, last, trace.near("down", use.at, use.done), shares)
     if use.failed:
-        missed: dict[str, Any] = {"k": "miss", "text": "Didn't work: " + _why(use.result)}
+        shown: dict[str, Any] = {"k": "miss", "text": "Didn't work: " + _why(use.result)}
         if seen.downs:
-            missed |= {"x": seen.downs[0]["x"], "y": seen.downs[0]["y"]}
-        return {"t": start, "seg": [start, end], **missed}
-    mouse = name.startswith("browser_mouse_") and "x" in use.input
-    return {"t": start, "seg": [start, end], **(_mouse(seen) if mouse else _SHOWN.get(name, _other)(seen))}
+            shown |= {"x": seen.downs[0]["x"], "y": seen.downs[0]["y"]}
+    else:
+        mouse = name.startswith("browser_mouse_") and "x" in use.input
+        shown = _mouse(seen) if mouse else _SHOWN.get(name, _other)(seen)
+    if browser(use) == SECOND:
+        shown |= {"in": SECOND, **({"file": f"{SECOND}/{shown['file']}"} if "file" in shown else {})}
+    return {"t": start, "seg": [start, end], **shown}
 
 
 def _go(seen: Seen) -> dict[str, Any]:
@@ -264,6 +271,7 @@ _WORDS: dict[str, Callable[[dict[str, Any]], tuple[str, str]]] = {
     ROUTE: lambda a: ("read", f"Answered {str(a.get('pattern', ''))[:40]} with {a.get('status', 200)}"),
     HOLD: lambda a: ("wait", f"Held the next request to {str(a.get('pattern', ''))[:40]}"),
     RELEASE: lambda a: ("wait", f"Let the held request to {str(a.get('pattern', ''))[:40]} go on"),
+    CLOSE: lambda a: ("go", "Closed the second browser"),
 }
 
 

@@ -1,8 +1,9 @@
 'use strict';
 /* A tester run's replay: opened from the task panel; a row opens on its failed step; picking a step moves nothing;
    Watch plays the title card, the thought and the actions over the frames; the stage pauses and resumes; the list
-   follows the player; the recording plays and hides a secret's stretch; a step that did not run says so. A check
-   shows each run's screenshots, and a run with no steps marked plays as its recording. */
+   follows the player; the recording plays and hides a secret's stretch; a step that did not run says so; what the
+   second browser showed is named. A check shows each run's screenshots, the second browser's named, and a run with
+   no steps marked plays as its recording. */
 const {drive, ready, settle} = require('./lib.cjs');
 
 const wait = (p, fn, arg, ms = 20000) => p.waitForFunction(fn, arg, {timeout: ms}).then(() => true, () => false);
@@ -64,7 +65,9 @@ drive('replay', async t => {
       await p.$eval('.rp-slider', s => { s.value = '8.8'; s.dispatchEvent(new Event('input', {bubbles: true})); });
       t.check(await p.isVisible('.rp-raw .rp-secret'), tag('the secret stretch is not hidden'));
       t.check((await p.textContent('.rp-time')) === '0:09 / 0:09', tag('time: ' + await p.textContent('.rp-time')));
+      t.check(await p.textContent('.rp-raw .rp-who') === 'Second browser' && await p.isVisible('.rp-raw .rp-who'), tag('the second browser is not named on its screen'));
       await p.$eval('.rp-slider', s => { s.value = '0'; s.dispatchEvent(new Event('input', {bubbles: true})); });
+      t.check(!(await p.isVisible('.rp-raw .rp-who')), tag('the first browser is named the second'));
       await p.click('.rp-rawplay');
       t.check(await wait(p, () => +document.querySelector('.rp-slider').value > 1), tag('the recording did not play'));
       await p.keyboard.press('Escape'); await settle(p);
@@ -75,6 +78,10 @@ drive('replay', async t => {
     // a step that did not run says so, with nothing to watch
     await p.click('.rp-row'); await settle(p);
     await p.click('.rp-item:nth-child(2) .rp-row'); await settle(p);
+    // a step walked in the second browser says so, and so does its picture
+    await p.click('.rp-step[data-step="0"]'); await settle(p);
+    t.check((await p.textContent('#rp-said')).includes('Step 1 · Open the profile · second browser'), tag('said: ' + await p.textContent('#rp-said')));
+    t.check(await p.isVisible('.rp-body .rp-stage > .rp-who'), tag("the second browser's picture is not named"));
     await p.click('.rp-step[data-step="1"]'); await settle(p);
     t.check(await p.isVisible('.rp-skip') && !(await p.isVisible('.rp-watch')), tag('a step that did not run offers Watch'));
     t.check((await p.textContent('#rp-said')).includes("Step 2 · Change the name: didn't run"), tag('said: ' + await p.textContent('#rp-said')));
@@ -87,6 +94,7 @@ drive('replay', async t => {
     await p.click('.check-row[data-open-doc="c-20261009T140500Z-a1b2c3d"]'); await settle(p);
     t.check(await p.$$eval('#sheet-body .doc-proof .tester', els => els.length) === 2, tag('the check shows no testers'));
     t.check(await p.$$eval('#sheet-body .doc-proof .shots a img', els => els.length) === 3, tag('the check shows no screenshots'));
+    t.check(await p.$$eval('#sheet-body .doc-proof .shot-note', els => els.map(e => e.textContent).join()) === 'Second browser', tag("the second browser's screenshot is not named"));
     t.check((await p.textContent('#sheet-body .doc-proof')).includes('No replay: its tester is not known.'), tag('an unknown tester is not said'));
     await t.wide(p, tag('check'));
     await t.shot(p, `check-${w}.png`);

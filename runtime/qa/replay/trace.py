@@ -1,10 +1,12 @@
-"""A run's Playwright trace, read for its replay: every frame the screen showed, on the wall clock Chrome stamped it
+"""A run's Playwright traces, read for its replay: every frame the screen showed, on the wall clock Chrome stamped it
 with, and the page recorder's lines (recorder.js), which the trace keeps as console messages. Each frame names the
 width of the page it showed, which a tester's hand-back is checked against.
 
 Chrome stamps each frame with the moment it swapped it onto the screen (``frameSwapWallTime``), and the recorder
 stamps each line with the page's own wall clock: both are this machine's clock, as the transcript's times are, so
-nothing needs aligning.
+nothing needs aligning. Each browser writes a trace of its own into the run's ``traces/``: the first browser's starts
+before the tester's first call, and the second's each time it opens, later. Playwright names a trace by the moment it
+started, so the first by name is the first browser's, and the rest are the second's.
 """
 
 from __future__ import annotations
@@ -15,6 +17,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from runtime.qa.wrapper import FIRST, SECOND
 
 RECORDER = "[qa-rec] "
 FRAME = "screencast-frame"
@@ -48,13 +52,24 @@ class Trace:
         return [e for e in self.events if e["k"] == kind and start - self.before <= e["at"] <= end + self.after]
 
 
-def read(folder: Path, before: float, after: float) -> Trace:
-    """The run's one trace, from ``folder``/traces; ReplayError when there is none or it holds no frame."""
+def read(folder: Path, before: float, after: float) -> dict[str, Trace]:
+    """Each browser's trace from ``folder``/traces; ReplayError when there is none or the first's holds no frame."""
     found = sorted((folder / "traces").glob("*.trace"))
-    if len(found) != 1:
-        raise ReplayError(f"the run has {len(found)} traces, not one, so it cannot be replayed")
-    trace = Trace(before, after)
-    with found[0].open(encoding="utf-8", errors="replace") as lines:
+    if not found:
+        raise ReplayError("the run has no trace, so it cannot be replayed")
+    traces = {FIRST: Trace(before, after)}
+    for n, path in enumerate(found):
+        _read_into(traces.setdefault(SECOND if n else FIRST, Trace(before, after)), path)
+    if not traces[FIRST].frames:
+        raise ReplayError("the run's trace holds no frame of the screen")
+    for trace in traces.values():
+        trace.frames.sort(key=lambda f: f.at)
+        trace.events.sort(key=lambda e: e["at"])
+    return traces
+
+
+def _read_into(trace: Trace, path: Path) -> None:
+    with path.open(encoding="utf-8", errors="replace") as lines:
         for line in lines:
             try:
                 event = json.loads(line)
@@ -69,11 +84,6 @@ def read(folder: Path, before: float, after: float) -> Trace:
                 recorded = _recorded(str(event["text"]))
                 if recorded is not None:
                     trace.events.append(recorded)
-    if not trace.frames:
-        raise ReplayError("the run's trace holds no frame of the screen")
-    trace.frames.sort(key=lambda f: f.at)
-    trace.events.sort(key=lambda e: e["at"])
-    return trace
 
 
 def widths(lines: Iterable[str]) -> set[int]:

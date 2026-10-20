@@ -3,11 +3,12 @@ when the tester starts, and stops when it finishes.
 
 It makes the run's folder, writes Playwright's settings into it, then runs Playwright's MCP server behind the
 wrapper (wrapper.py), which talks to Claude Code over standard input and output, so nothing here prints to standard
-output. The wrapper traces the whole run: every frame the screen showed and every action, on the browser's own clock,
-from which the warden builds the run's replay. A page recorder (recorder.js) runs in every page and notes where each
-click landed and what each read touched. When the tester reports its result, or the orchestrator saves the check a
-regression tester walked for, the warden copies the folder into its evidence, where only the owner looks; its
-clean-up removes a run nothing took.
+output; when the server stops, the wrapper stops too, so the session sees its browser gone. The wrapper traces the
+whole run: every frame the screen showed and every action, on the browser's own clock, from which the warden builds
+the run's replay. A page recorder (recorder.js) runs in every page and notes where each click landed and what each
+read touched. The tester's second browser (second.py) writes into the run's ``second/``. When the tester reports its
+result, or the orchestrator saves the check a regression tester walked for, the warden copies the folder into its
+evidence, where only the owner looks; its clean-up removes a run nothing took.
 """
 
 from __future__ import annotations
@@ -17,14 +18,18 @@ import os
 import pwd
 import re
 import secrets
+import subprocess
 import sys
+import threading
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
-from runtime.qa import wrapper
+from runtime.qa import second as second_module
+from runtime.qa.wrapper import CLOSE, FIRST, SECOND, Proxy
 from runtime.qa.wrapper_tools import NOTES, TOOLS, ToolError, Tools, first_link
 from runtime.shared import environment, lanes, store
 from runtime.shared import settings as settings_module
@@ -68,9 +73,10 @@ def blocked(settings: Settings) -> list[str]:
     ]
 
 
-def playwright_settings(folder: Path, role: str, settings: Settings) -> dict[str, Any]:
-    """Chrome headless with a private profile, every file in the run's folder, and no screenshot shown to a tester
-    whose screenshots are the owner's only. The trace's frames are the run's recording, so no video is made."""
+def playwright_settings(folder: Path, role: str, settings: Settings, endpoint: str | None = None) -> dict[str, Any]:
+    """Chrome headless with a private profile, every file in ``folder``, and no screenshot shown to a tester whose
+    screenshots are the owner's only. The trace's frames are the run's recording, so no video is made. With
+    ``endpoint``, a context of its own in the browser whose process answers there, as the second browser is."""
     unseen = role in settings.get_list("qa.screenshots_for_owner_only")
     viewport = {"width": int(settings.get_list("qa.widths")[0]), "height": settings.get_int("qa.viewport_height")}
     return {
@@ -79,6 +85,7 @@ def playwright_settings(folder: Path, role: str, settings: Settings) -> dict[str
             "isolated": True,
             "launchOptions": {"channel": "chrome", "headless": True},
             "contextOptions": {"viewport": viewport, "permissions": settings.get_list("qa.browser_permissions")},
+            **({"remoteEndpoint": endpoint} if endpoint else {}),
         },
         # Vision clicks at a point, which a remote desktop needs: it is a video of a screen. Devtools holds the
         # trace's tools, which only the wrapper sees. Network lets a step answer a request with the status it asks
@@ -108,6 +115,20 @@ def published(places: Places) -> Settings:
 
 def server_command(config: Path) -> list[str]:
     return ["npx", "-y", PLAYWRIGHT_MCP, "--config", str(config), "--init-script", str(RECORDER)]
+
+
+def second_command(folder: Path, role: str, settings: Settings) -> Callable[[str], tuple[list[str], Path]]:
+    """How the second browser's server starts, given where the first browser's process answers: in a folder of its
+    own in the run's, which holds its settings and every file it writes."""
+
+    def command(endpoint: str) -> tuple[list[str], Path]:
+        where = folder / SECOND
+        where.mkdir(mode=0o700, exist_ok=True)
+        config = where / "playwright.json"
+        config.write_text(json.dumps(playwright_settings(where, role, settings, endpoint)), encoding="utf-8")
+        return server_command(config), where
+
+    return command
 
 
 def keeper(folder: Path) -> Callable[[str], None]:
@@ -153,38 +174,108 @@ def main(argv: list[str], places: Places, sign_in: Callable[[str], dict[str, Any
         print(f"factory qa-browser: no browser: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
     os.chdir(config.parent)
-    equip = equipper(link_asker(sign_in), keeper(config.parent), settings)
-    return wrapper.serve(
+    second = second_command(config.parent, lanes.kind_of(argv[0]), settings)
+    equip = equipper(link_asker(sign_in), keeper(config.parent), settings, second)
+    return serve(
         server_command(config), equip, settings.get_int("qa.browser_answer_seconds"),
         settings.get_int("qa.browser_answer_chars"),
     )  # fmt: skip
 
 
 def equipper(
-    link_for: Callable[[str], str], keep: Callable[[str], None], settings: Settings
-) -> Callable[[wrapper.Proxy], None]:
-    """What the wrapper adds to the browser: the factory's tools, and every link they sign in with kept beside the
-    run for the replay and hidden from the session from then on."""
+    link_for: Callable[[str], str],
+    keep: Callable[[str], None],
+    settings: Settings,
+    second: Callable[[str], tuple[list[str], Path]],
+) -> Callable[[Proxy], None]:
+    """What the wrapper adds to the browser: the factory's tools in either browser, the second browser ``second``
+    starts, and every link they sign in with kept beside the run for the replay and hidden from the session."""
     width, height = (int(n) for n in settings.get_list("qa.desktop_viewport"))
 
-    def equip(proxy: wrapper.Proxy) -> None:
+    def equip(proxy: Proxy) -> None:
         def kept(secret: str) -> None:
             keep(secret)
             proxy.hide(secret)
 
-        tools = Tools(
-            proxy.call_tool,
-            link_for,
-            kept,
-            settings.get_int("qa.wait_reload_seconds"),
-            settings.get_int("qa.wait_max_minutes"),
-            (width, height),
-            settings.get_int("qa.key_delay_ms"),
-            settings.get_int("qa.hold_max_seconds"),
-            settings.get_int("qa.click_hold_ms"),
-            settings.get_int("qa.press_settle_ms"),
-            time.monotonic,
-        )
-        proxy.add_tools(TOOLS, tools.answer, NOTES)
+        opened = second_module.Second(proxy, second, settings.get_int("qa.browser_answer_seconds"))
+        proxy.add_second(opened)
+        tools = {
+            which: Tools(
+                partial(proxy.call_tool, which=which),
+                link_for,
+                kept,
+                settings.get_int("qa.wait_reload_seconds"),
+                settings.get_int("qa.wait_max_minutes"),
+                (width, height),
+                settings.get_int("qa.key_delay_ms"),
+                settings.get_int("qa.hold_max_seconds"),
+                settings.get_int("qa.click_hold_ms"),
+                settings.get_int("qa.press_settle_ms"),
+                time.monotonic,
+            )
+            for which in (FIRST, SECOND)
+        }
+
+        def answer(name: str, arguments: dict[str, Any], cancelled: threading.Event, which: str) -> tuple[str, bool]:
+            return opened.close() if name == CLOSE else tools[which].answer(name, arguments, cancelled)
+
+        proxy.add_tools([*TOOLS, second_module.TOOL], answer, NOTES)
 
     return equip
+
+
+def serve(
+    argv: list[str],
+    equip: Callable[[Proxy], None],
+    wait_seconds: float,
+    answer_chars: int,
+    client_in: IO[str] = sys.stdin,
+    client_out: IO[str] = sys.stdout,
+) -> int:
+    """Run the server as a child, let ``equip`` add the factory's tools, and carry the session's traffic until the
+    session closes standard input or the server stops; the server's exit code, or 1 when the trace did not start."""
+    server = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1)
+    assert server.stdin is not None and server.stdout is not None  # both were asked for as pipes
+    proxy = Proxy(server.stdin, client_out, wait_seconds, answer_chars)
+    equip(proxy)
+    ended, why = threading.Event(), []
+
+    def untraced(reason: str) -> None:
+        why.append(f"the trace did not start, so this browser stops: {reason}")
+        ended.set()
+
+    proxy.untraced = untraced
+
+    def pump() -> None:
+        assert server.stdout is not None  # asked for as a pipe
+        for line in server.stdout:
+            if line.strip():
+                proxy.from_server(line)
+        why.append("server")
+        ended.set()
+
+    def feed() -> None:
+        try:
+            for line in client_in:
+                if line.strip():
+                    proxy.from_client(line)
+            proxy.traced()
+            why.append("session")
+        # telemetry: surfaced — the server is gone; `why` says so, and `serve` reports it on stderr
+        except OSError:
+            why.append("server")
+        ended.set()
+
+    reader = threading.Thread(target=pump, daemon=True)
+    reader.start()
+    threading.Thread(target=feed, daemon=True).start()
+    ended.wait()
+    proxy.close()
+    if why[0] == "session":
+        server.stdin.close()
+        reader.join()  # the server's last answers still reach the session
+        return server.wait()
+    server.kill()
+    said = why[0] if why[0] != "server" else f"the browser stopped (exit {server.wait()})"
+    print(f"factory qa-browser: {said}", file=sys.stderr)
+    return 1

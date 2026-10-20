@@ -54,6 +54,22 @@ def test_a_testers_browser_lets_every_page_use_what_the_setting_names(world: Wor
     assert context["permissions"] == ["clipboard-read", "clipboard-write"]
 
 
+def test_a_testers_second_browser_is_a_context_of_its_own_in_the_first_ones_process_and_writes_apart(
+    world: World, tmp_path: Path
+) -> None:
+    at = datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
+    config = qa_browser.prepare("qa-ui-function-2", IMPL_ID, tmp_path / "runs", world.ctx().settings(), at)
+    argv, where = qa_browser.second_command(config.parent, "qa-ui-function", world.ctx().settings())("/tmp/b.sock")
+    first, second = (json.loads(path.read_text()) for path in (config, where / "playwright.json"))
+    assert where == config.parent / "second" and argv[argv.index("--config") + 1] == str(where / "playwright.json")
+    assert (second["browser"].pop("remoteEndpoint"), second.pop("outputDir"), first.pop("outputDir")) == (
+        "/tmp/b.sock",
+        str(where),
+        str(config.parent),
+    )
+    assert second == first  # the same blocks, window and permissions, and screenshots seen by the same testers
+
+
 def test_surfaces_toml_names_only_surfaces() -> None:
     with pytest.raises(plan.SurfacesError, match="nothing is not a surface"):
         plan.surface_prefixes('nothing = ["docs/"]')

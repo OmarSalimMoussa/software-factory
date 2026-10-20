@@ -51,18 +51,28 @@ def test_a_testers_runs_are_copied_without_following_links_or_a_replay_and_taken
     assert evidence.intake(world.ctx(), runs, SESSION, "t-0001", HEAD, "qa-ux", "ag-ux", "2026-10-09T12:00:00Z") == []
 
 
-def test_a_page_is_sent_a_runs_screenshots_never_the_files_of_its_trace(world: World, tmp_path: Path) -> None:
+def test_a_page_is_sent_a_runs_screenshots_from_both_browsers_in_order_never_the_files_of_its_trace(
+    world: World, tmp_path: Path
+) -> None:
     run = tmp_path / "runs" / SESSION / "20261009T120500Z-0a1b2c"
-    (run / "traces" / "resources").mkdir(parents=True)
+    for folder in ("traces/resources", "second", "second/sub"):
+        (run / folder).mkdir(parents=True)
     (run / "run.json").write_text(json.dumps({"role": "qa-ux", "started": "2026-10-09T12:05:00Z"}))
-    for name in ("page-1.png", "page-1.yml", "traces/resources/page@1.jpeg"):
+    for name in (
+        "page-3.png",
+        "page-1.png",
+        "page-1.yml",
+        "traces/resources/page@1.jpeg",
+        "second/page-2.png",
+        "second/sub/page-4.png",
+    ):
         (run / name).write_bytes(b"x")
     evidence.intake(world.ctx(), run.parent.parent, SESSION, "t-0001", HEAD, "qa-ux", "ag", "2026-10-09T12:00:00Z")
 
     answer = snapshot.snapshot(world.ctx(), {"want": ["qa"], "tasks": ["t-0001"]}, None)
 
     [entry] = answer["state"]["qa"]["t-0001"]["evidence"]
-    assert (entry["shots"], "files" in entry) == (["page-1.png"], False)
+    assert (entry["shots"], "files" in entry) == (["page-1.png", "second/page-2.png", "page-3.png"], False)
 
 
 def test_two_testers_of_one_kind_at_once_each_take_only_their_own_lanes_run(world: World, tmp_path: Path) -> None:

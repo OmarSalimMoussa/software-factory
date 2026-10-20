@@ -97,18 +97,21 @@
      {
       "tester": "qa-ui-function",
       "url": "/api/evidence/t-0013/page.svg",
+      "note": null,
       "verdict": "pass",
       "tone": "good"
      },
      {
       "tester": "qa-visual",
       "url": "/api/evidence/t-0013/button.svg",
+      "note": null,
       "verdict": "pass",
       "tone": "good"
      },
      {
       "tester": "qa-ux",
       "url": "/api/evidence/t-0013/phone.svg",
+      "note": null,
       "verdict": "pass",
       "tone": "good"
      }

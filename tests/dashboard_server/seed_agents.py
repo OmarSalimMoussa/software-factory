@@ -21,7 +21,7 @@ REPLAYED = ("t-0017", "qa-ui-function")  # the one task run whose replay is buil
 # The newest check's two regression runs: one by a tester it knows, whose replay is built, and one by none it knows.
 CHECKED = "c-20261009T140500Z-a1b2c3d"
 CHECK_RUNS = (
-    ("20261009T134000Z-0a1b2c", "ag-reg-1", ("page-1", "page-2")),
+    ("20261009T134000Z-0a1b2c", "ag-reg-1", ("page-1", "second/page-2")),
     ("20261009T134005Z-0d0e0f", None, ("page-1",)),
 )
 REPLAY_URL = "/api/replay?of=t-0017&head=eeeeeeeeeeee&tester=qa-ui-function&run=20261009T120000Z-abc123"
@@ -253,6 +253,7 @@ def seed_check_runs(places: Places, now: float) -> None:
         folder = places.evidence / CHECKED / head[:12] / "qa-regression" / run
         folder.mkdir(parents=True)
         for shot in shots:
+            (folder / f"{shot}.svg").parent.mkdir(exist_ok=True)
             (folder / f"{shot}.svg").write_bytes(picture)
         if agent is not None:
             seed_replay(folder, marked=False)

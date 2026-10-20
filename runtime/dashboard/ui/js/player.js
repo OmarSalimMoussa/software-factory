@@ -27,6 +27,7 @@ class Screen {
     if (i === this.shown) return;
     this.shown = i;
     const f = this.frames[i], im = this.img(i);
+    this.host.classList.toggle('in-second', f.second);
     this.host.style.setProperty('--w', f.w); this.host.style.setProperty('--h', f.h);
     /* A frame still loading leaves the one before it up, so the screen never goes blank. */
     const put = () => { if (this.shown === i && this.host.isConnected) this.host.querySelector('.rp-frames').replaceChildren(im); };
@@ -68,7 +69,7 @@ class Player {
     const c = this.stage.classList, s = this.step();
     c.toggle('idle', this.idle); c.toggle('playing', this.playing); c.toggle('done', this.done);
     c.toggle('paused', !this.idle && !this.done && !this.playing); c.toggle('ran', s.beats.length > 0);
-    c.toggle('has-still', !!s.still);
+    c.toggle('has-still', !!s.still); c.toggle('still-second', s.still_second);
     this.el('catch').setAttribute('aria-label', this.playing ? 'Pause' : 'Resume');
   }
 

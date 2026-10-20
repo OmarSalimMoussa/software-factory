@@ -12,19 +12,22 @@
     "t": 0.0,
     "url": "/api/evidence/t-0017/eeeeeeeeeeee/qa-ui-function/20261009T120000Z-abc123/replay/frames/000001.jpg",
     "w": 1280,
-    "h": 800
+    "h": 800,
+    "second": false
    },
    {
     "t": 4.1,
     "url": "/api/evidence/t-0017/eeeeeeeeeeee/qa-ui-function/20261009T120000Z-abc123/replay/frames/000002.jpg",
     "w": 1280,
-    "h": 800
+    "h": 800,
+    "second": false
    },
    {
     "t": 7.4,
     "url": "/api/evidence/t-0017/eeeeeeeeeeee/qa-ui-function/20261009T120000Z-abc123/replay/frames/000003.jpg",
     "w": 1280,
-    "h": 800
+    "h": 800,
+    "second": true
    }
   ],
   "hidden": [
@@ -34,6 +37,7 @@
    ]
   ],
   "hidden_says": "A sign-in link was on screen here, so this part is hidden.",
+  "second_says": "Second browser",
   "seconds": 9.4,
   "pace": {
    "freeze": 120,
@@ -76,6 +80,7 @@
       "got": "The form showed",
       "hint": null,
       "still": "/api/evidence/t-0017/eeeeeeeeeeee/qa-ui-function/20261009T120000Z-abc123/replay/frames/000001.jpg",
+      "still_second": false,
       "rough": false,
       "beats": [
        {
@@ -136,6 +141,7 @@
       "got": "The page stayed on the form",
       "hint": "Major finding: Continue does nothing on the first click",
       "still": "/api/evidence/t-0017/eeeeeeeeeeee/qa-ui-function/20261009T120000Z-abc123/replay/frames/000002.jpg",
+      "still_second": false,
       "rough": false,
       "beats": [
        {
@@ -240,18 +246,19 @@
       "icon": "check-circle",
       "tone": "good",
       "card": "Step 1 of 2 · Open the profile",
-      "head": "Step 1 · Open the profile",
+      "head": "Step 1 · Open the profile · second browser",
       "expected": "The profile shows",
       "got": "It showed",
       "hint": null,
       "still": "/api/evidence/t-0017/eeeeeeeeeeee/qa-ui-function/20261009T120000Z-abc123/replay/frames/000003.jpg",
+      "still_second": true,
       "rough": false,
       "beats": [
        {
         "k": "wait",
         "icon": "clock",
         "bad": false,
-        "log": "Waited for “Profile”",
+        "log": "Waited for “Profile” · second browser",
         "say": "Waited for “Profile”",
         "t": 8.4,
         "seg": [
@@ -272,6 +279,7 @@
       "got": "Didn't run",
       "hint": null,
       "still": null,
+      "still_second": false,
       "rough": false,
       "beats": []
      }

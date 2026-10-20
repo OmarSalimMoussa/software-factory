@@ -490,7 +490,8 @@ mark{background:color-mix(in srgb,var(--warn) 35%,transparent);color:inherit;bor
 .testers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .tester{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .tester .shots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.tester .shots a{display:block;min-width:0}
+.tester .shots a{display:block;min-width:0;text-decoration:none}
+.shot-note{display:block;margin-top:3px;font-size:11px;line-height:1.3;color:var(--muted)}
 .doc-proof{margin-top:20px}
 .tester .shots i{flex:1;aspect-ratio:16/10;max-width:100%;border-radius:6px;background:linear-gradient(135deg,var(--sunken),color-mix(in srgb,var(--line) 70%,var(--sunken)));border:1px solid var(--line)}
 .timeline{display:flex;flex-direction:column;gap:0;margin:0;padding:0;list-style:none}
@@ -814,6 +815,8 @@ body.has-savebar .toasts{bottom:84px}
 .rp-screen.secret>.rp-secret,.rp-stage.idle:not(.ran) .rp-skip{display:grid}
 .rp-still{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:var(--sunken);display:none}
 .rp-stage.idle.has-still .rp-still{display:block}
+.rp-who{position:absolute;left:12px;top:12px;height:34px;padding:0 12px;border-radius:8px;background:var(--overlay);color:var(--overlay-fg);font-weight:600;align-items:center;pointer-events:none;display:none;z-index:3}
+.rp-screen.in-second>.rp-who,.rp-stage.idle.has-still.still-second>.rp-who{display:flex}
 .rp-flash{position:absolute;inset:0;background:var(--bubble);opacity:0;pointer-events:none}
 .rp-flash.on{animation:rp-flash .45s ease-out forwards}
 .rp-boxes i{position:absolute;border-radius:4px;border:3px solid var(--mark);background:color-mix(in srgb,var(--mark) 16%,transparent);box-shadow:0 0 0 4px color-mix(in srgb,var(--mark) 25%,transparent);animation:rp-in .4s ease-out;pointer-events:none}

@@ -42,6 +42,7 @@ def kit(tmp_path: Path) -> Kit:
         ("Bash", {"command": "curl -s http://127.0.0.1:8300/api/home"}, False, True),
         ("WebFetch", {"url": "https://laptop.tail1.ts.net/", "prompt": "x"}, False, True),
         ("mcp__qa-browser__browser_navigate", {"url": "http://localhost:8300/"}, True, True),
+        ("mcp__qa-browser__browser_navigate", {"url": "http://localhost:8300/", "browser": "second"}, True, True),
         ("mcp__qa-browser__browser_navigate", {"url": "http://localhost:8101/"}, True, False),
         ("Bash", {"command": "curl -s http://localhost:8101/health"}, False, False),
         ("Bash", {"command": "cat {state}/public/sessions.json"}, False, False),
@@ -70,6 +71,8 @@ def _fill(value: Any, where: dict[str, Path]) -> Any:
     [
         ("mcp__qa-browser__browser_navigate", "qa-ui-function", None),
         ("mcp__qa-browser__browser_mouse_click_xy", "qa-regression", None),
+        ("mcp__qa-browser__browser_close_second", "qa-ui-function", None),
+        ("mcp__qa-browser__browser_close_second", "qa-backend", "product-drivers"),
         ("mcp__computer-use__screenshot", "qa-ui-function", None),
         ("mcp__claude-in-chrome__navigate", "qa-ui-function", "product-drivers"),
         ("mcp__qa-browser__browser_navigate", "qa-backend", "product-drivers"),
@@ -131,6 +134,7 @@ def test_a_route_answers_what_it_catches_and_never_sends_it_on(kit: Kit, asked: 
     [
         ({"textGone": "Restarting", "time": 60}, {"textGone": "Restarting"}),
         ({"text": "Saved", "time": 5}, {"text": "Saved"}),
+        ({"text": "Saved", "time": 5, "browser": "second"}, {"text": "Saved", "browser": "second"}),
         ({"textGone": "Restarting"}, None),
         ({"time": 5}, None),
     ],

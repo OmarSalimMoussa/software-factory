@@ -40,10 +40,10 @@ function stepsHTML(r) {
 function stageHTML(d) {
   const f = d.frames[0];
   return `<div class="rp-stage idle" style="--sw:${f.w};--sh:${f.h}">
-    <div class="rp-screen"><div class="rp-frames"></div><div class="rp-secret">${esc(d.hidden_says)}</div>
+    <div class="rp-screen"><div class="rp-frames"></div><div class="rp-secret">${esc(d.hidden_says)}</div><div class="rp-who">${esc(d.second_says)}</div>
       <div class="rp-flash"></div><div class="rp-boxes"></div><span class="rp-ripple"></span><span class="rp-cursor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2.5 19 12.2l-6.3 1.2 3.7 7.4-3 1.5-3.7-7.4L5 19.4Z"/></svg></span>
       <div class="rp-bubble" role="status"><i></i><i></i><span class="rp-bubble-text"></span></div><span class="rp-pill"></span></div>
-    <img class="rp-still" alt="The screen at the end of this step"><div class="rp-skip">Didn't run</div><div class="rp-card"></div>
+    <img class="rp-still" alt="The screen at the end of this step"><div class="rp-who">${esc(d.second_says)}</div><div class="rp-skip">Didn't run</div><div class="rp-card"></div>
     <button class="rp-catch" data-rp="toggle" aria-label="Pause"></button>
     <button class="rp-watch" data-rp="watch">${icon('play')}Watch</button>
     <button class="rp-resume" data-rp="toggle" aria-label="Resume">${icon('play', 'lg')}</button>
@@ -57,7 +57,7 @@ function logHTML(r) {
   return `<aside class="rp-log${RP.log ? ' open' : ''}" id="rp-log" aria-label="The tester's thoughts and actions" aria-hidden="${!RP.log}"><div class="rp-log-h"><h2>Thoughts and actions</h2><button class="iconbtn" data-rp="log" aria-label="Close">${icon('x-mark')}</button></div><div class="rp-list">${items}</div></aside>`;
 }
 const rawHTML = d => `<div class="rp-raw" role="dialog" aria-modal="true" aria-label="Recording" hidden><div class="rp-raw-h"><div><b>Recording</b><span>The whole run, as it was recorded</span></div><button class="iconbtn" data-rp="raw-close" aria-label="Close">${icon('x-mark')}</button></div>
-  <div class="rp-stage rp-rawstage" style="--sw:${d.frames[0].w};--sh:${d.frames[0].h}"><div class="rp-screen"><div class="rp-frames"></div><div class="rp-secret">${esc(d.hidden_says)}</div></div></div>
+  <div class="rp-stage rp-rawstage" style="--sw:${d.frames[0].w};--sh:${d.frames[0].h}"><div class="rp-screen"><div class="rp-frames"></div><div class="rp-secret">${esc(d.hidden_says)}</div><div class="rp-who">${esc(d.second_says)}</div></div></div>
   <div class="rp-bar"><button class="iconbtn rp-rawplay" data-rp="raw-play" aria-label="Play"></button><input class="rp-slider" type="range" min="0" step="0.1" value="0" data-rp-seek aria-label="Time in the run"><span class="rp-time"></span></div></div>`;
 
 /* ---------- the player on the open row ---------- */

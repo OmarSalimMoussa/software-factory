@@ -57,8 +57,14 @@
      "name": "qa-regression 1",
      "note": null,
      "shots": [
-      "/api/evidence/c-20261009T140500Z-a1b2c3d/a1b2c3d00000/qa-regression/20261009T134000Z-0a1b2c/page-1.svg",
-      "/api/evidence/c-20261009T140500Z-a1b2c3d/a1b2c3d00000/qa-regression/20261009T134000Z-0a1b2c/page-2.svg"
+      {
+       "url": "/api/evidence/c-20261009T140500Z-a1b2c3d/a1b2c3d00000/qa-regression/20261009T134000Z-0a1b2c/page-1.svg",
+       "note": null
+      },
+      {
+       "url": "/api/evidence/c-20261009T140500Z-a1b2c3d/a1b2c3d00000/qa-regression/20261009T134000Z-0a1b2c/page-2.svg",
+       "note": null
+      }
      ],
      "replays": [
       {
@@ -71,7 +77,10 @@
      "name": "qa-regression 2",
      "note": "No replay: its tester is not known.",
      "shots": [
-      "/api/evidence/c-20261009T140500Z-a1b2c3d/a1b2c3d00000/qa-regression/20261009T134005Z-0d0e0f/page-1.svg"
+      {
+       "url": "/api/evidence/c-20261009T140500Z-a1b2c3d/a1b2c3d00000/qa-regression/20261009T134005Z-0d0e0f/page-1.svg",
+       "note": null
+      }
      ],
      "replays": []
     }

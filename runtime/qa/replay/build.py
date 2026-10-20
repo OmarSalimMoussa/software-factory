@@ -6,12 +6,14 @@ it plays, and nothing of the trace besides. The frames are the trace's own pictu
 Chrome's by construction. A secret the tester typed or was handed (a sign-in link, the desktop's password) never
 reaches the replay: its words say what it was, and from the moment it was typed until ``replay.secret_seconds``
 after the typing ended the picture is hidden: those frames and screenshots are deleted. The trace, which holds what
-was typed and every address, is deleted once the replay is built.
+was typed and every address, is deleted once the replay is built. With a second browser, the replay shows at each
+moment the screen of the browser the tester last acted in, and marks what comes from the second ``in`` it.
 """
 
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 from collections.abc import Callable
@@ -20,11 +22,13 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from runtime.guard.browser import BROWSER
 from runtime.qa import qa_browser
 from runtime.qa.replay import beats as beats_mod
 from runtime.qa.replay import trace as trace_mod
 from runtime.qa.replay.timeline import Timings, order
 from runtime.qa.scenarios import Scenario, Step
+from runtime.qa.wrapper import FIRST, SECOND
 from runtime.qa.wrapper_tools import LINK
 from runtime.shared.models import SEVERITIES
 
@@ -51,21 +55,24 @@ class Inputs:
 
 def build(given: Inputs) -> dict[str, Any]:
     """Build the run's replay into its folder and return what was written."""
-    trace = trace_mod.read(given.run, *given.recorder)
-    t0 = trace.frames[0].at
+    traces = trace_mod.read(given.run, *given.recorder)
+    t0 = traces[FIRST].frames[0].at
     said = beats_mod.read(given.transcript)
     secrets = said.secrets | _kept(given.run)
     moments = [{"k": "think", "text": text, "at": round(at - t0, 2)} for at, text in said.thoughts]
-    last: list[tuple[int, int]] = []
-    for use in sorted(said.uses, key=lambda u: u.at):
-        found = beats_mod.beat(use, trace, t0, last, given.shares)
+    last: dict[str, list[tuple[int, int]]] = {FIRST: [], SECOND: []}
+    uses = sorted(said.uses, key=lambda u: u.at)
+    for use in uses:
+        which = beats_mod.browser(use)
+        found = beats_mod.beat(use, traces.get(which, trace_mod.Trace(*given.recorder)), t0, last[which], given.shares)
         if found is not None:
             moments.append(found)
     mask = _masker(secrets)
     hidden = _mask(moments, secrets, mask, given.secret_seconds)
     _drop_hidden_shots(given.run, moments, hidden)
     items = _items(given, moments, t0, mask)
-    frames = _frames(given.run, trace.frames, t0, hidden)
+    shown = _shown(traces, uses)
+    frames = _frames(given.run, shown, t0, hidden)
     for item in items:
         for step in item["steps"]:
             step["still"] = _still(given.run, step, frames)
@@ -74,7 +81,7 @@ def build(given: Inputs) -> dict[str, Any]:
         "frames": frames,
         "hidden": hidden,
         "items": items,
-        "seconds": round(trace.frames[-1].at - t0, 2),
+        "seconds": round(shown[-1][0] - t0, 2),
     }
     _scrub(given.run, _forms(secrets))
     (given.run / FOLDER / DATA).write_text(json.dumps(data), encoding="utf-8")
@@ -155,7 +162,7 @@ def _drop_hidden_shots(run: Path, moments: list[dict[str, Any]], hidden: list[li
     for moment in moments:
         if moment["k"] == "shot" and moment.get("file") and _inside(moment["seg"][1], hidden):
             shot = run / str(moment.pop("file"))
-            if shot.parent == run and not shot.is_symlink():
+            if shot.parent in (run, run / SECOND) and not shot.is_symlink():
                 shot.unlink(missing_ok=True)
 
 
@@ -257,21 +264,46 @@ def _verdict(steps: list[dict[str, Any]], findings: list[dict[str, Any]]) -> dic
     return {"verdict": "pass" if whole else "none", "at": None, "severity": worst}
 
 
-def _frames(run: Path, frames: list[trace_mod.Frame], t0: float, hidden: list[list[float]]) -> list[dict[str, Any]]:
-    """The frames the replay plays, moved out of the trace and numbered; a frame shown while a secret could be on
-    screen is not kept."""
+Shown = tuple[float, trace_mod.Frame, str]  # a frame, the wall time it shows at, and its browser
+
+
+def _shown(traces: dict[str, trace_mod.Trace], uses: list[beats_mod.Use]) -> list[Shown]:
+    """The frames the replay plays, in order: at each moment the screen of the browser the tester last acted in,
+    which shows its last frame from the moment the tester turns to it."""
+    turns = [(-math.inf, FIRST)]
+    for use in uses:
+        if use.name.startswith(BROWSER) and beats_mod.browser(use) != turns[-1][1]:
+            turns.append((use.at, beats_mod.browser(use)))
+    shown: list[Shown] = []
+    for (start, which), (end, _) in zip(turns, [*turns[1:], (math.inf, FIRST)], strict=True):
+        frames = traces[which].frames if which in traces else []
+        before = [f for f in frames if f.at < start]
+        shown += [(start, before[-1], which)] if before else []
+        shown += [(f.at, f, which) for f in frames if start <= f.at < end]
+    return shown
+
+
+def _frames(run: Path, shown: list[Shown], t0: float, hidden: list[list[float]]) -> list[dict[str, Any]]:
+    """The frames the replay plays, moved out of the trace and numbered; a frame taken or shown while a secret could
+    be on screen is not kept."""
     target = run / FOLDER / "frames"
     target.mkdir(parents=True, exist_ok=True)
     resources = run / "traces" / "resources"
     kept: list[dict[str, Any]] = []
-    for frame in frames:
-        t = round(frame.at - t0, 3)
+    for at, frame, which in shown:
+        t = round(at - t0, 3)
         source = resources / frame.file
-        if _inside(t, hidden) or not source.is_file() or source.is_symlink():
+        if (
+            _inside(t, hidden)
+            or _inside(round(frame.at - t0, 3), hidden)
+            or not source.is_file()
+            or source.is_symlink()
+        ):
             continue
         name = f"{len(kept) + 1:06d}.jpg"
         shutil.copyfile(source, target / name)
-        kept.append({"t": t, "file": f"{FOLDER}/frames/{name}", "w": frame.width, "h": frame.height})
+        browser = {"in": SECOND} if which == SECOND else {}
+        kept.append({"t": t, "file": f"{FOLDER}/frames/{name}", "w": frame.width, "h": frame.height, **browser})
     return kept
 
 

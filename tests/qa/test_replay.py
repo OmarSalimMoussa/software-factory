@@ -93,6 +93,32 @@ def test_no_secret_is_left_in_the_replay_its_pictures_or_its_files(tmp_path: Pat
     assert not any(secret in (given.run / p).read_text(errors="replace") for p in left for secret in SECRETS)
 
 
+def test_a_second_browsers_screen_plays_while_the_tester_acts_in_it_and_each_of_its_beats_says_so(
+    tmp_path: Path,
+) -> None:
+    given = replay_run.second(replay_run.make(tmp_path / "run", tmp_path / "agent-a1.jsonl"))
+    data = build.build(given)
+    # Turned back to the first, the screen shows its last frame at once, unless a secret could be on it.
+    assert [(f["t"], f.get("in")) for f in data["frames"]] == [
+        *((n, None) for n in range(6)),
+        (22, "second"),
+        (23, "second"),
+        (25, "second"),
+        (27.6, None),
+    ]
+    assert (given.run / data["frames"][6]["file"]).read_bytes() == b"jpeg 22"
+    step = data["items"][0]["steps"][2]
+    assert [(b["k"], b["text"], b.get("in")) for b in step["beats"]] == [
+        ("go", "Opened app.test/visits", "second"),
+        ("click", "Clicked “Start visit”", "second"),
+        ("shot", "Took a screenshot", "second"),
+        ("go", "Closed the second browser", None),
+        ("go", "Opened app.test/cart", None),
+    ]
+    assert (step["beats"][1]["x"], step["beats"][1]["y"]) == (300, 200)  # where the second browser's recorder saw it
+    assert step["beats"][2]["file"] == step["still"] == "second/page-24.png"
+
+
 def test_the_same_run_always_gives_the_same_replay(tmp_path: Path) -> None:
     first = build.build(replay_run.make(tmp_path / "a" / "run", tmp_path / "a" / "agent-a1.jsonl"))
     again = build.build(replay_run.make(tmp_path / "b" / "run", tmp_path / "b" / "agent-a1.jsonl"))
@@ -102,11 +128,11 @@ def test_the_same_run_always_gives_the_same_replay(tmp_path: Path) -> None:
 def test_a_run_that_cannot_be_replayed_says_why_and_keeps_no_trace_nor_secret(tmp_path: Path) -> None:
     given = replay_run.make(tmp_path / "run", tmp_path / "agent-a1.jsonl")
     (given.run / "traces" / "run.trace").unlink()
-    with pytest.raises(ReplayError, match="the run has 0 traces, not one"):
+    with pytest.raises(ReplayError, match="the run has no trace"):
         build.build(given)
-    build.failed(given.run, "the run has 0 traces, not one, so it cannot be replayed")
+    build.failed(given.run, "the run has no trace, so it cannot be replayed")
     replay = json.loads((given.run / "replay" / "replay.json").read_text())
-    assert replay == {"version": 1, "error": "the run has 0 traces, not one, so it cannot be replayed"}
+    assert replay == {"version": 1, "error": "the run has no trace, so it cannot be replayed"}
     assert not (given.run / "traces").exists() and not (given.run / "secrets.json").exists()
     assert not (given.run / "page-3.yml").exists() and (given.run / "page-9.yml").exists()
 

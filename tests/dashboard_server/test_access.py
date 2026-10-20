@@ -89,8 +89,8 @@ def test_pages_and_pictures_carry_their_policies(rig: Rig) -> None:
     server = serve(rig.app, 0, 2, 5)
     base = f"http://127.0.0.1:{server.server_address[1]}"
     head = rig.parts("/api/task/t-0017")["task"]["data"]["testers"]["rows"]
-    evidence = next(shot for row in head for shot in row["shots"])
-    checked = rig.parts(f"/api/doc/{CHECKED}")["doc"]["data"]["proof"]["rows"][0]["shots"][0]
+    evidence = next(shot["url"] for row in head for shot in row["shots"])
+    checked = rig.parts(f"/api/doc/{CHECKED}")["doc"]["data"]["proof"]["rows"][0]["shots"][0]["url"]
     try:
         for path, policy, media in (
             ("/", auth.PAGE_POLICY, "text/html; charset=utf-8"),

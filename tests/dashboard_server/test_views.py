@@ -206,7 +206,7 @@ _CLEAN = {f"{severity}s": 0 for severity in OPEN_SEVERITIES}
 def test_a_fixs_qa_line_carries_its_tone_and_each_screenshot_its_verdicts(
     names: list[str], results: dict[str, list[dict[str, Any]]], tone: str | None, shots: list[str]
 ) -> None:
-    line = qa_line(names, results, [f"{name}\t/api/picture/qa/{name}.png" for name in names])
+    line = qa_line(names, results, [(name, {"url": f"/api/picture/qa/{name}.png", "note": None}) for name in names])
 
     assert (line["tone"], [shot["tone"] for shot in line["shots"]]) == (tone, shots)
 
@@ -456,6 +456,20 @@ def test_a_replay_not_built_says_why_in_its_place(rig: Rig, replay: dict[str, An
     data = rig.parts(REPLAY_URL)["replay"]["data"]
     assert (data["title"], data["says"]) == ("Sign-in sends people back to the sign-in page", says)
     assert "rows" not in data
+
+
+def test_what_a_testers_second_browser_showed_took_and_did_says_so(rig: Rig) -> None:
+    data = rig.parts(REPLAY_URL)["replay"]["data"]
+    signed_in, profile = data["rows"][0]["steps"][0], data["rows"][1]["steps"][0]
+    assert ([f["second"] for f in data["frames"]], data["second_says"]) == ([False, False, True], "Second browser")
+    assert (profile["head"], profile["still_second"], profile["beats"][0]["log"]) == (
+        "Step 1 · Open the profile · second browser",
+        True,
+        "Waited for “Profile” · second browser",
+    )
+    assert (signed_in["head"], signed_in["still_second"]) == ("Step 1 · Open the sign-in page", False)
+    proof = rig.parts(f"/api/doc/{CHECKED}")["doc"]["data"]["proof"]
+    assert [shot["note"] for shot in proof["rows"][0]["shots"]] == [None, "Second browser"]
 
 
 def test_a_checks_page_shows_each_runs_screenshots_and_a_replay_only_where_its_tester_is_known(rig: Rig) -> None:

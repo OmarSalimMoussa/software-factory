@@ -27,18 +27,26 @@ LINK = "https://app.test/auth/link/one-time-secret"
 
 class Session:
     """The tester's session, talking to the wrapper over two pipes, the wrapper running the fake server and equipped
-    as the tester's browser is."""
+    as the tester's browser is; its second browser is another fake server, run after ``before``."""
 
-    def __init__(self, log: Path, settings: Settings, link_for: Callable[[str], str], kept: list[str]) -> None:
+    def __init__(
+        self, log: Path, settings: Settings, link_for: Callable[[str], str], kept: list[str], before: list[str]
+    ) -> None:
         read_in, write_in = os.pipe()
         read_out, write_out = os.pipe()
         self.to_wrapper, self.from_wrapper = os.fdopen(write_in, "w"), os.fdopen(read_out)
         client_in, client_out = os.fdopen(read_in), os.fdopen(write_out, "w")
-        equip = qa_browser.equipper(link_for, kept.append, settings)
+        self.endpoints: list[str] = []
+
+        def second(endpoint: str) -> tuple[list[str], Path]:
+            self.endpoints.append(endpoint)
+            return [*before, sys.executable, str(FAKE), str(log.with_name("second.log"))], log.parent
+
+        equip = qa_browser.equipper(link_for, kept.append, settings, second)
         argv = [sys.executable, str(FAKE), str(log)]
         self.exit: list[int] = []
         self.thread = threading.Thread(
-            target=lambda: self.exit.append(wrapper.serve(argv, equip, 10, 10_000, client_in, client_out))
+            target=lambda: self.exit.append(qa_browser.serve(argv, equip, 10, 10_000, client_in, client_out))
         )
         self.thread.start()
         self.sent = 0
@@ -68,8 +76,10 @@ class Session:
         return self.exit[0]
 
 
-def _open(tmp_path: Path, world: World, link_for: Callable[[str], str], kept: list[str]) -> Session:
-    session = Session(tmp_path / "server.log", world.ctx().settings(), link_for, kept)
+def _open(
+    tmp_path: Path, world: World, link_for: Callable[[str], str], kept: list[str], before: tuple[str, ...] = ()
+) -> Session:
+    session = Session(tmp_path / "server.log", world.ctx().settings(), link_for, kept, list(before))
     session.send("initialize", {"protocolVersion": "2025-06-18"})
     session.notify("notifications/initialized")
     return session
@@ -108,14 +118,18 @@ def test_the_trace_starts_before_the_first_call_and_the_tester_can_neither_see_n
         "browser_type_keys",
         "browser_hold_request",
         "browser_release_request",
+        "browser_close_second",
     ]
     # A tester that loads Playwright's typing or clicking tool reads which of the factory's works on a remote desktop.
     noted = {t["name"]: t["description"] for t in tools if t["name"] in NOTES}
     assert noted == {name: "Playwright's own. " + note for name, note in NOTES.items()}
     assert "browser_type_keys" in noted["browser_type"] and "browser_mouse_press_xy" in noted["browser_mouse_click_xy"]
-    # The guard refuses a named file, so no tool offers one.
+    # The guard refuses a named file, so no tool offers one; every tool but the close acts in either browser.
     playwrights = [t["inputSchema"]["properties"] for t in tools if t["description"].startswith("Playwright's own.")]
-    assert playwrights and all(fields == {"type": {"type": "string"}} for fields in playwrights)
+    either = {"type": {"type": "string"}, "browser": wrapper.FIELD}
+    assert playwrights and all(fields == either for fields in playwrights)
+    assert [t["name"] for t in tools if "browser" not in t["inputSchema"]["properties"]] == ["browser_close_second"]
+    assert "second" in wrapper.FIELD["description"] and "browser_close_second" in wrapper.FIELD["description"]
     assert stopped["error"]["message"] == "there is no tool browser_stop_tracing"
     assert closed["error"]["message"] == "there is no tool browser_close"  # closing would end the trace
     assert log.read_text().splitlines() == [
@@ -140,6 +154,74 @@ def test_signing_in_opens_a_fresh_link_the_tester_never_sees_and_keeps_it_for_th
     assert later["result"]["content"][0]["text"] == "### Page\n- Page URL: the sign-in link\n"
     assert LINK not in json.dumps([answer, later]) and kept == [LINK]
     assert log.read_text().splitlines()[-2:] == ["tools/call browser_navigate", "tools/call browser_snapshot"]
+
+
+def _go(url: str, **where: str) -> dict[str, Any]:
+    return {"name": "browser_navigate", "arguments": {"url": url, **where}}
+
+
+def _text(answer: dict[str, Any]) -> str:
+    return str(answer["result"]["content"][0]["text"])
+
+
+def test_a_second_browser_opens_on_its_first_call_traced_in_the_first_browsers_process_and_closes(
+    opened: tuple[Session, Path, list[str]],
+) -> None:
+    session, log, kept = opened
+    session.send("tools/call", _go("https://app.test/a"))
+    # Sent together while it opens: they reach it in the order they were sent.
+    session.post("tools/call", _go("https://app.test/b1", browser="second"))
+    session.post("tools/call", _go("https://app.test/b2", browser="second"))
+    went = {answer["id"]: _text(answer) for answer in (json.loads(session.from_wrapper.readline()) for _ in "ab")}
+    last = session.send("tools/call", {"name": "browser_snapshot", "arguments": {"browser": "second"}})
+    who = {"address": "tester-2@example.com", "browser": "second"}
+    signed = session.send("tools/call", {"name": "browser_sign_in", "arguments": who})
+    first = session.send("tools/call", {"name": "browser_snapshot", "arguments": {}})
+    closed, again = (session.send("tools/call", {"name": "browser_close_second", "arguments": {}}) for _ in "ab")
+    assert session.close() == 0
+
+    assert went == {n: f"### Page\n- Page URL: https://app.test/b{n - 2}\n" for n in (3, 4)}
+    assert _text(last) == "### Page\n- Page URL: https://app.test/b2\n"
+    assert _text(first) == "### Page\n- Page URL: https://app.test/a\n"  # each browser keeps its own page
+    assert _text(signed).startswith("Signed in as tester-2@example.com.") and kept == [LINK]
+    assert LINK not in json.dumps(signed)
+    assert _text(closed).startswith("Your second browser closed") and _text(again) == "You have no second browser open."
+    # The second connects to the first browser's process at the address that process gave.
+    assert session.endpoints == ["/tmp/pw-fake/browser/browser-fake.sock"]
+    assert log.read_text().splitlines()[3:] == [
+        "tools/call browser_navigate",
+        "tools/call browser_run_code_unsafe",
+        "tools/call browser_snapshot",
+    ]
+    assert log.with_name("second.log").read_text().splitlines() == [
+        "initialize",
+        "notifications/initialized",
+        "tools/call browser_start_tracing",
+        *["tools/call browser_navigate"] * 2,
+        "tools/call browser_snapshot",
+        "tools/call browser_navigate",
+        "tools/call browser_close",  # its context closes with it, not only its server
+    ]
+
+
+@pytest.mark.parametrize(
+    ("before", "asked", "said"),
+    [
+        (("env", "FAIL_TRACE=1"), "second", "your second browser did not open: its trace did not start: ### Error"),
+        ((), "third", "browser is first or second"),
+    ],
+    ids=["untraced", "no-such-browser"],
+)
+def test_a_call_reaches_no_browser_it_cannot_be_traced_in_and_the_first_still_answers(
+    tmp_path: Path, world: World, before: tuple[str, ...], asked: str, said: str
+) -> None:
+    session = _open(tmp_path, world, lambda address: LINK, [], before)
+    answer = session.send("tools/call", _go("https://app.test/b", browser=asked))
+    first = session.send("tools/call", _go("https://app.test/a"))
+    assert session.close() == 0
+    assert said in (_text(answer) if "result" in answer else answer["error"]["message"])
+    assert _text(first) == "### Page\n- Page URL: https://app.test/a\n"
+    assert not before or "browser_navigate" not in (tmp_path / "second.log").read_text()
 
 
 def test_a_factory_tool_that_breaks_still_answers(tmp_path: Path, world: World) -> None:
@@ -233,7 +315,7 @@ def test_a_cancelled_factory_call_stops_and_gets_no_answer() -> None:
     proxy, to_server, to_session = _proxy()
     stopped = threading.Event()
 
-    def answer(name: str, args: dict[str, Any], cancelled: threading.Event) -> tuple[str, bool]:
+    def answer(name: str, args: dict[str, Any], cancelled: threading.Event, which: str) -> tuple[str, bool]:
         stopped.set() if cancelled.wait(10) else None
         return "Waited", False
 
@@ -293,7 +375,7 @@ def test_a_wait_for_seconds_alone_is_the_factorys_as_the_browsers_needs_an_open_
     proxy, to_server, to_session = _proxy()
     asked: list[tuple[str, dict[str, Any]]] = []
 
-    def answer(name: str, args: dict[str, Any], cancelled: threading.Event) -> tuple[str, bool]:
+    def answer(name: str, args: dict[str, Any], cancelled: threading.Event, which: str) -> tuple[str, bool]:
         asked.append((name, args))
         return "Waited 30 s.", False
 
