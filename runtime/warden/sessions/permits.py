@@ -238,12 +238,13 @@ def _approved(ctx: Context, settings: Settings, role: str, task: Task) -> Permit
         raise Refused("approval", f"{task.id} changed since the owner approved it; propose it again")
     rung = approval.rung
     # The facts that made the approved rung allowed (slices, surfaces, owner class, cause) may have changed since:
-    # the ladder runs again, and a route higher than the one proposed and approved refuses. A run proposed below its
-    # route, with the orchestrator's reason, still starts: its facts did not move.
-    needed = ladders.route(task, settings)
-    if needed > approval.routed:
+    # the ladder runs again, and a route higher than both the approved route and the approved run refuses. A run
+    # approved below its route, with the orchestrator's reason, starts while its facts do not move; one approved above
+    # it starts while they route no higher than the run, since a task already building comes back only a rung up.
+    needed, allowed = ladders.route(task, settings), max(approval.routed, rung)
+    if needed > allowed:
         raise Refused("rung", f"{task.id}'s facts changed since the owner approved it: they route to rung {needed} "
-                              f"now, not {approval.routed}; propose it again")  # fmt: skip
+                              f"now, above the {allowed} it was approved at; propose it again")  # fmt: skip
     designed = rung >= 3 and role == IMPL
     if role == DESIGN and rung < 3:
         raise Refused("rung", f"the owner approved rung {rung}, which needs no designer; start an implementer")

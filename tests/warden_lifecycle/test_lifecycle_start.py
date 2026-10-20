@@ -48,6 +48,24 @@ def test_a_start_is_refused_when_the_facts_now_need_a_higher_rung_than_was_appro
     assert refusal(world) == "rung"
 
 
+@pytest.mark.parametrize(
+    ("approved", "facts", "starts"),
+    [({"run": 2}, {"surfaces": ["api", "access"]}, True), ({"run": 2}, {"cause": ""}, False),
+     ({"run": 3, "status": "building"}, {"slices": 2}, True)],
+    ids=["route-2-under-rung-2", "route-3-over-rung-2", "built-at-rung-3"],
+)  # fmt: skip
+def test_a_run_approved_above_its_route_starts_while_its_facts_route_no_higher_than_the_run(
+    world: World, approved: dict[str, Any], facts: dict[str, Any], starts: bool
+) -> None:
+    task = world.approve(**approved)  # its facts route to rung 1, and the orchestrator proposed more with its reason
+    world.queue.tasks["t-0001"] = dataclasses.replace(task, **facts)
+
+    if starts:
+        lifecycle.start(world.ctx(), START, None)
+    else:
+        assert refusal(world) == "rung"
+
+
 def test_a_run_proposed_below_its_route_with_a_reason_still_starts(world: World) -> None:
     world.approve(cause="")  # its facts route to rung 3, and the orchestrator proposed rung 1 with its reason
 
