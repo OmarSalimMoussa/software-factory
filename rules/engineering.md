@@ -30,6 +30,8 @@ you, and on the critics and testers who hold you to it.
 - **A workflow failure surfaces.** A user's input that fails validation, a job that hits its own limit, a verdict
   the product reached on purpose: record it where the user sees it, draw it in the UI, and log nothing above info.
   No user content in a log message.
+- **A failure only the browser sees reports too.** A stream or socket that never connects, a page that waits past
+  its own limit: the page tells the server, which reports it once, with the ids and the failure class.
 - **Report once, at the layer that knows.** Not in the service and again in the route.
 - **A catch site re-raises, reports, or says why not** in a `telemetry:` comment (`expected`, `surfaced`,
   `last-resort`). The comment is a claim, not an exemption: never mark a platform failure to quiet the check.
@@ -94,5 +96,8 @@ you, and on the critics and testers who hold you to it.
 - **Migrations keep the previous build working.** Prod can be pushed back to the commit it ran before, so a
   migration must leave that build able to run: add first, remove in a later change. A migration that cannot run
   backwards is fixed forward.
+- **What a person reaches works from where they are.** A server's address, port or stream that answers only on the
+  server itself, such as loopback or a port published on 127.0.0.1, is broken for every person. A server workspace
+  sets its public address by hand, and a scenario checks the address a page is offered, not only that it loads.
 - **Images carry their inputs.** A deploy builds them on the server from a clean copy of the commit, never at
   `docker compose up`.

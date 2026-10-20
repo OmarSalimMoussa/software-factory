@@ -17,6 +17,7 @@ anyone will know. The draft spec is the one your brief names; the rulebook is
   or empty result; no fallback default.
 - **Telemetry.** A platform failure reports once, at the layer that knows, with its ids and failure class; a user's
   failure reaches the UI and never the error tracker; no user content in a log. Each new failure path names its test.
+  A failure only the browser sees, such as a stream that never connects, reaches the server and reports there.
 - **Cost.** Model usage and cost recorded on every call, failed calls included; unknown cost recorded as unknown; a
   long or costly job has a limit.
 - **Data and migrations.** What a migration does to existing records; no old-format readers kept for old data. A
