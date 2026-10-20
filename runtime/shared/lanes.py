@@ -104,6 +104,11 @@ def line(places: Places) -> tuple[list[str], dict[str, float]]:
     return waiting, told
 
 
+def keeps(told: dict[str, float], settings: Settings, now: float) -> dict[str, float]:
+    turn = settings.get_int("qa.place_turn_seconds")
+    return {sid: at for sid, at in told.items() if now - at < turn}
+
+
 def write_line(places: Places, waiting: list[str], told: dict[str, float]) -> None:
     store.write_json(places.browser_line, {"waiting": waiting, "told": told})
 

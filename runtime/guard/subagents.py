@@ -118,14 +118,15 @@ def _model(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision
 def _browsers(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     """At most caps.browsers_at_once browser testers on the machine, none on red vitals or while a tester holds a
     desktop: amber holds back new work. This session's earlier starts count too: one sent in the same message has no
-    session row yet. A place the warden told another session of is kept for it for qa.place_turn_seconds, and none
-    goes to another while the orchestrator waits for one: its merge check is what every merge waits on."""
+    session row yet. A place the warden told a session of is kept for it for qa.place_turn_seconds, even while the
+    orchestrator waits; no other goes to another while it waits: its merge check is what every merge waits on."""
     personas = call.settings.get_list("subagents.browser_personas")
     if kind not in personas or call.off(lanes.PLACES):
         return None
     waiting, told = lanes.line(call.places)
+    me, kept = call.session.id if call.session else "", lanes.keeps(told, call.settings, call.now.timestamp())
     first = {s.id for s in call.sessions.values() if s.role == ORCHESTRATOR and not s.parent}
-    if call.role != ORCHESTRATOR and first & set(waiting):
+    if call.role != ORCHESTRATOR and me not in kept and first & set(waiting):
         return Refusal(lanes.PLACES, f"the orchestrator waits for a browser place for the merge check, which every "
                                      f"merge waits on, so it goes first. {WOKEN}")  # fmt: skip
     desktops = lanes.desktop_walks(call.sessions.values(), read_desktops(call.places), call.settings, call.now)
@@ -137,11 +138,10 @@ def _browsers(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decis
     known = {s.agent_id for s in call.sessions.values() if s.agent_id}
     starting = [c for c in calls if lanes.kind_of(c.subagent_type) in personas and c.agent_id not in known
                 and _running(call, c)]  # fmt: skip
-    turn, me = call.settings.get_int("qa.place_turn_seconds"), call.session.id if call.session else ""
-    kept = sum(1 for sid, at in told.items() if sid != me and call.now.timestamp() - at < turn)
+    others = len(kept.keys() - {me})
     running, cap = len(rows) + len(starting), call.settings.get_int("caps.browsers_at_once")
-    if running + kept >= cap:
-        also = f", and {kept} kept for a session told one is free" if kept else ""
+    if running + others >= cap:
+        also = f", and {others} kept for a session told one is free" if others else ""
         return Refusal(lanes.PLACES, f"{running} browser testers run on this machine{also}, its cap of {cap}. {WOKEN}")
     vitals = read_vitals(call.places)
     if vitals.level == "red":

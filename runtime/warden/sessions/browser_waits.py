@@ -3,9 +3,9 @@ or while a tester holds a desktop (`browsers-at-once`), and a session cannot see
 So the warden keeps each refused session in a line, in the order the guard refused them, and each pass tells as many
 as there are free places, the longest waiting first, while the vitals are not red and no tester at work holds a
 desktop, as a desktop walk runs alone. The orchestrator joins at the head: its merge check is what every merge waits
-on, and the guard holds back other testers while it waits. A place told of is kept for its session
-qa.place_turn_seconds, which the guard counts as taken for every other session; a told session refused again goes
-back to the head of the line. A session leaves the line once it starts a browser tester or retires.
+on, and the guard holds back other testers while it waits. A place told of is kept qa.place_turn_seconds for its
+session, which may take it even while the orchestrator waits; every other counts it taken. A told session refused
+again goes back to the head, behind the orchestrator. A session leaves once it starts a browser tester or retires.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import Any
 
 from runtime.guard.facts import read_desktops
 from runtime.shared import lanes
-from runtime.shared.models import RETIRED
+from runtime.shared.models import RETIRED, Session
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
 from runtime.warden.sessions import lifecycle, permits, registry
@@ -35,13 +35,13 @@ def refused(ctx: Context, line: dict[str, Any]) -> None:
     with ctx.lock:
         waiting, told = lanes.line(ctx.places)
         if sid not in waiting:
-            first = told.pop(sid, None) is not None or _orchestrator(ctx, sid)
-            waiting = [sid, *waiting] if first else [*waiting, sid]
-            lanes.write_line(ctx.places, waiting, told)
+            waiting = [sid, *waiting] if told.pop(sid, None) is not None else [*waiting, sid]
+            sessions = registry.read(ctx.places)
+            lanes.write_line(ctx.places, sorted(waiting, key=lambda s: not _orchestrator(sessions, s)), told)
 
 
-def _orchestrator(ctx: Context, sid: str) -> bool:
-    session = registry.read(ctx.places).get(sid)
+def _orchestrator(sessions: dict[str, Session], sid: str) -> bool:
+    session = sessions.get(sid)
     return session is not None and session.role == permits.ORCH
 
 
@@ -60,8 +60,7 @@ def run_pass(ctx: Context) -> None:
             return
         sessions, settings, now = registry.read(ctx.places), ctx.settings(), ctx.clock.now()
         live = {sid for sid, s in sessions.items() if s.state != RETIRED}
-        turn = settings.get_int("qa.place_turn_seconds")
-        told = {sid: at for sid, at in told.items() if sid in live and now - at < turn}
+        told = {sid: at for sid, at in lanes.keeps(told, settings, now).items() if sid in live}
         waiting = [sid for sid in waiting if sid in live]
         when = datetime.fromtimestamp(now, UTC)
         held = lanes.holders(sessions.values(), settings, when)
