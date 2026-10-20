@@ -160,7 +160,9 @@ def _shot(tester: str, url: str, verdict: str) -> dict[str, Any]:
 def _verdict(results: list[dict[str, Any]]) -> str:
     if not results:
         return "no result"
-    return "fail" if any(r[f"{s}s"] for r in results for s in OPEN_SEVERITIES) else "pass"
+    if any(r[f"{s}s"] for r in results for s in OPEN_SEVERITIES):
+        return "fail"
+    return "blocked" if any("blocked" in r for r in results) else "pass"
 
 
 def sheet(snap: Snap, task_id: str) -> dict[str, Any]:

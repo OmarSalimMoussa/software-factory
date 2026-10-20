@@ -13,8 +13,9 @@ from typing import Any
 
 from runtime.guard.facts import REPRODUCE
 from runtime.qa import evidence, findings, plan, qa_browser, steps
+from runtime.qa.widths import unwalked
 from runtime.queue import tasks
-from runtime.queue.formats import SHA
+from runtime.queue.formats import SHA, one_line
 from runtime.queue.statuses import IMPL
 from runtime.shared import slices, store
 from runtime.shared.models import RETIRED, TESTER, Session, Task
@@ -61,16 +62,22 @@ def _results_path(ctx: Context, session: Session) -> Path:
     return ctx.places.results_of(session.id)
 
 
+def _diff_surfaces(ctx: Context, session: Session, *span: str) -> dict[str, list[str]]:
+    """Each surface the worktree's diff over ``span`` touches, with the paths that touch it."""
+    settings = ctx.settings()
+    surfaces = f"{settings.get_str('repo.default_branch')}:{SURFACES_FILE}"
+    prefixes = plan.surface_prefixes(_git(ctx, settings.get_str("repo.path"), "show", surfaces))
+    changed = _git(ctx, session.worktree, "diff", "--name-only", "--no-renames", *span).splitlines()
+    return plan.diff_surfaces(changed, prefixes)
+
+
 def testers_for(ctx: Context, session: Session, task: Task) -> dict[str, list[str]]:
     """The required testers for the worktree's head, each with why: the task's surfaces and the diff's, joined."""
-    settings = ctx.settings()
-    branch = settings.get_str("repo.default_branch")
-    prefixes = plan.surface_prefixes(_git(ctx, settings.get_str("repo.path"), "show", f"{branch}:{SURFACES_FILE}"))
-    changed = _git(ctx, session.worktree, "diff", "--name-only", "--no-renames", f"{branch}...HEAD").splitlines()
+    diff = _diff_surfaces(ctx, session, f"{ctx.settings().get_str('repo.default_branch')}...HEAD")
     rung = task.run if task.run is not None else session.rung
     if rung is None:
         raise Refused("qa", f"{task.id} has no run, so its testers are unknown")
-    return plan.required(task.surfaces, rung, plan.diff_surfaces(changed, prefixes))
+    return plan.required(task.surfaces, rung, diff)
 
 
 def qa_plan(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
@@ -172,12 +179,8 @@ def _slice_commits(ctx: Context, session: Session, head: str, count: int | None)
 
 def _touched(ctx: Context, session: Session, task: Task, tested: str, head: str) -> set[str]:
     """The testers the commits from ``tested`` to ``head`` require: those whose surfaces they touch."""
-    settings = ctx.settings()
-    surfaces = f"{settings.get_str('repo.default_branch')}:{SURFACES_FILE}"
-    prefixes = plan.surface_prefixes(_git(ctx, settings.get_str("repo.path"), "show", surfaces))
-    changed = _git(ctx, session.worktree, "diff", "--name-only", "--no-renames", tested, head).splitlines()
     rung = task.run if task.run is not None else session.rung
-    return set(plan.required([], rung or 0, plan.diff_surfaces(changed, prefixes)))
+    return set(plan.required([], rung or 0, _diff_surfaces(ctx, session, tested, head)))
 
 
 def ready_check(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
@@ -242,20 +245,44 @@ def qa_waive(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     return ok(task=task, waived=finding)
 
 
+def _walked_every_width(ctx: Context, session: Session, tester: Session, ready: dict[str, Any]) -> None:
+    """Refused while a browser tester's walk of a QA round on a change to the screens never showed one of the
+    widths, by its browser's own trace."""
+    settings = ctx.settings()
+    if ready.get(REPRODUCE) or tester.role not in settings.get_list("subagents.browser_personas"):
+        return
+    diff = _diff_surfaces(ctx, session, f"{settings.get_str('repo.default_branch')}...{ready['head']}")
+    if plan.SCREENS not in [*tasks.read(ctx, session.task).surfaces, *diff]:
+        return
+    widths = [int(width) for width in settings.get_list("qa.widths")]
+    missing = unwalked(ctx.places, qa_browser.runs_root(), session.id, tester.started_as, str(ready["at"]), widths)
+    if missing:
+        raise Refused(
+            "qa-result",
+            f"your browser's trace never shows the page at {', '.join(map(str, missing))} px wide, and a change to "
+            f"the screens is walked at each of {', '.join(map(str, widths))} px. Resize to each with the resize tool, "
+            "walk the changed screens there, then run factory qa result again. If something stopped you, say what: "
+            "factory qa result --head <sha> --blocked '…'",
+        )
+
+
 def qa_result(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """A tester's last step: its verdict on the head it tested, counted from the findings it recorded, and its runs
-    into evidence."""
+    into evidence. With nothing open it is refused until its walk is whole, unless it says what blocked it."""
     session, tester, full = _tester_on_head(ctx, args, "qa-result")
+    blocked = args.get("blocked")
+    if blocked is not None and (not isinstance(blocked, str) or not blocked.strip()):
+        raise Refused("qa-result", "say what stopped you in a few words: --blocked '…'")
     records = ready_records(ctx, session)
     found = findings.counts(ctx, session.task, full, agent=ctx.caller.agent_id)
     counts = {"blockers": found["blocker"], "majors": found["major"], "minors": found["minor"]}
+    failed = counts["blockers"] or counts["majors"]
+    if not failed and blocked is None:
+        _walked_every_width(ctx, session, tester, records[-1])
+    said = {"blocked": one_line(blocked)} if blocked else {}
     result = {"head": full, "tester": tester.role, "agent": ctx.caller.agent_id, "at": ctx.clock.iso(), **counts}
-    store.append_jsonl(_results_path(ctx, session), result)
-    verdict = (
-        "clean"
-        if not (counts["blockers"] or counts["majors"])
-        else (f"{counts['blockers']} blockers, {counts['majors']} majors")
-    )
+    store.append_jsonl(_results_path(ctx, session), {**result, **said})
+    verdict = f"{counts['blockers']} blockers, {counts['majors']} majors" if failed else "blocked" if said else "clean"
     doing.record(ctx.places, ctx.caller.agent_id, verdict=verdict)
     taken = evidence.intake(ctx, qa_browser.runs_root(), session.id, session.task, full, tester.started_as,
                             ctx.caller.agent_id, str(records[-1]["at"]))  # fmt: skip
@@ -263,8 +290,9 @@ def qa_result(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
 
 
 def qa_clean(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Refused until every required tester has a verdict on the final head with no open blocker or major. A clean
-    verdict on an earlier head carries forward when the commits since it touch none of that tester's surfaces."""
+    """Refused until every required tester has a verdict on the final head with no open blocker or major, and none
+    could not walk it. A clean verdict on an earlier head carries forward when the commits since it touch none of
+    that tester's surfaces."""
     session = _implementer(ctx)
     records = ready_records(ctx, session)
     if not records or records[-1].get(REPRODUCE):
@@ -273,27 +301,31 @@ def qa_clean(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     if _head(ctx, session) != head:
         raise Refused("qa-clean", f"your head moved past {head[:9]}: run qa-ready on it and test it again")
     task = tasks.read(ctx, session.task)
-    latest: dict[str, str] = {}  # each tester's newest head with a verdict
+    latest: dict[str, dict[str, Any]] = {}  # each tester's newest verdict
     reported: set[str] = set()
     reproduced = {str(r["head"]) for r in records if r.get(REPRODUCE)}
     for result in store.read_jsonl(_results_path(ctx, session)):
         if result["head"] in reproduced:
             continue
-        latest[str(result["tester"])] = str(result["head"])
+        latest[str(result["tester"])] = result
         reported |= {str(result["agent"])} if result["head"] == head else set()
     # Two testers of one kind may test at once, each in its own browser lane: one's verdict is not the other's.
     walking = registry.testing(registry.read(ctx.places).values(), session.id)
     testing = sorted(s.name for s in walking if s.agent_id not in reported)
     missing: list[str] = []
     open_: list[str] = []
+    blocked: list[str] = []
     for tester in records[-1].get("testers", []):
-        tested = latest.get(tester)
+        tested = str(latest[tester]["head"]) if tester in latest else None
         if tested is None or (tested != head and tester in _touched(ctx, session, task, tested, head)):
             missing.append(tester)
+        elif latest[tester].get("blocked"):
+            blocked.append(f"{tester} could not walk it ({latest[tester]['blocked']})")
         elif findings.open_count(ctx, task.id, tested, tester):
             open_.append(tester)
     said = (
         ([f"no result from {', '.join(missing)} on what changed since it tested"] if missing else [])
+        + ([f"{'; '.join(blocked)}: test again once that is fixed"] if blocked else [])
         + ([f"open blockers or majors from {', '.join(open_)}"] if open_ else [])
         + ([f"{', '.join(testing)} still testing: wait for its report"] if testing else [])
     )

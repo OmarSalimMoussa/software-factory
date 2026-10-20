@@ -1,5 +1,6 @@
 """A run's Playwright trace, read for its replay: every frame the screen showed, on the wall clock Chrome stamped it
-with, and the page recorder's lines (recorder.js), which the trace keeps as console messages.
+with, and the page recorder's lines (recorder.js), which the trace keeps as console messages. Each frame names the
+width of the page it showed, which a tester's hand-back is checked against.
 
 Chrome stamps each frame with the moment it swapped it onto the screen (``frameSwapWallTime``), and the recorder
 stamps each line with the page's own wall clock: both are this machine's clock, as the transcript's times are, so
@@ -10,11 +11,13 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 RECORDER = "[qa-rec] "
+FRAME = "screencast-frame"
 # One plain name in the trace's resources: Playwright names a frame's picture ``page@<the page's id>-<ms>.jpeg``.
 # No slash, backslash or leading dot, so no name reaches out of the folder.
 _PICTURE = re.compile(r"[A-Za-z0-9][A-Za-z0-9@._-]{0,127}")
@@ -60,7 +63,7 @@ def read(folder: Path, before: float, after: float) -> Trace:
                 continue
             if not isinstance(event, dict):
                 continue
-            if event.get("type") == "screencast-frame":
+            if event.get("type") == FRAME:
                 trace.frames.append(_frame(event))
             elif event.get("type") == "console" and str(event.get("text", "")).startswith(RECORDER):
                 recorded = _recorded(str(event["text"]))
@@ -71,6 +74,24 @@ def read(folder: Path, before: float, after: float) -> Trace:
     trace.frames.sort(key=lambda f: f.at)
     trace.events.sort(key=lambda e: e["at"])
     return trace
+
+
+def widths(lines: Iterable[str]) -> set[int]:
+    """The widths of the page a trace's frames showed: Playwright names the viewport each frame was drawn at."""
+    found: set[int] = set()
+    for line in lines:
+        # Most lines are copies of the page, too large to parse for nothing.
+        if f'"{FRAME}"' not in line:
+            continue
+        try:
+            event = json.loads(line)
+        # telemetry: expected — the trace's last line may be cut where the browser is writing it
+        except ValueError:
+            continue
+        width = event.get("width") if isinstance(event, dict) and event.get("type") == FRAME else None
+        if isinstance(width, int):
+            found.add(width)
+    return found
 
 
 def _frame(event: dict[str, Any]) -> Frame:

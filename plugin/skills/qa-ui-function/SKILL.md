@@ -28,7 +28,7 @@ in every state, and you prove each finding with a screenshot.
 
 - Your browser is your own: the `qa-browser` tools, a private browser that starts and ends with you. Open the
   slot's address from your brief and sign in as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/sign-in.md` says. With no
-  `qa-browser` tools, report "no browser" as your whole result.
+  `qa-browser` tools, run `factory qa result --head <sha> --blocked 'no browser'` and report that as your whole result.
 - Mark each step you walk, and name it on each finding, as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/steps.md` says:
   the owner watches your run as a replay of those steps.
 - To wait for the page to show something, call `browser_wait_until` with the words, a ceiling inside the item's
@@ -68,7 +68,9 @@ in every state, and you prove each finding with a screenshot.
 One finding per problem: severity (`blocker`, `major` or `minor`), the screen and control, the steps, what happened,
 what should have, and the screenshot's file name. Say which flows you did not reach. Record each finding as you find it, on the head `factory ready-check` named: its text to a file in the
 folder it names, with the Write tool, then `factory qa finding --head <sha> --severity <s> --where "<where>" --body
-<file>`. Last, `factory qa result --head <sha>`: your verdict is counted from the findings you recorded.
+<file>`. Last, `factory qa result --head <sha>`: your verdict is counted from the findings you recorded. On a change
+to the screens it is refused, naming the widths, until your browser has shown the page at each width your brief lists:
+walk them, then run it again. If something stopped you, add `--blocked '<what stopped you>'`.
 
 ## Never
 

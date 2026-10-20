@@ -215,7 +215,7 @@ def _qa_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
     if not ns.head:
         raise CliError(f"factory qa {ns.what} --head <sha> …")
     if ns.what == "result":
-        return Call("qa.result", {"head": ns.head})
+        return Call("qa.result", {"head": ns.head, **({"blocked": ns.blocked} if ns.blocked else {})})
     if ns.what in ("step", "step-result"):
         return _step_call(ns)
     if not (ns.severity and ns.where and ns.body):

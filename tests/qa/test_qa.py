@@ -17,10 +17,12 @@ from queue_kit import World
 from runtime.qa import findings, plan, qa_browser, steps
 from runtime.qa import verbs as qa
 from runtime.qa.scenarios import Step, parse
+from runtime.shared import store
 from runtime.shared.protocol import Refused
 from runtime.slots import health, leases
 from runtime.slots.verbs import slot
 from runtime.warden.context import StackResult
+from runtime.warden.sessions import registry
 
 HEAD = "a" * 40
 IMPL_ID = "0b6f1c3e-1d2a-4c5b-9e8f-7a6b5c4d3e2f"  # Claude Code names sessions by a UUID
@@ -81,6 +83,11 @@ def test_a_scenarios_steps_carry_their_names_and_the_first_thing_each_expects() 
     assert scenario.steps == (Step("Open the cart", "the cart shows"), Step("", "a receipt"), Step("Leave", ""))
 
 
+def _git(answers: dict[str, str]) -> Callable[[list[str]], tuple[int, str]]:
+    """git, answering each subcommand from ``answers``; the warden's removal of a run it took succeeds."""
+    return lambda argv: (0, "" if argv[0] == "rm" else answers[argv[3]])
+
+
 @pytest.fixture
 def ready_world(world: World, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> World:
     task = world.task(surfaces=["ui", "api"], slices=1)
@@ -95,19 +102,29 @@ def ready_world(world: World, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         world.session(agent, kind, f"{kind}-1", task.id, agent_id=agent)
     leases.claim(world.ctx("implementer", IMPL_ID), "impl-t-0001", "/wt/impl-t-0001")
 
-    def git(argv: list[str]) -> tuple[int, str]:
-        answers = {"rev-parse": HEAD, "show": PREFIXES, "diff": "web/page.ts\n", "merge-base": ""}
-        return 0, answers[argv[3]]
-
-    world.launcher.git = git
+    world.launcher.git = _git({"rev-parse": HEAD, "show": PREFIXES, "diff": "web/page.ts\n", "merge-base": ""})
     world.launcher.stack = lambda n, verb: StackResult(0, f"http://127.0.0.1:{8100 + n}/health\n", "/log")
     monkeypatch.setattr(health, "http_get", lambda url, timeout, limit: json.dumps({"build_commit": HEAD}).encode())
     monkeypatch.setattr(qa_browser, "runs_root", lambda: tmp_path / "runs")
     return world
 
 
+def _walk(world: World, agent: str, widths: list[int]) -> None:
+    """A browser run of the tester ``agent``, whose trace shows the page at each of ``widths``."""
+    at = datetime.fromtimestamp(world.clock.now(), UTC)
+    lane = registry.read(world.places)[agent].started_as
+    run = qa_browser.prepare(lane, IMPL_ID, qa_browser.runs_root(), world.ctx().settings(), at).parent
+    (run / "traces").mkdir()
+    frames = [{"type": "screencast-frame", "sha1": f"page@1-{n}.jpeg", "width": w, "height": 900}
+              for n, w in enumerate(widths)]  # fmt: skip
+    (run / "traces" / "trace-1.trace").write_text("".join(json.dumps(frame) + "\n" for frame in frames))
+
+
 def _result(world: World, agent: str, majors: int = 0) -> list[str]:
     """The tester ``agent`` records ``majors`` major findings and two minor ones, then its verdict; the majors' ids."""
+    session = registry.read(world.places).get(agent)
+    if session is not None and session.started_as in world.settings.get_list("subagents.browser_personas"):
+        _walk(world, agent, [int(w) for w in world.settings.get_list("qa.widths")])
     ctx = world.ctx("implementer", IMPL_ID, agent)
     found = [qa.qa_finding(ctx, {"head": HEAD[:9], "severity": severity, "where": "/cart"}, b"It breaks.")["finding"]
              for severity in ["major"] * majors + ["minor"] * 2]  # fmt: skip
@@ -133,6 +150,22 @@ def test_qa_clean_waits_for_every_required_tester_on_the_head(ready_world: World
     assert world.queue().task("t-0001").status == "qa-clean"
 
 
+def test_a_blocked_verdict_holds_qa_clean_until_the_tester_walks_again(ready_world: World) -> None:
+    world, impl = ready_world, ready_world.ctx("implementer", IMPL_ID)
+    qa.qa_ready(impl, {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
+    for agent in ("ag-ux", "ag-vis", "ag-be"):
+        _result(world, agent)
+    qa.qa_result(world.ctx("implementer", IMPL_ID, "ag-fn"), {"head": HEAD[:9], "blocked": "no sign-in link"}, None)
+
+    with pytest.raises(Refused, match=r"qa-ui-function could not walk it \(no sign-in link\)"):
+        qa.qa_clean(impl, {}, None)
+    # A verdict ends a tester's walk: a new one walks again.
+    world.session("ag-fn2", "qa-ui-function", "impl-t-0001.qa-ui-function-ab12cd", "t-0001", agent_id="ag-fn2",
+                  parent=IMPL_ID)  # fmt: skip
+    _result(world, "ag-fn2")
+    qa.qa_clean(impl, {}, None)
+
+
 def test_qa_clean_waits_for_a_second_tester_of_a_kind_still_testing(ready_world: World) -> None:
     world, impl = ready_world, ready_world.ctx("implementer", IMPL_ID)
     world.session("ag-ux2", "qa-ux", "impl-t-0001.qa-ux-ab12cd", "t-0001", agent_id="ag-ux2", parent=IMPL_ID)
@@ -147,6 +180,53 @@ def test_qa_clean_waits_for_a_second_tester_of_a_kind_still_testing(ready_world:
     qa.qa_clean(impl, {}, None)
 
 
+WHY = "the slot's sign-in printed no link"
+
+
+@pytest.mark.parametrize(
+    ("agent", "shown", "excuse", "surfaces", "changed", "refused"),
+    [
+        ("ag-fn", [1440, 1280, 1024, 390], "", ["desktop"], "web/page.ts", None),
+        ("ag-fn", [1440, 1280], "", ["desktop"], "web/page.ts", "1024, 390"),
+        ("ag-vis", None, "", ["ui"], "", "1440, 1024, 390"),
+        ("ag-ux", [1440], "major", ["ui"], "", None),
+        ("ag-ux", [1440], "blocked", ["ui"], "", None),
+        ("ag-fn", [1280], "", ["desktop"], "ext/panel.js", None),
+        ("ag-fn", [1440], "reproduce", ["ui"], "", None),
+        ("ag-be", None, "", ["ui"], "", None),
+    ],
+    ids=["every-width", "two-missed", "no-walk", "failed-with-a-finding", "blocked-with-why", "off-the-screens",
+         "a-reproduction", "no-browser"],
+)  # fmt: skip
+def test_a_browser_testers_clean_verdict_on_the_screens_waits_for_its_walk_at_every_width(
+    ready_world: World, agent: str, shown: list[int] | None, excuse: str, surfaces: list[str], changed: str,
+    refused: str | None,
+) -> None:  # fmt: skip
+    world = ready_world
+    world.with_settings(qa__widths=[1440, 1024, 390])
+    world.queue().write_task(dataclasses.replace(world.queue().task("t-0001"), surfaces=surfaces))
+    answers = {"rev-parse": HEAD, "show": PREFIXES, "diff": f"{changed}\n", "merge-base": "", "log": "docs/a.md\n"}
+    world.launcher.git = _git(answers)
+    ready = {"reproduce": True} if excuse == "reproduce" else {"slices": [HEAD[:7]]}
+    qa.qa_ready(world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], **ready}, None)
+    ctx = world.ctx("implementer", IMPL_ID, agent)
+    if shown is not None:
+        _walk(world, agent, shown)
+    if excuse == "major":
+        qa.qa_finding(ctx, {"head": HEAD[:9], "severity": "major", "where": "/cart"}, b"It breaks.")
+    args = {"head": HEAD[:9], **({"blocked": WHY} if excuse == "blocked" else {})}
+
+    if refused is not None:
+        with pytest.raises(Refused, match=f"never shows the page at {refused} px wide"):
+            qa.qa_result(ctx, args, None)
+        assert not store.read_jsonl(world.places.results_of(IMPL_ID))
+        _walk(world, agent, [int(w) for w in refused.split(", ")])
+    qa.qa_result(ctx, args, None)
+
+    [row] = store.read_jsonl(world.places.results_of(IMPL_ID))
+    assert row.get("blocked") == (WHY if excuse == "blocked" else None)
+
+
 @pytest.mark.parametrize(
     ("changed", "slices", "refused"),
     [("", None, False), ("docs/specs/t-0001.md\n", None, False), ("docs/specs/t-0001.md\n\nweb/page.ts\n", None, True),
@@ -157,7 +237,7 @@ def test_a_reproduction_comes_before_the_first_commit_beyond_markdown_and_none_o
     ready_world: World, monkeypatch: pytest.MonkeyPatch, changed: str, slices: list[str] | None, refused: bool
 ) -> None:
     answers = {"rev-parse": HEAD, "show": PREFIXES, "diff": "web/page.ts\n", "merge-base": "", "log": changed}
-    ready_world.launcher.git = lambda argv: (0, answers[argv[3]])
+    ready_world.launcher.git = _git(answers)
     impl = ready_world.ctx("implementer", IMPL_ID)
     args = {"head": HEAD[:12], "reproduce": True, **({"slices": slices} if slices else {})}
     if refused:
@@ -256,7 +336,7 @@ def test_qa_ready_finds_each_slices_commit_by_its_slice_line(
     task = ready_world.queue().task("t-0001")
     ready_world.queue().write_task(dataclasses.replace(task, slices=2))
     answers = {"rev-parse": HEAD, "show": PREFIXES, "diff": "web/page.ts\n", "merge-base": "", "log": log}
-    ready_world.launcher.git = lambda argv: (0, answers[argv[3]])
+    ready_world.launcher.git = _git(answers)
     impl = ready_world.ctx("implementer", IMPL_ID)
 
     if isinstance(found, str):
@@ -336,6 +416,8 @@ def test_a_testers_verdict_is_its_last_word_as_it_takes_its_runs_into_the_eviden
     other = ready_world.ctx("implementer", IMPL_ID, "ag-ux")
     if verb is qa.qa_step_result:
         qa.qa_step(other, {"head": HEAD[:9], "item": "cart", "step": 3}, None)
+    if verb is qa.qa_result:
+        _walk(ready_world, "ag-ux", [int(w) for w in ready_world.settings.get_list("qa.widths")])
     verb(other, {"head": HEAD[:9], **args}, b"It breaks.")
 
 
@@ -375,12 +457,14 @@ def test_a_step_is_marked_up_to_the_steps_a_scenario_that_takes_the_most_items_h
         ("step-result", {"item": "cart", "step": 1, "result": "ok", "got": "it showed"}, "pass, fail, blocked"),
         ("step-result", {"item": "cart", "step": 1, "result": "pass", "got": " "}, "--got"),
         ("finding", {"severity": "minor", "where": "/cart", "step": "cart"}, "<item>:<n>"),
+        ("result", {"blocked": " "}, "--blocked"),
     ],
 )
 def test_a_step_mark_names_its_item_and_step_and_a_result_says_what_was_seen(
     ready_world: World, verb: str, args: dict[str, object], says: str
 ) -> None:
     qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
-    send = {"step": qa.qa_step, "step-result": qa.qa_step_result, "finding": qa.qa_finding}[verb]
+    verbs = {"step": qa.qa_step, "step-result": qa.qa_step_result, "finding": qa.qa_finding, "result": qa.qa_result}
+    send = verbs[verb]
     with pytest.raises(Refused, match=re.escape(says)):
         send(ready_world.ctx("implementer", IMPL_ID, "ag-fn"), {"head": HEAD[:9], **args}, b"It breaks.")

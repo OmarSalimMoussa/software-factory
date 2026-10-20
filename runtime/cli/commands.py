@@ -95,7 +95,7 @@ def _tasks(sub: Any) -> None:
 def _qa(sub: Any) -> None:
     said = ("qa plan | step --head … --step <item>:<n> | step-result --head … --step <item>:<n> --result "
             "pass|fail|blocked --got … | finding --head … --severity … --where … [--step <item>:<n>] --body <file> | "
-            "result --head … | waive <task> <finding> --why …")  # fmt: skip
+            "result --head … [--blocked '<what stopped you>'] | waive <task> <finding> --why …")  # fmt: skip
     qa = sub.add_parser("qa", help=said)
     qa.add_argument("what", choices=["plan", "step", "step-result", "finding", "result", "waive", "scenario"])
     qa.add_argument("words", nargs="*")
@@ -107,6 +107,7 @@ def _qa(sub: Any) -> None:
     qa.add_argument("--got", default="")
     qa.add_argument("--body")
     qa.add_argument("--why", default="")
+    qa.add_argument("--blocked", default="")
     ready = sub.add_parser("qa-ready")
     ready.add_argument("head")
     ready.add_argument("--slices", nargs="+", help="one commit per slice; by default each slice's Slice: n/N commit")

@@ -14,8 +14,9 @@ from collections.abc import Iterable, Mapping, Sequence
 
 from runtime.shared.models import SURFACES
 
+SCREENS = "ui"  # the surface whose browser testers walk it at every width (qa.widths)
 TESTERS: dict[str, tuple[str, ...]] = {
-    "ui": ("qa-ui-function", "qa-ux", "qa-visual"),
+    SCREENS: ("qa-ui-function", "qa-ux", "qa-visual"),
     "api": ("qa-backend",),
     "access": ("qa-security",),
     "desktop": ("qa-ui-function",),

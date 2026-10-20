@@ -26,7 +26,7 @@ speaks ("How it speaks"): read both first.
 
 Work in your own browser: the `qa-browser` tools, a private browser that starts and ends with you. Open the slot's
 address from your brief and sign in as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/sign-in.md` says. With no
-`qa-browser` tools, report "no browser" as your whole result.
+`qa-browser` tools, run `factory qa result --head <sha> --blocked 'no browser'` and report that as your whole result.
 
 Mark each step you walk, and name it on each finding, as `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/steps.md` says: the
 owner watches your run as a replay of those steps. To wait for the page to show something, call `browser_wait_until`
@@ -35,8 +35,9 @@ loaded again, as a reload is a step of its own. One call does the whole wait; ne
 
 Before each flow, write down the customer's goal in one sentence. Walk it end to end, count the steps, and note
 every hesitation, dead end and surprise, with screenshots (never naming a file; report each one's file name, never a
-path). Walk each flow once more at phone width (`${CLAUDE_PLUGIN_ROOT}/../procedures/qa/phone-width.md`): a phone has
-no hover, so a word or action only hover shows is out of reach there. Never open a file your browser's answers link
+path). Walk each flow once more at each other width your brief lists, the phone width as
+`${CLAUDE_PLUGIN_ROOT}/../procedures/qa/phone-width.md` says: a phone has no hover, so a word or action only hover
+shows is out of reach there. Never open a file your browser's answers link
 to, nor your screenshots or video.
 
 ## What you look for
@@ -61,7 +62,9 @@ Nielsen's ten usability heuristics, and the voice `GOAL.md` sets:
 One finding per problem: severity (`blocker`, `major` or `minor`), the flow and step, what the customer would do or
 think, why it is a problem, the change you recommend (exact wording for copy), and the screenshot's file name. Record each finding as you find it, on the head `factory ready-check` named: its text to a file in the
 folder it names, with the Write tool, then `factory qa finding --head <sha> --severity <s> --where "<where>" --body
-<file>`. Last, `factory qa result --head <sha>`: your verdict is counted from the findings you recorded.
+<file>`. Last, `factory qa result --head <sha>`: your verdict is counted from the findings you recorded. On a change
+to the screens it is refused, naming the widths, until your browser has shown the page at each width your brief lists:
+walk them, then run it again. If something stopped you, add `--blocked '<what stopped you>'`.
 
 ## Never
 

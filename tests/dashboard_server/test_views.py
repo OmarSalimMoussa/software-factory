@@ -198,8 +198,10 @@ _CLEAN = {f"{severity}s": 0 for severity in OPEN_SEVERITIES}
         (["qa-visual", "qa-ux"], {"qa-visual": [_CLEAN], "qa-ux": [{**_CLEAN, "majors": 1}]}, None, ["good", "bad"]),
         # Two testers of one kind, each in its own browser lane: the kind fails when either found a major.
         (["qa-ux"], {"qa-ux": [{**_CLEAN, "majors": 1}, _CLEAN]}, None, ["bad"]),
+        # A walk that said what blocked it is no pass, though it found nothing open.
+        (["qa-ux"], {"qa-ux": [{**_CLEAN, "blocked": "no browser"}]}, None, ["bad"]),
     ],
-    ids=["untested", "backend-tested", "screenshots", "two-lanes"],
+    ids=["untested", "backend-tested", "screenshots", "two-lanes", "blocked"],
 )
 def test_a_fixs_qa_line_carries_its_tone_and_each_screenshot_its_verdicts(
     names: list[str], results: dict[str, list[dict[str, Any]]], tone: str | None, shots: list[str]

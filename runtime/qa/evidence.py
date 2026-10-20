@@ -112,6 +112,15 @@ def _untaken(places: Places, runs: Path, session_id: str) -> Iterator[tuple[Path
             yield run, _meta(run)
 
 
+def walks(places: Places, runs: Path, session_id: str, started_as: str, since: str) -> list[Path]:
+    """The runs a tester started as ``started_as`` made in the session since ``since`` that the evidence lacks."""
+    return [
+        run
+        for run, meta in _untaken(places, runs, session_id)
+        if meta.get("role") == started_as and str(meta.get("started", "")) >= since
+    ]
+
+
 def _take(ctx: Context, runs: Path, run: Path, entry: dict[str, Any]) -> None:
     files = _copy_tree(run, folder(ctx.places, entry))
     store.append_jsonl(index_path(ctx.places), {**entry, "at": ctx.clock.iso(), "files": files})
@@ -127,9 +136,7 @@ def intake(
     if not SESSION.match(session_id) or not TESTER.match(started_as):
         raise ValueError("evidence is taken for a Claude Code session and a tester kind")
     found: list[str] = []
-    for run, meta in _untaken(ctx.places, runs, session_id):
-        if meta.get("role") != started_as or str(meta.get("started", "")) < since:
-            continue
+    for run in walks(ctx.places, runs, session_id, started_as, since):
         names = {"task": task, "head": head, "tester": lanes.kind_of(started_as), "run": run.name}
         _take(ctx, runs, run, {**names, "session": session_id, "agent": agent})
         found.append(run.name)

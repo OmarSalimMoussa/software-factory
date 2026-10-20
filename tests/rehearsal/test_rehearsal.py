@@ -4,11 +4,13 @@ real handler, each request sent by the caller who really sends it. The proof tha
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from rehearsal_kit import Rehearsal, at_once, build, git
 
+from runtime.qa import qa_browser
 from runtime.queue import format_check, turn
 from runtime.queue.book import Queue
 from runtime.shared.models import BENCH_PENDING, FINISHED, RETIRED, WORKING
@@ -136,6 +138,17 @@ def _filed_and_proposed(r: Rehearsal, tmp_path: Path, orch: str) -> None:
     r.session(orch, ["propose", TASK, "--picture", picture, "--why", "G1 is the goal's first item"])
 
 
+def _walk(r: Rehearsal, impl: str, tester: str) -> None:
+    """The tester's own browser, traced as the wrapper traces it, shows the page at every width."""
+    settings = r.warden().settings()
+    run = qa_browser.prepare(tester, impl, qa_browser.runs_root(), settings, datetime.fromtimestamp(r.clock.t, UTC))
+    (run.parent / "traces").mkdir()
+    frames = [
+        {"type": "screencast-frame", "width": int(width), "height": 900} for width in settings.get_list("qa.widths")
+    ]
+    (run.parent / "traces" / "trace-1.trace").write_text("".join(json.dumps(frame) + "\n" for frame in frames))
+
+
 def _built_and_tested(r: Rehearsal, impl: str, worktree: Path) -> list[str]:
     # The implementer builds its one slice, brings its slot up at the head and readies QA.
     app = worktree / "web" / "app.js"
@@ -154,6 +167,7 @@ def _built_and_tested(r: Rehearsal, impl: str, worktree: Path) -> list[str]:
         agent = f"a{n}7f3c9e1d2b4a6"
         r.hook(impl, "subagent.start", {"agent_id": agent, "kind": tester})
         assert r.session(impl, ["ready-check"], agent_id=agent)["folder"] == str(worktree / scratch_of(agent))
+        _walk(r, impl, tester)
         note = r.body(worktree, f"{agent}/finding-{n}.md", b"The empty list says nothing about how to add a note.\n")
         finding = ["qa", "finding", "--head", head, "--severity", "minor", "--where", "/notes", "--body", note]
         r.session(impl, finding, agent_id=agent)

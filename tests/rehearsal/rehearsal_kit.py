@@ -146,7 +146,7 @@ class Systemd:
             (runs / f"{request_id}.exit").write_text("0\n")
             return subprocess.CompletedProcess(argv, 0, "", "")
         if raw["kind"] == "command":
-            assert raw["argv"][0] == "git", f"the warden asked a unit to run {raw['argv']}"
+            assert raw["argv"][0] in ("git", "rm"), f"the warden asked a unit to run {raw['argv']}"
         if raw["kind"] == "check":
             launch_file.check_parts(raw, self.agent_home)
             self.checks.append(raw)
