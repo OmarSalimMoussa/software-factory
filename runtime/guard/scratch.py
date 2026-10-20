@@ -50,8 +50,9 @@ def _refused_at(call: Call, path: Path) -> Refusal | None:
     if not any(inside(real, root) for root in writes.product_roots(call)):
         return None
     if call.in_subagent:
-        where = call.worktree / _folder(call)
-        return Refusal("subagent-writes", f"a subagent writes only in {where}; report to your parent")
+        whose = "your own folder" if _folder(call) != SCRATCH else "your session's scratch folder"
+        told = f"a subagent writes only in {whose}, {call.worktree / _folder(call)}/: write a file there with the Write"
+        return Refusal("subagent-writes", f"{told} or Edit tool, by its full path; report the rest to your parent")
     return Refusal("orchestrator-writes", f"you never write product code; write only in {call.worktree / SCRATCH}")
 
 

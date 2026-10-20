@@ -37,8 +37,8 @@ RULES: dict[str, str] = {
     "prod-frozen": "pushing a tag or another branch",
     "protected-paths": "writes to the factory's own files and the product's protected paths",
     "own-worktree": "Edit, Write, MultiEdit and NotebookEdit outside the session's own worktree",
-    "subagent-writes": "a subagent's write in a checkout outside its session's .factory/, or a git command that "
-    "changes anything",
+    "subagent-writes": "a subagent's write in a checkout outside its session's .factory/, a tester's outside its own "
+    "folder there, or a git command that changes anything",
     "orchestrator-writes": "the orchestrator's write in its checkout outside .factory/, or a commit on the default "
     "branch that finishes no merge or revert",
     "product-drivers": "a browser or computer-use tool outside a UI tester; the owner's Chrome, always",

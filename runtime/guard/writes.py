@@ -35,6 +35,12 @@ _COPIERS = frozenset({"cp", "install", "ln", "rsync"})
 _MODE = re.compile(r"^(?:[0-7]{1,4}|[ugoa]*(?:[-+=][rwxXst]*)+(?:,[ugoa]*(?:[-+=][rwxXst]*)+)*)$")
 # A flag cluster that edits in place: sed's and perl's `-i`, alone or among others (`-pi`, `-ni`).
 _IN_PLACE = re.compile(r"^-[a-zA-Z]*i")
+# An in-place editor's script flag (`-e`, `-ne`, `-es/a/b/`); a cluster's letters stop at one whose argument ends it.
+_SCRIPT_FLAG = {
+    "sed": re.compile(r"^-(?:(?![efi])[a-zA-Z])*[ef](.*)$", re.S),
+    "perl": re.compile(r"^-(?:(?![eEiIFCxdDMmV])[a-zA-Z])*[eE](.*)$", re.S),
+}
+_LONG_SCRIPTS = ("--expression", "--file")
 _RECURSIVE = re.compile(r"^(-[a-zA-Z]*[rRa][a-zA-Z]*|--recursive|--archive)$")
 
 
@@ -185,8 +191,10 @@ def written(inv: shell.Invocation) -> list[tuple[str, bool]]:
         # A tree copied into a folder that holds a protected path can overwrite it.
         tree = inv.program == "rsync" or any(_RECURSIVE.match(a) for a in args)
         return found + ([(target, tree)] if target else [])
-    in_place = inv.program in {"sed", "perl"} and any(_IN_PLACE.match(a) or a.startswith("--in-place") for a in args)
-    if inv.program not in _MUTATORS and not in_place:
+    script = _SCRIPT_FLAG.get(inv.program)
+    if script is not None and any(_IN_PLACE.match(a) or a.startswith("--in-place") for a in args):
+        return found + [(word, False) for word in _edited(script, args)]
+    if inv.program not in _MUTATORS:
         return found
     # mv's last word is where things go; what it moves away is removed from where it was.
     gone = args[:-1] if inv.program == "mv" else args
@@ -195,6 +203,22 @@ def written(inv: shell.Invocation) -> list[tuple[str, bool]]:
     if mode is not None:
         del words[mode]
     return found + [(word, inv.program in _REMOVERS and word in gone) for word in words]
+
+
+def _edited(script: re.Pattern[str], args: list[str]) -> list[str]:
+    """The files an in-place sed or perl edits: no flag or script, nor the first word when no flag names a script."""
+    files: list[str] = []
+    named = takes_next = False
+    for word in args:
+        if takes_next:
+            takes_next = False
+        elif word.startswith(_LONG_SCRIPTS):
+            named, takes_next = True, "=" not in word
+        elif (flag := script.match(word)) is not None:
+            named, takes_next = True, not flag.group(1)
+        elif not word.startswith("-"):
+            files.append(word)
+    return files if named else files[1:]
 
 
 def _shell_writes(call: Call, inv: shell.Invocation, cwd: Path) -> Refusal | None:

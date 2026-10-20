@@ -238,6 +238,11 @@ READER = {"agent_id": "a1234567890abc", "agent_type": "Explore"}  # a reader: no
         ("git stash", "subagent-writes"),
         ("git checkout -- app.py", "subagent-writes"),
         ("sed -i s/a/b/ app.py", "subagent-writes"),
+        ("sed -ni -e s/a/b/p app.py", "subagent-writes"),
+        ("sed -i 's/a b$/c/' .factory/notes.md", None),
+        ("sed -i -e s/a/b/ --expression=s/c/d/ .factory/notes.md", None),
+        ("perl -pi -e s/a/b/ .factory/notes.md", None),
+        ("sed -i s/a/b/ /tmp/walk.py", None),
         ("echo x > app.py", "subagent-writes"),
         ("echo x > .factory/notes.md", None),
         ("chmod 700 .factory/notes.md", None),
@@ -279,6 +284,27 @@ def test_a_tester_writes_only_in_its_own_folder_as_testers_of_one_worktree_run_a
     kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
     asked = {"file_path": str(kit.worktree / path), "content": "Save fails."}
     assert kit.rule("Write", asked, agent_id=TESTER_ID, agent_type="qa-visual") == rule
+
+
+@pytest.mark.parametrize(
+    ("tool", "tool_input", "kind", "folder"),
+    [
+        ("Write", {"file_path": ".factory/f-1.md", "content": "x"}, "qa-visual", f".factory/{TESTER_ID}"),
+        ("Bash", {"command": "rm -f .factory/jar.txt"}, "qa-visual", f".factory/{TESTER_ID}"),
+        ("Bash", {"command": "echo x > app.py"}, "Explore", ".factory"),
+    ],
+    ids=["a-testers-write", "a-testers-shell-write", "a-readers-shell-write"],
+)
+def test_a_subagents_refused_write_names_the_folder_it_writes_in_and_the_tools_that_do(
+    tmp_path: Path, tool: str, tool_input: dict[str, str], kind: str, folder: str
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
+    asked = {**tool_input, "file_path": str(kit.worktree / tool_input["file_path"])} if tool == "Write" else tool_input
+    decision = kit.decide(tool, asked, agent_id=TESTER_ID, agent_type=kind)
+    assert isinstance(decision, Refusal) and decision.rule == "subagent-writes"
+    assert f"{kit.worktree / folder}/" in decision.reason and "the Write or Edit tool" in decision.reason
 
 
 @pytest.mark.parametrize("command", ["D=.factory/x; chmod 700 $D", 'echo x > "$OUT"', "touch `pwd`/f"])
