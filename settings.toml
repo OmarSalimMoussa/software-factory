@@ -54,7 +54,8 @@ revert_fails = 2        # a bundle names a merge for a revert once this many wal
 seconds_per_item = 120
 setup_seconds = 180     # added once to each tester's time, for its start-up and sign-in
 max_items = 10
-desktop_seconds = 300
+desktop_seconds = 300   # a tester holding the remote desktop works at least this long from its first desktop up,
+                        # or to the end of its items' time if that is later
 desktop_wait_minutes = 5  # a tester's desktop up waits this long in all, on the factory's time, for a desktop to
                           # free, or it is refused, then for the other browser walks to hand back, or it goes ahead:
                           # it and desktop up's own minutes fit one shell call's longest wait

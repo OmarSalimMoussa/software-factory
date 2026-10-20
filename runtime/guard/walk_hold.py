@@ -142,9 +142,10 @@ _OUT_OF_TIME = re.compile(
 
 
 def check_tester_time(call: Call) -> Decision:
-    """A tester's own calls: refused once its time is spent, or its desktop time once it drives the remote desktop;
-    shell and browser waits cut to the time left, but for `desktop up`, and a Monitor never. Its report always goes,
-    uncut: a file in its scratch folder, its steps' results, findings and verdict, a reflection, and its hand-back."""
+    """A tester's own calls: refused once its time is spent, which while it holds the remote desktop is the later of
+    its items' time and its desktop time; shell and browser waits cut to the time left, but for `desktop up`, and a
+    Monitor never. Its report always goes, uncut: a file in its scratch folder, its steps' results, findings and
+    verdict, a reflection, and its hand-back."""
     tester = call.in_subagent and call.agent_type.startswith(TESTER)
     if not tester or call.tool == HANDBACK or call.off("tester-time"):
         return None
@@ -184,7 +185,8 @@ def reports(call: Call) -> bool:
 
 
 def _time_left(call: Call) -> float | Refusal:
-    """Seconds left of the tester's budget: its items' time, or its desktop time once it drives the remote desktop."""
+    """Seconds left of the tester's budget: its items' time, and while it holds the remote desktop, the later of that
+    and its desktop time."""
     path = transcript.subagent_transcript(call.transcript, call.agent_id)
     try:
         brief, started = transcript.first_brief(path)
@@ -192,17 +194,15 @@ def _time_left(call: Call) -> float | Refusal:
     # telemetry: surfaced — `_time_up` tells the tester to report what it has
     except transcript.BriefError as exc:
         return _time_up(call, f"your time budget cannot be read ({exc})")
-    budget = float(lanes.tester_seconds(call.settings, items))
     first_up, in_ups = _desktop_starts(call, path)
-    spent = (call.now - started).total_seconds() - in_ups
-    # On a desktop a tester works to the desktop's end, its items' time aside; that counts from its first `desktop up`.
+    left = lanes.tester_seconds(call.settings, items) - (call.now - started).total_seconds() + in_ups
+    why = "your time is up"
+    # A desktop's time counts from the tester's first `desktop up`, so the web items before it take none of it.
     if call.agent_id in read_desktops(call.places).values():
         desktop_s = call.settings.get_int("qa.desktop_seconds")
-        on_desktop = (call.now - (first_up or started)).total_seconds() - in_ups
-        if on_desktop >= desktop_s:
-            return _time_up(call, f"the desktop is a tester's for {desktop_s} s, and goes down once you hand back")
-        return max(budget - spent, desktop_s - on_desktop)
-    return budget - spent if budget > spent else _time_up(call, "your time is up")
+        left = max(left, desktop_s - (call.now - (first_up or started)).total_seconds() + in_ups)
+        why = f"your items' time and the desktop's {desktop_s} s are both spent, and the desktop goes down at hand-back"
+    return left if left > 0 else _time_up(call, why)
 
 
 def _desktop_starts(call: Call, path: Path) -> tuple[datetime | None, float]:

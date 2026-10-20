@@ -153,7 +153,8 @@ runs: in-turn
 - `runs`: `in-turn` on the default branch, `desktop` on the slot's remote desktop, or `waiting` (never run until
   what it needs exists).
 - `items` (optional): how many of a tester's items it takes, from 1 to `qa.max_items`; without it, one. A tester's
-  time grows with its items, so a scenario with a long wait, such as a recording or a rebuild, names more.
+  time grows with its items, on the remote desktop too, so a scenario with a long wait, such as a recording or a
+  rebuild, names more.
 
 ## check-values/
 

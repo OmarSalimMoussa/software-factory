@@ -15,13 +15,13 @@ in every state, and you prove each finding with a screenshot.
   that build, and names the head. If it answers "not ready", report that line as your whole result and stop.
 - **Your time.** Your brief's `Scenarios and checks: N` line sets it, and the brief ends with the factory's time. Once
   the guard says your time is spent, mark each item left `timed out` with what you saw and go on; while you hold the
-  remote desktop, its time is yours instead, as the next point says. Never wait on a long operation: mark that step
+  remote desktop, it may run longer, as the next point says. Never wait on a long operation: mark that step
   blocked and go on. The guard cuts your commands to the time left and, once it is spent, lets only your report through:
   your finding files, `factory qa step-result`, `factory qa finding`, `factory qa result`, `factory reflect` and your
   hand-back. A scenario's own timings never override this.
 - **The website first.** Use the slot's remote desktop only for steps outside the web UI, and only as the factory's
-  procedure `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/desktop.md` says. One tester holds the desktop at a time, for
-  the seconds its `desktop up` answers with: while you hold it, that is your time, however long an item gets. Never
+  procedure `${CLAUDE_PLUGIN_ROOT}/../procedures/qa/desktop.md` says. One tester holds the desktop at a time: while
+  you hold it, your time runs to the later of your items' time and the seconds your `desktop up` answers with. Never
   take a password from a brief, and never put one in a report.
 
 ## How you work

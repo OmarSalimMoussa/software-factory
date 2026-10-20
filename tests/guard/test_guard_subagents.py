@@ -398,26 +398,6 @@ def test_a_tester_cannot_report_its_time_out_before_the_guard_says_so(
 
 
 @pytest.mark.parametrize(
-    ("leased", "tool", "refused"),
-    [
-        (True, "mcp__computer-use__screenshot", True),
-        (True, "Read", True),
-        (False, "mcp__qa-browser__browser_mouse_click_xy", False),  # a mouse step on a web page is no desktop use
-        (False, "Read", False),
-    ],
-)
-def test_a_tester_holding_a_desktop_stops_at_its_desktop_time(
-    tmp_path: Path, leased: bool, tool: str, refused: bool
-) -> None:
-    kit = Kit(tmp_path)
-    kit.session("implementer")
-    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=310), "user", "Scenarios and checks: 10")])
-    store.write_json(kit.public / "desktops.json", {"2": TESTER_ID} if leased else {})
-    tester = {"agent_id": TESTER_ID, "agent_type": "qa-ui-function"}
-    assert (kit.rule(tool, {"file_path": "/x"}, **tester) == "tester-time") is refused
-
-
-@pytest.mark.parametrize(
     ("command", "answered", "refused"),
     [
         ("factory slot desktop up qa-admin@notes.test", 100, False),
@@ -431,7 +411,7 @@ def test_a_testers_clock_stops_while_the_factory_starts_its_desktop(
 ) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer")
-    lines = [entry(NOW - timedelta(seconds=310), "user", "Scenarios and checks: 10"),
+    lines = [entry(NOW - timedelta(seconds=310), "user", "Scenarios and checks: 1"),
              entry(NOW - timedelta(seconds=300), "assistant", [bash_use("d1", command)])]  # fmt: skip
     if answered is not None:
         lines.append(entry(NOW - timedelta(seconds=answered), "user", [result("d1", "view: http://x password: p")]))
@@ -442,12 +422,22 @@ def test_a_testers_clock_stops_while_the_factory_starts_its_desktop(
 
 
 @pytest.mark.parametrize(
-    ("items", "up_ago", "refused"),
-    [(10, 120, False), (10, 330, True), (1, 120, False)],
-    ids=["within", "past", "within-past-its-items-time"],
+    ("items", "up_ago", "leased", "refused"),
+    [
+        (1, 120, True, False),
+        (10, 330, True, False),
+        (1, 330, True, True),
+        (1, 120, False, True),
+    ],
+    ids=[
+        "its-desktop-time-from-its-first-up-outlasts-its-items",
+        "its-items-outlast-its-desktop-time",
+        "both-spent",
+        "holding-no-desktop",
+    ],
 )
-def test_a_testers_desktop_time_counts_from_its_first_desktop_up_so_its_web_items_take_none(
-    tmp_path: Path, items: int, up_ago: int, refused: bool
+def test_a_tester_holding_a_desktop_works_to_the_later_of_its_desktop_time_and_its_items_time(
+    tmp_path: Path, items: int, up_ago: int, leased: bool, refused: bool
 ) -> None:
     kit = Kit(tmp_path)
     kit.session("implementer")
@@ -456,7 +446,7 @@ def test_a_testers_desktop_time_counts_from_its_first_desktop_up_so_its_web_item
              entry(NOW - timedelta(seconds=up_ago), "assistant", [up]),
              entry(NOW - timedelta(seconds=up_ago - 20), "user", [view])]  # fmt: skip
     kit.subagent(TESTER_ID, lines)
-    store.write_json(kit.public / "desktops.json", {"2": TESTER_ID})
+    store.write_json(kit.public / "desktops.json", {"2": TESTER_ID} if leased else {})
     tester = {"agent_id": TESTER_ID, "agent_type": "qa-ui-function"}
     assert (kit.rule("mcp__computer-use__screenshot", {}, **tester) == "tester-time") is refused
 
