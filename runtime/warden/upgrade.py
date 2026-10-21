@@ -13,17 +13,18 @@ import re
 from collections.abc import Callable
 from typing import Any
 
+from runtime.guard.facts import REPRODUCE, WALKED, qa_round, read_ready
 from runtime.queue import approvals, formats, reports, turn
 from runtime.queue.book import Queue
 from runtime.shared import claude_accounts, store
-from runtime.shared.models import SEVERITIES
+from runtime.shared.models import RETIRED, SEVERITIES
 from runtime.slots import leases
 from runtime.system import layout
 from runtime.warden import gc, imports, loop
 from runtime.warden.context import Context
 from runtime.warden.health import errors_import
 from runtime.warden.owner import reflections
-from runtime.warden.sessions import lifecycle, older_skills, registry
+from runtime.warden.sessions import doing, lifecycle, older_skills, registry
 from runtime.warden.spend import partition
 
 log = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ def migrate(ctx: Context) -> list[str]:
     steps: list[Callable[[Context], str]] = [
         _inbox_cursor, _leases, _errors_filed, _errors_since, _failing_since, _turn, _merges, _staging_red,
         _typed_verdicts, _approvals_routed, _briefs_home, _active_account, _older_skills, _reflection_states,
-        _gc_record, _paused_why, _time_cursor,
+        _gc_record, _paused_why, _time_cursor, _walked_rounds,
     ]  # fmt: skip
     for step in steps:
         try:
@@ -50,6 +51,32 @@ def migrate(ctx: Context) -> list[str]:
             log.info("warden: brought the state over: %s", said)
             done.append(said)
     return done
+
+
+def _walked_rounds(ctx: Context) -> str:
+    """A QA round is a head a tester walked to a verdict: each live implementer's ready records mark the heads its
+    testers walked, and its round in progress is counted again by that rule."""
+    counted = []
+    for sid, session in registry.read(ctx.places).items():
+        path = ctx.places.ready(sid)
+        if session.state == RETIRED or not path.exists():
+            continue
+        records = read_ready(ctx.places, sid)
+        walked = {r["head"] for r in store.read_jsonl(ctx.places.results_of(sid)) if not r.get("blocked")}
+        newest = {r["head"]: r for r in records}  # each head's last record
+        marks = (walked - {r["head"] for r in records if r.get(WALKED)}) & newest.keys()
+        for head in marks:
+            newest[head][WALKED] = True
+        if marks:
+            store.write_json(path, {"records": records})
+        known = doing.facts(ctx.places, sid).get("qa_round")
+        last = records[-1] if records else None
+        now = qa_round(records, str(last["head"])) if last is not None and not last.get(REPRODUCE) else None
+        if now is not None and now != known:
+            doing.record(ctx.places, sid, qa_round=now)
+        if marks or now not in (None, known):
+            counted.append(session.name)
+    return f"the QA rounds of {', '.join(counted)}, by the heads a tester walked" if counted else ""
 
 
 def _paused_why(ctx: Context) -> str:

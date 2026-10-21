@@ -5,8 +5,9 @@ orchestrator's first (`browsers-at-once`), a tester's brief (`tester-brief`), QA
 gets ready and each tester's time (`cpu-hold`, `upgrade-hold`, `tester-time`, in walk_hold), and no finished subagent
 resumed (`resume-subagent`).
 
-Every count comes from the session's own transcript; the current call is left out by its ``tool_use_id``, and a
-call the guard refused never ran.
+Every count but the QA rounds comes from the session's own transcript; the current call is left out by its
+``tool_use_id``, and a call the guard refused never ran. A QA round is a head a tester walked to a verdict, which the
+warden marks on the session's ready records.
 """
 
 from __future__ import annotations
@@ -24,10 +25,10 @@ from runtime.guard.facts import (
     Decision,
     Refusal,
     Rewrite,
+    qa_round,
     read_desktops,
     read_ready,
     read_vitals,
-    ready_at,
 )
 from runtime.guard.wire import HANDBACK, REFUSED
 from runtime.shared import lanes
@@ -206,7 +207,7 @@ def _running(call: Call, agent: history.AgentCall) -> bool:
 
 
 def _qa(call: Call, kind: str, calls: list[history.AgentCall]) -> Decision:
-    """QA only after every slice: a ready record for this exact head, and at most the round limit of heads."""
+    """QA only after every slice: a ready record for this exact head, and at most the round limit of heads walked."""
     if not kind.startswith(TESTER) or call.role != IMPLEMENTER or call.off("qa-ready") or call.session is None:
         return None
     head = branches.head(call.worktree)
@@ -217,17 +218,7 @@ def _qa(call: Call, kind: str, calls: list[history.AgentCall]) -> Decision:
         return Refusal("qa-ready", f"no ready record for {short}: {remedy}")
     if call.off("qa-rounds") or records[-1].get(REPRODUCE):
         return None
-    # A round its subagents were interrupted in, when the session was benched, does not count, unless it is the
-    # round this start continues.
-    interrupted = _interrupted(call)
-    heads: dict[str, bool] = {head: False}
-    for agent in calls:
-        if agent.subagent_type.startswith(TESTER):
-            active = ready_at(records, agent.started)
-            if active is not None and not active.get(REPRODUCE):
-                started_on = str(active["head"])
-                heads[started_on] = heads.get(started_on, False) or agent.agent_id in interrupted
-    rounds = sum(1 for h, cut in heads.items() if h == head or not cut)
+    rounds = qa_round(records, head)
     limit = call.settings.get_int("rounds.qa") + call.extension("qa")
     if rounds > limit:
         return Refusal("qa-rounds", f"this would be QA round {rounds} (limit {limit}); report to the orchestrator")

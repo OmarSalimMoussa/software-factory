@@ -3,7 +3,8 @@
 
 The warden reads the branch with git as the agent, through the agent's own unit, and reads surfaces.toml from the
 default branch, which only the owner changes, never from the worktree. A ready record names the full head the slot
-runs; the guard reads the records from public/ to let testers start, and counts QA rounds by their heads.
+runs; the guard reads the records from public/ to let testers start, and counts QA rounds by the heads a tester
+walked to a verdict, which a verdict marks on its record.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from runtime.guard.facts import REPRODUCE
+from runtime.guard.facts import REPRODUCE, WALKED, qa_round
 from runtime.qa import evidence, findings, plan, qa_browser, steps
 from runtime.qa.widths import unwalked
 from runtime.queue import tasks
@@ -124,8 +125,8 @@ def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
         record = {"head": head, "slices": slices, "at": ctx.clock.iso(), "slot": lease.slot, "testers": list(testers),
                   **marks}  # fmt: skip
         store.write_json(_ready_path(ctx, session), {"records": [*records, record]})
-        rounds = len({str(r["head"]) for r in [*records, record] if not r.get(REPRODUCE)})
         if not reproduce:
+            rounds = qa_round([*records, record], head)
             doing.record(ctx.places, session.id, slice=len(slices), slices=len(slices), qa_round=rounds)
     if task.status == "building" and not reproduce:
         tasks.move(ctx, task.id, "qa", "qa-ready", IMPL, f"ready for QA at {head[:9]}", branch=branch)
@@ -269,7 +270,8 @@ def _walked_every_width(ctx: Context, session: Session, tester: Session, ready: 
 
 def qa_result(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """A tester's last step: its verdict on the head it tested, counted from the findings it recorded, and its runs
-    into evidence. With nothing open it is refused until its walk is whole, unless it says what blocked it."""
+    into evidence. With nothing open it is refused until its walk is whole, unless it says what blocked it. A verdict
+    from a walk makes its head a QA round."""
     session, tester, full = _tester_on_head(ctx, args, "qa-result")
     blocked = args.get("blocked")
     if blocked is not None and (not isinstance(blocked, str) or not blocked.strip()):
@@ -283,11 +285,23 @@ def qa_result(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[st
     said = {"blocked": one_line(blocked)} if blocked else {}
     result = {"head": full, "tester": tester.role, "agent": ctx.caller.agent_id, "at": ctx.clock.iso(), **counts}
     store.append_jsonl(_results_path(ctx, session), {**result, **said})
+    if not said:
+        _walked(ctx, session, full)
     verdict = f"{counts['blockers']} blockers, {counts['majors']} majors" if failed else "blocked" if said else "clean"
     doing.record(ctx.places, ctx.caller.agent_id, verdict=verdict)
     taken = evidence.intake(ctx, qa_browser.runs_root(), session.id, session.task, full, tester.started_as,
                             ctx.caller.agent_id, str(records[-1]["at"]))  # fmt: skip
     return ok(head=full, tester=tester.role, evidence=taken, **counts)
+
+
+def _walked(ctx: Context, session: Session, head: str) -> None:
+    """Mark the newest ready record of ``head`` walked, which makes the head a QA round."""
+    with ctx.lock:
+        records = ready_records(ctx, session)
+        newest = next((r for r in reversed(records) if r["head"] == head), None)
+        if newest is not None and not newest.get(WALKED):
+            newest[WALKED] = True
+            store.write_json(_ready_path(ctx, session), {"records": records})
 
 
 def qa_clean(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:

@@ -7,6 +7,7 @@ import json
 
 from queue_kit import World
 
+from runtime.guard.facts import WALKED, read_ready
 from runtime.qa import findings
 from runtime.queue import approvals, cards, formats, intake, records, reports, turn
 from runtime.queue.book import Queue, spec_rel, task_rel
@@ -16,6 +17,7 @@ from runtime.warden import gc, inbox, loop, upgrade
 from runtime.warden.context import Caller
 from runtime.warden.health import errors_import
 from runtime.warden.owner import reflections
+from runtime.warden.sessions import doing
 
 FULL = "f" * 40
 
@@ -133,4 +135,23 @@ def test_self_reflect_entries_open_under_the_ids_the_library_gave_them_by_their_
     assert [(e["id"], e["text"], e["state"]) for e in reflections.entries(world.places)] == [
         ("sr1", "Entry 1.", "open"), ("sr2", "Entry 2.", "open")
     ]  # fmt: skip
+    assert upgrade.migrate(ctx) == []
+
+
+def test_a_head_a_tester_walked_to_a_verdict_before_the_upgrade_stays_a_qa_round_and_the_round_is_counted_again(
+    world: World,
+) -> None:
+    places, heads = world.places, ["a" * 40, "b" * 40, "c" * 40, "d" * 40]
+    world.session("s-impl", "implementer", "impl-t-0001")
+    store.write_json(places.ready("s-impl"), {"records": [{"head": h, "slices": [], "at": "x"} for h in heads]})
+    verdict = {"tester": "qa-backend", "agent": "ag", "at": "x", "blockers": 0, "majors": 1, "minors": 0}
+    store.append_jsonl(places.results_of("s-impl"), {**verdict, "head": heads[0]})
+    store.append_jsonl(places.results_of("s-impl"), {**verdict, "head": heads[1], "blocked": "the session was benched"})
+    doing.record(places, "s-impl", qa_round=4)
+    ctx = dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden"))
+
+    assert upgrade.migrate(ctx) != []
+
+    assert [r.get(WALKED, False) for r in read_ready(places, "s-impl")] == [True, False, False, False]
+    assert doing.facts(places, "s-impl")["qa_round"] == 2
     assert upgrade.migrate(ctx) == []

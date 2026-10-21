@@ -27,12 +27,13 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    before the branch's first commit beyond Markdown, such as its spec: no QA round, and none of their results counts
    toward `qa-clean`.
 7. **QA.** `factory qa-ready` records the head; every tester the change's surfaces require runs at once. A round is
-   a head. Rounds end when one finds no new blocker or major, at most `rounds.qa`. `factory qa-clean` is refused
-   until every required tester passed on the final head. When a change touches the screens, a browser tester's
-   `factory qa result` with nothing open is refused, naming the widths, until its browser's trace shows the page at
-   every width in `qa.widths`. The factory names those widths in the tester's brief, as one more item of its time,
-   `widths`. A tester that could not walk them says what stopped it (`--blocked`): its verdict then reads blocked,
-   and qa-clean waits until a new tester walks it.
+   a head a tester walked to a verdict: one whose testers a bench, a pause or a lost slot cut short, or that no
+   tester could walk, is none. Rounds end when one finds no new blocker or major, at most `rounds.qa`.
+   `factory qa-clean` is refused until every required tester passed on the final head. When a change touches the
+   screens, a browser tester's `factory qa result` with nothing open is refused, naming the widths, until its
+   browser's trace shows the page at every width in `qa.widths`. The factory names those widths in the tester's
+   brief, as one more item of its time, `widths`. A tester that could not walk them says what stopped it
+   (`--blocked`): its verdict then reads blocked, and qa-clean waits until a new tester walks it.
 8. **Merge turn.** One branch at a time: the warden gives the turn to the next ready task and tells its
    implementer, which rebases and has the warden run `factory check`, at most `rounds.check_runs` times. The
    orchestrator merges with `--no-ff`; the merge hook lets only the turn's branch land, with the pass for its tree.

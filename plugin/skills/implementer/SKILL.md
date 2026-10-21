@@ -84,10 +84,10 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
    Each bug a tester caught gets a test, or a scenario step, that would catch it again. A tester the environment
    stopped (a missing key, seed or account, a site it cannot reach) is no finding: tell the orchestrator what
    stopped it. It blocks the task, and you are benched until the owner fixes it.
-6. **A round is a head.** After fixes, commit, rebuild, run `factory qa-ready` on the new head, and rerun the testers
-   whose last round found something and those whose surfaces your new commits touch; a clean verdict on the rest
-   carries to the new head. `factory qa-clean` names any it still needs. A finished tester is never messaged again:
-   start a new one.
+6. **A round is a head a tester walked to a verdict:** one cut short, or that no tester could walk, is none. After
+   fixes, commit, rebuild, run `factory qa-ready` on the new head, and rerun the testers whose last round found
+   something and those whose surfaces your new commits touch; a clean verdict on the rest carries to the new head.
+   `factory qa-clean` names any it still needs. A finished tester is never messaged again: start a new one.
 7. **Clean.** The loop ends when a round brings no new blocker or major, at most `rounds.qa` rounds. Then
    `factory qa-clean`: the warden refuses it until every required tester recorded its verdict on that head with no
    open blocker or major. Out of rounds: send what is open to the orchestrator and file the minors.

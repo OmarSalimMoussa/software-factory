@@ -23,7 +23,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import health, leases
 from runtime.slots.verbs import slot
 from runtime.warden.context import StackResult
-from runtime.warden.sessions import registry
+from runtime.warden.sessions import doing, registry
 
 HEAD = "a" * 40
 IMPL_ID = "0b6f1c3e-1d2a-4c5b-9e8f-7a6b5c4d3e2f"  # Claude Code names sessions by a UUID
@@ -169,6 +169,30 @@ def test_qa_clean_waits_for_every_required_tester_on_the_head(ready_world: World
     qa.qa_waive(world.ctx(), {"task": "t-0001", "finding": disputed[0], "why": "the spec asks for it"}, None)
     qa.qa_clean(impl, {}, None)
     assert world.queue().task("t-0001").status == "qa-clean"
+
+
+NEXT = "b" * 40
+
+
+@pytest.mark.parametrize(("verdict", "shown"), [("walked", 2), ("blocked", 1), (None, 1)],
+                         ids=["walked-to-a-verdict", "could-not-walk-it", "cut-short-with-no-verdict"])  # fmt: skip
+def test_a_head_is_a_qa_round_only_once_a_tester_walked_it_to_a_verdict(
+    ready_world: World, monkeypatch: pytest.MonkeyPatch, verdict: str | None, shown: int
+) -> None:
+    # t-0193: a bench and pauses cut its testers short, and its QA round rose to 3 of 4 with no tester's finding.
+    world, impl = ready_world, ready_world.ctx("implementer", IMPL_ID)
+    qa.qa_ready(impl, {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
+    if verdict == "walked":
+        _result(world, "ag-be")
+    if verdict == "blocked":
+        qa.qa_result(world.ctx("implementer", IMPL_ID, "ag-be"), {"head": HEAD[:9], "blocked": "benched"}, None)
+    world.launcher.git = _git({"rev-parse": NEXT, "show": PREFIXES, "diff": "web/page.ts\n", "merge-base": ""})
+    monkeypatch.setattr(health, "http_get", lambda url, timeout, limit: json.dumps({"build_commit": NEXT}).encode())
+
+    qa.qa_ready(impl, {"head": NEXT[:12], "slices": [NEXT[:7]]}, None)
+
+    said = doing.describe(world.places, world.settings, registry.read(world.places)[IMPL_ID])
+    assert f"QA round {shown} of {world.settings.get_int('rounds.qa')}" in said
 
 
 def _step(world: World, agent: str, mark: str, result: str) -> None:

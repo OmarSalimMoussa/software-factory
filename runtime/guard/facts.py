@@ -142,6 +142,9 @@ def read_settings(places: Places) -> Settings:
 
 # A ready record's mark: its testers reproduce a bug before its fix, and are no QA.
 REPRODUCE = "reproduce"
+# A ready record's mark: a tester walked its head to a verdict, clean or not. Only such a head is a QA round: one whose
+# testers a bench, a pause or a lost slot cut short, or that each tester could not walk, is none.
+WALKED = "walked"
 
 
 def read_ready(places: Places, session_id: str) -> list[dict[str, Any]]:
@@ -154,6 +157,12 @@ def read_ready(places: Places, session_id: str) -> list[dict[str, Any]]:
     ):
         raise store.StoreError(f"{path}: holds no list of records with a head and a time")
     return records
+
+
+def qa_round(records: list[dict[str, Any]], head: str) -> int:
+    """The QA round testers on ``head`` are in: one for each other head a tester walked to a verdict, then this one."""
+    walked = {str(r["head"]) for r in records if r.get(WALKED) and not r.get(REPRODUCE)}
+    return len(walked - {head}) + 1
 
 
 def ready_at(records: list[dict[str, Any]], when: datetime) -> dict[str, Any] | None:

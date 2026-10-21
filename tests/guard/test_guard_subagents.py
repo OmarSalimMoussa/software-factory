@@ -13,7 +13,7 @@ import pytest
 from guard_kit import NOW, SID, TESTER_ID, Kit, agent_use, bash_use, entry, result
 
 from runtime.guard.browser import BROWSER
-from runtime.guard.facts import Refusal, Rewrite
+from runtime.guard.facts import WALKED, Refusal, Rewrite
 from runtime.guard.subagents import SLOT_API, WOKEN
 from runtime.qa.wrapper import WAIT_FOR
 from runtime.shared import lanes, store
@@ -211,34 +211,27 @@ def test_a_fifth_head_of_testers_is_refused_unless_extended_or_a_reproduction(
     kit = Kit(tmp_path)
     kit.git_product()
     kit.session("implementer", extensions={"qa": extended})
-    lines, records = [], []
-    for i in range(4):
-        at = NOW - timedelta(hours=5 - i)
-        records.append({"head": str(i) * 40, "slices": [], "at": at.isoformat()})
-        lines.append(entry(at + timedelta(minutes=1), "assistant", [agent_use(f"t{i}", "qa-backend")]))
-        lines.append(entry(at + timedelta(minutes=2), "user", [result(f"t{i}", "done")]))
-    records.append({"head": kit.head(), "slices": [], "at": NOW.isoformat()})
+    walked = [{"head": str(i) * 40, "slices": [], "at": (NOW - timedelta(hours=5 - i)).isoformat(), WALKED: True}
+              for i in range(4)]  # fmt: skip
+    records = [*walked, {"head": kit.head(), "slices": [], "at": NOW.isoformat()}]
     if reproduction is not None:
         records[reproduction]["reproduce"] = True
     kit.ready(*records)
-    kit.transcript(lines)
     assert kit.rule("Agent", _agent("qa-backend")) == rule
 
 
-@pytest.mark.parametrize(("interrupted", "rule"), [(False, "qa-rounds"), (True, None)])
-def test_a_qa_round_cut_short_by_a_bench_does_not_count(tmp_path: Path, interrupted: bool, rule: str | None) -> None:
+@pytest.mark.parametrize(("walked", "rule"), [(True, "qa-rounds"), (False, None)], ids=["walked", "cut-short"])
+def test_a_head_no_tester_walked_to_a_verdict_is_no_qa_round(tmp_path: Path, walked: bool, rule: str | None) -> None:
+    # t-0193: a bench and pauses cut its testers short, and its QA round rose to 3 of 4 with no tester's finding.
     kit = Kit(tmp_path)
     kit.git_product()
     kit.session("implementer")
-    if interrupted:
-        kit.session("implementer", sid="sub-1", state="retired", agent_id=TESTER_ID, retired="with-parent")
     lines, records = [], []
     for i in range(4):
         at = NOW - timedelta(hours=5 - i)
-        records.append({"head": str(i) * 40, "slices": [], "at": at.isoformat()})
+        records.append({"head": str(i) * 40, "slices": [], "at": at.isoformat(), WALKED: i < 3 or walked})
         lines.append(entry(at + timedelta(minutes=1), "assistant", [agent_use(f"t{i}", "qa-backend")]))
-        done = f"Async agent launched successfully. agentId: {TESTER_ID}" if i == 3 else "done"
-        lines.append(entry(at + timedelta(minutes=2), "user", [result(f"t{i}", done)]))
+        lines.append(entry(at + timedelta(minutes=2), "user", [result(f"t{i}", "done")]))
     kit.ready(*records, {"head": kit.head(), "slices": [], "at": NOW.isoformat()})
     kit.transcript(lines)
     assert kit.rule("Agent", _agent("qa-backend")) == rule
