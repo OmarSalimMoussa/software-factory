@@ -53,7 +53,7 @@ function taskRow(t, flip) {
 function masterHTML(m) {
   const b = m.button;
   return `<div class="card master"><div style="min-width:0"><div class="label">${esc(m.label)}</div><div><span class="mono">${esc(m.sha)}</span> · ${esc(m.github)}</div><div class="faint">${esc(m.slot)}</div></div>
-    <button class="btn" ${b.url ? `data-slot-open="${esc(b.url)}" data-write` : 'disabled'} title="${esc(b.title)}">${esc(b.label)}${b.url ? ' ↗' : ''}</button></div>`;
+    <button class="btn" ${b.url ? `data-slot-open="${esc(b.url)}" data-wait="${esc(b.timeout_ms)}" data-write` : 'disabled'} title="${esc(b.title)}">${esc(b.label)}${b.url ? ' ↗' : ''}</button></div>`;
 }
 const doneRow = t => `<div class="row done-row" data-task="${esc(t.id)}"><div style="min-width:0"><div class="tt">${esc(t.title)}</div><div class="ts">${esc(t.sub)}</div></div>
     <span class="stages">${t.stages.map(s => `<span class="chip ${s.tone}" title="${esc(s.title)}">${esc(s.label)}</span>`).join('')}</span></div>`;
@@ -66,7 +66,7 @@ async function openSlot(btn) {
     if (!to) { alertToast('slot-open', 'The browser blocked the new tab. Press Open again.'); return; }
     to.opener = null; if (to === tab) tab.location.href = ans.open;
   };
-  const ans = await act(btn.dataset.slotOpen, {}, {btn, onOk: go});
+  const ans = await act(btn.dataset.slotOpen, {}, {btn, onOk: go, wait: Number(btn.dataset.wait)});
   if (tab && !(ans && ans.ok)) tab.close();
 }
 function reqRow(r) {

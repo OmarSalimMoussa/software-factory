@@ -21,7 +21,7 @@ from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 from runtime.dashboard import auth, brief_frame, cache, mcp, pictures
-from runtime.dashboard.client import Warden, WardenDown
+from runtime.dashboard.client import Warden, WardenDown, page_ms
 from runtime.dashboard.views import ops, routes, writes
 from runtime.dashboard.views.kit import PartError, Snap, clock, iso
 from runtime.dashboard.views.tasks import proposals
@@ -141,12 +141,7 @@ class App:
         return _json(503, {"ok": False, "warden": warden, "error": "Can't reach the warden.", "reason": reason})
 
     def _timed(self, envelope: dict[str, Any]) -> dict[str, Any]:
-        """The envelope with how long the page waits for an answer: the dashboard's own wait for the warden, and a
-        margin for the trip, so the page never gives up on a write the warden is still doing."""
-        wait = self.settings().get_int("dashboard.warden_seconds") + self.settings().get_int(
-            "dashboard.page_margin_seconds"
-        )
-        return {**envelope, "timeout_ms": wait * 1000}
+        return {**envelope, "timeout_ms": page_ms(self.settings(), "snapshot")}
 
     def _away(self, key: str, lost: WardenDown) -> Reply:
         self._warden_lost(lost)
@@ -385,7 +380,7 @@ def main() -> int:
     except (error_reports.DsnError, OSError) as exc:
         log.critical("dashboard: it does not start without the factory's GlitchTip project: %s", exc)
         return 2
-    warden = Warden(places.owner_socket, lambda: float(settings().get_int("dashboard.warden_seconds")))
+    warden = Warden(places.owner_socket, settings)
     app = App(settings, warden, time.time)
     port = current.get_int("dashboard.port")
     server = serve(app, port, current.get_int("dashboard.max_threads"), current.get_int("watch.socket_read_seconds"))

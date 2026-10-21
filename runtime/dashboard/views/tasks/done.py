@@ -5,10 +5,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from runtime.dashboard.client import page_ms
+from runtime.dashboard.views import writes
 from runtime.dashboard.views.kit import Query, Snap, ago, epoch, one_of, page, plural
 from runtime.dashboard.views.words import taskwords
 
 VIEWS = (("tasks", "Tasks"), ("commits", "Commits"))
+_OPEN = "/api/slot/open"
 _STAGES = (("github", "GitHub"), ("staging", "staging"), ("prod", "prod"))
 _STATE = {True: ("good", "has it"), False: ("", "does not have it yet"), None: ("muted", "is not known yet")}
 _NOTE = {"tasks": "newest merge first", "commits": "newest first"}
@@ -73,7 +76,10 @@ def _button(snap: Snap, slot: dict[str, Any]) -> dict[str, Any]:
     label = f"Open {settings.get_str('repo.github').split('/')[-1]}"
     if not address:
         return {"label": label, "url": None, "title": "Set the test address you sign in as under Settings, Slots."}
-    return {"label": label, "url": "/api/slot/open", "title": f"Opens staging, signed in as {address}"}
+    found = writes.find(_OPEN)
+    assert found is not None
+    wait = page_ms(settings, found[0].verb)
+    return {"label": label, "url": _OPEN, "title": f"Opens staging, signed in as {address}", "timeout_ms": wait}
 
 
 def _master(snap: Snap, found: dict[str, Any]) -> dict[str, Any]:

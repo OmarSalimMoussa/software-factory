@@ -1,8 +1,10 @@
-"""Work's Done tab: a finished task moves there from Tasks, and its button opens slot 0 only when it can."""
+"""Work's Done tab: a finished task moves there from Tasks, and its button opens slot 0 only when it can, waiting as
+long as slot 0's sign-in takes."""
 
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -60,3 +62,28 @@ def test_open_answers_with_the_link_the_page_opens(rig: Rig) -> None:
     reply = rig.post("/api/slot/open", {"idempotency_key": "open-slot-01"})
 
     assert json.loads(reply.body)["open"] == "http://203.0.113.7:8090/sign-in/once"
+
+
+@pytest.mark.parametrize(
+    ("path", "verb", "status"),
+    [("/api/slot/open", "slot.open", 200), ("/api/outage/stop", "outage.stop", 503)],
+    ids=["runs-a-product-script", "does-not"],
+)
+def test_only_an_action_that_runs_a_product_script_waits_past_the_dashboards_wait(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch, path: str, verb: str, status: int
+) -> None:
+    rig.dashboard(warden_seconds=1, slow_write_seconds=8)
+    handler = rig.warden.dispatcher.handlers[verb]
+    monkeypatch.setitem(rig.warden.dispatcher.handlers, verb, lambda *asked: time.sleep(3) or handler(*asked))
+
+    reply = rig.post(path, {"idempotency_key": "slow-write-01"})
+
+    assert reply.status == status
+
+
+def test_the_page_waits_for_open_as_long_as_the_dashboard_waits_for_a_product_script(rig: Rig) -> None:
+    rig.dashboard(warden_seconds=4, slow_write_seconds=30, page_margin_seconds=2)
+
+    page = json.loads(rig.get("/api/work?tab=done").body)
+
+    assert (page["parts"]["done"]["data"]["master"]["button"]["timeout_ms"], page["timeout_ms"]) == (32000, 6000)

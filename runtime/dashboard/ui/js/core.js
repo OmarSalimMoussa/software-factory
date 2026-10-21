@@ -61,8 +61,8 @@ class NeedsDevice extends Error {}
 class Halted extends Error {}
 class ApiFailed extends Error {}
 
-async function request(method, url, body) {
-  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+async function request(method, url, body, wait = TIMEOUT_MS) {
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), wait);
   const headers = {Accept: 'application/json'};
   if (method === 'POST') Object.assign(headers, {'Content-Type': 'application/json', 'X-Software': '1'});
   let res;
@@ -96,7 +96,7 @@ async function fetchEnv(key, url) {
   return LATEST[key] === n ? env : null;
 }
 function newKey() { const a = new Uint8Array(16); crypto.getRandomValues(a); return [...a].map(b => b.toString(16).padStart(2, '0')).join(''); }
-const post = (url, body, key) => request('POST', url, {...body, idempotency_key: key || newKey()});
+const post = (url, body, key, wait) => request('POST', url, {...body, idempotency_key: key || newKey()}, wait);
 
 function loadFailed(e, what, retry) {
   if (e instanceof Halted) return;
@@ -113,7 +113,7 @@ async function act(url, body = {}, opts = {}) {
   const key = opts.key || newKey(), btn = opts.btn, was = btn ? btn.disabled : false;
   if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
   let ans;
-  try { ans = await post(url, body, key); }
+  try { ans = await post(url, body, key, opts.wait); }
   catch (e) {
     if (e instanceof NeedsDevice) askDevice();
     else if (e instanceof TimedOut) alertToast('write:' + url, 'No answer came in time, so it may have gone through. Retrying is safe: it is never done twice.', {retry: () => act(url, body, {...opts, key})});

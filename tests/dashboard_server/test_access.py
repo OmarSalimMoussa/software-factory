@@ -152,7 +152,8 @@ def test_the_warning_that_the_warden_does_not_answer_names_the_verb_and_why(
     stand_in = socketserver.ThreadingUnixStreamServer(str(address), StandIn) if serving else None
     if stand_in is not None:
         threading.Thread(target=stand_in.serve_forever, daemon=True).start()
-    app = App(PublicSettings(rig.places), Warden(address, lambda: 0.2), rig.clock.now)
+    rig.dashboard(warden_seconds=1)
+    app = App(PublicSettings(rig.places), Warden(address, PublicSettings(rig.places)), rig.clock.now)
     try:
         with caplog.at_level(logging.WARNING, logger="factory.dashboard"):
             reply = app.get("/api/home", OWNER)

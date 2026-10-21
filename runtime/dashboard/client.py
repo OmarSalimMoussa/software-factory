@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from runtime.shared import protocol
+from runtime.shared.settings import Settings
+from runtime.warden.verbs import VERBS
 
 
 class WardenDown(Exception):
@@ -19,15 +21,26 @@ class WardenDown(Exception):
         self.verb, self.why = verb, why
 
 
+def wait(settings: Settings, verb: str) -> int:
+    """Seconds the dashboard waits for the warden's answer to ``verb``: longer for one that runs a product's script."""
+    slow = verb in VERBS and VERBS[verb].slow
+    return settings.get_int("dashboard.slow_write_seconds" if slow else "dashboard.warden_seconds")
+
+
+def page_ms(settings: Settings, verb: str) -> int:
+    """How long a page waits for the answer to ``verb``: the dashboard's wait, and a margin for the trip."""
+    return (wait(settings, verb) + settings.get_int("dashboard.page_margin_seconds")) * 1000
+
+
 class Warden:
-    def __init__(self, path: Path, timeout: Callable[[], float]) -> None:
-        self.path, self.timeout = path, timeout
+    def __init__(self, path: Path, settings: Callable[[], Settings]) -> None:
+        self.path, self.settings = path, settings
 
     def call(self, verb: str, args: dict[str, Any], data: bytes | None = None) -> dict[str, Any]:
         """The warden's answer, ``{"ok": true, ...}`` or a refusal; raises WardenDown when there is none."""
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
-                conn.settimeout(self.timeout())
+                conn.settimeout(wait(self.settings(), verb))
                 conn.connect(str(self.path))
                 conn.sendall(protocol.request(verb, args, data))
                 with conn.makefile("rb") as reader:

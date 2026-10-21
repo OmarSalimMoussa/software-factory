@@ -17,7 +17,7 @@ def rig(tmp_path: Path) -> Iterator[Rig]:
     places = seed(tmp_path)
     clock = FixedClock(T0)
     warden = FakeWarden(places, clock).start()
-    app = App(PublicSettings(places), Warden(warden.address, lambda: 5.0), clock.now)
+    app = App(PublicSettings(places), Warden(warden.address, PublicSettings(places)), clock.now)
     try:
         yield Rig(places, clock, warden, app)
     finally:

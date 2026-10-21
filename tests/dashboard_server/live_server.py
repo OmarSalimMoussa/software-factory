@@ -127,7 +127,8 @@ class Live:
         self.warden = FakeWarden(places, self.clock, accept=CODE, on_event=self.on_event)
         self.warden.launcher.deploy = self.deployed
         self.warden.start()
-        return server.App(server.PublicSettings(places), Warden(self.warden.address, lambda: 5.0), self.clock.now)
+        settings = server.PublicSettings(places)
+        return server.App(settings, Warden(self.warden.address, settings), self.clock.now)
 
     def _settings(self) -> settings_module.Settings:
         return settings_module.load(self.places.defaults, self.places.overrides)

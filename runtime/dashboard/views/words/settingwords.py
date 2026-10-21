@@ -247,6 +247,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("dashboard.hosts", "Addresses the dashboard answers"),
             ("dashboard.max_threads", "Requests served at once"),
             ("dashboard.warden_seconds", "Seconds the dashboard waits for the warden"),
+            ("dashboard.slow_write_seconds", "Seconds the dashboard waits for the product's scripts"),
             ("dashboard.settled_seconds", "Seconds a card you acted on says what happened"),
             ("dashboard.message_max_chars", "Longest message to a session, characters"),
             ("dashboard.thread_messages", "Your messages a session's thread shows"),
@@ -395,6 +396,5 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         ],
     ),
 ]
-
 
 LABELS = {key: label for _, _, _, rows in GROUPS for key, label in rows}

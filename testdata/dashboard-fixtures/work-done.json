@@ -53,7 +53,8 @@
    "button": {
     "label": "Open acme-app",
     "url": "/api/slot/open",
-    "title": "Opens staging, signed in as owner@example.com"
+    "title": "Opens staging, signed in as owner@example.com",
+    "timeout_ms": 50000
    }
   },
   "rows": [

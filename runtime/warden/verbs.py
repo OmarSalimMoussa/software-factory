@@ -39,14 +39,15 @@ class Verb:
     coded: bool = False
     owner_socket: bool = False
     kinds: frozenset[str] = frozenset()  # the subagent kinds that may call it; none but these
+    slow: bool = False  # it runs one of the product's scripts, so the dashboard waits dashboard.slow_write_seconds
 
 
 def _v(handler: str, *roles: str, kinds: frozenset[str] = frozenset()) -> Verb:
     return Verb(handler, frozenset(roles), kinds=kinds)
 
 
-def _o(handler: str, coded: bool = False) -> Verb:
-    return Verb(handler, frozenset({DASH, OWNER}), coded=coded, owner_socket=True)
+def _o(handler: str, coded: bool = False, slow: bool = False) -> Verb:
+    return Verb(handler, frozenset({DASH, OWNER}), coded=coded, owner_socket=True, slow=slow)
 
 
 VERBS: dict[str, Verb] = {
@@ -154,7 +155,7 @@ VERBS: dict[str, Verb] = {
     "reflections.mark": _o("runtime.warden.owner.reflections:mark"),
     "push.prod": _o("runtime.warden.delivery.prod_push:push_prod"),
     "push.back": _o("runtime.warden.delivery.prod_push:push_back"),
-    "slot.open": _o("runtime.warden.owner.slot_sign_in:open_slot"),
+    "slot.open": _o("runtime.warden.owner.slot_sign_in:open_slot", slow=True),
     "yolo.switch": _o("runtime.warden.owner.yolo:owner_switch"),
     # contract: added by FB9, the agents' Claude accounts. No code: only the owner's own uid reaches owner.sock.
     "account.list": _o("runtime.warden.owner.accounts:list_accounts"),

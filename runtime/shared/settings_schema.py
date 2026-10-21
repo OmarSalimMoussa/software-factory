@@ -235,6 +235,7 @@ SCHEMA: dict[str, Spec] = {
     "dashboard.retired_linger_minutes": Spec("int", 1, 30),
     "dashboard.idempotency_hours": Spec("int", 1, 168),  # contract: added by 1B-3
     "dashboard.warden_seconds": Spec("int", 1, 60),  # contract: added by 2A, its longest wait on the warden
+    "dashboard.slow_write_seconds": Spec("int", 5, 300),
     "dashboard.settled_seconds": Spec("int", 1, 30),  # contract: added by 2A, an acted-on card says so this long
     "dashboard.message_max_chars": Spec("int", 100, 20000),  # contract: the longest message the owner sends
     "dashboard.thread_messages": Spec("int", 1, 50),  # contract: the owner's messages a session's thread shows
