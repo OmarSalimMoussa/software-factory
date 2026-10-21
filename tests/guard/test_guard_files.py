@@ -145,18 +145,22 @@ def test_intake_reads_the_queue_and_hears_a_command_that_does_not_exist_named_as
 @pytest.mark.parametrize(
     ("command", "rule"),
     [
-        ("factory status && touch x", "factory-alone"),
-        ("factory status; ls", "factory-alone"),
-        ("factory status || true", "factory-alone"),
+        ("factory status && touch x", None),
+        ("factory status; ls", None),
+        ("factory status || true", None),
+        ("ls; factory status; factory qa plan", None),
         ("factory status | tail -3", "factory-alone"),
+        ("ls; factory status | tail -3", "factory-alone"),
         ("factory status &", "factory-alone"),
         ("(factory status)", "factory-alone"),
         ("cd src && factory status", None),
         ("cd /home/software-agent/product; factory status", None),
         ("cd 'my work' && factory status", None),
-        ("cd $HOME && factory status", "factory-alone"),
-        ("cd a && cd b && factory status", "factory-alone"),
-        ("cd src && factory status && ls", "factory-alone"),
+        ("cd $HOME && factory status", None),
+        ("cd a && cd b && factory status", None),
+        ("cd src && factory status && ls", None),
+        ('ls; echo "$(factory status)"', "factory-alone"),
+        ("ls; (factory status)", "factory-alone"),
         ("timeout 60 factory status", "factory-alone"),
         ("/usr/local/bin/factory status", "factory-alone"),
         ("FACTORY_X=1 factory status", "factory-alone"),
@@ -164,7 +168,9 @@ def test_intake_reads_the_queue_and_hears_a_command_that_does_not_exist_named_as
         ("factory status > out.txt", "factory-alone"),
         ("factory request new --severity normal --where x < body.md", "factory-alone"),
         ("factory request new --severity normal --where x <<'EOF'\nbody\nEOF", "factory-alone"),
-        ("factory status\nls", "factory-alone"),
+        ("factory status\nls", None),
+        ("cat >> notes.md <<'EOF'\nfactory status\nEOF\nfactory qa plan", None),
+        ("bash <<'EOF'\nfactory status\nEOF\nfactory qa plan", "factory-alone"),
         ('factory reflect --kind miss "$(cat note.md)"', "factory-alone"),
         ('factory reflect --kind miss "$HOME"', "factory-alone"),
         ("factory reflect --kind miss notes/*", "factory-alone"),
@@ -175,19 +181,55 @@ def test_intake_reads_the_queue_and_hears_a_command_that_does_not_exist_named_as
         ("factory qa plan", None),
     ],
 )
-def test_a_factory_call_is_one_plain_command_and_names_no_subagent(kit: Kit, command: str, rule: str | None) -> None:
+def test_a_sessions_factory_commands_are_each_plain_and_name_no_subagent(
+    kit: Kit, command: str, rule: str | None
+) -> None:
     assert kit.bash(command) == rule
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "ls; factory queue task new --title x",
+        "factory queue task new --title x && ls",
+        "ls\nfactory queue task new --title x",
+    ],
+)
+def test_a_subagents_factory_call_is_the_whole_call_as_its_name_goes_in_the_text(tmp_path: Path, command: str) -> None:
+    kit = Kit(tmp_path)
+    kit.session("orchestrator", worktree=kit.repo)
+    intake = {"agent_id": "a1234567890abc", "agent_type": "intake", "cwd": str(kit.repo)}
+    assert kit.rule("Bash", {"command": command}, **intake) == "factory-alone"
+    assert kit.rule("Bash", {"command": command}, cwd=str(kit.repo)) is None
+
+
+@pytest.mark.parametrize(
+    ("command", "rule"),
+    [
+        ("cd {worktree} && factory records --help 2>&1 | head -30", "factory-alone"),
+        ("factory doing 'Checking how GLM is reached' ; grep -rn -i \"glm\" --include=*.py . 2>/dev/null | head", None),
+        ("cd {worktree}/harness && ls step; sed -n 1,80p step/session.py; factory slot --help", None),
+        ("git diff --stat main...HEAD -- docs | cat; ls docs/specs | tail -5; factory doing 'Writing the spec'", None),
+        ("cat >> docs/a.md <<'EOF'\n\n## Critic rounds\nEOF\nfactory spec save t-0001 docs/a.md --slices 2", None),
+    ],
+)
+def test_a_designers_factory_commands_may_share_its_call_with_others_but_not_hand_their_answer_on(
+    tmp_path: Path, command: str, rule: str | None
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("designer")
+    assert kit.bash(command.format(worktree=kit.worktree)) == rule
 
 
 @pytest.mark.parametrize(
     ("command", "cause"),
     [
         ("factory queue task show t-0007 | head -80", "`|` pipes the answer into another command"),
-        ("factory status && ls", "`&&` adds a second command"),
+        ("factory status &", "`&` runs it in the background"),
         ("factory status 2>&1", "`>&` joins a second command or a file"),
         ("factory status > out.txt", "`>` sends the answer to a file"),
         ("timeout 60 factory status", "something comes before the bare word factory"),
-        ("factory status\nls", "a line break starts a second command"),
+        ("factory reflect --kind miss 'one\ntwo'", "a line break starts a second command"),
         ('factory reflect --kind miss "costs $5"', "the shell would expand `$` there"),
     ],
 )

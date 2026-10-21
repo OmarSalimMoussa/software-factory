@@ -4,7 +4,8 @@ telemetry verbs to intake, triage and the testers among subagents), a task's sta
 
 The guard names a subagent on its factory calls by rewriting the call's text, which it can do safely only when the
 whole text is `factory` or `factory …`, after at most one `cd` into a plain folder: one plain command, nothing the shell
-would expand or join.
+would expand or join. A session's own call needs no name, as the warden knows it by its process, so other commands may
+come before and after its factory commands, joined by `;`, `&&`, `||` or line breaks, while each one stays plain.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import re
 import shlex
 
 from runtime.cli.factory import LOCAL
-from runtime.guard import shell
+from runtime.guard import heredocs, shell
 from runtime.guard.facts import ORCHESTRATOR, Call, Decision, Refusal, Rewrite
 from runtime.warden.verbs import VERBS
 
@@ -30,6 +31,12 @@ _JOINS = {"|": "pipes the answer into another command", "&&": "adds a second com
           ">>": "sends the answer to a file", "<": "feeds it a file", "<<": "feeds it a heredoc",
           "(": "runs it in a subshell", ")": "runs it in a subshell"}  # fmt: skip
 _HELP = frozenset({"-h", "--help", "help"})
+# A command list's pieces: quoted text, an escape, a substitution's or subshell's bracket, a cut, or plain text.
+_PIECES = re.compile(
+    r"""'[^']*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`|\\.|\$\(|&&|\|\||[;\n()]|[^'"`\\$()&|;\n]+|.""", re.S
+)
+_CUTS = frozenset({";", "&&", "||", "\n"})
+_NAMED = re.compile(r"\bfactory\b")
 _FLAG_VERBS = {("inbox", "--wait"): "inbox.wait", ("propose", "--none"): "propose.none"}
 _STARTS = frozenset({"implementer", "designer"})
 
@@ -144,15 +151,34 @@ def plain_words(command: str) -> list[str] | None:
 
 
 def check_alone(call: Call, command: str, found: list[shell.Invocation]) -> Decision:
-    """A call that runs `factory` is that one plain call."""
-    if not any(inv.program == FACTORY for inv in found) or call.off("factory-alone"):
+    """A subagent's call that runs `factory` is that one plain call. A session's runs each factory command plainly,
+    as a command of the list on its own: every factory the shell would run is one of those."""
+    runs = sum(inv.program == FACTORY for inv in found)
+    if not runs or call.off("factory-alone"):
         return None
-    _, why = _parse(command)
-    if why:
-        return Refusal(
-            "factory-alone", f"{why}: run factory on its own, one plain call, and read its answer as printed"
-        )
-    return None
+    parts = [command] if call.in_subagent else _commands(command)
+    whys = [_parse(part)[1] for part in parts]
+    if whys.count("") == runs:
+        return None
+    named = [why for part, why in zip(parts, whys, strict=True) if why and _NAMED.search(part)]
+    why = named[0] if named else "something comes before the bare word factory"
+    return Refusal("factory-alone", f"{why}: run factory on its own, one plain call, and read its answer as printed")
+
+
+def _commands(command: str) -> list[str]:
+    """The commands of a list as written, cut where the shell cuts them: at `;`, `&&`, `||` and line breaks outside
+    quotes, substitutions and subshells. A heredoc's body is no command of the list."""
+    parts: list[str] = []
+    current: list[str] = []
+    depth = 0
+    for piece in _PIECES.findall(heredocs.split(command)[0]):
+        if depth == 0 and piece in _CUTS:
+            parts.append("".join(current))
+            current = []
+            continue
+        depth += (piece in {"(", "$("}) - (piece == ")")
+        current.append(piece)
+    return [*parts, "".join(current)]
 
 
 def check_forged(call: Call, found: list[shell.Invocation]) -> Decision:
