@@ -89,14 +89,14 @@ function boostTask(id, on, btn, close) {
 const BIG = /^[≈$\d]/;
 const kvBox = k => `<div><div class="l">${esc(k.label)}</div>${BIG.test(String(k.value)) ? `<div class="big">${esc(k.value)}</div>` : `<div style="font-weight:650;margin-top:4px">${esc(k.value)}</div>`}</div>`;
 const testerCard = x => `<div class="tester"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(x.name)}</b><span class="chip ${x.tone}">${esc(x.state)}</span></div><div class="faint" style="font-size:12px">${esc(x.model)}${x.note ? ' · ' + esc(x.note) : ''}</div>${shotsHTML(x.shots, x.name + ' evidence')}${replaysHTML(x.replays)}</div>`;
-function taskBody(t) {
+function taskBody(t, time) {
   const p = t.proposal;
   return `${p ? `<div class="mock">${picture(p.picture, 'Sketch: now and after')}</div><div><div class="label">Why now</div><div style="margin-top:4px">${esc(p.why)}</div></div>` : ''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="status"><i class="dot ${t.status.tone}"></i>${esc(t.status.word)}</span>${t.chips.map(chip).join('')}</div>
     ${t.blocked ? `<div class="section"><div class="label">${esc(t.blocked.label)}</div><div>${esc(t.blocked.why)}</div></div>` : ''}
     <div class="kv">${t.kv.map(kvBox).join('')}</div>
     <div class="section"><div class="label">${esc(t.route.label)}</div><div class="ladder">${t.route.steps.map((x, i) => `<div class="${i === t.route.current ? 'on' : ''}">${esc(x)}</div>`).join('')}</div>${t.route.cause ? `<div class="muted" style="font-size:12px">Cause: <span class="mono">${esc(t.route.cause)}</span></div>` : ''}</div>
-    <div class="section"><div class="label">Progress</div><div class="ladder track">${t.progress.stages.map((x, i) => `<div class="${i <= t.progress.at ? 'on' : ''}">${esc(x)}</div>`).join('')}</div></div>
+    <div class="section"><div class="label">Progress</div><div class="ladder track">${t.progress.stages.map((x, i) => `<div class="${i <= t.progress.at ? 'on' : ''}">${esc(x)}</div>`).join('')}</div></div>${time}
     <div class="section"><div class="label">Testers <span class="n">${esc(t.testers.note)}</span></div>${t.testers.rows.length ? `<div class="testers">${t.testers.rows.map(testerCard).join('')}</div>` : `<div class="empty card" style="min-height:64px">${esc(t.testers.empty)}</div>`}</div>
     ${t.built_from ? `<div class="section"><div class="label">Built from</div><div class="card" style="overflow:hidden"><div class="origin" style="border:0">${builtFromHTML(t.built_from, t.id)}</div></div></div>` : ''}
     <div class="section"><div class="label">Requests</div>${t.requests.length ? `<div class="card rows">${t.requests.map(r => `<div class="row" style="grid-template-columns:minmax(0,1fr) auto;min-height:48px" data-open-doc="${esc(r.id)}"><span class="tt" style="font-weight:500">${esc(r.text)}</span><span class="faint">${esc(r.age)}</span></div>`).join('')}</div>` : '<div class="muted">No requests linked yet.</div>'}</div>
@@ -117,5 +117,5 @@ function taskFoot(t) {
   };
   return t.actions.map(a => B[a] ? B[a]() : '').join('');
 }
-SHEETS.task = {what: 'This task', url: id => '/api/task/' + encodeURIComponent(id), draw: (env, id) => sheetPart(env, 'task', t => [t.sheet_title, taskBody(t), taskFoot(t)], 'Task ' + id)};
+SHEETS.task = {what: 'This task', url: id => '/api/task/' + encodeURIComponent(id), draw: (env, id) => sheetPart(env, 'task', t => [t.sheet_title, taskBody(t, part(env, 'time', taskTimeHTML)), taskFoot(t)], 'Task ' + id)};
 const openTask = id => openKeyed('task', id);

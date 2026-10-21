@@ -104,6 +104,7 @@ document.addEventListener('click', e => {
   if (d.tree) { UI.agentsClosed = d.tree === 'close' ? new Set(treeIds(agentsTree())) : new Set(); syncTree(); return; }
   if (d.stop) { e.stopPropagation(); openStop(d.stop); return; }
   if (d.stopnow) { stopNow(d.stopnow, t); return; }
+  if (d.timeList) { openKeyed('timelist', d.timeList); return; }
   if (d.task) { if (t.matches('.prop') && e.target.closest('.dd, .prop-a')) return; openTask(d.task); return; }
   if (d.agent) { openAgent(d.agent); return; }
   if (d.hist) { openHist(d.hist); return; }

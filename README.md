@@ -4,11 +4,12 @@ A frozen dev-workflow harness. Pointed at one product repo of the standard shape
 Claude agents, holds the code to one standard set of checks, ships to staging, and leaves prod to the owner.
 
 - **The warden** is a system service: the only way a session starts, and the keeper of permits, caps, the agent
-  lifecycle, probes, cost and settings. Everything the dashboard shows comes from it.
+  lifecycle, probes, cost, time and settings. Everything the dashboard shows comes from it.
 - **The guard** is a Claude Code hook on every tool call of every factory session.
 - **The `factory` command** is how agents and the owner ask the warden.
 - **The dashboard** is the owner's one window: proposals to approve, staging and prod, the work, the agents,
-  spend, the library, settings (the agents' Claude account among them), self-reflections and the guard.
+  spend, where the time goes, the library, settings (the agents' Claude account among them), self-reflections and
+  the guard.
 - **The checks** are one standard set for every product, fed only with values from the product's `check-values/`.
 - **The plugin** carries the roles (orchestrator, designers, implementers, intake, triage, critics and testers).
 - **The standard build and deploy** in `standard/`: the build plan, the server's set-up, prod's build and deploy on

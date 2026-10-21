@@ -3,7 +3,7 @@
 const {drive, ready, settle} = require('./lib.cjs');
 
 drive('shell', async t => {
-  const PAGES = ['home', 'work', 'agents', 'spend', 'library', 'settings', 'reflect', 'guard'];
+  const PAGES = ['home', 'work', 'agents', 'spend', 'time', 'library', 'settings', 'reflect', 'guard'];
   for (const [w, h] of [[1440, 900], [1024, 800]]) {
     const p = await t.open(w, h);
     t.check(await p.$$eval('[data-action="promote"]', els => els.length) === 1, `${w}: more than one Push to prod`);
@@ -46,7 +46,7 @@ drive('shell', async t => {
   const m = await t.open(390, 844);
   t.check(!(await m.isVisible('#sidenav')), 'phone: sidebar shows');
   for (const pg of ['work', 'agents', 'spend', 'home']) { await m.click(`#bottomnav [data-go="${pg}"]`); await ready(m); await t.wide(m, '390 ' + pg); await t.shot(m, `${pg}-390.png`); }
-  for (const pg of ['library', 'settings', 'reflect', 'guard']) {
+  for (const pg of ['time', 'library', 'settings', 'reflect', 'guard']) {
     await m.click('#bottomnav [data-go="more"]'); await settle(m);
     await m.click(`#sheet [data-go="${pg}"]`); await ready(m); await t.wide(m, '390 ' + pg); await t.shot(m, `${pg}-390.png`);
   }

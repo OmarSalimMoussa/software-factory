@@ -926,3 +926,14 @@ body.has-savebar .toasts{bottom:84px}
 .tok-bar i{display:block;height:100%}
 .tok-read{background:var(--accent)} .tok-write{background:var(--warn)} .tok-in{background:var(--f-impl)} .tok-out{background:var(--f-design)}
 .bar-detail{grid-column:1/-1;font-size:12px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+/* ---------- Time: wall time per step and the merges' wait, each row with its median and its p75 ---------- */
+.time-card{margin-top:16px;display:grid;gap:10px;padding:18px 20px;min-width:0}
+.time-card .bar-row{padding:7px 0}
+.time-row{grid-template-columns:minmax(150px,1.4fr) minmax(0,2fr) 100px 120px}
+.time-row.total .name{font-weight:650}
+.time-step{grid-template-columns:minmax(120px,1.2fr) minmax(0,1fr) 130px}
+.section>.time-card{margin-top:0}
+.time-group{display:grid;gap:10px}
+.time-group+.time-group{border-top:1px solid var(--line);padding-top:12px}
+.time-fact{font-size:13px}
+@media (max-width:760px){.time-row,.time-step{grid-template-columns:minmax(0,1fr) 120px}.time-row>.faint{grid-column:1/-1}}

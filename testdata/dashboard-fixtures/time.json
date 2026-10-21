@@ -1,0 +1,210 @@
+{
+ "wall": {
+  "sub": "4 tasks reached staging in the last 7 days",
+  "hint": "Calendar time between two moves of a task, each move counted the first time it was made.",
+  "rows": [
+   {
+    "label": "Approved, until on staging",
+    "total": true,
+    "median": "10 h 6 min",
+    "note": "p75 16 h 21 min",
+    "pct": 30.5
+   },
+   {
+    "label": "Queued, until proposed",
+    "total": false,
+    "median": "1 d 9 h",
+    "note": "p75 1 d 23 h",
+    "pct": 100.0
+   },
+   {
+    "label": "Proposed, until approved",
+    "total": false,
+    "median": "45 min",
+    "note": "p75 1 h 15 min",
+    "pct": 2.3
+   },
+   {
+    "label": "Approved, until work starts",
+    "total": false,
+    "median": "9 min",
+    "note": "p75 12 min",
+    "pct": 0.5
+   },
+   {
+    "label": "Design and build, until its first QA",
+    "total": false,
+    "median": "2 h 36 min",
+    "note": "p75 3 h 50 min",
+    "pct": 7.8
+   },
+   {
+    "label": "QA, until it passes",
+    "total": false,
+    "median": "45 min",
+    "note": "p75 1 h 0 min",
+    "pct": 2.3
+   },
+   {
+    "label": "Passed, until its merge turn",
+    "total": false,
+    "median": "6 min",
+    "note": "p75 6 min",
+    "pct": 0.3
+   },
+   {
+    "label": "Merging",
+    "total": false,
+    "median": "24 min",
+    "note": "p75 4 h 2 min",
+    "pct": 1.2
+   },
+   {
+    "label": "Merged, until its check passes",
+    "total": false,
+    "median": "4 h 15 min",
+    "note": "p75 6 h 8 min",
+    "pct": 12.8
+   },
+   {
+    "label": "Checked, until on staging",
+    "total": false,
+    "median": "6 min",
+    "note": "p75 6 min",
+    "pct": 0.3
+   },
+   {
+    "label": "On staging, until on prod",
+    "total": false,
+    "median": "no task yet",
+    "note": null,
+    "pct": 0.0
+   }
+  ],
+  "lists": [
+   [
+    "slowest",
+    "Slowest tasks"
+   ],
+   [
+    "tools",
+    "Tool time"
+   ]
+  ]
+ },
+ "runtime": {
+  "sub": "Median per task, over the 3 of 4 tasks measured",
+  "hint": "Time an agent was doing something, from its transcript: the model, its tools, waiting on its testers, or idle until it is woken. Measured only for a task whose every transcript was read from its start.",
+  "groups": [
+   {
+    "name": "Designer and implementer",
+    "alive": "1 h 40 min",
+    "parts": [
+     {
+      "key": "model",
+      "label": "Model thinking",
+      "color": "--f-design",
+      "value": "22 min",
+      "pct": 19.7
+     },
+     {
+      "key": "tools",
+      "label": "Tools",
+      "color": "--f-impl",
+      "value": "44 min",
+      "pct": 39.0
+     },
+     {
+      "key": "waiting",
+      "label": "Waiting on its testers",
+      "color": "--f-qa",
+      "value": "6 min",
+      "pct": 5.4
+     },
+     {
+      "key": "idle",
+      "label": "Idle, waiting to be woken",
+      "color": "--idle",
+      "value": "40 min",
+      "pct": 35.9
+     }
+    ]
+   },
+   {
+    "name": "Testers and critics",
+    "alive": "33 min",
+    "parts": [
+     {
+      "key": "model",
+      "label": "Model thinking",
+      "color": "--f-design",
+      "value": "11 min",
+      "pct": 33.6
+     },
+     {
+      "key": "tools",
+      "label": "Tools",
+      "color": "--f-impl",
+      "value": "22 min",
+      "pct": 66.4
+     },
+     {
+      "key": "idle",
+      "label": "Idle, waiting to be woken",
+      "color": "--idle",
+      "value": "none",
+      "pct": 0.0
+     }
+    ]
+   }
+  ],
+  "empty": null
+ },
+ "checks": {
+  "sub": "4 merges in the window, from merged until its check passed",
+  "kv": [
+   {
+    "label": "Median",
+    "value": "4 h 15 min"
+   },
+   {
+    "label": "p75",
+    "value": "6 h 8 min"
+   },
+   {
+    "label": "Longest",
+    "value": "11 h 0 min"
+   }
+  ],
+  "split": [
+   {
+    "key": "walking",
+    "label": "A regression tester walking",
+    "color": "--f-qa",
+    "value": "none",
+    "share": "0%",
+    "pct": 0.0
+   },
+   {
+    "key": "after_failure",
+    "label": "After a failed check, until the next walk",
+    "color": "--bad",
+    "value": "30 min",
+    "share": "18%",
+    "pct": 17.5
+   },
+   {
+    "key": "waiting",
+    "label": "Waiting for a check to start",
+    "color": "--idle",
+    "value": "2 h 30 min",
+    "share": "82%",
+    "pct": 82.5
+   }
+  ],
+  "facts": [
+   "Checks a merge waited through: 1, 0.5 of them failed or blocked (medians)",
+   "2 of 4 merges waited through a failed or blocked check"
+  ]
+ }
+}

@@ -20,6 +20,7 @@ from runtime.dashboard.views import (
     settings,
     shell,
     spend,
+    timing,
 )
 from runtime.dashboard.views.kit import Parts, Query, Snap
 from runtime.dashboard.views.tasks import brief, push, task, work
@@ -46,6 +47,8 @@ PAGES: list[tuple[re.Pattern[str], Page, dict[str, str]]] = [
     (re.compile(rf"^/api/agent/{_ID}/stop-preview$"), _page(agent), {"view": "preview"}),
     (re.compile(rf"^/api/history/{_ID}$"), _page(agent), {"view": "history"}),
     (re.compile(r"^/api/spend$"), _page(spend), {}),
+    (re.compile(r"^/api/time$"), _page(timing), {}),
+    (re.compile(rf"^/api/time/{_ID}$"), _page(timing), {"view": "list"}),
     (re.compile(r"^/api/library$"), _page(library), {}),
     (re.compile(rf"^/api/doc/{_ID}$"), _page(doc), {}),
     (re.compile(r"^/api/settings$"), _page(settings), {}),

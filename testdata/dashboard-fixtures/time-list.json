@@ -1,0 +1,37 @@
+{
+ "list": {
+  "title": "Slowest tasks",
+  "note": "Approved, until on staging: the tasks that reached staging in the window, slowest first.",
+  "rows": [
+   {
+    "task": "t-0012",
+    "name": "Usage page: totals per day",
+    "value": "1 d 0 h",
+    "pct": 100.0,
+    "detail": "runtime 3 h 39 min designer and implementer, 56 min testers and critics"
+   },
+   {
+    "task": "t-0016",
+    "name": "Billing page shows credit after a refund",
+    "value": "13 h 36 min",
+    "pct": 55.3,
+    "detail": "runtime 1 h 26 min designer and implementer, 33 min testers and critics"
+   },
+   {
+    "task": "t-0013",
+    "name": "Invoice page: the Approve button jumps",
+    "value": "6 h 36 min",
+    "pct": 26.8,
+    "detail": "runtime 1 h 40 min designer and implementer, 27 min testers and critics"
+   },
+   {
+    "task": "t-0015",
+    "name": "Invoice list loads slowly with 200 items",
+    "value": "6 h 6 min",
+    "pct": 24.8,
+    "detail": "runtime unknown"
+   }
+  ],
+  "empty": "No task reached staging in the window."
+ }
+}

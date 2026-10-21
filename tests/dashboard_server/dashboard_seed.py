@@ -18,6 +18,7 @@ from typing import Any
 from seed_agents import history_lines, seed_check_runs, seed_cost, seed_evidence, seed_sessions, seed_transcript
 from seed_kit import FIXTURES, PRICES, ROOT, fixture, fixture_time, iso, write
 from seed_queue import seed_checks, seed_requests, seed_tasks
+from seed_time import seed_time
 from settings_text import set_line
 
 from runtime.queue import formats, owner, records, turn
@@ -247,6 +248,7 @@ def seed(root: Path, now: float = T0) -> Places:
     settings = settings_module.load(places.defaults, places.overrides)
     public.write_settings(places, settings)
     tasks = _seed_queue(repo, now)
+    seed_time(repo, places, now)
     sessions = seed_sessions(now)
     store.write_text(places.history, history_lines(sessions))
     store.write_json(places.registry, {s.id: models.dump(s) for s in sessions})

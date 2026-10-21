@@ -1,0 +1,134 @@
+{
+ "time": {
+  "total": "1 d 0 h from approved to on staging",
+  "hint": "Calendar time between two moves of a task, each move counted the first time it was made.",
+  "rows": [
+   {
+    "label": "Queued",
+    "value": "3 d 0 h",
+    "pct": 100.0,
+    "note": null
+   },
+   {
+    "label": "Waiting for you",
+    "value": "1 h 0 min",
+    "pct": 1.4,
+    "note": null
+   },
+   {
+    "label": "Approved",
+    "value": "12 min",
+    "pct": 0.3,
+    "note": null
+   },
+   {
+    "label": "Building",
+    "value": "3 h 48 min",
+    "pct": 5.2,
+    "note": null
+   },
+   {
+    "label": "In QA",
+    "value": "1 h 0 min",
+    "pct": 1.4,
+    "note": null
+   },
+   {
+    "label": "QA passed, waiting to merge",
+    "value": "6 min",
+    "pct": 0.1,
+    "note": null
+   },
+   {
+    "label": "Merging",
+    "value": "14 h 54 min",
+    "pct": 20.5,
+    "note": null
+   },
+   {
+    "label": "Merged, being checked",
+    "value": "4 h 30 min",
+    "pct": 6.2,
+    "note": null
+   },
+   {
+    "label": "Checked, on its way to staging",
+    "value": "6 min",
+    "pct": 0.1,
+    "note": null
+   },
+   {
+    "label": "On staging",
+    "value": "24 min",
+    "pct": 0.6,
+    "note": "so far"
+   }
+  ],
+  "runtime": [
+   {
+    "name": "Designer and implementer",
+    "alive": "3 h 39 min",
+    "parts": [
+     {
+      "key": "model",
+      "label": "Model thinking",
+      "color": "--f-design",
+      "value": "35 min",
+      "pct": 16.0
+     },
+     {
+      "key": "tools",
+      "label": "Tools",
+      "color": "--f-impl",
+      "value": "1 h 17 min",
+      "pct": 35.2
+     },
+     {
+      "key": "waiting",
+      "label": "Waiting on its testers",
+      "color": "--f-qa",
+      "value": "12 min",
+      "pct": 5.5
+     },
+     {
+      "key": "idle",
+      "label": "Idle, waiting to be woken",
+      "color": "--idle",
+      "value": "1 h 35 min",
+      "pct": 43.4
+     }
+    ]
+   },
+   {
+    "name": "Testers and critics",
+    "alive": "56 min",
+    "parts": [
+     {
+      "key": "model",
+      "label": "Model thinking",
+      "color": "--f-design",
+      "value": "18 min",
+      "pct": 31.2
+     },
+     {
+      "key": "tools",
+      "label": "Tools",
+      "color": "--f-impl",
+      "value": "38 min",
+      "pct": 68.8
+     },
+     {
+      "key": "idle",
+      "label": "Idle, waiting to be woken",
+      "color": "--idle",
+      "value": "none",
+      "pct": 0.0
+     }
+    ]
+   }
+  ],
+  "unknown": null,
+  "run_hint": "Time an agent was doing something, from its transcript: the model, its tools, waiting on its testers, or idle until it is woken. Measured only for a task whose every transcript was read from its start.",
+  "tools": "browser_take_screenshot 45 min · Bash factory slot up 30 min · Read 22 min · Edit 18 min"
+ }
+}

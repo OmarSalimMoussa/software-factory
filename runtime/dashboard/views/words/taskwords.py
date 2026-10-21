@@ -134,6 +134,11 @@ def status(snap: Snap, task: dict[str, Any]) -> dict[str, str]:
     return {"tone": TONES[state], "word": _WORDS[state]}
 
 
+def word(state: str) -> str:
+    """A status in a few words, as a task's timeline lists it."""
+    return {**_WORDS, "approved": "Approved", "building": "Building", "qa": "In QA"}[state]
+
+
 def progress_at(task: dict[str, Any], log: list[dict[str, Any]]) -> int:
     if task["status"] != "closed":
         return _AT[task["status"]]

@@ -1,11 +1,11 @@
-"""A task's own panel: what it is, its route and progress, its testers and their evidence, what it was built from,
-its requests, its log, its branch and, once it is done, its commits."""
+"""A task's own panel: what it is, its route and progress, where its time went (timing.py), its testers and their
+evidence, what it was built from, its requests, its log, its branch and, once it is done, its commits."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from runtime.dashboard.views import replay
+from runtime.dashboard.views import replay, timing
 from runtime.dashboard.views.kit import (
     PartError,
     Parts,
@@ -26,7 +26,7 @@ from runtime.dashboard.views.words import taskwords
 from runtime.queue.formats import TASK_ID
 from runtime.shared.models import OPEN_SEVERITIES, RETIRED
 
-WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "cards", "logs", "qa", "specs", "done")
+WANTS = ("settings", "queue", "proposals", "sessions", "cost", "outage", "cards", "logs", "qa", "specs", "done", "time")
 UI_TESTERS = ("qa-ui-function", "qa-ux", "qa-visual")
 
 
@@ -262,4 +262,4 @@ def wants(query: Query) -> dict[str, Any]:
 
 
 def parts(snap: Snap, query: Query) -> Parts:
-    return {"task": lambda: sheet(snap, _id(query))}
+    return {"task": lambda: sheet(snap, _id(query)), "time": lambda: timing.task_time(snap, _id(query))}

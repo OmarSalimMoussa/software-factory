@@ -13,6 +13,7 @@ PAGES = [
     ["work", "Work", "queue-list", "w"],
     ["agents", "Agents", "cpu-chip", "a"],
     ["spend", "Spend", "currency-dollar", "s"],
+    ["time", "Time", "clock", "t"],
     ["library", "Library", "book-open", "l"],
     ["settings", "Settings", "adjustments-horizontal", "c"],
     ["reflect", "Self-reflect", "light-bulb", "r"],

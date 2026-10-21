@@ -6,7 +6,7 @@ const {drive, ready, settle, until} = require('./lib.cjs');
 drive('search', async t => {
   const p = await t.open(1440, 900);
   const results = () => p.waitForFunction(() => !document.querySelector('#gs-pop').hidden, null, {timeout: 8000});
-  for (const pg of ['home', 'work', 'agents', 'spend', 'library', 'settings', 'reflect', 'guard']) {
+  for (const pg of ['home', 'work', 'agents', 'spend', 'time', 'library', 'settings', 'reflect', 'guard']) {
     await p.click(`#sidenav [data-go="${pg}"]`); await ready(p);
     t.check(!(await p.$$eval('#page input', els => els.filter(e => /search/i.test(e.placeholder + e.getAttribute('aria-label'))).length)), 'a page search box on ' + pg);
     t.check(await p.isVisible('#gq'), 'search bar missing on ' + pg);
