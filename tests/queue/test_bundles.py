@@ -19,7 +19,7 @@ from runtime.shared.protocol import Refused
 from runtime.slots import health, leases
 from runtime.warden.context import StackResult
 from runtime.warden.delivery import deploys
-from runtime.warden.sessions import backstop
+from runtime.warden.sessions import backstop, doing
 
 
 @pytest.mark.parametrize(("cap", "count"), [(2, 2), (3, 3)])
@@ -272,9 +272,12 @@ def test_a_regression_tester_reads_each_scenario_as_the_build_slot_0_runs_has_it
     if not built or name == "gone":
         with pytest.raises(Refused, match=said):
             walked.show(tester, {"name": name}, None)
+        assert doing.scenarios(world.places, "a1") == []
         return
     shown = walked.show(tester, {"name": name}, None)
     answer = shown["message"]
     assert answer.startswith(f"{name}, as slot 0 runs it at {older[:8]}") and said in answer
     assert "Rewritten" not in answer
     assert shown["folder"] == str(world.repo / ".factory" / "a1")  # the one folder the guard lets it write in
+    # What it read is noted for an error first seen in its walk: a scenario, never a procedure or the README.
+    assert doing.scenarios(world.places, "a1") == (["web"] if name == "web" else [])

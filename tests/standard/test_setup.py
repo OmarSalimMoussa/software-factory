@@ -372,6 +372,20 @@ def test_records_name_folders_inside_prods_volumes(folders: str, refused: bool) 
 
 
 @pytest.mark.parametrize(
+    ("marks", "refused"),
+    [('["QaPlanted"]', False), ("[]", True), ('["Error"]', True), ('["qa planted"]', True)],
+)
+def test_planted_marks_are_words_too_long_to_match_a_real_faults_title(marks: str, refused: bool) -> None:
+    text = f"{FACTORY_TOML}\n[planted]\nmarks = {marks}\n"
+    if not refused:
+        assert parse_text(text).planted == ("QaPlanted",) and parse_text(FACTORY_TOML).planted == ()
+        return
+    with pytest.raises(ConfigError) as error:
+        parse_text(text)
+    assert [p for p in error.value.problems if p.startswith("[planted].marks")], error.value.problems
+
+
+@pytest.mark.parametrize(
     ("table", "where"),
     [
         ("[smoke]\ntimeout_seconds = 60\n", "factory.toml.smoke"),

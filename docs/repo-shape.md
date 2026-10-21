@@ -40,6 +40,7 @@ schema.
 | `[edge]` | Paths the edge answers 404, and hosts it redirects |
 | `[reports]` | Optional: the tailnet port and path where prod's report export answers, the header that carries its token, and `token_key`: the key in prod's env file that holds the token |
 | `[records]` | Optional: `folders`, the folders of prod's volumes whose files agents may read with `factory records`, each the compose volume's name and then folders in it, such as `job-store/*/steps`, where `*` stands for any one folder |
+| `[planted]` | Optional: `marks`, words of 6 to 64 letters, digits, `_` or `-` that an error a QA scenario makes on purpose carries in its error-tracker title, such as an error named `QaPlanted`. The factory files such an issue as noise, never as a fault |
 
 The scripts factory.toml names are its **hooks**: prod's `after_deploy` scripts, which run on the server after a
 deploy. Each hook is committed and executable.

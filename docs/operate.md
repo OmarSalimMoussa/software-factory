@@ -99,11 +99,11 @@ agents' sessions, so your commit lands.
 
 Every product gets a database and errors (GlitchTip) from one copy of the shared services on its server, for prod and
 every stack slot, staging among them ([server.md](server.md), [shared-services.md](shared-services.md)). Each new prod
-error arrives once as a request in the agents' inbox, for triage beside your feedback. Agents read errors and log lines
-with `factory errors` and `factory logs`. The factory's own failures report to a GlitchTip project of its own there,
-`factory`, which no agent reads. An implementer or a designer reads one of prod's records, such as a model's answer
-behind a failed step, with `factory records`: the warden reads it from the folders that factory.toml's `[records]` names
-([repo-shape.md](repo-shape.md)), and the task's log names who read which path.
+or staging error arrives once as a request in the agents' inbox, for triage beside your feedback; one QA planted on
+purpose, whose title holds a mark factory.toml's `[planted]` names, arrives marked noise. Agents read errors and logs
+with `factory errors` and `factory logs`. The factory's own failures report to its own GlitchTip project, `factory`,
+which no agent reads. An implementer or a designer reads prod's records with `factory records`, from the folders
+factory.toml's `[records]` names ([repo-shape.md](repo-shape.md)); the task's log names who read which path.
 
 ## The product's tools
 

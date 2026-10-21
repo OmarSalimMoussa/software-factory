@@ -19,7 +19,7 @@ from runtime.shared.settings import Settings
 from runtime.slots import leases
 
 MAX_TEXT = 60
-FACTS = ("slice", "slices", "qa_round", "critic_round", "verdict")
+FACTS = ("slice", "slices", "qa_round", "critic_round", "verdict", "scenarios")
 _UNSAFE = re.compile(r"[\x00-\x1f\x7f<>&\"'`]")
 
 
@@ -41,6 +41,16 @@ def record(places: Places, session_id: str, **changes: int | str) -> None:
         raise ValueError(f"not doing facts: {sorted(unknown)}")
     merged = {**facts(places, session_id), **changes}
     store.write_json(facts_path(places, session_id), merged, mode=0o600)
+
+
+def note_scenario(places: Places, session_id: str, name: str) -> None:
+    """A scenario a regression tester read, which a slot 0 error first seen in its walk names."""
+    record(places, session_id, scenarios=" ".join(dict.fromkeys([*scenarios(places, session_id), name])))
+
+
+def scenarios(places: Places, session_id: str) -> list[str]:
+    read = facts(places, session_id).get("scenarios")
+    return str(read).split() if read else []
 
 
 def clean(text: str) -> str:

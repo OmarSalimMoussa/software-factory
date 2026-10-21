@@ -48,6 +48,7 @@ _HEADER = re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]+$")
 _URL_PATH = re.compile(r"^/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$")
 _BLOCKED = re.compile(r"^/[A-Za-z0-9._~!$&'()+,;=:@%/-]*\*?$")
 _RECORDS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*(?:/(?:[A-Za-z0-9][A-Za-z0-9._-]*|\*))*$")
+_MARK = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{5,63}$")
 
 
 class ConfigError(Exception):
@@ -94,7 +95,7 @@ class _Reader(Fields):
     """Walks the parsed file, collecting every problem rather than stopping at the first."""
 
     def config(self, data: dict[str, Any]) -> Config | None:
-        self.known(data, "factory.toml", (*REQUIRED, "reports", "records"))
+        self.known(data, "factory.toml", (*REQUIRED, "reports", "records", "planted"))
         product = self.product(data)
         build = self.build(data)
         services = self.services(data)
@@ -105,9 +106,10 @@ class _Reader(Fields):
         edge = self.edge(data)
         reports = self.reports(data)
         records = self.records(data)
+        planted = self.planted(data)
         if self.problems:
             return None
-        return Config(product, build, services, env, server, workspaces, deploy, edge, reports, records, data)
+        return Config(product, build, services, env, server, workspaces, deploy, edge, reports, records, planted, data)
 
     def product(self, data: dict[str, Any]) -> Product:
         t = self.table(data, "product", "", ("name", "registry"))
@@ -271,3 +273,15 @@ class _Reader(Fields):
                 )
 
         return self.texts(t, "folders", "[records]", folder, empty_ok=False)
+
+    def planted(self, data: dict[str, Any]) -> tuple[str, ...]:
+        if "planted" not in data:
+            return ()
+        t = self.table(data, "planted", "", ("marks",))
+
+        def mark(where: str, value: str) -> None:
+            if not _MARK.fullmatch(value):
+                why = "such as QaPlanted: a shorter one could be in a real fault's title"
+                self.fail(where, f"{value!r} must be one word of 6 to 64 letters, digits, _ or -, {why}")
+
+        return self.texts(t, "marks", "[planted]", mark, empty_ok=False)

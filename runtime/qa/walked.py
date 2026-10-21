@@ -17,7 +17,7 @@ from runtime.shared.paths import scratch_of
 from runtime.shared.protocol import Refused, ok
 from runtime.slots import health
 from runtime.warden.context import Context
-from runtime.warden.sessions import registry
+from runtime.warden.sessions import doing, registry
 
 _NAME = re.compile(r"^(?:[a-z0-9][a-z0-9-]*|README)$")
 
@@ -41,6 +41,9 @@ def show(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, An
     for folder in (FOLDER, str(PurePosixPath(FOLDER).parent)):
         code, text = ctx.launcher.agent_command(["git", "-C", repo, "show", f"{commit}:{folder}/{name}.md"], repo)
         if code == 0:
+            if ctx.caller.agent_id and named(f"{folder}/{name}.md"):
+                with ctx.lock:
+                    doing.note_scenario(ctx.places, ctx.caller.agent_id, name)
             return ok(message=f"{name}, as slot 0 runs it at {commit[:9]}:\n\n{text.rstrip()}", **own)
     raise Refused("qa-scenario", f"slot 0 runs {commit[:9]}, which has no scenario or qa procedure {name}")
 

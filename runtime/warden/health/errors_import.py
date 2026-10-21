@@ -7,9 +7,11 @@ its name, so the factory's own project (error_reports.PROJECT) is no environment
 open then as known, each filed once GlitchTip sees it again. Another issue not filed before is filed from glitchtip.
 One filed before is filed again when GlitchTip saw it after the task its request became reached that environment
 (promoted for prod, on staging for slot 0). Its severity comes from the issue: a fatal one, or one with at least
-errors.severe_events events, is severe and goes to intake at once. Each environment keeps its own record,
-errors-<env>.json: the issues it knows with their request, since when it reads, and the timer runtime/warden/imports.py
-keeps.
+errors.severe_events events, is severe and goes to intake at once. One whose title or culprit holds a mark
+factory.toml's [planted] names is QA's own on purpose: its request is settled as noise as it is filed. A slot 0
+issue's request names the regression testers walking slot 0 when it was first seen, and the scenarios each read.
+Each environment keeps its own record, errors-<env>.json: the issues it knows with their request, since when it
+reads, and the timer runtime/warden/imports.py keeps.
 """
 
 from __future__ import annotations
@@ -27,8 +29,10 @@ from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused
 from runtime.warden import imports
 from runtime.warden.context import Context
-from runtime.warden.health import telemetry
+from runtime.warden.health import probes, telemetry
 from runtime.warden.health.telemetry import Issue
+from runtime.warden.sessions import doing, registry
+from runtime.warden.verbs import REGRESSION
 
 log = logging.getLogger(__name__)
 
@@ -42,9 +46,9 @@ _FRESH: dict[str, Any] = {"filed": {}, "since": None, **imports.fresh()}
 
 def _timed(env: str) -> imports.Timed:
     # A TelemetryError's text names the service, the path and the cause's class, and never a key.
-    expected = (telemetry.TelemetryError, Refused, OSError)
+    expected = (telemetry.TelemetryError, probes.NoAddress, Refused, OSError)
     return imports.Timed(f"{env} errors import", f"importing {env}'s errors", "errors.poll_minutes",
-                         expected=expected, told=(telemetry.TelemetryError,))  # fmt: skip
+                         expected=expected, told=(telemetry.TelemetryError, probes.NoAddress))  # fmt: skip
 
 
 def path(places: Places, env: str) -> Path:
@@ -81,8 +85,10 @@ def poll(ctx: Context) -> None:
                                           settings.get_int("errors.max_pages"))  # fmt: skip
             if state["since"] is None:
                 return _take_known(ctx, env, state, issues)
-            filed = _file_new(ctx, env, state, issues)
-            return f"{filed} {'issue' if filed == 1 else 'issues'} filed"
+            filed, planted = _file_new(ctx, env, state, issues)
+            return f"{filed} {'issue' if filed == 1 else 'issues'} filed" + (
+                f", {planted} planted by QA as noise" if planted else ""
+            )
 
         if imports.run(ctx, _timed(env), state, work):
             store.write_json(path(ctx.places, env), state)
@@ -127,27 +133,46 @@ def _came_back(queue: Queue, env: str, record: dict[str, str], issue: Issue) -> 
     return bool(reached) and seen is not None and seen > formats.epoch(reached[-1])
 
 
-def _file_new(ctx: Context, env: str, state: dict[str, Any], issues: list[Issue]) -> int:
-    """File each issue not filed before, or come back since; oldest first. Each is kept as soon as it is written."""
+def _file_new(ctx: Context, env: str, state: dict[str, Any], issues: list[Issue]) -> tuple[int, int]:
+    """File each issue not filed before, or come back since; oldest first. Each is kept as soon as it is written. How
+    many were filed, and how many of those QA planted."""
     queue = Queue.of(ctx)
     severe_events = ctx.settings().get_int("errors.severe_events")
-    filed = 0
+    marks = probes.product(ctx).planted
+    filed = planted = 0
     for issue in reversed(issues):
         record = state["filed"].get(issue.id)
         if record is not None and not _again(queue, env, record, issue):
             continue
-        where, body = request_text(issue, env if record is not None and "request" in record else None)
+        walkers = _walkers(ctx, issue) if env == SLOT_ZERO else None
+        where, body = request_text(issue, env if record is not None and "request" in record else None, walkers)
+        mark = next((m for m in marks if m in " ".join(filter(None, (issue.title, issue.culprit)))), None)
+        noise = f"noise planted by QA: its title or culprit holds {mark}, which factory.toml's [planted] names"
         with ctx.lock, queue.lock():
-            req = intake.file_request(ctx, queue, "agents", SENDER, severity(issue, severe_events), where, body)
+            req = intake.file_request(ctx, queue, "agents", SENDER, severity(issue, severe_events), where, body,
+                                      outcome=noise if mark else "")  # fmt: skip
         state["filed"][issue.id] = {"request": req.id, "at": req.at}
         store.write_json(path(ctx.places, env), state)
-        filed += 1
-    return filed
+        filed, planted = filed + 1, planted + bool(mark)
+    return filed, planted
 
 
-def request_text(issue: Issue, came_back_to: str | None) -> tuple[str, str]:
-    """The request's where and body; ``came_back_to`` names the environment its fix reached, for an issue filed again.
-    The title and culprit come from whoever sent the event: they are data."""
+def _walkers(ctx: Context, issue: Issue) -> str:
+    at = _time(issue.first_seen)
+    if at is None:
+        return "unknown, as GlitchTip gave no first-seen time"
+    found = [
+        f"{s.name} from {s.started}{f' to {s.ended}' if s.ended else ', still walking'}, having read "
+        f"{', '.join(doing.scenarios(ctx.places, s.id)) or 'no scenario'}"
+        for s in registry.read(ctx.places).values()
+        if s.role == REGRESSION and formats.epoch(s.started) <= at and (not s.ended or at <= formats.epoch(s.ended))
+    ]
+    return "; ".join(found) or "none"
+
+
+def request_text(issue: Issue, came_back_to: str | None, walkers: str | None) -> tuple[str, str]:
+    """The request's where and body; ``came_back_to`` names the environment its fix reached, for an issue filed again,
+    and ``walkers`` slot 0's testers then. The title and culprit come from whoever sent the event: they are data."""
 
     def known(value: str | None) -> str:
         return formats.one_line(value) if value else "unknown"
@@ -162,5 +187,6 @@ def request_text(issue: Issue, came_back_to: str | None) -> tuple[str, str]:
         f"- First seen {known(issue.first_seen)}, last seen {known(issue.last_seen)}",
         f"- Events: {known(issue.count)}",
         f"- Link: {known(issue.permalink)}",
+        *([f"- Testers walking slot 0 when it was first seen: {walkers}"] if walkers is not None else []),
     ])  # fmt: skip
     return where, body

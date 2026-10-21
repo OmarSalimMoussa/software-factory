@@ -104,6 +104,7 @@ class Config:
     edge: Edge
     reports: Reports | None  # None: the product has no report export
     records: tuple[str, ...]  # prod's folders agents may read, each "<volume>/<folder>…"; none without [records]
+    planted: tuple[str, ...]
     raw: dict[str, Any]  # the parsed file, for comparing two copies
 
     def workspace(self, name: str) -> Workspace:

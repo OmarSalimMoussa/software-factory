@@ -29,9 +29,17 @@ def body_text(data: bytes | None, what: str, limit_kib: int) -> str:
 
 
 def file_request(
-    ctx: Context, queue: Queue, inbox: str, from_role: str, severity: str, where: str, body: str, report: str = ""
+    ctx: Context,
+    queue: Queue,
+    inbox: str,
+    from_role: str,
+    severity: str,
+    where: str,
+    body: str,
+    report: str = "",
+    outcome: str = "",
 ) -> Request:
-    """Write one new request; the caller holds the queue lock."""
+    """Write one new request, settled at once with ``outcome`` when it is given; the caller holds the queue lock."""
     now = ctx.clock.iso()
     req = Request(
         queue.next_request_id(now[:10]),
@@ -42,10 +50,10 @@ def file_request(
         formats.one_line(where),
         body.strip(),
         report,
-        "",
+        outcome,
     )
     queue.write({request_rel(req): formats.dump_request(req)})
-    if severity == "severe":
+    if severity == "severe" and not outcome:
         ctx.post_event(SEVERE_REQUEST, {"request": req.id, "inbox": inbox, "where": req.where})
     return req
 

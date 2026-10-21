@@ -26,7 +26,8 @@ You run beside the orchestrator in the main checkout, on the default branch. Rea
 
 1. **Is it already known?** `factory queue next`, then search `queue/tasks/` for the screen, endpoint or error. An
    open task about the same problem means this request joins it. A closed one that is back is a regression: name the
-   merge that closed it when its log says.
+   merge that closed it when its log says. A slot 0 error's request names the regression testers walking slot 0
+   when it was first seen and the scenarios they read: when one of those makes that failure on purpose, it is no fault.
 2. **Where it lives:** the screen or endpoint, and the files and lines that make it. Read `git log` on those files: a
    recent merge is a likely cause. Find it in the errors: `factory errors` (prod; `--where slot <n>` for a
    slot, and slot 0 is staging; `--find <text>` for those whose title or culprit holds it, `--since <time>` for
