@@ -8,8 +8,8 @@
 - ``browser_open_desktop`` sets the browser to the desktop's size (``qa.desktop_viewport``), then opens the desktop's
   live view: a screenshot is not shrunk before the tester sees it, so a point in it is the point on the desktop.
 - ``browser_color_scheme`` shows the page light or dark: fixed code the wrapper runs, as testers' code tool is hidden.
-- ``browser_mouse_press_xy`` clicks at a point, resting there ``qa.press_settle_ms`` first and holding the button
-  ``qa.click_hold_ms``: a remote desktop under load misses a press that comes with its move, or a shorter one.
+- ``browser_mouse_press_xy`` clicks at a point as a remote desktop under load takes a click, then answers once the
+  desktop's live view shows a change, or says it saw none: the desktop draws a click's effect seconds late.
 - ``browser_type_keys`` types a text as key presses into whatever has the keyboard, in one call, ``qa.key_delay_ms``
   apart: the remote desktop's view takes keys, not a field's filled value, drops keys sent faster, and reads a capital
   or a shifted symbol only with Shift held.
@@ -65,6 +65,34 @@ SHIFTED = {
 }
 
 
+# The live view's picture: the largest video playing in a frame, drawn into a canvas of a few cells, each the average
+# grey of the pixels it covers (a canvas shrinks a video by averaging them; its data holds four bytes a pixel). null
+# with no video playing, false when the canvas will not give its pixels back, as for a video from another site.
+PICTURE = (
+    "([w, h]) => { const shown = [...document.querySelectorAll('video')].filter((v) => v.videoWidth > 0 && "
+    "v.readyState >= v.HAVE_CURRENT_DATA); if (!shown.length) return null; const video = shown.reduce((a, b) => "
+    "b.clientWidth * b.clientHeight > a.clientWidth * a.clientHeight ? b : a); const pen = Object.assign("
+    "document.createElement('canvas'), { width: w, height: h }).getContext('2d', { willReadFrequently: true }); "
+    "pen.drawImage(video, 0, 0, w, h); try { const d = pen.getImageData(0, 0, w, h).data; "
+    "return Array.from({ length: w * h }, (_, i) => (d[4 * i] + d[4 * i + 1] + d[4 * i + 2]) / 3); } "
+    "catch { return false; } }"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class Desktop:
+    """How the factory's tools work a remote desktop's live view: the ``qa.`` settings of these names."""
+
+    viewport: tuple[int, int]  # qa.desktop_viewport
+    key_delay_ms: int
+    click_hold_ms: int
+    press_settle_ms: int
+    press_wait_ms: int
+    press_look_ms: int
+    press_look_cells: tuple[int, int]
+    press_look_level: int
+
+
 class ToolError(Exception):
     """A factory tool cannot do what was asked; the message, which the tester reads, says why."""
 
@@ -88,11 +116,8 @@ class Tools:
     signed_in: Callable[[str], None]
     reload_seconds: int
     max_minutes: int
-    desktop: tuple[int, int]
-    key_delay_ms: int
+    desktop: Desktop
     hold_max_seconds: int
-    click_hold_ms: int
-    press_settle_ms: int
     now: Callable[[], float]  # a monotonic clock, in seconds
 
     def answer(self, name: str, arguments: dict[str, Any], cancelled: threading.Event) -> tuple[str, bool]:
@@ -176,7 +201,7 @@ class Tools:
         url = arguments.get("url")
         if not isinstance(url, str) or not WEB.match(url):
             raise ToolError("give the view's address, starting http:// or https://")
-        width, height = self.desktop
+        width, height = self.desktop.viewport
         self.call("browser_resize", {"width": width, "height": height})
         return self.call("browser_navigate", {"url": url})
 
@@ -195,7 +220,7 @@ class Tools:
             raise ToolError("give the text to type")
         # The keys go as JSON data to one fixed loop, so the text cannot end the code it sits in.
         keys = json.dumps([["press", f"Shift+{SHIFTED[c]}"] if c in SHIFTED else ["type", c] for c in text])
-        each = f"await page.keyboard[how](key); await page.waitForTimeout({self.key_delay_ms});"
+        each = f"await page.keyboard[how](key); await page.waitForTimeout({self.desktop.key_delay_ms});"
         self.call(SERVER_CODE, {"code": f"async (page) => {{ for (const [how, key] of {keys}) {{ {each} }} }}"})
         return (
             f"Typed {len(text)} keys. A desktop may draw them seconds late: see them in a screenshot, then type more."
@@ -203,7 +228,7 @@ class Tools:
 
     def _press(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
         x, y = arguments.get("x"), arguments.get("y")
-        width, height = self.desktop
+        width, height = self.desktop.viewport
         if (
             isinstance(x, bool)
             or isinstance(y, bool)
@@ -213,10 +238,17 @@ class Tools:
             raise ToolError("give the point as x and y, in the page's pixels")
         if not (0 <= x < width and 0 <= y < height):
             raise ToolError(f"the point is off the page: x from 0 to {width - 1}, y from 0 to {height - 1}")
-        rest = f"await page.mouse.move({x}, {y}); await page.waitForTimeout({self.press_settle_ms});"
-        held = f"await page.mouse.down(); await page.waitForTimeout({self.click_hold_ms}); await page.mouse.up();"
-        self.call(SERVER_CODE, {"code": f"async (page) => {{ {rest} {held} }}"})
-        return f"Pressed at {x:g}, {y:g}. A screenshot shows what it did."
+        seen = self._value(_press_code(x, y, self.desktop))
+        pressed, most = f"Pressed at {x:g}, {y:g}.", f"{self.desktop.press_wait_ms / 1000:g} s"
+        said = {
+            "none": f"{pressed} A screenshot shows what it did.",
+            "same": f"{pressed} No change on the desktop within {most}: take a screenshot before you click again.",
+            "unread": f"{pressed} The factory cannot read this view's picture, so it waited {most}: take a "
+            "screenshot before you click again.",
+        }
+        if isinstance(seen, str):
+            return said[seen]
+        return f"{pressed} The desktop changed {seen / 1000:.1f} s after the press: a screenshot shows what it did."
 
     def _hold_request(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
         pattern, seconds = arguments.get("pattern"), arguments.get("seconds")
@@ -275,11 +307,42 @@ class Tools:
     def _held(self, pattern: str, body: str) -> Any:
         """``body`` run in the browser server with ``held``, the holds kept on its context, and ``p``, the address."""
         start = f"const held = page.context().__held ??= {{}}; const p = {json.dumps(pattern)}; "
-        answer = self.call(SERVER_CODE, {"code": f"async (page) => {{ {start}{body} }}"})
+        return self._value(f"async (page) => {{ {start}{body} }}")
+
+    def _value(self, code: str) -> Any:
+        """What ``code``, run in the browser server, returned."""
+        answer = self.call(SERVER_CODE, {"code": code})
         found = RESULT.search(answer)
         if found is None:
             raise ToolError("the browser answered with no result; report the step blocked with that")
         return json.loads(found.group(1))
+
+
+def _press_code(x: float, y: float, desk: Desktop) -> str:
+    """A click as code for the browser server, which answers ``none`` with no live view on the page, ``unread`` once
+    it waited on a view whose picture it cannot read, ``same`` when no look saw a change, or the milliseconds from the
+    release to the look that saw one."""
+    look = (
+        "const look = async () => { for (const frame of page.frames()) { const seen = await frame.evaluate("
+        f"{PICTURE}, {json.dumps(list(desk.press_look_cells))}).catch(() => null); if (seen !== null) return seen; "
+        "} return null; };"
+    )
+    # A press that comes with its move, or a shorter one, misses on a desktop under load.
+    press = (
+        f"await page.mouse.move({x}, {y}); await page.waitForTimeout({desk.press_settle_ms}); "
+        "const before = await look(); "
+        f"await page.mouse.down(); await page.waitForTimeout({desk.click_hold_ms}); await page.mouse.up();"
+    )
+    wait, level = desk.press_wait_ms, desk.press_look_level
+    # A picture gone after the press is a change too: the page left the view.
+    watch = (
+        f"if (before === null) return 'none'; if (before === false) {{ await page.waitForTimeout({wait}); "
+        f"return 'unread'; }} const start = Date.now(); while (Date.now() - start < {wait}) {{ "
+        f"await page.waitForTimeout({desk.press_look_ms}); const now = await look(); "
+        f"if (!now || now.some((v, i) => Math.abs(v - before[i]) > {level})) return Date.now() - start; }} "
+        "return 'same';"
+    )
+    return f"async (page) => {{ {look} {press} {watch} }}"
 
 
 def first_link(text: str) -> str:

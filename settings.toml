@@ -77,6 +77,15 @@ hold_max_seconds = 120  # the longest browser_hold_request holds a request: each
                         # a step may need several, such as a click and its confirm, before its release
 click_hold_ms = 150     # how long browser_mouse_press_xy holds the button: a remote desktop under load misses shorter clicks
 press_settle_ms = 250   # how long browser_mouse_press_xy rests on its point first: a press with its move may miss
+press_wait_ms = 6000    # the longest browser_mouse_press_xy then waits for the desktop's live view to draw a change,
+                        # and its wait on a view whose picture it cannot read: on a desktop walk under CPU throttle
+                        # a click's effect drew 0.4 to 4.1 s after the press; this leaves half again
+press_look_ms = 200     # how often it looks at the view's picture meanwhile: a look shrinks one frame to a few
+                        # hundred cells, little work, and the answer comes within this of the change
+press_look_cells = [32, 20]  # the picture shrunk to this many cells across and down, each its pixels' average: on
+                        # that walk the video's own noise, a typed letter and a blinking text cursor moved a cell by
+                        # under 12 grey levels, and a click's effect by 12 to 255; finer cells see the cursor blink
+press_look_level = 12   # a cell must change by more than this many grey levels of 255 to count as the desktop drawing
 place_turn_seconds = 120  # a freed browser place waits this long for the session told of it, then the next is told
 wait_max_minutes = 15   # the longest one wait may last
 browser_answer_seconds = 120  # the longest the browser has to answer one call, a browser_wait_for's own time aside

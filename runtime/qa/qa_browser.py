@@ -31,7 +31,7 @@ from typing import IO, Any
 from runtime.qa import second as second_module
 from runtime.qa.tool_list import NOTES, TOOLS
 from runtime.qa.wrapper import CLOSE, FIRST, SECOND, Proxy
-from runtime.qa.wrapper_tools import ToolError, Tools, first_link
+from runtime.qa.wrapper_tools import Desktop, ToolError, Tools, first_link
 from runtime.shared import environment, lanes, store
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import AGENT_USER, Places
@@ -192,6 +192,17 @@ def equipper(
     """What the wrapper adds to the browser: the factory's tools in either browser, the second browser ``second``
     starts, and every link they sign in with kept beside the run for the replay and hidden from the session."""
     width, height = (int(n) for n in settings.get_list("qa.desktop_viewport"))
+    across, down = (int(n) for n in settings.get_list("qa.press_look_cells"))
+    desktop = Desktop(
+        viewport=(width, height),
+        key_delay_ms=settings.get_int("qa.key_delay_ms"),
+        click_hold_ms=settings.get_int("qa.click_hold_ms"),
+        press_settle_ms=settings.get_int("qa.press_settle_ms"),
+        press_wait_ms=settings.get_int("qa.press_wait_ms"),
+        press_look_ms=settings.get_int("qa.press_look_ms"),
+        press_look_cells=(across, down),
+        press_look_level=settings.get_int("qa.press_look_level"),
+    )
 
     def equip(proxy: Proxy) -> None:
         def kept(secret: str) -> None:
@@ -208,11 +219,8 @@ def equipper(
                 partial(proxy.answers.signed_in, which),
                 settings.get_int("qa.wait_reload_seconds"),
                 settings.get_int("qa.wait_max_minutes"),
-                (width, height),
-                settings.get_int("qa.key_delay_ms"),
+                desktop,
                 settings.get_int("qa.hold_max_seconds"),
-                settings.get_int("qa.click_hold_ms"),
-                settings.get_int("qa.press_settle_ms"),
                 time.monotonic,
             )
             for which in (FIRST, SECOND)

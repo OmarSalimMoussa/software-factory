@@ -182,3 +182,54 @@ def test_a_request_set_to_fail_fails_once_with_its_network_error_and_the_next_go
     ]  # fmt: skip
     assert '"failed: Failed to fetch"' in got[0] and '"pong"' in got[1]
     assert "ERR_CONNECTION_RESET" in console and "ERR_TIMED_OUT" not in console
+
+
+def _live_view(late: int | None) -> str:
+    """A live view as a remote desktop's: a video of a white picture, sent over WebRTC from one connection in the page
+    to another; a press turns the picture black ``late`` ms after it, or never."""
+    press = f"addEventListener('mousedown', () => setTimeout(() => {{ shade = 0; }}, {late})); " if late else ""
+    return "data:text/html," + quote(
+        "<canvas id=src width=320 height=200 hidden></canvas><video id=v autoplay muted playsinline "
+        "style='position:fixed;inset:0;width:100%;height:100%'></video><script>const pen = src.getContext('2d'); "
+        "let shade = 255; setInterval(() => { pen.fillStyle = `rgb(${shade},${shade},${shade})`; "
+        f"pen.fillRect(0, 0, 320, 200); }}, 50); {press}"
+        "const a = new RTCPeerConnection(), b = new RTCPeerConnection(); "
+        "a.onicecandidate = (e) => e.candidate && b.addIceCandidate(e.candidate); "
+        "b.onicecandidate = (e) => e.candidate && a.addIceCandidate(e.candidate); "
+        "b.ontrack = (e) => { v.srcObject = e.streams[0]; }; "
+        "src.captureStream().getTracks().forEach((t) => a.addTrack(t, new MediaStream([t]))); "
+        "(async () => { await a.setLocalDescription(); await b.setRemoteDescription(a.localDescription); "
+        "await b.setLocalDescription(); await a.setRemoteDescription(b.localDescription); })();</script>"
+    )
+
+
+@pytest.mark.skipif(not (shutil.which("node") and CHROME.is_file() and _server()), reason="needs node, Chrome, MCP")
+@pytest.mark.parametrize(
+    ("page", "says"),
+    [
+        (_live_view(1000), r"The desktop changed (\d\.\d) s after the press: a screenshot shows what it did\."),
+        (_live_view(None), r"No change on the desktop within 6 s: take a screenshot before you click again\."),
+        (PAGE, r"A screenshot shows what it did\."),
+    ],
+    ids=["the-picture-changes-late", "the-picture-stays", "no-live-view"],
+)
+def test_a_desktop_click_reads_the_live_views_video_and_answers_once_it_changed_or_its_wait_ended(
+    tmp_path: Path, world: World, page: str, says: str
+) -> None:
+    cli = _server()
+    assert cli is not None
+    browser = Browser(tmp_path, world, cli)
+    playing = (
+        "() => new Promise((done) => { const t = setInterval(() => { const v = document.querySelector('video'); "
+        "if (!v || v.readyState >= v.HAVE_CURRENT_DATA) { clearInterval(t); done(!!v); } }, 50); })"
+    )
+    try:
+        browser.call("browser_navigate", {"url": page})
+        shown = browser.evaluate(playing)[0]
+        said, failed = browser.call("browser_mouse_press_xy", {"x": 640, "y": 400})
+    finally:
+        browser.close()
+    assert ("### Result\ntrue" in shown) == (page != PAGE)
+    found = re.fullmatch(r"Pressed at 640, 400\. " + says, said)
+    assert found and not failed, said
+    assert not found.groups() or 0.8 <= float(found.group(1)) < 6, "the picture turned black 1 s after the press"

@@ -88,8 +88,9 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": PRESS,
         "description": "Click at a point on the remote desktop's view, holding the button a moment, as the desktop "
-        "takes a click. A point is in the page's pixels from its top-left corner, as a screenshot shows them: a "
-        "view inside a frame counts from the page's corner, not the frame's.",
+        "takes a click. It answers once the desktop has drawn a change, or says it saw none. A point is in the "
+        "page's pixels from its top-left corner, as a screenshot shows them: a view inside a frame counts from the "
+        "page's corner, not the frame's.",
         "inputSchema": {
             "type": "object",
             "properties": {"x": {"type": "number"}, "y": {"type": "number"}},

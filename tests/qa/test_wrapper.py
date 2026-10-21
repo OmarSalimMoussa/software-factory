@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fake_browser import LINK, Browser
+from fake_browser import DESKTOP, LINK, Browser
 from queue_kit import World
 
 from runtime.qa import answers, qa_browser, wrapper
@@ -573,6 +573,7 @@ def test_a_release_says_what_it_let_go(name: str, result: str | None, says: str,
         ("browser_mouse_press_xy", {"x": "1); x(", "y": 10}, "give the point as x and y"),
         ("browser_mouse_press_xy", {"x": True, "y": 10}, "give the point as x and y"),
         ("browser_release_request", {"pattern": "**/x"}, "the browser answered with no result"),
+        ("browser_mouse_press_xy", {"x": 10, "y": 10}, "the browser answered with no result"),
     ],
 )
 def test_a_factory_tool_that_cannot_do_what_was_asked_fails_and_says_why(
@@ -593,11 +594,8 @@ def test_a_browser_failure_reaches_the_tester_without_the_sign_in_link() -> None
         lambda address: None,
         60,
         15,
-        (1280, 800),
-        40,
+        DESKTOP,
         30,
-        150,
-        250,
         lambda: 0.0,
     )
     said, failed = tools.answer("browser_sign_in", {"address": "tester-1@example.com"}, threading.Event())

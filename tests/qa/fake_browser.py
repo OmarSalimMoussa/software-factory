@@ -7,9 +7,19 @@ import threading
 from typing import Any
 
 from runtime.qa.wrapper import ServerError
-from runtime.qa.wrapper_tools import Tools
+from runtime.qa.wrapper_tools import Desktop, Tools
 
 LINK = "https://app.test/auth/link/one-time-secret"
+DESKTOP = Desktop(
+    viewport=(1280, 800),
+    key_delay_ms=40,
+    click_hold_ms=150,
+    press_settle_ms=250,
+    press_wait_ms=6000,
+    press_look_ms=200,
+    press_look_cells=(32, 20),
+    press_look_level=12,
+)
 
 
 class Ticks(threading.Event):
@@ -56,11 +66,8 @@ class Browser:
             lambda address: None,
             reload_seconds,
             max_minutes,
-            (1280, 800),
-            40,
+            DESKTOP,
             30,
-            150,
-            250,
             lambda: self.ticks.clock,
         )
         return tools.answer(name, args, self.ticks)

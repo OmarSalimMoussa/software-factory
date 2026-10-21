@@ -28,8 +28,10 @@ after them.
 ## 2. Work it
 
 - **Click:** take a screenshot, click at the point with `browser_mouse_press_xy`, which holds the button as the desktop
-  needs, then take a screenshot again to check what happened. Take each point from a screenshot taken after the last
-  change: a panel that opens or closes moves what is under it.
+  needs, then take a screenshot again to check what happened, once the click has answered, not beside it. The desktop
+  may draw a click seconds late, so the click answers only once the desktop has drawn a change, or says it saw none:
+  then look again before you click again. Take each point from a screenshot taken after the last change: a panel that
+  opens or closes moves what is under it.
 - **Check by screenshot.** The desktop's words are pixels in a video, not page text: a text wait or a snapshot never
   sees them.
 - **Type:** click where the text goes on the video first, then `browser_type_keys` with the text: one call types
