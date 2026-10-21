@@ -66,13 +66,13 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
    One tester at a time uses the slot's remote desktop, and the factory takes it down when that tester hands back.
 4. **The brief:** one line `Scenarios and checks: N` (N from 1 to `qa.max_items`: the items of the scenarios you
    list (a scenario's `items:`, or one), plus one for each check and each hold you ask for, such as one for your own
-   measurement, and, on a change to the screens, one named `widths` for a browser tester's walk of them at each width,
-   which the factory checks at its hand-back. Pad nothing: a tester's time is its items' time, which the factory adds
-   to the brief, so name no time of your own. Name each item as testers mark it: a scenario by its file name without
-   `.md`, a check or a hold by a short name of words joined by dashes); your slot's address; the widths to test (`qa.widths`); what changed and
-   why, with file paths; the spec's checks; the scenarios to walk (round 1 walks each scenario your branch adds or
-   changes, cold); the test address each tester signs in as; and every finding earlier rounds raised, with what you
-   did about it. Never a desktop's address or password, nor a word of `desktop up` or `desktop down`: a tester takes
+   measurement. Pad nothing: a tester's time is its items' time, which the factory adds to the brief, so name no time
+   of your own. On a change to the screens the factory also adds to each browser tester's brief the widths its
+   hand-back checks, as one more item, `widths`: count it nowhere and name no widths of your own. Name each item as
+   testers mark it: a scenario by its file name without `.md`, a check or a hold by a short name of words joined by
+   dashes); your slot's address; what changed and why, with file paths; the spec's checks; the scenarios to walk
+   (round 1 walks each scenario your branch adds or changes, cold); the test address each tester signs in as; and
+   every finding earlier rounds raised, with what you did about it. Never a desktop's address or password, nor a word of `desktop up` or `desktop down`: a tester takes
    neither from a brief, brings the desktop up itself, and leaves it for the warden to take down at its hand-back.
 5. **Findings** are claims to check (the `taking-review` skill): fix it, dispute it with evidence (the orchestrator
    may waive it: `factory qa waive <task> <finding> --why "…"`), or file it when it is outside your task: `factory request new --from <tester> --severity normal --where "<where>" --body <file>`.

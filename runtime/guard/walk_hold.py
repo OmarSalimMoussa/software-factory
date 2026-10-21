@@ -24,7 +24,18 @@ from datetime import datetime
 from pathlib import Path
 
 from runtime.guard import browser, factory_calls, scratch, transcript
-from runtime.guard.facts import Call, Decision, Refusal, Rewrite, Vitals, read_desktops, read_vitals, resolve
+from runtime.guard.facts import (
+    Call,
+    Decision,
+    Refusal,
+    Rewrite,
+    Vitals,
+    read_desktops,
+    read_ready,
+    read_vitals,
+    ready_at,
+    resolve,
+)
 from runtime.guard.wire import HANDBACK, REFUSED, marker
 from runtime.shared import lanes, store
 from runtime.shared.models import TESTER
@@ -184,13 +195,21 @@ def reports(call: Call) -> bool:
     return words is not None and factory_calls.verb_of(words) in _REPORTS
 
 
+def walk_items(call: Call, brief: str, kind: str, started: datetime) -> tuple[int, list[int]]:
+    """A tester's items, its brief's and `widths` when its round checks its walk at widths, and those widths."""
+    items = transcript.declared_items(brief, call.settings.get_int("qa.max_items"))
+    record = ready_at(read_ready(call.places, call.session.id), started) if call.session else None
+    widths = lanes.checked_widths(call.settings, record, kind)
+    return items + (1 if widths else 0), widths
+
+
 def _time_left(call: Call) -> float | Refusal:
     """Seconds left of the tester's budget: its items' time, and while it holds the remote desktop, the later of that
     and its desktop time."""
     path = transcript.subagent_transcript(call.transcript, call.agent_id)
     try:
         brief, started = transcript.first_brief(path)
-        items = transcript.declared_items(brief, call.settings.get_int("qa.max_items"))
+        items, _ = walk_items(call, brief, call.agent_type, started)
     # telemetry: surfaced — `_time_up` tells the tester to report what it has
     except transcript.BriefError as exc:
         return _time_up(call, f"your time budget cannot be read ({exc})")

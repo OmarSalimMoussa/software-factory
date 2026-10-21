@@ -603,25 +603,44 @@ def test_a_brief_carries_the_notes_on_calling_factory_and_reflecting_exactly_whe
 
 
 @pytest.mark.parametrize(
-    ("role", "kind", "timed"), [("implementer", "qa-backend", True), ("designer", "critic-ux", False)]
+    ("role", "kind", "seconds", "widths"),
+    [
+        ("implementer", "qa-backend", 1320, False),
+        ("implementer", "qa-ui-function", 1740, True),
+        ("designer", "critic-ux", None, False),
+    ],
 )
-def test_a_testers_brief_ends_with_the_time_the_guard_holds_it_to(
-    tmp_path: Path, role: str, kind: str, timed: bool
+def test_a_testers_brief_ends_with_the_widths_its_hand_back_is_checked_for_and_the_time_the_guard_holds_it_to(
+    tmp_path: Path, role: str, kind: str, seconds: int | None, widths: bool
 ) -> None:
     kit = Kit(tmp_path)
     kit.session(role, worktree=kit.worktree)
     kit.switch_off("qa-ready")
     kit.settings(qa__setup_seconds=60, qa__seconds_per_item=420)
-    brief = "Scenarios and checks: 3\nYou may spend up to about 25 minutes."
+    kit.ready({"head": "0" * 40, "slices": [], "at": NOW.isoformat(), lanes.WIDTHS: [1440, 1024, 390]})
+    brief = "Scenarios and checks: 3\nYou may spend up to about 25 minutes. This round has no widths item for you."
 
     decision = kit.decide("Agent", _agent(kind, brief))
 
     assert isinstance(decision, Rewrite)
-    last = decision.updated_input["prompt"].rstrip().splitlines()[-1]
-    assert last.startswith("Your time, set by the factory: 1320 s from your start") is timed
+    said, last = decision.updated_input["prompt"].rstrip().split("\n\n")[-2:]
+    assert last.startswith(f"Your time, set by the factory: {seconds} s from your start") is (seconds is not None)
     # A model cannot tell how long it has worked: a tester that guessed it had run out gave up a third of the way in.
-    assert ("walk on until the factory says your time is spent" in last) is timed
+    assert ("walk on until the factory says your time is spent" in last) is (seconds is not None)
+    assert ("one of your items is `widths`: the changed screens at each of 1440, 1024, 390 px wide" in said) is widths
     assert kit.decide("Agent", decision.updated_input) is None
+
+
+def test_a_browser_testers_time_counts_the_widths_item_its_round_is_checked_for(tmp_path: Path) -> None:
+    kit = Kit(tmp_path)
+    kit.session("implementer")
+    kit.settings(qa__setup_seconds=30, qa__seconds_per_item=120)
+    kit.subagent(TESTER_ID, [entry(NOW - timedelta(seconds=160), "user", "Scenarios and checks: 1")])
+    walker, sleep = {"agent_id": TESTER_ID, "agent_type": "qa-ux"}, {"command": "sleep 600", "timeout": 600_000}
+    assert isinstance(kit.decide("Bash", sleep, **walker), Refusal)
+    kit.ready({"head": "0" * 40, "slices": [], "at": (NOW - timedelta(seconds=200)).isoformat(), lanes.WIDTHS: [390]})
+    cut = kit.decide("Bash", sleep, **walker)
+    assert isinstance(cut, Rewrite) and cut.updated_input["timeout"] == 110_000
 
 
 def test_intakes_time_runs_out_and_then_only_factory_and_its_hand_back_go(tmp_path: Path) -> None:

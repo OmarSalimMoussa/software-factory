@@ -156,6 +156,12 @@ def read_ready(places: Places, session_id: str) -> list[dict[str, Any]]:
     return records
 
 
+def ready_at(records: list[dict[str, Any]], when: datetime) -> dict[str, Any] | None:
+    """The ready record a tester started at ``when`` walks: the newest by then."""
+    began = [r for r in records if datetime.fromisoformat(r["at"].replace("Z", "+00:00")) <= when]
+    return began[-1] if began else None
+
+
 def _record_name(home: Path, sid: str) -> str:
     """The name Claude Code's record of the running session ``sid`` holds; "" when there is none."""
     for path in (home / ".claude" / "sessions").glob("*.json"):

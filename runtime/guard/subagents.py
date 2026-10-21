@@ -27,6 +27,7 @@ from runtime.guard.facts import (
     read_desktops,
     read_ready,
     read_vitals,
+    ready_at,
 )
 from runtime.guard.wire import HANDBACK, REFUSED
 from runtime.shared import lanes
@@ -196,7 +197,7 @@ def _running(call: Call, agent: transcript.AgentCall) -> bool:
     budget = 0
     if agent.subagent_type.startswith(TESTER):
         try:
-            items = transcript.declared_items(agent.prompt, call.settings.get_int("qa.max_items"))
+            items, _ = walk_hold.walk_items(call, agent.prompt, agent.subagent_type, agent.started)
             budget = lanes.tester_seconds(call.settings, items)
         # telemetry: expected — a tester started with no brief, while that rule was off, has no time budget
         except transcript.BriefError:
@@ -223,9 +224,9 @@ def _qa(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     heads: dict[str, bool] = {head: False}
     for agent in calls:
         if agent.subagent_type.startswith(TESTER):
-            active = [r for r in records if datetime.fromisoformat(r["at"].replace("Z", "+00:00")) <= agent.started]
-            if active and not active[-1].get(REPRODUCE):
-                started_on = str(active[-1]["head"])
+            active = ready_at(records, agent.started)
+            if active is not None and not active.get(REPRODUCE):
+                started_on = str(active["head"])
                 heads[started_on] = heads.get(started_on, False) or agent.agent_id in interrupted
     rounds = sum(1 for h, cut in heads.items() if h == head or not cut)
     limit = call.settings.get_int("rounds.qa") + call.extension("qa")
@@ -281,13 +282,14 @@ def _saves_spec(command: str) -> bool:
 
 def _with_notes(call: Call, kind: str) -> Decision:
     """A brief gains the note on calling factory if its kind may, the note on reflecting if it may, and a tester's
-    brief ends with the time the guard holds it to."""
+    brief ends with the widths its hand-back is checked for, if any, and the time the guard holds it to."""
     names = [name for name, may in (("factory-calls.md", any(kind in v.kinds for v in VERBS.values())),
                                     ("self-reflect.md", kind in VERBS["reflect"].kinds)) if may]  # fmt: skip
     prompt = str(call.tool_input.get("prompt", ""))
     texts = [(call.places.plugin / name).read_text(encoding="utf-8").strip() for name in names]
     if kind.startswith(TESTER) and not call.off("tester-brief"):
-        items = transcript.declared_items(prompt, call.settings.get_int("qa.max_items"))
+        items, widths = walk_hold.walk_items(call, prompt, kind, call.now)
+        texts += [lanes.widths_note(widths)] if widths else []
         texts.append(lanes.time_note(call.settings, items))
     notes = [n for n in texts if n not in prompt]
     if not notes:

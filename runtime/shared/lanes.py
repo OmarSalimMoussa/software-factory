@@ -9,14 +9,19 @@ The machine has caps.browsers_at_once browser places. The guard refuses a browse
 (`browsers-at-once`), and the warden tells a refused session once one frees: both count the places held here. A
 desktop walk runs alone, as a desktop's live view needs the machine's spare CPU: while a tester at work holds a slot's
 desktop, no place is free.
+
+A tester's time is its items'. On a change to the screens, `factory qa-ready` records the widths of `qa.widths` in
+the round's ready record, and each browser tester's walk of that round must show the page at every one before it
+hands back clean. `checked_widths` alone decides which walks: the guard states those widths in the tester's brief and
+counts them as one more item, `widths`, in its time, and `factory qa result` checks the same ones.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
-from typing import Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from runtime.shared import store
 from runtime.shared.models import TESTER, WAITING, WORKING
@@ -24,6 +29,7 @@ from runtime.shared.paths import Places
 from runtime.shared.settings import Settings
 
 BROWSER = "qa-browser"  # the server a browser tester's launcher starts: `factory qa-browser <kind or lane>`
+WIDTHS = "widths"
 _LANE = re.compile(r"^(?P<kind>[A-Za-z][A-Za-z-]*?)-(?P<lane>[2-9]|[1-9][0-9]+)$")
 
 
@@ -57,6 +63,21 @@ def tester_seconds(settings: Settings, items: int) -> int:
     return settings.get_int("qa.setup_seconds") + items * settings.get_int("qa.seconds_per_item")
 
 
+def checked_widths(settings: Settings, record: Mapping[str, Any] | None, kind: str) -> list[int]:
+    """The widths a tester's walk of the round ``record`` readied must show before it hands back clean."""
+    if record is None or WIDTHS not in record or kind_of(kind) not in settings.get_list("subagents.browser_personas"):
+        return []
+    return [int(width) for width in record[WIDTHS]]
+
+
+def widths_note(widths: Sequence[int]) -> str:
+    return (
+        f"Widths, set by the factory: one of your items is `widths`: the changed screens at each of "
+        f"{', '.join(map(str, widths))} px wide. `factory qa result` is refused until your browser has shown the page "
+        "at each of them, whatever else this brief says of widths."
+    )
+
+
 def time_note(settings: Settings, items: int) -> str:
     """The line the guard ends a tester's brief with, so a time its writer named does not stand for the one held."""
     setup, each = settings.get_int("qa.setup_seconds"), settings.get_int("qa.seconds_per_item")
@@ -76,11 +97,11 @@ def holders(rows: Iterable[R], settings: Settings, now: datetime) -> list[R]:
 
 def testers(rows: Iterable[R], settings: Settings, now: datetime) -> list[R]:
     """The testers at work: working under a live session, and younger than any tester may last, since none outlasts
-    its items' time, a desktop's start and a lost hand-back's quiet."""
+    its items' time, `widths` included, a desktop's start and a lost hand-back's quiet."""
     rows = list(rows)
     alive = {s.id for s in rows if s.state in (WORKING, WAITING)}
     waits = settings.get_int("slots.verb_minutes") * 60 + settings.get_int("qa.stale_seconds")
-    longest = tester_seconds(settings, settings.get_int("qa.max_items")) + waits
+    longest = tester_seconds(settings, settings.get_int("qa.max_items") + 1) + waits
     return [s for s in rows if s.parent in alive and s.state == WORKING and s.role.startswith(TESTER)
             and (now - datetime.fromisoformat(s.started.replace("Z", "+00:00"))).total_seconds() < longest]  # fmt: skip
 

@@ -17,7 +17,7 @@ from runtime.qa.widths import unwalked
 from runtime.queue import tasks
 from runtime.queue.formats import SHA, one_line
 from runtime.queue.statuses import IMPL
-from runtime.shared import slices, store
+from runtime.shared import lanes, slices, store
 from runtime.shared.models import RETIRED, TESTER, Session, Task
 from runtime.shared.paths import scratch_of
 from runtime.shared.protocol import Refused, ok
@@ -71,18 +71,21 @@ def _diff_surfaces(ctx: Context, session: Session, *span: str) -> dict[str, list
     return plan.diff_surfaces(changed, prefixes)
 
 
-def testers_for(ctx: Context, session: Session, task: Task) -> dict[str, list[str]]:
-    """The required testers for the worktree's head, each with why: the task's surfaces and the diff's, joined."""
-    diff = _diff_surfaces(ctx, session, f"{ctx.settings().get_str('repo.default_branch')}...HEAD")
+def testers_for(ctx: Context, session: Session, task: Task) -> tuple[dict[str, list[str]], list[int]]:
+    """The required testers for the worktree's head, each with why, by the task's surfaces and the diff's joined; and
+    the widths their walks show when those surfaces hold the screens."""
+    settings = ctx.settings()
+    diff = _diff_surfaces(ctx, session, f"{settings.get_str('repo.default_branch')}...HEAD")
     rung = task.run if task.run is not None else session.rung
     if rung is None:
         raise Refused("qa", f"{task.id} has no run, so its testers are unknown")
-    return plan.required(task.surfaces, rung, diff)
+    screens = plan.SCREENS in [*task.surfaces, *diff]
+    return plan.required(task.surfaces, rung, diff), [int(w) for w in settings.get_list("qa.widths")] if screens else []
 
 
 def qa_plan(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     session = _implementer(ctx)
-    found = testers_for(ctx, session, tasks.read(ctx, session.task))
+    found, _ = testers_for(ctx, session, tasks.read(ctx, session.task))
     return ok(head=_head(ctx, session), testers=[{"tester": t, "why": why} for t, why in found.items()])
 
 
@@ -114,11 +117,12 @@ def qa_ready(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
     why = health.off_head(ctx, lease.slot, session.id, head)
     if why is not None:
         raise Refused("qa-ready", why)
-    testers = testers_for(ctx, session, task)
+    testers, widths = testers_for(ctx, session, task)
+    marks: dict[str, Any] = {REPRODUCE: True} if reproduce else {lanes.WIDTHS: widths} if widths else {}
     with ctx.lock:
         records = ready_records(ctx, session)
         record = {"head": head, "slices": slices, "at": ctx.clock.iso(), "slot": lease.slot, "testers": list(testers),
-                  **({REPRODUCE: True} if reproduce else {})}  # fmt: skip
+                  **marks}  # fmt: skip
         store.write_json(_ready_path(ctx, session), {"records": [*records, record]})
         rounds = len({str(r["head"]) for r in [*records, record] if not r.get(REPRODUCE)})
         if not reproduce:
@@ -246,15 +250,11 @@ def qa_waive(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str
 
 
 def _walked_every_width(ctx: Context, session: Session, tester: Session, ready: dict[str, Any]) -> None:
-    """Refused while a browser tester's walk of a QA round on a change to the screens never showed one of the
-    widths, by its browser's own trace."""
-    settings = ctx.settings()
-    if ready.get(REPRODUCE) or tester.role not in settings.get_list("subagents.browser_personas"):
+    """Refused while a browser tester's walk never showed one of the widths its brief named, by its browser's own
+    trace."""
+    widths = lanes.checked_widths(ctx.settings(), ready, tester.started_as)
+    if not widths:
         return
-    diff = _diff_surfaces(ctx, session, f"{settings.get_str('repo.default_branch')}...{ready['head']}")
-    if plan.SCREENS not in [*tasks.read(ctx, session.task).surfaces, *diff]:
-        return
-    widths = [int(width) for width in settings.get_list("qa.widths")]
     missing = unwalked(ctx.places, qa_browser.runs_root(), session.id, tester.started_as, str(ready["at"]), widths)
     if missing:
         raise Refused(

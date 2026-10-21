@@ -14,10 +14,11 @@ from typing import Any
 import pytest
 from queue_kit import World
 
+from runtime.guard.facts import read_ready
 from runtime.qa import findings, plan, qa_browser, steps
 from runtime.qa import verbs as qa
 from runtime.qa.scenarios import Step, parse
-from runtime.shared import store
+from runtime.shared import lanes, store
 from runtime.shared.protocol import Refused
 from runtime.slots import health, leases
 from runtime.slots.verbs import slot
@@ -241,6 +242,22 @@ def test_a_browser_testers_clean_verdict_on_the_screens_waits_for_its_walk_at_ev
 
     [row] = store.read_jsonl(world.places.results_of(IMPL_ID))
     assert row.get("blocked") == (WHY if excuse == "blocked" else None)
+
+
+def test_a_round_on_the_screens_gives_each_browser_testers_brief_the_widths_its_hand_back_checks(
+    ready_world: World,
+) -> None:
+    # sr407: a task naming the screens, with a diff off them; its brief said no widths item, and its hand-back refused.
+    world = ready_world
+    world.with_settings(qa__widths=[1440, 1024, 390])
+    world.launcher.git = _git({"rev-parse": HEAD, "show": PREFIXES, "diff": "ext/panel.js\n", "merge-base": ""})
+    qa.qa_ready(world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
+
+    [record] = read_ready(world.places, IMPL_ID)
+    told = {kind: lanes.checked_widths(world.settings, record, kind) for kind in ("qa-ui-function", "qa-backend")}
+    assert told == {"qa-ui-function": [1440, 1024, 390], "qa-backend": []}
+    with pytest.raises(Refused, match="never shows the page at 1440, 1024, 390 px wide"):
+        qa.qa_result(world.ctx("implementer", IMPL_ID, "ag-fn"), {"head": HEAD[:9]}, None)
 
 
 @pytest.mark.parametrize(
