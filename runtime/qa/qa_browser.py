@@ -204,6 +204,7 @@ def equipper(
                 partial(proxy.call_tool, which=which),
                 link_for,
                 kept,
+                partial(proxy.answers.signed_in, which),
                 settings.get_int("qa.wait_reload_seconds"),
                 settings.get_int("qa.wait_max_minutes"),
                 (width, height),

@@ -281,6 +281,7 @@ class Proxy:
 
     def second_gone(self) -> None:
         """The second browser's server ended: what waits on it fails now, not at its time-out."""
+        self.answers.signed_in(SECOND, None)
         for key, waiting in list(self._mine.items()):
             if waiting.which == SECOND and self._mine.pop(key, None) is not None:
                 waiting.answer = {"error": {"code": -32000, "message": "the second browser closed"}}
@@ -376,6 +377,7 @@ class Proxy:
             self._running.pop(str(message.get("id")), None)
         if cancelled.is_set():
             return  # a cancelled request gets no answer
+        text = self.answers.paged(which, text)
         self.answers.saw(which, text)
         result = {"content": [{"type": "text", "text": text}], **({"isError": True} if failed else {})}
         self._to_client(json.dumps({"jsonrpc": "2.0", "id": message.get("id"), "result": result}))

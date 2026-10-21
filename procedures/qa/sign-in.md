@@ -5,7 +5,8 @@ How a tester signs in on a slot. Only test addresses are used, never a real pers
 - **Which address.** Your brief names it. The product's `qa/scenarios/README.md` says which test address plays which
   role. Testers that run at the same time each sign in as their own address, so their data never clash.
 - **In your browser:** `browser_sign_in` with the address. It asks your slot for a fresh one-time link and opens it,
-  and you never see the link. To change person, call it again with the other address.
+  and you never see the link. To change person, call it again with the other address. Each page answer of that
+  browser says who the factory last signed it in as.
 - **Through the API,** for a tester with the `slot-api` tools: `factory slot sign-in <address>` prints a one-time
   link for the slot your session holds. Open its path with the `slot-api` tool, naming your address as its `session`,
   and name that `session` on every request that follows: the tool keeps the cookies the slot sets under it and never

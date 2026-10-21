@@ -151,7 +151,7 @@ def test_signing_in_opens_a_fresh_link_the_tester_never_sees_and_keeps_it_for_th
     assert session.close() == 0
     said = answer["result"]["content"][0]["text"]
     assert said.startswith("Signed in as tester-1@example.com.") and "Page URL: the sign-in link" in said
-    assert later["result"]["content"][0]["text"] == "### Page\n- Page URL: the sign-in link\n"
+    assert later["result"]["content"][0]["text"] == _page("the sign-in link", "tester-1@example.com")
     assert LINK not in json.dumps([answer, later]) and kept == [LINK]
     assert log.read_text().splitlines()[-2:] == ["tools/call browser_navigate", "tools/call browser_snapshot"]
 
@@ -162,6 +162,12 @@ def _go(url: str, **where: str) -> dict[str, Any]:
 
 def _text(answer: dict[str, Any]) -> str:
     return str(answer["result"]["content"][0]["text"])
+
+
+def _page(url: str, who: str | None = None) -> str:
+    return (
+        f"### Page\n- Page URL: {url}\n- " + (f"Signed in as {who}" if who else "Not signed in by the factory") + "\n"
+    )
 
 
 def test_a_second_browser_opens_on_its_first_call_traced_in_the_first_browsers_process_and_closes(
@@ -180,9 +186,9 @@ def test_a_second_browser_opens_on_its_first_call_traced_in_the_first_browsers_p
     closed, again = (session.send("tools/call", {"name": "browser_close_second", "arguments": {}}) for _ in "ab")
     assert session.close() == 0
 
-    assert went == {n: f"### Page\n- Page URL: https://app.test/b{n - 2}\n" for n in (3, 4)}
-    assert _text(last) == "### Page\n- Page URL: https://app.test/b2\n"
-    assert _text(first) == "### Page\n- Page URL: https://app.test/a\n"  # each browser keeps its own page
+    assert went == {n: _page(f"https://app.test/b{n - 2}") for n in (3, 4)}
+    assert _text(last) == _page("https://app.test/b2")
+    assert _text(first) == _page("https://app.test/a")  # each browser keeps its own page
     assert _text(signed).startswith("Signed in as tester-2@example.com.") and kept == [LINK]
     assert LINK not in json.dumps(signed)
     assert _text(closed).startswith("Your second browser closed") and _text(again) == "You have no second browser open."
@@ -204,6 +210,37 @@ def test_a_second_browser_opens_on_its_first_call_traced_in_the_first_browsers_p
     ]
 
 
+def test_each_page_answer_says_who_the_factory_last_signed_its_browser_in_as(
+    opened: tuple[Session, Path, list[str]],
+) -> None:
+    session, _, _ = opened
+
+    def said(name: str, **args: str) -> str:
+        return _text(session.send("tools/call", {"name": name, "arguments": args}))
+
+    pages = [
+        said("browser_snapshot"),
+        said("browser_sign_in", address="tester-1@example.com"),
+        said("browser_snapshot", browser="second"),
+        said("browser_sign_in", address="tester-2@example.com", browser="second"),
+        said("browser_snapshot"),
+        said("browser_resize", width="390"),
+        said("browser_close_second"),
+        said("browser_snapshot", browser="second"),
+    ]
+    assert session.close() == 0
+    assert pages == [
+        _page("about:blank"),
+        "Signed in as tester-1@example.com.\n\n" + _page("the sign-in link", "tester-1@example.com"),
+        _page("about:blank"),
+        "Signed in as tester-2@example.com.\n\n" + _page("the sign-in link", "tester-2@example.com"),
+        _page("the sign-in link", "tester-1@example.com"),
+        "browser_resize done",
+        "Your second browser closed, with its sign-in, cookies and storage. A call that names it opens anew.",
+        _page("about:blank"),  # a fresh second browser, signed in as no one
+    ]
+
+
 @pytest.mark.parametrize(
     ("before", "asked", "said"),
     [
@@ -220,7 +257,7 @@ def test_a_call_reaches_no_browser_it_cannot_be_traced_in_and_the_first_still_an
     first = session.send("tools/call", _go("https://app.test/a"))
     assert session.close() == 0
     assert said in (_text(answer) if "result" in answer else answer["error"]["message"])
-    assert _text(first) == "### Page\n- Page URL: https://app.test/a\n"
+    assert _text(first) == _page("https://app.test/a")
     assert not before or "browser_navigate" not in (tmp_path / "second.log").read_text()
 
 
@@ -452,6 +489,7 @@ class Browser:
             self.call,
             lambda address: LINK,
             lambda link: None,
+            lambda address: None,
             reload_seconds,
             max_minutes,
             (1280, 800),
@@ -627,6 +665,19 @@ def test_a_browser_failure_reaches_the_tester_without_the_sign_in_link() -> None
     def broken(name: str, args: dict[str, Any]) -> str:
         raise ServerError(f"browser_navigate failed: net::ERR_CONNECTION_REFUSED at {args['url']}")
 
-    tools = Tools(broken, lambda address: LINK, lambda link: None, 60, 15, (1280, 800), 40, 30, 150, 250, lambda: 0.0)
+    tools = Tools(
+        broken,
+        lambda address: LINK,
+        lambda link: None,
+        lambda address: None,
+        60,
+        15,
+        (1280, 800),
+        40,
+        30,
+        150,
+        250,
+        lambda: 0.0,
+    )
     said, failed = tools.answer("browser_sign_in", {"address": "tester-1@example.com"}, threading.Event())
     assert failed and said == "browser_navigate failed: net::ERR_CONNECTION_REFUSED at the sign-in link"

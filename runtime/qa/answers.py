@@ -11,6 +11,9 @@ several have it, it does not guess: the refusal reaches the tester with how many
 every element it names before it acts goes again, so no call that may have acted runs twice: browser_fill_form finds
 each field after it filled the one before. A snapshot prints an element as its role, its name when it has one, its
 states and its ref, the line in single quotes when it holds a colon.
+
+Each answer that names a page says who the factory last signed that browser in as, or that it signed it in as no
+one, so a tester with two people at once never has to track which address is in which browser.
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ AGAIN = frozenset({
 })  # fmt: skip
 TARGETS = ("target", "startTarget", "endTarget")
 Stale = tuple[dict[str, Any], str, str]
+PAGE_URL = re.compile(r"Page URL: (.+)")
 STALE = re.compile(r"^Error: Ref ((?:f\d+)?e\d+) not found in the current page snapshot", re.M)
 ELEMENT = re.compile(r"""^\s*- '?([\w-]+)( "(?:[^"\\]|\\.)*")?(?: \[[^\]\s]+\])* \[ref=((?:f\d+)?e\d+)\]""", re.M)
 
@@ -52,15 +56,25 @@ class Answers:
         self._seen: dict[str, dict[str, str]] = {}
         self._asked: dict[str, dict[str, Any]] = {}
         self._notes: dict[str, str] = {}
+        self._signed: dict[str, str | None] = {}
 
     def shown(self, key: Any, which: str, result: dict[str, Any]) -> None:
         texts = _texts(result)
         if texts:
-            texts[0]["text"] = self.told(key, str(texts[0].get("text")))
+            texts[0]["text"] = self.paged(which, self.told(key, str(texts[0].get("text"))))
         for part in texts:
             if len(str(part.get("text"))) > self._most:
                 part["text"] = str(part["text"])[: self._most] + CUT
         self.saw(which, text_of(result))
+
+    def signed_in(self, which: str, address: str | None) -> None:
+        self._signed[which] = address
+
+    def paged(self, which: str, text: str) -> str:
+        """``text``, when it names a page, with who the factory last signed ``which`` in as."""
+        found, who = PAGE_URL.search(text), self._signed.get(which)
+        said = "Not signed in by the factory" if who is None else f"Signed in as {who}"
+        return text if found is None else f"{text[: found.end()]}\n- {said}{text[found.end() :]}"
 
     def saw(self, which: str, text: str) -> None:
         found = elements(text)

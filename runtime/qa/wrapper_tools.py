@@ -29,14 +29,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from runtime.qa.answers import PAGE_URL
 from runtime.qa.wrapper import SERVER_CODE, WAIT_FOR, ServerError
 
 SIGN_IN, WAIT_UNTIL, OPEN_DESKTOP = "browser_sign_in", "browser_wait_until", "browser_open_desktop"
 COLOUR, TYPE_KEYS, HOLD = "browser_color_scheme", "browser_type_keys", "browser_hold_request"
 RELEASE, PRESS = "browser_release_request", "browser_mouse_press_xy"
 SCHEMES = ("light", "dark")
-# Playwright's answers name the page after an action on a line of their own, and its code tool's value after a heading.
-PAGE_URL = re.compile(r"Page URL: (\S+)")
+# Playwright's code tool names its value after a heading.
 RESULT = re.compile(r"### Result\n(.*)\n")
 # A link as the sign-in prints it, and as a transcript keeps that output: inside JSON, where a line break is the two
 # characters \n, so a backslash ends the link too.
@@ -190,6 +190,7 @@ class Tools:
     call: Callable[[str, dict[str, Any]], str]  # one of the server's tools: its text
     link_for: Callable[[str], str]  # a fresh one-time sign-in link for a test address
     keep_secret: Callable[[str], None]  # notes a secret beside the run, for the replay to scrub
+    signed_in: Callable[[str], None]
     reload_seconds: int
     max_minutes: int
     desktop: tuple[int, int]
@@ -228,6 +229,7 @@ class Tools:
             page = self.call("browser_navigate", {"url": link})
         except ServerError as exc:
             raise ToolError(str(exc).replace(link, "the sign-in link")) from exc
+        self.signed_in(address)
         return f"Signed in as {address}.\n\n" + page.replace(link, "the sign-in link")
 
     def _wait_until(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
