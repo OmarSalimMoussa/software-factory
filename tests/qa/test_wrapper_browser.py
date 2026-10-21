@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import threading
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 from queue_kit import World
@@ -57,10 +59,14 @@ class Browser:
             if answer.get("id") == self.sent:
                 return answer
 
+    def call(self, name: str, arguments: dict[str, Any]) -> tuple[str, bool]:
+        result = self.send("tools/call", {"name": name, "arguments": arguments})["result"]
+        return result["content"][0]["text"], bool(result.get("isError"))
+
     def evaluate(self, script: str) -> tuple[str, bool, float]:
         started = time.monotonic()
-        result = self.send("tools/call", {"name": "browser_evaluate", "arguments": {"function": script}})["result"]
-        return result["content"][0]["text"], bool(result.get("isError")), time.monotonic() - started
+        said, failed = self.call("browser_evaluate", {"function": script})
+        return said, failed, time.monotonic() - started
 
     def close(self) -> None:
         self.to_wrapper.close()
@@ -88,3 +94,46 @@ def test_a_page_script_whose_callback_throws_ends_at_once_naming_the_error_and_o
         assert "await page.evaluate('() => document.querySelector(\\'.ext-badge\\').dataset.tone');" in said
     finally:
         browser.close()
+
+
+# A live list: draw() makes every row anew, as a page that polls does, so the refs of an earlier snapshot go stale.
+LIST = "data:text/html," + quote(
+    "<p id=shown>none</p><ul id=rows></ul><script>function draw() { rows.innerHTML = ['a', 'b'].map((w) => "
+    "`<li>${w} <button onclick=\"shown.textContent='${w}'\">Invite ${w}</button> <button>Remove</button></li>`)"
+    ".join('') + '<input aria-label=Note>'; } draw();</script>"
+)
+STALE = "### Error\nError: Ref <ref> not found in the current page snapshot. Try capturing new snapshot."
+FILL = "browser_fill_form"
+
+
+@pytest.mark.skipif(not (shutil.which("node") and CHROME.is_file() and _server()), reason="needs node, Chrome, MCP")
+@pytest.mark.parametrize(
+    ("element", "tool", "says", "shows"),
+    [
+        ('button "Invite a"', "browser_click", r'The page drew button "Invite a" anew, so ref <ref> is e\d+ now: '
+         r"the factory sent your call again with it\.\n\n### Ran Playwright code", '"a"'),
+        ('button "Remove"', "browser_click", re.escape(STALE) + "\nThe page changed since your snapshot: 2 elements "
+         'are button "Remove" now. Pick one in a snapshot.$', '"none"'),
+        ('textbox "Note"', FILL, re.escape(STALE) + "$", '"none"'),
+        ("unseen", "browser_click", re.escape(STALE) + "$", '"none"'),
+    ],
+    ids=["one-like-it", "several-like-it", "may-have-acted", "never-seen"],
+)  # fmt: skip
+def test_a_call_to_an_element_the_page_drew_anew_goes_again_once_to_the_one_element_like_it(
+    tmp_path: Path, world: World, element: str, tool: str, says: str, shows: str
+) -> None:
+    cli = _server()
+    assert cli is not None
+    browser = Browser(tmp_path, world, cli)
+    try:
+        browser.call("browser_navigate", {"url": LIST})
+        seen = re.search(rf"{re.escape(element)} \[ref=(e\d+)\]", browser.call("browser_snapshot", {})[0])
+        ref = seen.group(1) if seen else "e99"
+        browser.evaluate("() => draw()")
+        target = {"fields": [{"target": ref, "name": "Note", "type": "textbox", "value": "x"}]} if tool == FILL else {}
+        said, failed = browser.call(tool, target or {"target": ref})
+        page = browser.evaluate("() => shown.textContent")[0]
+    finally:
+        browser.close()
+    assert re.match(says.replace("<ref>", ref), said) and failed == (shows == '"none"')
+    assert f"### Result\n{shows}\n" in page

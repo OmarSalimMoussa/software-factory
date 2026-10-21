@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 from queue_kit import World
 
-from runtime.qa import qa_browser, wrapper
+from runtime.qa import answers, qa_browser, wrapper
 from runtime.qa.wrapper import ServerError
 from runtime.qa.wrapper_tools import NOTES, Tools
 from runtime.shared.settings import Settings
@@ -300,7 +300,7 @@ def test_a_browser_answer_past_the_factorys_cap_reaches_the_tester_cut_with_a_no
         json.dumps({"jsonrpc": "2.0", "id": 7, "result": {"content": [{"type": "text", "text": text}, shot]}})
     )
     [answer] = _said(to_session)
-    assert answer["result"]["content"] == [{"type": "text", "text": text[:40] + (wrapper.CUT if cut else "")}, shot]
+    assert answer["result"]["content"] == [{"type": "text", "text": text[:40] + (answers.CUT if cut else "")}, shot]
 
 
 def test_an_answer_the_wrapper_stopped_waiting_for_reaches_no_one() -> None:
@@ -359,6 +359,25 @@ def test_a_call_the_browser_does_not_answer_in_time_fails_and_its_late_answer_re
                                     "params": {"requestId": 7, "reason": "no answer within 0 s"}}  # fmt: skip
     proxy.from_server(json.dumps({"jsonrpc": "2.0", "id": 7, "result": {"content": []}}))
     assert len(_said(to_session)) == 1
+
+
+def test_a_request_the_browser_sends_never_takes_the_place_of_the_session_call_that_shares_its_id() -> None:
+    proxy, _, to_session = _proxy(wait=0.5)
+    stale = "### Error\nError: Ref e2 not found in the current page snapshot. Try capturing new snapshot."
+    proxy.from_client(_call(1, "browser_snapshot"))
+    proxy.from_server(json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": (
+        '- button "Go" [ref=e2]')}]}}))  # fmt: skip
+    proxy.from_client(_call(2, "browser_click", target="e2"))
+    proxy.from_server(json.dumps({"jsonrpc": "2.0", "id": 2, "method": "roots/list"}))
+    proxy.from_server(json.dumps({"jsonrpc": "2.0", "id": 2, "result": {"content": [{"type": "text", "text": stale}],
+                                                                        "isError": True}}))  # fmt: skip
+    for _ in range(500):
+        if len(_said(to_session)) == 3:
+            break
+        threading.Event().wait(0.01)
+    assert _said(to_session)[-1]["result"]["content"][0]["text"] == (
+        f"{stale}\nThe factory could not look at the page again: the browser did not answer tools/call within 0 s"
+    )
 
 
 def test_a_wait_has_its_own_time_to_answer_beside_the_browsers() -> None:

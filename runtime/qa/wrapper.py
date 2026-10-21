@@ -6,7 +6,9 @@ Right after the session opens, the wrapper starts the trace itself and swallows 
 start stops the browser, so nothing is tested untraced. It drops the trace's tools and the rest of the devtools
 capability from the tool list, adds the factory's tools (wrapper_tools.py) and answers those itself, calling the
 server as a client would. A page script goes inside a harness that ends it once its own callback throws
-(page_script.py). Every other message passes through unchanged. Nothing but MCP goes to standard output.
+(page_script.py). Every other message passes through, each answer as answers.py has the session read it, and a call
+refused for an element the page drew anew goes again once to the one element like it. Nothing but MCP goes to
+standard output.
 A call of the session's the server leaves unanswered past ``qa.browser_answer_seconds``, plus a browser_wait_for's own
 time, fails, and the server is told to stop it: a page script that never ends would hold the tester to the end.
 
@@ -25,17 +27,15 @@ from dataclasses import dataclass, field
 from typing import IO, Any, Protocol
 
 from runtime.qa import page_script
+from runtime.qa.answers import Answers, Stale, elements, text_of
 from runtime.qa.calls import Calls
 
 SERVER_CODE = "browser_run_code_unsafe"
+SNAPSHOT = "browser_snapshot"
 WAIT_FOR = "browser_wait_for"
 ROUTE = "browser_route"
 # The input that names a file a server tool writes: the guard refuses it, so no listed tool offers it.
 FILENAME = "filename"
-CUT = (
-    "\n\n[The factory cut this answer here: the page holds more than one answer can carry. Read what you need "
-    "with browser_evaluate, or look with browser_take_screenshot.]"
-)
 # The devtools capability holds the trace's tools; the wrapper needs the capability on, the tester keeps its usual
 # tools, so every tool the capability adds is hidden. Closing the browser would end the trace, and the next call
 # would open an untraced browser, so that is hidden too: the browser closes with the session.
@@ -108,7 +108,8 @@ class Proxy:
     """One session's MCP traffic: the client is the tester's session, the server is Playwright's."""
 
     def __init__(self, server_in: IO[str], client_out: IO[str], wait_seconds: float, answer_chars: int) -> None:
-        self._server_in, self._client_out, self._wait, self._most = server_in, client_out, wait_seconds, answer_chars
+        self._server_in, self._client_out, self._wait = server_in, client_out, wait_seconds
+        self.answers = Answers(answer_chars)
         self._tools: list[dict[str, Any]] = []
         self._answer_tool: Answer = lambda name, args, cancelled, which: ("", True)
         self._notes: dict[str, str] = {}
@@ -154,7 +155,7 @@ class Proxy:
 
     def from_server(self, line: str) -> None:
         message = json.loads(line)
-        key = message.get("id")
+        key, result, which = message.get("id"), message.get("result"), self._calls.where(message.get("id"))
         if "method" not in message and not self._calls.arrived(key):
             return
         if isinstance(key, str) and key.startswith(OWN):
@@ -164,14 +165,43 @@ class Proxy:
                 mine.answer = message
                 mine.done.set()
             return
-        if key in self._lists and isinstance(message.get("result"), dict):
+        asked = self.answers.asked(key) if "method" not in message else None
+        if key in self._lists and isinstance(result, dict):
             self._lists.discard(key)
-            listed = [self._noted(t) for t in message["result"].get("tools", []) if t.get("name") not in HIDDEN]
-            message["result"]["tools"] = [self._either(t) for t in listed + self._tools]
+            listed = [self._noted(t) for t in result.get("tools", []) if t.get("name") not in HIDDEN]
+            result["tools"] = [self._either(t) for t in listed + self._tools]
             line = json.dumps(message)
-        elif isinstance(message.get("result"), dict) and _cut(message["result"].get("content"), self._most):
+        elif isinstance(result, dict) and which is not None:
+            stale = self.answers.stale(asked, which, text_of(result)) if result.get("isError") else None
+            if stale is not None:
+                cancelled = self._running[str(key)] = threading.Event()
+                threading.Thread(
+                    target=self._refind, args=(which, cancelled, text_of(result), stale), daemon=True
+                ).start()
+                return
+            self.answers.shown(key, which, result)
             line = json.dumps(message)
         self._to_client(line)
+
+    def _refind(self, which: str, cancelled: threading.Event, refused: str, stale: Stale) -> None:
+        """Send ``asked`` again with the one element that is ``what`` now, or tell the session how many are."""
+        asked, old, what = stale
+        key = asked.get("id")
+        try:
+            now = [ref for ref, it in elements(self.call_tool(SNAPSHOT, {}, which)).items() if it == what]
+            why = f"The page changed since your snapshot: {len(now)} elements are {what} now. Pick one in a snapshot."
+        # telemetry: surfaced — the session reads `why` after the browser's own refusal
+        except ServerError as exc:
+            now, why = [], f"The factory could not look at the page again: {exc}"
+        self._running.pop(str(key), None)
+        if cancelled.is_set():
+            return
+        if len(now) != 1:
+            self._failed(key, f"{refused}\n{why}")
+            return
+        again = self.answers.again(asked, which, old, now[0], what)
+        self._time(key, again["params"], which)
+        self._carry(json.dumps(again), which)
 
     def from_client(self, line: str) -> None:
         message = json.loads(line)
@@ -210,8 +240,10 @@ class Proxy:
         elif not self.traced():
             self._error(key, "the browser stopped: its trace did not start")
         else:
+            message = {**message, "params": page_script.wrapped(params)}
+            self.answers.sent(message)
             self._time(key, params, which)
-            self._carry(json.dumps({**message, "params": page_script.wrapped(params)}), which)
+            self._carry(json.dumps(message), which)
 
     def _carry(self, line: str, which: str) -> None:
         """A line of the session's to the browser it names; the second takes it once it has opened."""
@@ -239,7 +271,7 @@ class Proxy:
         ))  # fmt: skip
 
     def _failed(self, key: Any, said: str) -> None:
-        result = {"content": [{"type": "text", "text": said}], "isError": True}
+        result = {"content": [{"type": "text", "text": self.answers.told(key, said)}], "isError": True}
         self._to_client(json.dumps({"jsonrpc": "2.0", "id": key, "result": result}))
 
     def refuse(self, key: Any, said: str) -> None:
@@ -344,6 +376,7 @@ class Proxy:
             self._running.pop(str(message.get("id")), None)
         if cancelled.is_set():
             return  # a cancelled request gets no answer
+        self.answers.saw(which, text)
         result = {"content": [{"type": "text", "text": text}], **({"isError": True} if failed else {})}
         self._to_client(json.dumps({"jsonrpc": "2.0", "id": message.get("id"), "result": result}))
 
@@ -362,20 +395,3 @@ class Proxy:
                 line = line.replace(secret, "the sign-in link")
             self._client_out.write(line.rstrip("\n") + "\n")
             self._client_out.flush()
-
-
-def _cut(content: object, most: int) -> bool:
-    """Whether an answer held a text past ``most`` characters, now cut there: Claude Code refuses a tool's answer past
-    its own cap, which a snapshot of a page with a recorded page in its frame passes."""
-    long = [c for c in content if isinstance(c, dict) and c.get("type") == "text" and len(str(c.get("text")))
-            > most] if isinstance(content, list) else []  # fmt: skip
-    for part in long:
-        part["text"] = str(part["text"])[:most] + CUT
-    return bool(long)
-
-
-def text_of(result: dict[str, Any]) -> str:
-    content = result.get("content")
-    if not isinstance(content, list):
-        return ""
-    return "\n".join(str(c.get("text", "")) for c in content if isinstance(c, dict) and c.get("type") == "text")

@@ -18,7 +18,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from runtime.qa.wrapper import CLOSE, SERVER_CODE, Proxy, ServerError, text_of
+from runtime.qa.answers import text_of
+from runtime.qa.wrapper import CLOSE, SERVER_CODE, Proxy, ServerError
 from runtime.qa.wrapper_tools import RESULT
 
 TOOL = {
