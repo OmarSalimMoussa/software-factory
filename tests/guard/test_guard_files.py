@@ -260,6 +260,11 @@ BODY = f"cat > .factory/{TESTER_ID}/f.md <<'EOF'\nfactory {QA}\nEOF\n"
         (f"echo 'it'\"'\"'s; factory {QA}' && factory {QA}", f"echo 'it'\"'\"'s; factory {QA}' && {ME} {QA}"),
         (f'echo "a \\" ; factory {QA}"', f'echo "a \\" ; factory {QA}"'),
         (f"{BODY}factory {QA}", f"{BODY}{ME} {QA}"),
+        # The name goes where bash reads the program word: past comments and line joins.
+        (f"echo a # it's\nfactory {QA} # it's", f"echo a # it's\n{ME} {QA} # it's"),
+        (f"ls # factory {QA}\nfactory {QA}", f"ls # factory {QA}\n{ME} {QA}"),
+        (f"cat <<EOF # it's\nx\nEOF\nfactory {QA}", f"cat <<EOF # it's\nx\nEOF\n{ME} {QA}"),
+        (f"fact\\\nory {QA}", f"fact\\\nory --agent-id {TESTER_ID} {QA}"),
         # bash splits words only at spaces and tabs, so `\u00a0factory` is no factory: neither checked nor named.
         (f"\u00a0factory {QA}; factory {QA}", f"\u00a0factory {QA}; {ME} {QA}"),
         ("\u00a0factory task status t-0001 done", "\u00a0factory task status t-0001 done"),

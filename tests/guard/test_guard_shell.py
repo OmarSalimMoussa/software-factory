@@ -162,6 +162,15 @@ def test_a_hand_run_of_the_installed_checks_is_refused(kit: Kit) -> None:
         "git fetch origin",
         "git reset --hard HEAD~1",
         "git log --oneline -3 # <<EOF is a comment",
+        "git log --oneline -3 # it's the last three",
+        "echo a # don`t\nls",
+        "ls # sudo ls",
+        "echo a \\\n#sudo ls",
+        "echo 'a # b' \"#\" a#b $# # sudo ls",
+        "cat <<'EOF' # it's\nsudo is text\nEOF",
+        "uv run pytest \\\n  tests/guard -q",
+        "IFS=$'\\n'; echo $'it\\'s'",
+        'cat ">" GOAL.md',
         "ls 2>/dev/null; command -v uv",
         "bash -lc 'ls'",
         "bash tools/build.sh list",
@@ -209,6 +218,44 @@ def test_an_implementers_ordinary_command_passes(kit: Kit, command: str) -> None
 )
 def test_a_line_hidden_from_the_guard_or_named_only_once_expanded_is_refused(kit: Kit, command: str) -> None:
     assert kit.bash(command) is not None
+
+
+@pytest.mark.parametrize(
+    ("command", "rule"),
+    [
+        ("echo a # it's\nsudo ls # it's", "leave-slice"),
+        ('echo a # say "hi\nsudo ls # "', "leave-slice"),
+        ("echo a # don`t\nsudo ls # won`t", "leave-slice"),
+        ("echo a # it's \\\nsudo ls # '", "leave-slice"),
+        ("echo a\\ #b; sudo ls", "leave-slice"),
+        ("echo a\\\n#b; sudo ls", "leave-slice"),
+        ("x=1; echo ${#x} $#; sudo ls # it's", "leave-slice"),
+        ("su\\\ndo ls", "leave-slice"),
+        ("cat <<E\\\nX; sudo ls\nE\nEX", "leave-slice"),
+        ("cat <<EOF\nE\\\nOF\nsudo ls\nEOF", "leave-slice"),
+        ("bash <<D\nsu\\\\\ndo ls\nD", "leave-slice"),
+        ("bash <<'A'\ngit commit -m x --no-veri\\\nA", "git-bypass"),
+        ("cat <<EOF # it's\nbody\nEOF\nsudo ls # it's", "leave-slice"),
+        ("cat <<EOF $(echo\nsudo ls)\nbody\nEOF", "leave-slice"),
+        ("cat <<EOF\n$(echo a # )\nsudo ls\n)\nEOF", "leave-slice"),
+        ("cat <<EOF\n$(cat <<X\n)\nX\nsudo ls\n)\nEOF", "leave-slice"),
+        ("bash -c \"echo a # it's\nsudo ls # it's\"", "leave-slice"),
+        ("bash <<'A'\necho a # it's\nsudo ls # it's\nA", "leave-slice"),
+        ("bash -c 'echo a'$'\\n''sudo ls'", "leave-slice"),
+        ("$'sudo' ls", "leave-slice"),
+        ("echo $'\\'' ; sudo ls ; echo '\\'", "leave-slice"),
+        ('git commit ")" --no-verify -m x', "git-bypass"),
+        ('echo "<" ; sudo ls', "leave-slice"),
+        ('rm -rf "(" deploy', "protected-paths"),
+        ("echo \"$(case a in a) ' \" ' ; sudo ls ; ' \" ' ;; esac)\"", "unreadable-command"),
+        ("echo $(( 2 # 3 ))\nsudo ls", "unreadable-command"),
+    ],
+)
+def test_what_bash_runs_past_a_comment_a_line_join_a_heredoc_or_a_quote_meets_the_rules(
+    kit: Kit, command: str, rule: str
+) -> None:
+    # In bash 5.2 each command runs the program its rule refuses, as stand-ins on its PATH showed.
+    assert kit.bash(command) == rule
 
 
 @pytest.mark.parametrize(

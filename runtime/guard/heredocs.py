@@ -1,25 +1,67 @@
-"""Heredocs, read the way bash reads them, so no line of a command hides from the guard as a body.
+"""A command read the way bash reads it before it runs: line joins, comments, quotes, substitutions and heredocs, so
+no line of a command hides from the guard as a comment, a body or a quoted string.
 
-A `<<` counts only outside quotes and comments; a `$( … )` starts quoting afresh, so the `"$(cat <<'EOF' …)"` of a
-commit message is a heredoc. A delimiter is unquoted as bash does (`E"OF"` ends at `EOF`), and a body that never closes
-cannot be read. Stdlib only.
+A backslash before a line break joins the lines, except in single quotes, a comment or a body under a quoted delimiter.
+A `#` starts a comment only where a word starts, outside quotes and brackets, and the comment ends at the line break.
+A heredoc's body starts after the line break that ends its command line, in the same `$( … )`; under an unquoted
+delimiter bash joins its lines before it looks for the delimiter, and still runs each `$( … )` and backtick command in
+it. What bash would read in a way the guard does not follow is unreadable. Stdlib only.
 """
 
 from __future__ import annotations
 
+import functools
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from runtime.guard import nested
 
-# Words that run the command after them, read past to find the program a heredoc feeds.
-_LEADERS = frozenset({"sudo", "env", "exec", "command", "nohup", "time", "busybox", "nice", "setsid"})
-# Where a pipeline ends: `;`, `&&`, `||` or a lone `&`, never the `&` of a redirect (`2>&1`, `&>`).
-_PIPELINE_END = re.compile(r"&&|\|\||;|(?<![<>&])&(?![>&])")
+# What stands for a substitution's output in the words the guard reads: no rule may take it for a program or a flag.
+EXPANDED = "$()"
+_WORD_ENDS = frozenset(" \t\n;&|()<>")
+_JOIN = "\\\n"
+_UNESCAPE = re.compile(r"\\([\\`$])")
+# The escapes of `$'…'` bash decodes to one character; a numbered or control escape is unreadable, any other is text.
+_ANSI = {"n": "\n", "t": "\t", "r": "\r", "a": "\a", "b": "\b", "e": "\x1b", "E": "\x1b", "f": "\f", "v": "\v",
+         "\\": "\\", "'": "'", '"': '"', "?": "?"}  # fmt: skip
+_ARITHMETIC_WORD_ENDS = frozenset(" \t\n()+-*/%<>=!&|^~?:,;")
 
 
-class Unclosed(ValueError):
-    """A heredoc whose delimiter line never comes."""
+class Unreadable(ValueError):
+    """What the guard cannot read as bash would: a quote, bracket or heredoc left open, or an end it cannot place."""
+
+
+@dataclass(frozen=True, slots=True)
+class Code:
+    """Commands as bash runs them: their text, each substitution in it as `EXPANDED`, and what the substitutions run,
+    already read, or as a backtick's text to read afresh."""
+
+    plain: str
+    inner: tuple[Code | str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Reading:
+    """A command as bash reads it: ``code`` is its text without heredoc bodies, comments or line joins, ``at`` where
+    each character of it stands in the command, and ``cuts`` the `;`, `&&`, `||` and line breaks that cut its list."""
+
+    top: Code
+    code: str
+    at: tuple[int, ...]
+    cuts: tuple[tuple[int, int], ...]
+    scripts: tuple[str, ...]  # heredoc bodies a shell reads as its script
+    runs: tuple[Code | str, ...]  # what bash runs inside the other bodies, under an unquoted delimiter
+    fed: int  # how many bodies a shell reads from its standard input
+
+
+@functools.lru_cache(maxsize=16)
+def read(command: str) -> Reading:
+    reader = _Reader(command)
+    reader.commands(closer=False)
+    reader.closed()
+    top = Code("".join(reader.frames[0].plain), tuple(reader.frames[0].inner))
+    return Reading(top, "".join(reader.code), tuple(reader.at), tuple(reader.cuts), tuple(reader.scripts),
+                   tuple(reader.runs), reader.fed)  # fmt: skip
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,214 +70,329 @@ class _Marker:
     quoted: bool
     strip_tabs: bool
     start: int
+    line: int
 
 
 @dataclass(slots=True)
 class _Frame:
-    """One level of quoting: the command itself, a `$( … )` inside it, or a place where `<<` opens no heredoc: an
-    arithmetic `(( … ))`, `$(( … ))` or `$[ … ]`, or a `${ … }` expansion."""
+    """The commands of one level: the call's own, or a `$( … )`'s, with the heredocs opened on its current line."""
 
-    quote: str = ""
-    parens: int = 0
-    arithmetic: bool = False
-    closer: str = ""
-
-
-# What opens a frame; the longest spelling first.
-_OPENERS = ("$((", "$(", "${", "$[")
+    plain: list[str] = field(default_factory=list)
+    inner: list[Code | str] = field(default_factory=list)
+    pending: list[_Marker] = field(default_factory=list)
+    quotes: int = 0
 
 
-def _frame_for(opener: str) -> _Frame:
-    if opener == "$((":
-        return _Frame(parens=1, arithmetic=True)
-    if opener == "$(":
-        return _Frame()
-    return _Frame(closer="}" if opener == "${" else "]")
+class _Reader:
+    def __init__(self, text: str) -> None:
+        self.text, self.i = text, 0
+        self.code: list[str] = []
+        self.at: list[int] = []
+        self.cuts: list[tuple[int, int]] = []
+        self.frames = [_Frame()]
+        self.line = 0
+        self.scripts: list[str] = []
+        self.runs: list[Code | str] = []
+        self.fed = 0
 
+    def _ahead(self, n: int) -> str:
+        """The next ``n`` characters as bash reads them, with joined line breaks dropped."""
+        got: list[str] = []
+        j = self.i
+        while len(got) < n and j < len(self.text):
+            if self.text.startswith(_JOIN, j):
+                j += 2
+            else:
+                got.append(self.text[j])
+                j += 1
+        return "".join(got)
 
-# A `#` starts a comment where a word starts: after a blank or a metacharacter.
-_WORD_START = " \t;&|()<>"
+    def _joins(self) -> None:
+        while self.text.startswith(_JOIN, self.i):
+            self.i += 2
 
+    def _take(self, n: int = 1, *, plain: bool = True, joined: bool = True) -> None:
+        """Copy the next ``n`` characters into the code, and into the frame's text when ``plain``, where a line break
+        outside quotes ends a command as `;` does."""
+        for _ in range(n):
+            if joined:
+                self._joins()
+            if self.i >= len(self.text):
+                return
+            ch = self.text[self.i]
+            self.code.append(ch)
+            self.at.append(self.i)
+            if plain:
+                self.frames[-1].plain.append(" ; " if ch == "\n" and not self.frames[-1].quotes else ch)
+            self.i += 1
 
-def split(command: str) -> tuple[str, list[str], list[str], int]:
-    """The command with every heredoc body cut out, the bodies a shell may run, the other unquoted bodies, and how
-    many bodies a shell reads from its standard input.
+    def _end(self, what: str) -> None:
+        self._joins()
+        if self.i >= len(self.text):
+            raise Unreadable(f"{what} is never closed")
 
-    A body is text for its program, except a body in a pipeline that runs a shell: that is read as a script. In a body
-    under an unquoted delimiter, bash still runs each `$( … )` and backtick command.
-    """
-    kept, scripts, expanded, fed = _read(command)
-    lines = command.split("\n")
-    return "\n".join(lines[k] for k in kept), scripts, expanded, fed
+    def commands(self, closer: bool) -> None:
+        """Commands up to the end of the text, or to the `)` that closes the `$(` they are in (``closer``)."""
+        depth, start = 0, True
+        while True:
+            self._joins()
+            if self.i >= len(self.text):
+                if closer:
+                    raise Unreadable("a `$(` is never closed")
+                return
+            ch = self.text[self.i]
+            if start and self._comment(closer):
+                continue
+            if ch == ")" and closer and depth == 0:
+                return
+            start = ch in _WORD_ENDS
+            depth = self._piece(ch, depth)
 
+    def _comment(self, closer: bool) -> bool:
+        """At a word's start: read past a comment, if one starts here."""
+        if self.text[self.i] == "#":
+            end = self.text.find("\n", self.i)
+            self.i = len(self.text) if end < 0 else end
+            return True
+        # A `case` pattern's `)` would close the `$(` early.
+        if closer and self._ahead(4) == "case" and self._ahead(5)[4:] in ("", *_WORD_ENDS):
+            raise Unreadable("a `case` inside `$( … )` cannot be read; run it plainly")
+        return False
 
-def kept_lines(command: str) -> list[int]:
-    """The indexes of the lines of ``command`` that `split` keeps: every line but heredoc bodies and their ends."""
-    return _read(command)[0]
+    def _piece(self, ch: str, depth: int) -> int:
+        """Read one piece of commands at ``depth`` subshells deep: how deep the next piece is."""
+        if ch == "\n":
+            self._line_break(depth)
+        elif self._ahead(2) == "((":
+            self._arithmetic(command=True)
+        elif ch in "()":
+            depth += 1 if ch == "(" else -1
+            self._take()
+        elif ch in ";&|":
+            size = 2 if self._ahead(2) in ("&&", "||") else 1
+            at = len(self.code)
+            self._take(size)
+            if len(self.frames) == 1 and depth == 0 and (size == 2 or ch == ";"):
+                self.cuts.append((at, len(self.code)))
+        elif self._ahead(2) == "<<" and self._ahead(3) != "<<<":
+            self._heredoc()
+        else:
+            self._word(ch, ansi=True)
+        return depth
 
+    def _word(self, ch: str, *, ansi: bool) -> None:
+        """One piece of a word outside double quotes: a quote, an escape, an expansion or a character."""
+        if ch == "\\":
+            self._take(2, joined=False)
+        elif ch == "'":
+            self._single()
+        elif ch == '"':
+            self._double()
+        elif ch == "`":
+            self._backtick()
+        elif ch == "$":
+            self._dollar(ansi=ansi)
+        else:
+            self._take()
 
-def _read(command: str) -> tuple[list[int], list[str], list[str], int]:
-    lines = command.split("\n")
-    kept: list[int] = []
-    scripts: list[str] = []
-    expanded: list[str] = []
-    frames = [_Frame()]
-    fed = 0
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        kept.append(i)
-        i += 1
-        for marker in _opened(line, frames):
-            body: list[str] = []
-            while True:
-                if i >= len(lines):
-                    raise Unclosed(f"a heredoc never closes: no line `{marker.delimiter}`")
-                text = lines[i]
-                i += 1
-                if (text.lstrip("\t") if marker.strip_tabs else text) == marker.delimiter:
-                    break
-                body.append(text)
-            shell, reads = _pipeline_shell(line, marker.start)
-            fed += int(reads)
+    def _single(self) -> None:
+        end = self.text.find("'", self.i + 1)
+        if end < 0:
+            raise Unreadable("a quote is never closed")
+        self.frames[-1].quotes += 1
+        self._take(end + 1 - self.i, joined=False)
+        self.frames[-1].quotes -= 1
+
+    def _double(self) -> None:
+        self._take()
+        self.frames[-1].quotes += 1
+        while True:
+            self._end("a quote")
+            ch = self.text[self.i]
+            if ch == '"':
+                self.frames[-1].quotes -= 1
+                self._take()
+                return
+            if ch == "\\":
+                self._take(2, joined=False)
+            elif ch == "$":
+                self._dollar(ansi=False)
+            elif ch == "`":
+                self._backtick()
+            else:
+                self._take()
+
+    def _ansi(self) -> None:
+        """`$'…'`: the frame's text holds the value bash decodes from it, single-quoted, for the word reader."""
+        self._take(2, plain=False)
+        value: list[str] = []
+        while self.text[self.i : self.i + 1] != "'":
+            pair = self.text[self.i : self.i + 2]
+            if not pair or pair == "\\":
+                raise Unreadable("a quote is never closed")
+            if pair[0] == "\\" and pair[1] in "01234567xuUc":
+                raise Unreadable(f"the escape `{pair}` inside `$'…'` cannot be read; write the character itself")
+            value.append(_ANSI.get(pair[1], pair) if pair[0] == "\\" else pair[0])
+            self._take(2 if pair[0] == "\\" else 1, plain=False, joined=False)
+        self._take(plain=False, joined=False)
+        self.frames[-1].plain.append("'" + "".join(value).replace("'", "'\\''") + "'")
+
+    def _backtick(self) -> None:
+        """A backtick's text runs as a script of its own, once bash removes the backslashes before `\\`, `` ` `` and
+        `$`; it ends at the first backtick no backslash escapes, quotes or not."""
+        j = self.i + 1
+        while j < len(self.text) and self.text[j] != "`":
+            j += 2 if self.text[j] == "\\" else 1
+        if j >= len(self.text):
+            raise Unreadable("a backtick is never closed")
+        self.frames[-1].plain.append(EXPANDED)
+        self.frames[-1].inner.append(_UNESCAPE.sub(r"\1", self.text[self.i + 1 : j]))
+        self._take(j + 1 - self.i, plain=False, joined=False)
+
+    def _dollar(self, *, ansi: bool) -> None:
+        after = self._ahead(3)
+        if after.startswith("$(("):
+            self._arithmetic(command=False)
+        elif after.startswith("$("):
+            self._take(2, plain=False)
+            self.frames[-1].plain.append(EXPANDED)
+            self.frames.append(_Frame())
+            self.commands(closer=True)
+            self._take(plain=False)
+            frame = self.frames.pop()
+            self.frames[-1].inner.append(Code("".join(frame.plain), tuple(frame.inner)))
+            self.frames[-1].pending.extend(frame.pending)
+        elif after.startswith(("${", "$[")):
+            self._take(2)
+            self._bracket("}" if after[1] == "{" else "]")
+        elif after.startswith("$'") and ansi:
+            self._ansi()
+        else:
+            self._take()
+
+    def _bracket(self, close: str) -> None:
+        """Up to the `}` of a `${`, which nests no braces, or the `]` of a `$[`, which nests brackets."""
+        depth = 0
+        while True:
+            self._end("a `${`" if close == "}" else "a `$[`")
+            ch = self.text[self.i]
+            if ch == close and depth == 0:
+                self._take()
+                return
+            if close == "]" and ch in "[]":
+                depth += 1 if ch == "[" else -1
+            self._word(ch, ansi=True)
+
+    def _arithmetic(self, *, command: bool) -> None:
+        """`(( … ))` or `$(( … ))`: arithmetic only if the bracket closing its second `(` comes right before its last;
+        otherwise bash runs it as a subshell, where a `#` may start a comment, so the guard reads none."""
+        if not command:
+            self._take(3, plain=False)
+            self.frames[-1].plain.append(EXPANDED)
+            self.frames.append(_Frame())
+        else:
+            self._take(2)
+        depth, start, arithmetic = 2, True, None
+        while depth:
+            self._end("a `((`")
+            ch = self.text[self.i]
+            if ch == "#" and start:
+                raise Unreadable("a `#` inside `(( … ))` cannot be read")
+            start = ch in _ARITHMETIC_WORD_ENDS
+            if ch in "()":
+                depth += 1 if ch == "(" else -1
+                self._take(plain=command or depth > 0)
+                if depth == 1 and arithmetic is None:
+                    arithmetic = self._ahead(1) == ")"
+            else:
+                self._word(ch, ansi=True)
+        if not command:
+            frame = self.frames.pop()
+            if arithmetic:
+                self.frames[-1].inner.extend(frame.inner)
+            else:
+                self.frames[-1].inner.append(Code("(" + "".join(frame.plain), tuple(frame.inner)))
+
+    def _heredoc(self) -> None:
+        at = len(self.code)
+        self._take(2)
+        strip_tabs = self._ahead(1) == "-"
+        self._take(int(strip_tabs))
+        while self._ahead(1) in (" ", "\t"):
+            self._take()
+        word, quoted = "", False
+        while (ch := self._ahead(1)) and ch not in _WORD_ENDS and (word or ch != "#"):
+            self._joins()
+            if ch in "'\"":
+                end = self.text.find(ch, self.i + 1)
+                part = self.text[self.i + 1 : end]
+            else:
+                end = self.i + (ch == "\\")
+                part = self.text[end : end + 1]
+            if ch in "$`" or end < 0 or "\n" in part or (ch == '"' and set(part) & set("\\$`")):
+                raise Unreadable("a heredoc delimiter the guard cannot read; write it plainly, as 'EOF'")
+            word, quoted = word + part, quoted or ch in "'\"\\"
+            self._take(end + 1 - self.i, joined=False)
+        if word:
+            self.frames[-1].pending.append(_Marker(word, quoted, strip_tabs, at, self.line))
+
+    def _line_break(self, depth: int) -> None:
+        at = len(self.code)
+        self._take()
+        if len(self.frames) == 1 and depth == 0:
+            self.cuts.append((at, at + 1))
+        markers, self.frames[-1].pending = self.frames[-1].pending, []
+        for marker in markers:
+            body = self._body(marker)
+            shell, reads = nested.heredoc_shell("".join(self.code[marker.line : at]), marker.start - marker.line)
+            self.fed += int(reads)
+            # Under an unquoted delimiter, the shell reads the body as bash expands it: its escapes gone.
             if shell:
-                scripts.append("\n".join(body))
-            elif not marker.quoted:
-                expanded.append("\n".join(body))
-    return kept, scripts, expanded, fed
+                self.scripts.append(body if marker.quoted else _UNESCAPE.sub(r"\1", body))
+            if not marker.quoted:
+                self._expansions(body)
+        self.line = len(self.code)
 
+    def _body(self, marker: _Marker) -> str:
+        lines: list[str] = []
+        while True:
+            if self.i >= len(self.text):
+                raise Unreadable(f"a heredoc never closes: no line `{marker.delimiter}`")
+            line = self._body_line(marker.quoted)
+            if (line.lstrip("\t") if marker.strip_tabs else line) == marker.delimiter:
+                return "".join(f"{line}\n" for line in lines)  # each line keeps its break: a backslash may join it
+            lines.append(line)
 
-def _opened(line: str, frames: list[_Frame]) -> list[_Marker]:
-    """The heredocs a line opens; ``frames`` carries the quoting into the next line."""
-    markers: list[_Marker] = []
-    i = 0
-    while i < len(line):
-        i, marker = _step(line, i, frames)
-        if marker is not None:
-            markers.append(marker)
-    return markers
+    def _body_line(self, quoted: bool) -> str:
+        """One line of a body; under an unquoted delimiter, a backslash before its break joins the next line to it."""
+        parts: list[str] = []
+        while True:
+            end = self.text.find("\n", self.i)
+            end = len(self.text) if end < 0 else end
+            part = self.text[self.i : end]
+            self.i = min(end + 1, len(self.text))
+            odd = (len(part) - len(part.rstrip("\\"))) % 2 == 1
+            joins = odd and not quoted and end < len(self.text)
+            parts.append(part[:-1] if joins else part)
+            if not joins:
+                return "".join(parts)
 
+    def _expansions(self, body: str) -> None:
+        """What bash runs in a body under an unquoted delimiter: each `$( … )` and backtick command in it. Bash reads
+        no quote or comment there."""
+        sub = _Reader(body)
+        while sub.i < len(body):
+            if body[sub.i] == "$":
+                sub._dollar(ansi=False)
+            elif body[sub.i] == "`":
+                sub._backtick()
+            else:
+                sub._take(2 if body[sub.i] == "\\" else 1, joined=False)
+        sub.closed()
+        self.runs.extend([*sub.frames[0].inner, *sub.runs])
+        self.scripts.extend(sub.scripts)
+        self.fed += sub.fed
 
-def _step(line: str, i: int, frames: list[_Frame]) -> tuple[int, _Marker | None]:
-    """Read one character or construct at ``i``: where reading goes on, and the heredoc it opened, if any."""
-    frame, ch = frames[-1], line[i]
-    if frame.closer:
-        return _in_expansion(line, i, frames)
-    if frame.quote == "'":
-        frame.quote = "" if ch == "'" else frame.quote
-        return i + 1, None
-    if ch == "\\":
-        return i + 2, None
-    for opener in _OPENERS:
-        if line.startswith(opener, i):
-            frames.append(_frame_for(opener))
-            return i + len(opener), None
-    if frame.quote == '"':
-        frame.quote = "" if ch == '"' else frame.quote
-        return i + 1, None
-    return _unquoted(line, i, frames)
-
-
-def _unquoted(line: str, i: int, frames: list[_Frame]) -> tuple[int, _Marker | None]:
-    frame, ch = frames[-1], line[i]
-    if ch == "#" and (i == 0 or line[i - 1] in _WORD_START):
-        return len(line), None  # the rest of the line is a comment
-    if line.startswith("<<", i) and not line.startswith("<<<", i) and not frame.arithmetic:
-        marker, end = _delimiter(line, i)
-        return end, marker
-    if ch in "'\"":
-        frame.quote = ch
-    elif line.startswith("((", i):
-        frames.append(_Frame(parens=1, arithmetic=True))
-        return i + 2, None
-    elif ch in "()":
-        _paren(ch, frames)
-    elif line.startswith("<<<", i):
-        return i + 3, None
-    return i + 1, None
-
-
-def _in_expansion(line: str, i: int, frames: list[_Frame]) -> tuple[int, None]:
-    """Inside `${ … }` or `$[ … ]`, which nest, until the bracket that closes it."""
-    frame, ch = frames[-1], line[i]
-    opener = "{" if frame.closer == "}" else "["
-    if ch == "\\":
-        return i + 2, None
-    if ch == opener:
-        frame.parens += 1
-    elif ch == frame.closer:
-        if frame.parens:
-            frame.parens -= 1
-        else:
-            frames.pop()
-    return i + 1, None
-
-
-def _paren(ch: str, frames: list[_Frame]) -> None:
-    """A bracket opens or closes within the frame, and a closing one past its own ends the `$( … )`."""
-    frame = frames[-1]
-    if ch == "(":
-        frame.parens += 1
-    elif frame.parens:
-        frame.parens -= 1
-    elif len(frames) > 1:
-        frames.pop()
-
-
-def _delimiter(line: str, start: int) -> tuple[_Marker | None, int]:
-    i = start + 2
-    strip_tabs = line.startswith("-", i)
-    i += 1 if strip_tabs else 0
-    while i < len(line) and line[i] in " \t":
-        i += 1
-    word_start = i
-    while i < len(line) and line[i] not in " \t;&|<>()":
-        if line[i] in "'\"":
-            close = line.find(line[i], i + 1)
-            i = len(line) if close < 0 else close + 1
-        else:
-            i += 2 if line[i] == "\\" else 1
-    raw = line[word_start:i]
-    delimiter = raw.replace("'", "").replace('"', "").replace("\\", "")
-    if not delimiter:
-        return None, i
-    return _Marker(delimiter, delimiter != raw, strip_tabs, start), i
-
-
-def _pipeline_shell(line: str, start: int) -> tuple[bool, bool]:
-    """Whether the pipeline holding the heredoc at ``start`` runs a shell, and whether that shell reads the body from
-    its standard input. A group (`{ …; } <<EOF`) may run one, so its body is read, though no shell is known to take it.
-    """
-    bounds = [0, *(m.end() for m in _PIPELINE_END.finditer(line))]
-    ends = [m.start() for m in _PIPELINE_END.finditer(line) if m.start() > start]
-    pipeline = line[max(b for b in bounds if b <= start) : min(ends) if ends else len(line)]
-    shell = reads = False
-    for stage in pipeline.split("|"):
-        words = _command_words(stage)
-        if words[:1] in (["}"], [")"]):
-            shell = True
-        elif words and words[0].rsplit("/", 1)[-1] in nested.SHELLS:
-            shell = True
-            reads = reads or nested.reads_its_script_from_stdin(words[0].rsplit("/", 1)[-1], words[1:])
-    return shell, reads
-
-
-_REDIRECT = re.compile(r"^\d*(<<-?|<<<|<&|>&|&>>?|>>|>\||<|>)")
-
-
-def _command_words(stage: str) -> list[str]:
-    """A stage's words from its program on: past redirects (`<<'A' bash`), assignments, `{`, `!` and leaders."""
-    words: list[str] = []
-    skip = False
-    for word in stage.split():
-        if skip:
-            skip = False
-        elif match := _REDIRECT.match(word):
-            skip = match.end() == len(word)  # the redirect's target is the next word
-        elif not words and ("=" in word or word in {"{", "(", "!"}):
-            continue
-        else:
-            words.append(word)
-    while words and words[0].rsplit("/", 1)[-1] in _LEADERS:
-        words = [w for w in words[1:] if not w.startswith("-")]
-    return words
+    def closed(self) -> None:
+        if self.frames[0].pending:
+            raise Unreadable(f"a heredoc never closes: no line `{self.frames[0].pending[0].delimiter}`")

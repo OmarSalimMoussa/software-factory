@@ -34,11 +34,6 @@ _JOINS = {"|": "pipes the answer into another command", "&&": "adds a second com
           ">>": "sends the answer to a file", "<": "feeds it a file", "<<": "feeds it a heredoc",
           "(": "runs it in a subshell", ")": "runs it in a subshell"}  # fmt: skip
 _HELP = frozenset({"-h", "--help", "help"})
-# A command list's pieces: quoted text, an escape, a substitution's or subshell's bracket, a cut, or plain text.
-_PIECES = re.compile(
-    r"""'[^']*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`|\\.|\$\(|&&|\|\||[;\n()]|[^'"`\\$()&|;\n]+|.""", re.S
-)
-_CUTS = frozenset({";", "&&", "||", "\n"})
 _REMEDY = (
     "give factory a command of its own, joined to others only by `;`, `&&`, `||` or a new line, and read its answer "
     "as printed"
@@ -153,7 +148,11 @@ def _parse(command: str) -> tuple[list[str], str]:
 
 def plain_words(command: str) -> list[str] | None:
     """The words of a command that is one plain `factory` call, or None when the shell would read more into it."""
-    words, why = _parse(command)
+    try:
+        words, why = _parse(heredocs.read(command).code)
+    # telemetry: expected — a command bash would not read plainly is no plain factory call
+    except heredocs.Unreadable:
+        return None
     return None if why else words
 
 
@@ -162,7 +161,7 @@ def check_alone(call: Call, command: str, found: list[shell.Invocation]) -> Deci
     runs = sum(inv.program == FACTORY for inv in found)
     if not runs or call.off("factory-alone"):
         return None
-    parts = [part for _, part in _commands(heredocs.split(command)[0])]
+    parts = [part for _, part in _commands(heredocs.read(command))]
     whys = [_parse(part)[1] for part in parts]
     if whys.count("") == runs:
         return None
@@ -171,19 +170,15 @@ def check_alone(call: Call, command: str, found: list[shell.Invocation]) -> Deci
     return Refusal("factory-alone", f"{why}: {_REMEDY}")
 
 
-def _commands(text: str) -> list[tuple[int, str]]:
-    """The commands of a list as written, each with where it starts in ``text``: cut where the shell cuts them, at
-    `;`, `&&`, `||` and line breaks outside quotes, substitutions and subshells. ``text`` holds no heredoc body."""
+def _commands(reading: heredocs.Reading) -> list[tuple[int, str]]:
+    """The commands of the list as bash reads them, each with where it starts in the reading's code: cut at `;`,
+    `&&`, `||` and line breaks outside quotes, substitutions and subshells."""
     parts: list[tuple[int, str]] = []
-    start = depth = 0
-    for found in _PIECES.finditer(text):
-        piece = found.group()
-        if depth == 0 and piece in _CUTS:
-            parts.append((start, text[start : found.start()]))
-            start = found.end()
-        else:
-            depth += (piece in {"(", "$("}) - (piece == ")")
-    return [*parts, (start, text[start:])]
+    start = 0
+    for begin, end in reading.cuts:
+        parts.append((start, reading.code[start:begin]))
+        start = end
+    return [*parts, (start, reading.code[start:])]
 
 
 def check_forged(call: Call, found: list[shell.Invocation]) -> Decision:
@@ -204,22 +199,20 @@ def stamp(call: Call) -> Decision:
         return None
     command = str(call.tool_input.get("command", ""))
     try:
-        lines, kept = command.split("\n"), heredocs.kept_lines(command)
+        reading = heredocs.read(command)
     # telemetry: expected — the shell rules refused this unreadable command, unless the owner switched them off
-    except heredocs.Unclosed:
+    except heredocs.Unreadable:
         return None
-    text = "\n".join(lines[k] for k in kept)
-    ends = [at + end for at, part in _commands(text) if (end := _word_end(part)) is not None]
+    # Where each program word ends in the command as written, past the comments and line joins bash reads away.
+    ends = [reading.at[at + end - 1] + 1 for at, part in _commands(reading) if (end := _word_end(part)) is not None]
     if not ends:
         return None
     if not _SAFE_ID.match(call.agent_id):
         return Refusal("agent-id", "this subagent's id cannot be passed to the factory safely; report to your parent")
     name = [AGENT_ID_FLAG, call.agent_id]
+    stamped = command
     for end in reversed(ends):
-        text = f"{text[:end]} {' '.join(name)}{text[end:]}"
-    for k, line in zip(kept, text.split("\n"), strict=True):
-        lines[k] = line
-    stamped = "\n".join(lines)
+        stamped = f"{stamped[:end]} {' '.join(name)}{stamped[end:]}"
     if _unnamed(stamped, name) and not call.off("factory-alone"):
         return Refusal("factory-alone", f"the guard cannot name you in each factory command here: {_REMEDY}")
     return Rewrite({**call.tool_input, "command": stamped})
