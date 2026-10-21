@@ -113,6 +113,7 @@ def passes(places: Places, transcripts: Sequence[Path], agent_home: Path) -> lis
         ("yolo", yolo.run_pass),
         ("cost", lambda ctx: cost.run_pass(ctx, transcripts)),
         ("plan", watch.run_pass),
+        ("plan pause", plan.pause_at_limit),
         ("reap", reaper.run_pass),
         ("gc", cleanup.run_pass),
     ]

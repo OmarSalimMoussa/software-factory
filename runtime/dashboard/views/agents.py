@@ -156,10 +156,12 @@ def legend(snap: Snap) -> list[dict[str, Any]]:
 def banner(snap: Snap) -> dict[str, Any] | None:
     state = factory_state(snap)
     if state == "paused":
+        why = snap.get("factory")["paused"]["why"]
+        kept = "Every agent is benched with its work kept. Resume brings them back in order."
         return {
             "icon": "pause-circle",
             "text": "The factory is paused.",
-            "sub": "Every agent is benched with its work kept. Resume brings them back in order.",
+            "sub": f"{why} {kept}" if why else kept,
             "action": "resume",
         }
     if state == "stopped":

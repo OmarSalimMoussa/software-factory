@@ -137,7 +137,13 @@ def revive_session(ctx: Context, sid: str, by: str) -> str:
 
 
 def owner_pause(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Bench every running session, the orchestrator included; nothing is lost, and resume brings them back in order."""
+    return pause(ctx, None)
+
+
+def pause(ctx: Context, why: str | None) -> dict[str, Any]:
+    """Bench every running session, the orchestrator included; nothing is lost, and resume brings them back in order.
+    ``why`` is the warden's reason when it pauses on its own; the owner's pause gives none."""
+    by = permits.actor(ctx)
     with ctx.lock:
         if paused_path(ctx).exists():
             raise Refused("paused", "the factory is already paused")
@@ -146,7 +152,7 @@ def owner_pause(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
             raise Refused("reviving", "a session is coming back right now; pause again in a moment")
         ranked = permits.in_order(ctx, [s for s in sessions.values() if not s.parent and s.state in (WORKING, WAITING)])
         for s in ranked:
-            begin_bench(ctx, s, OWNER, "paused with the factory", models.PAUSED)
+            begin_bench(ctx, s, by, "paused with the factory", models.PAUSED)
         registry.write(ctx.places, sessions)
         # One step per session; the crash watch completes each as it settles that bench (pause_progress).
         op_id = ops.start(
@@ -155,7 +161,7 @@ def owner_pause(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[
         for index in range(1, len(ranked) + 1):
             ops.step(ctx, op_id, index, ops.RUNNING)
         ops.complete(ctx, op_id, 0, f"{len(ranked)} told", PAUSED)
-        record = {"at": ctx.clock.iso(), "sessions": [s.id for s in ranked], "op": op_id}
+        record = {"at": ctx.clock.iso(), "sessions": [s.id for s in ranked], "op": op_id, "why": why}
         store.write_json(paused_path(ctx), record, mode=0o600)
     ctx.post_event(inbox.PAUSED, {"sessions": [s.id for s in ranked]})
     return ok(op=op_id, benched=[s.name for s in ranked],

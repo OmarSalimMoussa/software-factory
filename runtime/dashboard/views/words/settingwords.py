@@ -1,6 +1,5 @@
 """The settings page's words: every setting's label, in the groups the page draws, each group with its hint
-saying when a change takes effect, as (group, title, hint, [(key, label), ...]).
-"""
+saying when a change takes effect, as (group, title, hint, [(key, label), ...])."""
 
 from __future__ import annotations
 
@@ -154,6 +153,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("cost.plan_stale_minutes", "Minutes before a plan reading counts as unknown"),
             ("cost.plan_amber_percent", "Plan bar turns amber at, %"),
             ("cost.plan_red_percent", "Plan bar turns red at, %"),
+            ("cost.plan_pause_percent", "Pause the factory at weekly plan use, %"),
             ("prices", "Prices per million tokens"),
         ],
     ),

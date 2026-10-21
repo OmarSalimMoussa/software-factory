@@ -124,8 +124,8 @@ record the warden reads, the vitals turn red and the crash watch resumes and ret
 
 ## Pause, stop, resume
 
-- **Pause the factory:** every session, the orchestrator included, commits its work and pauses. Nothing is
-  lost; Resume brings everything back in order.
+- **Pause the factory:** every session, the orchestrator included, commits its work and pauses; Resume brings them back
+  in order. The warden pauses it at `cost.plan_pause_percent` of the weekly plan, says why, and waits for you.
 - **Stop an agent** from the Agents page: it retires with everything under it, and its task returns to Proposed with
   its branch kept. Stopping the orchestrator stops the whole factory, so the dashboard asks you to confirm it.
 

@@ -11,8 +11,9 @@ from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVIN
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import checks, schedule
-from runtime.warden.owner import ops
+from runtime.warden.owner import ops, reflections
 from runtime.warden.sessions import crashwatch, lifecycle, older_skills, permits, revive
+from runtime.warden.spend import plan
 
 
 def rule(call: Any, *args: Any) -> str:
@@ -177,6 +178,78 @@ def test_resume_leaves_benched_a_session_whose_task_waits_for_its_merge_check(
         [world.session("1a1a1a1a").name],
     )
     assert (world.launcher.resumed, world.session("1a1a1a1a").state) == (["0c0c0c0c"], DEPRIORITIZED)
+
+
+def weekly(world: World, used: float | None, written_ago_minutes: int = 0, resets_in: int = 86400) -> None:
+    now = world.clock.now()
+    window = None if used is None else {"used_percentage": used, "resets_at": now + resets_in}
+    reading = {"written_at": now - written_ago_minutes * 60, "five_hour": None, "seven_day": window, "copied_at": now}
+    store.write_json(world.places.plan, reading)
+
+
+def warden_pass(world: World) -> dict[str, object] | None:
+    """One plan pass; the pause record it leaves, if any."""
+    plan.pause_at_limit(world.ctx(role="warden", kind="warden"))
+    return store.read_json_or(lifecycle.paused_path(world.ctx()), None)
+
+
+@pytest.mark.parametrize(
+    ("used", "written_ago_minutes", "resets_in", "why"),
+    [
+        (26, 0, 86400, "The plan's weekly usage reached 26%, at or past the pause at 26%."),
+        (40.5, 0, 86400, "The plan's weekly usage reached 40.5%, at or past the pause at 26%."),
+        (25.9, 0, 86400, None),
+        (40, 120, 86400, None),
+        (None, 0, 86400, None),
+        (40, 0, -60, None),
+    ],
+    ids=["at-the-setting", "past-it", "under-it", "stale", "window-missing", "week-already-reset"],
+)
+def test_the_warden_pauses_the_factory_once_when_a_live_weekly_reading_reaches_the_setting(
+    world: World, used: float | None, written_ago_minutes: int, resets_in: int, why: str | None
+) -> None:
+    world.seat("0c0c0c0c", role="orchestrator", family="orch")
+    world.run("0c0c0c0c")
+    weekly(world, used, written_ago_minutes, resets_in)
+
+    warden_pass(world)
+    paused = warden_pass(world)
+
+    assert (paused and paused["why"]) == why
+    assert world.session("0c0c0c0c").state == (BENCH_PENDING if why else WORKING)
+    assert [kind for kind, _ in world.events] == (["paused"] if why else [])
+    told = [e["text"] for e in reflections.entries(world.places)]
+    assert told == ([f"The warden paused the factory. {why}"] if why else [])
+
+
+@pytest.mark.parametrize(
+    ("setting", "readings", "paused"),
+    [
+        (26, [28, 45], [False, False]),
+        (26, [2, 26], [False, True]),
+        (35, [30, 35], [False, True]),
+        (25, [30], [True]),
+    ],
+    ids=["still-over", "a-new-week-reaches-it", "raised-and-reached", "changed-under-the-reading"],
+)
+def test_a_resume_over_the_setting_stands_until_the_use_falls_under_it_or_the_setting_changes(
+    world: World, setting: int, readings: list[float], paused: list[bool]
+) -> None:
+    world.seat("0c0c0c0c", role="orchestrator", family="orch")
+    world.run("0c0c0c0c")
+    weekly(world, 27)
+    assert warden_pass(world) is not None
+    world.later(world.settings.get_int("watch.bench_grace_seconds"))
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
+    ops.join(revive.owner_resume(world.owner(), {}, None)["op"])
+    world.settings = world.settings.with_changes({"cost.plan_pause_percent": setting})
+
+    seen = []
+    for used in readings:
+        weekly(world, used)
+        seen.append(warden_pass(world) is not None)
+
+    assert seen == paused
 
 
 def test_a_paused_session_whose_task_moves_past_its_part_on_its_way_to_the_bench_ends_and_the_pause_completes(

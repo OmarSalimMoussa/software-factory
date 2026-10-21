@@ -54,11 +54,14 @@ def test_an_earlier_factorys_state_is_brought_over_once_and_reads(world: World) 
     # A clean-up record that does not say what failed, and a Docker reading file.
     store.write_json(gc.record_path(places), {"last_day": "2026-10-09"})
     store.write_json(places.state / "docker-disk.json", {"at": "x", "bytes": 1, "budget_bytes": 2})
+    # The owner's pause, which gives no reason.
+    store.write_json(places.state / "paused.json", {"at": "x", "sessions": [], "op": "op-x"})
 
     ctx = dataclasses.replace(world.ctx(), caller=Caller("warden", role="warden"))
     done = upgrade.migrate(ctx)
 
-    assert len(done) == 10, done
+    assert len(done) == 11, done
+    assert json.loads((places.state / "paused.json").read_text())["why"] is None
     assert gc.record(places) is None and not (places.state / "docker-disk.json").exists()
     assert inbox.unacknowledged(places) == []
     assert leases.read(places, 1) is not None

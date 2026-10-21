@@ -156,12 +156,22 @@ def test_a_daily_budget_far_above_the_spend_is_named_beside_the_chart_not_drawn_
 
 
 @pytest.mark.parametrize(
-    ("paused", "icon"), [("2026-10-09T00:00:00Z", "pause-circle"), (None, "stop-circle")], ids=["paused", "stopped"]
+    ("paused", "icon", "lead"),
+    [
+        ({"why": None}, "pause-circle", "Every agent is benched"),
+        ({"why": "The plan's weekly usage reached 27%."}, "pause-circle", "The plan's weekly usage reached 27%. Every"),
+        (None, "stop-circle", "Nothing new starts"),
+    ],
+    ids=["paused-by-the-owner", "paused-by-the-warden", "stopped"],
 )
-def test_the_agents_banner_carries_the_icon_of_the_factorys_state(paused: str | None, icon: str) -> None:
+def test_the_agents_banner_carries_the_icon_of_the_factorys_state_and_why_the_warden_paused_it(
+    paused: dict[str, str | None] | None, icon: str, lead: str
+) -> None:
     snap = Snap(0.0, {"factory": {"paused": paused}, "sessions": {}}, {})
 
-    assert agents.banner(snap)["icon"] == icon
+    banner = agents.banner(snap)
+
+    assert (banner["icon"], banner["sub"].startswith(lead)) == (icon, True)
 
 
 @pytest.mark.parametrize(("agent", "icon"), [("impl-project-names", "clock"), ("qa-sec-1", "lock-closed")])

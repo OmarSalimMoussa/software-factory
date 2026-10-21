@@ -216,6 +216,7 @@ SCHEMA: dict[str, Spec] = {
     "cost.plan_stale_minutes": Spec("int", 5, 240),
     "cost.plan_amber_percent": Spec("int", 1, 100),
     "cost.plan_red_percent": Spec("int", 1, 100),
+    "cost.plan_pause_percent": Spec("int", 1, 100),
     "prices": Spec("prices"),
     "dashboard.port": Spec("int", 1024, 65535, when=AT_INSTALL),
     "dashboard.refresh_seconds": Spec("int", 5, 120),

@@ -206,6 +206,9 @@ daily_budget_usd = 150  # at API prices (an estimate on a subscription): past it
 plan_stale_minutes = 45 # an older plan-limit reading shows as unknown
 plan_amber_percent = 80
 plan_red_percent = 95
+plan_pause_percent = 26 # the warden pauses the factory once the plan's weekly use reaches this, and only you resume
+                        # it; resumed over it, it pauses again only once this changes, or the use falls under it (a
+                        # new week) and climbs back
 
 [prices]                # dollars per million tokens, per allowed model; a model without one costs "unknown"
 # Anthropic's API list prices (claude.com/pricing). Cache writes at the 1-hour rate, the cache Claude Code writes;
