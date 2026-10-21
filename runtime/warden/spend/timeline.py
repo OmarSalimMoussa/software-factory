@@ -87,6 +87,9 @@ def _runtime(agents: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 
 def _check_wait(merged: float, checked: float, walks: list[Span], checks: list[tuple[float, bool]]) -> dict[str, Any]:
+    # Every regression walk ever made is given, and each piece of the wait is weighed against the walks: only those
+    # that overlap the wait can touch it, and weighing them all grows with every walk.
+    walks = [(s, e) for s, e in walks if s < checked and e > merged]
     inside = [(at, ok) for at, ok in checks if merged < at <= checked]
     starts = [(s, True) for s, _ in walks if merged < s < checked]  # a walk that starts ends the wait after a failure
     cuts = sorted({merged, checked, *(t for w in walks for t in w if merged < t < checked), *(at for at, _ in inside)})
