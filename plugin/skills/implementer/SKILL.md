@@ -52,7 +52,8 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
   (`protects`, `needs`, `runs`), `items: <n>` when its walk takes more than one of a tester's items, as a long wait
   does, and at most `qa.max_steps` steps for each item, each opening with a short bold name and holding an `Expect:`
   line: the owner's replay shows both. A scenario that signs in as a test address names its role in
-  `needs` (`person <role>`), and your brief gives its tester an address for each person it names.
+  `needs` (`person <role>`), and your brief gives its tester an address for each person it names. Its
+  `## Before you start` holds only what comes before step 1: an action timed to a later step goes in that step.
 
 ## 3. QA rounds
 

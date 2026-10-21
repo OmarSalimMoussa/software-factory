@@ -1,6 +1,7 @@
 """QA scenarios: every file in qa/scenarios/ has its three labels, an ``items`` label from 1 to ``qa.max_items`` if
-it takes more than one item, and at most ``qa.max_steps`` steps for each item it takes; one a branch adds or changes
-that signs in as a named address lists a ``person <role>``: the orchestrator hands testers their people by ``needs``.
+it takes more than one item, and at most ``qa.max_steps`` steps for each item it takes. One a branch adds or changes
+that signs in as a named address lists a ``person <role>``: the orchestrator hands testers their people by ``needs``;
+and its ``## Before you start`` times no action to a later step, which a tester doing all of it first would miss.
 Only changed ones, so a branch that left before older scenarios were fixed is not failed on files it never touched.
 The paths the product lists in check-values/qa-shared.toml, those every scenario depends on, each exist.
 
@@ -22,7 +23,8 @@ from runtime.shared import settings as settings_mod
 ID = "qa-scenarios"
 RULE = (
     "Scenarios have their three labels, any items label from 1 to qa.max_items, at most qa.max_steps steps for each "
-    "item, a person for an address they sign in as, and the paths every scenario shares exist"
+    "item, a person for an address they sign in as, nothing in Before you start timed to a later step, and the paths "
+    "every scenario shares exist"
 )
 VALUES_FILE = None
 VALUES = None
@@ -50,7 +52,7 @@ def run(repo: Repo, values: dict[str, Any]) -> list[str]:
         protected = {p for p in meta.get("protects", "").split() if (repo.root / p).exists()}
         found += scenarios.problems(rel, text, protected, max_steps, max_items)
         if repo.changed is None or rel in repo.changed:
-            found += _unnamed(rel, meta, text)
+            found += _unnamed(rel, meta, text) + scenarios.timed_set_up(rel, text)
     return found + (_shared(repo) if scenarios.SHARED in repo.tracked else [])
 
 

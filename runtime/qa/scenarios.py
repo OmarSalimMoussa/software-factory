@@ -8,7 +8,9 @@ it, each of which exists. ``needs`` lists what must be set up first: ``nothing``
 until what it needs exists). An ``items`` label may say how many of a tester's items it takes, up to ``qa.max_items``;
 without it, one. Then at most ``qa.max_steps`` numbered steps for each item it takes, so its walk fits its items'
 time; a waiting scenario may hold more. A step may open with a short bold name (``1. **Search.** …``) and holds what
-it expects on a line of its own (``Expect: …`` or ``Expected: …``); the replay shows both.
+it expects on a line of its own (``Expect: …`` or ``Expected: …``); the replay shows both. Its ``## Before you
+start`` holds only what comes before step 1: a tester does it all first, so an action it times to a later step is
+one the tester misses.
 
 A path ``protects`` names covers itself and, as a folder, everything under it. ``SHARED`` lists, as ``paths``, the
 ones every scenario depends on though none names them, such as a lockfile: a change to one carries no pass past it.
@@ -30,6 +32,14 @@ _FRONT = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 _STEP = re.compile(r"^\d+\. (.*)$")
 _NAME = re.compile(r"^\*\*([^*]{1,40}?)[.:]?\*\*\s*")
 _EXPECT = re.compile(r"^\s*(?:-\s*)?Expect(?:ed)?:\s*(.+)$")
+_SET_UP = re.compile(r"^## Before you start[ \t]*\n(.*?)(?=^#{1,2} |\Z)", re.M | re.S | re.I)
+# A word that times an action right before a step's number. A step named after "for", "in", "with", "as" or "from",
+# or as the subject ("step 3 copies the password"), only says what a later step uses or does.
+_TIMED = re.compile(
+    r"\b(?:(?P<after>after|once)|before|during|at|(?:as|before|once|when|while)\s+you\s+(?:reach|get\s+to|start|begin))"
+    r"\s+steps?\s+(?P<n>\d+)",
+    re.I,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +149,23 @@ def _size(rel: str, text: str, meta: dict[str, str], max_steps: int, max_items: 
         out.append(f"{rel}: no numbered steps")
     elif taken and count > taken * max_steps and meta["runs"] != "waiting":
         out.append(f"{rel}: {count} steps; {max_steps} at most for each of {taken} item(s): split it, or raise items")
+    return out
+
+
+def timed_set_up(rel: str, text: str) -> list[str]:
+    """Each action ``## Before you start`` times to a step after the first: its line, and the step it belongs in.
+    Not one of ``problems``: the check asks it only of a scenario a branch touches, and ``parse`` must still read the
+    ones already on the default branch."""
+    out = []
+    for section in _SET_UP.finditer(text):
+        for said in _TIMED.finditer(text, section.start(1), section.end(1)):
+            step = int(said["n"]) + (1 if said["after"] else 0)
+            if step > 1:
+                line, phrase = text.count("\n", 0, said.start()) + 1, " ".join(said[0].lower().split())
+                out.append(
+                    f"{rel}:{line}: Before you start holds only what comes before step 1; move what it does {phrase} "
+                    f"into step {step} as its first line, or to the end of step {step - 1}"
+                )
     return out
 
 

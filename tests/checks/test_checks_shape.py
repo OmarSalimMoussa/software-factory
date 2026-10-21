@@ -86,6 +86,49 @@ def test_a_scenario_that_signs_in_as_a_named_address_needs_that_person(
 
 
 @pytest.mark.parametrize(
+    ("set_up", "first_step", "said"),
+    [
+        ("Before step 2, open the second member's visit over the API.", "Go on.", [(10, "before step 2", 2)]),
+        ("Ask for a second link for your own browser before\n  step 6: each link works once.", "Go on.",
+         [(10, "before step 6", 6)]),
+        ("The session stops the browser when you reach step 2,\n  and resumes it at step 3, each on your word.",
+         "Go on.", [(10, "when you reach step 2", 2), (11, "at step 3", 3)]),
+        ("After step 3, reload the page. Once step 4 shows the list, copy its first row.", "Go on.",
+         [(10, "after step 3", 4), (10, "once step 4", 5)]),
+        ("Open the page before step 1, and keep the console open during steps 1 to 6.", "Go on.", []),
+        ("Keep the tab: step 3 copies the password from it.", "Go on.", []),
+        ("A second tab on the same note, for step 4. Note the time you start, for step 6.", "Go on.", []),
+        ("If a request answers 202, stop it at once with step 4's request.", "Go on.", []),
+        ("Send every request in steps 2 to 5 with the cookie; in step 6 the walk changes the seed.", "Go on.", []),
+        ("Expect the same answer as step 2, and the release from step 1.", "Go on.", []),
+        ("Open the page.", "Plan these clicks before step 2's picker closes.", []),
+    ],
+    ids=["before-a-later-step", "over-a-line-break", "on-reaching-and-at", "after-and-once", "before-the-first",
+         "what-a-step-uses", "for-a-step", "at-once", "in-a-step", "as-and-from", "inside-a-step"],
+)  # fmt: skip
+def test_before_you_start_holds_only_what_comes_before_step_one(
+    fixture_product: Path,
+    commit: Callable[[Path, str], None],
+    set_up: str,
+    first_step: str,
+    said: list[tuple[int, str, int]],
+) -> None:
+    front = "---\nprotects: app/notes.py\nneeds: nothing\nruns: in-turn\n---\n# Timed\n\n## Before you start\n\n"
+    steps = "".join(f"{n}. Go on.\n" for n in range(2, 7))
+    _add("qa/scenarios/timed.md", f"{front}- {set_up}\n\n## Steps\n\n1. {first_step}\n{steps}")(fixture_product)
+    commit(fixture_product, "a scenario")
+    want = [
+        f"qa/scenarios/timed.md:{line}: Before you start holds only what comes before step 1; move what it does "
+        f"{phrase} into step {step} as its first line, or to the end of step {step - 1}"
+        for line, phrase, step in said
+    ]
+    for changed in (None, ["qa/scenarios/timed.md"]):
+        assert [p for p in qa_scenarios.run(Repo.open(fixture_product, changed), {}) if "timed.md" in p] == want
+    # A branch that left before the product moved such a line is not failed on a scenario it never touched.
+    assert not [p for p in qa_scenarios.run(Repo.open(fixture_product, ["app/notes.py"]), {}) if "timed.md" in p]
+
+
+@pytest.mark.parametrize(
     ("label", "steps", "said"),
     [
         ("", 6, []),

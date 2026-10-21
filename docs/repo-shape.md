@@ -161,6 +161,10 @@ runs: in-turn
   time grows with its items, on the remote desktop too, so a scenario with a long wait, such as a recording or a
   rebuild, names more.
 
+Its `## Before you start` holds only what comes before step 1, since a tester does all of it first. An action timed
+to a later step, such as one "before step 4" or "at step 3", goes into that step as its first line, or at the end of
+the step before. `factory check` refuses one in a scenario the branch adds or changes.
+
 A scenario's full pass carries to a later check while nothing it depends on changes
 ([dev-cycle.md](dev-cycle.md)), so a path every scenario depends on that no `protects` names, such as a lockfile, the
 app's entry point or a shared stylesheet, belongs in `check-values/qa-shared.toml`: `paths = ["uv.lock", "web/app.py"]`.
