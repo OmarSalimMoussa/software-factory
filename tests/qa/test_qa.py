@@ -557,11 +557,14 @@ def test_a_tester_starts_an_items_step_only_once_its_earlier_step_ended_while_an
         ("ag-be", "cart", 7, "cart has 6 steps at aaaaaaaaa: mark one from 1 to 6, and a check of your brief under "
                              "its own item"),
         ("ag-fn", "widths", 1, None),
-        ("ag-fn", "widths", 2, "widths has no numbered steps at aaaaaaaaa, so it is one step: --step widths:1"),
-        ("ag-be", "slow-total", 2, "slow-total has no numbered steps at aaaaaaaaa, so it is one step"),
+        ("ag-fn", "widths", 2, "widths is no scenario with numbered steps at aaaaaaaaa, so it is one step: --step "
+                               "widths:1. Mark a walk of a scenario's steps, whole or part, under the scenario's file "
+                               "name by its own numbers: --step <scenario>:2"),
+        ("ag-be", "nopicture", 2, "nopicture is no scenario with numbered steps at aaaaaaaaa, so it is one step: "
+                                  "--step nopicture:1. Mark a walk of a scenario's steps"),
     ],
     ids=["a-scenarios-last", "past-its-last", "past-its-last-with-no-widths", "a-check", "past-a-check",
-         "past-a-hold"],
+         "past-the-briefs-own-check"],
 )  # fmt: skip
 def test_a_step_is_one_of_its_items_own_numbered_steps(
     ready_world: World, agent: str, item: str, step: int, refused: str | None
@@ -584,19 +587,21 @@ def test_a_step_is_one_of_its_items_own_numbered_steps(
     [
         ([("ag-fn", 1, "pass")], ("ag-fn", 2), None),
         ([("ag-fn", 1, "blocked")], ("ag-fn", 2), None),
-        ([], ("ag-fn", 3), "mark step 1 of cart first"),
+        ([], ("ag-fn", 2), None),
         ([("ag-fn", 1, "pass")], ("ag-fn", 3), "mark step 2 of cart first"),
+        ([("ag-fn", 2, "pass")], ("ag-fn", 4), "mark step 3 of cart first"),
         ([("ag-fn", 1, "pass"), ("ag-fn", 2, "fail")], ("ag-fn", 2), None),
         ([("ag-fn", 1, "pass"), ("ag-fn", 2, "fail")], ("ag-fn", 1), None),
-        ([("ag-ux", 1, "pass")], ("ag-fn", 2), "mark step 1 of cart first"),
+        ([("ag-ux", 1, "pass"), ("ag-ux", 2, "pass"), ("ag-fn", 1, "pass")], ("ag-fn", 3), "mark step 2 of cart first"),
     ],
-    ids=["after-the-step-before", "after-a-blocked-step", "before-the-step-before-started", "past-a-gap",
-         "a-re-walk", "a-re-walk-of-an-earlier-step", "another-testers-marks"],
+    ids=["after-the-step-before", "after-a-blocked-step", "a-part-begins-where-it-does", "past-a-gap",
+         "past-a-gap-in-a-part", "a-re-walk", "a-re-walk-of-an-earlier-step", "another-testers-marks"],
 )  # fmt: skip
-def test_an_items_steps_start_in_order_once_the_step_before_has_the_testers_own_result(
+def test_a_walk_of_an_item_begins_at_any_step_then_goes_in_order_by_the_testers_own_results(
     ready_world: World, walked: list[tuple[str, int, str]], then: tuple[str, int], refused: str | None
 ) -> None:
     # sr425: a tester marked step 4 without its start, then opened step 5, and the replay showed them out of order.
+    # sr428: a brief's check walked steps 1-2 of a scenario, and the tester could mark only one step of it.
     qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
     for agent, step, result in walked:
         ctx = ready_world.ctx("implementer", IMPL_ID, agent)

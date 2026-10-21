@@ -4,11 +4,12 @@ tester got from its result.
 
 `factory qa step --step <item>:<n>` marks a step's start; `factory qa step-result --step <item>:<n> --result
 pass|fail|blocked --got '…'` its end. A step is one of its item's own: a scenario's numbered steps at the tested head,
-or step 1 of an item with none, such as a check, a hold or the widths. An item's steps start in order: step n once
-the tester recorded how step n-1 ended on that head; a step it walked may start again. A result for a step the tester
-never started is refused, so every result has a start, and so is a start while a step of the same item has no
-result, so an item's steps never overlap in the replay; a step of another item, such as a hold the brief counts as its
-own, may run inside one. An implementer's session keeps its testers' marks in the warden's state.
+whatever name the brief gives a walk of them, or step 1 of an item with none, such as a check, a hold or the widths.
+A tester's walk of an item may begin at any step, as a walk of part of a scenario does, and goes on in order from
+there: step n once the tester recorded how step n-1 ended on that head; a step it walked may start again. A result
+for a step the tester never started is refused, so every result has a start, and so is a start while a step of the
+same item has no result, so an item's steps never overlap in the replay; a step of another item, such as a hold the
+brief counts as its own, may run inside one. An implementer's session keeps its testers' marks in the warden's state.
 """
 
 from __future__ import annotations
@@ -54,13 +55,18 @@ def _within(ctx: Context, head: str, item: str, step: int, widths: bool) -> None
             f"its own item{such}",
         )
     if not count and step > 1:
-        raise Refused("qa-step", f"{item} has no numbered steps at {head[:9]}, so it is one step: --step {item}:1")
+        raise Refused(
+            "qa-step",
+            f"{item} is no scenario with numbered steps at {head[:9]}, so it is one step: --step {item}:1. Mark a walk "
+            f"of a scenario's steps, whole or part, under the scenario's file name by its own numbers: --step "
+            f"<scenario>:{step}",
+        )
 
 
 def start(
     ctx: Context, session_id: str, head: str, tester: str, agent: str, args: dict[str, Any], widths: bool
 ) -> dict[str, Any]:
-    """Mark the start of one of the item's own steps on ``head``, once ``agent`` marked how the one before ended."""
+    """Mark the start of one of the item's own steps on ``head``: where ``agent``'s walk of it begins, or next in it."""
     item, step = _mark(args, "qa-step")
     _within(ctx, head, item, step, widths)
     record = {"item": item, "step": step, "head": head, "tester": tester, "agent": agent, "at": ctx.clock.iso()}
@@ -74,13 +80,15 @@ def start(
                 f"mark how step {was_step} of {was_item} ended first: factory qa step-result --head <sha> --step "
                 f"{was_item}:{was_step} --result pass|fail|blocked --got '…'",
             )
-        ended = {m.get("step") for m in marks if "result" in m and m.get("head") == head}
-        if step > 1 and step - 1 not in ended:
-            first = min(set(range(1, step)) - ended)
+        on_head = [m for m in marks if m.get("head") == head]
+        ended = {m["step"] for m in on_head if "result" in m}
+        begun = [m["step"] for m in on_head if "result" not in m and m["step"] < step]
+        if begun and not {step - 1, step} & ended:
+            first = min(set(range(min(begun), step)) - ended)
             raise Refused(
                 "qa-step",
-                f"an item's steps go in order: mark step {first} of {item} first, its start and how it ended; a step "
-                "you could not walk ends --result blocked",
+                f"a walk of an item goes on in order from the step it began at: mark step {first} of {item} first, "
+                "its start and how it ended; a step you could not walk ends --result blocked",
             )
         store.append_jsonl(path(ctx, session_id), record)
     return record
