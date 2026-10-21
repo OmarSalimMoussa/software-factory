@@ -95,7 +95,8 @@ def _tasks(sub: Any) -> None:
 def _qa(sub: Any) -> None:
     said = ("qa plan | step --head … --step <item>:<n> | step-result --head … --step <item>:<n> --result "
             "pass|fail|blocked --got … | finding --head … --severity … --where … [--step <item>:<n>] --body <file> | "
-            "result --head … [--blocked '<what stopped you>'] | waive <task> <finding> --why …")  # fmt: skip
+            "result --head … [--blocked '<what stopped you>'] | waive <task> <finding> --why … "
+            "[--filed r-…]")  # fmt: skip
     qa = sub.add_parser("qa", help=said)
     qa.add_argument("what", choices=["plan", "step", "step-result", "finding", "result", "waive", "scenario"])
     qa.add_argument("words", nargs="*")
@@ -107,6 +108,7 @@ def _qa(sub: Any) -> None:
     qa.add_argument("--got", default="")
     qa.add_argument("--body")
     qa.add_argument("--why", default="")
+    qa.add_argument("--filed", default="", help="waive: the request that tracks the finding as an older fault")
     qa.add_argument("--blocked", default="")
     ready = sub.add_parser("qa-ready")
     ready.add_argument("head")

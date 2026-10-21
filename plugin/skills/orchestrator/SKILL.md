@@ -100,7 +100,8 @@ is live and nothing merged for a while, a regression walk of the scenarios that 
   `factory status` says why each one still waits. A designed build's implementer starts the same way once you
   approve its spec or the owner says Go.
 - **Disputed findings.** An implementer that disputes a tester's finding with evidence asks you to rule. If the
-  evidence holds, `factory qa waive <task> <finding> --why "<why>"`: it no longer counts toward qa-clean.
+  evidence holds, `factory qa waive <task> <finding> --why "<why>"`: it no longer counts toward qa-clean. One found at
+  a step waits for a later tester's pass of it on that head, or `--filed r-…`, the request tracking an older fault.
 - **Questions.** Answer from `GOAL.md`, the task's log and the owner's past rulings; about a factory command, from
   what you saw and its `--help`, never from what it might do. Ask the owner only what is theirs: the product's
   vision, its quality bar, or what comes first. When none of those answers it:

@@ -135,6 +135,13 @@ def test_a_reproduction_asks_for_one_and_a_ready_head_does_not() -> None:
     assert _build(["qa-ready", "abc1234"]).args == {"head": "abc1234"}
 
 
+def test_a_waiver_names_the_request_it_rests_on_only_when_given() -> None:
+    ruling = {"task": "t-0001", "finding": "f-2", "why": "older"}
+    assert _build(["qa", "waive", "t-0001", "f-2", "--why", "older"]).args == ruling
+    filed = _build(["qa", "waive", "t-0001", "f-2", "--why", "older", "--filed", "r-2026-10-09-0001"])
+    assert filed.args == {**ruling, "filed": "r-2026-10-09-0001"}
+
+
 def test_task_facts_arrive_typed() -> None:
     call = _build(["queue", "task", "facts", "t-0001", "--surfaces", "ui,", "api", "--slices", "2", "--after", "t-2"])
     assert call.args == {"task": "t-0001", "surfaces": ["ui", "api"], "slices": 2, "after": ["t-2"]}

@@ -79,6 +79,8 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
    neither from a brief, brings the desktop up itself, and leaves it for the warden to take down at its hand-back.
 5. **Findings** are claims to check (the `taking-review` skill): fix it, dispute it with evidence (the orchestrator
    may waive it: `factory qa waive <task> <finding> --why "…"`), or file it when it is outside your task: `factory request new --from <tester> --severity normal --where "<where>" --body <file>`.
+   A finding at a step is waived only once a later tester passes that step on the same head, or with `--filed r-…`,
+   the request you filed for a fault older than your branch.
    Each bug a tester caught gets a test, or a scenario step, that would catch it again. A tester the environment
    stopped (a missing key, seed or account, a site it cannot reach) is no finding: tell the orchestrator what
    stopped it. It blocks the task, and you are benched until the owner fixes it.

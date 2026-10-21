@@ -167,6 +167,53 @@ def test_qa_clean_waits_for_every_required_tester_on_the_head(ready_world: World
     assert world.queue().task("t-0001").status == "qa-clean"
 
 
+def _step(world: World, agent: str, mark: str, result: str) -> None:
+    ctx, (item, n) = world.ctx("implementer", IMPL_ID, agent), mark.split(":")
+    qa.qa_step(ctx, {"head": HEAD[:9], "item": item, "step": int(n)}, None)
+    qa.qa_step_result(ctx, {"head": HEAD[:9], "item": item, "step": int(n), "result": result, "got": "seen"}, None)
+
+
+@pytest.mark.parametrize(
+    ("again", "filed", "refused"),
+    [
+        (None, None, "walks that step on aaaaaaaaa again and it passes, or name the request that tracks it"),
+        (("ag-fn2", "sign-in:2", "pass"), None, None),
+        (("ag-fn2", "sign-in:3", "pass"), None, "walks that step"),
+        (("ag-fn2", "sign-in:2", "fail"), None, "walks that step"),
+        (("ag-fn", "sign-in:2", "pass"), None, "walks that step"),
+        (None, "older", None),
+        (None, "own", "is t-0001's own request"),
+        (None, "r-2026-10-09-0099", "no request r-2026-10-09-0099"),
+    ],
+    ids=["neither", "a-later-tester-passed-it", "another-step", "failed-again", "the-same-testers-retry",
+         "an-older-faults-request", "the-tasks-own-request", "no-such-request"],
+)  # fmt: skip
+def test_a_finding_at_a_step_is_waived_once_a_later_tester_passed_it_or_a_request_tracks_it_as_older(
+    ready_world: World, again: tuple[str, str, str] | None, filed: str | None, refused: str | None
+) -> None:
+    # sr328: 'typed keys never showed' was waived as a missed aim, and the next round showed a real defect.
+    world = ready_world
+    qa.qa_ready(world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
+    world.session(
+        "ag-fn2", "qa-ui-function", "impl-t-0001.qa-ui-function-2", "t-0001", agent_id="ag-fn2", parent=IMPL_ID
+    )
+    _step(world, "ag-fn", "sign-in:2", "fail")
+    args = {"head": HEAD[:9], "severity": "major", "where": "/sign-in", "step": "sign-in:2"}
+    finding = qa.qa_finding(world.ctx("implementer", IMPL_ID, "ag-fn"), args, b"Typed keys never showed.")["finding"]
+    world.clock.at += 60
+    if again is not None:
+        _step(world, *again)
+    named = {"older": world.request().id, "own": world.queue().task("t-0001").requests[0]}.get(filed or "", filed)
+    ruling = {"task": "t-0001", "finding": finding, "why": "an older fault", **({"filed": named} if named else {})}
+
+    if refused is not None:
+        with pytest.raises(Refused, match=refused):
+            qa.qa_waive(world.ctx(), ruling, None)
+    else:
+        qa.qa_waive(world.ctx(), ruling, None)
+    assert findings.open_count(world.ctx(), "t-0001", HEAD, "qa-ui-function") == (1 if refused else 0)
+
+
 def test_a_blocked_verdict_holds_qa_clean_until_the_tester_walks_again(ready_world: World) -> None:
     world, impl = ready_world, ready_world.ctx("implementer", IMPL_ID)
     qa.qa_ready(impl, {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)

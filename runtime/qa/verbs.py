@@ -242,10 +242,10 @@ def qa_step_result(ctx: Context, args: dict[str, Any], data: bytes | None) -> di
 
 def qa_waive(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """The orchestrator's ruling on a disputed finding: it no longer counts, for the reason given."""
-    task, finding = args.get("task"), args.get("finding")
-    if not isinstance(task, str) or not isinstance(finding, str):
-        raise Refused("qa-waive", "factory qa waive <task> <finding> --why '…'")
-    findings.waive(ctx, task, finding, str(args.get("why", "")))
+    task, finding, filed = args.get("task"), args.get("finding"), args.get("filed")
+    if not isinstance(task, str) or not isinstance(finding, str) or not isinstance(filed, str | None):
+        raise Refused("qa-waive", "factory qa waive <task> <finding> --why '…' [--filed r-…]")
+    findings.waive(ctx, task, finding, str(args.get("why", "")), filed)
     return ok(task=task, waived=finding)
 
 

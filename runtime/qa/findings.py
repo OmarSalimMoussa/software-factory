@@ -4,7 +4,8 @@ A tester records each finding as it finds it (`factory qa finding`), on the head
 own words, and the step it is on when it has one (``item:n``), which the replay shows beside that step. Its verdict
 (`factory qa result`) is counted from those records, never typed. qa-clean counts the open blockers and majors each
 required tester found on the final head; one the orchestrator waived (`factory qa waive`, with why) no longer
-counts. Each task keeps its findings and waivers in the warden's state.
+counts. One found at a step is waived only once a later tester passed that step on its head, or with the request that
+tracks it as a fault older than the branch. Each task keeps its findings and waivers in the warden's state.
 """
 
 from __future__ import annotations
@@ -13,12 +14,15 @@ import re
 from pathlib import Path
 from typing import Any
 
+from runtime.qa import steps
 from runtime.qa.steps import ITEM
 from runtime.queue import formats, intake
+from runtime.queue.book import Queue
 from runtime.shared import store
 from runtime.shared.models import OPEN_SEVERITIES, SEVERITIES
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
+from runtime.warden.sessions import registry
 
 OPEN = OPEN_SEVERITIES
 _ID = re.compile(r"^f-\d{1,6}$")
@@ -56,13 +60,48 @@ def add(
     return finding
 
 
-def waive(ctx: Context, task_id: str, finding: str, why: str) -> None:
-    """The orchestrator rules a disputed finding no longer counts, with why."""
-    if not _ID.match(finding) or not any(r.get("finding") == finding for r in _records(ctx, task_id)):
+def waive(ctx: Context, task_id: str, finding: str, why: str, filed: str | None) -> None:
+    """The orchestrator rules a disputed finding no longer counts, with why, and ``filed``: the request that tracks
+    it as an older fault."""
+    found = next((r for r in _records(ctx, task_id) if r.get("finding") == finding), None)
+    if not _ID.match(finding) or found is None:
         raise Refused("qa-waive", f"{task_id} has no finding {finding}")
     if not why.strip():
         raise Refused("qa-waive", "say why the finding no longer counts: --why '…'")
-    store.append_jsonl(_path(ctx, task_id), {"waived": finding, "why": formats.one_line(why), "at": ctx.clock.iso()})
+    if filed is not None:
+        _tracks(ctx, task_id, filed)
+    elif "step" in found and not _passed_later(ctx, task_id, found):
+        item, _, n = found["step"].partition(":")
+        raise Refused(
+            "qa-waive",
+            f"{finding} was found at step {n} of {item}: waive it once a later tester walks that step on "
+            f"{found['head'][:9]} again and it passes, or name the request that tracks it as a fault older than the "
+            f"branch: factory qa waive {task_id} {finding} --filed r-… --why '…'",
+        )
+    store.append_jsonl(_path(ctx, task_id), {"waived": finding, "why": formats.one_line(why), "at": ctx.clock.iso(),
+                                              **({"filed": filed} if filed else {})})  # fmt: skip
+
+
+def _passed_later(ctx: Context, task_id: str, found: dict[str, Any]) -> bool:
+    item, _, n = found["step"].partition(":")
+    runs = [s.id for s in registry.read(ctx.places).values() if s.task == task_id]
+    return any(
+        r.get("result") == "pass"
+        and (r["item"], r["step"], r["head"]) == (item, int(n), found["head"])
+        and r["agent"] != found["agent"]
+        and r["at"] > found["at"]
+        for run in runs
+        for r in store.read_jsonl(steps.path(ctx, run))
+    )
+
+
+def _tracks(ctx: Context, task_id: str, filed: str) -> None:
+    try:
+        req = Queue.of(ctx).request(filed)
+    except FileNotFoundError as exc:
+        raise Refused("qa-waive", f"no request {filed}: file the older fault with factory request new") from exc
+    if formats.outcome(req.outcome).task == task_id:
+        raise Refused("qa-waive", f"{filed} is {task_id}'s own request, not one that tracks an older fault")
 
 
 def counts(ctx: Context, task_id: str, head: str, **who: str) -> dict[str, int]:
