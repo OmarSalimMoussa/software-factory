@@ -106,8 +106,8 @@ def _triage_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> C
 
 
 def _needs_owner_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:
-    args = {k: getattr(ns, k) for k in ("task", "ask", "question") if getattr(ns, k)}
-    return Call("needs-owner", args, read_file(ns.picture))
+    args = {k: getattr(ns, k) for k in ("task", "ask", "question", "act") if getattr(ns, k)}
+    return Call("needs-owner", args, read_file(ns.picture) if ns.picture else None)
 
 
 def _brief_call(ns: argparse.Namespace, read_file: Callable[[str], bytes]) -> Call:

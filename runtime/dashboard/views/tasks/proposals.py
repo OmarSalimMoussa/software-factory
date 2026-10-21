@@ -34,6 +34,7 @@ DONE_WORDS = {
     "park": "Parked until the goal changes.",
     "answer": "Your answer is on its way to the session.",
     "fixed": "Back to its builder, who carries on when a place frees.",
+    "done": "Done. The orchestrator checks that it worked.",
 }
 
 
@@ -199,6 +200,8 @@ def needs(snap: Snap) -> dict[str, Any]:
                 icon="no-symbol",
                 actions=["fixed"],
             )
+        elif card["kind"] == "act":
+            row.update(chips=[{"text": "Only you can do this", "tone": "warn"}], icon="bolt", actions=["done"])
         elif card["kind"] == "decide":
             row.update(
                 title=f"{card['title']} needs your decision",

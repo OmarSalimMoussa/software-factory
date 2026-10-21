@@ -167,10 +167,11 @@ class Approval:
 
 @dataclass(slots=True)
 class Card:
-    """Something that needs the owner, other than a proposal: a spec's sign-off, a decision, a question, a block."""
+    """Something that needs the owner, other than a proposal: a spec's sign-off, a decision, a question, a block, a
+    step only a person can take."""
 
     id: str
-    kind: str  # spec, decide, question, blocked
+    kind: str  # spec, decide, question, blocked, act
     task: str
     title: str
     ask: str

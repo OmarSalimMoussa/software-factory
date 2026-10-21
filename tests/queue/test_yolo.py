@@ -79,7 +79,7 @@ def test_yolo_approves_again_a_task_whose_own_run_holds_its_place_though_no_othe
 
 
 def test_yolo_answers_a_question_asked_of_the_owner_as_the_owner(world: World) -> None:
-    asked = cards.needs_owner(world.ctx("designer", "s-design"), world.task().id, "", "Keep the link?", PICTURE)
+    asked = cards.needs_owner(world.ctx("designer", "s-design"), world.task().id, "", "Keep the link?", "", PICTURE)
     _switch(world, True)
 
     yolo.run_pass(world.ctx())

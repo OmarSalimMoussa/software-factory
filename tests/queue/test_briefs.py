@@ -78,7 +78,7 @@ def test_a_spec_revised_while_the_owners_card_is_open_sets_its_designer_waiting_
     documents.save_spec(ctx, task, b"# A spec\n\nThe plan.\n", 2)
     briefs.save(ctx, {"task": task}, PAGE)
     if asked:
-        cards.needs_owner(ctx, task, "Go?", "", PICTURE)
+        cards.needs_owner(ctx, task, "Go?", "", "", PICTURE)
     sessions = registry.read(world.places)  # the owner's feedback set it working on the revision
     sessions["s-design"] = dataclasses.replace(sessions["s-design"], state=WORKING)
     registry.write(world.places, sessions)
@@ -93,10 +93,10 @@ def test_a_specs_sign_off_names_the_brief_version_it_asks_on(world: World) -> No
     world.queue().write_task(dataclasses.replace(world.queue().task(task), status="designing", run=4))
     documents.save_spec(ctx, task, b"# A spec\n\nThe plan.\n", 2)
     with pytest.raises(Refused, match="save the brief"):
-        cards.needs_owner(ctx, task, "Go?", "", PICTURE)
+        cards.needs_owner(ctx, task, "Go?", "", "", PICTURE)
     briefs.save(ctx, {"task": task}, PAGE)
     briefs.save(ctx, {"task": task}, PAGE)
 
-    card = cards.needs_owner(ctx, task, "Go?", "", PICTURE)
+    card = cards.needs_owner(ctx, task, "Go?", "", "", PICTURE)
 
     assert (card.kind, card.brief) == ("spec", "v2")

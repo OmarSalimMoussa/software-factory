@@ -90,6 +90,7 @@ def test_a_named_file_is_sent_as_its_bytes_never_as_its_path(argv: list[str]) ->
         ["brief", "comments", "t-0001"],
         ["brief", "reply", "t-0001", "c1", "Cut to 180 ms."],
         ["needs-owner", "t-0001", "--picture", FILE, "--question", "Why?"],
+        ["needs-owner", "t-0001", "--act", "Restart prod's Caddy"],
         ["turn", "next"],
         ["slot", "claim"],
         ["slot", "up", "web"],

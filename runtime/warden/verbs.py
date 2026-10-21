@@ -142,6 +142,7 @@ VERBS: dict[str, Verb] = {
     "needs.park": _o("runtime.queue.verbs:owner_park"),
     "needs.answer": _o("runtime.queue.verbs:owner_answer"),
     "needs.fixed": _o("runtime.queue.verbs:owner_fixed"),
+    "needs.done": _o("runtime.queue.verbs:owner_done"),
     "agent.message": _o("runtime.warden.owner.messages:send"),  # contract: the owner's message to a running session
     "agent.stop": _o("runtime.warden.sessions.lifecycle:stop"),
     "orchestrator.start": _o("runtime.warden.sessions.lifecycle:owner_start_orchestrator"),

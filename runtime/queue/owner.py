@@ -249,6 +249,15 @@ def fixed(ctx: Context, card_id: str) -> dict[str, Any]:
     return {"card": card_id, "task": card.task, "status": moved.status}
 
 
+def done(ctx: Context, card_id: str) -> dict[str, Any]:
+    """The owner took the step a card asked for: the orchestrator hears it, to see that it worked."""
+    with ctx.lock:
+        found, card = cards.find(ctx.places, card_id, "act")
+        cards.settle(ctx, found, card, "done")
+    ctx.post_event(inbox.ACTED, {"card": card_id, "task": card.task, "ask": card.ask})
+    return {"card": card_id, "task": card.task}
+
+
 def _before_decide(queue: Queue, task_id: str) -> str:
     """The running status a spent limit took the task from: a designer's task goes back to designing, an
     implementer's to where it was, so its own session carries on. A merge turn is not held while the owner

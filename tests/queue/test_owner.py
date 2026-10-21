@@ -9,13 +9,13 @@ from collections.abc import Callable
 import pytest
 from queue_kit import PICTURE, World
 
-from runtime.queue import cards, formats, owner, proposals, turn
+from runtime.queue import cards, formats, owner, proposals, turn, verbs
 from runtime.queue.book import task_rel
 from runtime.queue.propose import propose
 from runtime.shared import store
 from runtime.shared.models import RETIRED, STOPPED, WAITING, WORKING
 from runtime.shared.protocol import Refused
-from runtime.warden.owner import ops, reflections
+from runtime.warden.owner import ops, reflections, yolo
 from runtime.warden.sessions import backstop, limits, registry
 from runtime.warden.sessions.backstop import Proc
 
@@ -50,7 +50,7 @@ def test_each_proposal_decision_posts_its_event(
 
 def test_a_question_card_carries_the_answer_back_to_the_session_that_asked(world: World) -> None:
     task = world.task()
-    asked = cards.needs_owner(world.ctx("designer", "s-design"), task.id, "", "Keep the old link?", PICTURE)
+    asked = cards.needs_owner(world.ctx("designer", "s-design"), task.id, "", "Keep the old link?", "", PICTURE)
     owner.answer(world.owner(), asked.id, "Yes,\nkeep it")
     assert world.events[-1] == ("answered", {"card": asked.id, "task": task.id, "session": "s-design",
                                              "answer": "Yes, keep it"})  # fmt: skip
@@ -58,10 +58,31 @@ def test_a_question_card_carries_the_answer_back_to_the_session_that_asked(world
         owner.answer(world.owner(), asked.id, "No")
 
 
-def test_a_card_for_the_owner_needs_a_picture(world: World) -> None:
+CADDY = "Restart prod's Caddy: it runs an older Caddyfile, so sign-ins fail. It worked once the live view signs in."
+
+
+def test_the_orchestrator_asks_the_owner_for_a_step_only_a_person_can_take_in_words_alone(world: World) -> None:
+    task = world.task()
+    world.write_raw(task_rel(task.id), formats.dump_task(dataclasses.replace(task, status="designing", run=3)))
+    yolo.owner_switch(world.owner(), {"on": True}, None)
+    with pytest.raises(Refused, match="save the brief"):  # a spec's sign-off is on its brief
+        verbs.needs_owner(world.ctx(), {"task": task.id, "ask": CADDY}, PICTURE)
+
+    said = verbs.needs_owner(world.ctx(), {"task": task.id, "act": CADDY}, None)
+    yolo.run_pass(world.ctx())
+
+    [card] = cards.read(world.places)
+    assert (said["kind"], card.ask, card.answered) == ("act", CADDY, "")
+    assert world.queue().task(task.id).status == "designing"
+    owner.done(world.owner(), card.id)
+    assert world.events[-1] == ("acted", {"card": card.id, "task": task.id, "ask": CADDY})
+    assert [c.answered for c in cards.read(world.places)] == ["done"]
+
+
+def test_a_question_for_the_owner_needs_a_picture(world: World) -> None:
     task = world.task()
     with pytest.raises(Refused, match="picture"):
-        cards.needs_owner(world.ctx("designer", "s-design"), task.id, "", "Keep the old link?", None)
+        cards.needs_owner(world.ctx("designer", "s-design"), task.id, "", "Keep the old link?", "", None)
 
 
 @pytest.mark.parametrize("now", ["s-impl", "s-copy"], ids=["as-it-asked", "come-back-as-a-copy"])
@@ -70,7 +91,7 @@ def test_the_asking_session_waits_and_the_answer_reaches_it_once_and_it_works_ag
 ) -> None:
     task = world.task()
     world.session("s-impl", "implementer", "impl-t-0001", task.id)
-    asked = cards.needs_owner(world.ctx("implementer", "s-impl"), task.id, "", "Keep the old link?", PICTURE)
+    asked = cards.needs_owner(world.ctx("implementer", "s-impl"), task.id, "", "Keep the old link?", "", PICTURE)
     if now != "s-impl":  # it came back as a copy while it waited: its row moved, and the history says where
         sessions = registry.read(world.places)
         sessions[now] = dataclasses.replace(sessions.pop("s-impl"), id=now)

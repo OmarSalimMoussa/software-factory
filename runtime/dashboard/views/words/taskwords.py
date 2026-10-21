@@ -71,6 +71,7 @@ NEED_ACTIONS: dict[str, dict[str, Any]] = {
     "park": {"label": "Park", "icon": None, "primary": False},
     "answer": {"label": "Send answer", "icon": "check", "primary": True},
     "fixed": {"label": "Fixed, carry on", "icon": "check", "primary": True},
+    "done": {"label": "Done", "icon": "check", "primary": True},
 }
 _TASK_FIELDS = frozenset(f.name for f in dataclasses.fields(Task))
 LANDED = ("merged", "checked", ON_STAGING, "promoted")

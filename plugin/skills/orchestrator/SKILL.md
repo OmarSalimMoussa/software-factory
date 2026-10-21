@@ -41,12 +41,11 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 | `approved` | The warden starts it when a place frees. Fill the free proposal slot. |
 | `not-now`, `dropped`, `proposal-slot-free` | Fill the free proposal slots. |
 | `boosted` | Propose the task it names now: it goes first, even when every slot is held. |
-| `go` | The owner said Go to a spec: the warden starts its build when a place frees and ends its designer. Nothing to do. |
 | `check due` | The default branch's newest commit (the event's `commit`) waits on nothing but `factory check`: the owner's own change, or a revert. Run `factory check` in the main checkout; once it passes, bring slot 0 up at it (`factory slot up`), so staging runs it. A failure becomes a request. |
 | `decided-extend`, `park`, `to-designer` | The owner decided a stuck task; the warden told its session or ended it. `to-designer`: propose it at rung 3. |
-| `limit-extended`, `unblocked` | The owner gave a session more of a limit, or fixed what blocked a task; the warden told it, or brings its implementer back when a place frees. Nothing to do. |
+| `go`, `limit-extended`, `unblocked` | The owner said Go to a spec, gave a session more of a limit, or fixed what blocked a task: the warden starts the build and ends the designer, tells the session, or brings the implementer back, each when a place frees. Nothing to do. |
 | `still blocked` | Each task it names has been blocked past `queue.blocked_recheck_hours`, with how long and why. Have a subagent re-check each blocker, and never wait for the owner. Cleared, with no owner card open: lift it (`building --note "<what cleared>"`, below). Still blocked: block it again saying why it still waits and what would fix it; that goes on the owner's card and restarts its count. |
-| `answered` | The owner answered a question you asked: act on it. A session's own answer reaches it from the warden. |
+| `answered`, `acted` | The owner answered a question you asked, or took the step an `--act` card named: act on the answer, or see that the step worked. A session's own answer reaches it from the warden. |
 | `stopped` | The owner stopped a run. Its task is back in Proposed with its branch kept: nothing to undo. |
 | `benched` | A session was benched for higher work and keeps its context; the warden starts what it made room for. |
 | `crashed` | A session kept dying and was retired. Its task is back in Proposed with its branch kept: propose it again. |
@@ -110,8 +109,9 @@ is live and nothing merged for a while, a regression walk of the scenarios that 
 - **Reports.** A session's report that asks nothing gets no reply: a reply wakes it, and it must then tell you
   something again before it may stop.
 - **What only the owner can give** (a key, an account, a paid service, leave to use an outside site): never wait for
-  it. A task it stops is blocked (below); anything else goes to `factory reflect --kind friction "<what is missing and what it
-  stops>"`, and you move on.
+  it. A task it stops is blocked (below). A step only a person can take, such as on prod, is `factory needs-owner
+  [<task>] --act "<what to do, why, how to tell it worked>"`, in words, no brief or picture; anything else goes to
+  `factory reflect --kind friction "<what is missing and what it stops>"`. Then move on.
 - **Specs.** A rung 3 designer hands back its spec and brief: approve it if it serves the task's goal item and stays
   within rung 3 (`factory queue task status <task> building`); the warden starts its implementer. A spec that turned
   out large and visible goes back to the owner one rung up.

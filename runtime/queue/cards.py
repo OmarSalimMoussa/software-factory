@@ -1,6 +1,6 @@
-"""Cards that ask for the owner beside the proposals: a spec's second sign-off, a stuck task's decision, and a
-session's question (routing spec, R14, R15). Each carries a picture of what it asks; the warden keeps them in its
-own cards.json, where no agent writes.
+"""Cards that ask for the owner beside the proposals: a spec's second sign-off, a stuck task's decision, a session's
+question (routing spec, R14, R15), each with a picture of what it asks; and, in words alone, a blocked task's fix and
+a step only a person can take. The warden keeps them in its own cards.json, where no agent writes.
 """
 
 from __future__ import annotations
@@ -54,17 +54,23 @@ def _add(ctx: Context, card: Card, picture: bytes | None) -> Card:
     return card
 
 
-def needs_owner(ctx: Context, task_id: str, ask: str, question: str, picture: bytes | None) -> Card:
-    """A spec's sign-off, on the task's latest saved brief, or a question with a text answer; both carry a picture."""
-    if picture is None:
+def needs_owner(ctx: Context, task_id: str, ask: str, question: str, act: str, picture: bytes | None) -> Card:
+    """A spec's sign-off, on the task's latest saved brief, or a question with a text answer, both with a picture; or
+    a step only a person can take, in words alone, which the owner marks done."""
+    if [bool(ask), bool(question), bool(act)].count(True) != 1:
+        raise Refused("needs-owner", "ask for a spec's sign-off with <task> --ask, ask --question, or name a step "
+                      "only a person can take with --act")  # fmt: skip
+    if picture is None and not act:
         raise Refused("picture", "a card for the owner carries a picture: --picture <file.svg|file.png>")
-    if bool(ask) == bool(question):
-        raise Refused("needs-owner", "ask for a spec's sign-off with <task> --ask, or ask --question")
     queue = Queue.of(ctx)
     by = tasks.actor(ctx)
     with ctx.lock, queue.lock():
         task = queue.task(task_id) if task_id or ask else None
         now = ctx.clock.iso()
+        if act:
+            title = task.title if task else "A step for you"
+            card = Card("", "act", task_id, title, formats.one_line(act), now, asked_by=ctx.caller.session)
+            return _add(ctx, card, picture)
         if question:
             title = task.title if task else "A question"
             card = Card("", "question", task_id, title, formats.one_line(question), now, asked_by=ctx.caller.session)

@@ -9,8 +9,8 @@ import pytest
 from dashboard_rig import Rig
 from dashboard_seed import blocked
 
+from runtime.shared import models, store
 from runtime.shared import settings as settings_module
-from runtime.shared import store
 from runtime.warden.owner import ops
 
 STALE = {"ok": False, "refused": "stale", "reason": "This changed; here it is now."}
@@ -76,6 +76,19 @@ def test_a_blocked_task_says_you_fix_it_only_while_the_owners_card_is_open_and_i
     if card_open:
         sent = {"version": panel["blocked"]["version"], "idempotency_key": "fixed-0002"}
         assert json.loads(rig.post("/api/needs/n4/fixed", sent).body)["ok"]
+
+
+def test_a_step_only_the_owner_can_take_shows_on_home_and_done_tells_the_orchestrator(rig: Rig) -> None:
+    step = "Restart prod's Caddy: it runs an older Caddyfile. It worked once the live view signs in."
+    card = models.Card("n5", "act", "t-0020", "Long project names wrap badly", step, "2026-10-09T11:00:00Z")
+    store.write_json(rig.places.cards, [*store.read_json(rig.places.cards), models.dump(card)])
+
+    row = next(c for c in rig.parts("/api/home")["needs"]["data"]["cards"] if c["id"] == "n5")
+    reply = rig.post("/api/needs/n5/done", {"version": row["version"], "idempotency_key": "done-0001"})
+
+    assert (row["sub"], [a["label"] for a in row["actions"]]) == (step, ["Done"])
+    assert json.loads(reply.body)["message"] == "Done. The orchestrator checks that it worked."
+    assert rig.warden.events[-1] == ("acted", {"card": "n5", "task": "t-0020", "ask": step})
 
 
 def test_a_move_sends_the_warden_its_own_order_once_the_device_saw_the_same(rig: Rig) -> None:

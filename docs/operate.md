@@ -49,9 +49,9 @@ or from `/opt/software-factory`.
 - **Home** shows what needs you: up to three proposals, each with a picture and why now. Approve, reorder or say not
   now. Nothing starts until you approve it, except the fix for a clear prod outage.
 - **Also needs you** holds the rest: a spec to sign off (open its brief, select text to comment on, press Go or Send
-  feedback), a stuck task (Extend, To a designer or Park), questions from sessions, and a task blocked by what only you
-  can give, such as a key: give it, then press **Fixed, carry on**. A task that says only Blocked waits on the factory;
-  its panel says why. One waiting for another task's check is on hold, and comes back by itself.
+  feedback), a stuck task (Extend, To a designer or Park), questions, a step only you can take (do it, press **Done**),
+  and a task blocked by what only you can give, such as a key (give it, press **Fixed, carry on**). A plain Blocked
+  waits on the factory; its panel says why. A task on hold waits for another task's check, and comes back by itself.
 - **Boost** any queued task or request on the Work page to make it the next proposal.
 - **Done**, on the Work page, lists each finished task and how far it has reached: local, GitHub, staging, prod.
   Its Open button opens staging, which is slot 0, signed in as the test address you set under Settings, Slots.

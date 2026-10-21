@@ -249,6 +249,7 @@ WRITES: list[tuple[re.Pattern[str], Write]] = [
     _needs("park", "needs.park", lambda b, r, s: {"card": r}),
     _needs("answer", "needs.answer", lambda b, r, s: {"card": r, "answer": _text(b, "text")}),
     _needs("fixed", "needs.fixed", lambda b, r, s: {"card": r}),
+    _needs("done", "needs.done", lambda b, r, s: {"card": r}),
     _w(f"agents/{_P}/stop", "agent.stop", lambda b, r, s: {"session": r},
        lambda a, s: _stopped(a), ["agents", "home", "shell"], _agent_check, ("sessions",)),
     _w("agent/message", "agent.message", lambda b, r, s: {"session": _text(b, "session"), "text": _said_text(b)},

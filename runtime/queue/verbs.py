@@ -156,8 +156,8 @@ def spec_save(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
 
 
 def needs_owner(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
-    optional = {k: _text(args, k, required=False) for k in ("task", "ask", "question")}
-    card = cards.needs_owner(ctx, optional["task"], optional["ask"], optional["question"], data)
+    optional = {k: _text(args, k, required=False) for k in ("task", "ask", "question", "act")}
+    card = cards.needs_owner(ctx, optional["task"], optional["ask"], optional["question"], optional["act"], data)
     return ok(card=card.id, kind=card.kind)
 
 
@@ -247,6 +247,10 @@ def owner_park(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
 
 def owner_fixed(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
     return ok(**owner.fixed(ctx, _text(args, "card")))
+
+
+def owner_done(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
+    return ok(**owner.done(ctx, _text(args, "card")))
 
 
 def owner_answer(ctx: Context, args: Args, data: bytes | None) -> dict[str, Any]:
