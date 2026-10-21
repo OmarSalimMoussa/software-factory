@@ -30,7 +30,8 @@ To probe from inside the slot, run one command in a new container of a service:
 `factory slot run <service> -- <command>`. It has the service's image, settings and network, so it reaches what that
 service reaches, such as an internal port or socket, and shows what the image holds. A service that mounts Docker's
 socket is refused: any command there would command the machine. It stops at `slots.run_seconds`
-and its container is removed after; no command opens a shell in a running container.
+and its container is removed after. To look inside one of the slot's running containers, such as a browser the
+stack started, run `factory slot exec <container> -- <command>`; `factory slot top` names them.
 
 ## What you look for
 

@@ -208,3 +208,7 @@ def _slot(sub: Any) -> None:
     run = ops.add_parser("run", usage="factory slot run <service> -- <command> [word ...]")
     run.add_argument("service")
     run.add_argument("command", nargs="+")
+    inside = "one command in a container of your slot that cannot command Docker, such as a browser the stack started"
+    exec_in = ops.add_parser("exec", usage="factory slot exec <container> -- <command> [word ...]", help=inside)
+    exec_in.add_argument("container")
+    exec_in.add_argument("command", nargs="+")

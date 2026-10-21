@@ -6,11 +6,12 @@ answer carries scripts/dev's exit status and the tail of its output; the full lo
 
 A tester only reads its slot and what runs on it, signs in and opens its desktop: seeds and the stack are its
 parent's. The slot's own session, an implementer or the orchestrator, may run one command in a new container of a
-service, such as a scenario's set-up; so may its backend and security testers, to look from inside the slot's
-network. One tester holds a slot's desktop at a time, until its parent or, once it hands back, the warden takes it
-down; another tester's `desktop up` waits, so no one's new password cuts off a tester mid-step. A desktop walk runs
-alone: a tester's `desktop up` records its desktop first, which holds back new browser walks, then waits for the
-other browser testers to hand back, within the same minutes. While the machine's CPU use is past
+service, such as a scenario's set-up, or in one of the slot's own containers; so may its backend and security testers,
+to look from inside the slot's network; neither in a container that commands Docker (the stack unit's
+docker_reach.py). One tester holds a slot's desktop at a time, until its parent or, once it hands back, the warden
+takes it down; another tester's `desktop up` waits, so no one's new password cuts off a tester mid-step. A desktop
+walk runs alone: a tester's `desktop up` records its desktop first, which holds back new browser walks, then waits for
+the other browser testers to hand back, within the same minutes. While the machine's CPU use is past
 budget.walk_hold_percent, a session's own `desktop up` waits too (runtime/guard/walk_hold.py), but never a tester's,
 whose walk the hold let start; the wait counts per slot, in the warden's memory, so a restart begins it again. Slot 0
 is staging, so it comes up whole: one build of the stack, never a service at a time, at the tip or, for a check, an
@@ -33,7 +34,7 @@ from runtime.slots import health, leases, staging
 from runtime.warden import public
 from runtime.warden.context import Context, StackResult
 from runtime.warden.sessions import permits, registry
-from runtime.warden.verbs import IMPL, ORCH, slot_ops
+from runtime.warden.verbs import IMPL, ORCH, SLOT_EXEC, slot_ops
 
 WORD = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@+-]{0,127}$")
 EMAIL = re.compile(r"^[A-Za-z0-9._+-]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
@@ -224,12 +225,12 @@ def _verb(op: object, args: dict[str, Any]) -> list[str]:
         return _seed_verb(args)
     if op == "desktop":
         return _desktop_verb(args)
-    if op == leases.RUN:
-        return _run_verb(args)
+    if op in (leases.RUN, SLOT_EXEC):
+        return _run_verb(str(op), args)
     raise Refused(
         "args",
         f"{op!r} is not a slot verb: claim, up, down, restart <service…>, stop <service…>, release, free, list, "
-        "sign-in, seed, desktop, run, top",
+        "sign-in, seed, desktop, run, exec, top",
     )
 
 
@@ -258,14 +259,16 @@ def _desktop_verb(args: dict[str, Any]) -> list[str]:
     raise Refused("args", "desktop up <email> | desktop down")
 
 
-def _run_verb(args: dict[str, Any]) -> list[str]:
-    """The command is handed on as its own words, never through a shell, so any word may follow the service."""
-    service, command = args.get("service"), args.get("command")
+def _run_verb(op: str, args: dict[str, Any]) -> list[str]:
+    """The command is handed on as its own words, never through a shell, so any word may follow what it runs in: a new
+    container of a service for run, one of the slot's own containers for exec."""
+    where = "service" if op == leases.RUN else "container"
+    target, command = args.get(where), args.get("command")
     if not isinstance(command, list) or not all(isinstance(word, str) and "\0" not in word for word in command):
         command = []
-    if not isinstance(service, str) or not WORD.match(service) or not command:
-        raise Refused("args", "run <service> -- <command> [word…]")
-    return [leases.RUN, service, "--", *command]
+    if not isinstance(target, str) or not WORD.match(target) or not command:
+        raise Refused("args", f"{op} <{where}> -- <command> [word…]")
+    return [leases.RUN if op == leases.RUN else leases.EXEC, target, "--", *command]
 
 
 def _list(ctx: Context, session: Session) -> list[dict[str, Any]]:

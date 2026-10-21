@@ -17,6 +17,7 @@ import json
 import re
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 # `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
@@ -354,18 +355,16 @@ def _stop_run(slot: int, label: str, timeout: int) -> None:
 
 def _own_verb(slot: int, verb: list[str], timeout: int) -> int | None:
     """The exit of one of the stack unit's own verbs; None for a product verb."""
-    if verb[0] == lf.SWEEP:
-        return sweep(slot, timeout)
-    if verb[0] == lf.PRUNE:
-        images, cache = verb[1:] if len(verb) == 3 else ["", ""]
-        return prune(images, cache, timeout)
-    if verb[0] == lf.DISK:
-        return disk(timeout)
-    if verb[0] == lf.RESTARTS:
-        return restarts(timeout)
-    if verb[0] == lf.TOP:
-        return top(slot, timeout)
-    return None
+    images, cache = verb[1:] if len(verb) == 3 else ["", ""]
+    own: dict[str, Callable[[], int]] = {
+        lf.SWEEP: lambda: sweep(slot, timeout),
+        lf.PRUNE: lambda: prune(images, cache, timeout),
+        lf.DISK: lambda: disk(timeout),
+        lf.RESTARTS: lambda: restarts(timeout),
+        lf.TOP: lambda: top(slot, timeout),
+        lf.EXEC: lambda: docker_reach.exec_in(f"{SLOT_LABEL}={slot}", verb[1:], _docker, timeout),
+    }
+    return own[verb[0]]() if verb[0] in own else None
 
 
 def main(argv: list[str]) -> int:
@@ -375,7 +374,7 @@ def main(argv: list[str]) -> int:
         raw = lf.read(state, request_id, (lf.STACK,))
         settings, sessions = lf.published(state)
         slot, verb, session = lf.stack_parts(raw, settings)
-        run = verb[0] == leases.RUN
+        run = verb[0] in (leases.RUN, lf.EXEC)
         timeout = settings.get_int("slots.run_seconds") if run else settings.get_int("slots.verb_minutes") * 60
         own = _own_verb(slot, verb, timeout)
         if own is not None:

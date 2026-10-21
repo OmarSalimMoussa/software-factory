@@ -197,6 +197,8 @@ def _slot_call(ns: argparse.Namespace) -> Call:
         args["desktop"] = ns.desktop
     elif ns.op == "run":
         args.update({"service": ns.service, "command": ns.command})
+    elif ns.op == "exec":
+        args.update({"container": ns.container, "command": ns.command})
     return Call("slot", args)
 
 

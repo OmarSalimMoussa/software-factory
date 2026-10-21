@@ -214,7 +214,7 @@ class Units:
         return StackResult(exit=code, tail=_last(kept, settings.get_int("slots.tail_max_kib") * 1024), log=str(log))
 
 
-_WHOLE = frozenset({leases.RUN, leases.TOP})
+_WHOLE = frozenset({leases.RUN, leases.EXEC, leases.TOP})
 
 
 def _last(text: str, most: int) -> str:

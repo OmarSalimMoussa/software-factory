@@ -79,6 +79,8 @@ def test_the_slot_comes_from_the_lease_never_from_an_argument(world: World) -> N
         ({"op": "run", "service": "web", "command": ["ls"]}, "agent-qa-1"),
         ({"op": "run", "service": "--rm", "command": ["ls"]}, ""),
         ({"op": "run", "service": "web", "command": []}, ""),
+        ({"op": "exec", "container": "--privileged", "command": ["ls"]}, ""),
+        ({"op": "exec", "container": "notes-signin-1", "command": ["ls"]}, "agent-qa-1"),
         ({"op": "restart", "services": []}, ""),
         ({"op": "restart", "services": ["--force-recreate"]}, ""),
         ({"op": "restart", "services": ["web"]}, "agent-qa-1"),
@@ -206,15 +208,19 @@ def test_the_holder_restarts_or_stops_the_services_it_names(world: World, op: st
     assert world.launcher.stacks[-1] == (1, [op, "web", "worker"])
 
 
+@pytest.mark.parametrize(
+    ("op", "where", "target", "verb"),
+    [("run", "service", "web", leases.RUN), ("exec", "container", "notes-signin-1", leases.EXEC)],
+)
 def test_a_slots_own_session_and_its_backend_and_security_testers_run_any_command_in_it_and_no_other_tester_does(
-    world: World,
+    world: World, op: str, where: str, target: str, verb: str
 ) -> None:
     _implementer(world, 1)
     world.session("s-orch", "orchestrator", "orchestrator")
     slot(world.ctx("implementer", "s-1"), {"op": "claim"}, None)
     world.launcher.stack = lambda n, verb: StackResult(0, "4.0K /app\n", "/log")
     command = ["sh", "-c", "du -sh /app; rm -f /tmp/x"]
-    run = {"op": "run", "service": "web", "command": command}
+    run = {"op": op, where: target, "command": command}
 
     answer = slot(world.ctx("implementer", "s-1"), run, None)
     for agent_id, kind in (("agent-api-1", "qa-backend"), ("agent-sec-1", "qa-security")):
@@ -223,8 +229,8 @@ def test_a_slots_own_session_and_its_backend_and_security_testers_run_any_comman
     slot(world.ctx(), run, None)
 
     assert answer["tail"] == "4.0K /app\n" and world.launcher.stacks == [
-        *[(1, ["run", "web", "--", *command])] * 3,
-        (0, ["run", "web", "--", *command]),
+        *[(1, [verb, target, "--", *command])] * 3,
+        (0, [verb, target, "--", *command]),
     ]
     with pytest.raises(Refused, match="a qa-regression may run"):
         slot(world.ctx("orchestrator", "s-orch", "agent-reg-1", "qa-regression"), run, None)

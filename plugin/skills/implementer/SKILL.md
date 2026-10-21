@@ -43,9 +43,11 @@ Keep one short line current with `factory doing "<what you are doing>"` whenever
   and `factory slot restart <service>` restarts it). Drive its API with the `slot-api` tools, which reach your slot
   and nothing else. To see what code prints inside a service, such as a size or a timing, run it there:
   `factory slot run <service> -- <command>`. A service that mounts Docker's socket is refused: any command there
-  would command the machine. Prepare what your testers need: seeds (`factory slot seed load <name>`)
-  and any setup a scenario names. A tester that needs a service stopped asks you. Stop it with `factory slot stop
-  <service…>` before you start that tester: its ready check then names what you stopped, on the build it ran.
+  would command the machine. To read inside a container the stack started, such as a browser, run `factory slot
+  exec <container> -- <command>`; `factory slot top` names them. Prepare what your testers need: seeds (`factory
+  slot seed load <name>`) and any setup a scenario names. A tester that needs a service stopped asks you. Stop it
+  with `factory slot stop <service…>` before you start that tester: its ready check then names what you stopped, on
+  the build it ran.
 - **New behaviour gets a standing scenario** in `qa/scenarios/`, or an update to the one that covers it: three labels
   (`protects`, `needs`, `runs`), `items: <n>` when its walk takes more than one of a tester's items, as a long wait
   does, and at most `qa.max_steps` steps for each item, each opening with a short bold name and holding an `Expect:`

@@ -24,9 +24,10 @@ KEYS = ("holder", "since", "note")
 # and image labelled with the request's slot, and every container still on one of its networks. PRUNE <hours> <hours>
 # removes the unused slot-labelled images and the build cache older than those, all of them at 0. DISK prints Docker's
 # data's bytes alone on its last line. RESTARTS prints how many times Docker restarted each container. TOP prints the
-# CPU of each container running for the request's slot, and of each process in it.
+# CPU of each container running for the request's slot, and of each process in it. EXEC <container> -- <command…>
+# runs a command in one of the slot's containers that cannot command Docker (runtime/system/runners/docker_reach.py).
 SWEEP, PRUNE, DISK, RESTARTS = "factory-sweep-slot", "factory-prune", "factory-disk", "factory-restarts"
-TOP = "factory-top"
+TOP, EXEC = "factory-top", "factory-exec"
 # The product's optional slot verbs, which the stack unit runs only once `scripts/dev verbs` lists them: run <service>
 # -- <command…> runs a command in a new container of the service; restart or stop <service…> restarts or stops them.
 RUN, RESTART, STOP = SLOT_RUN, "restart", "stop"

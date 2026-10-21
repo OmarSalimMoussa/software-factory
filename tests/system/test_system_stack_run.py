@@ -13,8 +13,8 @@ import pytest
 from system_fakes import FIXTURE, settings
 
 from runtime.shared.paths import SLOT_KEYS, Places
+from runtime.system.runners import docker_reach, same_up, stack_run
 from runtime.system.runners import launch_file as lf
-from runtime.system.runners import same_up, stack_run
 from standard import envfile
 from standard.services import provision
 
@@ -58,12 +58,13 @@ class Shared:
 
 # docker as a stand-in: logs each call and answers a listing; slot 2's network still holds two unlabelled containers.
 DOCKER = f"""#!{sys.executable}
-import os, sys
+import os, sys, time
 with open(os.environ["DOCKER_LOG"], "a") as log:
     log.write(" ".join(sys.argv[1:]) + "\\n")
 answers = {{"container ls": "c-web", "network ls": "n-slot2", "network inspect": "agent-7 agent-8 ",
            "container inspect": '["c-web", "/notes-slot2-web", false]'}}
 print(answers.get(" ".join(sys.argv[1:3]), ""))
+time.sleep(float(sys.argv[-1]) if sys.argv[-2:-1] == ["sleep"] else 0)
 """
 
 
@@ -469,6 +470,43 @@ def test_a_run_is_refused_in_a_service_whose_container_commands_this_machines_do
     assert said in capsys.readouterr().out
     service = ["--filter", "label=software.slot=2", "--filter", "label=com.docker.compose.service=web"]
     assert asked[0] == ["container", "ls", "-aq", *service]
+
+
+@pytest.mark.parametrize(
+    ("words", "socket", "code", "status", "said"),
+    [
+        (["notes-signin-1", "--", "python3", "-c", "1"], [], 0, 0, ""),
+        (["notes-signin-1", "--", "sleep", "30"], [], 0, lf.TIMED_OUT, "the command may still run in notes-signin-1"),
+        (["notes-slot2-web", "--", "ls"], ["/var/run/docker.sock"] * 2, 0, lf.REFUSED, "notes-slot2-web commands this"),
+        (["notes-slot3-web", "--", "ls"], [], 0, lf.REFUSED, "this slot has no container named notes-slot3-web"),
+        (["notes-signin-1", "--", "ls"], [], 1, lf.REFUSED, "docker could not say what this slot's containers mount"),
+        (["notes-signin-1", "ls"], [], 0, lf.REFUSED, "exec <container> -- <command>"),
+    ],
+    ids=["a-visit", "past-its-time", "mounts-the-socket", "another-slots", "docker-failed", "no-command"],
+)
+def test_an_exec_runs_only_in_a_container_of_the_slot_that_cannot_command_docker(
+    capsys: pytest.CaptureFixture[str],
+    docker_log: Path,
+    words: list[str],
+    socket: list[str],
+    code: int,
+    status: int,
+    said: str,
+) -> None:
+    told = [["c-visit", "/notes-signin-1", False], ["c-web", "/notes-slot2-web", False, *socket]]
+    asked: list[list[str]] = []
+
+    def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+        asked.append(args)
+        rows = "\n".join(json.dumps(row) for row in told) if args[:2] == ["container", "inspect"] else "c-visit c-web"
+        return subprocess.CompletedProcess(args, code, rows, "Cannot connect to the Docker daemon" if code else "")
+
+    answer = docker_reach.exec_in("software.slot=2", words, docker, 1)
+
+    calls = docker_log.read_text().splitlines() if docker_log.exists() else []
+    assert (answer, calls) == (status, [] if status == lf.REFUSED else [f"exec c-visit {' '.join(words[2:])}"])
+    assert said in capsys.readouterr().out
+    assert asked[:1] in ([], [["container", "ls", "-aq", "--filter", "label=software.slot=2"]])
 
 
 @pytest.mark.parametrize(

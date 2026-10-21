@@ -121,7 +121,8 @@ stack.
 
 Everything a slot creates (containers, volumes, networks, images) carries a label naming its slot, so the warden
 can find and remove it when the session that held the slot retires. A container the stack starts while it runs, such
-as an agent's, needs no label: the warden also removes every container still on one of the slot's networks.
+as an agent's, needs no label: the warden also removes every container still on one of the slot's networks. Only
+one with the label is reachable with `factory slot exec`.
 
 **User reports.** Without the `reports` verb, the users' inbox stays empty. With it, the warden reads prod's report
 export itself, where the server set-up saved it from `[reports]`, so no code agents wrote reaches the tailnet. It hands

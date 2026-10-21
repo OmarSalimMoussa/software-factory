@@ -124,9 +124,10 @@ def test_a_check_with_nothing_left_to_walk_sends_no_report() -> None:
     assert (call.verb, call.args, call.data) == ("queue.check", {"commit": "abc1234"}, None)
 
 
-def test_a_slot_run_hands_on_every_word_after_the_double_dash() -> None:
-    call = _build(["slot", "run", "web", "--", "python", "-c", "print(1)", "--verbose"])
-    assert call.args == {"op": "run", "service": "web", "command": ["python", "-c", "print(1)", "--verbose"]}
+@pytest.mark.parametrize(("op", "where"), [("run", "service"), ("exec", "container")])
+def test_a_slot_run_hands_on_every_word_after_the_double_dash(op: str, where: str) -> None:
+    call = _build(["slot", op, "web", "--", "python", "-c", "print(1)", "--verbose"])
+    assert call.args == {"op": op, where: "web", "command": ["python", "-c", "print(1)", "--verbose"]}
 
 
 def test_a_reproduction_asks_for_one_and_a_ready_head_does_not() -> None:
