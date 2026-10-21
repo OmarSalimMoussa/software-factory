@@ -5,7 +5,9 @@ a step starts and how it ended only from your marks, so mark every step you walk
 its report's tables are its record.
 
 - **Name the item as your brief does:** a scenario by its file name without `.md`, a check by its short name. A check
-  with no numbered steps is one step, step 1.
+  with no numbered steps, such as `widths`, is one step, step 1.
+- **Number a scenario's steps as its file does, in order.** The factory refuses a step past its last, and a step's
+  start until you marked how the one before it ended. A step you could not walk ends `--result blocked`.
 - **Setup is not a step.** Sign in, load seeds and reach the starting page first. A step's start is marked as its own
   walk begins, and its result only once that walk is done: an item's steps one at a time, so the factory refuses a
   step's start while an earlier one of its item has no result. Another item's step, such as a hold your brief counts

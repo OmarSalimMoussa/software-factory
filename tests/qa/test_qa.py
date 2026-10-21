@@ -28,6 +28,9 @@ from runtime.warden.sessions import registry
 HEAD = "a" * 40
 IMPL_ID = "0b6f1c3e-1d2a-4c5b-9e8f-7a6b5c4d3e2f"  # Claude Code names sessions by a UUID
 PREFIXES = 'ui = ["web/"]\napi = ["server/"]\naccess = ["server/auth/"]\n'
+# The scenarios at HEAD, by their numbered steps, as `git grep -n` prints them.
+SCENARIOS = "".join(f"{HEAD}:qa/scenarios/{name}.md:{n}:{n}. Walk.\n" for name, steps in (("cart", 6), ("sign-in", 3))
+                    for n in range(1, steps + 1))  # fmt: skip
 
 
 @pytest.mark.parametrize(
@@ -119,7 +122,8 @@ def ready_world(world: World, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         world.session(agent, kind, f"{kind}-1", task.id, agent_id=agent)
     leases.claim(world.ctx("implementer", IMPL_ID), "impl-t-0001", "/wt/impl-t-0001")
 
-    world.launcher.git = _git({"rev-parse": HEAD, "show": PREFIXES, "diff": "web/page.ts\n", "merge-base": ""})
+    answers = {"rev-parse": HEAD, "show": PREFIXES, "diff": "web/page.ts\n", "merge-base": "", "grep": SCENARIOS}
+    world.launcher.git = _git(answers)
     world.launcher.stack = lambda n, verb: StackResult(0, f"http://127.0.0.1:{8100 + n}/health\n", "/log")
     monkeypatch.setattr(health, "http_get", lambda url, timeout, limit: json.dumps({"build_commit": HEAD}).encode())
     monkeypatch.setattr(qa_browser, "runs_root", lambda: tmp_path / "runs")
@@ -168,9 +172,12 @@ def test_qa_clean_waits_for_every_required_tester_on_the_head(ready_world: World
 
 
 def _step(world: World, agent: str, mark: str, result: str) -> None:
+    """The tester ``agent`` walks ``mark``'s item in order up to it: ``result`` at it, blocked before it."""
     ctx, (item, n) = world.ctx("implementer", IMPL_ID, agent), mark.split(":")
-    qa.qa_step(ctx, {"head": HEAD[:9], "item": item, "step": int(n)}, None)
-    qa.qa_step_result(ctx, {"head": HEAD[:9], "item": item, "step": int(n), "result": result, "got": "seen"}, None)
+    for step in range(1, int(n) + 1):
+        qa.qa_step(ctx, {"head": HEAD[:9], "item": item, "step": step}, None)
+        said = {"result": result if step == int(n) else "blocked", "got": "seen"}
+        qa.qa_step_result(ctx, {"head": HEAD[:9], "item": item, "step": step, **said}, None)
 
 
 @pytest.mark.parametrize(
@@ -463,24 +470,24 @@ def test_a_clean_verdict_carries_to_the_next_head_unless_its_surfaces_changed(
 def test_a_testers_steps_are_kept_in_order_and_a_result_needs_its_start(ready_world: World) -> None:
     qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
     ctx = ready_world.ctx("implementer", IMPL_ID, "ag-fn")
-    ended = {"head": HEAD[:9], "item": "cart", "step": 2, "result": "fail", "got": "the total\nstayed"}
-    with pytest.raises(Refused, match="start step 2 of cart first"):
+    ended = {"head": HEAD[:9], "item": "cart", "step": 1, "result": "fail", "got": "the total\nstayed"}
+    with pytest.raises(Refused, match="start step 1 of cart first"):
         qa.qa_step_result(ctx, ended, None)
-    qa.qa_step(ctx, {"head": HEAD[:9], "item": "cart", "step": 2}, None)
+    qa.qa_step(ctx, {"head": HEAD[:9], "item": "cart", "step": 1}, None)
     qa.qa_step_result(ctx, ended, None)
-    qa.qa_finding(ctx, {"head": HEAD[:9], "severity": "major", "where": "/cart", "step": "cart:2"}, b"It breaks.")
+    qa.qa_finding(ctx, {"head": HEAD[:9], "severity": "major", "where": "/cart", "step": "cart:1"}, b"It breaks.")
 
     marks = steps.of_agent(ready_world.ctx(), IMPL_ID, "ag-fn")
     assert [(m["item"], m["step"], m.get("result"), m.get("got")) for m in marks] == [
-        ("cart", 2, None, None), ("cart", 2, "fail", "the total stayed")]  # fmt: skip
-    assert [f["step"] for f in findings.of_agent(ready_world.ctx(), "t-0001", "ag-fn")] == ["cart:2"]
+        ("cart", 1, None, None), ("cart", 1, "fail", "the total stayed")]  # fmt: skip
+    assert [f["step"] for f in findings.of_agent(ready_world.ctx(), "t-0001", "ag-fn")] == ["cart:1"]
 
 
 @pytest.mark.parametrize(
     ("verb", "args"),
     [
-        (qa.qa_step, {"item": "cart", "step": 3}),
-        (qa.qa_step_result, {"item": "cart", "step": 3, "result": "pass", "got": "it saved"}),
+        (qa.qa_step, {"item": "cart", "step": 1}),
+        (qa.qa_step_result, {"item": "cart", "step": 1, "result": "pass", "got": "it saved"}),
         (qa.qa_finding, {"severity": "major", "where": "/cart"}),
         (qa.qa_result, {}),
     ],
@@ -495,7 +502,7 @@ def test_a_testers_verdict_is_its_last_word_as_it_takes_its_runs_into_the_eviden
         verb(ready_world.ctx("implementer", IMPL_ID, "ag-fn"), {"head": HEAD[:9], **args}, b"It breaks.")
     other = ready_world.ctx("implementer", IMPL_ID, "ag-ux")
     if verb is qa.qa_step_result:
-        qa.qa_step(other, {"head": HEAD[:9], "item": "cart", "step": 3}, None)
+        qa.qa_step(other, {"head": HEAD[:9], "item": "cart", "step": 1}, None)
     if verb is qa.qa_result:
         _walk(ready_world, "ag-ux", [int(w) for w in ready_world.settings.get_list("qa.widths")])
     verb(other, {"head": HEAD[:9], **args}, b"It breaks.")
@@ -517,23 +524,73 @@ def test_a_tester_starts_an_items_step_only_once_its_earlier_step_ended_while_an
     assert [m["step"] for m in steps.of_agent(ready_world.ctx(), IMPL_ID, "ag-fn")] == [1, 1, 1, 2]
 
 
-@pytest.mark.parametrize("step", [7, 60], ids=["past-qa-max-steps", "the-steps-of-qa-max-items"])
-def test_a_step_is_marked_up_to_the_steps_a_scenario_that_takes_the_most_items_holds(
-    ready_world: World, step: int
+@pytest.mark.parametrize(
+    ("agent", "item", "step", "refused"),
+    [
+        ("ag-fn", "cart", 6, None),
+        ("ag-fn", "cart", 7, "cart has 6 steps at aaaaaaaaa: mark one from 1 to 6, and a check of your brief under "
+                             "its own item, such as --step widths:1"),
+        ("ag-be", "cart", 7, "cart has 6 steps at aaaaaaaaa: mark one from 1 to 6, and a check of your brief under "
+                             "its own item"),
+        ("ag-fn", "widths", 1, None),
+        ("ag-fn", "widths", 2, "widths has no numbered steps at aaaaaaaaa, so it is one step: --step widths:1"),
+        ("ag-be", "slow-total", 2, "slow-total has no numbered steps at aaaaaaaaa, so it is one step"),
+    ],
+    ids=["a-scenarios-last", "past-its-last", "past-its-last-with-no-widths", "a-check", "past-a-check",
+         "past-a-hold"],
+)  # fmt: skip
+def test_a_step_is_one_of_its_items_own_numbered_steps(
+    ready_world: World, agent: str, item: str, step: int, refused: str | None
 ) -> None:
+    # sr425: a tester marked a width check as step 7 of a six-step scenario, and the factory took it.
     qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
-    ctx = ready_world.ctx("implementer", IMPL_ID, "ag-fn")
-    qa.qa_step(ctx, {"head": HEAD[:9], "item": "cart", "step": step}, None)
-    qa.qa_step_result(ctx, {"head": HEAD[:9], "item": "cart", "step": step, "result": "pass", "got": "it saved"}, None)
+    if step > 1:
+        _step(ready_world, agent, f"{item}:{step - 1}", "pass")
+    mark = {"head": HEAD[:9], "item": item, "step": step}
+    if refused is not None:
+        with pytest.raises(Refused) as said:
+            qa.qa_step(ready_world.ctx("implementer", IMPL_ID, agent), mark, None)
+        assert said.value.reason.startswith(refused) and ("widths" in said.value.reason) == ("widths" in refused)
+    else:
+        qa.qa_step(ready_world.ctx("implementer", IMPL_ID, agent), mark, None)
 
-    assert [m["step"] for m in steps.of_agent(ready_world.ctx(), IMPL_ID, "ag-fn")] == [step, step]
+
+@pytest.mark.parametrize(
+    ("walked", "then", "refused"),
+    [
+        ([("ag-fn", 1, "pass")], ("ag-fn", 2), None),
+        ([("ag-fn", 1, "blocked")], ("ag-fn", 2), None),
+        ([], ("ag-fn", 3), "mark step 1 of cart first"),
+        ([("ag-fn", 1, "pass")], ("ag-fn", 3), "mark step 2 of cart first"),
+        ([("ag-fn", 1, "pass"), ("ag-fn", 2, "fail")], ("ag-fn", 2), None),
+        ([("ag-fn", 1, "pass"), ("ag-fn", 2, "fail")], ("ag-fn", 1), None),
+        ([("ag-ux", 1, "pass")], ("ag-fn", 2), "mark step 1 of cart first"),
+    ],
+    ids=["after-the-step-before", "after-a-blocked-step", "before-the-step-before-started", "past-a-gap",
+         "a-re-walk", "a-re-walk-of-an-earlier-step", "another-testers-marks"],
+)  # fmt: skip
+def test_an_items_steps_start_in_order_once_the_step_before_has_the_testers_own_result(
+    ready_world: World, walked: list[tuple[str, int, str]], then: tuple[str, int], refused: str | None
+) -> None:
+    # sr425: a tester marked step 4 without its start, then opened step 5, and the replay showed them out of order.
+    qa.qa_ready(ready_world.ctx("implementer", IMPL_ID), {"head": HEAD[:12], "slices": [HEAD[:7]]}, None)
+    for agent, step, result in walked:
+        ctx = ready_world.ctx("implementer", IMPL_ID, agent)
+        qa.qa_step(ctx, {"head": HEAD[:9], "item": "cart", "step": step}, None)
+        qa.qa_step_result(ctx, {"head": HEAD[:9], "item": "cart", "step": step, "result": result, "got": "seen"}, None)
+    ctx = ready_world.ctx("implementer", IMPL_ID, then[0])
+    if refused is not None:
+        with pytest.raises(Refused, match=re.escape(refused)):
+            qa.qa_step(ctx, {"head": HEAD[:9], "item": "cart", "step": then[1]}, None)
+    else:
+        qa.qa_step(ctx, {"head": HEAD[:9], "item": "cart", "step": then[1]}, None)
 
 
 @pytest.mark.parametrize(
     ("verb", "args", "says"),
     [
         ("step", {"item": "Cart page", "step": 1}, "name the item as your brief does"),
-        ("step", {"item": "cart", "step": 61}, "from 1 to 60"),
+        ("step", {"item": "cart", "step": 0}, "its number in the item"),
         ("step-result", {"item": "cart", "step": 1, "result": "ok", "got": "it showed"}, "pass, fail, blocked"),
         ("step-result", {"item": "cart", "step": 1, "result": "pass", "got": " "}, "--got"),
         ("finding", {"severity": "minor", "where": "/cart", "step": "cart"}, "<item>:<n>"),

@@ -81,10 +81,6 @@ def items_of(meta: dict[str, str], max_items: int) -> int | None:
     return int(said) if said.isdecimal() and 1 <= int(said) <= max_items else None
 
 
-def most_steps(taken: int, max_steps: int) -> int:
-    return taken * max_steps
-
-
 def covers(protects: tuple[str, ...], path: str) -> bool:
     return any(path == entry.rstrip("/") or path.startswith(entry.rstrip("/") + "/") for entry in protects)
 
@@ -141,7 +137,7 @@ def _size(rel: str, text: str, meta: dict[str, str], max_steps: int, max_items: 
     out = [] if taken else [f"{rel}: items {meta[ITEMS]!r} is not a whole number from 1 to {max_items}"]
     if not count:
         out.append(f"{rel}: no numbered steps")
-    elif taken and count > most_steps(taken, max_steps) and meta["runs"] != "waiting":
+    elif taken and count > taken * max_steps and meta["runs"] != "waiting":
         out.append(f"{rel}: {count} steps; {max_steps} at most for each of {taken} item(s): split it, or raise items")
     return out
 

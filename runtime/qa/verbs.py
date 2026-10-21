@@ -231,7 +231,8 @@ def qa_finding(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[s
 def qa_step(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
     """A tester marks the start of one numbered step of an item, on the head it tests."""
     session, tester, full = _tester_on_head(ctx, args, "qa-step")
-    return ok(**steps.start(ctx, session.id, full, tester.role, ctx.caller.agent_id, args))
+    widths = lanes.checked_widths(ctx.settings(), ready_records(ctx, session)[-1], tester.started_as)
+    return ok(**steps.start(ctx, session.id, full, tester.role, ctx.caller.agent_id, args, bool(widths)))
 
 
 def qa_step_result(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:

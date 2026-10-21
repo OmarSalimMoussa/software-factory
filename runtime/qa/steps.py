@@ -3,10 +3,12 @@ the run at these marks and words each step from them: its name and what it expec
 tester got from its result.
 
 `factory qa step --step <item>:<n>` marks a step's start; `factory qa step-result --step <item>:<n> --result
-pass|fail|blocked --got '…'` its end. A result for a step the tester never started is refused, so every result has a
-start, and so is a start while a step of the same item has no result, so an item's steps never overlap in the replay;
-a step of another item, such as a hold the brief counts as its own, may run inside one. An implementer's session keeps
-its testers' marks in the warden's state.
+pass|fail|blocked --got '…'` its end. A step is one of its item's own: a scenario's numbered steps at the tested head,
+or step 1 of an item with none, such as a check, a hold or the widths. An item's steps start in order: step n once
+the tester recorded how step n-1 ended on that head; a step it walked may start again. A result for a step the tester
+never started is refused, so every result has a start, and so is a start while a step of the same item has no
+result, so an item's steps never overlap in the replay; a step of another item, such as a hold the brief counts as its
+own, may run inside one. An implementer's session keeps its testers' marks in the warden's state.
 """
 
 from __future__ import annotations
@@ -15,9 +17,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from runtime.qa import scenarios
+from runtime.qa import scenarios, walked
 from runtime.queue import formats
-from runtime.shared import store
+from runtime.shared import lanes, store
 from runtime.shared.protocol import Refused
 from runtime.warden.context import Context
 
@@ -30,29 +32,55 @@ def path(ctx: Context, session_id: str) -> Path:
     return ctx.places.steps_of(session_id)
 
 
-def _mark(ctx: Context, args: dict[str, Any], verb: str) -> tuple[str, int]:
+def _mark(args: dict[str, Any], verb: str) -> tuple[str, int]:
     item, step = args.get("item"), args.get("step")
     if not isinstance(item, str) or not ITEM.match(item):
         raise Refused(verb, "name the item as your brief does: a scenario's file name or a check's short name")
-    settings = ctx.settings()
-    most = scenarios.most_steps(settings.get_int("qa.max_items"), settings.get_int("qa.max_steps"))
-    if not isinstance(step, int) or isinstance(step, bool) or not 1 <= step <= most:
-        raise Refused(verb, f"the step is its number in the item, from 1 to {most}")
+    if not isinstance(step, int) or isinstance(step, bool) or step < 1:
+        raise Refused(verb, "the step is its number in the item, from 1")
     return item, step
 
 
-def start(ctx: Context, session_id: str, head: str, tester: str, agent: str, args: dict[str, Any]) -> dict[str, Any]:
-    """Mark the start of one step of ``agent``'s item on ``head``, once its item's earlier steps have their end."""
-    item, step = _mark(ctx, args, "qa-step")
+def _within(ctx: Context, head: str, item: str, step: int, widths: bool) -> None:
+    """Refused unless ``step`` is one of the item's own: a scenario's numbered steps at ``head``, or one step."""
+    rel = f"{scenarios.FOLDER}/{item}.md"
+    text = walked.texts(ctx, head, rel).get(rel)
+    count = len(scenarios.steps_of(text)) if text is not None else 0
+    if count and step > count:
+        such = f", such as --step {lanes.WIDTHS}:1" if widths else ""
+        raise Refused(
+            "qa-step",
+            f"{item} has {count} steps at {head[:9]}: mark one from 1 to {count}, and a check of your brief under "
+            f"its own item{such}",
+        )
+    if not count and step > 1:
+        raise Refused("qa-step", f"{item} has no numbered steps at {head[:9]}, so it is one step: --step {item}:1")
+
+
+def start(
+    ctx: Context, session_id: str, head: str, tester: str, agent: str, args: dict[str, Any], widths: bool
+) -> dict[str, Any]:
+    """Mark the start of one of the item's own steps on ``head``, once ``agent`` marked how the one before ended."""
+    item, step = _mark(args, "qa-step")
+    _within(ctx, head, item, step, widths)
     record = {"item": item, "step": step, "head": head, "tester": tester, "agent": agent, "at": ctx.clock.iso()}
     with ctx.lock:
-        unended = [s for s in _unended(of_agent(ctx, session_id, agent)) if s[0] == item]
+        marks = [m for m in of_agent(ctx, session_id, agent) if m.get("item") == item]
+        unended = _unended(marks)
         if unended:
             was_item, was_step = unended[0]
             raise Refused(
                 "qa-step",
                 f"mark how step {was_step} of {was_item} ended first: factory qa step-result --head <sha> --step "
                 f"{was_item}:{was_step} --result pass|fail|blocked --got '…'",
+            )
+        ended = {m.get("step") for m in marks if "result" in m and m.get("head") == head}
+        if step > 1 and step - 1 not in ended:
+            first = min(set(range(1, step)) - ended)
+            raise Refused(
+                "qa-step",
+                f"an item's steps go in order: mark step {first} of {item} first, its start and how it ended; a step "
+                "you could not walk ends --result blocked",
             )
         store.append_jsonl(path(ctx, session_id), record)
     return record
@@ -69,7 +97,7 @@ def _unended(marks: list[dict[str, Any]]) -> list[tuple[Any, Any]]:
 
 def end(ctx: Context, session_id: str, head: str, tester: str, agent: str, args: dict[str, Any]) -> dict[str, Any]:
     """Record what ``agent`` saw at the end of a step it started."""
-    item, step = _mark(ctx, args, "qa-step-result")
+    item, step = _mark(args, "qa-step-result")
     result, got = args.get("result"), args.get("got")
     if result not in RESULTS:
         raise Refused("qa-step-result", f"the result is one of {', '.join(RESULTS)}")
