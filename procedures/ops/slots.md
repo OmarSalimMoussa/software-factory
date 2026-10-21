@@ -11,7 +11,7 @@ A slot is one running copy of the product on the laptop. The factory decides who
 | `factory slot restart <service…>` | the holder | Restarts the named services, which must be running |
 | `factory slot stop <service…>` | the holder | Stops the named services, keeping their data, for a set-up that needs them down; `factory slot up` starts them again |
 | `factory slot down` | the holder | Stops it, keeping its data |
-| `factory slot run <service> -- <command…>` | the holder and its backend and security testers | Runs one command in a new container of the service and answers with its output. Bring the service up first, so the run is not spent building it |
+| `factory slot run <service> -- <command…>` | the holder and its backend and security testers | Runs one command in a new container of the service and answers with its output. Bring the service up first: the factory reads what its container mounts, and runs nothing in a service with none yet. A service whose container mounts Docker's socket or runs privileged is refused, since any command there, docker or not, would command this machine and prod |
 | `factory slot release` | the holder | Gives the slot back once your work is checked |
 | `factory slot free <n>` | the orchestrator | Frees a slot whose work is finished |
 | `factory slot list` | anyone | Who holds which slot, since when, and why |

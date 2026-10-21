@@ -61,7 +61,8 @@ DOCKER = f"""#!{sys.executable}
 import os, sys
 with open(os.environ["DOCKER_LOG"], "a") as log:
     log.write(" ".join(sys.argv[1:]) + "\\n")
-answers = {{"container ls": "c-web", "network ls": "n-slot2", "network inspect": "agent-7 agent-8 "}}
+answers = {{"container ls": "c-web", "network ls": "n-slot2", "network inspect": "agent-7 agent-8 ",
+           "container inspect": '["c-web", "/notes-slot2-web", false]'}}
 print(answers.get(" ".join(sys.argv[1:3]), ""))
 """
 
@@ -419,7 +420,55 @@ def test_a_run_needs_the_products_run_verb_and_one_past_its_time_leaves_no_conta
     assert (ran.read_text() if ran.exists() else None) == (None if status == lf.REFUSED else f"software.run={REQUEST}")
     # Only the run's own container goes: another run, or a job the stack started, carries no such label.
     gone = [f"container ls -aq --filter label=software.run={REQUEST}", "container rm -f c-web"]
-    assert calls == (gone if status == lf.TIMED_OUT else [])
+    checked = 0 if status == lf.REFUSED else 2
+    assert calls[checked:] == (gone if status == lf.TIMED_OUT else [])
+
+
+@pytest.mark.parametrize(
+    ("code", "listed", "privileged", "mounts", "said"),
+    [
+        (0, "c-web", False, ["/var/run/docker.sock", "/var/run/docker.sock"], "web's container commands this machine"),
+        (0, "c-web", False, ["/var/run", "/host/run"], "web's container commands this machine's Docker"),
+        (0, "c-web", True, [], "web's container commands this machine's Docker"),
+        (0, "", False, [], "slot 2 ran nothing: it has no web container yet"),
+        (1, "", False, [], "docker could not say what web's containers mount"),
+        (0, "c-web", False, ["/srv/notes/media", "/media"], ""),
+    ],
+    ids=["its-socket", "a-folder-holding-it", "privileged", "not-up", "docker-failed", "plain"],
+)
+def test_a_run_is_refused_in_a_service_whose_container_commands_this_machines_docker(
+    tmp_path: Path,
+    checkout: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    code: int,
+    listed: str,
+    privileged: bool,
+    mounts: list[str],
+    said: str,
+) -> None:
+    (checkout / "scripts" / "dev").write_text(RUN_DEV)
+    (checkout / "scripts" / "verbs.txt").write_text("up run verbs")
+    monkeypatch.setattr(provision, "workspace", Shared(checkout).workspace)
+    asked: list[list[str]] = []
+
+    def docker(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+        asked.append(args)
+        told = json.dumps(["c-web", "/notes-slot2-web", privileged, *mounts])
+        return subprocess.CompletedProcess(args, code, told if args[:2] == ["container", "inspect"] else listed, "")
+
+    monkeypatch.setattr(stack_run, "_docker", docker)
+    run = ["run", "web", "--", "sleep", "0"]
+
+    answer = stack_run.product_verb(
+        Places.under(tmp_path), settings(), SLOT, run, checkout, run=_never, timeout=5, request=REQUEST
+    )
+
+    # Python or curl on the socket command Docker as `docker` does: the service is refused, whatever the command.
+    assert (answer, (checkout / "scripts" / "ran.json").exists()) == ((lf.REFUSED, False) if said else (0, True))
+    assert said in capsys.readouterr().out
+    service = ["--filter", "label=software.slot=2", "--filter", "label=com.docker.compose.service=web"]
+    assert asked[0] == ["container", "ls", "-aq", *service]
 
 
 @pytest.mark.parametrize(

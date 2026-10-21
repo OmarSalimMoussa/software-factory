@@ -17,7 +17,8 @@ The factory installs on that server, beside prod, and makes no services of its o
   password. The uninstall leaves the services and their data as they are.
 
 Slot code can use the server's Docker socket, so an agent's code can reach prod and its data: know that before a
-product has real users.
+product has real users. `factory slot run` runs no agent's command in a container that mounts the socket or runs
+privileged, but the code an agent writes for the slot still runs with it.
 
 ## Where to open them
 

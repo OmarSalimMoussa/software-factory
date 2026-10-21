@@ -3,9 +3,10 @@
 Run as ``/usr/bin/python3 -I <install>/runtime/system/runners/stack_run.py <state> <id>``. A product verb runs the
 checkout's own ``scripts/dev`` with its slot's facts in the environment. Before each one, the slot gets its share of
 the shared services (its network, database and error projects) and its env file, written from the product's template;
-a verb never runs on a slot half provisioned. An ``up`` that would change nothing runs nothing (same_up.py). After a
-successful ``empty``, the slot's database and env file go; what ``scripts/dev`` wrote beside the env file is the
-product's own to clear.
+a verb never runs on a slot half provisioned. An ``up`` that would change nothing runs nothing (same_up.py), nor does
+a ``run`` in a service whose container commands this machine's Docker (docker_reach.py). After a successful
+``empty``, the slot's database and env file go; what ``scripts/dev`` wrote beside the env file is the product's own to
+clear.
 The factory's own verbs never reach the product: sweeping a slot's labelled Docker objects (and the containers still
 on its networks), the clean-up's prune of slots' images alone, Docker's disk use, and restart counts. Stdlib only.
 """
@@ -25,8 +26,8 @@ from runtime.shared import environment
 from runtime.shared.paths import SLOT_KEYS, Places
 from runtime.shared.settings import Settings
 from runtime.slots import leases
+from runtime.system.runners import docker_reach, same_up
 from runtime.system.runners import launch_file as lf
-from runtime.system.runners import same_up
 from runtime.warden import public
 from standard import config as product_config
 from standard import envfile
@@ -218,7 +219,10 @@ def product_verb(places: Places, settings: Settings, slot: int, verb: list[str],
                  run: provision.Run, timeout: int, request: str) -> int:  # fmt: skip
     """``scripts/dev <verb>`` on a slot provisioned first, as stack request ``request``; its exit status, or 1 when
     provisioning or the drop after ``empty`` failed."""
-    if verb[0] in leases.OPTIONAL and (why := _lacks(checkout, verb[0], timeout)):
+    why = _lacks(checkout, verb[0], timeout) if verb[0] in leases.OPTIONAL else ""
+    if verb[0] == leases.RUN and not why:
+        why = docker_reach.run_refusal(f"{SLOT_LABEL}={slot}", verb[1], _docker, timeout)
+    if why:
         print(f"stack-run: slot {slot} ran nothing: {why}", flush=True)
         return lf.REFUSED
     workspace, port = f"slot{slot}", leases.port(settings, slot)
@@ -371,11 +375,8 @@ def main(argv: list[str]) -> int:
         raw = lf.read(state, request_id, (lf.STACK,))
         settings, sessions = lf.published(state)
         slot, verb, session = lf.stack_parts(raw, settings)
-        timeout = (
-            settings.get_int("slots.run_seconds")
-            if verb[0] == leases.RUN
-            else settings.get_int("slots.verb_minutes") * 60
-        )
+        run = verb[0] == leases.RUN
+        timeout = settings.get_int("slots.run_seconds") if run else settings.get_int("slots.verb_minutes") * 60
         own = _own_verb(slot, verb, timeout)
         if own is not None:
             return own

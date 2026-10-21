@@ -115,7 +115,7 @@ stack.
 | `verbs` | Lists the verbs it supports |
 | `deps` | Optional: installs what the checks and tests read (package trees, tools); `factory check` runs it first |
 | `reports --since <cursor>` | Optional: reads prod's report export on its input, and prints erased reports, then new user reports, as JSON lines |
-| `run <service> -- <command…>` | Optional: runs one command in a new container of the service, labelled `FACTORY_RUN_LABEL`, with the slot's settings and network, and prints its output. The factory stops it at `slots.run_seconds` and removes its container |
+| `run <service> -- <command…>` | Optional: runs one command in a new container of the service, labelled `FACTORY_RUN_LABEL`, with the slot's settings and network, and prints its output. The factory stops it at `slots.run_seconds` and removes its container. It runs none for a service whose container mounts Docker's socket or runs privileged, or that has no container yet |
 | `restart <service…>` | Optional: restarts the named services' running containers, as they are |
 | `stop <service…>` | Optional: stops the named services' containers, keeping their data |
 
