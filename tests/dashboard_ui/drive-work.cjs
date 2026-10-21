@@ -133,4 +133,15 @@ drive('work', async t => {
   await p.setViewportSize({width: 1024, height: 800}); await settle(p);
   await t.wide(p, '1024 work');
   await t.shot(p, 'work-1024.png');
+
+  // a blocked task says who fixes it; its panel says why, with the owner's Fixed while the card is open
+  await t.srv.reset(); await t.srv.set({scenario: 'blocked'});
+  const b = await t.open(1440, 900, 'work');
+  t.check((await b.textContent('#taskrows [data-task="t-0020"] .c-status')).includes('Blocked until you fix it'), 'the blocked row does not say you fix it');
+  await b.$eval('#taskrows [data-task="t-0020"]', e => e.click()); await settle(b);
+  t.check((await b.textContent('#sheet-body .section')).startsWith('Blocked'), 'the panel does not say why it is blocked');
+  await t.shot(b, 'task-blocked-1440.png');
+  await b.click('#sheet-foot [data-need-act="fixed"]');
+  t.check(await until(b, () => document.querySelector('#taskrows [data-task="t-0020"] .c-status').textContent.includes('Building')), 'Fixed in the panel did not send it back');
+  await b.close();
 });

@@ -180,18 +180,20 @@ def test_an_agent_out_of_the_work_says_so_with_its_icon(rig: Rig, agent: str, ic
 
 
 @pytest.mark.parametrize(
-    ("benched_for", "status", "says"),
+    ("benched_for", "status", "card", "says"),
     [
-        ("t-0002", "merged", "Pushed out for “Task two” · comes back first"),
-        ("t-0001", "merged", "Merged · ends when its check passes, comes back if it fails"),
-        ("t-0001", "blocked", "Blocked · comes back when you mark it fixed"),
-        ("t-0001", "on-hold", "On hold · comes back when the task it waits for passes its check"),
-        ("t-0001", "building", "Sent back to it · comes back when a place frees"),
+        ("t-0002", "merged", None, "Pushed out for “Task two” · comes back first"),
+        ("t-0001", "merged", None, "Merged · ends when its check passes, comes back if it fails"),
+        ("t-0001", "blocked", "n-0001", "Blocked · comes back when you mark it fixed"),
+        ("t-0001", "blocked", None, "Blocked · comes back when the orchestrator finds it cleared"),
+        ("t-0001", "on-hold", None, "On hold · comes back when the task it waits for passes its check"),
+        ("t-0001", "building", None, "Sent back to it · comes back when a place frees"),
     ],
-    ids=["for-another", "merged", "blocked", "on-hold", "sent-back"],
+    ids=["for-another", "merged", "blocked-on-the-owners-card", "blocked-with-no-owner-card", "on-hold", "sent-back"],
 )
-def test_a_benched_agent_says_what_it_waits_for(benched_for: str, status: str, says: str) -> None:
-    tasks = [{"id": "t-0001", "title": "Task one", "status": status}, {"id": "t-0002", "title": "Task two"}]
+def test_a_benched_agent_says_what_it_waits_for(benched_for: str, status: str, card: str | None, says: str) -> None:
+    own = {"id": "t-0001", "title": "Task one", "status": status, "owner_card": card}
+    tasks = [own, {"id": "t-0002", "title": "Task two"}]
     row = {"state": models.DEPRIORITIZED, "benched_for": benched_for, "task": "t-0001"}
 
     assert agentwords.doing(Snap(0.0, {"queue": {"tasks": tasks}}, {}), row) == says

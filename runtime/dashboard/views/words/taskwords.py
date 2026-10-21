@@ -128,6 +128,8 @@ def status(snap: Snap, task: dict[str, Any]) -> dict[str, str]:
             return {"tone": TONES[state], "word": "In QA"}
         total = snap.settings.get_int("rounds.qa") + session["extensions"].get("qa", 0)
         return {"tone": TONES[state], "word": f"QA, round {session['facts']['qa_round']} of {total}"}
+    if state == "blocked" and task["owner_card"] is None:
+        return {"tone": TONES[state], "word": "Blocked"}
     return {"tone": TONES[state], "word": _WORDS[state]}
 
 

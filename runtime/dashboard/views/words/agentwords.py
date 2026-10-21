@@ -39,6 +39,7 @@ OWN_WAIT = {
     "blocked": "Blocked · comes back when you mark it fixed",
     "on-hold": "On hold · comes back when the task it waits for passes its check",
 }
+FACTORY_BLOCKED = "Blocked · comes back when the orchestrator finds it cleared"
 # Where a merged task's check stands, each with its dot's tone: a line under a benched implementer's doing. A check
 # walks a bundle of merges at one commit, the {sha} named.
 CHECK = {
@@ -113,6 +114,8 @@ def _pushed_out(snap: Snap, benched_for: str, own: str) -> str:
     task = next((t for t in snap.get("queue")["tasks"] if t["id"] == benched_for), None)
     if task is None:
         return "Pushed out · comes back first"
+    if benched_for == own and task["status"] == "blocked" and task["owner_card"] is None:
+        return FACTORY_BLOCKED
     if benched_for == own:
         return OWN_WAIT.get(task["status"], "Sent back to it · comes back when a place frees")
     return f"Pushed out for “{task['title']}” · comes back first"

@@ -105,15 +105,20 @@ def _queue(ctx: Context, args: dict[str, Any]) -> Any:
                 continue
             specs[spec.task] = {k: v for k, v in models.dump(spec).items() if k != "body"}
     rows = []
+    # A broken cards.json fails the queue only while a blocked task needs to know whose its block is.
+    found_cards = cards.read(ctx.places) if any(t.status == "blocked" for t in tasks) else []
     for task in tasks:
         row = models.dump(task)
-        # What only a task's log holds: how it came to be closed, parked or proposed, and whether the owner then
-        # changed a proposal's run.
-        if task.status in ("closed", "parked", "proposed"):
+        # What only a task's log holds: how it came to be closed, parked, proposed or blocked, and whether the owner
+        # then changed a proposal's run.
+        if task.status in ("closed", "parked", "proposed", "blocked"):
             log = queue.read_log(task.id)
             last = next((e for e in reversed(log) if e.get("to") == task.status), {})
             row["last_move"] = {k: last.get(k, "") for k in ("from", "event", "at", "text")}
             row["run_changed"] = any(e["event"] == "owner-run" and e["at"] >= last.get("at", "") for e in log)
+        if task.status == "blocked":
+            card = cards.owner_block(found_cards, task.id)
+            row["owner_card"] = None if card is None else card.id
         rows.append(row)
     return {
         "requests": [models.dump(r) for r in requests],

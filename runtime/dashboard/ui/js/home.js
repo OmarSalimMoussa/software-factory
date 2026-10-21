@@ -123,8 +123,8 @@ function needCard(n) {
 }
 const needOf = id => (homePart('needs') || {cards: []}).cards.find(n => n.id === id);
 function needAct(id, what, btn, close) {
-  const n = needOf(id); if (!n) return;
-  const body = {version: n.version};
+  const n = needOf(id), version = btn && btn.dataset.version ? btn.dataset.version : n && n.version; if (!version) return;
+  const body = {version};
   if (what === 'answer') { body.text = (UI.answers[id] || '').trim(); if (!body.text) { alertToast('answer:' + id, 'Write an answer first.'); return; } }
   act(`/api/needs/${encodeURIComponent(id)}/${what}`, body, {btn, quiet: true, onOk: () => { if (what === 'answer') delete UI.answers[id]; if (close) closeSheet(); }});
 }

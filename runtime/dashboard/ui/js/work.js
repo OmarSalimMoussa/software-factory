@@ -93,6 +93,7 @@ function taskBody(t) {
   const p = t.proposal;
   return `${p ? `<div class="mock">${picture(p.picture, 'Sketch: now and after')}</div><div><div class="label">Why now</div><div style="margin-top:4px">${esc(p.why)}</div></div>` : ''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="status"><i class="dot ${t.status.tone}"></i>${esc(t.status.word)}</span>${t.chips.map(chip).join('')}</div>
+    ${t.blocked ? `<div class="section"><div class="label">${esc(t.blocked.label)}</div><div>${esc(t.blocked.why)}</div></div>` : ''}
     <div class="kv">${t.kv.map(kvBox).join('')}</div>
     <div class="section"><div class="label">${esc(t.route.label)}</div><div class="ladder">${t.route.steps.map((x, i) => `<div class="${i === t.route.current ? 'on' : ''}">${esc(x)}</div>`).join('')}</div>${t.route.cause ? `<div class="muted" style="font-size:12px">Cause: <span class="mono">${esc(t.route.cause)}</span></div>` : ''}</div>
     <div class="section"><div class="label">Progress</div><div class="ladder track">${t.progress.stages.map((x, i) => `<div class="${i <= t.progress.at ? 'on' : ''}">${esc(x)}</div>`).join('')}</div></div>
@@ -111,7 +112,8 @@ function taskFoot(t) {
     later: () => `<button class="btn" data-prop-act="later" data-id="${id}" ${v}>Not now</button>`,
     approve: () => `<button class="btn primary" data-prop-act="approve" data-id="${id}" ${v}>${icon('check', 'sm')}Approve</button>`,
     boost: () => `<button class="btn primary" data-boost="${id}" ${v}>${icon('arrow-up-circle', 'sm')}Boost</button>`,
-    unboost: () => `<button class="btn primary" data-unboost="${id}" ${v}>${icon('arrow-up-circle', 'sm')}Unboost</button>`
+    unboost: () => `<button class="btn primary" data-unboost="${id}" ${v}>${icon('arrow-up-circle', 'sm')}Unboost</button>`,
+    fixed: () => `<button class="btn primary" data-need-act="fixed" data-id="${esc(t.blocked.card)}" data-version="${esc(t.blocked.version)}" data-close="1" data-write>${icon('check', 'sm')}Fixed, carry on</button>`
   };
   return t.actions.map(a => B[a] ? B[a]() : '').join('');
 }

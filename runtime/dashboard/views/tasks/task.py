@@ -184,11 +184,14 @@ def sheet(snap: Snap, task_id: str) -> dict[str, Any]:
     chips += [{"text": s, "tone": ""} for s in taskwords.surfaces(task)]
     label, money = taskwords.money_or_estimate(snap, task)
     log = snap.get("logs").get(task_id, [])
+    block = blocked(snap, task)
     actions = ["library"]
     if proposed:
         actions += ["drop", "later", "approve"]
     elif task["status"] == "queued" and n != 0:
         actions.append("unboost" if task["boosted_at"] else "boost")
+    elif block is not None and block["card"] is not None:
+        actions.append("fixed")
     return {
         "id": task["id"],
         "title": task["title"],
@@ -198,6 +201,7 @@ def sheet(snap: Snap, task_id: str) -> dict[str, Any]:
         if proposed
         else None,
         "status": taskwords.status(snap, task),
+        "blocked": block,
         "chips": chips,
         "kv": [
             {"label": "Requests", "value": str(len(task["requests"]))},
@@ -222,6 +226,18 @@ def sheet(snap: Snap, task_id: str) -> dict[str, Any]:
         "branch": task["branch"] or None,
         "commits": _commits(snap, task_id),
         "actions": actions,
+    }
+
+
+def blocked(snap: Snap, task: dict[str, Any]) -> dict[str, Any] | None:
+    if task["status"] != "blocked":
+        return None
+    card = next((c for c in snap.get("cards") if c["id"] == task["owner_card"]), None)
+    return {
+        "label": f"Blocked {ago(epoch(task['last_move']['at']), snap.now)}",
+        "why": task["last_move"]["text"],
+        "card": None if card is None else card["id"],
+        "version": None if card is None else proposals.need_version(card),
     }
 
 

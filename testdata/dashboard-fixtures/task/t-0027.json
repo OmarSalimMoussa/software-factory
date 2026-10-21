@@ -12,6 +12,7 @@
    "tone": "warn",
    "word": "Waiting for you"
   },
+  "blocked": null,
   "chips": [
    {
     "text": "Billing: the credit line shows twice",

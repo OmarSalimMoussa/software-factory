@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from dashboard_rig import Rig
 from dashboard_seed import blocked
 
@@ -56,6 +57,25 @@ def test_a_blocked_task_asks_the_owner_only_to_say_it_is_fixed_and_then_goes_bac
 
     assert json.loads(reply.body)["message"] == "Back to its builder, who carries on when a place frees."
     assert "status: building" in task.read_text()
+
+
+@pytest.mark.parametrize("card_open", [True, False], ids=["the-owners-card-open", "no-owner-card"])
+def test_a_blocked_task_says_you_fix_it_only_while_the_owners_card_is_open_and_its_panel_says_why(
+    rig: Rig, tmp_path: Path, card_open: bool
+) -> None:
+    blocked(tmp_path / "repo", rig.places, "t-0020", "The seed is missing", "2026-10-09T11:00:00Z")
+    if not card_open:
+        store.write_json(rig.places.cards, [c for c in store.read_json(rig.places.cards) if c["task"] != "t-0020"])
+
+    row = next(r for r in rig.parts("/api/work?tab=tasks")["tasks"]["data"]["groups"][0]["rows"] if r["id"] == "t-0020")
+    panel = rig.parts("/api/task/t-0020")["task"]["data"]
+
+    assert row["status"]["word"] == ("Blocked until you fix it" if card_open else "Blocked")
+    assert (panel["blocked"]["label"], panel["blocked"]["why"]) == ("Blocked 40 min ago", "The seed is missing")
+    assert (panel["blocked"]["card"], "fixed" in panel["actions"]) == ("n4" if card_open else None, card_open)
+    if card_open:
+        sent = {"version": panel["blocked"]["version"], "idempotency_key": "fixed-0002"}
+        assert json.loads(rig.post("/api/needs/n4/fixed", sent).body)["ok"]
 
 
 def test_a_move_sends_the_warden_its_own_order_once_the_device_saw_the_same(rig: Rig) -> None:
