@@ -19,6 +19,7 @@ from runtime.guard import (
     commands,
     factory_calls,
     git_rules,
+    history,
     scratch,
     shell,
     subagents,
@@ -69,6 +70,7 @@ _INBOX_WAIT = re.compile(r"(?:^|\s)factory inbox --wait(?!\S)")
 def resolve(payload: dict[str, Any], places: Places, now: datetime, home: Path) -> Call | None:
     """The call with the warden's published facts, or None for a session the warden registered as the owner's."""
     transcript.forget()
+    history.forget()
     try:
         switches = read_switches(places)
     # telemetry: expected — every rule stays on; the warden reports the unreadable switches on the Guard page

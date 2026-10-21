@@ -23,7 +23,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from runtime.guard import browser, factory_calls, scratch, transcript
+from runtime.guard import browser, factory_calls, history, scratch, transcript
 from runtime.guard.facts import (
     Call,
     Decision,
@@ -78,7 +78,7 @@ def _unknown(vitals: Vitals, age: float | None) -> str:
     return f"its last reading is {age / 60:.0f} min old"
 
 
-def check(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
+def check(call: Call, kind: str, calls: list[history.AgentCall]) -> Decision:
     return _upgrade(call, kind) or _cpu(call, kind)
 
 
@@ -123,9 +123,9 @@ def _cpu(call: Call, kind: str) -> Decision:
 
 
 def _held_since(call: Call, personas: list[str]) -> datetime | None:
-    held, refused = (transcript.refused_ids(call.transcript, found) for found in (marker(HOLD), REFUSED))
+    held, refused = (history.refused_ids(call.transcript, found) for found in (marker(HOLD), REFUSED))
     current, since = str(call.payload.get("tool_use_id", "")), None
-    for agent in transcript.agent_calls(call.transcript):
+    for agent in history.agent_calls(call.transcript):
         if agent.tool_use_id == current:
             break
         if lanes.kind_of(agent.subagent_type) not in personas:

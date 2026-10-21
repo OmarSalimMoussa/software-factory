@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from guard_kit import NOW, SID, TESTER_ID, Kit
+from guard_kit import NOW, SID, TESTER_ID, Kit, agent_use, entry, result
 
-from runtime.guard import decide, transcript
+from runtime.guard import deadline, decide, history, transcript
 from runtime.guard.facts import Refusal
 from runtime.shared import lanes, store
 from runtime.shared.models import PENDING
@@ -126,6 +126,79 @@ def test_each_decision_reads_the_transcript_as_it_is_though_its_size_and_time_di
     os.utime(path, ns=(1, 1))
     kit.decide("Read", {"file_path": "/x"})
     assert [e["n"] for e in transcript.entries(path)] == [2]
+
+
+_PARSED = transcript.parsed
+
+
+def _finished(count: int) -> list[str]:
+    started = NOW - timedelta(hours=1)
+    pairs = [([agent_use(f"f{n}", "intake")], [result(f"f{n}", "Intake: done.")]) for n in range(count)]
+    return [line for use, done in pairs for line in (entry(started, "assistant", use), entry(started, "user", done))]
+
+
+def _two_running() -> list[str]:
+    return [entry(NOW, "assistant", [agent_use("r0", "qa-regression"), agent_use("r1", "intake")])]
+
+
+def _parses(monkeypatch: pytest.MonkeyPatch, cut_at: int = 0) -> list[bytes]:
+    """The transcript lines each decision parses from here on; the ``cut_at``-th runs the guard out of time."""
+    read: list[bytes] = []
+
+    def counted(line: bytes) -> dict[str, Any] | None:
+        read.append(line)
+        if len(read) == cut_at:
+            raise deadline.OutOfTime("the guard ran out of time to decide")
+        return _PARSED(line)
+
+    monkeypatch.setattr(transcript, "parsed", counted)
+    return read
+
+
+def test_a_long_sessions_subagent_start_parses_only_the_lines_added_since_the_last(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("orchestrator", worktree=kit.repo)
+    kit.settings(caps__subagents_at_once=3)
+    kit.transcript(_finished(2000))
+    assert kit.rule("Agent", {"subagent_type": "triage", "prompt": "Triage these."}) is None
+    read = _parses(monkeypatch)
+    kit.transcript([*_finished(2000), *_two_running()])
+    assert kit.rule("Agent", {"subagent_type": "triage", "prompt": "Triage these."}) == "subagents-at-once"
+    assert len(read) == 1
+
+
+def test_a_start_cut_short_by_the_guards_time_spares_the_next_the_steps_it_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("orchestrator", worktree=kit.repo)
+    kit.settings(caps__subagents_at_once=3)
+    lines = [*_finished(400), *_two_running()]
+    kit.transcript(lines)
+    monkeypatch.setattr(history, "_STEP", 10_000)
+    _parses(monkeypatch, cut_at=300)
+    with pytest.raises(deadline.OutOfTime):
+        kit.decide("Agent", {"subagent_type": "triage", "prompt": "Triage these."})
+    read = _parses(monkeypatch)
+    assert kit.rule("Agent", {"subagent_type": "triage", "prompt": "Triage these."}) == "subagents-at-once"
+    assert 0 < len(read) <= len(lines) - 200  # on from the last step it kept, of 300 lines read, never from the start
+
+
+@pytest.mark.parametrize("kept", ["{", '{"at": 1}', None], ids=["unreadable", "misshapen", "another-transcripts"])
+def test_a_kept_read_that_does_not_fit_the_transcript_is_read_again_from_its_start(
+    tmp_path: Path, kept: str | None
+) -> None:
+    kit = Kit(tmp_path)
+    kit.session("orchestrator", worktree=kit.repo)
+    kit.settings(caps__subagents_at_once=3)
+    kit.transcript(_two_running())
+    assert kit.rule("Agent", {"subagent_type": "triage", "prompt": "Triage these."}) == "subagents-at-once"
+    if kept is not None:
+        (kit.session_transcript.with_suffix("") / history.KEPT).write_text(kept)
+    kit.transcript(_finished(20))
+    assert kit.rule("Agent", {"subagent_type": "triage", "prompt": "Triage these."}) is None
 
 
 @pytest.mark.parametrize("rule", ["raw-starts", "retired"])

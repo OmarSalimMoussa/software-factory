@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from runtime.guard import branches, factory_calls, shell, transcript, walk_hold
+from runtime.guard import branches, factory_calls, history, shell, transcript, walk_hold
 from runtime.guard.facts import (
     DESIGNER,
     IMPLEMENTER,
@@ -56,8 +56,8 @@ def check_agent(call: Call) -> Decision:
     brief gains the factory's notes on calling factory and on when to reflect, as its kind may."""
     kind = lanes.kind_of(_started_as(call))
     current = str(call.payload.get("tool_use_id", ""))
-    refused = transcript.refused_ids(call.transcript, REFUSED)
-    found = transcript.agent_calls(call.transcript)
+    refused = history.refused_ids(call.transcript, REFUSED)
+    found = history.agent_calls(call.transcript)
     ids = [c.tool_use_id for c in found]
     # Starts sent in one message are all in the transcript at the first one's hook: only those before this one count.
     earlier = found[: ids.index(current)] if current in ids else found
@@ -69,7 +69,7 @@ def check_agent(call: Call) -> Decision:
     return _with_notes(call, kind)
 
 
-def _kind(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
+def _kind(call: Call, kind: str, calls: list[history.AgentCall]) -> Decision:
     if call.off("subagent-kinds"):
         return None
     if call.in_subagent:
@@ -89,7 +89,7 @@ def _started_as(call: Call) -> str:
     return str(call.tool_input.get("subagent_type") or "general-purpose")
 
 
-def _lane(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
+def _lane(call: Call, kind: str, calls: list[history.AgentCall]) -> Decision:
     """Two testers in one browser lane would share its browser, and the first to finish would close it on the other."""
     name = _started_as(call)
     if call.off("subagents-at-once") or kind not in call.settings.get_list("subagents.browser_personas"):
@@ -103,7 +103,7 @@ def _lane(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
     return Refusal("subagents-at-once", f"a {name} is running and its browser is that tester's; {then}")
 
 
-def _model(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
+def _model(call: Call, kind: str, calls: list[history.AgentCall]) -> Decision:
     asked = str(call.tool_input.get("model") or "")
     if not asked or call.off("model"):
         return None
@@ -116,7 +116,7 @@ def _model(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision
     return Refusal("model", f"a {kind} {wanted}; leave the model out")
 
 
-def _browsers(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
+def _browsers(call: Call, kind: str, calls: list[history.AgentCall]) -> Decision:
     """At most caps.browsers_at_once browser testers on the machine, none on red vitals or while a tester holds a
     desktop: amber holds back new work. This session's earlier starts count too: one sent in the same message has no
     session row yet. A place the warden told a session of is kept for it for qa.place_turn_seconds, even while the
@@ -150,7 +150,7 @@ def _browsers(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decis
     return None
 
 
-def _at_once(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
+def _at_once(call: Call, kind: str, calls: list[history.AgentCall]) -> Decision:
     if call.off("subagents-at-once"):
         return None
     running = [c for c in calls if _running(call, c)]
@@ -164,7 +164,7 @@ def _at_once(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decisi
     return Refusal("subagents-at-once", f"{len(running)} running ({names}){keep}; wait for one to report")
 
 
-def _brief(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
+def _brief(call: Call, kind: str, calls: list[history.AgentCall]) -> Decision:
     if not kind.startswith(TESTER) or call.off("tester-brief"):
         return None
     try:
@@ -179,11 +179,10 @@ def _brief(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision
     return None
 
 
-def _running(call: Call, agent: transcript.AgentCall) -> bool:
+def _running(call: Call, agent: history.AgentCall) -> bool:
     """Whether a started subagent still holds a place: not finished nor stopped, and not quiet past its budget or
     the stale limit."""
-    stopped = {s.agent_id for s in call.sessions.values() if s.agent_id and s.state == RETIRED}
-    if agent.finished or agent.agent_id in stopped:
+    if agent.finished or agent.agent_id in {s.agent_id for s in call.sessions.values() if s.state == RETIRED}:
         return False
     path = transcript.subagent_transcript(call.transcript, agent.agent_id) if agent.agent_id else None
     try:
@@ -206,7 +205,7 @@ def _running(call: Call, agent: transcript.AgentCall) -> bool:
     return not (quiet >= call.settings.get_int("qa.quiet_seconds") and spent >= budget)
 
 
-def _qa(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
+def _qa(call: Call, kind: str, calls: list[history.AgentCall]) -> Decision:
     """QA only after every slice: a ready record for this exact head, and at most the round limit of heads."""
     if not kind.startswith(TESTER) or call.role != IMPLEMENTER or call.off("qa-ready") or call.session is None:
         return None
@@ -241,11 +240,11 @@ def _interrupted(call: Call) -> set[str | None]:
     return {s.agent_id for s in rows if s.agent_id and s.state == RETIRED and s.retired == WITH_PARENT}
 
 
-def _critic_rounds(call: Call, kind: str, calls: list[transcript.AgentCall]) -> Decision:
+def _critic_rounds(call: Call, kind: str, calls: list[history.AgentCall]) -> Decision:
     """A critic round is a run of critic starts with no saved spec revision between them."""
     if not kind.startswith(CRITIC) or call.role != DESIGNER or call.off("critic-rounds"):
         return None
-    refused = transcript.refused_ids(call.transcript, REFUSED)
+    refused = history.refused_ids(call.transcript, REFUSED)
     saves = [
         use.when
         for use in transcript.tool_uses(call.transcript, frozenset({"Bash"}))
@@ -303,7 +302,7 @@ def check_send(call: Call) -> Decision:
     if not target or call.off("resume-subagent"):
         return None
     stopped = {s.agent_id for s in call.sessions.values() if s.agent_id and s.state == RETIRED}
-    finished = {a.agent_id for a in transcript.agent_calls(call.transcript) if a.finished and a.agent_id}
+    finished = {a.agent_id for a in history.agent_calls(call.transcript) if a.finished and a.agent_id}
     if target in finished | stopped:
         return Refusal("resume-subagent", "a finished subagent is not resumed; start a new one (it counts)")
     return None
