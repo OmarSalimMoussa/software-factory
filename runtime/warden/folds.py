@@ -1,6 +1,6 @@
 """The logs the dashboard draws, folded as they grow: retirements for History, cost by day and in total, each
-environment's health streak and the guard's refusals. Each poll reads only the lines added since the last one; one
-fold of each log is kept for the warden's life.
+agent's time, each environment's health streak and the guard's refusals. Each poll reads only the lines added since
+the last one; one fold of each log is kept for the warden's life.
 """
 
 from __future__ import annotations
@@ -118,6 +118,26 @@ class Cost(Fold):
         recent = sorted(self.days)[-days:]
         return {"days": {d: self.days[d] for d in recent}, "totals": self.totals,
                 "tokens": {"days": {d: self.tokens[d] for d in recent}, "task": self.task_tokens}}  # fmt: skip
+
+
+class Times(Fold):
+    """Each agent's time in total: its parts, its task and role, whether it is a lead (a session of its own) or a
+    subagent, and whether every transcript it was measured from was read whole."""
+
+    def reset(self) -> None:
+        self.agents: dict[str, dict[str, Any]] = {}
+
+    def step(self, raw: dict[str, Any]) -> None:
+        record = models.load(models.TimeRecord, raw)
+        agent = self.agents.setdefault(record.subagent or record.session, {
+            "task": record.task, "role": record.role, "lead": not record.subagent, "model": 0.0, "tools": {},
+            "waiting": 0.0, "idle": 0.0, "whole": True,
+        })  # fmt: skip
+        for part in ("model", "waiting", "idle"):
+            agent[part] += getattr(record, part)
+        for key, seconds in record.tools.items():
+            agent["tools"][key] = agent["tools"].get(key, 0.0) + seconds
+        agent["whole"] = agent["whole"] and record.whole
 
 
 class Streaks(Fold):

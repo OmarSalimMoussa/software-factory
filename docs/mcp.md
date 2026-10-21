@@ -36,7 +36,9 @@ Add `--scope user` to have it in every folder, not only the one you run it in. `
 Two tools:
 
 - **`snapshot`** reads what the dashboard reads: the factory's state, the agents, the queue, the settings,
-  Self-reflect and more. `want` names the parts; an empty `want` gets the warden to list every name.
+  Self-reflect and more. `want` names the parts; an empty `want` gets the warden to list every name. `time` tells
+  where the tasks that reached staging in the last `dashboard.time_days` days spent their time, in seconds: wall
+  time per step and per status apart from runtime, and the merges' wait for their check; add `tasks` to read others.
 - **`call`** runs any action you have on the dashboard: a verb the warden answers on the owner socket
   (`runtime/warden/verbs.py`), with its `args`. The answer is the warden's own, as JSON, and a refusal says why.
   An `idempotency_key` in `args` makes a retry run the action only once.

@@ -241,6 +241,7 @@ SCHEMA: dict[str, Spec] = {
     "dashboard.message_max_chars": Spec("int", 100, 20000),  # contract: the longest message the owner sends
     "dashboard.thread_messages": Spec("int", 1, 50),  # contract: the owner's messages a session's thread shows
     "dashboard.thread_tail_kib": Spec("int", 64, 65536),  # contract: how much of a transcript the thread reads
+    "dashboard.time_days": Spec("int", 1, 90),
     "gc.every_hours": Spec("int", 1, 168),
     "gc.images_keep_days": Spec("int", 1, 90),
     "gc.build_cache_keep_hours": Spec("int", 1, 2160),

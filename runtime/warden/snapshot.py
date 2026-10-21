@@ -34,7 +34,7 @@ from runtime.warden.folds import Cost, History, Refusals, Streaks, kept
 from runtime.warden.health import probes
 from runtime.warden.owner import accounts, briefs, codes, factory_upgrade, messages, reflections, settings_save, yolo
 from runtime.warden.sessions import doing, lifecycle, permits, registry
-from runtime.warden.spend import plan
+from runtime.warden.spend import plan, timeline
 
 log = logging.getLogger("factory.warden")
 
@@ -313,6 +313,7 @@ READERS: dict[str, Reader] = {
     "brief": _brief,
     "thread": _thread,
     "cost": _cost,
+    "time": lambda ctx, args: timeline.read(ctx, _ids(ctx, args, "tasks")),
     "accounts": lambda ctx, args: accounts.listing(ctx),
 }
 

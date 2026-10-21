@@ -1,5 +1,4 @@
-"""The settings page's words: every setting's label, in the groups the page draws, each group with its hint
-saying when a change takes effect, as (group, title, hint, [(key, label), ...])."""
+"""The settings page's words: each group the page draws, its hint on when a change applies, and each label."""
 
 from __future__ import annotations
 
@@ -252,6 +251,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
             ("dashboard.message_max_chars", "Longest message to a session, characters"),
             ("dashboard.thread_messages", "Your messages a session's thread shows"),
             ("dashboard.thread_tail_kib", "End of a transcript the thread reads, KiB"),
+            ("dashboard.time_days", "Days the Time page measures"),
         ],
     ),
     (
