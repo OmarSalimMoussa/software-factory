@@ -244,7 +244,7 @@ def decide(ctx: Context, card_id: str, choice: str, by: str = "you") -> dict[str
 def fixed(ctx: Context, card_id: str) -> dict[str, Any]:
     """The owner fixed what blocked a task: it goes back to its implementer, which comes back when a place frees."""
     _, card = cards.find(ctx.places, card_id, "blocked")
-    moved = turn.unblock(ctx, card.task)
+    moved = turn.unblock(ctx, card.task, OWNER, turn.OWNER_FIXED)
     ctx.post_event(inbox.UNBLOCKED, {"task": card.task, "card": card_id})
     return {"card": card_id, "task": card.task, "status": moved.status}
 

@@ -238,6 +238,34 @@ def test_a_blocked_task_waits_benched_for_the_owners_fixed_then_goes_back_to_its
         owner.fixed(world.owner(), card.id)
 
 
+CLEARED = "the vision key is in every slot's env now"
+
+
+@pytest.mark.parametrize("card_lost", [True, False], ids=["its-card-lost", "the-owners-card-open"])
+def test_the_orchestrator_lifts_a_block_only_when_no_owner_card_holds_it_saying_what_cleared(
+    world: World, monkeypatch: pytest.MonkeyPatch, card_lost: bool
+) -> None:
+    task = _blocked(world, monkeypatch, "qa-clean", "working")
+    [card] = cards.read(world.places)
+    if card_lost:
+        cards.write(world.places, [])  # as a clean install of the factory left it, the task still blocked
+    lift = {"task": task.id, "to": "building"}
+    if not card_lost:
+        with pytest.raises(Refused, match=f"the owner's Fixed on {card.id}"):
+            verbs.task_status(world.ctx(), {**lift, "note": CLEARED}, None)
+        assert world.queue().task(task.id).status == "blocked"
+        return
+    with pytest.raises(Refused, match="--note"):
+        verbs.task_status(world.ctx(), lift, None)
+
+    verbs.task_status(world.ctx(), {**lift, "note": CLEARED}, None)
+
+    last = world.queue().read_log(task.id)[-1]
+    assert [last[k] for k in ("actor", "event", "to", "text")] == ["orchestrator", "unblocked", "building", CLEARED]
+    told = lifecycle.held_path(world.ctx(), task.id).read_text()
+    assert BLOCK in told and f"It is clear now: {CLEARED}. Carry on." in told
+
+
 def test_a_blocked_task_the_owner_drops_takes_its_card_with_it(world: World, monkeypatch: pytest.MonkeyPatch) -> None:
     task = _blocked(world, monkeypatch, "merged", DEPRIORITIZED)
 

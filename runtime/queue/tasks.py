@@ -28,7 +28,7 @@ LANDED = frozenset({"merged", "checked", "on-staging", "promoted", "closed"})
 SETTLED = LANDED - {"merged"}  # past the check of its merge's bundle, or closed
 SCORED = frozenset({"queued", "parked", "proposed"})
 REVERTED = "reverted"  # the event that takes a landed task back to its builder
-BLOCKED = "blocked"
+BLOCKED, UNBLOCKED = "blocked", "unblocked"
 ON_HOLD = "on-hold"
 RELEASED = "released"
 _FACTS: dict[str, type] = {
@@ -144,7 +144,7 @@ def set_status(ctx: Context, task_id: str, to: str, event: str, note: str, after
             event = found[0]
         if after and event != ON_HOLD:
             raise Refused("task-status", "--after names the task a hold waits for, and goes only with on-hold")
-        if event not in (REVERTED, BLOCKED, ON_HOLD, RELEASED):
+        if event not in (REVERTED, BLOCKED, UNBLOCKED, ON_HOLD, RELEASED):
             moved = transition(ctx, queue, task, to, event, actor(ctx), note or f"{event}: now {to}")
             if event == "spec-approved":
                 documents.approve_spec(ctx, queue, task_id)

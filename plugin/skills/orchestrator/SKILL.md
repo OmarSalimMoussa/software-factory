@@ -171,7 +171,8 @@ is live and nothing merged for a while, a regression walk of the scenarios that 
    report): revert that merge the same way, then one of two:
    - Only the owner can give it (a key, an account, a paid service, leave to use an outside site):
      `factory queue task status <task> blocked --note "<what stopped it and what would fix it>; reverted as <sha>"`.
-     The warden benches its implementer, writes it to SELF_REFLECT and puts it on Home for the owner's Fixed.
+     The warden benches its implementer, writes it to SELF_REFLECT and puts it on Home for the owner's Fixed. With
+     no owner card open for it, lift it once it cleared: `factory queue task status <task> building --note "<what>"`.
    - Another open task makes it: `factory queue task status <task> on-hold --after <that task> --note "<what
      stopped it>; reverted as <sha>"`. The warden benches its implementer and sends it back once that task's check
      passes, or, told why, once that task is closed or parked. When that task cannot pass soon and this one does
@@ -188,9 +189,8 @@ is live and nothing merged for a while, a regression walk of the scenarios that 
 ## When something is red
 
 - **Prod red** is a clear outage only when the warden says so. The warden files its severe request, which goes to
-  intake at once, and
-  `factory start implementer <task>` starts the one fix without an approval, at rung 1 or 2. The fix merges and
-  reaches staging like any other; the owner pushes it to prod.
+  intake at once, and `factory start implementer <task>` starts the one fix without an approval, at rung 1 or 2.
+  The fix merges and reaches staging like any other; the owner pushes it to prod.
 
 ## Never
 

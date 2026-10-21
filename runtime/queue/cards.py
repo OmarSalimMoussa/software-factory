@@ -157,6 +157,11 @@ def blocked(ctx: Context, task: Task, why: str) -> Card:
     return _add(ctx, Card("", "blocked", task.id, task.title, formats.one_line(why), ctx.clock.iso()), None)
 
 
+def owner_block(found: list[Card], task_id: str) -> Card | None:
+    """The open card on which a blocked task waits for the owner's Fixed; None when its block is the factory's."""
+    return next((c for c in found if c.kind == "blocked" and c.task == task_id and not c.answered), None)
+
+
 def unblocked(ctx: Context, task_id: str, status: str) -> None:
     """The task left blocked, by the owner's Fixed or any other move: its card is answered with where it went."""
     found = read(ctx.places)

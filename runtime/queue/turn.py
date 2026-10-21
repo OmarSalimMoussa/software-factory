@@ -7,8 +7,9 @@ tick: the first-parent merge on the default branch, since the turn was given, wh
 branch; a check clears it with the merges bundled with it (bundle.py). Until then, a holder whose implementer was
 benched, outside the owner's pause, or ended goes back to qa-clean, so the next task merges first. The warden
 benches the merged task's implementer, which holds no place while the check runs. The orchestrator keeps the merge
-itself and the call to revert or block; the warden sends a reverted task, or a blocked one at the owner's Fixed, back
-to its implementer, or, once that has ended, to a new one.
+itself and the call to revert or block; the warden sends a reverted task, or a blocked one at the owner's Fixed (or the
+orchestrator's word that it cleared, while no owner card holds it), back to its implementer, or, once that has ended,
+to a new one.
 """
 
 from __future__ import annotations
@@ -41,7 +42,8 @@ _BRING_BACK = (
     "alone would leave the work reverted."
 )
 REVERTED = "Your work was taken back off {default}: {note}\n\n" + _BRING_BACK
-BLOCKED = "Your task was blocked: {note}\n\nThe owner fixed what blocked it: carry on."
+BLOCKED = "Your task was blocked: {note}\n\nIt is clear now: {cleared}. Carry on."
+OWNER_FIXED = "the owner fixed what blocked it"
 BLOCKED_OFF = BLOCKED + " It was taken back off {default}. " + _BRING_BACK
 HELD = "Your task was put on hold: {note}\n\n{after}, which it waited for, passed its check: carry on."
 RELEASED = "Your task was put on hold, and the orchestrator let it go on without what it waited for: {note}"
@@ -212,7 +214,9 @@ def take_off_course(ctx: Context, task_id: str, to: str, event: str, note: str, 
     if event == tasks.RELEASED:
         return release(ctx, task_id, note)
     if to != "building":
-        raise Refused("task-status", f"a revert sends {task_id} back to building; the warden finds who builds it")
+        raise Refused("task-status", f"{event} sends {task_id} back to building; the warden finds who builds it")
+    if event == tasks.UNBLOCKED:
+        return unblock(ctx, task_id, tasks.actor(ctx), note)
     return send_back(ctx, task_id, note)
 
 
@@ -306,14 +310,25 @@ def release(ctx: Context, task_id: str, note: str) -> Task:
     return _back(ctx, task_id, tasks.RELEASED, statuses.ORCH, note.strip(), told, after=[])
 
 
-def unblock(ctx: Context, task_id: str) -> Task:
-    """The owner fixed what blocked the task: it goes back as a revert does, told what stopped it."""
-    block = next((e for e in reversed(Queue.of(ctx).read_log(task_id)) if e["event"] == "blocked"), None)
+def last_block(queue: Queue, task_id: str) -> dict[str, Any] | None:
+    return next((e for e in reversed(queue.read_log(task_id)) if e["event"] == tasks.BLOCKED), None)
+
+
+def unblock(ctx: Context, task_id: str, by: str, note: str) -> Task:
+    """What blocked the task cleared: it goes back as a revert does, told what stopped it. A block an open owner card
+    holds, only the owner lifts."""
+    block = last_block(Queue.of(ctx), task_id)
     if block is None:
         raise Refused("task-status", f"{task_id} was never blocked")
+    card = cards.owner_block(cards.read(ctx.places), task_id)
+    if by != statuses.OWNER and card is not None:
+        raise Refused("task-status", f"{task_id} waits for the owner's Fixed on {card.id}")
+    if not note.strip():
+        raise Refused("note", "an unblock says what cleared the block, in --note")
     word = BLOCKED_OFF if block.get("from") == MERGED else BLOCKED
-    told = word.format(default=ctx.settings().get_str("repo.default_branch"), note=block["text"])
-    return _back(ctx, task_id, "unblocked", statuses.OWNER, "the owner fixed what blocked it", told)
+    cleared = note.strip().rstrip(".")
+    told = word.format(default=ctx.settings().get_str("repo.default_branch"), note=block["text"], cleared=cleared)
+    return _back(ctx, task_id, tasks.UNBLOCKED, by, note.strip(), told)
 
 
 def _back(ctx: Context, task_id: str, event: str, by: str, note: str, told: str, **fields: Any) -> Task:
