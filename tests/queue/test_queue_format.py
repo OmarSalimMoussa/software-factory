@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 from queue_kit import World
 
 from runtime.queue import format_check, formats, records
-from runtime.queue.book import request_rel, task_rel
+from runtime.queue.book import Queue, request_rel, task_rel
 from runtime.queue.files import QueueFiles
 from runtime.queue.formats import FormatError
 from runtime.shared.models import Request, Task
@@ -134,6 +136,35 @@ def test_the_sweep_reads_nothing_while_the_queue_is_unchanged_and_a_rewrite_is_r
     world.queue().files.write("tasks/t-0042.md", b"still not a task")
     assert world.queue().blobs()["tasks/t-0042.md"] == b"still not a task"
     assert reads == ["tasks/t-0042.md"]
+
+
+CHECK = records.CheckRecord("c-20261009T120000Z-abc1234", "abc1234" + "0" * 33, "2026-10-09T12:00:00Z", "Merged.",
+                            [records.ScenarioRow("sign-in", "pass", 3, "evidence/x")], "Walked.")  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("scan", "rel", "changed"),
+    [
+        (Queue.tasks, task_rel(TASK.id), formats.dump_task(dataclasses.replace(TASK, title="Sign-in loops twice"))),
+        (Queue.requests, request_rel(REQ), formats.dump_request(dataclasses.replace(REQ, body="It loops twice."))),
+        (Queue.checks, f"checks/{CHECK.id}.md", records.dump_check(dataclasses.replace(CHECK, notes="Walked twice."))),
+    ],
+    ids=["tasks", "requests", "checks"],
+)
+def test_a_scan_of_the_queue_reads_only_the_files_that_changed_since_the_last(
+    world: World, monkeypatch: pytest.MonkeyPatch, scan: Callable[[Queue], Any], rel: str, changed: str
+) -> None:
+    world.write_raw(task_rel(TASK.id), formats.dump_task(TASK))
+    world.write_raw(request_rel(REQ), formats.dump_request(REQ))
+    world.write_raw(f"checks/{CHECK.id}.md", records.dump_check(CHECK))
+    before = scan(world.queue())
+    reads: list[str] = []
+    real = QueueFiles.read
+    monkeypatch.setattr(QueueFiles, "read", lambda self, rel: reads.append(rel) or real(self, rel))
+
+    assert scan(world.queue()) == before and reads == []
+    world.write_raw(rel, changed)
+    assert scan(world.queue()) != before and reads == [rel]
 
 
 @pytest.mark.parametrize(

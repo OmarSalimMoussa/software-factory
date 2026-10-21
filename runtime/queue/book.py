@@ -72,18 +72,23 @@ class Queue:
         warden last read it is read again: the queue only grows, and every write checks all of it."""
         return {rel: self.files.read_stamped(rel, stamp) for rel, stamp in self.stamps().items()}
 
+    def _folder(self, sub: str, suffix: str) -> Iterator[tuple[str, bytes]]:
+        """Each file of a queue folder whose name ends with ``suffix``, in name order, with its bytes. As in ``blobs``,
+        only a file that changed since the warden last read it is read again: a safe read costs more than its parse."""
+        for name, stamp in self.files.stamps(sub).items():
+            if name.endswith(suffix):
+                yield f"{sub}/{name}", self.files.read_stamped(f"{sub}/{name}", stamp)
+
     def requests(self) -> tuple[list[Request], list[Broken]]:
         good: list[Request] = []
         broken: list[Broken] = []
         for inbox in INBOXES:
-            for name in self.files.names(f"requests/{inbox}"):
-                if name.endswith(".md"):
-                    rel = f"requests/{inbox}/{name}"
-                    try:
-                        good.append(formats.parse_request(self.files.read(rel).decode(), rel))
-                    # telemetry: surfaced — a request that cannot be read is one of the `broken` rows, which say so
-                    except (FormatError, UnicodeDecodeError) as exc:
-                        broken.append(Broken(rel, str(exc)))
+            for rel, raw in self._folder(f"requests/{inbox}", ".md"):
+                try:
+                    good.append(formats.parse_request(raw.decode(), rel))
+                # telemetry: surfaced — a request that cannot be read is one of the `broken` rows, which say so
+                except (FormatError, UnicodeDecodeError) as exc:
+                    broken.append(Broken(rel, str(exc)))
         return good, broken
 
     def request(self, request_id: str) -> Request:
@@ -102,14 +107,12 @@ class Queue:
     def tasks(self) -> tuple[list[Task], list[Broken]]:
         good: list[Task] = []
         broken: list[Broken] = []
-        for name in self.files.names("tasks"):
-            if name.endswith(".md"):
-                rel = f"tasks/{name}"
-                try:
-                    good.append(formats.parse_task(self.files.read(rel).decode(), rel))
-                # telemetry: surfaced — a task that cannot be read is one of the `broken` rows, which say so
-                except (FormatError, UnicodeDecodeError) as exc:
-                    broken.append(Broken(rel, str(exc)))
+        for rel, raw in self._folder("tasks", ".md"):
+            try:
+                good.append(formats.parse_task(raw.decode(), rel))
+            # telemetry: surfaced — a task that cannot be read is one of the `broken` rows, which say so
+            except (FormatError, UnicodeDecodeError) as exc:
+                broken.append(Broken(rel, str(exc)))
         return good, broken
 
     def task(self, task_id: str) -> Task:
@@ -129,10 +132,9 @@ class Queue:
     def checks(self) -> tuple[list[CheckRecord], list[Broken]]:
         good: list[CheckRecord] = []
         broken: list[Broken] = []
-        for name in self.files.names("checks"):
-            rel = f"checks/{name}"
+        for rel, raw in self._folder("checks", ""):
             try:
-                good.append(records.parse_check(self.files.read(rel).decode(), rel))
+                good.append(records.parse_check(raw.decode(), rel))
             # telemetry: surfaced — a check record that cannot be read is one of the `broken` rows, which say so
             except (FormatError, UnicodeDecodeError) as exc:
                 broken.append(Broken(rel, str(exc)))
