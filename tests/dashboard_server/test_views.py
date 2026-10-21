@@ -19,7 +19,7 @@ from runtime.dashboard.views import agents, ops, spend
 from runtime.dashboard.views.kit import PartError, Snap
 from runtime.dashboard.views.tasks.task import qa_line
 from runtime.dashboard.views.words import agentwords, taskwords
-from runtime.dashboard.views.words.settingwords import LABELS
+from runtime.dashboard.views.words.settingwords.page import LABELS
 from runtime.qa import retention
 from runtime.queue import formats, owner
 from runtime.shared import models, store

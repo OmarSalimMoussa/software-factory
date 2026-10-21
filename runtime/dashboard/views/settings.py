@@ -2,7 +2,7 @@
 what runs now; and the owner's edits turned back into the values the warden saves. The Claude account section at the
 page's top is accounts.py's.
 
-The labels in words/settingwords.py cover every key in runtime/shared/settings_schema.SCHEMA; a key missing from them
+The labels in words/settingwords/ cover every key in runtime/shared/settings_schema.SCHEMA; a key missing from them
 fails the page loudly.
 """
 
@@ -13,7 +13,7 @@ from typing import Any
 
 from runtime.dashboard.views import accounts
 from runtime.dashboard.views.kit import PartError, Parts, Query, Snap, ago, epoch, model_label
-from runtime.dashboard.views.words.settingwords import GROUPS, LABELS
+from runtime.dashboard.views.words.settingwords.page import GROUPS, LABELS
 from runtime.shared.models import RETIRED
 from runtime.shared.settings import Settings
 from runtime.shared.settings_schema import AT_INSTALL, SCHEMA
