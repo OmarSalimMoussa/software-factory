@@ -64,8 +64,19 @@ def split(command: str) -> tuple[str, list[str], list[str], int]:
     A body is text for its program, except a body in a pipeline that runs a shell: that is read as a script. In a body
     under an unquoted delimiter, bash still runs each `$( … )` and backtick command.
     """
+    kept, scripts, expanded, fed = _read(command)
     lines = command.split("\n")
-    kept: list[str] = []
+    return "\n".join(lines[k] for k in kept), scripts, expanded, fed
+
+
+def kept_lines(command: str) -> list[int]:
+    """The indexes of the lines of ``command`` that `split` keeps: every line but heredoc bodies and their ends."""
+    return _read(command)[0]
+
+
+def _read(command: str) -> tuple[list[int], list[str], list[str], int]:
+    lines = command.split("\n")
+    kept: list[int] = []
     scripts: list[str] = []
     expanded: list[str] = []
     frames = [_Frame()]
@@ -73,8 +84,8 @@ def split(command: str) -> tuple[str, list[str], list[str], int]:
     i = 0
     while i < len(lines):
         line = lines[i]
+        kept.append(i)
         i += 1
-        kept.append(line)
         for marker in _opened(line, frames):
             body: list[str] = []
             while True:
@@ -91,7 +102,7 @@ def split(command: str) -> tuple[str, list[str], list[str], int]:
                 scripts.append("\n".join(body))
             elif not marker.quoted:
                 expanded.append("\n".join(body))
-    return "\n".join(kept), scripts, expanded, fed
+    return kept, scripts, expanded, fed
 
 
 def _opened(line: str, frames: list[_Frame]) -> list[_Marker]:

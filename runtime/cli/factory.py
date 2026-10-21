@@ -3,10 +3,10 @@
 It turns a command line into one request on the warden's socket and prints the answer. The warden knows who is
 asking from the calling process, never from these arguments. Every file the caller names (a picture, a spec, a
 body given with ``--body``) is read here, as the caller, and sent as bytes; the warden never opens a path a caller
-names. Nothing comes from stdin: the guard lets a call through only when it is ``factory …`` alone, with no pipe,
-redirect or heredoc, so it can put ``--agent-id <id>`` first on a subagent's call. `qa-browser` and `slot-api` run
-here without the warden; `check` is the warden's, which runs it walled into the caller's checkout; `account` is the
-owner's alone, on owner.sock (runtime/cli/accounts.py).
+names. Nothing comes from stdin: the guard lets a factory command through only as a plain command of its own, with
+no pipe, redirect or heredoc, so it can put ``--agent-id <id>`` first in each of a subagent's. `qa-browser` and
+`slot-api` run here without the warden; `check` is the warden's, which runs it walled into the caller's checkout;
+`account` is the owner's alone, on owner.sock (runtime/cli/accounts.py).
 """
 
 from __future__ import annotations

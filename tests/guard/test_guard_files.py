@@ -184,23 +184,8 @@ def test_intake_reads_the_queue_and_hears_a_command_that_does_not_exist_named_as
 def test_a_sessions_factory_commands_are_each_plain_and_name_no_subagent(
     kit: Kit, command: str, rule: str | None
 ) -> None:
-    assert kit.bash(command) == rule
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "ls; factory queue task new --title x",
-        "factory queue task new --title x && ls",
-        "ls\nfactory queue task new --title x",
-    ],
-)
-def test_a_subagents_factory_call_is_the_whole_call_as_its_name_goes_in_the_text(tmp_path: Path, command: str) -> None:
-    kit = Kit(tmp_path)
-    kit.session("orchestrator", worktree=kit.repo)
-    intake = {"agent_id": "a1234567890abc", "agent_type": "intake", "cwd": str(kit.repo)}
-    assert kit.rule("Bash", {"command": command}, **intake) == "factory-alone"
-    assert kit.rule("Bash", {"command": command}, cwd=str(kit.repo)) is None
+    decision = kit.decide("Bash", {"command": command})
+    assert (decision.rule if isinstance(decision, Refusal) else decision) == rule
 
 
 @pytest.mark.parametrize(
@@ -239,7 +224,7 @@ def test_a_factory_alone_refusal_names_what_made_the_call_more_than_one_command(
     decision = kit.decide("Bash", {"command": command})
     # One text for every cause left agents guessing, and they retried the same call until the incident filed.
     assert isinstance(decision, Refusal) and decision.rule == "factory-alone"
-    assert decision.reason.startswith(cause) and "run factory on its own" in decision.reason
+    assert decision.reason.startswith(cause) and "give factory a command of its own" in decision.reason
 
 
 @pytest.mark.parametrize(
@@ -257,17 +242,53 @@ def test_tools_that_run_or_keep_work_outside_the_factory_are_refused(kit: Kit, t
     assert kit.rule(tool, {"file_path": str(kit.worktree / "a.md")}) == rule
 
 
-def test_a_subagents_factory_call_names_it_right_after_the_program(tmp_path: Path) -> None:
+ME = f"factory --agent-id {TESTER_ID}"
+IN = "slot sign-in qa-x@product.test"
+QA = "qa result --head abc1234"
+BODY = f"cat > .factory/{TESTER_ID}/f.md <<'EOF'\nfactory {QA}\nEOF\n"
+
+
+@pytest.mark.parametrize(
+    ("command", "runs"),
+    [
+        (f"date +%s; factory {IN}", f"date +%s; {ME} {IN}"),
+        (f"factory {IN}; factory {QA}", f"{ME} {IN}; {ME} {QA}"),
+        (f"factory {IN}\nfactory {QA} || ls", f"{ME} {IN}\n{ME} {QA} || ls"),
+        (f"cd .factory && factory {QA}; factory {QA}", f"cd .factory && {ME} {QA}; {ME} {QA}"),
+        (f"  factory {QA} --blocked 'at (1,2); && quit'", f"  {ME} {QA} --blocked 'at (1,2); && quit'"),
+        (f'factory {QA} --blocked "tom\'s box && froze"', f'{ME} {QA} --blocked "tom\'s box && froze"'),
+        (f"echo 'it'\"'\"'s; factory {QA}' && factory {QA}", f"echo 'it'\"'\"'s; factory {QA}' && {ME} {QA}"),
+        (f'echo "a \\" ; factory {QA}"', f'echo "a \\" ; factory {QA}"'),
+        (f"{BODY}factory {QA}", f"{BODY}{ME} {QA}"),
+        # bash splits words only at spaces and tabs, so `\u00a0factory` is no factory: neither checked nor named.
+        (f"\u00a0factory {QA}; factory {QA}", f"\u00a0factory {QA}; {ME} {QA}"),
+        ("\u00a0factory task status t-0001 done", "\u00a0factory task status t-0001 done"),
+        (f"date +%s; factory {IN} | grep -o 'http[^ ]*'", "factory-alone"),
+        (f"L=$(factory {IN}); echo ok", "factory-alone"),
+        (f"factory {QA} > /dev/null; echo done", "factory-alone"),
+        (f"for i in 1 2; do factory {QA}; done", "factory-alone"),
+        (f"(factory {QA}); ls", "factory-alone"),
+        (f"ls & factory {QA}", "factory-alone"),
+        (f'ls; factory {QA} --blocked "$WHY"', "factory-alone"),
+        (f"ls; FOO=1 factory {QA}", "factory-alone"),
+        (f"ls; bash -c 'factory {QA}'", "factory-alone"),
+        # The guard reads these two lines as one factory command, which the name would not lead.
+        (f"factory {QA} <\nfactory {QA}", "factory-alone"),
+        (f"factory {QA}; factory --agent-id a9999999999999 {QA}", "agent-id"),
+        (f"ls && factory --agent-id=a9999999999999 {QA}", "agent-id"),
+    ],
+)
+def test_a_subagent_names_itself_in_each_factory_command_of_its_call_and_runs_none_without_it(
+    tmp_path: Path, command: str, runs: str
+) -> None:
     kit = Kit(tmp_path)
-    kit.session("orchestrator", worktree=kit.repo)
-    intake = {"agent_id": "a1234567890abc", "agent_type": "intake", "cwd": str(kit.repo)}
-    decision = kit.decide("Bash", {"command": "factory queue task new --title x"}, **intake)
-    assert isinstance(decision, Rewrite)
-    assert decision.updated_input["command"] == "factory --agent-id a1234567890abc queue task new --title x"
-    decision = kit.decide("Bash", {"command": "cd notes && factory queue task new --title x"}, **intake)
-    assert isinstance(decision, Rewrite)
-    assert decision.updated_input["command"] == "cd notes && factory --agent-id a1234567890abc queue task new --title x"
-    assert kit.decide("Bash", {"command": "factory status"}, cwd=str(kit.repo)) is None
+    kit.session("implementer")
+    kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
+    decision = kit.decide("Bash", {"command": command}, agent_id=TESTER_ID, agent_type="qa-ui-function")
+    if runs in {"factory-alone", "agent-id"}:
+        assert isinstance(decision, Refusal) and decision.rule == runs
+    else:
+        assert isinstance(decision, Rewrite) and decision.updated_input["command"] == runs
 
 
 READER = {"agent_id": "a1234567890abc", "agent_type": "Explore"}  # a reader: no tester time to count

@@ -1,11 +1,12 @@
 """The factory command in a shell command: who may run which verb (`factory-verbs`, which also keeps the read-only
 telemetry verbs to intake, triage and the testers among subagents), a task's status set only by the orchestrator
-(`queue-status`), and the command alone in its line (`factory-alone`). The warden counts an implementer's check runs.
+(`queue-status`), and each factory command plain (`factory-alone`). The warden counts an implementer's check runs.
 
-The guard names a subagent on its factory calls by rewriting the call's text, which it can do safely only when the
-whole text is `factory` or `factory …`, after at most one `cd` into a plain folder: one plain command, nothing the shell
-would expand or join. A session's own call needs no name, as the warden knows it by its process, so other commands may
-come before and after its factory commands, joined by `;`, `&&`, `||` or line breaks, while each one stays plain.
+A factory command is plain when it is a command of the list on its own, starting with the bare word factory, with
+nothing the shell would expand, pipe or redirect. Other commands may come before and after it, joined by `;`, `&&`,
+`||` or line breaks, in a session's call and a subagent's alike. The warden knows a session by its process; a subagent
+it knows by the name the guard writes into each of its factory commands, right after the program word, and the guard
+refuses a call in which the name would miss a factory the shell runs, which would then run as the parent.
 """
 
 from __future__ import annotations
@@ -22,7 +23,9 @@ FACTORY = "factory"
 # The flag that names a subagent to the warden; only the guard writes it, on a subagent's own calls.
 AGENT_ID_FLAG = "--agent-id"
 _SAFE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
-_PLAIN_START = re.compile(r"^factory(\s|$)")
+_PLAIN_START = re.compile(r"factory(?:[ \t]|\Z)")
+# What bash reads as blanks around a command; no other space splits words, so `\u00a0factory` is no factory.
+_BLANKS = " \t\n"
 # One `cd` into a plain folder may come first: agents reach for it by habit, and a relative --body file needs it.
 _CD_FIRST = re.compile(r"^cd[ \t]+(?:'[^'\n]*'|[\w./+-]+)[ \t]*(?:&&|;)[ \t]*")
 _SHELL_SPECIAL = frozenset("$`*?[{}")
@@ -36,6 +39,10 @@ _PIECES = re.compile(
     r"""'[^']*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`|\\.|\$\(|&&|\|\||[;\n()]|[^'"`\\$()&|;\n]+|.""", re.S
 )
 _CUTS = frozenset({";", "&&", "||", "\n"})
+_REMEDY = (
+    "give factory a command of its own, joined to others only by `;`, `&&`, `||` or a new line, and read its answer "
+    "as printed"
+)
 _NAMED = re.compile(r"\bfactory\b")
 _FLAG_VERBS = {("inbox", "--wait"): "inbox.wait", ("propose", "--none"): "propose.none"}
 _STARTS = frozenset({"implementer", "designer"})
@@ -115,7 +122,7 @@ def _expanded(text: str) -> str:
 
 def _after_cd(command: str) -> tuple[str, str]:
     """``command`` split into its leading `cd` into one plain folder, if any, and the rest."""
-    text = command.strip()
+    text = command.strip(_BLANKS)
     found = _CD_FIRST.match(text)
     return (found.group(0), text[found.end() :]) if found else ("", text)
 
@@ -151,34 +158,32 @@ def plain_words(command: str) -> list[str] | None:
 
 
 def check_alone(call: Call, command: str, found: list[shell.Invocation]) -> Decision:
-    """A subagent's call that runs `factory` is that one plain call. A session's runs each factory command plainly,
-    as a command of the list on its own: every factory the shell would run is one of those."""
+    """Each factory command is plain, a command of the list on its own: every factory the shell would run is one."""
     runs = sum(inv.program == FACTORY for inv in found)
     if not runs or call.off("factory-alone"):
         return None
-    parts = [command] if call.in_subagent else _commands(command)
+    parts = [part for _, part in _commands(heredocs.split(command)[0])]
     whys = [_parse(part)[1] for part in parts]
     if whys.count("") == runs:
         return None
     named = [why for part, why in zip(parts, whys, strict=True) if why and _NAMED.search(part)]
     why = named[0] if named else "something comes before the bare word factory"
-    return Refusal("factory-alone", f"{why}: run factory on its own, one plain call, and read its answer as printed")
+    return Refusal("factory-alone", f"{why}: {_REMEDY}")
 
 
-def _commands(command: str) -> list[str]:
-    """The commands of a list as written, cut where the shell cuts them: at `;`, `&&`, `||` and line breaks outside
-    quotes, substitutions and subshells. A heredoc's body is no command of the list."""
-    parts: list[str] = []
-    current: list[str] = []
-    depth = 0
-    for piece in _PIECES.findall(heredocs.split(command)[0]):
+def _commands(text: str) -> list[tuple[int, str]]:
+    """The commands of a list as written, each with where it starts in ``text``: cut where the shell cuts them, at
+    `;`, `&&`, `||` and line breaks outside quotes, substitutions and subshells. ``text`` holds no heredoc body."""
+    parts: list[tuple[int, str]] = []
+    start = depth = 0
+    for found in _PIECES.finditer(text):
+        piece = found.group()
         if depth == 0 and piece in _CUTS:
-            parts.append("".join(current))
-            current = []
-            continue
-        depth += (piece in {"(", "$("}) - (piece == ")")
-        current.append(piece)
-    return [*parts, "".join(current)]
+            parts.append((start, text[start : found.start()]))
+            start = found.end()
+        else:
+            depth += (piece in {"(", "$("}) - (piece == ")")
+    return [*parts, (start, text[start:])]
 
 
 def check_forged(call: Call, found: list[shell.Invocation]) -> Decision:
@@ -192,15 +197,47 @@ def check_forged(call: Call, found: list[shell.Invocation]) -> Decision:
 
 
 def stamp(call: Call) -> Decision:
-    """A subagent's factory call names the subagent right after the program word, so the warden knows which
-    subagent asks, not only its parent."""
+    """Each factory command of a subagent's call names the subagent right after the program word, so the warden
+    knows which subagent asks, not only its parent. A call in which a factory the guard finds lacks the name is
+    refused: that one would run as the parent."""
     if not call.in_subagent or call.tool not in {"Bash", "Monitor"}:
         return None
     command = str(call.tool_input.get("command", ""))
-    if plain_words(command) is None:
+    try:
+        lines, kept = command.split("\n"), heredocs.kept_lines(command)
+    # telemetry: expected — the shell rules refused this unreadable command, unless the owner switched them off
+    except heredocs.Unclosed:
+        return None
+    text = "\n".join(lines[k] for k in kept)
+    ends = [at + end for at, part in _commands(text) if (end := _word_end(part)) is not None]
+    if not ends:
         return None
     if not _SAFE_ID.match(call.agent_id):
         return Refusal("agent-id", "this subagent's id cannot be passed to the factory safely; report to your parent")
-    cd, text = _after_cd(command)
-    stamped = f"{cd}{FACTORY} {AGENT_ID_FLAG} {call.agent_id}{text[len(FACTORY) :]}"
+    name = [AGENT_ID_FLAG, call.agent_id]
+    for end in reversed(ends):
+        text = f"{text[:end]} {' '.join(name)}{text[end:]}"
+    for k, line in zip(kept, text.split("\n"), strict=True):
+        lines[k] = line
+    stamped = "\n".join(lines)
+    if _unnamed(stamped, name) and not call.off("factory-alone"):
+        return Refusal("factory-alone", f"the guard cannot name you in each factory command here: {_REMEDY}")
     return Rewrite({**call.tool_input, "command": stamped})
+
+
+def _word_end(part: str) -> int | None:
+    """Where the program word of a plain factory command ends in ``part``, one command of a list (so no `cd … &&`
+    leads it); None when ``part`` is no such command."""
+    if _parse(part)[1]:
+        return None
+    return len(part) - len(part.lstrip(_BLANKS)) + len(FACTORY)
+
+
+def _unnamed(command: str, name: list[str]) -> bool:
+    """Whether a factory that ``command`` runs, as the guard reads it, lacks ``name`` right after its program word."""
+    try:
+        found = shell.invocations(command)
+    # telemetry: expected — an unreadable command gets here only with the shell rules off; unread, it counts unnamed
+    except shell.ShellError:
+        return True
+    return any(inv.program == FACTORY and inv.argv[1:3] != name for inv in found)

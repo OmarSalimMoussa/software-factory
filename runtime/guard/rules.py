@@ -11,7 +11,7 @@ RULES: dict[str, str] = {
     "raw-starts": "running `claude`, except to list agents, read logs or print its version",
     "leave-slice": "sudo, systemd-run, at, crontab, su, systemctl --user, docker, podman, ssh, xdg-open, gio and kin",
     "factory-verbs": "a `factory` verb the role, or a subagent of it, may not use",
-    "factory-alone": "a `factory` command piped, redirected, wrapped or expanded; a subagent's, joined to any other",
+    "factory-alone": "a `factory` command piped, redirected, wrapped or expanded, or a subagent's left unnamed",
     "queue-status": "a task status set by anyone but the orchestrator; any write to the queue but through `factory`",
     "subagent-kinds": "a subagent kind not on the role's list; any start from inside a subagent",
     "subagents-at-once": "past the cap, or two testers in one browser lane; the orchestrator keeps a place for intake",
