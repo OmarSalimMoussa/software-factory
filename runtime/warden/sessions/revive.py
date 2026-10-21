@@ -11,6 +11,7 @@ from typing import Any
 from runtime.shared import models, operations, store
 from runtime.shared.models import RETIRED, WAITING, WORKING, Session
 from runtime.shared.protocol import Refused, ok
+from runtime.slots import leases
 from runtime.warden import checks, inbox
 from runtime.warden.context import Context
 from runtime.warden.owner import ops
@@ -32,10 +33,13 @@ from runtime.warden.sessions.permits import CAP, DESIGN, IMPL, SEVERE
 log = logging.getLogger(__name__)
 PAUSED = {"message": "The factory is paused; every session keeps its context.", "refresh": "all"}
 BROUGHT, CARRY_ON = "The warden brought you back", "carry on with your task from your branch."
+REBUILD = " Slot {slot} is yours again: rebuild it with factory slot up."
+KEPT = " Slot {slot} is still yours, as you left it: its stack and data ran on while you were away."
 
 
 def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
-    """Resume a session already marked reviving, claiming a slot for an implementer; why it failed, or nothing.
+    """Resume a session already marked reviving; why it failed, or nothing. An implementer comes back to the slot its
+    bench kept, or claims one; a slot claimed here is given up again when the resume fails.
 
     ``note`` follows the warden's own words in the message it comes back to: the owner's message, when one brought it.
     """
@@ -44,9 +48,11 @@ def bring_back(ctx: Context, sid: str, by: str, note: str = "") -> str:
     try:
         waits = permits.awaits_turn(ctx, s)
         builds = s.role == IMPL and not waits
-        if builds:
+        kept = leases.held_by(ctx.places, ctx.settings(), s.name) if builds else None
+        if builds and kept is None:
             slot = permits.claim_slot(ctx, s)
-        rebuild = f" Slot {slot} is yours again: rebuild it with factory slot up." if slot is not None else ""
+        rebuild = (KEPT.format(slot=kept.slot) if kept is not None
+                   else REBUILD.format(slot=slot) if slot is not None else "")  # fmt: skip
         older = older_skills.holds(ctx.places, s.id)
         held = held_word(ctx, s.task)
         unheard = checks.unheard(ctx.places, s.name)

@@ -116,9 +116,10 @@ message, or your first one, says so) comes back first: `git merge --ff-only <def
 - **Told to pause** (pushed out for higher-ranked work, or the factory paused): commit what you have at once,
   `git add -A`, then `git commit -m "Paused: <slice, and what is left>"`, and end your turn. Only `git commit` and
   `factory` work until you stop.
-- **Revived:** your context is whole. Claim a slot and rebuild it (`factory slot claim`, `factory slot up`). Testers
-  that were running ended with you: start the interrupted round again; it does not count. A task QA clean needs no
-  slot: end your turn, and the merge turn's word wakes you.
+- **Revived:** your context is whole. The warden's message names your slot. One it kept is as you left it, and a
+  build you started there ran on: check it before you rebuild anything. A new one you rebuild (`factory slot up`).
+  Testers that were running ended with you: start the interrupted round again; it does not count. A task QA clean
+  needs no slot: end your turn, and the merge turn's word wakes you.
 
 ## Never
 

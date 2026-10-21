@@ -4,7 +4,7 @@ A lease is a small file in the slot's folder in the warden's state: ``checkout``
 ``note``, one ``key=value`` line each. It is the one record of who holds a slot: the holder is a session's name. It
 has no expiry, and no agent can take another's. Slot 0 is the main checkout's and never leased; slots 1 to
 ``slots.count`` are claimed one per implementer, under one lock. ``empty`` is the one way a slot is given up: the
-holder's release, the orchestrator's free, a bench and a reap all use it.
+holder's release, the orchestrator's free, a bench that gives it up and a reap all use it.
 """
 
 from __future__ import annotations
@@ -75,6 +75,11 @@ def numbers(places: Places, settings: Settings) -> list[int]:
     return [*range(1, count + 1), *(n for n in extra if read(places, n) is not None)]
 
 
+def free(places: Places, settings: Settings) -> list[int]:
+    """The agent slots no one holds, lowest first."""
+    return [n for n in range(1, settings.get_int("slots.count") + 1) if read(places, n) is None]
+
+
 def held_by(places: Places, settings: Settings, holder: str) -> Lease | None:
     return next(
         (lease for n in numbers(places, settings) if (lease := read(places, n)) and lease.holder == holder), None
@@ -88,12 +93,12 @@ def claim(ctx: Context, holder: str, note: str = "") -> int:
         mine = held_by(ctx.places, settings, holder)
         if mine is not None:
             return mine.slot
-        for n in range(1, settings.get_int("slots.count") + 1):
-            if read(ctx.places, n) is None:
-                line = " ".join(note.split())
-                text = f"holder={holder}\nsince={ctx.clock.iso()}\nnote={line}\n"
-                store.write_text(_path(ctx.places, n), text, mode=0o600)
-                return n
+        spare = free(ctx.places, settings)
+        if spare:
+            line = " ".join(note.split())
+            text = f"holder={holder}\nsince={ctx.clock.iso()}\nnote={line}\n"
+            store.write_text(_path(ctx.places, spare[0]), text, mode=0o600)
+            return spare[0]
     raise Refused("slots-full", "every stack slot is held; ask the orchestrator to free a finished one")
 
 

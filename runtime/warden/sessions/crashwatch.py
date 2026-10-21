@@ -3,8 +3,9 @@ their own), retire each session whose task moved past its part, resume or retire
 whose process is gone, and restart an orchestrator whose loop went silent.
 
 A finished implementer or designer is retired at once, its process stopped and its slot reaped, though a background
-session stays alive when idle: its place and slot are free for the next run. Only working and waiting sessions are
-watched: a deprioritized one has no process by design, and a bench-pending or reviving one is in the warden's own
+session stays alive when idle: its place and slot are free for the next run. A benched implementer keeps its slot,
+the stack running on, unless its task waits or the run it makes room for needs it. Only working and waiting sessions
+are watched: a deprioritized one has no process by design, and a bench-pending or reviving one is in the warden's own
 hands. A crashed session is resumed up to watch.resume_tries times within the crash window, each resume after a
 longer wait, then retired as crashed; the orchestrator is always resumed (the same session) and never retired by the
 watch. Nothing resumes until the agent's Claude daemon is up and settled, and sessions that ended with the daemon (a
@@ -29,6 +30,7 @@ from runtime.shared.models import (
     DEPRIORITIZED,
     FINISHED,
     OFF_SEAT,
+    PAUSED,
     PENDING,
     QA_CLEAN,
     WAITING,
@@ -99,12 +101,12 @@ def finish_benches(ctx: Context, procs: dict[str, Proc]) -> None:
 
 
 def _settle(ctx: Context, s: Session, procs: dict[str, Proc]) -> None:
-    """Stop the process, empty and give up its slot, then mark it deprioritized. Each step may run again: a slot
-    that would not empty keeps its lease, and the next tick tries again."""
+    """Stop the process, empty and give up its slot when it must (``_gives_up_slot``), then mark it deprioritized.
+    Each step may run again: a slot that would not empty keeps its lease, and the next tick tries again."""
     if s.id in procs:
         ctx.launcher.stop_session(s.id)
     lease = leases.held_by(ctx.places, ctx.settings(), s.name)
-    if lease is not None:
+    if lease is not None and _gives_up_slot(ctx, s):
         failed = leases.empty(ctx, lease.slot, s.id)
         if failed:
             raise LaunchError(f"slot {lease.slot} did not empty: {failed}")
@@ -122,6 +124,15 @@ def _settle(ctx: Context, s: Session, procs: dict[str, Proc]) -> None:
     revive.pause_progress(ctx, s.id, "on the bench")
     if current.benched_for != s.task:
         ctx.post_event(inbox.BENCHED, {"session": s.id, "name": s.name, "task": s.task})
+
+
+def _gives_up_slot(ctx: Context, s: Session) -> bool:
+    """A bench keeps the slot leased to its session, the stack and its data running on, so a build under way is
+    not lost and the session comes back to it. It gives the slot up when its task waits (merged, blocked or on
+    hold), as the run that takes its place needs one, or when the run it makes room for finds no other free."""
+    if not permits.has_work(ctx, s):
+        return True
+    return s.benched_for not in (PAUSED, s.task) and not leases.free(ctx.places, ctx.settings())
 
 
 def _finished(ctx: Context, s: Session) -> bool:

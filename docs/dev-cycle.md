@@ -118,6 +118,10 @@ branch is checked: it comes back only if its task is sent back to it. The warden
 task's status (an implementer's task checked, a designer's spec gone to build): it stops the session, empties its
 slot and frees its place, on the bench or off it.
 
+A benched implementer keeps its slot, its stack and data running on, so a build under way is not lost and it comes
+back to the same slot. Its slot is emptied only when its task waits (merged, blocked or on hold), or when the run it
+makes room for needs a slot and none other is free. A pause, an upgrade's included, keeps every slot.
+
 A session whose process ends is resumed, each time after a longer wait, and retired as crashed only after
 `watch.resume_tries` resumes within `watch.crash_window_minutes`. Nothing resumes until the agent's Claude daemon is
 up, and sessions that ended with it (a reboot, a daemon restart) come back without counting as crashed.

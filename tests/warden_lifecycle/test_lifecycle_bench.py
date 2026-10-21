@@ -7,12 +7,21 @@ import pytest
 from lifecycle_fakes import World, at_once
 
 from runtime.shared import store
-from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, REVIVING, STOPPED, WAITING, WORKING
+from runtime.shared.models import (
+    BENCH_PENDING,
+    DEPRIORITIZED,
+    PAUSED,
+    RETIRED,
+    REVIVING,
+    STOPPED,
+    WAITING,
+    WORKING,
+)
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.warden import checks, schedule
 from runtime.warden.owner import ops, reflections
-from runtime.warden.sessions import crashwatch, lifecycle, older_skills, permits, revive
+from runtime.warden.sessions import crashwatch, lifecycle, older_skills, permits, registry, revive
 from runtime.warden.spend import plan
 
 
@@ -107,6 +116,7 @@ def test_a_benched_session_settles_after_its_grace_and_revives_with_its_id(world
     benched_name = world.seat("5e550001", task="t-0001").name
     leases.claim(world.ctx(), "someone-else", "/w/x")  # slot 1
     assert leases.claim(world.ctx(), benched_name, "/w/b") == 2
+    leases.claim(world.ctx(), "a-third", "/w/y")  # slot 3: the severe run needs the benched one's slot
     world.run("5e550001")
     world.approve("t-0002", severity="severe")
     _approved(world, "t-0002")
@@ -128,6 +138,38 @@ def test_a_benched_session_settles_after_its_grace_and_revives_with_its_id(world
     lease = leases.held_by(world.places, world.settings, benched_name)
     assert (back.state, lease and lease.slot, world.launcher.resumed) == (WORKING, 2, ["5e550001"])
     assert world.queue.tasks["t-0001"].status == "building"
+
+
+@pytest.mark.parametrize(
+    ("benched_for", "status", "spare", "kept"),
+    [
+        (PAUSED, "building", False, True),
+        ("t-0002", "building", True, True),
+        ("t-0002", "building", False, False),
+        ("t-0001", "merged", True, False),
+    ],
+    ids=["paused", "for-a-run-with-a-slot-to-spare", "for-a-run-that-needs-its-slot", "its-task-waits"],
+)
+def test_a_benched_implementer_keeps_its_slot_running_unless_its_task_waits_or_the_run_it_makes_room_for_needs_it(
+    world: World, benched_for: str, status: str, spare: bool, kept: bool
+) -> None:
+    # t-0193: each pause for an upgrade emptied its slot while a model build ran there, and each revival began again.
+    world.queue.add("t-0001", status=status)
+    name = world.seat("5e550001", task="t-0001").name
+    world.run("5e550001")
+    for holder in ("impl-other", name, *([] if spare else ["impl-third"])):
+        leases.claim(world.ctx(), holder, "")
+    sessions = lifecycle.read(world.ctx())
+    lifecycle.begin_bench(world.ctx(), sessions["5e550001"], "warden", "benched", benched_for)
+    registry.write(world.places, sessions)
+    world.later(world.settings.get_int("watch.bench_grace_seconds"))
+
+    crashwatch.SessionsWatch(start=at_once).run_pass(world.ctx())
+
+    lease = leases.held_by(world.places, world.settings, name)
+    assert (world.session("5e550001").state, world.launcher.stopped) == (DEPRIORITIZED, ["5e550001"])
+    emptied = [(2, ["empty"]), (2, [leases.SWEEP])]
+    assert (lease and lease.slot, world.launcher.stacks) == ((2, []) if kept else (None, emptied))
 
 
 def test_pause_benches_every_session_and_resume_brings_them_back_in_order_each_with_todays_definitions(
@@ -321,15 +363,19 @@ def test_a_revived_implementer_is_told_how_far_the_default_branch_moved(
     assert any("was not compared with" in r.getMessage() for r in caplog.records) == logged
 
 
-@pytest.mark.parametrize(("status", "slot", "told"), [
-    ("deprioritized", 1, "Slot 1 is yours again: rebuild it"),
-    ("qa-clean", None, permits.AWAITS_TURN),
+@pytest.mark.parametrize(("status", "kept", "slot", "told"), [
+    ("deprioritized", False, 1, "Slot 1 is yours again: rebuild it"),
+    ("deprioritized", True, 2, "Slot 2 is still yours, as you left it"),
+    ("qa-clean", False, None, permits.AWAITS_TURN),
 ])  # fmt: skip
-def test_a_revived_implementer_rebuilds_its_slot_unless_its_task_waits_qa_clean_for_its_merge_turn(
-    world: World, status: str, slot: int | None, told: str
+def test_a_revived_implementer_rebuilds_a_slot_it_did_not_keep_unless_its_task_waits_qa_clean_for_its_merge_turn(
+    world: World, status: str, kept: bool, slot: int | None, told: str
 ) -> None:
     world.queue.add("t-0001", status=status)
-    world.seat("5e550001", task="t-0001", state=DEPRIORITIZED)
+    name = world.seat("5e550001", task="t-0001", state=DEPRIORITIZED).name
+    if kept:
+        leases.claim(world.ctx(), "someone-else", "")
+        leases.claim(world.ctx(), name, "")
     world.launcher.behind = 3
 
     revive.revive_session(world.ctx(), "5e550001", "warden")
@@ -337,6 +383,19 @@ def test_a_revived_implementer_rebuilds_its_slot_unless_its_task_waits_qa_clean_
     [(_, said)] = world.launcher.messages
     lease = leases.held_by(world.places, world.settings, world.session("5e550001").name)
     assert (told in said, "git rebase" in said, lease and lease.slot) == (True, slot is not None, slot)
+
+
+@pytest.mark.parametrize("kept", [False, True])
+def test_a_revive_that_fails_gives_up_only_a_slot_it_claimed(world: World, kept: bool) -> None:
+    world.queue.add("t-0001", status="deprioritized")
+    name = world.seat("5e550001", task="t-0001", state=DEPRIORITIZED).name
+    if kept:
+        leases.claim(world.ctx(), name, "")
+    world.launcher.lost = True
+
+    assert rule(revive.revive_session, world.ctx(), "5e550001", "warden") == "revive"
+
+    assert (leases.held_by(world.places, world.settings, name) is not None) == kept
 
 
 def test_a_stopped_run_that_never_was_a_proposal_goes_back_to_the_queue(world: World) -> None:
