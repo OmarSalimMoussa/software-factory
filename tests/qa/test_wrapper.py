@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from fake_browser import LINK, Browser
 from queue_kit import World
 
 from runtime.qa import answers, qa_browser, wrapper
@@ -23,7 +24,6 @@ from runtime.qa.wrapper_tools import Tools
 from runtime.shared.settings import Settings
 
 FAKE = Path(__file__).with_name("fake_mcp.py")
-LINK = "https://app.test/auth/link/one-time-secret"
 
 
 class Session:
@@ -450,60 +450,6 @@ def test_a_wait_for_seconds_alone_is_the_factorys_as_the_browsers_needs_an_open_
         ("Waited 30 s.", False), [], 30)  # fmt: skip
 
 
-class Ticks(threading.Event):
-    """A cancel flag whose waits pass on a clock of their own, and never end early."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.clock = 0.0
-
-    def wait(self, timeout: float | None = None) -> bool:
-        self.clock += timeout or 0
-        return self.is_set()
-
-
-class Browser:
-    """Playwright's tools as the factory's tools call them: each call kept, each snapshot the next page given."""
-
-    def __init__(self, pages: list[str], results: tuple[Any, ...] = (), misses: int = 0) -> None:
-        self.pages, self.results, self.ticks, self.misses = iter(pages), iter(results), Ticks(), misses
-        self.calls: list[tuple[str, dict[str, Any]]] = []
-        self.at: list[float] = []  # each call's time on the wait's clock
-
-    def call(self, name: str, args: dict[str, Any]) -> str:
-        self.calls.append((name, args))
-        self.at.append(self.ticks.clock)
-        if name == "browser_snapshot":
-            return next(self.pages)
-        if name == "browser_wait_for" and "text" in args:
-            if self.misses:
-                self.misses -= 1
-                self.ticks.clock += 5  # Playwright's own wait for a text ends at its action timeout
-                raise ServerError("browser_wait_for failed: TimeoutError: locator.waitFor: Timeout 5000ms exceeded")
-            return f"Waited for {args['text']}"
-        # The code tool's value as Playwright prints it.
-        return next((f"### Result\n{json.dumps(r)}\n### Ran Playwright code" for r in self.results), f"{name} done")
-
-    def answer(
-        self, name: str, args: dict[str, Any], reload_seconds: int = 60, max_minutes: int = 15
-    ) -> tuple[str, bool]:
-        tools = Tools(
-            self.call,
-            lambda address: LINK,
-            lambda link: None,
-            lambda address: None,
-            reload_seconds,
-            max_minutes,
-            (1280, 800),
-            40,
-            30,
-            150,
-            250,
-            lambda: self.ticks.clock,
-        )
-        return tools.answer(name, args, self.ticks)
-
-
 def test_a_wait_reloads_until_its_words_show_in_one_call() -> None:
     page = "- Page URL: https://app.test/jobs/7\n"
     browser = Browser([page + "Building", page + "Building", page + "Ready"])
@@ -566,15 +512,6 @@ def test_a_cancelled_wait_stops_at_its_next_reload() -> None:
     assert browser.calls == [("browser_snapshot", {})]
 
 
-def test_the_desktop_opens_at_its_own_size() -> None:
-    browser = Browser([])
-    browser.answer("browser_open_desktop", {"url": "http://127.0.0.1:6080/vnc.html"})
-    assert browser.calls == [
-        ("browser_resize", {"width": 1280, "height": 800}),
-        ("browser_navigate", {"url": "http://127.0.0.1:6080/vnc.html"}),
-    ]
-
-
 @pytest.mark.parametrize(
     ("name", "args", "code", "says"),
     [
@@ -614,26 +551,6 @@ def test_a_request_waits_for_its_release_or_its_seconds_and_still_meets_the_brow
 )
 def test_a_release_says_what_it_let_go(name: str, result: str | None, says: str, failed: bool) -> None:
     assert Browser([], (result,)).answer(name, {"pattern": "**/x", "seconds": 5}) == (says, failed)
-
-
-def test_typed_keys_hold_shift_for_capitals_and_symbols_and_the_text_never_runs_as_code() -> None:
-    browser = Browser([])
-    said, failed = browser.answer("browser_type_keys", {"text": 'Hi "x'})
-    keys = '[["press", "Shift+KeyH"], ["type", "i"], ["type", " "], ["press", "Shift+Quote"], ["type", "x"]]'
-    each = "await page.keyboard[how](key); await page.waitForTimeout(40);"
-    code = f"async (page) => {{ for (const [how, key] of {keys}) {{ {each} }} }}"
-    assert browser.calls == [("browser_run_code_unsafe", {"code": code})]
-    assert not failed and said.startswith("Typed 5 keys. A desktop may draw them seconds late")
-
-
-def test_a_desktop_click_rests_at_its_point_then_holds_the_button_as_the_desktop_takes_a_click() -> None:
-    browser = Browser([])
-    said, failed = browser.answer("browser_mouse_press_xy", {"x": 100, "y": 200.5})
-    rest = "await page.mouse.move(100, 200.5); await page.waitForTimeout(250);"
-    held = "await page.mouse.down(); await page.waitForTimeout(150); await page.mouse.up();"
-    code = f"async (page) => {{ {rest} {held} }}"
-    assert browser.calls == [("browser_run_code_unsafe", {"code": code})]
-    assert (said, failed) == ("Pressed at 100, 200.5. A screenshot shows what it did.", False)
 
 
 @pytest.mark.parametrize(
