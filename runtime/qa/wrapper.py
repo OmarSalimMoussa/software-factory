@@ -5,7 +5,8 @@ beside Playwright's.
 Right after the session opens, the wrapper starts the trace itself and swallows the answer; a trace that does not
 start stops the browser, so nothing is tested untraced. It drops the trace's tools and the rest of the devtools
 capability from the tool list, adds the factory's tools (wrapper_tools.py) and answers those itself, calling the
-server as a client would. Every other message passes through unchanged. Nothing but MCP goes to standard output.
+server as a client would. A page script goes inside a harness that ends it once its own callback throws
+(page_script.py). Every other message passes through unchanged. Nothing but MCP goes to standard output.
 A call of the session's the server leaves unanswered past ``qa.browser_answer_seconds``, plus a browser_wait_for's own
 time, fails, and the server is told to stop it: a page script that never ends would hold the tester to the end.
 
@@ -23,6 +24,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import IO, Any, Protocol
 
+from runtime.qa import page_script
 from runtime.qa.calls import Calls
 
 SERVER_CODE = "browser_run_code_unsafe"
@@ -209,7 +211,7 @@ class Proxy:
             self._error(key, "the browser stopped: its trace did not start")
         else:
             self._time(key, params, which)
-            self._carry(json.dumps(message), which)
+            self._carry(json.dumps({**message, "params": page_script.wrapped(params)}), which)
 
     def _carry(self, line: str, which: str) -> None:
         """A line of the session's to the browser it names; the second takes it once it has opened."""
@@ -354,6 +356,7 @@ class Proxy:
             self._server_in.flush()
 
     def _to_client(self, line: str) -> None:
+        line = page_script.unwrapped(line)
         with self._client_lock:
             for secret in self._secrets:
                 line = line.replace(secret, "the sign-in link")
