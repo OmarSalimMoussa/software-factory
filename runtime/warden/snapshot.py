@@ -150,9 +150,9 @@ def _qa(ctx: Context, args: dict[str, Any]) -> Any:
         found[s.task]["ready"] += ready.get("records", []) if isinstance(ready, dict) else []
         found[s.task]["results"] += store.read_jsonl(ctx.places.results_of(s.id))
     went = retention.cleaned(ctx.places)
-    for entry in store.read_jsonl(ctx.places.evidence / "index.jsonl"):
+    for entry in qa_evidence.drawn(ctx.places):
         if entry.get("task") in wanted:
-            found[entry["task"]]["evidence"].append(qa_evidence.drawn(entry, went.get(entry["task"])))
+            found[entry["task"]]["evidence"].append({**entry, "cleaned": went.get(entry["task"])})
     return found
 
 
@@ -162,9 +162,9 @@ def _check_runs(ctx: Context, args: dict[str, Any]) -> Any:
         raise Refused("snapshot", f"checks is a list of at most {_MAX_IDS} check ids")
     found: dict[str, list[dict[str, Any]]] = {str(c): [] for c in wanted}
     went = retention.cleaned(ctx.places)
-    for entry in qa_evidence.entries(ctx.places):
+    for entry in qa_evidence.drawn(ctx.places):
         if entry.get("check") in found:
-            found[entry["check"]].append(qa_evidence.drawn(entry, went.get(entry["check"])))
+            found[entry["check"]].append({**entry, "cleaned": went.get(entry["check"])})
     return found
 
 

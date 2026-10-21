@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import stat
+import threading
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ from runtime.shared import lanes, store
 from runtime.shared.models import RETIRED, Session
 from runtime.shared.paths import Places
 from runtime.warden.context import Context
+from runtime.warden.folds import Fold, kept
 from runtime.warden.sessions import registry
 from runtime.warden.verbs import REGRESSION
 
@@ -61,14 +63,41 @@ def of(entry: dict[str, Any]) -> str:
     return str(entry["check"] if "check" in entry else entry["task"])
 
 
-def drawn(entry: dict[str, Any], cleaned: str | None) -> dict[str, Any]:
-    """An entry as a page draws it: the screenshots of both browsers as ``shots``, in the order they were taken, in
-    place of ``files``, whose trace's thousands of names would overflow an answer about many tasks."""
-    found = [f.rpartition("/") for f in entry["files"] if f.rpartition(".")[2].lower() in IMAGES]
-    shots = [
-        folder + slash + name for folder, slash, name in sorted(found, key=lambda f: f[2]) if folder in ("", SECOND)
-    ]
-    return {**{k: v for k, v in entry.items() if k != "files"}, "shots": shots, "cleaned": cleaned}
+class _Drawn(Fold):
+    """The index's runs as a page draws them, folded as it grows: each read takes only the lines added since the last.
+    The whole index, which names every file of every run, takes a quarter second of CPU to read, and the replays pass
+    and each poll of a task's page read it. A line read again, as one is after an unreadable line fails a read, is
+    kept once."""
+
+    def reset(self) -> None:
+        self.runs: dict[tuple[str, ...], dict[str, Any]] = {}
+
+    def step(self, raw: dict[str, Any]) -> None:
+        if not isinstance(raw, dict):
+            raise TypeError("not an object")
+        found = [f.rpartition("/") for f in raw["files"] if f.rpartition(".")[2].lower() in IMAGES]
+        shots = [
+            folder + slash + name for folder, slash, name in sorted(found, key=lambda f: f[2]) if folder in ("", SECOND)
+        ]
+        entry = {**{k: v for k, v in raw.items() if k != "files"}, "shots": shots}
+        self.runs.setdefault((of(entry), str(entry["head"]), str(entry["tester"]), str(entry["run"])), entry)
+
+
+_DRAWN_LOCK = threading.Lock()
+
+
+def drawn(places: Places) -> list[dict[str, Any]]:
+    """Every run taken into the evidence, oldest first, as a page draws it: the screenshots of both browsers as
+    ``shots``, in the order they were taken, in place of ``files``, whose trace's thousands of names would overflow an
+    answer about many tasks. The runs are shared with the next read: a caller copies one before it changes it."""
+    path = index_path(places)
+    with _DRAWN_LOCK:
+        found = kept(_Drawn, path)
+        try:
+            found.read(path)
+        except OSError as exc:
+            raise store.StoreError(f"{path}: {exc}") from exc
+        return list(found.runs.values())
 
 
 def named(of_id: str) -> bool:
@@ -109,7 +138,7 @@ def _copy_tree(source: Path, target: Path) -> list[str]:
 
 def _untaken(places: Places, runs: Path, session_id: str) -> Iterator[tuple[Path, dict[str, Any]]]:
     """Each run a session's testers left that the evidence does not hold yet, with what its run.json says."""
-    taken = {(e["session"], e["run"]) for e in entries(places)}
+    taken = {(e["session"], e["run"]) for e in drawn(places)}
     left = runs / session_id
     for run in sorted(left.iterdir()) if left.is_dir() and not left.is_symlink() else []:
         if RUN.match(run.name) and not run.is_symlink() and (session_id, run.name) not in taken:

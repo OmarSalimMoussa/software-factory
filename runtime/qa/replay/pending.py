@@ -31,7 +31,7 @@ log = logging.getLogger("factory.warden")
 def build_pending(ctx: Context, roots: Sequence[Path]) -> int:
     """Build the replay of every run that has none yet; how many were built or failed."""
     done = 0
-    for entry in evidence.entries(ctx.places):
+    for entry in evidence.drawn(ctx.places):
         run = evidence.folder(ctx.places, entry)
         if not run.is_dir() or (run / FOLDER / DATA).exists():
             continue

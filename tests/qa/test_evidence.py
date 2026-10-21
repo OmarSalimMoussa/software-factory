@@ -13,7 +13,9 @@ import pytest
 from queue_kit import World
 
 from runtime.qa import evidence, qa_browser
+from runtime.qa.replay import pending
 from runtime.queue import records, verbs
+from runtime.shared import store
 from runtime.shared.models import RETIRED
 from runtime.warden import snapshot
 from runtime.warden.sessions import registry
@@ -73,6 +75,26 @@ def test_a_page_is_sent_a_runs_screenshots_from_both_browsers_in_order_never_the
 
     [entry] = answer["state"]["qa"]["t-0001"]["evidence"]
     assert (entry["shots"], "files" in entry) == (["page-1.png", "second/page-2.png", "page-3.png"], False)
+
+
+def test_the_evidence_is_read_once_and_then_only_the_runs_taken_since(world: World) -> None:
+    def qa() -> list[str]:
+        answer = snapshot.snapshot(world.ctx(), {"want": ["qa"], "tasks": ["t-0001"]}, None)
+        return [e["run"] for e in answer["state"]["qa"]["t-0001"]["evidence"]]
+
+    index, later = evidence.index_path(world.places), "20261009T120600Z-0d0e0f"
+    first = {"task": "t-0001", "head": HEAD, "tester": "qa-ux", "run": RUN, "session": SESSION, "agent": "",
+             "at": "2026-10-09T12:00:00Z", "files": ["page-1.png"]}  # fmt: skip
+    store.append_jsonl(index, first)
+    assert qa() == [RUN]
+    with index.open("r+b") as fh:
+        fh.write(b"x" * (index.stat().st_size - 1))
+    store.append_jsonl(index, {**first, "run": later})
+    for run in (RUN, later):
+        evidence.folder(world.places, {**first, "run": run}).mkdir(parents=True)
+
+    assert qa() == [RUN, later]
+    assert pending.build_pending(world.ctx(), []) == 2
 
 
 def test_two_testers_of_one_kind_at_once_each_take_only_their_own_lanes_run(world: World, tmp_path: Path) -> None:
