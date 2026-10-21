@@ -1,8 +1,8 @@
-"""Subagents in the registry: the guard reports each start and each hand-back of a session's subagent.
+"""Subagents in the registry: the guard reports each start and each end of a session's subagent.
 
-A subagent runs inside its parent's process, so the warden cannot see it from the socket's peer. The guard's
-SubagentStart and SubagentStop hooks report it from the parent's process tree, and the guard stamps a subagent's own
-`factory` calls with its id; the dispatcher accepts that id only from the parent it was registered under.
+A subagent runs inside its parent's process, so the warden cannot see it from the socket's peer. The guard's hooks
+report it from the parent's process tree, and the guard stamps a subagent's own `factory` calls with its id; the
+dispatcher accepts that id only from the parent it was registered under.
 """
 
 from __future__ import annotations
@@ -12,17 +12,20 @@ import re
 from typing import Any
 
 from runtime.shared import lanes
-from runtime.shared.models import RETIRED, WORKING, Session
+from runtime.shared.models import CRASHED, FINISHED, RETIRED, STOPPED, WORKING, Session
 from runtime.shared.paths import Places
 from runtime.shared.protocol import Refused, ok
 from runtime.shared.settings import model_role
 from runtime.warden.context import Caller, Context
 from runtime.warden.sessions import browser_waits, lifecycle, registry
+from runtime.warden.sessions.permits import actor
 from runtime.warden.spend.cost import family_of
 from runtime.warden.verbs import SESSIONS
 
 _AGENT_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _KIND = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+# Its hand-back (SubagentStop), its parent's TaskStop, or gone from what its parent runs at the end of its turn.
+_ENDS = {FINISHED: "handed back", STOPPED: "its parent stopped it", CRASHED: "it ended without handing back"}
 
 
 def _agent_id(args: dict[str, Any]) -> str:
@@ -67,8 +70,10 @@ def started(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str,
 
 
 def ended(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """A hand-back: the subagent is retired as finished, unless the owner or a bench already retired it."""
-    agent_id = _agent_id(args)
+    """The subagent is retired as it ended, unless the owner or a bench already retired it."""
+    agent_id, kind = _agent_id(args), args.get("ended")
+    if kind not in _ENDS:
+        raise Refused("args", f"ended is one of {', '.join(_ENDS)}")
     with ctx.lock:
         sessions = lifecycle.read(ctx)
         row = sessions.get(agent_id)
@@ -76,7 +81,7 @@ def ended(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, A
             raise Refused("session", "no subagent of yours has that id")
         if row.state == RETIRED:
             return ok(session=agent_id, retired=row.retired)
-        lifecycle.retire(ctx, [row], row, "finished", lifecycle.WARDEN, "handed back")
+        lifecycle.retire(ctx, [row], row, kind, actor(ctx) if kind == STOPPED else lifecycle.WARDEN, _ENDS[kind])
         registry.write(ctx.places, sessions)
     return ok(session=agent_id, retired=row.retired)
 

@@ -12,14 +12,14 @@ from queue_kit import World
 
 from runtime.guard.facts import read_desktops
 from runtime.shared import store
-from runtime.shared.models import RETIRED
+from runtime.shared.models import CRASHED, FINISHED, RETIRED, STOPPED
 from runtime.shared.protocol import Refused
 from runtime.slots import leases
 from runtime.slots import verbs as slots_verbs
 from runtime.slots.verbs import slot
 from runtime.warden import public
 from runtime.warden.context import StackResult
-from runtime.warden.sessions import reap, registry
+from runtime.warden.sessions import reap, registry, subagents
 
 
 def _implementer(world: World, n: int, status: str = "") -> None:
@@ -171,6 +171,29 @@ def test_no_stack_changes_under_a_tester_still_walking_the_slot(world: World, ar
     slot(world.ctx("implementer", "s-1"), args, None)
 
     assert len([verb for _, verb in world.launcher.stacks if verb != ["health"]]) == 1
+
+
+@pytest.mark.parametrize(
+    ("ended", "by", "why"),
+    [(FINISHED, "warden", "handed back"), (STOPPED, "implementer", "its parent stopped it"),
+     (CRASHED, "warden", "it ended without handing back")],
+)  # fmt: skip
+def test_a_tester_that_ended_however_it_ended_no_longer_holds_its_slot(
+    world: World, ended: str, by: str, why: str
+) -> None:
+    _implementer(world, 1)
+    impl = world.ctx("implementer", "s-1")
+    slot(impl, {"op": "claim"}, None)
+    subagents.started(impl, {"agent_id": "a9ab8a4d065092e07", "kind": "qa-ui-function"}, None)
+    world.launcher.stack = lambda n, verb: StackResult(0, "done\n", "/log")
+    with pytest.raises(Refused, match="still testing slot 1"):
+        slot(impl, {"op": "up", "services": ["control-plane"]}, None)
+
+    subagents.ended(impl, {"agent_id": "a9ab8a4d065092e07", "ended": ended}, None)
+
+    assert slot(impl, {"op": "up", "services": ["control-plane"]}, None)["exit"] == 0
+    row = registry.read(world.places)["a9ab8a4d065092e07"]
+    assert (row.state, row.retired, row.retired_by, row.note) == (RETIRED, ended, by, why)
 
 
 @pytest.mark.parametrize("op", ["restart", "stop"])

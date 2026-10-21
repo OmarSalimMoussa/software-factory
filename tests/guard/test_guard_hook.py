@@ -157,3 +157,31 @@ def test_a_subagent_the_warden_never_registered_is_registered_on_its_calls_but_n
     kit.subagent(TESTER_ID, [entry(NOW, "user", "Scenarios and checks: 1")])
     payload = kit.payload("Read", {"file_path": "/x"}, agent_id=agent_id, agent_type=agent_type)
     assert _asked_warden(kit, payload) == ((0, "", ""), asked)
+
+
+STOPPED_ID = "a9ab8a4d065092e07"
+STOP = {"tool_name": "TaskStop", "tool_input": {"task_id": STOPPED_ID}, "tool_response": {
+    "message": f"Successfully stopped task: {STOPPED_ID} (UI function test of live view size)", "task_id": STOPPED_ID,
+    "task_type": "local_agent", "command": "UI function test of live view size"}}  # fmt: skip
+SHELL_STOP = {**STOP, "tool_response": {**STOP["tool_response"], "task_id": "b7z5rdm20", "task_type": "local_bash"}}
+
+
+@pytest.mark.parametrize(
+    ("event", "extra", "ended"),
+    [
+        ("SubagentStop", {"agent_id": STOPPED_ID}, "finished"),
+        ("PostToolUse", STOP, "stopped"),
+        ("PostToolUse", SHELL_STOP, None),
+        ("Stop", {"background_tasks": []}, "crashed"),
+        ("Stop", {"background_tasks": [{"id": STOPPED_ID, "type": "subagent", "status": "running"}]}, None),
+    ],
+)
+def test_the_warden_hears_of_a_subagent_that_ended_however_it_ended(
+    kit: Kit, event: str, extra: dict[str, object], ended: str | None
+) -> None:
+    kit.session("qa-ui-function", sid=STOPPED_ID, agent_id=STOPPED_ID, parent=SID)
+    payload = {"hook_event_name": event, "session_id": SID, "transcript_path": str(kit.session_transcript), **extra}
+
+    _, asked = _asked_warden(kit, payload)
+
+    assert asked == ([("subagent.end", {"agent_id": STOPPED_ID, "ended": ended})] if ended else [])

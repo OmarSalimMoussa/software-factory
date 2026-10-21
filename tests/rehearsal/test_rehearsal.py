@@ -172,7 +172,7 @@ def _built_and_tested(r: Rehearsal, impl: str, worktree: Path) -> list[str]:
         finding = ["qa", "finding", "--head", head, "--severity", "minor", "--where", "/notes", "--body", note]
         r.session(impl, finding, agent_id=agent)
         assert r.session(impl, ["qa", "result", "--head", head], agent_id=agent)["minors"] == 1
-        r.hook(impl, "subagent.end", {"agent_id": agent})
+        r.hook(impl, "subagent.end", {"agent_id": agent, "ended": "finished"})
     r.session(impl, ["qa-clean"])
     return testers
 

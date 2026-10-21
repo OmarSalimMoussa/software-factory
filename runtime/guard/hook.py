@@ -1,4 +1,5 @@
-"""The Claude Code hook for every factory session: PreToolUse, SessionStart, Stop, SubagentStart and SubagentStop.
+"""The Claude Code hook for every factory session: PreToolUse, SessionStart, Stop, SubagentStart, SubagentStop, and
+PostToolUse of TaskStop.
 
 Run as ``/usr/bin/python3 -I <install>/runtime/guard/hook.py``. Before loading any rule it decides from the kernel
 alone whether this is a factory session: its process sits in the factory's slice. A session outside the slice is the
@@ -6,7 +7,7 @@ owner's and is never guarded. Inside it, any failure refuses the call with exit 
 through on a timeout or any other exit code; reading and reporting are never refused for a failure. Each refusal is
 one line naming the rule and the remedy, and goes to the warden's refusal socket. The guard decides within half the
 hook's time (runtime/guard/deadline.py), so a slow rule refuses instead of timing out. A subagent's start and end are
-reported to the warden, which registers it under its parent; those hooks never block. Stdlib only.
+reported to the warden, which registers it under its parent; those reports never block. Stdlib only.
 """
 
 from __future__ import annotations
@@ -16,12 +17,17 @@ import socket
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 # `python3 -I` leaves the script's own folder off sys.path; the install's root is root-owned, so it is safe to add.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from runtime.guard import deadline, wire
+from runtime.shared.models import CRASHED, FINISHED, STOPPED, WAITING, WORKING
 from runtime.shared.paths import SLICE, Places
+
+if TYPE_CHECKING:
+    from runtime.guard.facts import Call
 
 _INPUT_LIMIT = 4_000_000
 _DETAIL_LIMIT = 2000
@@ -63,6 +69,8 @@ def handle(raw: str, cgroup: str, places: Places, home: Path, now: datetime) -> 
     event = payload.get("hook_event_name")
     if event in _SUBAGENT_VERBS:
         return 0, "", report_subagent(payload, str(event), places)
+    if event == "PostToolUse":
+        return 0, "", _report_stop(payload, places)
     try:
         return _run(payload, event, places, home, now)
     # telemetry: surfaced — any failure, a broken rule module included, refuses the call naming the `failure`
@@ -84,14 +92,43 @@ _SUBAGENT_VERBS = {"SubagentStart": "subagent.start", "SubagentStop": "subagent.
 
 
 def report_subagent(payload: dict[str, object], event: str, places: Places) -> str:
-    """Tell the warden a subagent started or ended; what went wrong, as one line for standard error, or nothing."""
+    """Tell the warden a subagent started or handed back; what went wrong, as one line for standard error, or none."""
     verb = _SUBAGENT_VERBS[event]
+    args = {"agent_id": str(payload.get("agent_id", ""))}
+    if verb == "subagent.start":
+        args["kind"] = str(payload.get("agent_type", ""))
+    else:
+        args["ended"] = FINISHED
+    return _tell(places, verb, args)
+
+
+def _report_stop(payload: dict[str, object], places: Places) -> str:
+    """A subagent its parent stopped with TaskStop, which ends it with no SubagentStop."""
+    answer = payload.get("tool_response")
+    stopped = answer if payload.get("tool_name") == "TaskStop" and isinstance(answer, dict) else {}
+    if stopped.get("task_type") != "local_agent":
+        return ""
+    return _tell(places, "subagent.end", {"agent_id": str(stopped.get("task_id", "")), "ended": STOPPED})
+
+
+def _report_gone(call: Call, places: Places) -> None:
+    """At the end of a session's turn, tell the warden of each subagent it has at work that Claude Code does not list
+    as running: one that failed sends no SubagentStop either."""
+    tasks = call.payload.get("background_tasks")
+    if call.session is None or call.in_subagent or not isinstance(tasks, list):
+        return
+    running = {task.get("id") for task in tasks if isinstance(task, dict)}
+    for s in call.sessions.values():
+        if s.parent == call.session.id and s.state in (WORKING, WAITING) and s.agent_id not in running:
+            said = _tell(places, "subagent.end", {"agent_id": s.agent_id, "ended": CRASHED})
+            if said:
+                print(said, file=sys.stderr)
+
+
+def _tell(places: Places, verb: str, args: dict[str, str]) -> str:
     try:
         from runtime.shared.protocol import request
 
-        args = {"agent_id": str(payload.get("agent_id", ""))}
-        if verb == "subagent.start":
-            args["kind"] = str(payload.get("agent_type", ""))
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
             sock.settimeout(deadline.left())
             sock.connect(str(places.socket))
@@ -117,6 +154,7 @@ def _run(payload: dict[str, object], event: object, places: Places, home: Path, 
         return 0, _context(decide.session_context(call)), ""
     decision = None
     if event == "Stop":
+        _report_gone(call, places)
         decision = decide.check_stop(call)
     elif event == "PreToolUse":
         unregistered = call.in_subagent and call.session is not None and call.agent_id not in call.sessions

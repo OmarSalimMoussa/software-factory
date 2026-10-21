@@ -113,12 +113,12 @@ def test_a_place_told_of_is_taken_while_the_orchestrator_waits_and_the_orchestra
         world.run(sid)
         world.seat(f"{kind}-1", role=kind, parent=sid, agent_id=f"{kind}-1", started=RECENT)
     refused, told = [_start(world, tmp_path, IMPL)], []
-    subagents.ended(world.ctx(session=ORCH), {"agent_id": "qa-regression-1"}, None)
+    subagents.ended(world.ctx(session=ORCH), {"agent_id": "qa-regression-1", "ended": "finished"}, None)
     told += _pass(world, tmp_path, answer=False)  # its own subagents filled its cap, so it starts nothing yet
     refused += [_start(world, tmp_path, ORCH), _start(world, tmp_path, IMPL)]
     for _ in range(4):
         told += _pass(world, tmp_path)
-    subagents.ended(world.ctx(session=IMPL), {"agent_id": "qa-ux-1"}, None)
+    subagents.ended(world.ctx(session=IMPL), {"agent_id": "qa-ux-1", "ended": "finished"}, None)
     told += _pass(world, tmp_path)
 
     assert [why.split(", its cap")[0] for why in refused if why] == [

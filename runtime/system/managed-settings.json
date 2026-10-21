@@ -5,6 +5,9 @@
     "PreToolUse": [
       {"matcher": "*", "hooks": [{"type": "command", "command": "@guard@", "timeout": @hook_timeout@}]}
     ],
+    "PostToolUse": [
+      {"matcher": "TaskStop", "hooks": [{"type": "command", "command": "@guard@", "timeout": @hook_timeout@}]}
+    ],
     "SessionStart": [
       {
         "hooks": [

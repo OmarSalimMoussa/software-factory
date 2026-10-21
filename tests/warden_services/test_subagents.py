@@ -39,7 +39,7 @@ def test_a_subagent_id_is_honoured_only_from_its_parent_and_never_once_retired(d
     with pytest.raises(Refused, match="not registered under your session"):
         subagents.acting_as(places, _caller("s-b"), "a1b2c3")
 
-    subagents.ended(doors.context(_caller("s-a")), {"agent_id": "a1b2c3"}, None)
+    subagents.ended(doors.context(_caller("s-a")), {"agent_id": "a1b2c3", "ended": "finished"}, None)
     with pytest.raises(Refused) as refused:
         subagents.acting_as(places, _caller("s-a"), "a1b2c3")
     assert refused.value.rule == "retired"

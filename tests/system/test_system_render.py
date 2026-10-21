@@ -131,7 +131,7 @@ def test_managed_settings_hold_the_guard_the_rulebook_loader_and_consent_to_bypa
     assert body["skipDangerousModePermissionPrompt"] is True
     assert set(body) == {"env", "hooks", "skipDangerousModePermissionPrompt"}
     assert body["env"] == {"MCP_TIMEOUT": str(settings().get_int("install.mcp_start_seconds") * 1000)}
-    assert set(body["hooks"]) == {"PreToolUse", "SessionStart", "SubagentStart", "Stop", "SubagentStop"}
+    assert set(body["hooks"]) == {"PreToolUse", "PostToolUse", "SessionStart", "SubagentStart", "Stop", "SubagentStop"}
     commands = {hook["command"] for groups in body["hooks"].values() for group in groups for hook in group["hooks"]}
     assert commands == {
         "/usr/bin/python3 -I /opt/software-factory/runtime/guard/hook.py",
@@ -139,6 +139,7 @@ def test_managed_settings_hold_the_guard_the_rulebook_loader_and_consent_to_bypa
         "--slice software-factory.slice",
     }
     assert body["hooks"]["PreToolUse"][0]["matcher"] == "*"
+    assert body["hooks"]["PostToolUse"][0]["matcher"] == "TaskStop"
 
 
 def test_a_template_naming_an_unknown_value_fails_loudly(tmp_path: Path) -> None:
