@@ -7,8 +7,7 @@
 - ``browser_wait_for`` with a time alone waits here, not in the browser, whose wait needs an open page.
 - ``browser_open_desktop`` sets the browser to the desktop's size (``qa.desktop_viewport``), then opens the desktop's
   live view: a screenshot is not shrunk before the tester sees it, so a point in it is the point on the desktop.
-- ``browser_color_scheme`` shows the page in its light or dark colours: fixed code the wrapper runs in the browser
-  server, whose own code tool is hidden from testers.
+- ``browser_color_scheme`` shows the page light or dark: fixed code the wrapper runs, as testers' code tool is hidden.
 - ``browser_mouse_press_xy`` clicks at a point, resting there ``qa.press_settle_ms`` first and holding the button
   ``qa.click_hold_ms``: a remote desktop under load misses a press that comes with its move, or a shorter one.
 - ``browser_type_keys`` types a text as key presses into whatever has the keyboard, in one call, ``qa.key_delay_ms``
@@ -17,6 +16,7 @@
 - ``browser_hold_request`` holds the next request to an address until ``browser_release_request`` lets it go, or its
   seconds (at most ``qa.hold_max_seconds``) end, then hands it on through the browser's other routes, so a blocked
   address stays blocked: one request can overtake another, at the moment the step needs, whatever a call takes.
+- ``browser_fail_request`` fails the next request to an address once with a network error, then lifts itself.
 """
 
 from __future__ import annotations
@@ -30,12 +30,21 @@ from dataclasses import dataclass
 from typing import Any
 
 from runtime.qa.answers import PAGE_URL
+from runtime.qa.tool_list import (
+    COLOUR,
+    ERRORS,
+    FAIL,
+    HOLD,
+    OPEN_DESKTOP,
+    PRESS,
+    RELEASE,
+    SCHEMES,
+    SIGN_IN,
+    TYPE_KEYS,
+    WAIT_UNTIL,
+)
 from runtime.qa.wrapper import SERVER_CODE, WAIT_FOR, ServerError
 
-SIGN_IN, WAIT_UNTIL, OPEN_DESKTOP = "browser_sign_in", "browser_wait_until", "browser_open_desktop"
-COLOUR, TYPE_KEYS, HOLD = "browser_color_scheme", "browser_type_keys", "browser_hold_request"
-RELEASE, PRESS = "browser_release_request", "browser_mouse_press_xy"
-SCHEMES = ("light", "dark")
 # Playwright's code tool names its value after a heading.
 RESULT = re.compile(r"### Result\n(.*)\n")
 # A link as the sign-in prints it, and as a transcript keeps that output: inside JSON, where a line break is the two
@@ -54,120 +63,6 @@ SHIFTED = {
         )
     ),
 }
-
-# A line added to one of Playwright's own tools, where a tester reads it as it loads that tool.
-NOTES = {
-    "browser_type": f"On a remote desktop's live view, type with {TYPE_KEYS} instead: there this tool loses capitals, "
-    "symbols and keys sent fast.",
-    "browser_mouse_click_xy": f"On a remote desktop's live view, click with {PRESS} instead: a click this short may "
-    "not take there.",
-    WAIT_FOR: "A text or textGone wait gives up after a few seconds, and time sleeps before either, so a message that "
-    f"shows briefly can pass unseen: wait on its text alone, right after the step. {WAIT_UNTIL} waits longer, and "
-    "reloads the page only when asked.",
-}
-
-TOOLS: list[dict[str, Any]] = [
-    {
-        "name": SIGN_IN,
-        "description": "Sign this browser in as a test address with a fresh one-time link from your slot. The link "
-        "is never shown to you.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"address": {"type": "string", "description": "the test address your brief names"}},
-            "required": ["address"],
-        },
-    },
-    {
-        "name": WAIT_UNTIL,
-        "description": "Wait until a text shows on the page, up to a ceiling. One call does the whole wait. A reload "
-        "is a step of its own, which can change what a step tests: reload only a page that shows news once loaded "
-        "again. It reads the page's own text, never words drawn in a picture or a live remote view: check those "
-        "with a screenshot.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "text": {"type": "string", "description": "the words to wait for, as the page shows them"},
-                "minutes": {"type": "number", "description": "the ceiling, in minutes"},
-                "reload": {
-                    "type": "boolean",
-                    "description": "true reloads the page every so often; false leaves "
-                    "it as it is, for a page that updates itself",
-                },
-            },
-            "required": ["text", "minutes", "reload"],
-        },
-    },
-    {
-        "name": OPEN_DESKTOP,
-        "description": "Open your slot's remote desktop view at the desktop's own size, so your clicks land where you "
-        "aim.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "url": {"type": "string", "description": "the view's address `factory slot desktop up` " "printed"}
-            },
-            "required": ["url"],
-        },
-    },
-    {
-        "name": COLOUR,
-        "description": "Show this page in its light or dark colours, as a person's system setting would. Your "
-        "browser starts light; a switch holds across reloads until you switch back.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"scheme": {"type": "string", "enum": list(SCHEMES)}},
-            "required": ["scheme"],
-        },
-    },
-    {
-        "name": PRESS,
-        "description": "Click at a point on the remote desktop's view, holding the button a moment, as the desktop "
-        "takes a click. A point is in the page's pixels from its top-left corner, as a screenshot shows them: a "
-        "view inside a frame counts from the page's corner, not the frame's.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"x": {"type": "number"}, "y": {"type": "number"}},
-            "required": ["x", "y"],
-        },
-    },
-    {
-        "name": TYPE_KEYS,
-        "description": "Type a text as key presses into whatever has the keyboard, such as the remote desktop's view "
-        "after you click where the text goes. One call types it all.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"text": {"type": "string", "description": "the text to type"}},
-            "required": ["text"],
-        },
-    },
-    {
-        "name": HOLD,
-        "description": "Hold the next request to an address until you release it, or for at most some seconds, then "
-        "send it on as usual, so another request can overtake it. It holds one request, then lifts itself.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "pattern": {"type": "string", "description": "the address, * and ** as wildcards: **/api/runs/*"},
-                "seconds": {
-                    "type": "number",
-                    "description": "the most it waits for your release: allow for every "
-                    "call until then, at several seconds each",
-                },
-            },
-            "required": ["pattern", "seconds"],
-        },
-    },
-    {
-        "name": RELEASE,
-        "description": "Let the request you held to an address go on now, such as right after the request that "
-        "overtakes it.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"pattern": {"type": "string", "description": "the address you held, as you gave it"}},
-            "required": ["pattern"],
-        },
-    },
-]
 
 
 class ToolError(Exception):
@@ -210,6 +105,7 @@ class Tools:
             TYPE_KEYS: self._type_keys,
             PRESS: self._press,
             HOLD: self._hold_request,
+            FAIL: self._fail_request,
             RELEASE: self._release_request,
             WAIT_FOR: self._wait_seconds,
         }
@@ -360,6 +256,21 @@ class Tools:
         if was == "armed":
             return f"No request to {pattern} had come yet: the hold is lifted."
         raise ToolError(f"no request to {pattern} is held: its hold ended, or none was set")
+
+    def _fail_request(self, arguments: dict[str, Any], cancelled: threading.Event) -> str:
+        pattern, error = arguments.get("pattern"), arguments.get("error")
+        if not isinstance(pattern, str) or not pattern.strip():
+            raise ToolError("give the address of the request to fail")
+        if error not in ERRORS:
+            raise ToolError(f"name the network error: one of {', '.join(ERRORS)}")
+        was = self._held(pattern, (
+            "const failing = page.context().__failing ??= {}; const was = failing[p]; "
+            "if (was) await page.context().unroute(p, was); const fail = failing[p] = async (route) => { "
+            f"delete failing[p]; await route.abort({json.dumps(error)}); }}; "
+            "await page.context().route(p, fail, { times: 1 }); return !!was;"
+        ))  # fmt: skip
+        again = " It replaces the failure set before." if was else ""
+        return f"The next request to {pattern} fails with {error}, once; the one after goes through.{again}"
 
     def _held(self, pattern: str, body: str) -> Any:
         """``body`` run in the browser server with ``held``, the holds kept on its context, and ``p``, the address."""

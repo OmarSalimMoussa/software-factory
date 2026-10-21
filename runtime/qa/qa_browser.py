@@ -29,8 +29,9 @@ from pathlib import Path
 from typing import IO, Any
 
 from runtime.qa import second as second_module
+from runtime.qa.tool_list import NOTES, TOOLS
 from runtime.qa.wrapper import CLOSE, FIRST, SECOND, Proxy
-from runtime.qa.wrapper_tools import NOTES, TOOLS, ToolError, Tools, first_link
+from runtime.qa.wrapper_tools import ToolError, Tools, first_link
 from runtime.shared import environment, lanes, store
 from runtime.shared import settings as settings_module
 from runtime.shared.paths import AGENT_USER, Places

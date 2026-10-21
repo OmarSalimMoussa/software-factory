@@ -17,8 +17,9 @@ import pytest
 from queue_kit import World
 
 from runtime.qa import answers, qa_browser, wrapper
+from runtime.qa.tool_list import NOTES
 from runtime.qa.wrapper import ServerError
-from runtime.qa.wrapper_tools import NOTES, Tools
+from runtime.qa.wrapper_tools import Tools
 from runtime.shared.settings import Settings
 
 FAKE = Path(__file__).with_name("fake_mcp.py")
@@ -118,6 +119,7 @@ def test_the_trace_starts_before_the_first_call_and_the_tester_can_neither_see_n
         "browser_type_keys",
         "browser_hold_request",
         "browser_release_request",
+        "browser_fail_request",
         "browser_close_second",
     ]
     # A tester that loads Playwright's typing or clicking tool reads which of the factory's works on a remote desktop.
@@ -648,6 +650,8 @@ def test_a_desktop_click_rests_at_its_point_then_holds_the_button_as_the_desktop
         ("browser_hold_request", {"pattern": "**/cancel", "seconds": 31}, "at most 30 seconds"),
         ("browser_hold_request", {"pattern": " ", "seconds": 5}, "give the address"),
         ("browser_release_request", {"pattern": " "}, "give the address you held"),
+        ("browser_fail_request", {"pattern": " ", "error": "failed"}, "give the address of the request to fail"),
+        ("browser_fail_request", {"pattern": "**/x", "error": "502"}, "name the network error: one of aborted,"),
         ("browser_mouse_press_xy", {"x": 1280, "y": 10}, "the point is off the page: x from 0 to 1279"),
         ("browser_mouse_press_xy", {"x": "1); x(", "y": 10}, "give the point as x and y"),
         ("browser_mouse_press_xy", {"x": True, "y": 10}, "give the point as x and y"),

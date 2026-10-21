@@ -9,6 +9,7 @@ import re
 import shutil
 import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -40,7 +41,9 @@ class Browser:
         read_out, write_out = os.pipe()
         self.to_wrapper, self.from_wrapper = os.fdopen(write_in, "w"), os.fdopen(read_out)
         client_in, client_out = os.fdopen(read_in), os.fdopen(write_out, "w")
-        served = (argv, lambda proxy: None, WAIT, 100_000, client_in, client_out)
+        second = qa_browser.second_command(tmp_path, "qa-ui-function", settings)
+        equip = qa_browser.equipper(lambda address: "", lambda secret: None, settings, second)
+        served = (argv, equip, WAIT, 100_000, client_in, client_out)
         self.thread = threading.Thread(target=qa_browser.serve, args=served)
         self.thread.start()
         self.sent = 0
@@ -137,3 +140,45 @@ def test_a_call_to_an_element_the_page_drew_anew_goes_again_once_to_the_one_elem
         browser.close()
     assert re.match(says.replace("<ref>", ref), said) and failed == (shows == '"none"')
     assert f"### Result\n{shows}\n" in page
+
+
+class _Site(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        body = b"pong" if self.path == "/ping" else b"<p>site</p>"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format: str, *args: Any) -> None:
+        pass
+
+
+@pytest.mark.skipif(not (shutil.which("node") and CHROME.is_file() and _server()), reason="needs node, Chrome, MCP")
+def test_a_request_set_to_fail_fails_once_with_its_network_error_and_the_next_goes_through(
+    tmp_path: Path, world: World
+) -> None:
+    cli = _server()
+    assert cli is not None
+    site = ThreadingHTTPServer(("127.0.0.1", 0), _Site)
+    threading.Thread(target=site.serve_forever, daemon=True).start()
+    browser = Browser(tmp_path, world, cli)
+    fetch = "() => fetch('/ping').then((r) => r.text(), (e) => `failed: ${e.message}`)"
+    try:
+        browser.call("browser_navigate", {"url": f"http://127.0.0.1:{site.server_port}/"})
+        armed = [
+            browser.call("browser_fail_request", {"pattern": "**/ping", "error": e})
+            for e in ("timedout", "connectionreset")
+        ]
+        got = [browser.evaluate(fetch)[0] for _ in "ab"]
+        console = browser.call("browser_console_messages", {})[0]
+    finally:
+        browser.close()
+        site.shutdown()
+    assert armed == [
+        ("The next request to **/ping fails with timedout, once; the one after goes through.", False),
+        ("The next request to **/ping fails with connectionreset, once; the one after goes through. It replaces the "
+         "failure set before.", False),
+    ]  # fmt: skip
+    assert '"failed: Failed to fetch"' in got[0] and '"pong"' in got[1]
+    assert "ERR_CONNECTION_RESET" in console and "ERR_TIMED_OUT" not in console
