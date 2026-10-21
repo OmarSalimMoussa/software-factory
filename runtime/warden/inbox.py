@@ -26,6 +26,7 @@ PROD_RED = "prod red"
 SEVERE_REQUEST = "severe request"
 TRIAGE_DUE = "triage due"
 QA_PROD_DUE = "qa-prod due"  # prod answers on a build the owner pushed: walk it read-only
+STILL_BLOCKED = "still blocked"
 # The crash watch: a run benched for higher work, or retired after its process kept ending.
 BENCHED, CRASHED = "benched", "crashed"
 # The loop read a new GOAL.md: the scores changed, so the proposals may too; new goal items brought parked work back.
@@ -52,6 +53,7 @@ KINDS = frozenset(
         SEVERE_REQUEST,
         TRIAGE_DUE,
         QA_PROD_DUE,
+        STILL_BLOCKED,
         BENCHED,
         CRASHED,
         NEEDS_RUNG,

@@ -342,6 +342,7 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         [
             ("queue.max_upload_kib", "Largest upload, KiB"),
             ("queue.max_brief_kib", "Largest brief, KiB"),
+            ("queue.blocked_recheck_hours", "Hours a task stays blocked before the orchestrator checks it again"),
             ("reflect.fold_hours", "Hours a repeated reflection folds into one"),
             ("reflect.max_chars", "Longest reflection, characters"),
             ("reflect.chart_days", "Days the Self-reflect chart covers"),
@@ -396,5 +397,4 @@ GROUPS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         ],
     ),
 ]
-
 LABELS = {key: label for _, _, _, rows in GROUPS for key, label in rows}

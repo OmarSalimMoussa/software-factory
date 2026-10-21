@@ -154,7 +154,14 @@ def spent(ctx: Context, s: Session, limit: str, why: str) -> bool:
 
 
 def blocked(ctx: Context, task: Task, why: str) -> Card:
-    return _add(ctx, Card("", "blocked", task.id, task.title, formats.one_line(why), ctx.clock.iso()), None)
+    """The owner's one card for a blocked task, naming the latest fix."""
+    found = read(ctx.places)
+    card = owner_block(found, task.id)
+    if card is None:
+        return _add(ctx, Card("", "blocked", task.id, task.title, formats.one_line(why), ctx.clock.iso()), None)
+    card.ask = formats.one_line(why)
+    write(ctx.places, found)
+    return card
 
 
 def owner_block(found: list[Card], task_id: str) -> Card | None:

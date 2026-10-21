@@ -10,9 +10,9 @@ import pytest
 from loop_fakes import World, healthy, kernel
 
 from runtime.queue import formats
-from runtime.queue.book import Queue
-from runtime.shared import network, store
-from runtime.shared.models import INBOXES, Request
+from runtime.queue.book import Queue, request_rel, task_rel
+from runtime.shared import models, network, store
+from runtime.shared.models import INBOXES, Card, Request, Task
 from runtime.warden import inbox, loop
 from runtime.warden.health import errors_import, heartbeat, probes, telemetry
 from runtime.warden.health.probes import Answer
@@ -75,6 +75,44 @@ def test_loop_due_comes_once_per_loop_period_after_the_last_pass(ticking: World,
     assert tick(ticking, tmp_path) == []
     ticking.clock.t += 1
     assert tick(ticking, tmp_path) == [inbox.LOOP_DUE]
+
+
+def blocked(world: World, task_id: str, hours_ago: float, why: str) -> None:
+    queue, at = Queue.of(world.ctx), formats.iso(world.clock.now() - hours_ago * 3600)
+    if not (world.checkout / "queue" / task_rel(task_id)).exists():
+        req = Request(f"r-2026-10-01-{task_id[2:]}", "agents", "implementer", at, "normal", "a", "b")
+        req.outcome = f"task {task_id}"
+        task = Task(task_id, "T", [req.id], "G1", "major", ["ui"], "blocked", at, "", slices=1, run=1)
+        queue.write({request_rel(req): formats.dump_request(req), task_rel(task_id): formats.dump_task(task)})
+    queue.log(task_id, at, "orchestrator", "blocked", why, **{"from": "qa-clean", "to": "blocked"})
+
+
+def test_a_task_blocked_past_the_period_is_named_to_the_orchestrator_once_a_period_with_its_age_and_why(
+    ticking: World, tmp_path: Path
+) -> None:
+    file_requests(ticking, 0, 0)
+    hours = ticking.ctx.settings().get_int("queue.blocked_recheck_hours")
+    blocked(ticking, "t-0001", hours + 2, "No vision key in the slots. Fix: set it")
+    blocked(ticking, "t-0002", 1, "The practice site is refused")
+    card = Card("n-0001", "blocked", "t-0002", "T", "The practice site is refused", ticking.clock.iso())
+    store.write_json(ticking.ctx.places.cards, [models.dump(card)])
+
+    def named() -> list[list[str]]:
+        events = inbox.read(ticking.ctx, {}, None)["events"]
+        due = [e["data"]["tasks"] for e in events if e["kind"] == inbox.STILL_BLOCKED]
+        loop.tick(ticking.ctx, {}, None)
+        return due
+
+    run(ticking, tmp_path)
+    assert named() == [[f"t-0001, blocked {hours + 2} h: No vision key in the slots. Fix: set it"]]
+    ticking.clock.t += 3600
+    blocked(ticking, "t-0001", 0, "Still no key")  # the orchestrator records why it still waits
+    ticking.clock.t += (hours - 1) * 3600 - 1
+    run(ticking, tmp_path)
+    assert named() == []
+    ticking.clock.t += 1
+    run(ticking, tmp_path)
+    assert named() == [[f"t-0002, blocked {hours + 1} h, on the owner's card n-0001: The practice site is refused"]]
 
 
 def test_a_failed_errors_read_never_stops_the_loop_and_is_logged_once_a_run(

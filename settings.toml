@@ -229,6 +229,7 @@ writable_caches = [".cache/uv", ".npm"]  # folders in the agent's home a check m
 [queue]
 max_upload_kib = 512    # a picture, spec or triage plan sent with a factory command
 max_brief_kib = 8192    # a designer's brief, one HTML page with its pictures inline
+blocked_recheck_hours = 24  # a task blocked this long is named to the orchestrator to re-check, again each period
 
 [errors]                # prod's and staging's (slot 0's) unresolved GlitchTip issues, filed as requests from glitchtip
 poll_minutes = 5        # how often the warden reads them

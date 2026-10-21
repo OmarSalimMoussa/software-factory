@@ -3,11 +3,12 @@
 wardend calls run_tick every watch.tick_seconds. It reads the vitals; probes staging (slot 0) and prod every
 watch.probe_seconds (prod every tick while a push to prod is in flight or just landed) and logs each new build they
 answer with; moves the outage along; and posts to the orchestrator's inbox: loop due once watch.loop_minutes pass after
-its last pass, and triage due when intake.batch_size requests wait or the oldest has waited
-intake.batch_max_wait_hours. Last, it files prod's and slot 0's new GlitchTip issues (errors_import) as requests, on
-its own timer; the users' reports and the chat's tagged messages come in passes of the warden's own
-(runtime/queue/reports.py, runtime/chat/pull.py), off the tick. A step that fails never stops the steps after it. The
-orchestrator's `factory tick` acknowledges each pass.
+its last pass, triage due when intake.batch_size requests wait or the oldest has waited intake.batch_max_wait_hours,
+and still blocked, at most once each queue.blocked_recheck_hours, naming each task blocked that long, how long and
+why, so nothing stays blocked unseen (a fresh block restarts a task's count). Last, it files prod's and slot 0's new
+GlitchTip issues (errors_import) as requests, on its own timer; the users' reports and the chat's tagged messages come
+in passes of the warden's own (runtime/queue/reports.py, runtime/chat/pull.py), off the tick. A step that fails never
+stops the steps after it. The orchestrator's `factory tick` acknowledges each pass.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import files, format_check, formats, goal, intake, owner, tasks, triage, turn
+from runtime.queue import cards, files, format_check, formats, goal, intake, owner, tasks, triage, turn
 from runtime.queue.book import Queue
 from runtime.shared import store
 from runtime.shared.models import Probe
@@ -35,6 +36,11 @@ log = logging.getLogger(__name__)
 # deployed: the build each environment last answered with, so tasks advance once per new build.
 # goal: the hash of GOAL.md the scores were last made from.
 _FRESH: dict[str, Any] = {"probed": {}, "deployed": {}, "loop_due": None, "triage_due": None, "goal": None}
+RECHECK = (
+    "Re-check what blocks each one. Cleared, with no owner card open: factory queue task status <task> building "
+    "--note '<what cleared>'. Still blocked: factory queue task status <task> blocked --note '<why it still waits, "
+    "and what would fix it>', which puts that on the owner's card and restarts its count."
+)
 
 
 def memo_path(places: Places) -> Path:
@@ -92,6 +98,7 @@ def run_tick(
         ("outage fix", lambda: _fix(ctx)),
         ("merge turn", lambda: turn.find_merge(ctx)),
         ("triage due", lambda: _triage_due(ctx, _memo(ctx.places), now)),
+        ("still blocked", lambda: _still_blocked(ctx, now)),
         ("queue format", lambda: format_check.sweep(ctx)),
         ("goal", lambda: _goal(ctx, _memo(ctx.places))),
         ("rescore", lambda: _rescore(ctx, now)),
@@ -233,6 +240,28 @@ def _loop_due(ctx: Context, memo: dict[str, Any], now: float) -> None:
     ctx.post_event(inbox.LOOP_DUE, {})
     memo["loop_due"] = now
     store.write_json(memo_path(ctx.places), memo)
+
+
+def _still_blocked(ctx: Context, now: float) -> None:
+    period = ctx.settings().get_int("queue.blocked_recheck_hours") * 3600
+    last = inbox.last(ctx.places, inbox.STILL_BLOCKED)
+    if last is not None and (
+        now - formats.epoch(last["at"]) < period or inbox.pending(ctx.places, inbox.STILL_BLOCKED)
+    ):
+        return
+    queue, found = Queue.of(ctx), cards.read(ctx.places)
+    named = []
+    for task in queue.tasks()[0]:
+        if task.status != tasks.BLOCKED or (block := turn.last_block(queue, task.id)) is None:
+            continue
+        age = int(now - formats.epoch(block["at"]))
+        if age < period:
+            continue
+        card = cards.owner_block(found, task.id)
+        owners = "" if card is None else f", on the owner's card {card.id}"
+        named.append(f"{task.id}, blocked {age // 3600} h{owners}: {block['text']}")
+    if named:
+        ctx.post_event(inbox.STILL_BLOCKED, {"tasks": named, "do": RECHECK})
 
 
 def _triage_due(ctx: Context, memo: dict[str, Any], now: float) -> None:

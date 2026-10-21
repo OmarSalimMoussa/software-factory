@@ -66,7 +66,7 @@ MOVES: tuple[Move, ...] = (
     _m({"decide"}, set(RUNNING), "extend", OWNER),  # back to the status the spent limit stopped it in
     _m({"decide"}, {"parked"}, "park", OWNER),
     # What only the owner can give: off the default branch until it clears (queue/turn.py).
-    _m({"building", "qa", "qa-clean", "turn", "merged"}, {"blocked"}, "blocked", ORCH),
+    _m({"building", "qa", "qa-clean", "turn", "merged", "blocked"}, {"blocked"}, "blocked", ORCH),
     _m({"blocked"}, {"building", "approved"}, "unblocked", OWNER, ORCH),
     # What another task makes (a seed, a scenario): off the default branch until that task's check passes.
     _m({"building", "qa", "qa-clean", "turn", "merged"}, {"on-hold"}, "on-hold", ORCH),

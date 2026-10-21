@@ -184,6 +184,7 @@ SCHEMA: dict[str, Spec] = {
     "watch.socket_read_seconds": Spec("int", 1, 120),  # contract: added by 1B-3, a request line must arrive by then
     "queue.max_upload_kib": Spec("int", 16, 8192),
     "queue.max_brief_kib": Spec("int", 256, 12288),
+    "queue.blocked_recheck_hours": Spec("int", 1, 168),
     "checks.run_minutes": Spec("int", 1, 240),
     "checks.place_wait_minutes": Spec("int", 0, 240),
     "checks.test_seconds": Spec("int", 1, 600),

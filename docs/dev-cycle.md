@@ -64,8 +64,10 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
    takes the next turn and joins the bundle past the cap. When only the owner can give what a merge needs (a key, an
    account, leave to use an outside site), it is reverted and its task blocked: it waits on Home for the owner's
    **Fixed, carry on**, its implementer benched and written to SELF_REFLECT, while other work goes on; a block no
-   owner card holds open, the orchestrator lifts once it cleared, saying what cleared it. When another
-   open task makes it, the task is on hold, and the warden sends it back once that task is checked, or closed or
+   owner card holds open, the orchestrator lifts once it cleared, saying what cleared it. Each
+   `queue.blocked_recheck_hours`, the warden names to the orchestrator every task blocked that long, with how long and
+   why; it re-checks each and lifts it, or blocks it again saying why it still waits, which restarts the count. When
+   another open task makes it, the task is on hold, and the warden sends it back once that task is checked, or closed or
    parked; the orchestrator may release a hold whose task cannot pass soon, and it then no longer waits for it. A fix
    the merge carried for what every task shares, such as a build or ignore file, is applied again right after the
    revert, in one commit of its own; one that no longer applies cleanly becomes a request.

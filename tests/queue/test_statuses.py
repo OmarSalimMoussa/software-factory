@@ -266,6 +266,23 @@ def test_the_orchestrator_lifts_a_block_only_when_no_owner_card_holds_it_saying_
     assert BLOCK in told and f"It is clear now: {CLEARED}. Carry on." in told
 
 
+@pytest.mark.parametrize("card_lost", [True, False], ids=["its-card-lost", "the-owners-card-open"])
+def test_blocking_a_blocked_task_again_records_why_it_still_waits_on_the_owners_one_card(
+    world: World, monkeypatch: pytest.MonkeyPatch, card_lost: bool
+) -> None:
+    task = _blocked(world, monkeypatch, "qa-clean", "working")
+    if card_lost:
+        cards.write(world.places, [])
+    world.clock.at += 3600
+
+    verbs.task_status(world.ctx(), {"task": task.id, "to": "blocked", "note": "Still no key in the slots"}, None)
+
+    last = world.queue().read_log(task.id)[-1]
+    assert (last["event"], last["at"], last["text"]) == ("blocked", world.clock.iso(), "Still no key in the slots")
+    assert [(c.task, c.ask) for c in cards.read(world.places) if not c.answered] == [(task.id, last["text"])]
+    assert len(reflections.entries(world.places)) == 1  # the block's incident, written once
+
+
 def test_a_blocked_task_the_owner_drops_takes_its_card_with_it(world: World, monkeypatch: pytest.MonkeyPatch) -> None:
     task = _blocked(world, monkeypatch, "merged", DEPRIORITIZED)
 

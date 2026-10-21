@@ -44,8 +44,8 @@ short line current with `factory doing "<what you are doing>"` whenever it chang
 | `go` | The owner said Go to a spec: the warden starts its build when a place frees and ends its designer. Nothing to do. |
 | `check due` | The default branch's newest commit (the event's `commit`) waits on nothing but `factory check`: the owner's own change, or a revert. Run `factory check` in the main checkout; once it passes, bring slot 0 up at it (`factory slot up`), so staging runs it. A failure becomes a request. |
 | `decided-extend`, `park`, `to-designer` | The owner decided a stuck task; the warden told its session or ended it. `to-designer`: propose it at rung 3. |
-| `limit-extended` | The owner gave a session more of a limit; the warden told it. Nothing to do. |
-| `unblocked` | The owner fixed what blocked a task; the warden brings its implementer back when a place frees. Nothing to do. |
+| `limit-extended`, `unblocked` | The owner gave a session more of a limit, or fixed what blocked a task; the warden told it, or brings its implementer back when a place frees. Nothing to do. |
+| `still blocked` | Each task it names has been blocked past `queue.blocked_recheck_hours`, with how long and why. Have a subagent re-check each blocker, and never wait for the owner. Cleared, with no owner card open: lift it (`building --note "<what cleared>"`, below). Still blocked: block it again saying why it still waits and what would fix it; that goes on the owner's card and restarts its count. |
 | `answered` | The owner answered a question you asked: act on it. A session's own answer reaches it from the warden. |
 | `stopped` | The owner stopped a run. Its task is back in Proposed with its branch kept: nothing to undo. |
 | `benched` | A session was benched for higher work and keeps its context; the warden starts what it made room for. |

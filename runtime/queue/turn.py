@@ -232,7 +232,8 @@ def send_back(ctx: Context, task_id: str, note: str) -> Task:
 
 
 def block(ctx: Context, task_id: str, note: str) -> Task:
-    """The environment stopped the task: it waits benched, off the default branch, for the owner's Fixed."""
+    """The environment stopped the task: it waits benched, off the default branch, for the owner's Fixed. Blocked
+    again, it says why it still waits, on the owner's one card."""
     if not note.strip():
         raise Refused("note", "a block names what stopped the task, and the revert's commit once merged, in --note")
     queue = Queue.of(ctx)
@@ -241,7 +242,9 @@ def block(ctx: Context, task_id: str, note: str) -> Task:
         moved = tasks.transition(ctx, queue, task, "blocked", "blocked", tasks.actor(ctx), note.strip())
         cards.blocked(ctx, moved, note)
     _bench(ctx, task_id, f"blocked: {formats.one_line(note)}")
-    reflections.incident(ctx, f"{task_id} is blocked until the owner fixes what stopped it: {note}", f"task {task_id}")
+    if task.status != tasks.BLOCKED:
+        said = f"{task_id} is blocked until the owner fixes what stopped it: {note}"
+        reflections.incident(ctx, said, f"task {task_id}")
     return moved
 
 
