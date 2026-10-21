@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from warden_fakes import OWNER_CALLER, FakeClock, FakeGitHub, FakeLauncher, defaults_text
+from warden_fakes import OPUS, OWNER_CALLER, PRICE, FakeClock, FakeGitHub, FakeLauncher, defaults_text
 
 from runtime.shared import settings, totp
 from runtime.shared.paths import Places
@@ -21,6 +21,15 @@ def places(tmp_path: Path) -> Places:
     places.state.mkdir(parents=True)
     places.totp_secret.write_text(totp.new_secret())
     return places
+
+
+@pytest.fixture
+def root(places: Places, tmp_path: Path) -> Path:
+    places.overrides.parent.mkdir(parents=True)
+    places.overrides.write_text(settings.overrides_toml({"prices": {OPUS: PRICE}}))
+    root = tmp_path / "projects"
+    (root / "-srv-checkout-wt-s1").mkdir(parents=True)
+    return root
 
 
 @pytest.fixture

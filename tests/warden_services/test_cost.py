@@ -7,16 +7,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from warden_fakes import HAIKU, OPUS
 
-from runtime.shared import settings, store
+from runtime.shared import store
 from runtime.shared.models import RETIRED, WORKING, Session
 from runtime.shared.paths import Places
 from runtime.warden.context import Context
 from runtime.warden.sessions import registry
 from runtime.warden.spend import cost
-
-OPUS, HAIKU = "claude-opus-5-5", "claude-haiku-5-5"
-PRICE = {"input": 15.0, "output": 75.0, "cache_read": 1.5, "cache_write": 18.75}
 
 
 def session(sid: str, **fields: Any) -> Session:
@@ -31,15 +29,6 @@ def call(message_id: str, request_id: str, model: str = OPUS, out: int = 10, **e
     line = {"type": "assistant", "requestId": request_id, "timestamp": "2026-10-09T10:01:02.345Z",
             "message": {"id": message_id, "model": model, "usage": usage}, **extra}  # fmt: skip
     return json.dumps(line) + "\n"
-
-
-@pytest.fixture
-def root(places: Places, tmp_path: Path) -> Path:
-    places.overrides.parent.mkdir(parents=True)
-    places.overrides.write_text(settings.overrides_toml({"prices": {OPUS: PRICE}}))
-    root = tmp_path / "projects"
-    (root / "-srv-checkout-wt-s1").mkdir(parents=True)
-    return root
 
 
 def records(places: Places) -> list[dict[str, Any]]:

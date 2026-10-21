@@ -24,6 +24,7 @@ from runtime.warden.context import Context
 from runtime.warden.health import errors_import
 from runtime.warden.owner import reflections
 from runtime.warden.sessions import lifecycle, older_skills, registry
+from runtime.warden.spend import partition
 
 log = logging.getLogger(__name__)
 # The first line of an issue's request body as glitchtip files it (errors_import.request_text).
@@ -37,7 +38,7 @@ def migrate(ctx: Context) -> list[str]:
     steps: list[Callable[[Context], str]] = [
         _inbox_cursor, _leases, _errors_filed, _errors_since, _failing_since, _turn, _merges, _staging_red,
         _typed_verdicts, _approvals_routed, _briefs_home, _active_account, _older_skills, _reflection_states,
-        _gc_record, _paused_why,
+        _gc_record, _paused_why, _time_cursor,
     ]  # fmt: skip
     for step in steps:
         try:
@@ -59,6 +60,17 @@ def _paused_why(ctx: Context) -> str:
         return ""
     store.write_json(path, {**raw, "why": None}, mode=0o600)
     return "the pause's reason"
+
+
+def _time_cursor(ctx: Context) -> str:
+    """A transcript read before time was measured is measured from where its cursor stands, never as whole."""
+    raw = store.read_json_or(ctx.places.cost_cursor, {})
+    old = [m for m in raw.values() if isinstance(m, dict) and "time" not in m] if isinstance(raw, dict) else []
+    for mark in old:
+        mark["time"] = partition.fresh(mark["offset"] == 0)
+    if old:
+        store.write_json(ctx.places.cost_cursor, raw, mode=0o600)
+    return f"the time of {len(old)} transcripts, measured from here on" if old else ""
 
 
 def _gc_record(ctx: Context) -> str:

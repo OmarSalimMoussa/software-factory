@@ -1,12 +1,13 @@
-"""Every model call's cost, read from Claude Code's transcripts and appended to cost.jsonl.
+"""Every model call's cost, read from Claude Code's transcripts and appended to cost.jsonl; in the same pass, where
+each agent's time went (partition.py), appended to time.jsonl.
 
 Each pass reads only the lines added since the last one (a byte cursor per transcript, kept in cost-cursor.json),
 for every registered session and every subagent under it. Claude Code writes one API call as two or three adjacent
 lines that repeat its usage, so a call is counted once per ``message.id`` + ``requestId``. A call is priced with
 ``[prices]``; a model with no price costs unknown (None), never zero. A failed call is recorded too.
 
-Who pays: a session's calls go to its task; a subagent's to its parent's task, except an intake run, charged to the
-request it debugs (rolled into the task the request joins), and triage, which is upkeep (no task).
+Who pays, in money and in time: a session's calls go to its task; a subagent's to its parent's task, except an intake
+run, charged to the request it debugs (rolled into the task the request joins), and triage, which is upkeep (no task).
 """
 
 from __future__ import annotations
@@ -21,10 +22,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from runtime.queue.formats import iso
 from runtime.shared import models, store
-from runtime.shared.models import CostRecord, Session
+from runtime.shared.models import CostRecord, Session, TimeRecord
 from runtime.warden.context import Context
 from runtime.warden.sessions import registry
+from runtime.warden.spend import partition
 
 log = logging.getLogger("factory.warden")
 
@@ -167,23 +170,28 @@ def _new_lines(path: Path, offset: int) -> tuple[bytes, int]:
     return whole, offset + len(whole)
 
 
-def read_file(ctx: Context, path: Path, payer: Payer, cursor: dict[str, Any], copied: str = "") -> list[CostRecord]:
-    """The calls added to one transcript since its cursor, each once; moves the cursor past them. Lines older than
-    ``copied``, when a session's copy was made, repeat its original's, counted then."""
-    mark = cursor.setdefault(str(path), {"offset": 0, "last": "", "model": ""})
+def read_file(
+    ctx: Context, path: Path, payer: Payer, cursor: dict[str, Any], copied: str = ""
+) -> tuple[list[CostRecord], TimeRecord | None]:
+    """The calls added to one transcript since its cursor, each once, and where the time since went; moves the cursor
+    past them. Lines older than ``copied``, when a session's copy was made, repeat its original's, counted then."""
+    mark = cursor.setdefault(str(path), {"offset": 0, "last": "", "model": "", "time": partition.fresh(True)})
     data, offset = _new_lines(path, mark["offset"])
+    if offset < mark["offset"]:
+        mark["time"] = partition.fresh(False)
     before = datetime.fromisoformat(copied.replace("Z", "+00:00")) if copied else None
-    records = []
+    records, tally = [], partition.Tally()
     for number, line in enumerate(data.splitlines(), 1):
         try:
             entry = json.loads(line)
         except ValueError:
             log.warning("warden: cost skipped an unreadable transcript line (%s, line %d of a pass)", path.name, number)
             continue
-        if not isinstance(entry, dict) or entry.get("type") != "assistant" or _copied(entry, before):
+        if not isinstance(entry, dict) or _copied(entry, before):
             continue
+        partition.step(mark["time"], entry, tally)
         message = entry.get("message")
-        if not isinstance(message, dict) or "usage" not in message:
+        if entry.get("type") != "assistant" or not isinstance(message, dict) or "usage" not in message:
             continue
         key = f"{message.get('id')}:{entry.get('requestId')}"
         if key == mark["last"]:
@@ -198,7 +206,16 @@ def read_file(ctx: Context, path: Path, payer: Payer, cursor: dict[str, Any], co
             mark["model"] = record.model
         records.append(record)
     mark["offset"] = offset
-    return records
+    return records, _timed(tally, payer, mark["time"]["whole"])
+
+
+def _timed(tally: partition.Tally, payer: Payer, whole: bool) -> TimeRecord | None:
+    if tally.first is None or tally.last is None:
+        return None
+    return TimeRecord(first=iso(tally.first), last=iso(tally.last), session=payer.session, subagent=payer.subagent,
+                      role=payer.role, family=payer.family, task=payer.task, model=round(tally.model, 3),
+                      tools={k: round(v, 3) for k, v in tally.tools.items()}, waiting=round(tally.waiting, 3),
+                      idle=round(tally.idle, 3), whole=whole)  # fmt: skip
 
 
 def _copied(entry: dict[str, Any], before: datetime | None) -> bool:
@@ -212,13 +229,20 @@ def _copied(entry: dict[str, Any], before: datetime | None) -> bool:
 
 
 def run_pass(ctx: Context, roots: Sequence[Path]) -> int:
-    """Read every registered session's and subagent's new calls; returns how many were recorded."""
+    """Read every registered session's and subagent's new calls and time; returns how many calls were recorded."""
     sessions = registry.read(ctx.places)
     cursor = store.read_json_or(ctx.places.cost_cursor, {})
     if not isinstance(cursor, dict):
         raise store.StoreError(f"{ctx.places.cost_cursor}: not an object")
     by_agent = {s.agent_id: s for s in sessions.values() if s.agent_id}
     records: list[CostRecord] = []
+    times: list[TimeRecord] = []
+
+    def take(path: Path, payer: Payer, copied: str = "") -> None:
+        calls, time = read_file(ctx, path, payer, cursor, copied)
+        records.extend(calls)
+        times.extend([time] if time is not None else [])
+
     for session in sessions.values():
         if session.agent_id:
             continue  # read through its parent's transcript folder
@@ -228,18 +252,19 @@ def run_pass(ctx: Context, roots: Sequence[Path]) -> int:
         own = Payer(session.id, "", session.role, session.family, session.task, session.model)
         original = transcript_of(roots, session.worktree, session.copied_from) if session.copied_from else None
         if original is not None:
-            records += read_file(ctx, original, own, cursor)
-        records += read_file(ctx, path, own, cursor, session.renewed)
+            take(original, own)
+        take(path, own, session.renewed)
         folders = [p.with_suffix("") / "subagents" for p in (path, original) if p is not None]
         for sub in sorted(sub for folder in folders for sub in folder.glob("agent-*.jsonl")):
             agent_id = sub.name.removeprefix("agent-").removesuffix(".jsonl")
-            payer = _subagent_payer(session, agent_id, sub.with_name(f"agent-{agent_id}.meta.json"), by_agent)
-            records += read_file(ctx, sub, payer, cursor)
+            take(sub, _subagent_payer(session, agent_id, sub.with_name(f"agent-{agent_id}.meta.json"), by_agent))
     days = spent_days(ctx)
     for record in records:
         store.append_jsonl(ctx.places.cost, models.dump(record))
         known = days.setdefault(record.at[:10], [0.0, 0])
         known[0 if record.usd is not None else 1] += record.usd if record.usd is not None else 1
+    for time in times:
+        store.append_jsonl(ctx.places.times, models.dump(time))
     store.write_json(_days_path(ctx), days, mode=0o600)
     store.write_json(ctx.places.cost_cursor, cursor, mode=0o600)
     return len(records)

@@ -201,6 +201,10 @@ class Places:
         return self.state / "cost-cursor.json"
 
     @property
+    def times(self) -> Path:
+        return self.state / "time.jsonl"
+
+    @property
     def plan(self) -> Path:
         return self.state / "plan.json"
 

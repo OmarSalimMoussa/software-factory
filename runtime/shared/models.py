@@ -1,4 +1,4 @@
-"""The records every part of the factory shares: sessions, requests, tasks, approvals, cards, probes and costs.
+"""The records every part of the factory shares: sessions, requests, tasks, approvals, cards, probes, costs and times.
 
 Each record round-trips through plain JSON. ``load`` refuses a record with a missing or unknown field rather than
 filling a default, so a malformed state file fails loudly where it is read.
@@ -234,3 +234,21 @@ class CostRecord:
     cache_write: int
     usd: float | None
     failed: bool = False
+
+
+@dataclass(slots=True)
+class TimeRecord:
+    """Where an agent's time went between two moments of its transcript, in seconds (warden/spend/partition.py)."""
+
+    first: str
+    last: str
+    session: str
+    subagent: str
+    role: str
+    family: str
+    task: str
+    model: float
+    tools: dict[str, float]
+    waiting: float  # on its own subagents
+    idle: float
+    whole: bool  # its transcript was measured from its first line

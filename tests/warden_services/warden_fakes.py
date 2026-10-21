@@ -17,6 +17,8 @@ REPO = {
     "repo.github": "depot/product",
 }
 OWNER_CALLER = Caller(kind="owner", role="owner")
+OPUS, HAIKU = "claude-opus-5-5", "claude-haiku-5-5"
+PRICE = {"input": 15.0, "output": 75.0, "cache_read": 1.5, "cache_write": 18.75}
 
 
 class FakeClock(Clock):
