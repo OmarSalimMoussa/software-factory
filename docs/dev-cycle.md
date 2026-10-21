@@ -87,7 +87,8 @@ without the owner's approval, except the fix for a clear prod outage. Each role'
 | 4 | a designer, the owner's Go, then an implementer | A large change people will see, or a large or costly backend change |
 
 A run that turns out to need a higher rung comes back to the owner as a proposal, with its branch kept, and is
-written to `SELF_REFLECT.md` as a misroute.
+written to `SELF_REFLECT.md` as a misroute. The orchestrator stops it and proposes it again a rung up; until then,
+YOLO mode does not approve it at its old rung.
 
 ## Which testers
 

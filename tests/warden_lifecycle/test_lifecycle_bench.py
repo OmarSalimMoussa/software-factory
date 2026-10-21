@@ -27,7 +27,7 @@ def test_only_the_owner_retires_a_session_that_is_out_of_its_place(world: World,
     world.seat("5e550001", task="t-0001", state=state)
     assert rule(lifecycle.stop, world.ctx(), {"session": "5e550001"}, None) == "deprioritized"
     assert world.session("5e550001").state == state
-    lifecycle.owner_stop(world.owner(), {"session": "5e550001"}, None)
+    lifecycle.stop(world.owner(), {"session": "5e550001"}, None)
     retired = world.session("5e550001")
     assert (retired.state, retired.retired, retired.retired_by) == (RETIRED, STOPPED, "owner")
     assert world.queue.tasks["t-0001"].status == "proposed"

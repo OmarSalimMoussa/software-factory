@@ -3,7 +3,9 @@
 While it is on, the warden approves the orchestrator's proposals in the seat order, each only into a free place of
 its role: the role's cap, less the runs that hold a place, the benched ones and the runs approved or designed and
 waiting. A task whose run still holds its place, as one does when a facts change voids its approval, is approved in
-that place. So YOLO never starts a run the next one benches. It answers each question asked of the owner with ANSWER,
+that place. So YOLO never starts a run the next one benches. A run the orchestrator stopped, to move it up a rung,
+offers its old run, why and brief: it waits until the orchestrator proposes it again, by its task's log, whose last
+move names who sent it back. It answers each question asked of the owner with ANSWER,
 as the owner, and hands each spec's Go and each stuck task to the orchestrator to decide (`factory decide`). It never
 pushes: what waits for the owner's push to prod keeps waiting. The daily budget, the guard and every other limit
 stay as they are.
@@ -14,7 +16,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from runtime.queue import cards, owner, proposals
+from runtime.queue import cards, owner, proposals, statuses
+from runtime.queue.book import Queue
 from runtime.shared import order, store
 from runtime.shared.models import DEPRIORITIZED, RETIRED
 from runtime.shared.paths import Places
@@ -69,11 +72,17 @@ def _free(ctx: Context, role: str) -> int:
     return ctx.settings().get_int(permits.CAP[role]) - held
 
 
+def _stopped_by_orchestrator(ctx: Context, task_id: str) -> bool:
+    moves = [e for e in Queue.of(ctx).read_log(task_id) if e.get("to")]
+    return bool(moves) and (moves[-1]["actor"], moves[-1]["event"]) == (statuses.ORCH, "stop")
+
+
 def run_pass(ctx: Context) -> None:
     if state(ctx.places) is None:
         return
     ranking = permits.ranking(ctx)
-    offered = [permits.read_task(ctx, t) for t in proposals.read(ctx.places).open if t and t != "none"]
+    found = [t for t in proposals.read(ctx.places).open if t and t != "none" and not _stopped_by_orchestrator(ctx, t)]
+    offered = [permits.read_task(ctx, t) for t in found]
     for task in sorted(offered, key=lambda t: order.seat_rank(t, ranking)):
         role, run = permits.needed_role(ctx, task.id), registry.holding(registry.read(ctx.places).values(), task.id)
         if (run is not None and run.role == role) or _free(ctx, role) > 0:

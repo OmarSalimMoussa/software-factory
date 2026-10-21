@@ -115,9 +115,9 @@ is live and nothing merged for a while, a regression walk of the scenarios that 
   within rung 3 (`factory queue task status <task> building`); the warden starts its implementer. A spec that turned
   out large and visible goes back to the owner one rung up.
 - **Moving up a rung.** A session that reports `needs rung <N>`, or a `needs rung` event (an implementer spent its
-  cause tries): stop it (`factory stop <session>`; its branch
-  stays), propose the task again at that rung with the reason and a new picture, and write
-  `factory reflect --kind misroute "<the facts that misled the plan>"`.
+  cause tries): stop it (`factory stop <session>`; its branch stays). Its task waits in Proposed at its old run, and
+  YOLO mode leaves it to you: propose it again above that run, at rung N or the next one up, with the reason, a new
+  picture and a new brief. Then write `factory reflect --kind misroute "<the facts that misled the plan>"`.
 - **Limits.** A session out of QA rounds, critic rounds or check runs reports to you with what is open. Extend once
   (`factory extend <session> <limit>`), propose it one rung up, or park it. When it runs out a second time, the
   warden puts the task on the owner's decide card itself.

@@ -4,6 +4,8 @@ States are working, waiting, bench-pending, deprioritized, reviving and retired.
 the warden acts, so the crash watch and the backstop never misread a session in between. Retired is final. Only the
 owner retires a benched session its task still needs; a bench makes room for severe work or a higher goal item
 (order.may_bench), or frees a merged or blocked task's place. Each move is a history.jsonl line saying who and why.
+A run's task leaves its running status in the same hold of ctx.lock as its retire: a scheduling pass that found the
+run gone and the task still running would start the run again, on its old brief.
 """
 
 from __future__ import annotations
@@ -92,25 +94,26 @@ def end_children(ctx: Context, sessions: dict[str, Session], s: Session, why: st
         retire(ctx, running, s, models.WITH_PARENT, WARDEN, why)
 
 
-def after_retire(ctx: Context, retired: list[Session]) -> None:
-    """Stop what still runs, and send an unfinished task back to Proposed next."""
-    if not retired:
-        return
-    running = backstop.processes()
+def send_back(ctx: Context, retired: list[Session]) -> None:
+    """Send each unfinished task back to Proposed next, as its stopper's stop or the warden's, under ctx.lock."""
     for s in retired:
-        if s.id in running:
-            try:
-                ctx.launcher.stop_session(s.id)
-            except LaunchError as exc:
-                log.warning("stop of retired session %s failed (%s); the backstop retries", s.id, type(exc).__name__)
         unfinished = s.task and not s.parent and s.role in CAP and s.retired != models.FINISHED
         task = permits.read_task(ctx, s.task) if unfinished else None
         if task is not None and task.status in statuses.OPEN:
-            if s.retired_by == OWNER:
-                event, by = "stop", OWNER
-            else:
-                event, by = ("crashed" if s.retired == models.CRASHED else "stopped"), WARDEN
-            permits.move_task(ctx, s.task, "proposed" if task.why and task.picture else "queued", event, by)
+            stopper = s.retired_by in (OWNER, ORCH)
+            event = "stop" if stopper else "crashed" if s.retired == models.CRASHED else "stopped"
+            to = "proposed" if task.why and task.picture else "queued"
+            permits.move_task(ctx, s.task, to, event, s.retired_by if stopper else WARDEN)
+
+
+def after_retire(ctx: Context, retired: list[Session]) -> None:
+    """Stop what still runs, outside ctx.lock."""
+    running = backstop.processes() if retired else {}
+    for s in [s for s in retired if s.id in running]:
+        try:
+            ctx.launcher.stop_session(s.id)
+        except LaunchError as exc:
+            log.warning("stop of retired session %s failed (%s); the backstop retries", s.id, type(exc).__name__)
 
 
 def retire_session(ctx: Context, ref: str, kind: str, by: str) -> list[Session]:
@@ -120,6 +123,7 @@ def retire_session(ctx: Context, ref: str, kind: str, by: str) -> list[Session]:
         target = find(ctx, sessions, ref)
         retired = retire(ctx, registry.subtree(sessions, target.id), target, kind, by, f"{kind} by the {by}")
         registry.write(ctx.places, sessions)
+        send_back(ctx, retired)
     after_retire(ctx, retired)
     return retired
 
@@ -313,38 +317,27 @@ def owner_start_orchestrator(ctx: Context, args: dict[str, Any], data: bytes | N
 
 
 def stop(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    if actor(ctx) == OWNER:
-        return owner_stop(ctx, args, data)
-    why = str(args.get("why", "")).strip() or "stopped by the orchestrator"
+    """Retire a session and all under it; only the owner stops the orchestrator, which takes the factory with it."""
+    by = actor(ctx)
+    why = "stopped by the owner" if by == OWNER else str(args.get("why", "")).strip() or "stopped by the orchestrator"
     with ctx.lock:
         sessions = read(ctx)
         target = find(ctx, sessions, text_arg(args, "session"))
-        if target.role == ORCH:
+        if target.role == ORCH and by != OWNER:
             raise Refused("orchestrator", "only the owner stops the orchestrator, which stops the factory")
-        if target.state == RETIRED:
-            raise Refused("retired", f"{target.name} is already retired")
-        retired = retire(ctx, registry.subtree(sessions, target.id), target, models.STOPPED, ORCH, why)
-        registry.write(ctx.places, sessions)
-    after_retire(ctx, retired)
-    return ok(retired=[s.name for s in retired])
-
-
-def owner_stop(ctx: Context, args: dict[str, Any], data: bytes | None) -> dict[str, Any]:
-    """Retire a session and all under it; the orchestrator takes the whole factory with it."""
-    with ctx.lock:
-        sessions = read(ctx)
-        target = find(ctx, sessions, text_arg(args, "session"))
         if target.state == RETIRED:
             raise Refused("retired", f"{target.name} is already retired")
         tree = registry.subtree(sessions, target.id)
         if target.role == ORCH:
             tree = [target, *(s for s in sessions.values() if s is not target)]
-        retired = retire(ctx, tree, target, models.STOPPED, OWNER, "stopped by the owner")
+        retired = retire(ctx, tree, target, models.STOPPED, by, why)
         registry.write(ctx.places, sessions)
+        send_back(ctx, retired)
         if target.role == ORCH:
             paused_path(ctx).unlink(missing_ok=True)
     after_retire(ctx, retired)
-    ctx.post_event(inbox.STOPPED, {"session": target.id, "name": target.name, "retired": [s.id for s in retired]})
+    if by == OWNER:
+        ctx.post_event(inbox.STOPPED, {"session": target.id, "name": target.name, "retired": [s.id for s in retired]})
     return ok(retired=[s.name for s in retired])
 
 

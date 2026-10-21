@@ -7,7 +7,7 @@ from lifecycle_fakes import World
 
 from runtime.queue import proposals
 from runtime.shared import store
-from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, STOPPED, WORKING
+from runtime.shared.models import BENCH_PENDING, DEPRIORITIZED, RETIRED, STOPPED, WORKING
 from runtime.warden import schedule
 from runtime.warden.sessions import crashwatch, lifecycle
 
@@ -143,6 +143,22 @@ def test_a_designed_build_starts_its_implementer_and_a_run_that_cannot_start_say
     world.vitals("green")
     schedule.run_pass(world.ctx())
     assert _live(world, "t-0001") == [WORKING] and schedule.waits(world.places) == {}
+
+
+def test_a_designed_build_the_orchestrator_stops_starts_no_new_implementer_on_its_old_spec(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world.approve("t-0193", run=3, slices=2, status="building")
+    proposals.set_designed_builds(world.places, ["t-0193"])
+    world.seat("5e550193", task="t-0193")
+    world.run("5e550193")
+    # A pass while the stop waits for the process: t-0193's next implementer started before its task left building.
+    monkeypatch.setattr(world.launcher, "stop_session", lambda sid: schedule.run_pass(world.ctx()))
+
+    lifecycle.stop(world.ctx(session="0c0c0c0c"), {"session": "5e550193", "why": "needs rung 4"}, None)
+
+    assert world.queue.tasks["t-0193"].status == "proposed" and _live(world, "t-0193") == [RETIRED]
+    assert world.launcher.started == []
 
 
 def test_a_factory_the_owner_stopped_starts_no_run(world: World) -> None:

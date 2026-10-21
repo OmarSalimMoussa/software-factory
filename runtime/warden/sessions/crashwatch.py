@@ -205,6 +205,7 @@ def watch(ctx: Context) -> None:
             if relaunch is not None:
                 lifecycle.end_children(ctx, sessions, s, "its parent's process ended")
             registry.write(ctx.places, sessions)
+            lifecycle.send_back(ctx, retired)
         _act(ctx, sid, retired, relaunch)
     if facts.hosting and facts.daemon != facts.seen:
         store.write_json(_daemon_path(ctx), {"started": facts.daemon})

@@ -3,8 +3,8 @@
 At most ``routing.max_proposals`` places hold proposals. A proposal carries a picture and a one-line why, and the
 brief its run starts with once approved (the warden starts it; the orchestrator writes nothing more). It runs at
 the rung ``factory route`` names unless it names another, which needs a reason that goes to the task's log. A
-running task comes back one rung up the same way, with its approval gone. ``propose --none`` fills a place with
-"nothing else".
+running task comes back one rung up the same way, with its approval gone, and so does a proposal, such as a run its
+stop sent back. ``propose --none`` fills a place with "nothing else".
 """
 
 from __future__ import annotations

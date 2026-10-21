@@ -142,7 +142,7 @@ VERBS: dict[str, Verb] = {
     "needs.answer": _o("runtime.queue.verbs:owner_answer"),
     "needs.fixed": _o("runtime.queue.verbs:owner_fixed"),
     "agent.message": _o("runtime.warden.owner.messages:send"),  # contract: the owner's message to a running session
-    "agent.stop": _o("runtime.warden.sessions.lifecycle:owner_stop"),
+    "agent.stop": _o("runtime.warden.sessions.lifecycle:stop"),
     "orchestrator.start": _o("runtime.warden.sessions.lifecycle:owner_start_orchestrator"),
     "factory.pause": _o("runtime.warden.sessions.revive:owner_pause"),
     "factory.resume": _o("runtime.warden.sessions.revive:owner_resume"),

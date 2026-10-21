@@ -11,7 +11,8 @@ from runtime.queue import formats, owner, pictures, proposals, tasks
 from runtime.queue.book import task_rel
 from runtime.queue.propose import propose, propose_none
 from runtime.shared.protocol import Refused
-from runtime.warden.sessions import backstop, registry
+from runtime.warden.owner import yolo
+from runtime.warden.sessions import backstop, lifecycle, registry
 from runtime.warden.sessions.backstop import Proc
 
 PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + b"\x00" * 17
@@ -146,3 +147,32 @@ def test_a_run_moved_up_a_rung_stops_its_running_session(world: World, monkeypat
     row = registry.read(world.places)["s-impl"]
     assert (row.state, row.retired, world.launcher.stopped) == ("retired", "stopped", ["s-impl"])
     assert world.queue().task(task.id).status == "proposed"
+
+
+def test_a_run_the_orchestrator_stopped_for_a_higher_rung_waits_in_proposed_for_its_proposal_a_rung_up(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # t-0193, Oct 21: a stopped rung-3 build sat at run 3, refused a rung up, and YOLO approved run 3 again.
+    task = world.task()
+    propose(world.ctx(), task.id, 3, "a design first", "the cause cannot be read", PICTURE, "Design it.")
+    owner.approve(world.owner(), task.id)
+    building = dataclasses.replace(world.queue().task(task.id), status="building")
+    world.write_raw(task_rel(task.id), formats.dump_task(building))
+    world.session("s-impl", "implementer", f"impl-{task.id}", task.id)
+    monkeypatch.setattr(backstop, "processes", lambda: {"s-impl": Proc(1, "s-impl", f"impl-{task.id}", "", "idle")})
+    yolo.owner_switch(world.owner(), {"on": True}, None)
+
+    lifecycle.stop(world.ctx(), {"session": "s-impl", "why": "needs rung 4: the fix is outside the spec"}, None)
+    yolo.run_pass(world.ctx())
+    stopped = world.queue().task(task.id)
+    assert (stopped.status, stopped.run, proposals.read(world.places).approved) == ("proposed", 3, [])
+    with pytest.raises(Refused, match="only a rung up from 3"):
+        propose(world.ctx(), task.id, 3, "a new design", "the spec rules the fix out", PICTURE, "")
+    propose(world.ctx(), task.id, 4, "a new answer shape", "the spec rules the fix out", PICTURE, "Design anew.")
+    yolo.run_pass(world.ctx())
+
+    moved = world.queue().task(task.id)
+    assert (moved.status, moved.run) == ("approved", 4)
+    moves = [(e["actor"], e["event"]) for e in world.queue().read_log(task.id) if e.get("to")][-3:]
+    assert moves == [("orchestrator", "stop"), ("orchestrator", "rung-up"), ("owner", "approve")]
+    assert lifecycle.brief_path(world.ctx(), task.id).read_text() == "Design anew.\n"

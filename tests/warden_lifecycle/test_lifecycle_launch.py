@@ -225,7 +225,7 @@ def test_an_owner_stop_while_a_session_comes_back_as_a_copy_stays(
                 world.procs["c0b1e5ed"] = Proc(pid=7000, session="c0b1e5ed", name=s.name, chat_link="")
                 backstop.sweep(world.ctx(), dict(world.procs))
             [held] = registry.read(world.places)
-            lifecycle.owner_stop(world.owner(), {"session": held}, None)
+            lifecycle.stop(world.owner(), {"session": held}, None)
         sleep(seconds)
 
     monkeypatch.setattr(world.clock, "sleep", owner_stops)

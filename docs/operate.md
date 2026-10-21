@@ -132,11 +132,11 @@ record the warden reads, the vitals turn red and the crash watch resumes and ret
 ## YOLO mode
 
 Switch on **YOLO mode** in Settings to let the factory run without you, overnight say. While it is on, the warden
-approves the orchestrator's proposals as places free, answers any question an agent asks you with "Be proactive and
-solve it yourself.", and hands each spec's Go and each stuck task to the orchestrator to decide. Nothing goes to
-prod: the night's merges wait on staging for your Push to prod. The daily budget, the guard and every other limit
-still apply. Home shows a band while it is on; switch it off there or in Settings. Every choice is in its task's log,
-saying who made it.
+approves the orchestrator's proposals as places free (a run it stopped, once it proposes it again a rung up), answers
+any question an agent asks you with "Be proactive and solve it yourself.", and hands each spec's Go and each stuck
+task to the orchestrator to decide. Nothing goes to prod: the night's merges wait on staging for your Push to prod.
+The daily budget, the guard and every other limit still apply. Home shows a band while it is on; switch it off there
+or in Settings. Every choice is in its task's log, saying who made it.
 
 ## Switch the Claude account
 
