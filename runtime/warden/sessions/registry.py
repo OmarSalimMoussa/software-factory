@@ -6,7 +6,11 @@ Lifecycle moves live in lifecycle.py; this module only stores and queries.
 
 from __future__ import annotations
 
+import dataclasses
+import json
 from collections.abc import Iterable
+from pathlib import Path
+from typing import Any
 
 from runtime.shared import models, store
 from runtime.shared.models import HOLDS_SLOT, RETIRED, TESTER, Session
@@ -15,15 +19,45 @@ from runtime.shared.paths import Places
 # contract: rows written before a slot's lease file became the one record of its holder carry a slot of their own.
 # Dropped on read, so the warden's first write at its start leaves none; this line goes in the release after.
 _DROPPED = ("slot",)
+_FIELDS = tuple(f.name for f in dataclasses.fields(Session))
+# By registry file, the bytes last parsed and each session's values in field order. The warden reads the registry
+# dozens of times a tick and it keeps every session ever run: parsing it at each read would take most of its CPU.
+_PARSED: dict[Path, tuple[bytes, dict[str, tuple[Any, ...]]]] = {}
 
 
 def read(places: Places) -> dict[str, Session]:
-    raw = store.read_json_or(places.registry, {})
-    if not isinstance(raw, dict):
-        raise store.StoreError(f"{places.registry}: not an object")
+    try:
+        raw = places.registry.read_bytes()
+    # telemetry: expected — the warden writes the registry at its start: before then no session is known
+    except FileNotFoundError:
+        return {}
+    except OSError as exc:
+        raise store.StoreError(f"{places.registry}: {exc}") from exc
+    seen = _PARSED.get(places.registry)
+    if seen is None or seen[0] != raw:
+        rows = {sid: tuple(getattr(s, f) for f in _FIELDS) for sid, s in _parse(places.registry, raw).items()}
+        seen = _PARSED[places.registry] = (raw, rows)
+    # Each read gets sessions of its own, since callers change them in place. Built from positional values, a session
+    # costs a fifth of one built from keywords read from JSON.
+    return {sid: _fresh(values) for sid, values in seen[1].items()}
+
+
+def _parse(path: Path, raw: bytes) -> dict[str, Session]:
+    try:
+        found = json.loads(raw)
+    except ValueError as exc:
+        raise store.StoreError(f"{path}: {exc}") from exc
+    if not isinstance(found, dict):
+        raise store.StoreError(f"{path}: not an object")
     rows = {sid: {k: v for k, v in row.items() if k not in _DROPPED} if isinstance(row, dict) else row
-            for sid, row in raw.items()}  # fmt: skip
+            for sid, row in found.items()}  # fmt: skip
     return {sid: models.load(Session, row) for sid, row in rows.items()}
+
+
+def _fresh(values: tuple[Any, ...]) -> Session:
+    s = Session(*values)
+    s.kinds, s.extensions = list(s.kinds), dict(s.extensions)
+    return s
 
 
 def write(places: Places, sessions: dict[str, Session]) -> None:
