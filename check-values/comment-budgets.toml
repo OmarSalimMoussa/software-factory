@@ -1,2 +1,2 @@
 # The folders whose comment density is measured; every measured Python file sits in one of them.
-trees = ["runtime", "checks", "standard", "plugin", "tests"]
+trees = ["runtime", "checks", "standard", "plugin", "tests", ".claude"]

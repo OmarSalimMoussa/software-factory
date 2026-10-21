@@ -38,6 +38,7 @@ dist_to_src = {}
 "runtime/system/runners/upgrade.py" = "root's upgrade unit: its stderr and exit status go to the journal and its log"
 "runtime/system/runners/upgrading.py" = "a systemd unit's command: its stderr and exit status go to the journal"
 "runtime/system/runners/with_token.py" = "a systemd unit's command: its stderr and exit status go to the journal"
+".claude/skills/running-the-factory/scripts/install.py" = "the operator's install command: its output and exit status reach the operator"
 "standard/plan.py" = "a command the owner runs: its stderr and exit status reach the owner"
 "standard/server/gc.py" = "the server's weekly cron job: it writes its log, and each deploy shows a failed one"
 "standard/server/heartbeat.py" = "the server's cron job: a missed ping is what Healthchecks.io reports"
@@ -129,6 +130,15 @@ prefix = "plugin/"
 name = "plugin hooks"
 sink = "exit"
 grounds = "Claude Code's hooks: their stderr and exit status reach the session"
+reporters = []
+seams = []
+log_modules = []
+
+[[components]]
+prefix = ".claude/skills/running-the-factory/scripts/"
+name = "operator's scripts"
+sink = "exit"
+grounds = "commands the factory's operator runs, by hand or from a watch: their output and exit status reach the operator"
 reporters = []
 seams = []
 log_modules = []

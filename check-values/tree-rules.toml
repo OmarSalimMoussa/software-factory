@@ -28,6 +28,7 @@ env_allow = {}
 "plugin/skills/taking-review" = "a skill folder: its SKILL.md says what the skill is and when it runs"
 "plugin/skills/triage" = "a skill folder: its SKILL.md says what the skill is and when it runs"
 "plugin/skills/verifying-claims" = "a skill folder: its SKILL.md says what the skill is and when it runs"
+".claude" = "Claude Code's own folder for this repo: it holds only its skills"
 "plugin/.claude-plugin" = "Claude Code's plugin manifest folder, read by Claude Code, not by people"
 "testdata/dashboard-fixtures" = "fixtures of the dashboard's payloads; a README would be read as a fixture"
 "testdata/fixture-product/check-values" = "a copy of a product's values: the folder holds only values files"
