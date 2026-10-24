@@ -70,7 +70,7 @@ work waits on staging for you.
 - **Testers.** Every required tester must pass on the final version of a branch.
 
 Every limit is a setting with a default in [settings.toml](../settings.toml). You change them on the Settings page.
-[settings.md](settings.md) describes each group.
+[cost-and-vitals.md](cost-and-vitals.md) explains how each is measured, with the numbers from one run.
 
 ## What you need
 
@@ -87,6 +87,7 @@ Every limit is a setting with a default in [settings.toml](../settings.toml). Yo
 The factory never changes its own code. Agents write down what went wrong on the **Self-reflect** page: misses,
 friction, and tasks planned on the wrong rung. You, or Claude, read it and change the factory's repo. Then install
 the new commit with the `factory.upgrade` action. To go back, install the commit before it.
+[self-improvement.md](self-improvement.md) explains the whole loop.
 
 The factory's own code is Python 3.12's standard library, with no dependencies. Run its tests with:
 

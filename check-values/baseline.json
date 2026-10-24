@@ -2,7 +2,7 @@
   "module-docblock": {"pins": {}},
   "source-size": {"pins": {}},
   "test-size": {"pins": {}},
-  "readme-size": {"pins": {}},
+  "readme-size": {"pins": {"README.md": {"limit": 164, "reason": "The repo's front page shows a newcomer what the factory is, what it has done and how to start, with its diagrams and charts on one page; split across files it loses readability."}}},
   "doc-size": {"pins": {}},
   "dir-files": {"pins": {}}
 }
